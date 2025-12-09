@@ -280,6 +280,8 @@ NB_MODULE(_tesseract_command_language, m) {
 
     // ========== MoveInstruction ==========
     // In 0.33.x, constructor takes WaypointPoly directly
+    // Since CartesianWaypointPoly, JointWaypointPoly, StateWaypointPoly are not bound as
+    // subclasses of WaypointPoly, we need explicit overloads
     nb::class_<tp::MoveInstruction>(m, "MoveInstruction")
         .def(nb::init<tp::WaypointPoly, tp::MoveInstructionType, std::string, tc::ManipulatorInfo>(),
              "waypoint"_a, "type"_a, "profile"_a = tp::DEFAULT_PROFILE_KEY,
@@ -287,6 +289,25 @@ NB_MODULE(_tesseract_command_language, m) {
         .def(nb::init<tp::WaypointPoly, tp::MoveInstructionType, std::string, std::string, tc::ManipulatorInfo>(),
              "waypoint"_a, "type"_a, "profile"_a, "path_profile"_a,
              "manipulator_info"_a = tc::ManipulatorInfo())
+        // Overloads accepting specific Poly types (converted to WaypointPoly)
+        .def("__init__", [](tp::MoveInstruction* self, const tp::CartesianWaypointPoly& waypoint,
+                           tp::MoveInstructionType type, const std::string& profile,
+                           const tc::ManipulatorInfo& manipulator_info) {
+            new (self) tp::MoveInstruction(waypoint, type, profile, manipulator_info);
+        }, "waypoint"_a, "type"_a, "profile"_a = tp::DEFAULT_PROFILE_KEY,
+           "manipulator_info"_a = tc::ManipulatorInfo())
+        .def("__init__", [](tp::MoveInstruction* self, const tp::JointWaypointPoly& waypoint,
+                           tp::MoveInstructionType type, const std::string& profile,
+                           const tc::ManipulatorInfo& manipulator_info) {
+            new (self) tp::MoveInstruction(waypoint, type, profile, manipulator_info);
+        }, "waypoint"_a, "type"_a, "profile"_a = tp::DEFAULT_PROFILE_KEY,
+           "manipulator_info"_a = tc::ManipulatorInfo())
+        .def("__init__", [](tp::MoveInstruction* self, const tp::StateWaypointPoly& waypoint,
+                           tp::MoveInstructionType type, const std::string& profile,
+                           const tc::ManipulatorInfo& manipulator_info) {
+            new (self) tp::MoveInstruction(waypoint, type, profile, manipulator_info);
+        }, "waypoint"_a, "type"_a, "profile"_a = tp::DEFAULT_PROFILE_KEY,
+           "manipulator_info"_a = tc::ManipulatorInfo())
         .def("getWaypoint", [](tp::MoveInstruction& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)

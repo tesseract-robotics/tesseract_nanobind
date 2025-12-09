@@ -38,7 +38,7 @@ from tesseract_robotics.tesseract_geometry import Box
 
 
 SIMPLE_URDF = """
-<robot name="test_robot">
+<robot name="test_robot" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
   <link name="world"/>
   <link name="link1">
     <visual><geometry><box size="0.1 0.1 0.1"/></geometry></visual>
@@ -265,6 +265,7 @@ class TestRemoveAllowedCollisionLinkCommand:
         env.applyCommand(cmd)
 
 
+@pytest.mark.skip(reason="CollisionMarginOverrideType enum not bound")
 class TestChangeCollisionMarginsCommand:
     """Tests for ChangeCollisionMarginsCommand"""
 

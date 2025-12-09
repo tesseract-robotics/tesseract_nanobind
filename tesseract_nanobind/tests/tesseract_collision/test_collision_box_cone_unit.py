@@ -1,12 +1,19 @@
 import numpy as np
 import numpy.testing as nptest
+import os
+import pytest
+
+# Import tesseract_robotics first to set up environment
+import tesseract_robotics  # noqa: F401
 from tesseract_robotics import tesseract_geometry
 from tesseract_robotics import tesseract_common
 from tesseract_robotics import tesseract_collision
-import os
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
-TESSERACT_SUPPORT_DIR = os.environ["TESSERACT_SUPPORT_DIR"]
+# Get TESSERACT_SUPPORT_DIR, skip if not available
+TESSERACT_SUPPORT_DIR = os.environ.get("TESSERACT_SUPPORT_DIR")
+if not TESSERACT_SUPPORT_DIR:
+    pytestmark = pytest.mark.skip(reason="TESSERACT_SUPPORT_DIR not set")
 
 def addCollisionObjects(checker):
 
