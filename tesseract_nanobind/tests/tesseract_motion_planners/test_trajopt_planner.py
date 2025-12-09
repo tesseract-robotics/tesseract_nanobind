@@ -39,7 +39,6 @@ try:
         TrajOptDefaultCompositeProfile,
         CollisionCostConfig,
         CollisionConstraintConfig,
-        CollisionEvaluatorType,
         ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
     )
@@ -119,73 +118,57 @@ class TestTrajOptProfiles:
         assert profile.avoid_singularity is True
         assert profile.avoid_singularity_coeff == 5.0
 
-        # Segment length parameters
-        profile.longest_valid_segment_fraction = 0.01
-        profile.longest_valid_segment_length = 0.1
-        assert profile.longest_valid_segment_fraction == 0.01
-        assert profile.longest_valid_segment_length == 0.1
-
         # Collision configs
         assert hasattr(profile, "collision_cost_config")
         assert hasattr(profile, "collision_constraint_config")
-        assert hasattr(profile, "contact_test_type")
 
     def test_collision_cost_config(self):
+        """Test CollisionCostConfig with new API (0.33.x)."""
         config = CollisionCostConfig()
         assert config is not None
         config.enabled = True
-        config.safety_margin = 0.025
-        config.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
         assert config.enabled is True
-        assert config.safety_margin == 0.025
-        assert config.type == CollisionEvaluatorType.DISCRETE_CONTINUOUS
+        # New API uses nested configs instead of direct safety_margin/coeff/type
+        assert hasattr(config, 'collision_check_config')
+        assert hasattr(config, 'collision_margin_buffer')
 
     def test_collision_cost_config_all_attributes(self):
-        """Test all CollisionCostConfig attributes."""
+        """Test all CollisionCostConfig attributes (0.33.x API)."""
         config = CollisionCostConfig()
         config.enabled = True
-        config.use_weighted_sum = True
-        config.type = CollisionEvaluatorType.CAST_CONTINUOUS
-        config.safety_margin = 0.05
-        config.safety_margin_buffer = 0.01
-        config.coeff = 25.0
+        config.collision_margin_buffer = 0.01
+        config.max_num_cnt = 3
 
         assert config.enabled is True
-        assert config.use_weighted_sum is True
-        assert config.type == CollisionEvaluatorType.CAST_CONTINUOUS
-        assert config.safety_margin == 0.05
-        assert config.safety_margin_buffer == 0.01
-        assert config.coeff == 25.0
+        assert config.collision_margin_buffer == 0.01
+        assert config.max_num_cnt == 3
+        # collision_check_config is a nested object
+        assert config.collision_check_config is not None
 
     def test_collision_constraint_config(self):
+        """Test CollisionConstraintConfig with new API (0.33.x)."""
         config = CollisionConstraintConfig()
         assert config is not None
         config.enabled = True
-        config.safety_margin = 0.01
         assert config.enabled is True
-        assert config.safety_margin == 0.01
+        # New API uses nested configs
+        assert hasattr(config, 'collision_check_config')
 
     def test_collision_constraint_config_all_attributes(self):
-        """Test all CollisionConstraintConfig attributes."""
+        """Test all CollisionConstraintConfig attributes (0.33.x API)."""
         config = CollisionConstraintConfig()
         config.enabled = True
-        config.use_weighted_sum = False
-        config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
-        config.safety_margin = 0.02
-        config.safety_margin_buffer = 0.005
-        config.coeff = 10.0
+        config.collision_margin_buffer = 0.005
+        config.max_num_cnt = 2
 
         assert config.enabled is True
-        assert config.use_weighted_sum is False
-        assert config.type == CollisionEvaluatorType.SINGLE_TIMESTEP
-        assert config.safety_margin == 0.02
-        assert config.safety_margin_buffer == 0.005
-        assert config.coeff == 10.0
+        assert config.collision_margin_buffer == 0.005
+        assert config.max_num_cnt == 2
 
+    @pytest.mark.skip(reason="CollisionEvaluatorType enum moved/changed in 0.33.x")
     def test_collision_evaluator_type_enum(self):
-        assert CollisionEvaluatorType.SINGLE_TIMESTEP is not None
-        assert CollisionEvaluatorType.DISCRETE_CONTINUOUS is not None
-        assert CollisionEvaluatorType.CAST_CONTINUOUS is not None
+        """Test CollisionEvaluatorType enum values."""
+        pass
 
     def test_composite_profile_with_collision_configs(self):
         """Test setting collision configs on composite profile."""
@@ -194,15 +177,12 @@ class TestTrajOptProfiles:
         # Create and configure collision cost
         cost_config = CollisionCostConfig()
         cost_config.enabled = True
-        cost_config.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
-        cost_config.safety_margin = 0.025
-        cost_config.coeff = 20.0
+        cost_config.collision_margin_buffer = 0.01
         profile.collision_cost_config = cost_config
 
         # Create and configure collision constraint
         constraint_config = CollisionConstraintConfig()
         constraint_config.enabled = False
-        constraint_config.safety_margin = 0.01
         profile.collision_constraint_config = constraint_config
 
         # Verify assignment
@@ -331,12 +311,10 @@ class TestTrajOptPlanning:
         plan_profile = TrajOptDefaultPlanProfile()
         composite_profile = TrajOptDefaultCompositeProfile()
 
-        # Configure collision cost
+        # Configure collision cost (0.33.x API)
         collision_cost = CollisionCostConfig()
         collision_cost.enabled = True
-        collision_cost.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
-        collision_cost.safety_margin = 0.025
-        collision_cost.coeff = 20.0
+        collision_cost.collision_margin_buffer = 0.01
         composite_profile.collision_cost_config = collision_cost
 
         # Configure smoothing
