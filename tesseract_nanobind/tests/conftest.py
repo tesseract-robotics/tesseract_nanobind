@@ -4,7 +4,16 @@ Provides unified object lifetime management via TesseractContext fixture.
 C++ bindings require objects to be deleted in correct order - locators
 must outlive environments that use them, etc.
 
+IMPORTANT - Test Isolation:
+  Due to KinematicsPluginFactory global state in the C++ library, tests using
+  different kinematics plugin types (KDL vs OPW) CANNOT run in the same process.
+  See docs/KINEMATICS_PLUGIN_FACTORY_ISSUE.md for details.
+
+  For full test suite: Use ./run_tests.sh which runs tests in isolated phases.
+  For individual test categories: pytest -m <marker> tests/
+
 Custom markers:
+  - forked: Tests requiring process isolation (use with pytest-forked)
   - viewer: Viewer/visualization examples
   - planning: Motion planning examples (require TESSERACT_TASK_COMPOSER_CONFIG_FILE)
   - basic: Basic examples (collision, kinematics, scene_graph)
@@ -55,6 +64,7 @@ TESSERACT_SUPPORT_DIR = os.environ.get("TESSERACT_SUPPORT_DIR", "")
 
 def pytest_configure(config):
     """Register custom markers."""
+    config.addinivalue_line("markers", "forked: tests requiring process isolation (KinematicsPluginFactory)")
     config.addinivalue_line("markers", "viewer: marks tests as viewer examples")
     config.addinivalue_line("markers", "planning: marks tests as planning examples")
     config.addinivalue_line("markers", "basic: marks tests as basic examples")

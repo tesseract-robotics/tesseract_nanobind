@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import numpy.testing as nptest
+import pytest
 
 from tesseract_robotics import tesseract_kinematics
 from tesseract_robotics import tesseract_urdf
@@ -31,22 +32,22 @@ def test_kdl_kin_chain_lma_inverse_kinematic(ctx):
     """Test KDL LMA inverse kinematics solver."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
 
-    # Create plugin factory
+    # Create plugin factory - keep all objects alive via ctx
     kin_config = _FilesystemPath(os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820_plugins.yaml"))
     p_locator = ctx.keep(TesseractSupportResourceLocator())
-    plugin_factory = tesseract_kinematics.KinematicsPluginFactory(kin_config, p_locator)
+    plugin_factory = ctx.keep(tesseract_kinematics.KinematicsPluginFactory(kin_config, p_locator))
 
     # Parse scene graph
     path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
     sg_locator = ctx.keep(TesseractSupportResourceLocator())
-    scene_graph = tesseract_urdf.parseURDFFile(path, sg_locator)
+    scene_graph = ctx.keep(tesseract_urdf.parseURDFFile(path, sg_locator))
 
-    solver = tesseract_state_solver.KDLStateSolver(scene_graph)
+    solver = ctx.keep(tesseract_state_solver.KDLStateSolver(scene_graph))
     scene_state1 = solver.getState(np.zeros((7,)))
     scene_state2 = solver.getState(np.zeros((7,)))
 
-    inv_kin = plugin_factory.createInvKin("manipulator", "KDLInvKinChainLMA", scene_graph, scene_state1)
-    fwd_kin = plugin_factory.createFwdKin("manipulator", "KDLFwdKinChain", scene_graph, scene_state2)
+    inv_kin = ctx.keep(plugin_factory.createInvKin("manipulator", "KDLInvKinChainLMA", scene_graph, scene_state1))
+    fwd_kin = ctx.keep(plugin_factory.createFwdKin("manipulator", "KDLFwdKinChain", scene_graph, scene_state2))
 
     assert inv_kin
     assert fwd_kin
@@ -58,20 +59,20 @@ def test_jacobian(ctx):
     """Test Jacobian computation."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
 
-    # Create plugin factory
+    # Create plugin factory - keep all objects alive via ctx
     kin_config = _FilesystemPath(os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820_plugins.yaml"))
     p_locator = ctx.keep(TesseractSupportResourceLocator())
-    plugin_factory = tesseract_kinematics.KinematicsPluginFactory(kin_config, p_locator)
+    plugin_factory = ctx.keep(tesseract_kinematics.KinematicsPluginFactory(kin_config, p_locator))
 
     # Parse scene graph
     path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
     sg_locator = ctx.keep(TesseractSupportResourceLocator())
-    scene_graph = tesseract_urdf.parseURDFFile(path, sg_locator)
+    scene_graph = ctx.keep(tesseract_urdf.parseURDFFile(path, sg_locator))
 
-    solver = tesseract_state_solver.KDLStateSolver(scene_graph)
+    solver = ctx.keep(tesseract_state_solver.KDLStateSolver(scene_graph))
     scene_state = solver.getState(np.zeros((7,)))
 
-    fwd_kin = plugin_factory.createFwdKin("manipulator", "KDLFwdKinChain", scene_graph, scene_state)
+    fwd_kin = ctx.keep(plugin_factory.createFwdKin("manipulator", "KDLFwdKinChain", scene_graph, scene_state))
 
     jvals = np.array([-0.785398, 0.785398, -0.785398, 0.785398, -0.785398, 0.785398, -0.785398])
     jacobian = fwd_kin.calcJacobian(jvals, "tool0")

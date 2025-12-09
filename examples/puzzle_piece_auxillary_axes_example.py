@@ -46,7 +46,6 @@ from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
@@ -236,9 +235,7 @@ def main():
     trajopt_composite_profile = TrajOptDefaultCompositeProfile()
     trajopt_composite_profile.collision_constraint_config.enabled = False
     trajopt_composite_profile.collision_cost_config.enabled = True
-    trajopt_composite_profile.collision_cost_config.safety_margin = 0.025
-    trajopt_composite_profile.collision_cost_config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
-    trajopt_composite_profile.collision_cost_config.coeff = 1.0
+    trajopt_composite_profile.collision_cost_config.collision_margin_buffer = 0.025
 
     # Add profiles to dictionary
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile)

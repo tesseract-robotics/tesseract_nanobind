@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import numpy.testing as nptest
+import pytest
 
 from tesseract_robotics import tesseract_kinematics
 from tesseract_robotics import tesseract_urdf
@@ -31,22 +32,22 @@ def test_opw_inverse_kinematic(ctx):
     """Test OPW inverse kinematics solver."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
 
-    # Create plugin factory
+    # Create plugin factory - keep locator alive
     kin_config = _FilesystemPath(os.path.join(tesseract_support, "urdf/abb_irb2400_plugins.yaml"))
     p_locator = ctx.keep(TesseractSupportResourceLocator())
-    plugin_factory = tesseract_kinematics.KinematicsPluginFactory(kin_config, p_locator)
+    plugin_factory = ctx.keep(tesseract_kinematics.KinematicsPluginFactory(kin_config, p_locator))
 
-    # Parse scene graph
+    # Parse scene graph - keep locator and scene_graph alive
     path = os.path.join(tesseract_support, "urdf/abb_irb2400.urdf")
     sg_locator = ctx.keep(TesseractSupportResourceLocator())
-    scene_graph = tesseract_urdf.parseURDFFile(path, sg_locator)
+    scene_graph = ctx.keep(tesseract_urdf.parseURDFFile(path, sg_locator))
 
-    solver = tesseract_state_solver.KDLStateSolver(scene_graph)
+    solver = ctx.keep(tesseract_state_solver.KDLStateSolver(scene_graph))
     scene_state1 = solver.getState(np.zeros((6,)))
     scene_state2 = solver.getState(np.zeros((6,)))
 
-    inv_kin = plugin_factory.createInvKin("manipulator", "OPWInvKin", scene_graph, scene_state1)
-    fwd_kin = plugin_factory.createFwdKin("manipulator", "KDLFwdKinChain", scene_graph, scene_state2)
+    inv_kin = ctx.keep(plugin_factory.createInvKin("manipulator", "OPWInvKin", scene_graph, scene_state1))
+    fwd_kin = ctx.keep(plugin_factory.createFwdKin("manipulator", "KDLFwdKinChain", scene_graph, scene_state2))
 
     assert inv_kin
     assert fwd_kin

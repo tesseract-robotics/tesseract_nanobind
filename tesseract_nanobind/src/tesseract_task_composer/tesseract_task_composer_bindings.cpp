@@ -125,6 +125,13 @@ NB_MODULE(_tesseract_task_composer, m) {
                        std::shared_ptr<tp::TaskComposerContext> context) {
             return self.run(node, context);
         }, "node"_a, "context"_a)
+        // Overload for backwards compatibility: accept TaskComposerDataStorage and create context
+        .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
+                       std::shared_ptr<tp::TaskComposerDataStorage> data_storage) {
+            auto context = std::make_shared<tp::TaskComposerContext>("context", data_storage, false);
+            return self.run(node, context);
+        }, "node"_a, "data_storage"_a,
+        "Run task with TaskComposerDataStorage (creates context automatically)")
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
 
@@ -142,6 +149,13 @@ NB_MODULE(_tesseract_task_composer, m) {
             // Cast to base class to call public run method
             return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
         }, "node"_a, "context"_a)
+        // Overload for backwards compatibility: accept TaskComposerDataStorage and create context
+        .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
+                       std::shared_ptr<tp::TaskComposerDataStorage> data_storage) {
+            auto context = std::make_shared<tp::TaskComposerContext>("context", data_storage, false);
+            return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
+        }, "node"_a, "data_storage"_a,
+        "Run task with TaskComposerDataStorage (creates context automatically)")
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount);
 
