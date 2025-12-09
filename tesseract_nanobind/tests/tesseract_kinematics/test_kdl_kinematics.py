@@ -1,14 +1,14 @@
+import os
+import re
+import traceback
+import numpy as np
+import numpy.testing as nptest
+
 from tesseract_robotics import tesseract_kinematics
 from tesseract_robotics import tesseract_scene_graph
 from tesseract_robotics import tesseract_urdf
 from tesseract_robotics import tesseract_common
 from tesseract_robotics import tesseract_state_solver
-
-import re
-import os
-import traceback
-import numpy as np
-import numpy.testing as nptest
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 

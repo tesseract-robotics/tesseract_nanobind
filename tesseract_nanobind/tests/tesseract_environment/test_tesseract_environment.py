@@ -1,9 +1,10 @@
+import os
+
 from tesseract_robotics import tesseract_environment
 from tesseract_robotics import tesseract_urdf
 from tesseract_robotics import tesseract_srdf
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 import traceback
-import os
 import numpy as np
 
 def get_scene_graph():
