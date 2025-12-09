@@ -21,6 +21,7 @@
 
 // tesseract_task_composer taskflow
 #include <tesseract_task_composer/taskflow/taskflow_task_composer_executor.h>
+#include <tesseract_task_composer/taskflow/taskflow_task_composer_future.h>
 
 // tesseract_common
 #include <tesseract_common/any_poly.h>
@@ -60,7 +61,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("data", &tp::TaskComposerKeys::data);
 
     // ========== TaskComposerDataStorage ==========
-    // nanobind handles shared_ptr automatically when returned from functions
+    // nanobind automatically handles shared_ptr conversions for bound types
     nb::class_<tp::TaskComposerDataStorage>(m, "TaskComposerDataStorage")
         .def(nb::init<>())
         .def("getName", &tp::TaskComposerDataStorage::getName)
@@ -108,15 +109,41 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("setInputKeys", &tp::TaskComposerNode::setInputKeys, "input_keys"_a)
         .def("setOutputKeys", &tp::TaskComposerNode::setOutputKeys, "output_keys"_a);
 
-    // ========== TaskComposerFuture ==========
+    // ========== TaskComposerFuture (abstract base) ==========
     nb::class_<tp::TaskComposerFuture>(m, "TaskComposerFuture")
         .def_prop_rw("context",
             [](const tp::TaskComposerFuture& self) { return self.context; },
             [](tp::TaskComposerFuture& self, std::shared_ptr<tp::TaskComposerContext> v) { self.context = v; })
         .def("valid", &tp::TaskComposerFuture::valid)
         .def("ready", &tp::TaskComposerFuture::ready)
-        .def("wait", &tp::TaskComposerFuture::wait)
-        .def("waitFor", &tp::TaskComposerFuture::waitFor, "duration"_a);
+        // Release GIL during wait() to allow background threads to run
+        .def("wait", [](const tp::TaskComposerFuture& self) {
+            nb::gil_scoped_release release;
+            self.wait();
+        })
+        .def("waitFor", [](const tp::TaskComposerFuture& self, const std::chrono::duration<double>& d) {
+            nb::gil_scoped_release release;
+            return self.waitFor(d);
+        }, "duration"_a);
+
+    // ========== TaskflowTaskComposerFuture (derived implementation) ==========
+    // This is the actual class returned by TaskflowTaskComposerExecutor.run()
+    nb::class_<tp::TaskflowTaskComposerFuture, tp::TaskComposerFuture>(m, "TaskflowTaskComposerFuture")
+        .def_prop_rw("context",
+            [](const tp::TaskflowTaskComposerFuture& self) { return self.context; },
+            [](tp::TaskflowTaskComposerFuture& self, std::shared_ptr<tp::TaskComposerContext> v) { self.context = v; })
+        .def("valid", &tp::TaskflowTaskComposerFuture::valid)
+        .def("ready", &tp::TaskflowTaskComposerFuture::ready)
+        // Release GIL during wait() to allow background threads to run
+        .def("wait", [](const tp::TaskflowTaskComposerFuture& self) {
+            nb::gil_scoped_release release;
+            self.wait();
+        })
+        .def("waitFor", [](const tp::TaskflowTaskComposerFuture& self, const std::chrono::duration<double>& d) {
+            nb::gil_scoped_release release;
+            return self.waitFor(d);
+        }, "duration"_a)
+        .def("clear", &tp::TaskflowTaskComposerFuture::clear);
 
     // ========== TaskComposerExecutor (abstract base) ==========
     nb::class_<tp::TaskComposerExecutor>(m, "TaskComposerExecutor")

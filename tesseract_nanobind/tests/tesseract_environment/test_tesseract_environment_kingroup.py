@@ -1,4 +1,9 @@
-"""Tests for Environment kinematic group functionality."""
+"""Tests for Environment kinematic group functionality.
+
+NOTE: These tests PASS when run standalone but may FAIL in full test suite
+due to C++ plugin factory global state pollution from other tests.
+Run via: pytest tests/tesseract_environment/test_tesseract_environment_kingroup.py -v
+"""
 import numpy as np
 import pytest
 
@@ -12,6 +17,7 @@ def test_get_environment(abb_env):
     assert len(joint_names) == 6
 
 
+@pytest.mark.forked  # Run in subprocess to avoid state pollution
 def test_kinematic_group(abb_env):
     """Test kinematic group forward and inverse kinematics."""
     env, manip_info, joint_names = abb_env
@@ -48,6 +54,7 @@ def test_kinematic_info(abb_env):
     assert list(kin_info.link_groups) == []
 
 
+@pytest.mark.forked  # Run in subprocess to avoid state pollution
 def test_tesseract_redundant_solutions_tesseract_function(abb_env):
     """Test getRedundantSolutions function."""
     env, manip_info, joint_names = abb_env

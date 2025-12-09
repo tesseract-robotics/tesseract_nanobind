@@ -104,21 +104,12 @@ echo ""
 echo "=== Phase 7: Planning API tests (isolated) ==="
 run_tests "planning_api" "$TESTS_DIR/tesseract_planning/" || true
 
-# Phase 8: Example tests
+# Phase 8: Example tests (subprocess-based only - in-process tests are disabled)
+# tests/examples/test_examples.py is skipped due to C++ plugin state corruption issues
+# tests/test_examples.py runs examples in isolated subprocesses which works correctly
 echo ""
-echo "=== Phase 8: Example tests (isolated) ==="
-run_tests "examples_unit" "$TESTS_DIR/test_examples.py" || true
-if [ -d "$TESTS_DIR/examples/" ]; then
-    # Each planning example must run isolated (KinematicsPluginFactory limitation)
-    run_tests "examples_basic" "$TESTS_DIR/examples/test_examples.py" -m basic || true
-    run_tests "examples_freespace" "$TESTS_DIR/examples/test_examples.py::test_freespace_ompl_example" || true
-    run_tests "examples_basic_cartesian" "$TESTS_DIR/examples/test_examples.py::test_basic_cartesian_example" || true
-    run_tests "examples_glass_upright" "$TESTS_DIR/examples/test_examples.py::test_glass_upright_example" || true
-    run_tests "examples_puzzle_piece" "$TESTS_DIR/examples/test_examples.py::test_puzzle_piece_example" || true
-    run_tests "examples_pick_and_place" "$TESTS_DIR/examples/test_examples.py::test_pick_and_place_example" || true
-    run_tests "examples_car_seat" "$TESTS_DIR/examples/test_examples.py::test_car_seat_example" || true
-    run_tests "examples_puzzle_aux" "$TESTS_DIR/examples/test_examples.py::test_puzzle_piece_auxillary_axes_example" || true
-fi
+echo "=== Phase 8: Example tests (subprocess-based) ==="
+run_tests "examples" "$TESTS_DIR/test_examples.py" || true
 
 # Summary
 echo ""

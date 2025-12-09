@@ -77,8 +77,8 @@ task_composer_filename = os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"]
 locator = GeneralResourceLocator()
 abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
 abb_irb2400_srdf_package_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-abb_irb2400_urdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_urdf_package_url).getFilePath())
-abb_irb2400_srdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_srdf_package_url).getFilePath())
+abb_irb2400_urdf_fname = locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
+abb_irb2400_srdf_fname = locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
 
 t_env = Environment()
 

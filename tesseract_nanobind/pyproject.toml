@@ -46,6 +46,7 @@ Repository = "https://github.com/tesseract-robotics/tesseract_nanobind"
 minversion = "6.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+norecursedirs = ["ws", "build", ".git", "*.egg-info"]
 addopts = ["-ra", "--strict-markers", "--tb=short"]
 markers = [
     "forked: tests requiring process isolation (KinematicsPluginFactory limitation)",

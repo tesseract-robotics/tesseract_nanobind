@@ -94,8 +94,8 @@ def abb_env(ctx):
 
     locator = ctx.keep(TesseractSupportResourceLocator())
     env = Environment()
-    urdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/abb_irb2400.urdf"))
-    srdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/abb_irb2400.srdf"))
+    urdf = os.path.join(TESSERACT_SUPPORT_DIR, "urdf/abb_irb2400.urdf")
+    srdf = os.path.join(TESSERACT_SUPPORT_DIR, "urdf/abb_irb2400.srdf")
     if not env.init(urdf, srdf, locator):
         pytest.skip("Failed to init ABB IRB2400 environment")
 
@@ -120,8 +120,8 @@ def iiwa_env(ctx):
 
     locator = ctx.keep(TesseractSupportResourceLocator())
     env = Environment()
-    urdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.urdf"))
-    srdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.srdf"))
+    urdf = os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.urdf")
+    srdf = os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.srdf")
     if not env.init(urdf, srdf, locator):
         pytest.skip("Failed to init IIWA environment")
 

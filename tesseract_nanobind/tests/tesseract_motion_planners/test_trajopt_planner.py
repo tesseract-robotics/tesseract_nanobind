@@ -59,8 +59,8 @@ def lbr_iiwa_environment():
 
     locator = GeneralResourceLocator()
 
-    urdf_path = FilesystemPath(os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf"))
-    srdf_path = FilesystemPath(os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf"))
+    urdf_path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
+    srdf_path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
 
     t_env = Environment()
     success = t_env.init(urdf_path, srdf_path, locator)

@@ -221,8 +221,8 @@ def main():
     # Load car seat demo robot
     urdf_url = "package://tesseract_support/urdf/car_seat_demo.urdf"
     srdf_url = "package://tesseract_support/urdf/car_seat_demo.srdf"
-    urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locator.locateResource(urdf_url).getFilePath()
+    srdf_path = locator.locateResource(srdf_url).getFilePath()
 
     env = Environment()
     if not env.init(urdf_path, srdf_path, locator):

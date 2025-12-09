@@ -202,7 +202,7 @@ class TaskComposer:
             )
 
         factory = TaskComposerPluginFactory(
-            FilesystemPath(str(config_path)),
+            str(config_path),
             locator,
         )
 

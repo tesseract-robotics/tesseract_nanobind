@@ -1,5 +1,10 @@
 """Tests that run the example scripts to verify API coverage.
 
+NOTE: These in-process tests are DISABLED due to C++ plugin factory global state issues.
+Running examples via importlib.util.exec_module corrupts plugin factory singletons,
+causing segfaults in subsequent tests. Use tests/test_examples.py instead, which
+runs examples in isolated subprocesses.
+
 These tests import and run each example's main() function in headless mode.
 The goal is to verify all API methods can be invoked without error.
 
@@ -17,6 +22,11 @@ Usage:
 import os
 import importlib.util
 import pytest
+
+# Skip all tests in this module - use tests/test_examples.py (subprocess-based) instead
+pytestmark = pytest.mark.skip(
+    reason="In-process execution corrupts C++ plugin state - use tests/test_examples.py"
+)
 
 # Path: tesseract_nanobind/tests/examples/test_examples.py
 # ROOT_DIR should be tesseract_python_nanobind (4 levels up)

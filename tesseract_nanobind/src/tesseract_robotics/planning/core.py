@@ -34,7 +34,6 @@ from numpy.typing import ArrayLike
 
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
-    FilesystemPath,
     ManipulatorInfo,
     Isometry3d,
 )
@@ -166,8 +165,8 @@ class Robot:
         """
         locator = locator or GeneralResourceLocator()
 
-        urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-        srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+        urdf_path = locator.locateResource(urdf_url).getFilePath()
+        srdf_path = locator.locateResource(srdf_url).getFilePath()
 
         env = Environment()
         if not env.init(urdf_path, srdf_path, locator):
@@ -195,11 +194,8 @@ class Robot:
         """
         locator = locator or GeneralResourceLocator()
 
-        urdf_path = FilesystemPath(str(urdf_path))
-        srdf_path = FilesystemPath(str(srdf_path))
-
         env = Environment()
-        if not env.init(urdf_path, srdf_path, locator):
+        if not env.init(str(urdf_path), str(srdf_path), locator):
             raise RuntimeError(f"Failed to initialize environment from {urdf_path}")
 
         return cls(env, locator)

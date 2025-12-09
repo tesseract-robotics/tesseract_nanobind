@@ -3,23 +3,12 @@
 from tesseract_robotics.tesseract_common._tesseract_common import *
 
 
-# FilesystemPath - for SWIG compatibility, we keep it as a str subclass
-# This allows it to be passed directly to functions expecting strings
-# The C++ binding is available as _FilesystemPath for cases that need it
+# FilesystemPath - use the C++ binding directly
+# Note: SWIG compatibility wrapper removed as it doesn't work with nanobind's
+# type-strict overload resolution. The C++ FilesystemPath binding supports
+# construction from Python strings directly.
+# Alias for backwards compatibility with code that imported _FilesystemPath
 from tesseract_robotics.tesseract_common._tesseract_common import FilesystemPath as _FilesystemPath
-
-class FilesystemPath(str):
-    """A filesystem path wrapper for SWIG compatibility.
-
-    Subclasses str so it can be passed to C++ functions expecting strings.
-    Use _FilesystemPath for the raw C++ binding when needed.
-    """
-    def __new__(cls, path):
-        return str.__new__(cls, path)
-
-    def string(self):
-        """Return the path as a string (SWIG compatibility)."""
-        return str(self)
 
 # TransformMap is a dict wrapper for SWIG compatibility
 # In nanobind, plain Python dicts with string keys and Isometry3d values work automatically
