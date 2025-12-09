@@ -363,7 +363,7 @@ class TestProfileDictionary:
         profiles = ProfileDictionary()
 
         # Profiles can be used even if empty - defaults will be used
-        from tesseract_robotics.tesseract_command_language import AnyPoly_wrap_ProfileDictionary
+        from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_ProfileDictionary
         profiles_any = AnyPoly_wrap_ProfileDictionary(profiles)
         assert profiles_any is not None
 

@@ -305,7 +305,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_composite_instruction(self, ctx):
         """Test wrapping CompositeInstruction in AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_CompositeInstruction,
         )
 
@@ -324,7 +324,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_profile_dictionary(self, ctx):
         """Test wrapping ProfileDictionary in AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_ProfileDictionary,
         )
 
@@ -335,7 +335,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_roundtrip_composite_instruction(self, ctx):
         """Test wrapping and unwrapping CompositeInstruction via AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_CompositeInstruction,
             AnyPoly_as_CompositeInstruction,
         )

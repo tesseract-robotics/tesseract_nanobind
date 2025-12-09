@@ -36,6 +36,10 @@ def _load_module(name, path):
 @pytest.mark.viewer
 def test_shapes_viewer():
     """Test shapes_viewer example runs without error."""
+    try:
+        from tesseract_robotics_viewer import TesseractViewer
+    except ImportError:
+        pytest.skip("tesseract_robotics_viewer not available")
     module = _load_module("shapes_viewer", os.path.join(VIEWER_EXAMPLES, "shapes_viewer.py"))
     module.main()
 
@@ -43,6 +47,10 @@ def test_shapes_viewer():
 @pytest.mark.viewer
 def test_material_mesh_viewer():
     """Test material mesh viewer example."""
+    try:
+        from tesseract_robotics_viewer import TesseractViewer
+    except ImportError:
+        pytest.skip("tesseract_robotics_viewer not available")
     module = _load_module("tesseract_material_mesh_viewer", os.path.join(VIEWER_EXAMPLES, "tesseract_material_mesh_viewer.py"))
     module.main()
 
@@ -51,6 +59,12 @@ def test_material_mesh_viewer():
 @pytest.mark.planning
 def test_abb_irb2400_viewer():
     """Test ABB IRB2400 OMPL planning example."""
+    try:
+        from tesseract_robotics_viewer import TesseractViewer
+    except ImportError:
+        pytest.skip("tesseract_robotics_viewer not available")
+    if not os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE"):
+        pytest.skip("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set")
     module = _load_module("abb_irb2400_viewer", os.path.join(VIEWER_EXAMPLES, "abb_irb2400_viewer.py"))
     module.main()
 
