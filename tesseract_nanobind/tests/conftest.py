@@ -12,6 +12,10 @@ Custom markers:
 import os
 from pathlib import Path
 
+# Force TESSERACT_HEADLESS=1 to prevent visualization server stalling tests
+# Override any shell-sourced value (env.sh defaults to 0)
+os.environ["TESSERACT_HEADLESS"] = "1"
+
 # Set up env vars BEFORE importing tesseract_robotics
 # For dev testing, use ws/src/ paths if bundled data doesn't exist
 _tests_dir = Path(__file__).parent
@@ -54,14 +58,19 @@ def pytest_configure(config):
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test():
-    """Force garbage collection after each test to ensure proper cleanup order."""
+    """Force garbage collection after each test to ensure proper cleanup order.
+
+    Note: gc.collect() can cause segfaults with C++ bindings if objects
+    are deleted in wrong order. We disable forced GC here - tests that need
+    explicit cleanup should handle it in their own code.
+    """
     yield
-    # Force garbage collection to clean up C++ objects before interpreter shutdown
-    gc.collect()
-    gc.collect()  # Run twice to handle cyclic references
+    # Disabled: gc.collect() causes segfaults with certain test ordering
+    # Tests that need cleanup should use explicit del + gc.collect() in test code
+    pass
 
 
 def pytest_sessionfinish(session, exitstatus):
     """Clean up at end of test session."""
-    gc.collect()
-    gc.collect()
+    # Disabled: gc.collect() causes segfaults with C++ binding cleanup order
+    pass

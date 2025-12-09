@@ -13,10 +13,11 @@ from tesseract_robotics import tesseract_state_solver
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
 def get_scene_graph():
+    """Return (scene_graph, locator) - locator must be kept alive."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
     path =  os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
     locator = TesseractSupportResourceLocator()
-    return tesseract_urdf.parseURDFFile(path, locator)
+    return tesseract_urdf.parseURDFFile(path, locator), locator
 
 
 def get_plugin_factory():
@@ -44,8 +45,9 @@ def run_inv_kin_test(inv_kin, fwd_kin):
      nptest.assert_almost_equal(pose,result["tool0"].matrix(),decimal=3)
 
 def test_kdl_kin_chain_lma_inverse_kinematic():
+    import gc
     plugin_factory, p_locator = get_plugin_factory()
-    scene_graph = get_scene_graph()
+    scene_graph, sg_locator = get_scene_graph()
     solver = tesseract_state_solver.KDLStateSolver(scene_graph)
     scene_state1 = solver.getState(np.zeros((7,)))
     scene_state2 = solver.getState(np.zeros((7,)))
@@ -57,24 +59,33 @@ def test_kdl_kin_chain_lma_inverse_kinematic():
 
     run_inv_kin_test(inv_kin, fwd_kin)
 
-    del inv_kin
-    del fwd_kin
+    # Cleanup in correct order
+    del inv_kin, fwd_kin
+    del scene_state1, scene_state2, solver
+    del scene_graph, sg_locator
+    del plugin_factory, p_locator
+    gc.collect()
 
 
 def test_jacobian():
+    import gc
     plugin_factory, p_locator = get_plugin_factory()
-    scene_graph = get_scene_graph()
+    scene_graph, sg_locator = get_scene_graph()
     solver = tesseract_state_solver.KDLStateSolver(scene_graph)
     scene_state = solver.getState(np.zeros((7,)))
     fwd_kin = plugin_factory.createFwdKin("manipulator","KDLFwdKinChain",scene_graph,scene_state)
-    scene_graph = get_scene_graph()
-    
+
     jvals = np.array([-0.785398, 0.785398, -0.785398, 0.785398, -0.785398, 0.785398, -0.785398])
 
     link_name = "tool0"
     jacobian = fwd_kin.calcJacobian(jvals,link_name)
-    
+
     assert jacobian.shape == (6,7)
 
+    # Cleanup in correct order
     del fwd_kin
+    del scene_state, solver
+    del scene_graph, sg_locator
+    del plugin_factory, p_locator
+    gc.collect()
 

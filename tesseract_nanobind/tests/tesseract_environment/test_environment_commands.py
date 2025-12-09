@@ -64,13 +64,34 @@ SIMPLE_URDF = """
 """
 
 
+class EnvHolder:
+    """Hold environment and locator together to prevent premature GC."""
+    def __init__(self, environment, locator):
+        self.env = environment
+        self.locator = locator
+
+    def __getattr__(self, name):
+        # Delegate attribute access to environment
+        return getattr(self.env, name)
+
+
 @pytest.fixture
 def env():
-    """Create a test environment"""
+    """Create a test environment.
+
+    Returns EnvHolder that keeps locator alive until environment is deleted.
+    """
+    import gc
     environment = Environment()
     locator = GeneralResourceLocator()
     environment.init(SIMPLE_URDF, locator)
-    return environment
+    holder = EnvHolder(environment, locator)
+    yield holder
+    # Explicit cleanup in correct order
+    del holder.env
+    del holder.locator
+    del holder
+    gc.collect()
 
 
 class TestCommandImports:

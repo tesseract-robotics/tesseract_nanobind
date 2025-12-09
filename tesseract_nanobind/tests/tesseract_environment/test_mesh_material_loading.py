@@ -12,8 +12,8 @@ import traceback
 import numpy.testing as nptest
 
 mesh_urdf="""
-<robot name="mesh_viewer">
-  
+<robot name="mesh_viewer" xmlns:tesseract="http://tesseract.ros.org" tesseract:make_convex="false">
+
   <link name="world"/>
   <link name="mesh_dae_link">
     <visual>
@@ -35,12 +35,15 @@ mesh_urdf="""
 """
 
 def get_scene_graph():
+    """Return (scene_graph, locator) - locator must be kept alive."""
     locator = TesseractSupportResourceLocator()
     # nanobind automatically extracts from unique_ptr, no .release() needed
-    return tesseract_urdf.parseURDFString(mesh_urdf, locator)
-    
+    return tesseract_urdf.parseURDFString(mesh_urdf, locator), locator
+
+
 def test_mesh_material_loading():
-    scene = get_scene_graph()
+    import gc
+    scene, locator = get_scene_graph()
     visual = scene.getLink("mesh_dae_link").visual
     assert len(visual) == 1
 
@@ -110,3 +113,11 @@ def test_mesh_material_loading():
     texture = mesh0.getTextures()[0]
     assert len(texture.getTextureImage().getResourceContents()) == 38212
     assert len(texture.getUVs()) == 4
+
+    # Cleanup in correct order
+    del texture
+    del mesh0, mesh1, mesh2, mesh3, meshes
+    del mesh0_normals, mesh1_normals, mesh2_normals, mesh3_normals
+    del mesh0_material, mesh1_material, mesh2_material, mesh3_material
+    del visual, scene, locator
+    gc.collect()

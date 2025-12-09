@@ -336,6 +336,9 @@ NB_MODULE(_tesseract_common, m) {
 
     nb::class_<tesseract_common::ProfileDictionary>(m, "ProfileDictionary")
         .def(nb::init<>())
+        .def("addProfile", [](tesseract_common::ProfileDictionary& self, const std::string& ns, const std::string& profile_name, const tesseract_common::Profile::ConstPtr& profile) {
+            self.addProfile(ns, profile_name, profile);
+        }, "ns"_a, "profile_name"_a, "profile"_a)
         .def("hasProfile", [](const tesseract_common::ProfileDictionary& self, std::size_t key, const std::string& ns, const std::string& profile_name) {
             return self.hasProfile(key, ns, profile_name);
         }, "key"_a, "ns"_a, "profile_name"_a)

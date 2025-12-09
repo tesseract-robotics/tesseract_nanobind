@@ -10,7 +10,7 @@ readme = "../README.md"
 # this is in the interest of supporting the compas.dev community
 requires-python = ">=3.9"
 dependencies = [
-    "numpy>=1.21.0",
+    "numpy>=1.21.0,<2.0",
 ]
 authors = [
     { name = "Jelle Feringa", email = "jelle@terrestrial.construction" },

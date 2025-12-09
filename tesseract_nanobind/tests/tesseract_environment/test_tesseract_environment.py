@@ -8,25 +8,28 @@ import traceback
 import numpy as np
 
 def get_scene_graph():
+    """Return (scene_graph, locator) - locator must be kept alive."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
-    path =  os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
+    path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
     locator = TesseractSupportResourceLocator()
     # nanobind automatically extracts from unique_ptr, no .release() needed
-    return tesseract_urdf.parseURDFFile(path, locator)
+    return tesseract_urdf.parseURDFFile(path, locator), locator
 
 def get_srdf_model(scene_graph):
+    """Return (srdf, locator) - locator must be kept alive."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
-    path =  os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
+    path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
     srdf = tesseract_srdf.SRDFModel()
     locator = TesseractSupportResourceLocator()
     srdf.initFile(scene_graph, path, locator)
-    return srdf
+    return srdf, locator
 
 def get_environment():
-    scene_graph = get_scene_graph()
+    """Return (env, locators_list) - locators must be kept alive."""
+    scene_graph, sg_locator = get_scene_graph()
     assert scene_graph is not None
 
-    srdf = get_srdf_model(scene_graph)
+    srdf, srdf_locator = get_srdf_model(scene_graph)
     assert srdf is not None
 
     env = tesseract_environment.Environment()
@@ -34,12 +37,12 @@ def get_environment():
 
     assert env.getRevision() == 0
 
-    success = env.init(scene_graph,srdf)
+    success = env.init(scene_graph, srdf)
     assert success
     assert env.getRevision() == 3
-    
+
     joint_names = [f"joint_a{i+1}" for i in range(7)]
-    joint_values = np.array([1,2,1,2,1,2,1],dtype=np.float64)
+    joint_values = np.array([1, 2, 1, 2, 1, 2, 1], dtype=np.float64)
 
     scene_state_changed = [False]
     command_applied = [False]
@@ -74,19 +77,31 @@ def get_environment():
     assert env.applyCommand(cmd)
     assert command_applied[0]
 
-    return env
+    # Return env and all locators that must be kept alive
+    return env, [sg_locator, srdf_locator, scene_graph, srdf]
 
 def test_env():
-    get_environment()
+    import gc
+    env, refs = get_environment()
+    # Cleanup in correct order
+    del env
+    del refs
+    gc.collect()
 
 
 def test_anypoly_wrap_environment_const():
     """Test wrapping Environment in AnyPoly for TaskComposerDataStorage."""
+    import gc
     from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst
 
-    env = get_environment()
+    env, refs = get_environment()
     # AnyPoly_wrap_EnvironmentConst expects shared_ptr<const Environment>
     # The environment is already a shared_ptr from Python's perspective
     any_poly = AnyPoly_wrap_EnvironmentConst(env)
     assert any_poly is not None
     assert not any_poly.isNull()
+    # Cleanup in correct order
+    del any_poly
+    del env
+    del refs
+    gc.collect()

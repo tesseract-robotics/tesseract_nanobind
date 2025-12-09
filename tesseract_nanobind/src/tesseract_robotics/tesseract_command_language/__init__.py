@@ -1,5 +1,8 @@
 """tesseract_command_language Python bindings (nanobind)"""
 
+# Import dependencies first to ensure C++ types are registered
+from tesseract_robotics import tesseract_common  # noqa: F401
+
 from tesseract_robotics.tesseract_command_language._tesseract_command_language import *
 
 # Re-export Profile and ProfileDictionary from tesseract_common for backwards compat
