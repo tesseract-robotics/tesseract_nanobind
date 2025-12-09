@@ -2,6 +2,10 @@
 
 from tesseract_robotics.tesseract_command_language._tesseract_command_language import *
 
+# Re-export Profile and ProfileDictionary from tesseract_common for backwards compat
+# (moved from tesseract_planning to tesseract_common in 0.33.x)
+from tesseract_robotics.tesseract_common import Profile, ProfileDictionary
+
 # Re-export AnyPoly wrappers from tesseract_task_composer for convenience
 # (examples import these from command_language for SWIG compatibility)
 try:

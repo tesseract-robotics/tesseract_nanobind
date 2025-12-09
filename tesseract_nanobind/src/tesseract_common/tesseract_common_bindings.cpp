@@ -3,6 +3,8 @@
 // tesseract_common headers (need eigen_types.h before opaque declarations)
 #include <tesseract_common/eigen_types.h>
 #include <tesseract_common/types.h>
+#include <tesseract_common/profile.h>
+#include <tesseract_common/profile_dictionary.h>
 
 // Opaque declarations for vector types we want to bind as classes
 using VectorVector3d = tesseract_common::VectorVector3d;  // std::vector<Eigen::Vector3d>
@@ -16,7 +18,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract_common/allowed_collision_matrix.h>
 #include <tesseract_common/kinematic_limits.h>
 #include <tesseract_common/plugin_info.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 
 // console_bridge
 #include <console_bridge/console.h>
@@ -122,12 +124,12 @@ NB_MODULE(_tesseract_common, m) {
 
     // ========== FilesystemPath ==========
     // Wrapper for std::filesystem::path (SWIG compatibility)
-    nb::class_<tesseract_common::fs::path>(m, "FilesystemPath")
+    nb::class_<std::filesystem::path>(m, "FilesystemPath")
         .def(nb::init<>())
         .def(nb::init<const std::string&>(), "path"_a)
-        .def("string", [](const tesseract_common::fs::path& p) { return p.string(); })
-        .def("__str__", [](const tesseract_common::fs::path& p) { return p.string(); })
-        .def("__repr__", [](const tesseract_common::fs::path& p) {
+        .def("string", [](const std::filesystem::path& p) { return p.string(); })
+        .def("__str__", [](const std::filesystem::path& p) { return p.string(); })
+        .def("__repr__", [](const std::filesystem::path& p) {
             return "FilesystemPath('" + p.string() + "')";
         });
 
@@ -218,23 +220,44 @@ NB_MODULE(_tesseract_common, m) {
         .def("getAllAllowedCollisions", &tesseract_common::AllowedCollisionMatrix::getAllAllowedCollisions)
         .def("insertAllowedCollisionMatrix", &tesseract_common::AllowedCollisionMatrix::insertAllowedCollisionMatrix);
 
-    // ========== CollisionMarginData ==========
-    nb::enum_<tesseract_common::CollisionMarginOverrideType>(m, "CollisionMarginOverrideType")
-        .value("NONE", tesseract_common::CollisionMarginOverrideType::NONE)
-        .value("REPLACE", tesseract_common::CollisionMarginOverrideType::REPLACE)
-        .value("MODIFY", tesseract_common::CollisionMarginOverrideType::MODIFY)
-        .value("OVERRIDE_DEFAULT_MARGIN", tesseract_common::CollisionMarginOverrideType::OVERRIDE_DEFAULT_MARGIN)
-        .value("OVERRIDE_PAIR_MARGIN", tesseract_common::CollisionMarginOverrideType::OVERRIDE_PAIR_MARGIN)
-        .value("MODIFY_PAIR_MARGIN", tesseract_common::CollisionMarginOverrideType::MODIFY_PAIR_MARGIN);
+    // ========== CollisionMarginPairOverrideType ==========
+    nb::enum_<tesseract_common::CollisionMarginPairOverrideType>(m, "CollisionMarginPairOverrideType")
+        .value("NONE", tesseract_common::CollisionMarginPairOverrideType::NONE)
+        .value("REPLACE", tesseract_common::CollisionMarginPairOverrideType::REPLACE)
+        .value("MODIFY", tesseract_common::CollisionMarginPairOverrideType::MODIFY);
 
+    // ========== CollisionMarginPairData ==========
+    nb::class_<tesseract_common::CollisionMarginPairData>(m, "CollisionMarginPairData")
+        .def(nb::init<>())
+        .def("setCollisionMargin", &tesseract_common::CollisionMarginPairData::setCollisionMargin,
+             "obj1"_a, "obj2"_a, "margin"_a)
+        .def("getCollisionMargin", &tesseract_common::CollisionMarginPairData::getCollisionMargin,
+             "obj1"_a, "obj2"_a)
+        .def("getCollisionMargins", &tesseract_common::CollisionMarginPairData::getCollisionMargins)
+        .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract_common::CollisionMarginPairData::getMaxCollisionMargin, nb::const_))
+        .def("incrementMargins", &tesseract_common::CollisionMarginPairData::incrementMargins, "increment"_a)
+        .def("scaleMargins", &tesseract_common::CollisionMarginPairData::scaleMargins, "scale"_a)
+        .def("empty", &tesseract_common::CollisionMarginPairData::empty)
+        .def("clear", &tesseract_common::CollisionMarginPairData::clear);
+
+    // ========== CollisionMarginData ==========
     nb::class_<tesseract_common::CollisionMarginData>(m, "CollisionMarginData")
         .def(nb::init<>())
-        .def(nb::init<double>())
+        .def(nb::init<double>(), "default_collision_margin"_a)
+        .def(nb::init<double, tesseract_common::CollisionMarginPairData>(),
+             "default_collision_margin"_a, "pair_collision_margins"_a)
+        .def(nb::init<tesseract_common::CollisionMarginPairData>(), "pair_collision_margins"_a)
         .def("getDefaultCollisionMargin", &tesseract_common::CollisionMarginData::getDefaultCollisionMargin)
-        .def("setDefaultCollisionMargin", &tesseract_common::CollisionMarginData::setDefaultCollisionMargin)
-        .def("getPairCollisionMargin", &tesseract_common::CollisionMarginData::getPairCollisionMargin)
-        .def("setPairCollisionMargin", &tesseract_common::CollisionMarginData::setPairCollisionMargin)
-        .def("getMaxCollisionMargin", &tesseract_common::CollisionMarginData::getMaxCollisionMargin);
+        .def("setDefaultCollisionMargin", &tesseract_common::CollisionMarginData::setDefaultCollisionMargin,
+             "default_collision_margin"_a)
+        .def("setCollisionMargin", &tesseract_common::CollisionMarginData::setCollisionMargin,
+             "obj1"_a, "obj2"_a, "collision_margin"_a)
+        .def("getCollisionMargin", &tesseract_common::CollisionMarginData::getCollisionMargin,
+             "obj1"_a, "obj2"_a)
+        .def("getCollisionMarginPairData", &tesseract_common::CollisionMarginData::getCollisionMarginPairData)
+        .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract_common::CollisionMarginData::getMaxCollisionMargin, nb::const_))
+        .def("incrementMargins", &tesseract_common::CollisionMarginData::incrementMargins, "increment"_a)
+        .def("scaleMargins", &tesseract_common::CollisionMarginData::scaleMargins, "scale"_a);
 
     // ========== KinematicLimits ==========
     nb::class_<tesseract_common::KinematicLimits>(m, "KinematicLimits")
@@ -305,4 +328,21 @@ NB_MODULE(_tesseract_common, m) {
         .def("clear", [](VectorIsometry3d& self) { self.clear(); });
 
     // Note: VectorLong and Eigen::VectorXi use numpy arrays (automatic conversion)
+
+    // ========== Profile and ProfileDictionary ==========
+    // In 0.33.x, these moved from tesseract_planning to tesseract_common
+    nb::class_<tesseract_common::Profile>(m, "Profile")
+        .def("getKey", &tesseract_common::Profile::getKey);
+
+    nb::class_<tesseract_common::ProfileDictionary>(m, "ProfileDictionary")
+        .def(nb::init<>())
+        .def("hasProfile", [](const tesseract_common::ProfileDictionary& self, std::size_t key, const std::string& ns, const std::string& profile_name) {
+            return self.hasProfile(key, ns, profile_name);
+        }, "key"_a, "ns"_a, "profile_name"_a)
+        .def("getProfile", [](const tesseract_common::ProfileDictionary& self, std::size_t key, const std::string& ns, const std::string& profile_name) {
+            return self.getProfile(key, ns, profile_name);
+        }, "key"_a, "ns"_a, "profile_name"_a)
+        .def("removeProfile", [](tesseract_common::ProfileDictionary& self, std::size_t key, const std::string& ns, const std::string& profile_name) {
+            self.removeProfile(key, ns, profile_name);
+        }, "key"_a, "ns"_a, "profile_name"_a);
 }

@@ -25,14 +25,16 @@
 // tesseract_common
 #include <tesseract_common/any_poly.h>
 #include <tesseract_common/resource_locator.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 
 // tesseract_environment for Environment wrapper
 #include <tesseract_environment/environment.h>
 
-// tesseract_command_language for CompositeInstruction and ProfileDictionary wrappers
+// tesseract_command_language for CompositeInstruction
 #include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_command_language/profile_dictionary.h>
+
+// tesseract_common for ProfileDictionary
+#include <tesseract_common/profile_dictionary.h>
 
 namespace tp = tesseract_planning;
 namespace te = tesseract_environment;
@@ -120,9 +122,9 @@ NB_MODULE(_tesseract_task_composer, m) {
     nb::class_<tp::TaskComposerExecutor>(m, "TaskComposerExecutor")
         .def("getName", &tp::TaskComposerExecutor::getName)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
-                       std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph) {
-            return self.run(node, data_storage, dotgraph);
-        }, "node"_a, "data_storage"_a, "dotgraph"_a = false)
+                       std::shared_ptr<tp::TaskComposerContext> context) {
+            return self.run(node, context);
+        }, "node"_a, "context"_a)
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
 
@@ -136,10 +138,10 @@ NB_MODULE(_tesseract_task_composer, m) {
         // Re-expose base class methods (public run is from TaskComposerExecutor)
         .def("getName", &tp::TaskflowTaskComposerExecutor::getName)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
-                       std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph) {
+                       std::shared_ptr<tp::TaskComposerContext> context) {
             // Cast to base class to call public run method
-            return static_cast<tp::TaskComposerExecutor&>(self).run(node, data_storage, dotgraph);
-        }, "node"_a, "data_storage"_a, "dotgraph"_a = false)
+            return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
+        }, "node"_a, "context"_a)
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount);
 
@@ -148,7 +150,7 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
     nb::class_<tp::TaskComposerPluginFactory>(m, "TaskComposerPluginFactory")
         .def("__init__", [](tp::TaskComposerPluginFactory* self, const std::string& config_str, nb::handle locator_handle) {
-            tc::fs::path config(config_str);
+            std::filesystem::path config(config_str);
             auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
             auto grl_type = common_module.attr("GeneralResourceLocator");
             if (!nb::isinstance(locator_handle, grl_type)) {
@@ -175,7 +177,7 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
     m.def("createTaskComposerPluginFactory", [](const std::string& config_str, nb::handle locator_handle) {
         // Convert config string to path
-        tc::fs::path config(config_str);
+        std::filesystem::path config(config_str);
 
         // Get the GeneralResourceLocator type from the tesseract_common module
         auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
@@ -205,7 +207,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         return tc::AnyPoly(ci);
     }, "instruction"_a, "Wrap a CompositeInstruction into an AnyPoly");
 
-    m.def("AnyPoly_wrap_ProfileDictionary", [](std::shared_ptr<tp::ProfileDictionary> pd) {
+    m.def("AnyPoly_wrap_ProfileDictionary", [](std::shared_ptr<tc::ProfileDictionary> pd) {
         return tc::AnyPoly(pd);
     }, "profiles"_a, "Wrap a ProfileDictionary shared_ptr into an AnyPoly");
 

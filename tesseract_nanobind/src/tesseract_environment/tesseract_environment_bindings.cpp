@@ -40,7 +40,7 @@
 // tesseract_common
 #include <tesseract_common/resource_locator.h>
 #include <tesseract_common/manipulator_info.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 
 // tesseract_srdf
 #include <tesseract_srdf/srdf_model.h>
@@ -183,12 +183,15 @@ NB_MODULE(_tesseract_environment, m) {
 
     // ========== ChangeCollisionMarginsCommand ==========
     nb::class_<te::ChangeCollisionMarginsCommand, te::Command>(m, "ChangeCollisionMarginsCommand")
-        .def(nb::init<double, tc::CollisionMarginOverrideType>(),
-             "default_margin"_a, "override_type"_a = tc::CollisionMarginOverrideType::OVERRIDE_DEFAULT_MARGIN)
-        .def(nb::init<tc::CollisionMarginData, tc::CollisionMarginOverrideType>(),
-             "collision_margin_data"_a, "override_type"_a = tc::CollisionMarginOverrideType::REPLACE)
-        .def("getCollisionMarginData", &te::ChangeCollisionMarginsCommand::getCollisionMarginData)
-        .def("getCollisionMarginOverrideType", &te::ChangeCollisionMarginsCommand::getCollisionMarginOverrideType);
+        .def(nb::init<>())
+        .def(nb::init<double>(), "default_margin"_a)
+        .def(nb::init<tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
+             "pair_margins"_a, "pair_override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)
+        .def(nb::init<double, tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
+             "default_margin"_a, "pair_margins"_a, "pair_override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)
+        .def("getDefaultCollisionMargin", &te::ChangeCollisionMarginsCommand::getDefaultCollisionMargin)
+        .def("getCollisionMarginPairData", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairData)
+        .def("getCollisionMarginPairOverrideType", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairOverrideType);
 
     // ========== ChangeLinkCollisionEnabledCommand ==========
     nb::class_<te::ChangeLinkCollisionEnabledCommand, te::Command>(m, "ChangeLinkCollisionEnabledCommand")
@@ -256,7 +259,7 @@ NB_MODULE(_tesseract_environment, m) {
         .def("init", [](te::Environment& self, const std::string& urdf_path,
                         const std::string& srdf_path,
                         const std::shared_ptr<const tc::ResourceLocator>& locator) {
-            return self.init(tc::fs::path(urdf_path), tc::fs::path(srdf_path), locator);
+            return self.init(std::filesystem::path(urdf_path), std::filesystem::path(srdf_path), locator);
         }, "urdf_path"_a, "srdf_path"_a, "locator"_a)
         // Init from URDF string (for inline URDF content) - SWIG compatibility
         // Detects if it's content (starts with <) vs file path
@@ -267,7 +270,7 @@ NB_MODULE(_tesseract_environment, m) {
                 urdf_or_path.find("<robot") != std::string::npos)) {
                 return self.init(urdf_or_path, locator);  // URDF content
             } else {
-                return self.init(tc::fs::path(urdf_or_path), locator);  // File path
+                return self.init(std::filesystem::path(urdf_or_path), locator);  // File path
             }
         }, "urdf_or_path"_a, "locator"_a)
         // State methods
@@ -370,7 +373,7 @@ NB_MODULE(_tesseract_environment, m) {
         }, "command"_a)
         // Commands - ChangeCollisionMarginsCommand
         .def("applyCommand", [](te::Environment& self, const te::ChangeCollisionMarginsCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeCollisionMarginsCommand>(cmd.getCollisionMarginData(), cmd.getCollisionMarginOverrideType());
+            auto cmd_ptr = std::make_shared<te::ChangeCollisionMarginsCommand>(cmd.getCollisionMarginPairData(), cmd.getCollisionMarginPairOverrideType());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ChangeLinkCollisionEnabledCommand

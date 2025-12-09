@@ -15,9 +15,11 @@
 #include <tesseract_command_language/state_waypoint.h>
 #include <tesseract_command_language/move_instruction.h>
 #include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_command_language/profile.h>
-#include <tesseract_command_language/profile_dictionary.h>
 #include <tesseract_command_language/constants.h>
+
+// tesseract_common for Profile and ProfileDictionary (moved from command_language in 0.33.x)
+#include <tesseract_common/profile.h>
+#include <tesseract_common/profile_dictionary.h>
 
 // tesseract_command_language - Poly types
 #include <tesseract_command_language/poly/waypoint_poly.h>
@@ -36,6 +38,9 @@ namespace tc = tesseract_common;
 
 NB_MODULE(_tesseract_command_language, m) {
     m.doc() = "tesseract_command_language Python bindings";
+
+    // Import tesseract_common module for Profile and ProfileDictionary cross-module type sharing
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
 
     // ========== JointWaypoint ==========
     nb::class_<tp::JointWaypoint>(m, "JointWaypoint")
@@ -211,15 +216,11 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("isCompositeInstruction", &tp::InstructionPoly::isCompositeInstruction)
         .def("isMoveInstruction", &tp::InstructionPoly::isMoveInstruction)
         .def("isNull", &tp::InstructionPoly::isNull)
-        // Workaround for RTTI issues across shared library boundaries
-        // The standard as<T>() uses typeid() which fails when comparing types from different .so files
-        // Since isMoveInstruction() works (uses typeid() within C++ lib), we can use getInterface().recover()
-        // to get the underlying MoveInstructionPoly* and copy it
+        // Use as<T>() for type casting (0.33.x API)
         .def("asMoveInstruction", [](tp::InstructionPoly& self) -> tp::MoveInstructionPoly {
             if (!self.isMoveInstruction())
                 throw std::runtime_error("InstructionPoly is not a MoveInstruction");
-            auto* ptr = static_cast<tp::MoveInstructionPoly*>(self.getInterface().recover());
-            return *ptr;
+            return self.as<tp::MoveInstructionPoly>();
         }, "Cast to MoveInstructionPoly. Raises RuntimeError if not a move instruction.");
 
     // ========== MoveInstructionPoly ==========
@@ -229,9 +230,8 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getWaypoint", [](tp::MoveInstructionPoly& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)
-        .def("assignCartesianWaypoint", &tp::MoveInstructionPoly::assignCartesianWaypoint, "waypoint"_a)
-        .def("assignJointWaypoint", &tp::MoveInstructionPoly::assignJointWaypoint, "waypoint"_a)
-        .def("assignStateWaypoint", &tp::MoveInstructionPoly::assignStateWaypoint, "waypoint"_a)
+        // In 0.33.x, waypoint assignment is done through MoveInstruction constructor
+        // or by modifying the waypoint reference directly
         .def("getMoveType", &tp::MoveInstructionPoly::getMoveType)
         .def("setMoveType", &tp::MoveInstructionPoly::setMoveType, "move_type"_a)
         .def("getProfile", &tp::MoveInstructionPoly::getProfile, "ns"_a = "")
@@ -253,61 +253,43 @@ NB_MODULE(_tesseract_command_language, m) {
         return tp::MoveInstructionPoly(mi);
     }, "instruction"_a);
 
-    // Workaround for RTTI issues across shared library boundaries
-    // The C++ as<T>() method uses typeid() which generates different type_info in Python bindings
-    // Since isMoveInstruction() works (uses typeid() within C++ lib), we can use getInterface().recover()
-    // to get the underlying MoveInstructionPoly* and copy it
+    // Helper functions for Poly type casting (0.33.x uses as<T>() method)
     m.def("InstructionPoly_as_MoveInstructionPoly", [](tp::InstructionPoly& ip) -> tp::MoveInstructionPoly {
         if (!ip.isMoveInstruction())
             throw std::runtime_error("InstructionPoly is not a MoveInstruction");
-        // The internal value stores a MoveInstructionPoly - retrieve it via recover()
-        // recover() returns void* to the actual stored value
-        auto* ptr = static_cast<tp::MoveInstructionPoly*>(ip.getInterface().recover());
-        return *ptr;  // Copy
+        return ip.as<tp::MoveInstructionPoly>();
     }, "instruction"_a);
 
     m.def("WaypointPoly_as_StateWaypointPoly", [](tp::WaypointPoly& wp) -> tp::StateWaypointPoly {
         if (!wp.isStateWaypoint())
             throw std::runtime_error("WaypointPoly is not a StateWaypoint");
-        auto* ptr = static_cast<tp::StateWaypointPoly*>(wp.getInterface().recover());
-        return *ptr;
+        return wp.as<tp::StateWaypointPoly>();
     }, "waypoint"_a);
 
     m.def("WaypointPoly_as_CartesianWaypointPoly", [](tp::WaypointPoly& wp) -> tp::CartesianWaypointPoly {
         if (!wp.isCartesianWaypoint())
             throw std::runtime_error("WaypointPoly is not a CartesianWaypoint");
-        auto* ptr = static_cast<tp::CartesianWaypointPoly*>(wp.getInterface().recover());
-        return *ptr;
+        return wp.as<tp::CartesianWaypointPoly>();
     }, "waypoint"_a);
 
     m.def("WaypointPoly_as_JointWaypointPoly", [](tp::WaypointPoly& wp) -> tp::JointWaypointPoly {
         if (!wp.isJointWaypoint())
             throw std::runtime_error("WaypointPoly is not a JointWaypoint");
-        auto* ptr = static_cast<tp::JointWaypointPoly*>(wp.getInterface().recover());
-        return *ptr;
+        return wp.as<tp::JointWaypointPoly>();
     }, "waypoint"_a);
 
     // ========== MoveInstruction ==========
+    // In 0.33.x, constructor takes WaypointPoly directly
     nb::class_<tp::MoveInstruction>(m, "MoveInstruction")
-        .def(nb::init<tp::CartesianWaypointPoly, tp::MoveInstructionType>(),
-             "waypoint"_a, "type"_a)
-        .def(nb::init<tp::JointWaypointPoly, tp::MoveInstructionType>(),
-             "waypoint"_a, "type"_a)
-        .def(nb::init<tp::StateWaypointPoly, tp::MoveInstructionType>(),
-             "waypoint"_a, "type"_a)
-        // SWIG-compatible constructors with profile parameter
-        .def(nb::init<tp::CartesianWaypointPoly, tp::MoveInstructionType, std::string>(),
-             "waypoint"_a, "type"_a, "profile"_a)
-        .def(nb::init<tp::JointWaypointPoly, tp::MoveInstructionType, std::string>(),
-             "waypoint"_a, "type"_a, "profile"_a)
-        .def(nb::init<tp::StateWaypointPoly, tp::MoveInstructionType, std::string>(),
-             "waypoint"_a, "type"_a, "profile"_a)
+        .def(nb::init<tp::WaypointPoly, tp::MoveInstructionType, std::string, tc::ManipulatorInfo>(),
+             "waypoint"_a, "type"_a, "profile"_a = tp::DEFAULT_PROFILE_KEY,
+             "manipulator_info"_a = tc::ManipulatorInfo())
+        .def(nb::init<tp::WaypointPoly, tp::MoveInstructionType, std::string, std::string, tc::ManipulatorInfo>(),
+             "waypoint"_a, "type"_a, "profile"_a, "path_profile"_a,
+             "manipulator_info"_a = tc::ManipulatorInfo())
         .def("getWaypoint", [](tp::MoveInstruction& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)
-        .def("assignCartesianWaypoint", &tp::MoveInstruction::assignCartesianWaypoint, "waypoint"_a)
-        .def("assignJointWaypoint", &tp::MoveInstruction::assignJointWaypoint, "waypoint"_a)
-        .def("assignStateWaypoint", &tp::MoveInstruction::assignStateWaypoint, "waypoint"_a)
         .def("getMoveType", &tp::MoveInstruction::getMoveType)
         .def("setMoveType", &tp::MoveInstruction::setMoveType, "move_type"_a)
         .def("getProfile", &tp::MoveInstruction::getProfile, "ns"_a = "")
@@ -340,9 +322,13 @@ NB_MODULE(_tesseract_command_language, m) {
             return self.getInstructions();
         }, nb::rv_policy::reference_internal)
         .def("setInstructions", &tp::CompositeInstruction::setInstructions, "instructions"_a)
+        // In 0.33.x, use push_back instead of appendMoveInstruction
         .def("appendMoveInstruction", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
-            self.appendMoveInstruction(mi);
+            self.push_back(mi);
         }, "mi"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::InstructionPoly& ip) {
+            self.push_back(ip);
+        }, "instruction"_a)
         .def("size", &tp::CompositeInstruction::size)
         .def("empty", &tp::CompositeInstruction::empty)
         .def("clear", &tp::CompositeInstruction::clear)
@@ -355,31 +341,6 @@ NB_MODULE(_tesseract_command_language, m) {
             return nb::make_iterator(nb::type<tp::CompositeInstruction>(), "iterator", self.begin(), self.end());
         }, nb::keep_alive<0, 1>());
 
-    // ========== Profile (base class) ==========
-    nb::class_<tp::Profile>(m, "Profile")
-        .def(nb::init<>())
-        .def(nb::init<std::size_t>(), "key"_a)
-        .def("getKey", &tp::Profile::getKey);
-
-    // ========== ProfileDictionary ==========
-    nb::class_<tp::ProfileDictionary>(m, "ProfileDictionary")
-        .def(nb::init<>())
-        .def("addProfile", nb::overload_cast<const std::string&, const std::string&, const tp::Profile::ConstPtr&>(
-            &tp::ProfileDictionary::addProfile), "ns"_a, "profile_name"_a, "profile"_a)
-        .def("hasProfile", &tp::ProfileDictionary::hasProfile, "key"_a, "ns"_a, "profile_name"_a)
-        .def("getProfile", &tp::ProfileDictionary::getProfile, "key"_a, "ns"_a, "profile_name"_a)
-        .def("removeProfile", &tp::ProfileDictionary::removeProfile, "key"_a, "ns"_a, "profile_name"_a)
-        .def("hasProfileEntry", &tp::ProfileDictionary::hasProfileEntry, "key"_a, "ns"_a)
-        .def("removeProfileEntry", &tp::ProfileDictionary::removeProfileEntry, "key"_a, "ns"_a)
-        .def("clear", &tp::ProfileDictionary::clear);
-
-    // Helper function to add profiles from other modules (cross-module inheritance workaround)
-    // This casts Profile::ConstPtr from other modules to the base type
-    m.def("ProfileDictionary_addProfile", [](tp::ProfileDictionary& dict,
-                                              const std::string& ns,
-                                              const std::string& profile_name,
-                                              tp::Profile::ConstPtr profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add a profile to the dictionary (cross-module helper)");
+    // Profile and ProfileDictionary are now bound in tesseract_common (0.33.x)
+    // Import is done at module init to ensure cross-module type sharing works
 }

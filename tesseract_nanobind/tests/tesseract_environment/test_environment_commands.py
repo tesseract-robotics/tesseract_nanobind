@@ -31,7 +31,6 @@ from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     AllowedCollisionMatrix,
     CollisionMarginData,
-    CollisionMarginOverrideType,
     Isometry3d,
 )
 from tesseract_robotics.tesseract_scene_graph import Link, Joint, JointType, Visual, Collision

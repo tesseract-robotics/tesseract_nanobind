@@ -46,7 +46,10 @@ __all__ = [
     # Collision
     "AllowedCollisionMatrix",
     "CollisionMarginData",
-    "CollisionMarginOverrideType",
+
+    # Profile (moved from tesseract_planning in 0.33.x)
+    "Profile",
+    "ProfileDictionary",
 
     # Kinematics
     "KinematicLimits",
