@@ -1,40 +1,33 @@
+"""Tests for tesseract_environment bindings."""
 import os
+import numpy as np
+import traceback
 
 from tesseract_robotics import tesseract_environment
 from tesseract_robotics import tesseract_urdf
 from tesseract_robotics import tesseract_srdf
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
-import traceback
-import numpy as np
 
-def get_scene_graph():
-    """Return (scene_graph, locator) - locator must be kept alive."""
+
+def test_env(ctx):
+    """Test Environment creation and event callbacks."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
     path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
-    locator = TesseractSupportResourceLocator()
-    # nanobind automatically extracts from unique_ptr, no .release() needed
-    return tesseract_urdf.parseURDFFile(path, locator), locator
+    srdf_path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
 
-def get_srdf_model(scene_graph):
-    """Return (srdf, locator) - locator must be kept alive."""
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
-    path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
-    srdf = tesseract_srdf.SRDFModel()
-    locator = TesseractSupportResourceLocator()
-    srdf.initFile(scene_graph, path, locator)
-    return srdf, locator
-
-def get_environment():
-    """Return (env, locators_list) - locators must be kept alive."""
-    scene_graph, sg_locator = get_scene_graph()
+    locator = ctx.keep(TesseractSupportResourceLocator())
+    scene_graph = tesseract_urdf.parseURDFFile(path, locator)
+    ctx.keep(scene_graph)
     assert scene_graph is not None
 
-    srdf, srdf_locator = get_srdf_model(scene_graph)
+    srdf_locator = ctx.keep(TesseractSupportResourceLocator())
+    srdf = tesseract_srdf.SRDFModel()
+    srdf.initFile(scene_graph, srdf_path, srdf_locator)
+    ctx.keep(srdf)
     assert srdf is not None
 
     env = tesseract_environment.Environment()
     assert env is not None
-
     assert env.getRevision() == 0
 
     success = env.init(scene_graph, srdf)
@@ -66,8 +59,8 @@ def get_environment():
                     command_applied[0] = True
         except Exception:
             traceback.print_exc()
-    event_cb = tesseract_environment.EventCallbackFn(event_cb_py)
 
+    event_cb = tesseract_environment.EventCallbackFn(event_cb_py)
     env.addEventCallback(12345, event_cb)
 
     env.setState(joint_names, joint_values)
@@ -77,31 +70,27 @@ def get_environment():
     assert env.applyCommand(cmd)
     assert command_applied[0]
 
-    # Return env and all locators that must be kept alive
-    return env, [sg_locator, srdf_locator, scene_graph, srdf]
 
-def test_env():
-    import gc
-    env, refs = get_environment()
-    # Cleanup in correct order
-    del env
-    del refs
-    gc.collect()
-
-
-def test_anypoly_wrap_environment_const():
+def test_anypoly_wrap_environment_const(ctx):
     """Test wrapping Environment in AnyPoly for TaskComposerDataStorage."""
-    import gc
     from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst
 
-    env, refs = get_environment()
-    # AnyPoly_wrap_EnvironmentConst expects shared_ptr<const Environment>
-    # The environment is already a shared_ptr from Python's perspective
+    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
+    srdf_path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
+
+    locator = ctx.keep(TesseractSupportResourceLocator())
+    scene_graph = tesseract_urdf.parseURDFFile(path, locator)
+    ctx.keep(scene_graph)
+
+    srdf_locator = ctx.keep(TesseractSupportResourceLocator())
+    srdf = tesseract_srdf.SRDFModel()
+    srdf.initFile(scene_graph, srdf_path, srdf_locator)
+    ctx.keep(srdf)
+
+    env = tesseract_environment.Environment()
+    env.init(scene_graph, srdf)
+
     any_poly = AnyPoly_wrap_EnvironmentConst(env)
     assert any_poly is not None
     assert not any_poly.isNull()
-    # Cleanup in correct order
-    del any_poly
-    del env
-    del refs
-    gc.collect()

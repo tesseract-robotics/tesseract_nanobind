@@ -1,7 +1,8 @@
 """Pytest configuration for tesseract_robotics tests.
 
-Handles cleanup to avoid segfaults from Python's non-deterministic
-garbage collection order at interpreter shutdown.
+Provides unified object lifetime management via TesseractContext fixture.
+C++ bindings require objects to be deleted in correct order - locators
+must outlive environments that use them, etc.
 
 Custom markers:
   - viewer: Viewer/visualization examples
@@ -13,13 +14,11 @@ import os
 from pathlib import Path
 
 # Force TESSERACT_HEADLESS=1 to prevent visualization server stalling tests
-# Override any shell-sourced value (env.sh defaults to 0)
 os.environ["TESSERACT_HEADLESS"] = "1"
 
 # Set up env vars BEFORE importing tesseract_robotics
-# For dev testing, use ws/src/ paths if bundled data doesn't exist
 _tests_dir = Path(__file__).parent
-_project_root = _tests_dir.parent.parent  # tesseract_nanobind/tests -> tesseract_nanobind -> project_root
+_project_root = _tests_dir.parent.parent
 _ws_src = _project_root / "ws" / "src"
 
 # TESSERACT_SUPPORT_DIR
@@ -45,8 +44,13 @@ if _config_file.exists() and not os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_
 # Now import tesseract_robotics (its _configure_environment will be a no-op since we set vars)
 import tesseract_robotics  # noqa: F401
 
-import gc
 import pytest
+from .context import TesseractContext
+from .tesseract_support_resource_locator import TesseractSupportResourceLocator
+from tesseract_robotics.tesseract_common import FilesystemPath, ManipulatorInfo, GeneralResourceLocator
+from tesseract_robotics.tesseract_environment import Environment
+
+TESSERACT_SUPPORT_DIR = os.environ.get("TESSERACT_SUPPORT_DIR", "")
 
 
 def pytest_configure(config):
@@ -56,21 +60,102 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "basic: marks tests as basic examples")
 
 
-@pytest.fixture(autouse=True)
-def cleanup_after_test():
-    """Force garbage collection after each test to ensure proper cleanup order.
+@pytest.fixture
+def ctx():
+    """Provide TesseractContext for managing C++ object lifetimes.
 
-    Note: gc.collect() can cause segfaults with C++ bindings if objects
-    are deleted in wrong order. We disable forced GC here - tests that need
-    explicit cleanup should handle it in their own code.
+    Use ctx.keep(obj) to ensure obj stays alive until test cleanup.
+    Cleanup happens automatically in reverse order (LIFO).
     """
-    yield
-    # Disabled: gc.collect() causes segfaults with certain test ordering
-    # Tests that need cleanup should use explicit del + gc.collect() in test code
-    pass
+    context = TesseractContext()
+    yield context
+    context.cleanup()
 
 
-def pytest_sessionfinish(session, exitstatus):
-    """Clean up at end of test session."""
-    # Disabled: gc.collect() causes segfaults with C++ binding cleanup order
-    pass
+@pytest.fixture
+def abb_env(ctx):
+    """ABB IRB2400 environment with OPW kinematics.
+
+    Returns (env, manip_info, joint_names).
+    Locator kept alive via ctx.
+    """
+    if not TESSERACT_SUPPORT_DIR:
+        pytest.skip("TESSERACT_SUPPORT_DIR not set")
+
+    locator = ctx.keep(TesseractSupportResourceLocator())
+    env = Environment()
+    urdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/abb_irb2400.urdf"))
+    srdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/abb_irb2400.srdf"))
+    if not env.init(urdf, srdf, locator):
+        pytest.skip("Failed to init ABB IRB2400 environment")
+
+    manip_info = ManipulatorInfo()
+    manip_info.manipulator = "manipulator"
+    manip_info.tcp_frame = "tool0"
+    manip_info.working_frame = "base_link"
+    joint_names = list(env.getJointGroup("manipulator").getJointNames())
+
+    return env, manip_info, joint_names
+
+
+@pytest.fixture
+def iiwa_env(ctx):
+    """IIWA LBR 14 R820 environment with KDL kinematics.
+
+    Returns (env, manip_info, joint_names).
+    Locator kept alive via ctx.
+    """
+    if not TESSERACT_SUPPORT_DIR:
+        pytest.skip("TESSERACT_SUPPORT_DIR not set")
+
+    locator = ctx.keep(TesseractSupportResourceLocator())
+    env = Environment()
+    urdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.urdf"))
+    srdf = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.srdf"))
+    if not env.init(urdf, srdf, locator):
+        pytest.skip("Failed to init IIWA environment")
+
+    manip_info = ManipulatorInfo()
+    manip_info.manipulator = "manipulator"
+    manip_info.tcp_frame = "tool0"
+    manip_info.working_frame = "base_link"
+    joint_names = list(env.getJointGroup("manipulator").getJointNames())
+
+    return env, manip_info, joint_names
+
+
+@pytest.fixture
+def simple_env(ctx):
+    """Simple 2-link robot environment for command tests.
+
+    Returns env. Locator kept alive via ctx.
+    """
+    SIMPLE_URDF = """
+<robot name="test_robot" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
+  <link name="world"/>
+  <link name="link1">
+    <visual><geometry><box size="0.1 0.1 0.1"/></geometry></visual>
+    <collision><geometry><box size="0.1 0.1 0.1"/></geometry></collision>
+  </link>
+  <link name="link2">
+    <visual><geometry><box size="0.1 0.1 0.1"/></geometry></visual>
+    <collision><geometry><box size="0.1 0.1 0.1"/></geometry></collision>
+  </link>
+  <joint name="joint1" type="revolute">
+    <parent link="world"/>
+    <child link="link1"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" lower="-1.57" upper="1.57" velocity="1.0"/>
+  </joint>
+  <joint name="joint2" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" lower="-1.57" upper="1.57" velocity="1.0"/>
+  </joint>
+</robot>
+"""
+    locator = ctx.keep(GeneralResourceLocator())
+    env = Environment()
+    env.init(SIMPLE_URDF, locator)
+    return env

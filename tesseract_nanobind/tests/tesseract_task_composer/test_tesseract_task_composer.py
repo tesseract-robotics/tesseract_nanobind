@@ -3,15 +3,12 @@ import os
 import numpy as np
 import pytest
 
-import tesseract_robotics  # triggers env var setup
 from tesseract_robotics.tesseract_common import (
     FilesystemPath,
     Isometry3d,
     Translation3d,
-    ManipulatorInfo,
     GeneralResourceLocator,
 )
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     JointWaypoint,
@@ -37,31 +34,7 @@ from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_as_CompositeInstruction,
 )
 
-
-TESSERACT_SUPPORT_DIR = os.environ.get("TESSERACT_SUPPORT_DIR", "")
 TESSERACT_TASK_COMPOSER_CONFIG = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE", "")
-
-
-@pytest.fixture
-def iiwa_environment():
-    """Load IIWA robot environment for testing."""
-    if not TESSERACT_SUPPORT_DIR:
-        pytest.skip("TESSERACT_SUPPORT_DIR not set")
-
-    locator = GeneralResourceLocator()
-    env = Environment()
-    urdf_path = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.urdf"))
-    srdf_path = FilesystemPath(os.path.join(TESSERACT_SUPPORT_DIR, "urdf/lbr_iiwa_14_r820.srdf"))
-
-    if not env.init(urdf_path, srdf_path, locator):
-        pytest.skip("Failed to initialize IIWA environment")
-
-    manip_info = ManipulatorInfo()
-    manip_info.tcp_frame = "tool0"
-    manip_info.manipulator = "manipulator"
-    manip_info.working_frame = "base_link"
-
-    return env, manip_info
 
 
 def freespace_example_program_iiwa(manipulator_info, goal=None, freespace_profile=DEFAULT_PROFILE_KEY):
@@ -101,12 +74,12 @@ def freespace_example_program_iiwa(manipulator_info, goal=None, freespace_profil
 class TestTaskComposerPluginFactory:
     """Test TaskComposerPluginFactory."""
 
-    def test_create_factory(self):
+    def test_create_factory(self, ctx):
         if not TESSERACT_TASK_COMPOSER_CONFIG:
             pytest.skip("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set")
 
         config_path = FilesystemPath(TESSERACT_TASK_COMPOSER_CONFIG)
-        locator = GeneralResourceLocator()
+        locator = ctx.keep(GeneralResourceLocator())
         factory = TaskComposerPluginFactory(config_path, locator)
         assert factory is not None
 
@@ -114,11 +87,11 @@ class TestTaskComposerPluginFactory:
 class TestTaskComposerTrajOptPipeline:
     """Test TrajOpt pipeline through task composer."""
 
-    def test_trajopt_pipeline(self, iiwa_environment):
+    def test_trajopt_pipeline(self, iiwa_env):
         if not TESSERACT_TASK_COMPOSER_CONFIG:
             pytest.skip("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set")
 
-        env, manip_info = iiwa_environment
+        env, manip_info, joint_names = iiwa_env
 
         config_path = FilesystemPath(TESSERACT_TASK_COMPOSER_CONFIG)
         locator = GeneralResourceLocator()
@@ -146,33 +119,20 @@ class TestTaskComposerTrajOptPipeline:
         task_executor = factory.createTaskComposerExecutor("TaskflowExecutor")
         assert task_executor is not None
 
-        future = None
-        try:
-            future = task_executor.run(task, task_data)
-            future.wait()
+        future = task_executor.run(task, task_data)
+        future.wait()
 
-            output_program = AnyPoly_as_CompositeInstruction(
-                future.context.data_storage.getData(output_key)
-            )
-            assert len(output_program) == 11
+        output_program = AnyPoly_as_CompositeInstruction(
+            future.context.data_storage.getData(output_key)
+        )
+        assert len(output_program) == 11
 
-            # Verify output program structure
-            for i in range(len(output_program)):
-                instr = output_program[i]
-                if instr.isMoveInstruction():
-                    move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
-                    wp = move_instr.getWaypoint()
-                    if wp.isStateWaypoint():
-                        state_wp = WaypointPoly_as_StateWaypointPoly(wp)
-                        assert len(state_wp.getPosition()) == 7
-
-        finally:
-            # Cleanup to prevent segfault on exit
-            del task_data
-            del problem_anypoly
-            del environment_anypoly
-            del profiles_anypoly
-            if future is not None:
-                del future
-            del task_executor
-            del task
+        # Verify output program structure
+        for i in range(len(output_program)):
+            instr = output_program[i]
+            if instr.isMoveInstruction():
+                move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+                wp = move_instr.getWaypoint()
+                if wp.isStateWaypoint():
+                    state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+                    assert len(state_wp.getPosition()) == 7

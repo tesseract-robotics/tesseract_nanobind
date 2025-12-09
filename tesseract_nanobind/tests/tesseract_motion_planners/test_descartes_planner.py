@@ -1,7 +1,4 @@
-"""Tests for tesseract_motion_planners_descartes bindings.
-
-These tests cover Descartes motion planner and profiles.
-"""
+"""Tests for tesseract_motion_planners_descartes bindings."""
 import os
 import numpy as np
 import pytest
@@ -10,11 +7,7 @@ from tesseract_robotics.tesseract_common import (
     Isometry3d,
     Translation3d,
     Quaterniond,
-    ManipulatorInfo,
-    GeneralResourceLocator,
-    FilesystemPath,
 )
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
@@ -40,36 +33,7 @@ try:
 except ImportError:
     DESCARTES_AVAILABLE = False
 
-
 DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
-
-
-@pytest.fixture
-def abb_irb2400_environment():
-    """Load ABB IRB2400 robot environment for testing (has OPW kinematics)."""
-    tesseract_support = os.environ.get("TESSERACT_SUPPORT_DIR")
-    if not tesseract_support:
-        pytest.skip("TESSERACT_SUPPORT_DIR not set")
-
-    locator = GeneralResourceLocator()
-
-    urdf_path = FilesystemPath(os.path.join(tesseract_support, "urdf/abb_irb2400.urdf"))
-    srdf_path = FilesystemPath(os.path.join(tesseract_support, "urdf/abb_irb2400.srdf"))
-
-    t_env = Environment()
-    success = t_env.init(urdf_path, srdf_path, locator)
-    if not success:
-        pytest.skip("Failed to initialize ABB IRB2400 environment")
-
-    manip_info = ManipulatorInfo()
-    manip_info.tcp_frame = "tool0"
-    manip_info.manipulator = "manipulator"
-    manip_info.manipulator_ik_solver = "OPWInvKin"
-    manip_info.working_frame = "base_link"
-
-    joint_names = list(t_env.getJointGroup("manipulator").getJointNames())
-
-    return t_env, manip_info, joint_names
 
 
 class TestDescartesProfiles:
@@ -78,7 +42,6 @@ class TestDescartesProfiles:
     def test_default_plan_profile(self):
         profile = DescartesDefaultPlanProfileD()
         assert profile is not None
-        # Test base class methods
         assert profile.getKey() is not None
         assert DescartesDefaultPlanProfileD.getStaticKey() is not None
 
@@ -86,7 +49,6 @@ class TestDescartesProfiles:
         """Test DescartesDefaultPlanProfileD attributes."""
         profile = DescartesDefaultPlanProfileD()
 
-        # Test pose sampling attributes
         profile.target_pose_fixed = False
         assert profile.target_pose_fixed is False
 
@@ -99,7 +61,6 @@ class TestDescartesProfiles:
         profile.target_pose_sample_max = np.pi
         assert profile.target_pose_sample_max == pytest.approx(np.pi)
 
-        # Test collision attributes
         profile.allow_collision = True
         assert profile.allow_collision is True
 
@@ -127,7 +88,6 @@ class TestDescartesMotionPlanner:
     def test_terminate_and_clear(self):
         """Test terminate() and clear() methods."""
         planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
-        # These should not raise exceptions
         planner.terminate()
         planner.clear()
 
@@ -135,9 +95,9 @@ class TestDescartesMotionPlanner:
 class TestDescartesPlanning:
     """Integration test for Descartes motion planning."""
 
-    def test_descartes_freespace_fixed_poses(self, abb_irb2400_environment):
+    def test_descartes_freespace_fixed_poses(self, abb_env):
         """Test Descartes planning between two fixed Cartesian poses."""
-        env, manip_info, joint_names = abb_irb2400_environment
+        env, manip_info, joint_names = abb_env
 
         # Two cartesian waypoints
         wp1 = CartesianWaypoint(
@@ -175,7 +135,6 @@ class TestDescartesPlanning:
 
         # Setup Descartes profiles
         plan_profile = DescartesDefaultPlanProfileD()
-        # Use cast helper to convert to Profile for ProfileDictionary
         plan_profile_base = cast_DescartesPlanProfileD(plan_profile)
 
         profiles = ProfileDictionary()
@@ -193,7 +152,7 @@ class TestDescartesPlanning:
         response = single_descartes_planner.solve(request)
         assert response.successful, f"Descartes planning failed: {response.message}"
 
-        # Verify results - iterate through instructions
+        # Verify results
         results = response.results
         count = 0
         for instr in results:
@@ -202,7 +161,7 @@ class TestDescartesPlanning:
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
                     state_wp = WaypointPoly_as_StateWaypointPoly(wp)
-                    assert len(state_wp.getNames()) == 6  # ABB IRB2400 has 6 joints
+                    assert len(state_wp.getNames()) == 6
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 6
                 count += 1
