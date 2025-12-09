@@ -37,19 +37,19 @@ from tesseract_robotics.tesseract_command_language import (
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     MoveInstructionPoly_wrap_MoveInstruction,
     ProfileDictionary,
-    AnyPoly_wrap_CompositeInstruction,
-    AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_task_composer import (
     createTaskComposerPluginFactory,
     TaskComposerDataStorage,
+    AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_ProfileDictionary,
+    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )

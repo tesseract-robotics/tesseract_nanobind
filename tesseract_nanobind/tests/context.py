@@ -43,7 +43,8 @@ class TesseractContext:
         # Delete in reverse order to ensure proper cleanup
         while self._refs:
             self._refs.pop()
-        gc.collect()
+        # Note: gc.collect() can cause segfaults if C++ objects have circular refs
+        # Skip explicit gc - let Python handle it naturally
 
     def __enter__(self):
         return self

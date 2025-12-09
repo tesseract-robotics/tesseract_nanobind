@@ -11,15 +11,14 @@ from tesseract_robotics.tesseract_common import FilesystemPath, Isometry3d, Tran
 from tesseract_robotics.tesseract_command_language import CartesianWaypoint, WaypointPoly, \
     MoveInstructionType_FREESPACE, MoveInstruction, InstructionPoly, StateWaypoint, StateWaypointPoly, \
     CompositeInstruction, MoveInstructionPoly, CartesianWaypointPoly, ProfileDictionary, \
-        AnyPoly_as_CompositeInstruction, CompositeInstructionOrder_ORDERED, DEFAULT_PROFILE_KEY, \
-        AnyPoly_wrap_CompositeInstruction, DEFAULT_PROFILE_KEY, JointWaypoint, JointWaypointPoly, \
+        CompositeInstructionOrder_ORDERED, DEFAULT_PROFILE_KEY, JointWaypoint, JointWaypointPoly, \
         InstructionPoly_as_MoveInstructionPoly, WaypointPoly_as_StateWaypointPoly, \
         MoveInstructionPoly_wrap_MoveInstruction, StateWaypointPoly_wrap_StateWaypoint, \
-        CartesianWaypointPoly_wrap_CartesianWaypoint, JointWaypointPoly_wrap_JointWaypoint, \
-        AnyPoly_wrap_ProfileDictionary
+        CartesianWaypointPoly_wrap_CartesianWaypoint, JointWaypointPoly_wrap_JointWaypoint
 
 from tesseract_robotics.tesseract_task_composer import createTaskComposerPluginFactory, \
-    TaskComposerDataStorage, TaskComposerContext
+    TaskComposerDataStorage, TaskComposerContext, AnyPoly_wrap_CompositeInstruction, \
+    AnyPoly_as_CompositeInstruction, AnyPoly_wrap_ProfileDictionary
 
 from tesseract_robotics_viewer import TesseractViewer
 

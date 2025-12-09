@@ -54,13 +54,13 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypointPoly_wrap_StateWaypoint,
     MoveInstructionPoly_wrap_MoveInstruction,
     ProfileDictionary,
-    AnyPoly_wrap_CompositeInstruction,
-    AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_task_composer import (
     createTaskComposerPluginFactory,
     TaskComposerDataStorage,
+    AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_ProfileDictionary,
+    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
 
