@@ -34,9 +34,7 @@ def main():
     env = Environment()
     urdf_path_str = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
     srdf_path_str = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
-    urdf_path = FilesystemPath(urdf_path_str)
-    srdf_path = FilesystemPath(srdf_path_str)
-    assert env.init(urdf_path, srdf_path, locator)
+    assert env.init(urdf_path_str, srdf_path_str, locator)
 
     robot_joint_names = [f"joint_{i+1}" for i in range(6)]
     robot_joint_pos = np.zeros(6)

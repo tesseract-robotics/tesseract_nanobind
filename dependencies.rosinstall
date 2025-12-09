@@ -3,21 +3,25 @@
     uri: https://github.com/ros-industrial/ros_industrial_cmake_boilerplate.git
     version: 0.7.1
 - git:
+    local-name: boost_plugin_loader
+    uri: https://github.com/tesseract-robotics/boost_plugin_loader.git
+    version: 0.4.3
+- git:
     local-name: tesseract
     uri: https://github.com/tesseract-robotics/tesseract.git
-    version: 0.28.0
+    version: 0.33.0
 - git:
     local-name: tesseract_planning
     uri: https://github.com/tesseract-robotics/tesseract_planning.git
-    version: 0.28.1
+    version: 0.33.1
 - git:
     local-name: trajopt
     uri: https://github.com/tesseract-robotics/trajopt.git
-    version: 0.28.0
+    version: 0.33.0
 - git:
     local-name: descartes_light
     uri: https://github.com/swri-robotics/descartes_light.git
-    version: 0.4.5
+    version: 0.4.9
 - git:
     local-name: opw_kinematics
     uri: https://github.com/Jmeyer1292/opw_kinematics.git

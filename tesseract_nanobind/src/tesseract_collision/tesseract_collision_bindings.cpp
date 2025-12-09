@@ -16,7 +16,7 @@
 #include <tesseract_common/allowed_collision_matrix.h>
 #include <tesseract_common/collision_margin_data.h>
 #include <tesseract_common/resource_locator.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 #include <tesseract_common/types.h>
 
 // tesseract_geometry for collision objects
@@ -174,7 +174,7 @@ NB_MODULE(_tesseract_collision, m) {
     nb::class_<tc::ContactManagerConfig>(m, "ContactManagerConfig")
         .def(nb::init<>())
         .def(nb::init<double>(), "default_margin"_a)
-        .def_rw("margin_data_override_type", &tc::ContactManagerConfig::margin_data_override_type)
+        .def_rw("pair_margin_override_type", &tc::ContactManagerConfig::pair_margin_override_type)
         .def_rw("acm_override_type", &tc::ContactManagerConfig::acm_override_type);
 
     // ========== CollisionCheckConfig ==========
@@ -213,14 +213,14 @@ NB_MODULE(_tesseract_collision, m) {
         .def("getCollisionObjects", &tc::DiscreteContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::DiscreteContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::DiscreteContactManager::getActiveCollisionObjects)
-        .def("setDefaultCollisionMarginData", &tc::DiscreteContactManager::setDefaultCollisionMarginData,
+        .def("setDefaultCollisionMargin", &tc::DiscreteContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
-        .def("setPairCollisionMarginData", &tc::DiscreteContactManager::setPairCollisionMarginData,
+        .def("setCollisionMarginPair", &tc::DiscreteContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
-        .def("setCollisionMarginData", [](tc::DiscreteContactManager& self,
-                                          const tcommon::CollisionMarginData& margin_data) {
-            self.setCollisionMarginData(margin_data, tcommon::CollisionMarginOverrideType::REPLACE);
-        }, "collision_margin_data"_a)
+        .def("setCollisionMarginData", &tc::DiscreteContactManager::setCollisionMarginData,
+             "collision_margin_data"_a)
+        .def("setCollisionMarginPairData", &tc::DiscreteContactManager::setCollisionMarginPairData,
+             "pair_margin_data"_a, "override_type"_a = tcommon::CollisionMarginPairOverrideType::REPLACE)
         .def("getCollisionMarginData", &tc::DiscreteContactManager::getCollisionMarginData)
         .def("addCollisionObject",
              [](tc::DiscreteContactManager& self, const std::string& name, int mask_id,
@@ -252,41 +252,19 @@ NB_MODULE(_tesseract_collision, m) {
         .def("getCollisionObjects", &tc::ContinuousContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::ContinuousContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::ContinuousContactManager::getActiveCollisionObjects)
-        .def("setDefaultCollisionMarginData", &tc::ContinuousContactManager::setDefaultCollisionMarginData,
+        .def("setDefaultCollisionMargin", &tc::ContinuousContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
-        .def("setPairCollisionMarginData", &tc::ContinuousContactManager::setPairCollisionMarginData,
+        .def("setCollisionMarginPair", &tc::ContinuousContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
+        .def("setCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginData,
+             "collision_margin_data"_a)
+        .def("setCollisionMarginPairData", &tc::ContinuousContactManager::setCollisionMarginPairData,
+             "pair_margin_data"_a, "override_type"_a = tcommon::CollisionMarginPairOverrideType::REPLACE)
         .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a);
 
-    // ========== ContactManagersPluginFactory ==========
-    nb::class_<tc::ContactManagersPluginFactory>(m, "ContactManagersPluginFactory")
-        .def(nb::init<>())
-        .def("__init__", [](tc::ContactManagersPluginFactory* self,
-                            const tcommon::fs::path& config_path,
-                            const tcommon::ResourceLocator& locator) {
-            new (self) tc::ContactManagersPluginFactory(config_path, locator);
-        }, "config_path"_a, "locator"_a)
-        .def("__init__", [](tc::ContactManagersPluginFactory* self,
-                            const std::string& config,
-                            const tcommon::ResourceLocator& locator) {
-            new (self) tc::ContactManagersPluginFactory(config, locator);
-        }, "config"_a, "locator"_a)
-        .def("addSearchPath", &tc::ContactManagersPluginFactory::addSearchPath, "path"_a)
-        .def("getSearchPaths", &tc::ContactManagersPluginFactory::getSearchPaths)
-        .def("addSearchLibrary", &tc::ContactManagersPluginFactory::addSearchLibrary, "library_name"_a)
-        .def("getSearchLibraries", &tc::ContactManagersPluginFactory::getSearchLibraries)
-        .def("hasDiscreteContactManagerPlugins", &tc::ContactManagersPluginFactory::hasDiscreteContactManagerPlugins)
-        .def("getDefaultDiscreteContactManagerPlugin", &tc::ContactManagersPluginFactory::getDefaultDiscreteContactManagerPlugin)
-        .def("hasContinuousContactManagerPlugins", &tc::ContactManagersPluginFactory::hasContinuousContactManagerPlugins)
-        .def("getDefaultContinuousContactManagerPlugin", &tc::ContactManagersPluginFactory::getDefaultContinuousContactManagerPlugin)
-        .def("createDiscreteContactManager",
-             [](const tc::ContactManagersPluginFactory& self, const std::string& name) {
-                 return self.createDiscreteContactManager(name);
-             }, "name"_a)
-        .def("createContinuousContactManager",
-             [](const tc::ContactManagersPluginFactory& self, const std::string& name) {
-                 return self.createContinuousContactManager(name);
-             }, "name"_a);
+    // NOTE: ContactManagersPluginFactory binding removed in 0.33.x due to
+    // boost_plugin_loader::PluginLoader not exporting copy/move constructors.
+    // Use Environment::getDiscreteContactManager() / getContinuousContactManager() instead.
 
     // Convex hull utilities
     m.def("makeConvexMesh", &tc::makeConvexMesh, "mesh"_a,

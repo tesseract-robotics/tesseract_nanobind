@@ -37,19 +37,18 @@ from tesseract_robotics.tesseract_command_language import (
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     MoveInstructionPoly_wrap_MoveInstruction,
     ProfileDictionary,
-    AnyPoly_wrap_CompositeInstruction,
-    AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_task_composer import (
     createTaskComposerPluginFactory,
     TaskComposerDataStorage,
+    AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_ProfileDictionary,
+    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
@@ -138,8 +137,8 @@ def main():
     # Load puzzle piece workcell (KUKA + grinder + puzzle piece part + auxiliary axes)
     urdf_url = "package://tesseract_support/urdf/puzzle_piece_workcell.urdf"
     srdf_url = "package://tesseract_support/urdf/puzzle_piece_workcell.srdf"
-    urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locator.locateResource(urdf_url).getFilePath()
+    srdf_path = locator.locateResource(srdf_url).getFilePath()
 
     env = Environment()
     if not env.init(urdf_path, srdf_path, locator):
@@ -236,9 +235,7 @@ def main():
     trajopt_composite_profile = TrajOptDefaultCompositeProfile()
     trajopt_composite_profile.collision_constraint_config.enabled = False
     trajopt_composite_profile.collision_cost_config.enabled = True
-    trajopt_composite_profile.collision_cost_config.safety_margin = 0.025
-    trajopt_composite_profile.collision_cost_config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
-    trajopt_composite_profile.collision_cost_config.coeff = 1.0
+    trajopt_composite_profile.collision_cost_config.collision_margin_buffer = 0.025
 
     # Add profiles to dictionary
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile)

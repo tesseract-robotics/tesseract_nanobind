@@ -11,15 +11,14 @@ from tesseract_robotics.tesseract_common import FilesystemPath, Isometry3d, Tran
 from tesseract_robotics.tesseract_command_language import CartesianWaypoint, WaypointPoly, \
     MoveInstructionType_FREESPACE, MoveInstruction, InstructionPoly, StateWaypoint, StateWaypointPoly, \
     CompositeInstruction, MoveInstructionPoly, CartesianWaypointPoly, ProfileDictionary, \
-        AnyPoly_as_CompositeInstruction, CompositeInstructionOrder_ORDERED, DEFAULT_PROFILE_KEY, \
-        AnyPoly_wrap_CompositeInstruction, DEFAULT_PROFILE_KEY, JointWaypoint, JointWaypointPoly, \
+        CompositeInstructionOrder_ORDERED, DEFAULT_PROFILE_KEY, JointWaypoint, JointWaypointPoly, \
         InstructionPoly_as_MoveInstructionPoly, WaypointPoly_as_StateWaypointPoly, \
         MoveInstructionPoly_wrap_MoveInstruction, StateWaypointPoly_wrap_StateWaypoint, \
-        CartesianWaypointPoly_wrap_CartesianWaypoint, JointWaypointPoly_wrap_JointWaypoint, \
-        AnyPoly_wrap_ProfileDictionary
+        CartesianWaypointPoly_wrap_CartesianWaypoint, JointWaypointPoly_wrap_JointWaypoint
 
 from tesseract_robotics.tesseract_task_composer import createTaskComposerPluginFactory, \
-    TaskComposerDataStorage, TaskComposerContext
+    TaskComposerDataStorage, TaskComposerContext, AnyPoly_wrap_CompositeInstruction, \
+    AnyPoly_as_CompositeInstruction, AnyPoly_wrap_ProfileDictionary
 
 from tesseract_robotics_viewer import TesseractViewer
 
@@ -78,8 +77,8 @@ task_composer_filename = os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"]
 locator = GeneralResourceLocator()
 abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
 abb_irb2400_srdf_package_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-abb_irb2400_urdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_urdf_package_url).getFilePath())
-abb_irb2400_srdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_srdf_package_url).getFilePath())
+abb_irb2400_urdf_fname = locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
+abb_irb2400_srdf_fname = locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
 
 t_env = Environment()
 

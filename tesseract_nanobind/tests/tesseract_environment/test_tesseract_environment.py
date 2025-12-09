@@ -1,44 +1,41 @@
+"""Tests for tesseract_environment bindings."""
+import os
+import numpy as np
+import traceback
+
 from tesseract_robotics import tesseract_environment
 from tesseract_robotics import tesseract_urdf
 from tesseract_robotics import tesseract_srdf
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
-import traceback
-import os
-import numpy as np
 
-def get_scene_graph():
+
+def test_env(ctx):
+    """Test Environment creation and event callbacks."""
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
-    path =  os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
-    locator = TesseractSupportResourceLocator()
-    # nanobind automatically extracts from unique_ptr, no .release() needed
-    return tesseract_urdf.parseURDFFile(path, locator)
+    path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
+    srdf_path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
 
-def get_srdf_model(scene_graph):
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
-    path =  os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
-    srdf = tesseract_srdf.SRDFModel()
-    locator = TesseractSupportResourceLocator()
-    srdf.initFile(scene_graph, path, locator)
-    return srdf
-
-def get_environment():
-    scene_graph = get_scene_graph()
+    locator = ctx.keep(TesseractSupportResourceLocator())
+    scene_graph = tesseract_urdf.parseURDFFile(path, locator)
+    ctx.keep(scene_graph)
     assert scene_graph is not None
 
-    srdf = get_srdf_model(scene_graph)
+    srdf_locator = ctx.keep(TesseractSupportResourceLocator())
+    srdf = tesseract_srdf.SRDFModel()
+    srdf.initFile(scene_graph, srdf_path, srdf_locator)
+    ctx.keep(srdf)
     assert srdf is not None
 
     env = tesseract_environment.Environment()
     assert env is not None
-
     assert env.getRevision() == 0
 
-    success = env.init(scene_graph,srdf)
+    success = env.init(scene_graph, srdf)
     assert success
     assert env.getRevision() == 3
-    
+
     joint_names = [f"joint_a{i+1}" for i in range(7)]
-    joint_values = np.array([1,2,1,2,1,2,1],dtype=np.float64)
+    joint_values = np.array([1, 2, 1, 2, 1, 2, 1], dtype=np.float64)
 
     scene_state_changed = [False]
     command_applied = [False]
@@ -62,8 +59,8 @@ def get_environment():
                     command_applied[0] = True
         except Exception:
             traceback.print_exc()
-    event_cb = tesseract_environment.EventCallbackFn(event_cb_py)
 
+    event_cb = tesseract_environment.EventCallbackFn(event_cb_py)
     env.addEventCallback(12345, event_cb)
 
     env.setState(joint_names, joint_values)
@@ -73,19 +70,27 @@ def get_environment():
     assert env.applyCommand(cmd)
     assert command_applied[0]
 
-    return env
 
-def test_env():
-    get_environment()
-
-
-def test_anypoly_wrap_environment_const():
+def test_anypoly_wrap_environment_const(ctx):
     """Test wrapping Environment in AnyPoly for TaskComposerDataStorage."""
     from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst
 
-    env = get_environment()
-    # AnyPoly_wrap_EnvironmentConst expects shared_ptr<const Environment>
-    # The environment is already a shared_ptr from Python's perspective
+    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
+    srdf_path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
+
+    locator = ctx.keep(TesseractSupportResourceLocator())
+    scene_graph = tesseract_urdf.parseURDFFile(path, locator)
+    ctx.keep(scene_graph)
+
+    srdf_locator = ctx.keep(TesseractSupportResourceLocator())
+    srdf = tesseract_srdf.SRDFModel()
+    srdf.initFile(scene_graph, srdf_path, srdf_locator)
+    ctx.keep(srdf)
+
+    env = tesseract_environment.Environment()
+    env.init(scene_graph, srdf)
+
     any_poly = AnyPoly_wrap_EnvironmentConst(env)
     assert any_poly is not None
     assert not any_poly.isNull()

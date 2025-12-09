@@ -10,7 +10,7 @@ readme = "../README.md"
 # this is in the interest of supporting the compas.dev community
 requires-python = ">=3.9"
 dependencies = [
-    "numpy>=1.21.0",
+    "numpy>=1.21.0,<2.0",
 ]
 authors = [
     { name = "Jelle Feringa", email = "jelle@terrestrial.construction" },
@@ -46,7 +46,14 @@ Repository = "https://github.com/tesseract-robotics/tesseract_nanobind"
 minversion = "6.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+norecursedirs = ["ws", "build", ".git", "*.egg-info"]
 addopts = ["-ra", "--strict-markers", "--tb=short"]
+markers = [
+    "forked: tests requiring process isolation (KinematicsPluginFactory limitation)",
+    "planning: tests using motion planners",
+    "viewer: tests requiring tesseract_robotics_viewer",
+    "basic: basic examples (collision, kinematics, scene_graph)",
+]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

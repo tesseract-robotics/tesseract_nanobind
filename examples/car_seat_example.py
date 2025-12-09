@@ -54,13 +54,13 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypointPoly_wrap_StateWaypoint,
     MoveInstructionPoly_wrap_MoveInstruction,
     ProfileDictionary,
-    AnyPoly_wrap_CompositeInstruction,
-    AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_task_composer import (
     createTaskComposerPluginFactory,
     TaskComposerDataStorage,
+    AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_ProfileDictionary,
+    AnyPoly_as_CompositeInstruction,
 )
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
 
@@ -221,8 +221,8 @@ def main():
     # Load car seat demo robot
     urdf_url = "package://tesseract_support/urdf/car_seat_demo.urdf"
     srdf_url = "package://tesseract_support/urdf/car_seat_demo.srdf"
-    urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locator.locateResource(urdf_url).getFilePath()
+    srdf_path = locator.locateResource(srdf_url).getFilePath()
 
     env = Environment()
     if not env.init(urdf_path, srdf_path, locator):

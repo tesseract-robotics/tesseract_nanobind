@@ -8,40 +8,36 @@
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract_motion_planners/core/types.h>
 
-// tesseract_command_language (for Profile base class)
-#include <tesseract_command_language/profile.h>
-#include <tesseract_command_language/profile_dictionary.h>
+// tesseract_common (for Profile base class and ProfileDictionary)
+#include <tesseract_common/profile.h>
+#include <tesseract_common/profile_dictionary.h>
 
-// tesseract_motion_planners TrajOpt
+// tesseract_motion_planners TrajOpt (0.33.x: Plan -> Move profile rename)
 #include <tesseract_motion_planners/trajopt/trajopt_motion_planner.h>
 #include <tesseract_motion_planners/trajopt/profile/trajopt_profile.h>
-#include <tesseract_motion_planners/trajopt/profile/trajopt_default_plan_profile.h>
+#include <tesseract_motion_planners/trajopt/profile/trajopt_default_move_profile.h>
 #include <tesseract_motion_planners/trajopt/profile/trajopt_default_composite_profile.h>
-#include <tesseract_motion_planners/trajopt/trajopt_collision_config.h>
 #include <tesseract_motion_planners/trajopt/trajopt_waypoint_config.h>
 
-// trajopt for CollisionEvaluatorType
-#include <trajopt/problem_description.hpp>
+// trajopt_common for TrajOptCollisionConfig
+#include <trajopt_common/collision_types.h>
 
 // tesseract_collision for ContactTestType
 #include <tesseract_collision/core/types.h>
 
 namespace tp = tesseract_planning;
+namespace tc = tesseract_common;
 
 NB_MODULE(_tesseract_motion_planners_trajopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt Python bindings";
 
-    // Import Profile type from tesseract_command_language for cross-module inheritance
-    auto cl_module = nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
+    // Import tesseract_common for Profile base class (cross-module inheritance)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
 
-    // Import tesseract_collision for ContactTestType (used by TrajOptDefaultCompositeProfile)
+    // Import tesseract_collision for CollisionEvaluatorType and other types
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
-    // ========== trajopt::CollisionEvaluatorType enum ==========
-    nb::enum_<trajopt::CollisionEvaluatorType>(m, "CollisionEvaluatorType")
-        .value("SINGLE_TIMESTEP", trajopt::CollisionEvaluatorType::SINGLE_TIMESTEP)
-        .value("DISCRETE_CONTINUOUS", trajopt::CollisionEvaluatorType::DISCRETE_CONTINUOUS)
-        .value("CAST_CONTINUOUS", trajopt::CollisionEvaluatorType::CAST_CONTINUOUS);
+    // Note: CollisionEvaluatorType enum is bound in tesseract_collision (moved there in 0.33.x)
 
     // ========== TrajOptCartesianWaypointConfig ==========
     nb::class_<tp::TrajOptCartesianWaypointConfig>(m, "TrajOptCartesianWaypointConfig")
@@ -61,69 +57,72 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         .def_rw("upper_tolerance", &tp::TrajOptJointWaypointConfig::upper_tolerance)
         .def_rw("coeff", &tp::TrajOptJointWaypointConfig::coeff);
 
-    // ========== CollisionCostConfig ==========
-    nb::class_<tp::CollisionCostConfig>(m, "CollisionCostConfig")
+    // ========== TrajOptCollisionConfig (replaces CollisionCostConfig/CollisionConstraintConfig in 0.33.x) ==========
+    nb::class_<trajopt_common::TrajOptCollisionConfig>(m, "TrajOptCollisionConfig")
         .def(nb::init<>())
-        .def_rw("enabled", &tp::CollisionCostConfig::enabled)
-        .def_rw("use_weighted_sum", &tp::CollisionCostConfig::use_weighted_sum)
-        .def_rw("type", &tp::CollisionCostConfig::type)
-        .def_rw("safety_margin", &tp::CollisionCostConfig::safety_margin)
-        .def_rw("safety_margin_buffer", &tp::CollisionCostConfig::safety_margin_buffer)
-        .def_rw("coeff", &tp::CollisionCostConfig::coeff);
+        .def_rw("enabled", &trajopt_common::TrajOptCollisionConfig::enabled)
+        .def_rw("contact_manager_config", &trajopt_common::TrajOptCollisionConfig::contact_manager_config)
+        .def_rw("collision_check_config", &trajopt_common::TrajOptCollisionConfig::collision_check_config)
+        .def_rw("collision_coeff_data", &trajopt_common::TrajOptCollisionConfig::collision_coeff_data)
+        .def_rw("collision_margin_buffer", &trajopt_common::TrajOptCollisionConfig::collision_margin_buffer)
+        .def_rw("max_num_cnt", &trajopt_common::TrajOptCollisionConfig::max_num_cnt);
 
-    // ========== CollisionConstraintConfig ==========
-    nb::class_<tp::CollisionConstraintConfig>(m, "CollisionConstraintConfig")
-        .def(nb::init<>())
-        .def_rw("enabled", &tp::CollisionConstraintConfig::enabled)
-        .def_rw("use_weighted_sum", &tp::CollisionConstraintConfig::use_weighted_sum)
-        .def_rw("type", &tp::CollisionConstraintConfig::type)
-        .def_rw("safety_margin", &tp::CollisionConstraintConfig::safety_margin)
-        .def_rw("safety_margin_buffer", &tp::CollisionConstraintConfig::safety_margin_buffer)
-        .def_rw("coeff", &tp::CollisionConstraintConfig::coeff);
+    // Aliases for backwards compatibility (0.28.x API)
+    m.attr("CollisionCostConfig") = m.attr("TrajOptCollisionConfig");
+    m.attr("CollisionConstraintConfig") = m.attr("TrajOptCollisionConfig");
 
-    // ========== TrajOptPlanProfile (base) ==========
-    nb::class_<tp::TrajOptPlanProfile, tp::Profile>(m, "TrajOptPlanProfile")
-        .def("getKey", &tp::TrajOptPlanProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptPlanProfile::getStaticKey);
+    // ========== TrajOptMoveProfile (base) - renamed from TrajOptPlanProfile in 0.33.x ==========
+    nb::class_<tp::TrajOptMoveProfile, tc::Profile>(m, "TrajOptMoveProfile")
+        .def("getKey", &tp::TrajOptMoveProfile::getKey)
+        .def_static("getStaticKey", &tp::TrajOptMoveProfile::getStaticKey);
+
+    // Alias for backwards compatibility
+    m.attr("TrajOptPlanProfile") = m.attr("TrajOptMoveProfile");
 
     // ========== TrajOptCompositeProfile (base) ==========
-    nb::class_<tp::TrajOptCompositeProfile, tp::Profile>(m, "TrajOptCompositeProfile")
+    nb::class_<tp::TrajOptCompositeProfile, tc::Profile>(m, "TrajOptCompositeProfile")
         .def("getKey", &tp::TrajOptCompositeProfile::getKey)
         .def_static("getStaticKey", &tp::TrajOptCompositeProfile::getStaticKey);
 
-    // ========== TrajOptDefaultPlanProfile ==========
-    nb::class_<tp::TrajOptDefaultPlanProfile, tp::TrajOptPlanProfile>(m, "TrajOptDefaultPlanProfile")
+    // ========== TrajOptDefaultMoveProfile - renamed from TrajOptDefaultPlanProfile in 0.33.x ==========
+    nb::class_<tp::TrajOptDefaultMoveProfile, tp::TrajOptMoveProfile>(m, "TrajOptDefaultMoveProfile")
         .def(nb::init<>())
-        .def_rw("cartesian_cost_config", &tp::TrajOptDefaultPlanProfile::cartesian_cost_config)
-        .def_rw("cartesian_constraint_config", &tp::TrajOptDefaultPlanProfile::cartesian_constraint_config)
-        .def_rw("joint_cost_config", &tp::TrajOptDefaultPlanProfile::joint_cost_config)
-        .def_rw("joint_constraint_config", &tp::TrajOptDefaultPlanProfile::joint_constraint_config);
+        .def_rw("cartesian_cost_config", &tp::TrajOptDefaultMoveProfile::cartesian_cost_config)
+        .def_rw("cartesian_constraint_config", &tp::TrajOptDefaultMoveProfile::cartesian_constraint_config)
+        .def_rw("joint_cost_config", &tp::TrajOptDefaultMoveProfile::joint_cost_config)
+        .def_rw("joint_constraint_config", &tp::TrajOptDefaultMoveProfile::joint_constraint_config);
+
+    // Alias for backwards compatibility
+    m.attr("TrajOptDefaultPlanProfile") = m.attr("TrajOptDefaultMoveProfile");
 
     // ========== TrajOptDefaultCompositeProfile ==========
     nb::class_<tp::TrajOptDefaultCompositeProfile, tp::TrajOptCompositeProfile>(m, "TrajOptDefaultCompositeProfile")
         .def(nb::init<>())
-        .def_rw("contact_test_type", &tp::TrajOptDefaultCompositeProfile::contact_test_type)
         .def_rw("collision_cost_config", &tp::TrajOptDefaultCompositeProfile::collision_cost_config)
         .def_rw("collision_constraint_config", &tp::TrajOptDefaultCompositeProfile::collision_constraint_config)
         .def_rw("smooth_velocities", &tp::TrajOptDefaultCompositeProfile::smooth_velocities)
+        .def_rw("velocity_coeff", &tp::TrajOptDefaultCompositeProfile::velocity_coeff)
         .def_rw("smooth_accelerations", &tp::TrajOptDefaultCompositeProfile::smooth_accelerations)
+        .def_rw("acceleration_coeff", &tp::TrajOptDefaultCompositeProfile::acceleration_coeff)
         .def_rw("smooth_jerks", &tp::TrajOptDefaultCompositeProfile::smooth_jerks)
+        .def_rw("jerk_coeff", &tp::TrajOptDefaultCompositeProfile::jerk_coeff)
         .def_rw("avoid_singularity", &tp::TrajOptDefaultCompositeProfile::avoid_singularity)
-        .def_rw("avoid_singularity_coeff", &tp::TrajOptDefaultCompositeProfile::avoid_singularity_coeff)
-        .def_rw("longest_valid_segment_fraction", &tp::TrajOptDefaultCompositeProfile::longest_valid_segment_fraction)
-        .def_rw("longest_valid_segment_length", &tp::TrajOptDefaultCompositeProfile::longest_valid_segment_length);
+        .def_rw("avoid_singularity_coeff", &tp::TrajOptDefaultCompositeProfile::avoid_singularity_coeff);
 
-    // Helper to add TrajOpt plan profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptPlanProfile", [](tp::ProfileDictionary& dict,
+    // Helper to add TrajOpt move profile to ProfileDictionary directly
+    m.def("ProfileDictionary_addTrajOptMoveProfile", [](tc::ProfileDictionary& dict,
                                                          const std::string& ns,
                                                          const std::string& profile_name,
-                                                         std::shared_ptr<tp::TrajOptPlanProfile> profile) {
+                                                         std::shared_ptr<tp::TrajOptMoveProfile> profile) {
         dict.addProfile(ns, profile_name, profile);
     }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOpt plan profile to ProfileDictionary");
+    "Add TrajOpt move profile to ProfileDictionary");
+
+    // Alias for backwards compatibility
+    m.attr("ProfileDictionary_addTrajOptPlanProfile") = m.attr("ProfileDictionary_addTrajOptMoveProfile");
 
     // Helper to add TrajOpt composite profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptCompositeProfile", [](tp::ProfileDictionary& dict,
+    m.def("ProfileDictionary_addTrajOptCompositeProfile", [](tc::ProfileDictionary& dict,
                                                               const std::string& ns,
                                                               const std::string& profile_name,
                                                               std::shared_ptr<tp::TrajOptCompositeProfile> profile) {

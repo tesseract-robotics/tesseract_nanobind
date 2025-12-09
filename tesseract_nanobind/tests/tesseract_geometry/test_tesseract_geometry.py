@@ -1,8 +1,9 @@
-from tesseract_robotics import tesseract_geometry
-from tesseract_robotics import tesseract_common
+import os
 import numpy as np
 import numpy.testing as nptest
-import os
+
+from tesseract_robotics import tesseract_geometry
+from tesseract_robotics import tesseract_common
 
 def test_geometry_instantiation():
     box = tesseract_geometry.Box(1,1,1)
