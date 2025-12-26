@@ -128,15 +128,14 @@ def create_geometry_link(
     material = Material(f"{name}_material")
     material.color = np.array(color, dtype=np.float64)
     visual.material = material
-    # Use assignment - nanobind returns copies for .visual/.collision
-    link.visual = [visual]
+    link.addVisual(visual)
 
     # Collision component: used for physics queries, often simplified geometry
     # Note: Some geometry types (SDFMesh, PolygonMesh) aren't supported by Bullet
     if add_collision:
         collision = Collision()
         collision.geometry = geometry
-        link.collision = [collision]
+        link.addCollision(collision)
 
     # Fixed joint attaches this link rigidly to the robot's base_link
     # The transform positions the geometry in world coordinates

@@ -68,7 +68,10 @@ from tesseract_robotics.planning import (
     create_obstacle,
     TaskComposer,
 )
-from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles, create_trajopt_default_profiles
+from tesseract_robotics.planning.profiles import (
+    create_freespace_pipeline_profiles,
+    create_trajopt_default_profiles,
+)
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -109,14 +112,15 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     # Add sphere obstacle to force non-trivial trajectory
     # Without obstacle, robot could just rotate joint_a1 (trivial solution)
-    # Sphere positioned to block direct path, requiring UPRIGHT avoidance
+    # Sphere positioned near path to influence trajectory, not block it
+    # Position chosen to be reachable but not in direct collision path
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.15),  # 15cm radius - same as C++
-        transform=Pose.from_xyz(0.5, 0, 0.55),  # In front of robot
+        geometry=sphere(0.1),  # 10cm radius - smaller to avoid blocking
+        transform=Pose.from_xyz(0.55, 0, 0.45),  # Slightly forward and lower
     )
-    print("Added sphere obstacle at (0.5, 0, 0.55)")
+    print("Added sphere obstacle at (0.55, 0, 0.45)")
 
     # Get joint names for manipulator group
     joint_names = robot.get_joint_names("manipulator")
@@ -134,7 +138,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # UPRIGHT profile: coeff=[0,0,0,5,5,5] constrains orientation, frees position
     # LINEAR motion type ensures Cartesian interpolation at intermediate points
     # StateTarget specifies joint config - TrajOpt uses FK for Cartesian constraint
-    program = (MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
         .set_joint_names(joint_names)
         .linear_to(StateTarget(joint_start_pos, names=joint_names, profile="UPRIGHT"))
         .linear_to(StateTarget(joint_end_pos, names=joint_names, profile="UPRIGHT"))

@@ -84,14 +84,13 @@ def main():
     # Visual component for rendering (optional but helpful for debugging)
     visual = Visual()
     visual.geometry = sphere_geom
-    # Use assignment - nanobind returns copies for .visual/.collision
-    sphere_link.visual = [visual]
+    sphere_link.addVisual(visual)
 
     # Collision component - this is what the contact manager actually checks
     # Without this, the sphere would be visible but not cause collisions
     collision = Collision()
     collision.geometry = sphere_geom
-    sphere_link.collision = [collision]
+    sphere_link.addCollision(collision)
 
     # Attach sphere to environment at fixed position
     # Position chosen to be within robot reach for collision demonstration

@@ -164,11 +164,9 @@ def add_seats(robot):
         visual_meshes = createMeshFromResource(visual_resource)
         if visual_meshes:
             visual.geometry = visual_meshes[0]
-        # Use assignment - nanobind returns copies for .visual/.collision
-        link.visual = [visual]
+        link.addVisual(visual)
 
         # Collision meshes (10 convex hulls)
-        collisions = []
         for m in range(1, 11):
             collision_url = (
                 f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
@@ -178,8 +176,7 @@ def add_seats(robot):
                 collision = Collision()
                 collision.origin = visual.origin
                 collision.geometry = makeConvexMesh(mesh)
-                collisions.append(collision)
-        link.collision = collisions
+                link.addCollision(collision)
 
         # Fixed joint to world (rotated 180deg around Z, positioned along X)
         joint = Joint(f"joint_seat_{i + 1}")
