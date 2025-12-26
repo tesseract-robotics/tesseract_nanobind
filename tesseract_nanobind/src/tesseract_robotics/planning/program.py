@@ -22,11 +22,12 @@ Example:
     # Access underlying CompositeInstruction for low-level API
     composite = program.to_composite_instruction()
 """
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import List, Optional, Sequence, Union
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -53,8 +54,9 @@ from tesseract_robotics.planning.transforms import Pose
 
 class MoveType(Enum):
     """Motion type for move instructions."""
+
     FREESPACE = auto()  # Point-to-point, collision-free
-    LINEAR = auto()      # Linear interpolation in Cartesian space
+    LINEAR = auto()  # Linear interpolation in Cartesian space
 
 
 @dataclass
@@ -83,9 +85,10 @@ class CartesianTarget:
             move_type=MoveType.LINEAR,
         )
     """
-    pose: Optional[Pose] = None
-    position: Optional[ArrayLike] = None
-    quaternion: Optional[ArrayLike] = None
+
+    pose: Pose | None = None
+    position: ArrayLike | None = None
+    quaternion: ArrayLike | None = None
     move_type: MoveType = MoveType.FREESPACE
     profile: str = DEFAULT_PROFILE_KEY
 
@@ -137,15 +140,16 @@ class JointTarget:
             names=["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"],
         )
     """
+
     positions: ArrayLike
-    names: Optional[List[str]] = None
+    names: list[str] | None = None
     move_type: MoveType = MoveType.FREESPACE
     profile: str = DEFAULT_PROFILE_KEY
 
     def __post_init__(self):
         self.positions = np.asarray(self.positions, dtype=np.float64)
 
-    def to_waypoint(self, joint_names: Optional[List[str]] = None) -> JointWaypoint:
+    def to_waypoint(self, joint_names: list[str] | None = None) -> JointWaypoint:
         """
         Convert to low-level JointWaypoint.
 
@@ -181,11 +185,12 @@ class StateTarget:
         move_type: Motion type
         profile: Motion profile name
     """
+
     positions: ArrayLike
-    names: Optional[List[str]] = None
-    velocities: Optional[ArrayLike] = None
-    accelerations: Optional[ArrayLike] = None
-    time: Optional[float] = None
+    names: list[str] | None = None
+    velocities: ArrayLike | None = None
+    accelerations: ArrayLike | None = None
+    time: float | None = None
     move_type: MoveType = MoveType.FREESPACE
     profile: str = DEFAULT_PROFILE_KEY
 
@@ -196,7 +201,7 @@ class StateTarget:
         if self.accelerations is not None:
             self.accelerations = np.asarray(self.accelerations, dtype=np.float64)
 
-    def to_waypoint(self, joint_names: Optional[List[str]] = None) -> StateWaypoint:
+    def to_waypoint(self, joint_names: list[str] | None = None) -> StateWaypoint:
         """Convert to low-level StateWaypoint."""
         names = self.names or joint_names
         if names is None:
@@ -220,7 +225,7 @@ class StateTarget:
 
 
 # Type alias for any target type
-Target = Union[CartesianTarget, JointTarget, StateTarget]
+Target = CartesianTarget | JointTarget | StateTarget
 
 
 class MotionProgram:
@@ -253,7 +258,7 @@ class MotionProgram:
     def __init__(
         self,
         group_name: str,
-        tcp_frame: Optional[str] = None,
+        tcp_frame: str | None = None,
         working_frame: str = "base_link",
         profile: str = DEFAULT_PROFILE_KEY,
     ):
@@ -270,10 +275,10 @@ class MotionProgram:
         self.tcp_frame = tcp_frame
         self.working_frame = working_frame
         self.profile = profile
-        self._targets: List[Target] = []
-        self._joint_names: Optional[List[str]] = None
+        self._targets: list[Target] = []
+        self._joint_names: list[str] | None = None
 
-    def set_joint_names(self, names: List[str]) -> MotionProgram:
+    def set_joint_names(self, names: list[str]) -> MotionProgram:
         """
         Set joint names for the program.
 
@@ -357,7 +362,7 @@ class MotionProgram:
         return self
 
     @property
-    def targets(self) -> List[Target]:
+    def targets(self) -> list[Target]:
         """Get list of motion targets."""
         return self._targets
 
@@ -367,8 +372,8 @@ class MotionProgram:
 
     def to_composite_instruction(
         self,
-        joint_names: Optional[List[str]] = None,
-        tcp_frame: Optional[str] = None,
+        joint_names: list[str] | None = None,
+        tcp_frame: str | None = None,
     ) -> CompositeInstruction:
         """
         Convert to low-level CompositeInstruction.
@@ -410,7 +415,7 @@ class MotionProgram:
     def _target_to_instruction(
         self,
         target: Target,
-        joint_names: Optional[List[str]],
+        joint_names: list[str] | None,
     ) -> MoveInstruction:
         """Convert a target to a MoveInstruction with wrapped waypoint."""
         profile = target.profile or self.profile

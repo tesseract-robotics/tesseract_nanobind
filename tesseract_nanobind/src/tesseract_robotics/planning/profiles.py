@@ -8,10 +8,10 @@ Also provides helpers for:
 - OMPL planner configurators (RRTConnect, RRTstar, SBL)
 - Time parameterization (TOTG, ISP)
 """
+
 from __future__ import annotations
 
 import os
-from typing import List, Optional
 
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
@@ -36,8 +36,37 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 TRAJOPT_IFOPT_DEFAULT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
 
+def _create_trajopt_profiles():
+    """Create TrajOpt composite and plan profiles with C++ example defaults (internal helper).
+
+    Returns:
+        Tuple of (composite_profile, plan_profile) configured for constraints mode.
+    """
+    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+        TrajOptDefaultCompositeProfile,
+        TrajOptDefaultPlanProfile,
+    )
+
+    composite = TrajOptDefaultCompositeProfile()
+    composite.collision_constraint_config.enabled = True
+    composite.collision_constraint_config.safety_margin = 0.00
+    composite.collision_constraint_config.safety_margin_buffer = 0.005
+    composite.collision_constraint_config.coeff = 10
+    composite.collision_cost_config.safety_margin = 0.005
+    composite.collision_cost_config.safety_margin_buffer = 0.01
+    composite.collision_cost_config.coeff = 50
+
+    plan = TrajOptDefaultPlanProfile()
+    plan.cartesian_cost_config.enabled = False
+    plan.cartesian_constraint_config.enabled = True
+    plan.joint_cost_config.enabled = False
+    plan.joint_constraint_config.enabled = True
+
+    return composite, plan
+
+
 def create_trajopt_ifopt_default_profiles(
-    profile_names: Optional[List[str]] = None,
+    profile_names: list[str] | None = None,
 ) -> ProfileDictionary:
     """Create TrajOptIfopt profiles matching C++ example defaults.
 
@@ -124,7 +153,7 @@ def create_trajopt_ifopt_default_profiles(
 
 
 def create_trajopt_default_profiles(
-    profile_names: Optional[List[str]] = None,
+    profile_names: list[str] | None = None,
 ) -> ProfileDictionary:
     """Create TrajOpt profiles matching C++ example defaults.
 
@@ -167,8 +196,6 @@ def create_trajopt_default_profiles(
         )
     """
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
         ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
     )
@@ -176,21 +203,7 @@ def create_trajopt_default_profiles(
     if profile_names is None:
         profile_names = TRAJOPT_PROFILE_NAMES
 
-    # Create ONE set of profiles
-    composite = TrajOptDefaultCompositeProfile()
-    composite.collision_constraint_config.enabled = True
-    composite.collision_constraint_config.safety_margin = 0.00
-    composite.collision_constraint_config.safety_margin_buffer = 0.005
-    composite.collision_constraint_config.coeff = 10
-    composite.collision_cost_config.safety_margin = 0.005
-    composite.collision_cost_config.safety_margin_buffer = 0.01
-    composite.collision_cost_config.coeff = 50
-
-    plan = TrajOptDefaultPlanProfile()
-    plan.cartesian_cost_config.enabled = False
-    plan.cartesian_constraint_config.enabled = True
-    plan.joint_cost_config.enabled = False
-    plan.joint_constraint_config.enabled = True
+    composite, plan = _create_trajopt_profiles()
 
     # Register under all requested names
     profiles = ProfileDictionary()
@@ -209,12 +222,12 @@ OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 
 
 def create_ompl_default_profiles(
-    profile_names: Optional[List[str]] = None,
+    profile_names: list[str] | None = None,
     planning_time: float = 5.0,
     max_solutions: int = 10,
     optimize: bool = True,
     simplify: bool = False,
-    num_planners: Optional[int] = None,
+    num_planners: int | None = None,
 ) -> ProfileDictionary:
     """Create OMPL profiles with sensible defaults.
 
@@ -305,10 +318,8 @@ def create_ompl_default_profiles(
 
 
 def create_ompl_planner_configurators(
-    planners: Optional[List[str]] = None,
-    num_planners: Optional[int] = None,
-    **kwargs
-) -> List:
+    planners: list[str] | None = None, num_planners: int | None = None, **kwargs
+) -> list:
     """Create OMPL planner configurators with custom parameters.
 
     Supports multiple planner types with their specific parameters:
@@ -399,10 +410,10 @@ DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 
 
 def create_descartes_default_profiles(
-    profile_names: Optional[List[str]] = None,
+    profile_names: list[str] | None = None,
     enable_collision: bool = True,
     enable_edge_collision: bool = False,
-    num_threads: Optional[int] = None,
+    num_threads: int | None = None,
 ) -> ProfileDictionary:
     """Create Descartes profiles with sensible defaults.
 
@@ -498,12 +509,10 @@ def create_descartes_default_profiles(
 
 def _add_trajopt_to_profiles(
     profiles: ProfileDictionary,
-    profile_names: Optional[List[str]] = None,
+    profile_names: list[str] | None = None,
 ) -> None:
     """Add TrajOpt profiles to existing ProfileDictionary (internal helper)."""
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
         ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
     )
@@ -511,21 +520,7 @@ def _add_trajopt_to_profiles(
     if profile_names is None:
         profile_names = TRAJOPT_PROFILE_NAMES
 
-    # Create ONE set of profiles
-    composite = TrajOptDefaultCompositeProfile()
-    composite.collision_constraint_config.enabled = True
-    composite.collision_constraint_config.safety_margin = 0.00
-    composite.collision_constraint_config.safety_margin_buffer = 0.005
-    composite.collision_constraint_config.coeff = 10
-    composite.collision_cost_config.safety_margin = 0.005
-    composite.collision_cost_config.safety_margin_buffer = 0.01
-    composite.collision_cost_config.coeff = 50
-
-    plan = TrajOptDefaultPlanProfile()
-    plan.cartesian_cost_config.enabled = False
-    plan.cartesian_constraint_config.enabled = True
-    plan.joint_cost_config.enabled = False
-    plan.joint_constraint_config.enabled = True
+    composite, plan = _create_trajopt_profiles()
 
     # Register under all requested names
     for name in profile_names:
@@ -538,8 +533,8 @@ def _add_trajopt_to_profiles(
 
 
 def create_freespace_pipeline_profiles(
-    profile_names: Optional[List[str]] = None,
-    num_planners: Optional[int] = None,
+    profile_names: list[str] | None = None,
+    num_planners: int | None = None,
     planning_time: float = 5.0,
     optimize: bool = True,
     max_solutions: int = 10,
@@ -607,8 +602,8 @@ def create_freespace_pipeline_profiles(
 
 
 def create_cartesian_pipeline_profiles(
-    profile_names: Optional[List[str]] = None,
-    num_threads: Optional[int] = None,
+    profile_names: list[str] | None = None,
+    num_threads: int | None = None,
 ) -> ProfileDictionary:
     """Create profiles for CartesianPipeline (Descartes + TrajOpt).
 
@@ -718,8 +713,7 @@ def create_time_optimal_parameterization(
     )
 
     return TimeOptimalTrajectoryGeneration(
-        path_tolerance=path_tolerance,
-        min_angle_change=min_angle_change
+        path_tolerance=path_tolerance, min_angle_change=min_angle_change
     )
 
 

@@ -16,6 +16,7 @@ Example:
     # Convert to Isometry3d for low-level API
     isometry = pose.to_isometry()
 """
+
 from __future__ import annotations
 
 import math
@@ -121,8 +122,13 @@ class Pose:
         pos = np.asarray(position)
         quat = np.asarray(quaternion)
         return cls.from_xyz_quat(
-            pos[0], pos[1], pos[2],
-            quat[0], quat[1], quat[2], quat[3],
+            pos[0],
+            pos[1],
+            pos[2],
+            quat[0],
+            quat[1],
+            quat[2],
+            quat[3],
         )
 
     @classmethod
@@ -235,6 +241,7 @@ class Pose:
 
 # Convenience factory functions
 
+
 def translation(x: float, y: float, z: float) -> Pose:
     """Create pure translation pose."""
     return Pose.from_xyz(x, y, z)
@@ -273,18 +280,14 @@ def rotation_z(angle: float) -> Pose:
     return Pose(mat)
 
 
-def rotation_from_quaternion(
-    qx: float, qy: float, qz: float, qw: float
-) -> Pose:
+def rotation_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Pose:
     """Create pure rotation from quaternion (scalar-last: qx, qy, qz, qw)."""
     mat = np.eye(4)
     mat[:3, :3] = _quaternion_to_rotation_matrix(qx, qy, qz, qw)
     return Pose(mat)
 
 
-def rotation_from_axis_angle(
-    axis: ArrayLike, angle: float
-) -> Pose:
+def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
     """
     Create pure rotation from axis-angle representation.
 
@@ -319,6 +322,7 @@ Transform = Pose
 
 # Internal helper functions
 
+
 def _quaternion_to_rotation_matrix(
     qx: float, qy: float, qz: float, qw: float
 ) -> np.ndarray:
@@ -327,11 +331,25 @@ def _quaternion_to_rotation_matrix(
     n = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
     qx, qy, qz, qw = qx / n, qy / n, qz / n, qw / n
 
-    return np.array([
-        [1 - 2*(qy*qy + qz*qz), 2*(qx*qy - qz*qw), 2*(qx*qz + qy*qw)],
-        [2*(qx*qy + qz*qw), 1 - 2*(qx*qx + qz*qz), 2*(qy*qz - qx*qw)],
-        [2*(qx*qz - qy*qw), 2*(qy*qz + qx*qw), 1 - 2*(qx*qx + qy*qy)],
-    ])
+    return np.array(
+        [
+            [
+                1 - 2 * (qy * qy + qz * qz),
+                2 * (qx * qy - qz * qw),
+                2 * (qx * qz + qy * qw),
+            ],
+            [
+                2 * (qx * qy + qz * qw),
+                1 - 2 * (qx * qx + qz * qz),
+                2 * (qy * qz - qx * qw),
+            ],
+            [
+                2 * (qx * qz - qy * qw),
+                2 * (qy * qz + qx * qw),
+                1 - 2 * (qx * qx + qy * qy),
+            ],
+        ]
+    )
 
 
 def _rotation_matrix_to_quaternion(R: np.ndarray) -> np.ndarray:
@@ -372,11 +390,13 @@ def _rpy_to_rotation_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray
     cp, sp = math.cos(pitch), math.sin(pitch)
     cy, sy = math.cos(yaw), math.sin(yaw)
 
-    return np.array([
-        [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
-        [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
-        [-sp, cp * sr, cp * cr],
-    ])
+    return np.array(
+        [
+            [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+            [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+            [-sp, cp * sr, cp * cr],
+        ]
+    )
 
 
 def _rotation_matrix_to_rpy(R: np.ndarray) -> Tuple[float, float, float]:

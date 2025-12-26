@@ -17,15 +17,21 @@ Example:
         for waypoint in result.trajectory:
             print(waypoint)
 """
+
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
+
+if TYPE_CHECKING:
+    from tesseract_robotics.planning.core import Robot
+    from tesseract_robotics.planning.program import MotionProgram
 
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -62,13 +68,14 @@ class TrajectoryPoint:
         accelerations: Joint accelerations (optional)
         time: Time from start (optional)
     """
-    joint_names: List[str]
-    positions: np.ndarray
-    velocities: Optional[np.ndarray] = None
-    accelerations: Optional[np.ndarray] = None
-    time: Optional[float] = None
 
-    def as_dict(self) -> Dict[str, float]:
+    joint_names: list[str]
+    positions: np.ndarray
+    velocities: np.ndarray | None = None
+    accelerations: np.ndarray | None = None
+    time: float | None = None
+
+    def as_dict(self) -> dict[str, float]:
         """Return positions as {name: position} dictionary."""
         return dict(zip(self.joint_names, self.positions))
 
@@ -78,7 +85,7 @@ class TrajectoryPoint:
         return f"TrajectoryPoint([{pos_str}]{time_str})"
 
 
-def _extract_array_field(getter, field_name: str) -> Optional[np.ndarray]:
+def _extract_array_field(getter, field_name: str) -> np.ndarray | None:
     """Extract optional array field (velocity/acceleration) from StateWaypoint."""
     try:
         val = getter()
@@ -89,7 +96,7 @@ def _extract_array_field(getter, field_name: str) -> Optional[np.ndarray]:
     return None
 
 
-def _extract_time_field(getter, field_name: str) -> Optional[float]:
+def _extract_time_field(getter, field_name: str) -> float | None:
     """Extract optional time field from StateWaypoint."""
     try:
         val = getter()
@@ -111,10 +118,11 @@ class PlanningResult:
         trajectory: List of trajectory points (if successful)
         raw_results: Raw CompositeInstruction output
     """
+
     successful: bool
     message: str = ""
-    trajectory: List[TrajectoryPoint] = field(default_factory=list)
-    raw_results: Optional[CompositeInstruction] = None
+    trajectory: list[TrajectoryPoint] = field(default_factory=list)
+    raw_results: CompositeInstruction | None = None
 
     def __bool__(self) -> bool:
         """Allow `if result:` checks."""
@@ -170,9 +178,9 @@ class TaskComposer:
     def __init__(
         self,
         factory: TaskComposerPluginFactory,
-        locator: Optional[GeneralResourceLocator] = None,
-        num_threads: Optional[int] = None,
-        executor: Optional[TaskComposerExecutor] = None,
+        locator: GeneralResourceLocator | None = None,
+        num_threads: int | None = None,
+        executor: TaskComposerExecutor | None = None,
     ):
         """
         Initialize TaskComposer.
@@ -208,10 +216,10 @@ class TaskComposer:
     @classmethod
     def from_config(
         cls,
-        config_path: Optional[Union[str, Path]] = None,
-        locator: Optional[GeneralResourceLocator] = None,
-        num_threads: Optional[int] = None,
-        executor: Optional[TaskComposerExecutor] = None,
+        config_path: str | Path | None = None,
+        locator: GeneralResourceLocator | None = None,
+        num_threads: int | None = None,
+        executor: TaskComposerExecutor | None = None,
     ) -> TaskComposer:
         """
         Create TaskComposer from config file.
@@ -241,7 +249,7 @@ class TaskComposer:
             composer = TaskComposer.from_config(executor=executor)
         """
         locator = locator or GeneralResourceLocator()
-        tried_paths: List[str] = []
+        tried_paths: list[str] = []
 
         if config_path is None:
             # Try environment variable first
@@ -263,6 +271,7 @@ class TaskComposer:
         if config_path is None:
             # Last resort: use bundled config
             from tesseract_robotics import get_task_composer_config_path
+
             bundled = get_task_composer_config_path()
             if bundled:
                 tried_paths.append(f"bundled config: {bundled}")
@@ -297,15 +306,17 @@ class TaskComposer:
                 )
             else:
                 # Use factory (respects YAML config)
-                self._executor = self.factory.createTaskComposerExecutor("TaskflowExecutor")
+                self._executor = self.factory.createTaskComposerExecutor(
+                    "TaskflowExecutor"
+                )
         return self._executor
 
     def plan(
         self,
         robot: "Robot",
-        program: Union["MotionProgram", CompositeInstruction],
+        program: "MotionProgram | CompositeInstruction",
         pipeline: str = "TrajOptPipeline",
-        profiles: Optional[ProfileDictionary] = None,
+        profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
         Plan a motion program using specified pipeline.
@@ -339,20 +350,25 @@ class TaskComposer:
             if pipeline == "FreespacePipeline" or "Freespace" in pipeline:
                 # FreespacePipeline: OMPL (global planning) + TrajOpt (smoothing)
                 from .profiles import create_freespace_pipeline_profiles
+
                 profiles = create_freespace_pipeline_profiles()
             elif pipeline == "CartesianPipeline" or "Cartesian" in pipeline:
                 # CartesianPipeline: Descartes (sampling) + TrajOpt (optimization)
                 from .profiles import create_cartesian_pipeline_profiles
+
                 profiles = create_cartesian_pipeline_profiles()
             elif "TrajOpt" in pipeline:
                 # TrajOptPipeline: TrajOpt only
                 from .profiles import create_trajopt_default_profiles
+
                 profiles = create_trajopt_default_profiles()
             elif "OMPL" in pipeline:
                 from .profiles import create_ompl_default_profiles
+
                 profiles = create_ompl_default_profiles()
             elif "Descartes" in pipeline:
                 from .profiles import create_descartes_default_profiles
+
                 profiles = create_descartes_default_profiles()
             else:
                 profiles = ProfileDictionary()
@@ -423,8 +439,8 @@ class TaskComposer:
     def plan_freespace(
         self,
         robot: "Robot",
-        program: Union["MotionProgram", CompositeInstruction],
-        profiles: Optional[ProfileDictionary] = None,
+        program: "MotionProgram | CompositeInstruction",
+        profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
         Plan freespace motion using TrajOpt pipeline.
@@ -445,8 +461,8 @@ class TaskComposer:
     def plan_ompl(
         self,
         robot: "Robot",
-        program: Union["MotionProgram", CompositeInstruction],
-        profiles: Optional[ProfileDictionary] = None,
+        program: "MotionProgram | CompositeInstruction",
+        profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
         Plan freespace motion using OMPL pipeline.
@@ -468,8 +484,8 @@ class TaskComposer:
     def plan_cartesian(
         self,
         robot: "Robot",
-        program: Union["MotionProgram", CompositeInstruction],
-        profiles: Optional[ProfileDictionary] = None,
+        program: "MotionProgram | CompositeInstruction",
+        profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
         Plan Cartesian motion using Descartes pipeline.
@@ -484,11 +500,13 @@ class TaskComposer:
         Returns:
             PlanningResult
         """
-        return self.plan(robot, program, pipeline="DescartesPipeline", profiles=profiles)
+        return self.plan(
+            robot, program, pipeline="DescartesPipeline", profiles=profiles
+        )
 
     def _extract_trajectory(
         self, composite: CompositeInstruction
-    ) -> List[TrajectoryPoint]:
+    ) -> list[TrajectoryPoint]:
         """Extract trajectory points from CompositeInstruction."""
         trajectory = []
 
@@ -523,7 +541,9 @@ class TaskComposer:
                 joint_names=list(state_wp.getNames()),
                 positions=np.array(state_wp.getPosition()),
                 velocities=_extract_array_field(state_wp.getVelocity, "Velocity"),
-                accelerations=_extract_array_field(state_wp.getAcceleration, "Acceleration"),
+                accelerations=_extract_array_field(
+                    state_wp.getAcceleration, "Acceleration"
+                ),
                 time=_extract_time_field(state_wp.getTime, "Time"),
             )
 
@@ -531,7 +551,7 @@ class TaskComposer:
 
         return trajectory
 
-    def get_available_pipelines(self) -> List[str]:
+    def get_available_pipelines(self) -> list[str]:
         """
         Get list of available pipeline names.
 

@@ -392,6 +392,154 @@ class TestCreateObstacle:
         assert "test_sphere" in robot.get_link_names()
 
 
+class TestRobotLinkManagement:
+    """Test Robot.add_link, remove_link, and allowed collision methods."""
+
+    @pytest.fixture
+    def robot(self):
+        """Load test robot."""
+        return Robot.from_tesseract_support("abb_irb2400")
+
+    def test_add_link_with_geometry(self, robot):
+        """Test adding a link with visual/collision geometry."""
+        from tesseract_robotics.tesseract_scene_graph import (
+            Link,
+            Joint,
+            JointType,
+            Visual,
+            Collision,
+        )
+        from tesseract_robotics.tesseract_geometry import Box
+
+        # Create link with box geometry
+        link = Link("test_obstacle")
+        geometry = Box(0.1, 0.1, 0.1)
+        visual = Visual()
+        visual.geometry = geometry
+        link.visual.append(visual)
+        collision = Collision()
+        collision.geometry = geometry
+        link.collision.append(collision)
+
+        # Create fixed joint
+        joint = Joint("joint_test_obstacle")
+        joint.type = JointType.FIXED
+        joint.parent_link_name = "base_link"
+        joint.child_link_name = "test_obstacle"
+
+        # Verify not present initially
+        assert "test_obstacle" not in robot.get_link_names()
+
+        # Add link
+        result = robot.add_link(link, joint)
+        assert result is True
+        assert "test_obstacle" in robot.get_link_names()
+
+    def test_add_link_using_create_fixed_joint(self, robot):
+        """Test adding link using create_fixed_joint helper."""
+        from tesseract_robotics.tesseract_scene_graph import Link, Visual, Collision
+        from tesseract_robotics.tesseract_geometry import Sphere
+        from tesseract_robotics.planning import create_fixed_joint
+
+        # Create sphere link
+        link = Link("sphere_obstacle")
+        geometry = Sphere(0.05)
+        visual = Visual()
+        visual.geometry = geometry
+        link.visual.append(visual)
+        collision = Collision()
+        collision.geometry = geometry
+        link.collision.append(collision)
+
+        # Use helper for joint
+        joint = create_fixed_joint(
+            "joint_sphere_obstacle",
+            parent_link="base_link",
+            child_link="sphere_obstacle",
+        )
+
+        result = robot.add_link(link, joint)
+        assert result is True
+        assert "sphere_obstacle" in robot.get_link_names()
+
+    def test_remove_link(self, robot):
+        """Test removing a link from the environment."""
+        # First add a link
+        result = create_obstacle(
+            robot,
+            name="removable_box",
+            geometry=box(0.1, 0.1, 0.1),
+            transform=Pose.from_xyz(0.5, 0, 0.3),
+        )
+        assert result is True
+        assert "removable_box" in robot.get_link_names()
+
+        # Remove it
+        result = robot.remove_link("removable_box")
+        assert result is True
+        assert "removable_box" not in robot.get_link_names()
+
+    def test_remove_nonexistent_link(self, robot):
+        """Test removing a link that doesn't exist returns False."""
+        result = robot.remove_link("nonexistent_link_xyz")
+        assert result is False
+
+    def test_add_remove_multiple_links(self, robot):
+        """Test adding and removing multiple links."""
+        # Add multiple obstacles
+        for i in range(3):
+            result = create_obstacle(
+                robot,
+                name=f"multi_box_{i}",
+                geometry=box(0.05, 0.05, 0.05),
+                transform=Pose.from_xyz(0.3 + i * 0.1, 0, 0.5),
+            )
+            assert result is True
+
+        # Verify all added
+        for i in range(3):
+            assert f"multi_box_{i}" in robot.get_link_names()
+
+        # Remove in reverse order
+        for i in range(2, -1, -1):
+            result = robot.remove_link(f"multi_box_{i}")
+            assert result is True
+            assert f"multi_box_{i}" not in robot.get_link_names()
+
+    def test_add_allowed_collision(self, robot):
+        """Test adding an allowed collision pair."""
+        # Add obstacle first
+        create_obstacle(
+            robot,
+            name="collision_box",
+            geometry=box(0.1, 0.1, 0.1),
+            transform=Pose.from_xyz(0.5, 0, 0.3),
+        )
+
+        # Add allowed collision between link6 and the new obstacle
+        result = robot.add_allowed_collision("link_6", "collision_box", "TestReason")
+        assert result is True
+
+    def test_add_allowed_collision_with_default_reason(self, robot):
+        """Test add_allowed_collision uses default 'Adjacent' reason."""
+        create_obstacle(
+            robot,
+            name="acm_test_box",
+            geometry=box(0.05, 0.05, 0.05),
+            transform=Pose.from_xyz(0.4, 0, 0.4),
+        )
+
+        # Should work with default reason
+        result = robot.add_allowed_collision("link_5", "acm_test_box")
+        assert result is True
+
+    def test_add_allowed_collision_between_robot_links(self, robot):
+        """Test adding allowed collision between existing robot links."""
+        # Add allowed collision between two robot links
+        result = robot.add_allowed_collision("link_3", "link_6", "UserDefined")
+        assert result is True
+
+
 class TestPlanningIntegration:
     """Integration tests for planning (require task composer)."""
 

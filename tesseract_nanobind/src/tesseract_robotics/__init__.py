@@ -13,12 +13,14 @@ Environment Variables (auto-configured on import):
 
 Priority: Bundled data (installed) > Dev workspace (editable) > User env vars
 """
-from importlib.metadata import version, PackageNotFoundError
+
+from __future__ import annotations
+
 import hashlib
 import json
 import os
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 
@@ -32,6 +34,7 @@ def _is_editable_install() -> bool:
     """Check if package was installed in editable mode (pip install -e .)."""
     try:
         from importlib.metadata import distribution
+
         dist = distribution("tesseract-robotics-nanobind")
         # Check for direct_url.json which indicates editable install
         direct_url = dist.read_text("direct_url.json")
@@ -45,7 +48,9 @@ def _is_editable_install() -> bool:
     return "site-packages" not in str(pkg_path)
 
 
-def _set_env_if_missing(var_name: str, *candidates: Path, use_parent: bool = False) -> None:
+def _set_env_if_missing(
+    var_name: str, *candidates: Path, use_parent: bool = False
+) -> None:
     """Set env var to first existing path if not already set."""
     if var_name in os.environ:
         return
@@ -55,7 +60,7 @@ def _set_env_if_missing(var_name: str, *candidates: Path, use_parent: bool = Fal
             return
 
 
-def _resolve_config_paths(config_path: Path, plugin_path: Optional[str]) -> Path:
+def _resolve_config_paths(config_path: Path, plugin_path: str | None) -> Path:
     """
     Resolve plugin path placeholders in task composer YAML configs.
 
@@ -82,7 +87,10 @@ def _resolve_config_paths(config_path: Path, plugin_path: Optional[str]) -> Path
     resolved_path = cache_dir / f"{config_path.stem}_{path_hash}.yaml"
 
     # Only regenerate if source changed or cache missing
-    if not resolved_path.exists() or resolved_path.stat().st_mtime < config_path.stat().st_mtime:
+    if (
+        not resolved_path.exists()
+        or resolved_path.stat().st_mtime < config_path.stat().st_mtime
+    ):
         resolved_content = content.replace("@PLUGIN_PATH@", plugin_path)
         resolved_content = resolved_content.replace("/usr/local/lib", plugin_path)
         resolved_path.write_text(resolved_content)
@@ -104,14 +112,18 @@ def _configure_environment():
     project_root = pkg_dir.parent.parent.parent
     ws_support = project_root / "ws" / "src" / "tesseract" / "tesseract_support"
     ws_resource = project_root / "ws" / "src" / "tesseract"
-    ws_composer = project_root / "ws" / "src" / "tesseract_planning" / "tesseract_task_composer"
+    ws_composer = (
+        project_root / "ws" / "src" / "tesseract_planning" / "tesseract_task_composer"
+    )
     ws_config = ws_composer / "config" / "task_composer_plugins.yaml"
 
     # TESSERACT_SUPPORT_DIR: path to tesseract_support (bundled or dev)
     _set_env_if_missing("TESSERACT_SUPPORT_DIR", support_dir, ws_support)
 
     # TESSERACT_RESOURCE_PATH: parent of support_dir for resource resolution
-    _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir, ws_resource, use_parent=True)
+    _set_env_if_missing(
+        "TESSERACT_RESOURCE_PATH", support_dir, ws_resource, use_parent=True
+    )
 
     # Plugin search paths - env var, bundled plugins, or ws/install/lib
     # Linux: pkg_dir (all deps bundled in package root with $ORIGIN rpath)
@@ -143,10 +155,16 @@ def _configure_environment():
     elif "TESSERACT_TASK_COMPOSER_CONFIG_FILE" not in os.environ:
         cfg = config_dir / "task_composer_plugins.yaml"
         if cfg.is_file():
-            cfg_resolved = _resolve_config_paths(cfg, plugin_path) if plugin_path else cfg
+            cfg_resolved = (
+                _resolve_config_paths(cfg, plugin_path) if plugin_path else cfg
+            )
             os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg_resolved)
         elif ws_config.is_file():
-            cfg_resolved = _resolve_config_paths(ws_config, plugin_path) if plugin_path else ws_config
+            cfg_resolved = (
+                _resolve_config_paths(ws_config, plugin_path)
+                if plugin_path
+                else ws_config
+            )
             os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg_resolved)
 
     # TESSERACT_TASK_COMPOSER_DIR (needed by some code paths)
@@ -175,7 +193,12 @@ def get_tesseract_support_path() -> Path:
 
 def get_task_composer_config_path() -> Path:
     """Get path to bundled task composer config file."""
-    return Path(__file__).parent / "data" / "task_composer_config" / "task_composer_plugins.yaml"
+    return (
+        Path(__file__).parent
+        / "data"
+        / "task_composer_config"
+        / "task_composer_plugins.yaml"
+    )
 
 
 _configure_environment()
