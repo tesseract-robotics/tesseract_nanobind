@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Union
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -70,10 +70,10 @@ class RobotState:
         joint_accelerations: Array of joint accelerations (optional)
     """
 
-    joint_names: List[str]
+    joint_names: list[str]
     joint_positions: np.ndarray
-    joint_velocities: Optional[np.ndarray] = None
-    joint_accelerations: Optional[np.ndarray] = None
+    joint_velocities: np.ndarray | None = None
+    joint_accelerations: np.ndarray | None = None
 
     def __post_init__(self):
         """Convert arrays to numpy float64 for C++ interop."""
@@ -85,7 +85,7 @@ class RobotState:
                 self.joint_accelerations, dtype=np.float64
             )
 
-    def as_dict(self) -> Dict[str, float]:
+    def as_dict(self) -> dict[str, float]:
         """Return joint positions as {name: position} dictionary."""
         return dict(zip(self.joint_names, self.joint_positions))
 
@@ -134,7 +134,7 @@ class Robot:
     def __init__(
         self,
         env: Environment,
-        locator: Optional[GeneralResourceLocator] = None,
+        locator: GeneralResourceLocator | None = None,
     ):
         """
         Initialize Robot wrapper.
@@ -145,14 +145,14 @@ class Robot:
         """
         self.env = env
         self.locator = locator or GeneralResourceLocator()
-        self._manipulator_cache: Dict[str, ManipulatorInfo] = {}
+        self._manipulator_cache: dict[str, ManipulatorInfo] = {}
 
     @classmethod
     def from_urdf(
         cls,
         urdf_url: str,
         srdf_url: str,
-        locator: Optional[GeneralResourceLocator] = None,
+        locator: GeneralResourceLocator | None = None,
     ) -> Robot:
         """
         Load robot from URDF and SRDF URLs.
@@ -184,9 +184,9 @@ class Robot:
     @classmethod
     def from_files(
         cls,
-        urdf_path: Union[str, Path],
-        srdf_path: Union[str, Path],
-        locator: Optional[GeneralResourceLocator] = None,
+        urdf_path: str | Path,
+        srdf_path: str | Path,
+        locator: GeneralResourceLocator | None = None,
     ) -> Robot:
         """
         Load robot from local URDF and SRDF files.
@@ -214,7 +214,7 @@ class Robot:
     def from_tesseract_support(
         cls,
         robot_name: str,
-        locator: Optional[GeneralResourceLocator] = None,
+        locator: GeneralResourceLocator | None = None,
     ) -> Robot:
         """
         Load robot from tesseract_support package.
@@ -231,7 +231,7 @@ class Robot:
         srdf_url = f"package://tesseract_support/urdf/{robot_name}.srdf"
         return cls.from_urdf(urdf_url, srdf_url, locator)
 
-    def get_state(self, joint_names: Optional[List[str]] = None) -> RobotState:
+    def get_state(self, joint_names: list[str] | None = None) -> RobotState:
         """
         Get current robot state.
 
@@ -256,8 +256,8 @@ class Robot:
 
     def set_joints(
         self,
-        joint_values: Union[Dict[str, float], Sequence[float]],
-        joint_names: Optional[List[str]] = None,
+        joint_values: dict[str, float] | Sequence[float],
+        joint_names: list[str] | None = None,
     ) -> None:
         """
         Set robot joint positions.
@@ -277,7 +277,7 @@ class Robot:
 
         self.env.setState(names, values)
 
-    def get_joint_names(self, group_name: str) -> List[str]:
+    def get_joint_names(self, group_name: str) -> list[str]:
         """
         Get joint names for a kinematic group.
 
@@ -290,11 +290,11 @@ class Robot:
         group = self.env.getJointGroup(group_name)
         return list(group.getJointNames())
 
-    def get_link_names(self) -> List[str]:
+    def get_link_names(self) -> list[str]:
         """Get all link names in the robot."""
         return list(self.env.getLinkNames())
 
-    def get_joint_limits(self, group_name: str) -> Dict[str, Dict[str, float]]:
+    def get_joint_limits(self, group_name: str) -> dict[str, dict[str, float]]:
         """
         Get joint limits for a kinematic group.
 
@@ -322,7 +322,7 @@ class Robot:
         self,
         group_name: str,
         joint_positions: ArrayLike,
-        tip_link: Optional[str] = None,
+        tip_link: str | None = None,
     ) -> Pose:
         """
         Compute forward kinematics.
@@ -349,10 +349,10 @@ class Robot:
     def ik(
         self,
         group_name: str,
-        target_pose: Union[Pose, Isometry3d],
-        seed: Optional[ArrayLike] = None,
-        tip_link: Optional[str] = None,
-    ) -> Optional[np.ndarray]:
+        target_pose: Pose | Isometry3d,
+        seed: ArrayLike | None = None,
+        tip_link: str | None = None,
+    ) -> np.ndarray | None:
         """
         Compute inverse kinematics.
 
@@ -394,7 +394,7 @@ class Robot:
     def get_manipulator_info(
         self,
         group_name: str,
-        tcp_frame: Optional[str] = None,
+        tcp_frame: str | None = None,
         working_frame: str = "base_link",
     ) -> ManipulatorInfo:
         """

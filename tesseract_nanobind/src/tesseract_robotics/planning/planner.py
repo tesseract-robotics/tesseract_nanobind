@@ -18,10 +18,11 @@ Example:
     if result.successful:
         print(f"Found {len(result)} waypoints")
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING
 
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
@@ -33,6 +34,10 @@ from tesseract_robotics.tesseract_motion_planners import (
 
 # Re-export PlanningResult from composer
 from tesseract_robotics.planning.composer import PlanningResult, TaskComposer
+
+if TYPE_CHECKING:
+    from tesseract_robotics.planning.core import Robot
+    from tesseract_robotics.planning.program import MotionProgram
 
 
 @dataclass
@@ -48,6 +53,7 @@ class PlannerConfig:
         smoothing: Enable trajectory smoothing
         time_parameterization: Enable time parameterization
     """
+
     pipeline: str = "TrajOptPipeline"
     max_velocity_scaling: float = 1.0
     max_acceleration_scaling: float = 1.0
@@ -58,9 +64,9 @@ class PlannerConfig:
 
 def plan_freespace(
     robot: "Robot",
-    program: Union["MotionProgram", CompositeInstruction],
-    config: Optional[PlannerConfig] = None,
-    profiles: Optional[ProfileDictionary] = None,
+    program: "MotionProgram | CompositeInstruction",
+    config: PlannerConfig | None = None,
+    profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
     """
     Plan freespace motion.
@@ -105,9 +111,9 @@ def plan_freespace(
 
 def plan_ompl(
     robot: "Robot",
-    program: Union["MotionProgram", CompositeInstruction],
-    config: Optional[PlannerConfig] = None,
-    profiles: Optional[ProfileDictionary] = None,
+    program: "MotionProgram | CompositeInstruction",
+    config: PlannerConfig | None = None,
+    profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
     """
     Plan freespace motion using OMPL sampling-based planners.
@@ -154,9 +160,9 @@ def plan_ompl(
 
 def plan_cartesian(
     robot: "Robot",
-    program: Union["MotionProgram", CompositeInstruction],
-    config: Optional[PlannerConfig] = None,
-    profiles: Optional[ProfileDictionary] = None,
+    program: "MotionProgram | CompositeInstruction",
+    config: PlannerConfig | None = None,
+    profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
     """
     Plan Cartesian motion.

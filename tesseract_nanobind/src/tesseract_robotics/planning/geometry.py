@@ -25,12 +25,16 @@ Example:
         transform=Transform.from_xyz(0.3, 0.2, 0.6),
     )
 """
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from tesseract_robotics.planning.core import Robot
 
 from tesseract_robotics.tesseract_geometry import (
     Box,
@@ -111,8 +115,8 @@ def cone(radius: float, length: float) -> Cone:
 
 
 def mesh_from_file(
-    filepath: Union[str, Path],
-    scale: Optional[np.ndarray] = None,
+    filepath: str | Path,
+    scale: np.ndarray | None = None,
 ) -> Mesh:
     """
     Load mesh geometry from file.
@@ -158,8 +162,8 @@ def mesh_from_file(
 
 
 def convex_mesh_from_file(
-    filepath: Union[str, Path],
-    scale: Optional[np.ndarray] = None,
+    filepath: str | Path,
+    scale: np.ndarray | None = None,
 ) -> ConvexMesh:
     """
     Load convex mesh geometry from file.
@@ -185,7 +189,7 @@ def _add_visual_and_collision(
     geometry: Geometry,
     origin: Isometry3d,
     name: str,
-    color: Optional[tuple] = None,
+    color: tuple | None = None,
 ) -> None:
     """Add matching visual and collision geometry to a link."""
     visual = Visual()
@@ -206,12 +210,12 @@ def _add_visual_and_collision(
 
 
 def create_obstacle(
-    robot: "Robot",  # Forward reference to avoid circular import
+    robot: Robot,
     name: str,
     geometry: Geometry,
-    transform: Optional[Transform] = None,
+    transform: Transform | None = None,
     parent_link: str = "base_link",
-    color: Optional[tuple] = None,
+    color: tuple | None = None,
 ) -> bool:
     """
     Add a collision obstacle to the robot environment.
@@ -257,8 +261,8 @@ def create_obstacle(
 def create_link_with_geometry(
     name: str,
     geometry: Geometry,
-    origin: Optional[Transform] = None,
-    color: Optional[tuple] = None,
+    origin: Transform | None = None,
+    color: tuple | None = None,
 ) -> Link:
     """
     Create a link with visual and collision geometry.
@@ -286,7 +290,7 @@ def create_fixed_joint(
     name: str,
     parent_link: str,
     child_link: str,
-    origin: Optional[Transform] = None,
+    origin: Transform | None = None,
 ) -> Joint:
     """
     Create a fixed joint between two links.
