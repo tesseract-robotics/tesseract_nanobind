@@ -23,4 +23,4 @@ for arg in "$@"; do
   esac
 done
 
-exec pytest tesseract_nanobind/tests -n auto $VERBOSE_ARGS "${REMAINING_ARGS[@]}"
+exec pytest tesseract_nanobind/tests --ignore=tesseract_nanobind/tests/benchmarks -n auto $VERBOSE_ARGS "${REMAINING_ARGS[@]}"
