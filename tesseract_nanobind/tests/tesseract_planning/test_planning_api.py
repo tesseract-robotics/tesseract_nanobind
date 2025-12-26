@@ -101,6 +101,58 @@ class TestPose:
         assert "Pose" in repr_str
         assert "1.5" in repr_str or "1.50" in repr_str
 
+    def test_rotation_from_quaternion(self):
+        """Test rotation_from_quaternion factory function."""
+        from tesseract_robotics.planning import rotation_from_quaternion
+
+        # 90 degree rotation around Z axis
+        t = rotation_from_quaternion(0, 0, 0.707, 0.707)
+        assert t is not None
+        # Should rotate X to Y
+        x_vec = np.array([1, 0, 0])
+        rotated = t.rotation_matrix @ x_vec
+        np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=2)
+
+    def test_rotation_from_axis_angle(self):
+        """Test rotation_from_axis_angle factory function."""
+        from tesseract_robotics.planning import rotation_from_axis_angle
+
+        # 90 degree rotation around Z axis
+        t = rotation_from_axis_angle([0, 0, 1], np.pi / 2)
+        assert t is not None
+        # Should rotate X to Y
+        x_vec = np.array([1, 0, 0])
+        rotated = t.rotation_matrix @ x_vec
+        np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=5)
+
+    def test_from_position_quaternion(self):
+        """Test Pose.from_position_quaternion factory method."""
+        pos = [1, 2, 3]
+        quat = [0, 0, 0.707, 0.707]  # 90 deg around Z
+        t = Pose.from_position_quaternion(pos, quat)
+        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
+        np.testing.assert_array_almost_equal(t.quaternion, quat, decimal=2)
+
+    def test_from_matrix(self):
+        """Test Pose.from_matrix factory method for 4x4 matrix."""
+        # Identity matrix
+        mat = np.eye(4)
+        mat[0, 3] = 1.5  # Translation x
+        mat[1, 3] = 2.5  # Translation y
+        mat[2, 3] = 3.5  # Translation z
+        t = Pose.from_matrix(mat)
+        np.testing.assert_array_almost_equal(t.position, [1.5, 2.5, 3.5])
+
+    def test_from_matrix_position(self):
+        """Test Pose.from_matrix_position factory method."""
+        # Identity rotation
+        rot_mat = np.eye(3)
+        pos = [1, 2, 3]
+        t = Pose.from_matrix_position(rot_mat, pos)
+        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
+        # Check rotation is identity
+        np.testing.assert_array_almost_equal(t.rotation_matrix, np.eye(3))
+
 
 class TestRobot:
     """Test Robot loading and state management."""
@@ -431,6 +483,28 @@ class TestGeometry:
         c = cylinder(0.5, 1.0)
         assert c is not None
 
+    def test_cone(self):
+        from tesseract_robotics.planning.geometry import cone
+
+        c = cone(0.5, 1.0)
+        assert c is not None
+
+    def test_create_link_with_geometry(self):
+        """Test create_link_with_geometry helper."""
+        from tesseract_robotics.planning.geometry import create_link_with_geometry
+
+        link = create_link_with_geometry(
+            name="test_link",
+            geometry=box(0.1, 0.1, 0.1),
+            origin=Pose.from_xyz(0.5, 0, 0.3),
+            color=(1.0, 0, 0, 1.0),
+        )
+        assert link is not None
+        assert link.getName() == "test_link"
+        # Link should have visual and collision
+        assert len(link.visual) > 0
+        assert len(link.collision) > 0
+
 
 class TestCreateObstacle:
     """Test obstacle creation."""
@@ -729,6 +803,40 @@ class TestPlanningIntegration:
 
         # Should not raise - just sets seed on Cartesian waypoints
         assign_current_state_as_seed(composite, robot)
+
+
+class TestTaskComposer:
+    """Tests for TaskComposer methods."""
+
+    def test_get_available_pipelines(self):
+        """Test get_available_pipelines returns list of pipeline names."""
+        from tesseract_robotics.planning import TaskComposer
+
+        composer = TaskComposer.from_config()
+        pipelines = composer.get_available_pipelines()
+
+        assert isinstance(pipelines, list)
+        assert len(pipelines) > 0
+        assert "TrajOptPipeline" in pipelines
+
+    def test_plan_invalid_pipeline(self):
+        """Test plan returns failure for invalid pipeline."""
+        from tesseract_robotics.planning import TaskComposer
+
+        robot = Robot.from_tesseract_support("abb_irb2400")
+        joint_names = robot.get_joint_names("manipulator")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
+        )
+
+        composer = TaskComposer.from_config()
+        result = composer.plan(robot, program, pipeline="NonexistentPipeline")
+
+        assert not result.successful
+        assert "not found" in result.message.lower() or "error" in result.message.lower()
 
 
 class TestProfileCreation:
