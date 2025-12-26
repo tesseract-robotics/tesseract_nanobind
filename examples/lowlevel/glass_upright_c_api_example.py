@@ -37,6 +37,7 @@ from tesseract_robotics.planning import (
     create_obstacle,
     TaskComposer,
 )
+from tesseract_robotics.planning.profiles import create_trajopt_upright_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -60,13 +61,14 @@ def run():
     # Sphere obstacle near path to influence trajectory, not block it
     # Forces TrajOpt to find trajectory that avoids sphere while keeping tool upright
     # Without obstacle, robot could just rotate joint_a1 directly (trivial solution)
+    # C++ params: sphere(0.15) at (0.5, 0, 0.55)
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.1),  # 10cm radius - smaller to avoid blocking
-        transform=Pose.from_xyz(0.55, 0, 0.45),  # Slightly forward and lower
+        geometry=sphere(0.15),  # 15cm radius (C++ default)
+        transform=Pose.from_xyz(0.5, 0, 0.55),  # C++ position
     )
-    print("Added sphere obstacle at (0.55, 0, 0.45)")
+    print("Added sphere obstacle r=0.15 at (0.5, 0, 0.55)")
 
     # joint_a1 through joint_a7 for IIWA manipulator group
     joint_names = robot.get_joint_names("manipulator")
@@ -104,10 +106,13 @@ def run():
     )
 
     # TrajOptPipeline: trajectory optimization with collision avoidance
-    # C++ uses safety_margin=0.01, contact_buffer=0.01 for collision checking
+    # UPRIGHT profile: C++ collision (margin=0.01, buffer=0.01, coeff=1) + cartesian constraint
     print("\nRunning TrajOpt planner with upright constraint...")
     composer = TaskComposer.from_config()
-    result = composer.plan(robot, program, pipeline="TrajOptPipeline")
+    profiles = create_trajopt_upright_profiles()
+    result = composer.plan(
+        robot, program, pipeline="TrajOptPipeline", profiles=profiles
+    )
 
     assert result.successful, f"Planning failed: {result.message}"
     print("Planning successful!")

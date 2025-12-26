@@ -7,7 +7,7 @@ Only position changes; orientation remains constant throughout the trajectory.
 
 Pipeline Overview:
     1. Load KUKA IIWA 7-DOF robot from tesseract_support
-    2. Add sphere obstacle at (0.5, 0, 0.55) to force non-trivial path
+    2. Add sphere obstacle at (0.5, 0, 0.55) with radius 0.15m to force non-trivial path
     3. Define start/end via joint states (only joint_a1 changes: -0.4 -> 0.4 rad)
     4. Plan with TrajOptPipeline using UPRIGHT profile for orientation constraints
     5. TrajOpt optimizes trajectory while respecting orientation + collision constraints
@@ -45,7 +45,7 @@ C++ Profile Configuration (verified):
 
 C++ Parameters (verified):
     - Robot: KUKA LBR IIWA 14 R820 (7-DOF)
-    - Obstacle: Sphere radius=0.15m at (0.5, 0, 0.55)
+    - Obstacle: Sphere r=0.15m at (0.5, 0, 0.55)
     - Start: joint_a1=-0.4 rad, others=[0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0]
     - End: joint_a1=0.4 rad (same other joints)
     - Motion: LINEAR with UPRIGHT profile
@@ -70,7 +70,7 @@ from tesseract_robotics.planning import (
 )
 from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
-    create_trajopt_default_profiles,
+    create_trajopt_upright_profiles,
 )
 
 TesseractViewer = None
@@ -113,14 +113,14 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Add sphere obstacle to force non-trivial trajectory
     # Without obstacle, robot could just rotate joint_a1 (trivial solution)
     # Sphere positioned near path to influence trajectory, not block it
-    # Position chosen to be reachable but not in direct collision path
+    # C++ params: sphere(0.15) at (0.5, 0, 0.55)
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.1),  # 10cm radius - smaller to avoid blocking
-        transform=Pose.from_xyz(0.55, 0, 0.45),  # Slightly forward and lower
+        geometry=sphere(0.15),  # 15cm radius (C++ default)
+        transform=Pose.from_xyz(0.5, 0, 0.55),  # C++ position
     )
-    print("Added sphere obstacle at (0.55, 0, 0.45)")
+    print("Added sphere obstacle r=0.15 at (0.5, 0, 0.55)")
 
     # Get joint names for manipulator group
     joint_names = robot.get_joint_names("manipulator")
@@ -152,7 +152,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     if "Freespace" in pipeline or "OMPL" in pipeline:
         profiles = create_freespace_pipeline_profiles(num_planners=num_planners)
     else:
-        profiles = create_trajopt_default_profiles()
+        # UPRIGHT profile: C++ glass_upright collision+cartesian constraint settings
+        profiles = create_trajopt_upright_profiles()
 
     # Execute TrajOpt planning with orientation constraints
     print(f"\nRunning planner ({pipeline})...")

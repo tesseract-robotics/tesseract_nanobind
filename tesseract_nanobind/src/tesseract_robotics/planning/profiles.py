@@ -65,6 +65,46 @@ def _create_trajopt_profiles():
     return composite, plan
 
 
+def _create_trajopt_upright_profiles():
+    """Create TrajOpt profiles for glass-upright constraints (C++ glass_upright_example.cpp).
+
+    The UPRIGHT profile constrains orientation while allowing free position movement.
+    Collision settings match C++ exactly: safety_margin=0.01, buffer=0.01, coeff=1.
+
+    Returns:
+        Tuple of (composite_profile, plan_profile) for orientation-constrained motion.
+    """
+    import numpy as np
+
+    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+        TrajOptDefaultCompositeProfile,
+        TrajOptDefaultPlanProfile,
+    )
+
+    composite = TrajOptDefaultCompositeProfile()
+    # C++ glass_upright: DISCRETE_CONTINUOUS, margin=0.01, buffer=0.01, coeff=1
+    composite.collision_cost_config.enabled = True
+    composite.collision_cost_config.safety_margin = 0.01
+    composite.collision_cost_config.safety_margin_buffer = 0.01
+    composite.collision_cost_config.coeff = 1
+    composite.collision_constraint_config.enabled = True
+    composite.collision_constraint_config.safety_margin = 0.01
+    composite.collision_constraint_config.safety_margin_buffer = 0.01
+    composite.collision_constraint_config.coeff = 1
+    composite.smooth_velocities = True
+    composite.smooth_accelerations = False
+    composite.smooth_jerks = False
+
+    plan = TrajOptDefaultPlanProfile()
+    plan.joint_cost_config.enabled = False
+    plan.cartesian_cost_config.enabled = False
+    plan.cartesian_constraint_config.enabled = True
+    # C++ coeff: [0,0,0,5,5,5] - position free (0), orientation constrained (5)
+    plan.cartesian_constraint_config.coeff = np.array([0.0, 0.0, 0.0, 5.0, 5.0, 5.0])
+
+    return composite, plan
+
+
 def create_trajopt_ifopt_default_profiles(
     profile_names: list[str] | None = None,
 ) -> ProfileDictionary:
@@ -206,6 +246,50 @@ def create_trajopt_default_profiles(
     composite, plan = _create_trajopt_profiles()
 
     # Register under all requested names
+    profiles = ProfileDictionary()
+    for name in profile_names:
+        ProfileDictionary_addTrajOptCompositeProfile(
+            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
+        )
+        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
+
+    return profiles
+
+
+def create_trajopt_upright_profiles(
+    profile_names: list[str] | None = None,
+) -> ProfileDictionary:
+    """Create TrajOpt profiles for orientation-constrained motion (glass-upright).
+
+    This creates profiles matching the C++ glass_upright_example.cpp exactly:
+    - Collision: safety_margin=0.01, buffer=0.01, coeff=1 (DISCRETE_CONTINUOUS)
+    - Cartesian constraint: coeff=[0,0,0,5,5,5] (position free, orientation constrained)
+
+    The UPRIGHT profile keeps tool orientation constant while allowing position to vary.
+    Essential for tasks like carrying a glass of water without spilling.
+
+    Args:
+        profile_names: Profile names to register (default: ["UPRIGHT"])
+
+    Returns:
+        ProfileDictionary with configured TrajOpt profiles for orientation constraints
+
+    Usage:
+        from tesseract_robotics.planning.profiles import create_trajopt_upright_profiles
+
+        profiles = create_trajopt_upright_profiles()
+        result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
+    """
+    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+        ProfileDictionary_addTrajOptCompositeProfile,
+        ProfileDictionary_addTrajOptPlanProfile,
+    )
+
+    if profile_names is None:
+        profile_names = ["UPRIGHT"]
+
+    composite, plan = _create_trajopt_upright_profiles()
+
     profiles = ProfileDictionary()
     for name in profile_names:
         ProfileDictionary_addTrajOptCompositeProfile(
