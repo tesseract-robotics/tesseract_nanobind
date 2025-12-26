@@ -84,13 +84,14 @@ def main():
     # Visual component for rendering (optional but helpful for debugging)
     visual = Visual()
     visual.geometry = sphere_geom
-    sphere_link.visual.append(visual)
+    # Use assignment - nanobind returns copies for .visual/.collision
+    sphere_link.visual = [visual]
 
     # Collision component - this is what the contact manager actually checks
     # Without this, the sphere would be visible but not cause collisions
     collision = Collision()
     collision.geometry = sphere_geom
-    sphere_link.collision.append(collision)
+    sphere_link.collision = [collision]
 
     # Attach sphere to environment at fixed position
     # Position chosen to be within robot reach for collision demonstration
@@ -122,7 +123,7 @@ def main():
     # STEP 3: Collision Query Loop
     # =========================================================================
     # ABB IRB2400 has 6 revolute joints named joint_1 through joint_6
-    joint_names = [f"joint_{i+1}" for i in range(6)]
+    joint_names = [f"joint_{i + 1}" for i in range(6)]
     joint_pos = np.zeros(6)
 
     # Sweep joint_1 (base rotation) to move arm toward/away from obstacle
@@ -141,7 +142,9 @@ def main():
 
         # Debug: show current poses of relevant links
         print(f"Link 6 Pose:\n{scene_state.link_transforms['link_6'].matrix()}")
-        print(f"Sphere Link Pose:\n{scene_state.link_transforms['sphere_link'].matrix()}")
+        print(
+            f"Sphere Link Pose:\n{scene_state.link_transforms['sphere_link'].matrix()}"
+        )
 
         # Execute collision query
         # ContactTestType_ALL finds all collision pairs (vs FIRST for early-out)

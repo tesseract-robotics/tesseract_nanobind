@@ -59,11 +59,15 @@ RELATED EXAMPLES
 - glass_upright_example.py: orientation-constrained motion
 - lowlevel/car_seat_c_api_example.py: low-level API version with detailed comments
 """
+
 import sys
 import numpy as np
 
 from tesseract_robotics.planning import Robot, MotionProgram, StateTarget, TaskComposer
-from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles, create_trajopt_default_profiles
+from tesseract_robotics.planning.profiles import (
+    create_freespace_pipeline_profiles,
+    create_trajopt_default_profiles,
+)
 from tesseract_robotics.tesseract_common import Isometry3d, AllowedCollisionMatrix
 from tesseract_robotics.tesseract_environment import (
     AddLinkCommand,
@@ -71,7 +75,13 @@ from tesseract_robotics.tesseract_environment import (
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
 )
-from tesseract_robotics.tesseract_scene_graph import Link, Joint, JointType, Visual, Collision
+from tesseract_robotics.tesseract_scene_graph import (
+    Link,
+    Joint,
+    JointType,
+    Visual,
+    Collision,
+)
 from tesseract_robotics.tesseract_geometry import createMeshFromPath
 from tesseract_robotics.tesseract_collision import makeConvexMesh
 
@@ -88,19 +98,37 @@ if "pytest" not in sys.modules:
 POSITIONS = {
     # Home: all joints at zero (robot at origin, arm extended)
     "Home": {
-        "carriage_rail": 0.0, "joint_b": 0.0, "joint_e": 0.0, "joint_l": 0.0,
-        "joint_r": 0.0, "joint_s": 0.0, "joint_t": 0.0, "joint_u": 0.0,
+        "carriage_rail": 0.0,
+        "joint_b": 0.0,
+        "joint_e": 0.0,
+        "joint_l": 0.0,
+        "joint_r": 0.0,
+        "joint_s": 0.0,
+        "joint_t": 0.0,
+        "joint_u": 0.0,
     },
     # Pick1: carriage at 2.22m, arm reaching down to seat_1 at (0.5, 2.15, 0.45)
     # joint_s=-3.14 (~-pi): shoulder fully rotated for downward reach
     "Pick1": {
-        "carriage_rail": 2.22, "joint_b": 0.39, "joint_e": 0.0, "joint_l": 0.5,
-        "joint_r": 0.0, "joint_s": -3.14, "joint_t": -0.29, "joint_u": -1.45,
+        "carriage_rail": 2.22,
+        "joint_b": 0.39,
+        "joint_e": 0.0,
+        "joint_l": 0.5,
+        "joint_r": 0.0,
+        "joint_s": -3.14,
+        "joint_t": -0.29,
+        "joint_u": -1.45,
     },
     # Place1: carriage at 4.15m (far end of rail), arm oriented for vehicle mounting
     "Place1": {
-        "carriage_rail": 4.15466, "joint_b": 0.537218, "joint_e": 0.0189056, "joint_l": 0.801223,
-        "joint_r": 0.0580309, "joint_s": -0.0481182, "joint_t": -0.325783, "joint_u": -1.2813,
+        "carriage_rail": 4.15466,
+        "joint_b": 0.537218,
+        "joint_e": 0.0189056,
+        "joint_l": 0.801223,
+        "joint_r": 0.0580309,
+        "joint_s": -0.0481182,
+        "joint_t": -0.325783,
+        "joint_u": -1.2813,
     },
 }
 
@@ -136,17 +164,22 @@ def add_seats(robot):
         visual_meshes = createMeshFromPath(visual_path)
         if visual_meshes:
             visual.geometry = visual_meshes[0]
-        link.visual.append(visual)
+        # Use assignment - nanobind returns copies for .visual/.collision
+        link.visual = [visual]
 
         # Collision meshes (10 convex hulls)
+        collisions = []
         for m in range(1, 11):
-            collision_url = f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
+            collision_url = (
+                f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
+            )
             collision_path = locator.locateResource(collision_url).getFilePath()
             for mesh in createMeshFromPath(collision_path):
                 collision = Collision()
                 collision.origin = visual.origin
                 collision.geometry = makeConvexMesh(mesh)
-                link.collision.append(collision)
+                collisions.append(collision)
+        link.collision = collisions
 
         # Fixed joint to world (rotated 180deg around Z, positioned along X)
         joint = Joint(f"joint_seat_{i + 1}")
@@ -200,13 +233,25 @@ def attach_seat(robot, seat_name="seat_1"):
     for link in ["cell_logo", "fence", "link_b", "link_r", "link_t"]:
         acm.addAllowedCollision(seat_name, link, "Never")
 
-    robot.env.applyCommand(ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD))
+    robot.env.applyCommand(
+        ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD)
+    )
     print(f"Attached {seat_name} to end effector")
 
 
-def plan_motion(robot, composer, joint_names, start_pos, end_pos, phase_name, pipeline="TrajOptPipeline", profiles=None):
+def plan_motion(
+    robot,
+    composer,
+    joint_names,
+    start_pos,
+    end_pos,
+    phase_name,
+    pipeline="TrajOptPipeline",
+    profiles=None,
+):
     """Plan a motion from start to end position."""
-    program = (MotionProgram("manipulator", tcp_frame="end_effector")
+    program = (
+        MotionProgram("manipulator", tcp_frame="end_effector")
         .set_joint_names(joint_names)
         .move_to(StateTarget(start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(end_pos, names=joint_names, profile="FREESPACE"))
@@ -242,7 +287,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/car_seat_demo.urdf",
-        "package://tesseract_support/urdf/car_seat_demo.srdf"
+        "package://tesseract_support/urdf/car_seat_demo.srdf",
     )
     print(f"Loaded robot: {robot.env.getName()}")
 
@@ -272,7 +317,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     # === PHASE 2: PICK MOTION ===
     # Plan freespace motion from Home to Pick1 (above seat_1)
-    pick_result = plan_motion(robot, composer, joint_names, home_pos, pick_pos, "PICK", pipeline, profiles)
+    pick_result = plan_motion(
+        robot, composer, joint_names, home_pos, pick_pos, "PICK", pipeline, profiles
+    )
 
     # === PHASE 3: ATTACH SEAT ===
     # Update environment state to Pick1, then reparent seat_1 to end_effector
@@ -283,7 +330,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # === PHASE 4: PLACE MOTION ===
     # Plan transport motion Pick1 -> Place1 with attached seat
     # TrajOpt now includes seat_1 geometry in collision checking
-    place_result = plan_motion(robot, composer, joint_names, pick_pos, place_pos, "PLACE", pipeline, profiles)
+    place_result = plan_motion(
+        robot, composer, joint_names, pick_pos, place_pos, "PLACE", pipeline, profiles
+    )
 
     return {
         "pick_result": pick_result,

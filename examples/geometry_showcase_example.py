@@ -126,14 +126,15 @@ def create_geometry_link(
     material = Material(f"{name}_material")
     material.color = np.array(color, dtype=np.float64)
     visual.material = material
-    link.visual.append(visual)
+    # Use assignment - nanobind returns copies for .visual/.collision
+    link.visual = [visual]
 
     # Collision component: used for physics queries, often simplified geometry
     # Here we use same geometry for both - in practice you might use
     # detailed mesh for visual but convex hull for collision
     collision = Collision()
     collision.geometry = geometry
-    link.collision.append(collision)
+    link.collision = [collision]
 
     # Fixed joint attaches this link rigidly to the robot's base_link
     # The transform positions the geometry in world coordinates

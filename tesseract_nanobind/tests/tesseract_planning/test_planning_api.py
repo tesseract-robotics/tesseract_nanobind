@@ -579,10 +579,11 @@ class TestRobotLinkManagement:
         geometry = Box(0.1, 0.1, 0.1)
         visual = Visual()
         visual.geometry = geometry
-        link.visual.append(visual)
+        # Use assignment - nanobind returns copies for .visual/.collision
+        link.visual = [visual]
         collision = Collision()
         collision.geometry = geometry
-        link.collision.append(collision)
+        link.collision = [collision]
 
         # Create fixed joint
         joint = Joint("joint_test_obstacle")
@@ -609,10 +610,11 @@ class TestRobotLinkManagement:
         geometry = Sphere(0.05)
         visual = Visual()
         visual.geometry = geometry
-        link.visual.append(visual)
+        # Use assignment - nanobind returns copies for .visual/.collision
+        link.visual = [visual]
         collision = Collision()
         collision.geometry = geometry
-        link.collision.append(collision)
+        link.collision = [collision]
 
         # Use helper for joint
         joint = create_fixed_joint(
@@ -718,10 +720,11 @@ class TestRobotLinkManagement:
         geometry = Box(0.1, 0.1, 0.1)
         visual = Visual()
         visual.geometry = geometry
-        link.visual.append(visual)
+        # Use assignment - nanobind returns copies for .visual/.collision
+        link.visual = [visual]
         collision = Collision()
         collision.geometry = geometry
-        link.collision.append(collision)
+        link.collision = [collision]
 
         joint = Joint("moveable_box_joint")
         joint.parent_link_name = "base_link"
