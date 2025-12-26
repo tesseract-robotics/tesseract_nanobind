@@ -171,16 +171,39 @@ def convex_mesh_from_file(
     efficient collision checking.
 
     Args:
-        filepath: Path to mesh file
+        filepath: Path to mesh file or package:// URL
         scale: Optional scale factors [sx, sy, sz]
 
     Returns:
         ConvexMesh geometry
     """
-    from tesseract_robotics.tesseract_geometry import makeConvexMesh
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.tesseract_geometry import createConvexMeshFromPath
 
-    mesh = mesh_from_file(filepath, scale)
-    return makeConvexMesh(mesh)
+    locator = GeneralResourceLocator()
+    filepath = str(filepath)
+
+    if scale is None:
+        scale = np.array([1.0, 1.0, 1.0])
+    else:
+        scale = np.asarray(scale, dtype=np.float64)
+
+    # Resolve package:// URLs to filesystem paths
+    if filepath.startswith("package://"):
+        filepath = locator.locateResource(filepath).getFilePath()
+    elif not filepath.startswith("file://") and not filepath.startswith("/"):
+        # Relative path - make absolute
+        filepath = str(Path(filepath).resolve())
+
+    meshes = createConvexMeshFromPath(filepath, scale, True, False)
+
+    if meshes is None or len(meshes) == 0:
+        raise RuntimeError(
+            f"Failed to load convex mesh from {filepath}. "
+            f"Check file exists and format is supported (STL, DAE, OBJ)."
+        )
+
+    return meshes[0]
 
 
 def _add_visual_and_collision(
