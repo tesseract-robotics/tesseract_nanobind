@@ -1,7 +1,24 @@
+"""
+tesseract_robotics - Python bindings for Tesseract motion planning.
+
+Environment Variables (auto-configured on import):
+    TESSERACT_SUPPORT_DIR: Path to tesseract_support (URDF/meshes)
+    TESSERACT_RESOURCE_PATH: Resource search path for URDFs
+    TESSERACT_TASK_COMPOSER_CONFIG_FILE: Task composer YAML config
+    TESSERACT_TASK_COMPOSER_DIR: Task composer config directory
+    TESSERACT_PLUGIN_PATH: Override plugin search path
+    TESSERACT_CONTACT_MANAGERS_PLUGIN_DIRECTORIES: Collision plugin path
+    TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES: Kinematics plugin path
+    TESSERACT_TASK_COMPOSER_PLUGIN_DIRECTORIES: Composer plugin path
+
+Priority: Bundled data (installed) > Dev workspace (editable) > User env vars
+"""
 from importlib.metadata import version, PackageNotFoundError
+import hashlib
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 
@@ -28,7 +45,17 @@ def _is_editable_install() -> bool:
     return "site-packages" not in str(pkg_path)
 
 
-def _resolve_config_paths(config_path: Path, plugin_path) -> Path:
+def _set_env_if_missing(var_name: str, *candidates: Path, use_parent: bool = False) -> None:
+    """Set env var to first existing path if not already set."""
+    if var_name in os.environ:
+        return
+    for path in candidates:
+        if path.is_dir():
+            os.environ[var_name] = str(path.parent if use_parent else path)
+            return
+
+
+def _resolve_config_paths(config_path: Path, plugin_path: Optional[str]) -> Path:
     """
     Resolve plugin path placeholders in task composer YAML configs.
 
@@ -47,7 +74,6 @@ def _resolve_config_paths(config_path: Path, plugin_path) -> Path:
         return config_path
 
     # Generate resolved config in cache dir
-    import hashlib
     cache_dir = Path(__file__).parent / ".cache"
     cache_dir.mkdir(exist_ok=True)
 
@@ -81,19 +107,11 @@ def _configure_environment():
     ws_composer = project_root / "ws" / "src" / "tesseract_planning" / "tesseract_task_composer"
     ws_config = ws_composer / "config" / "task_composer_plugins.yaml"
 
-    # TESSERACT_SUPPORT_DIR
-    if "TESSERACT_SUPPORT_DIR" not in os.environ:
-        if support_dir.is_dir():
-            os.environ["TESSERACT_SUPPORT_DIR"] = str(support_dir)
-        elif ws_support.is_dir():
-            os.environ["TESSERACT_SUPPORT_DIR"] = str(ws_support)
+    # TESSERACT_SUPPORT_DIR: path to tesseract_support (bundled or dev)
+    _set_env_if_missing("TESSERACT_SUPPORT_DIR", support_dir, ws_support)
 
-    # TESSERACT_RESOURCE_PATH
-    if "TESSERACT_RESOURCE_PATH" not in os.environ:
-        if support_dir.is_dir():
-            os.environ["TESSERACT_RESOURCE_PATH"] = str(data_dir)
-        elif ws_resource.is_dir():
-            os.environ["TESSERACT_RESOURCE_PATH"] = str(ws_resource)
+    # TESSERACT_RESOURCE_PATH: parent of support_dir for resource resolution
+    _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir, ws_resource, use_parent=True)
 
     # Plugin search paths - env var, bundled plugins, or ws/install/lib
     # Linux: pkg_dir (all deps bundled in package root with $ORIGIN rpath)
@@ -132,11 +150,7 @@ def _configure_environment():
             os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg_resolved)
 
     # TESSERACT_TASK_COMPOSER_DIR (needed by some code paths)
-    if "TESSERACT_TASK_COMPOSER_DIR" not in os.environ:
-        if config_dir.is_dir():
-            os.environ["TESSERACT_TASK_COMPOSER_DIR"] = str(config_dir)
-        elif ws_composer.is_dir():
-            os.environ["TESSERACT_TASK_COMPOSER_DIR"] = str(ws_composer)
+    _set_env_if_missing("TESSERACT_TASK_COMPOSER_DIR", config_dir, ws_composer)
 
     # Set plugin directories for all plugin factories (if not overridden)
     if plugin_path:
