@@ -5,41 +5,45 @@ Full planning tests are skipped if TESSERACT_TASK_COMPOSER_CONFIG_FILE is not se
 """
 
 import os
-import pytest
-import numpy as np
+import subprocess
+import sys
+from pathlib import Path
 
+import numpy as np
+import pytest
+
+from tesseract_robotics.tesseract_command_language import (
+    CartesianWaypoint,
+    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType_FREESPACE,
+    MoveInstructionType_LINEAR,
+    ProfileDictionary,
+    StateWaypoint,
+    StateWaypointPoly_wrap_StateWaypoint,
+)
 from tesseract_robotics.tesseract_common import (
-    GeneralResourceLocator,
     FilesystemPath,
+    GeneralResourceLocator,
     Isometry3d,
-    Translation3d,
     ManipulatorInfo,
+    Translation3d,
 )
 from tesseract_robotics.tesseract_environment import (
-    Environment,
     AddLinkCommand,
+    Environment,
     MoveJointCommand,
     MoveLinkCommand,
 )
+from tesseract_robotics.tesseract_geometry import Box, Sphere
 from tesseract_robotics.tesseract_scene_graph import (
-    Link,
+    Collision,
     Joint,
     JointType,
+    Link,
     Visual,
-    Collision,
-)
-from tesseract_robotics.tesseract_geometry import Sphere, Box
-from tesseract_robotics.tesseract_command_language import (
-    CompositeInstruction,
-    MoveInstruction,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
-    StateWaypoint,
-    CartesianWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    ProfileDictionary,
 )
 
 
@@ -69,12 +73,12 @@ class TestFreespaceOMPLExample:
         visual.origin = Isometry3d.Identity()
         visual.origin = visual.origin * Translation3d(0.5, 0, 0.55)
         visual.geometry = Sphere(0.15)
-        link_sphere.visual.append(visual)
+        link_sphere.addVisual(visual)
 
         collision = Collision()
         collision.origin = visual.origin
         collision.geometry = visual.geometry
-        link_sphere.collision.append(collision)
+        link_sphere.addCollision(collision)
 
         joint_sphere = Joint("joint_sphere_attached")
         joint_sphere.parent_link_name = "base_link"
@@ -110,14 +114,10 @@ class TestFreespaceOMPLExample:
 
         # Create instructions
         start_instruction = MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(wp0),
-            MoveInstructionType_FREESPACE,
-            "FREESPACE"
+            StateWaypointPoly_wrap_StateWaypoint(wp0), MoveInstructionType_FREESPACE, "FREESPACE"
         )
         plan_f0 = MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
-            "FREESPACE"
+            StateWaypointPoly_wrap_StateWaypoint(wp1), MoveInstructionType_FREESPACE, "FREESPACE"
         )
 
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
@@ -137,12 +137,12 @@ class TestBasicCartesianExample:
         visual.origin = Isometry3d.Identity()
         visual.origin = visual.origin * Translation3d(1.0, 0, 0)
         visual.geometry = Box(0.5, 0.5, 0.5)
-        link_box.visual.append(visual)
+        link_box.addVisual(visual)
 
         collision = Collision()
         collision.origin = visual.origin
         collision.geometry = visual.geometry
-        link_box.collision.append(collision)
+        link_box.addCollision(collision)
 
         joint_box = Joint("joint_box_obstacle")
         joint_box.parent_link_name = "base_link"
@@ -173,6 +173,7 @@ class TestBasicCartesianExample:
 
         # Cartesian waypoint
         from tesseract_robotics.tesseract_common import Quaterniond
+
         wp1 = CartesianWaypoint(
             Isometry3d.Identity() * Translation3d(0.5, -0.2, 0.62) * Quaterniond(0, 0, 1.0, 0)
         )
@@ -180,12 +181,10 @@ class TestBasicCartesianExample:
         start_instruction = MoveInstruction(
             StateWaypointPoly_wrap_StateWaypoint(wp0),
             MoveInstructionType_FREESPACE,
-            "freespace_profile"
+            "freespace_profile",
         )
         plan_f0 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_LINEAR,
-            "RASTER"
+            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1), MoveInstructionType_LINEAR, "RASTER"
         )
 
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
@@ -199,11 +198,10 @@ class TestSceneGraphExample:
 
     def test_move_joint_command(self, iiwa_env):
         """Test moving a joint to a new parent using MoveJointCommand"""
-        # Get current parent
+        # Verify joint exists before moving
         scene_graph = iiwa_env.getSceneGraph()
         joint = scene_graph.getJoint("joint_a4")
         assert joint is not None
-        original_parent = joint.parent_link_name
 
         # Move joint to different parent
         move_joint_cmd = MoveJointCommand("joint_a4", "base_link")
@@ -216,6 +214,7 @@ class TestSceneGraphExample:
     def test_move_link_command(self, iiwa_env):
         """Test moving a link with a new joint using MoveLinkCommand"""
         import math
+
         from tesseract_robotics.tesseract_common import AngleAxisd
 
         # Create new joint
@@ -278,14 +277,10 @@ class TestGlassUprightExample:
 
         # Use LINEAR motion type
         start_instruction = MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(wp0),
-            MoveInstructionType_LINEAR,
-            "UPRIGHT"
+            StateWaypointPoly_wrap_StateWaypoint(wp0), MoveInstructionType_LINEAR, "UPRIGHT"
         )
         plan_f0 = MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(wp1),
-            MoveInstructionType_LINEAR,
-            "UPRIGHT"
+            StateWaypointPoly_wrap_StateWaypoint(wp1), MoveInstructionType_LINEAR, "UPRIGHT"
         )
 
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
@@ -307,8 +302,9 @@ class TestPuzzlePieceExample:
 
         # Read and parse CSV
         import csv
+
         poses_count = 0
-        with open(csv_path, 'r') as f:
+        with open(csv_path) as f:
             reader = csv.reader(f)
             for lnum, row in enumerate(reader):
                 if lnum < 2:  # Skip headers
@@ -320,7 +316,6 @@ class TestPuzzlePieceExample:
 
     def test_create_cartesian_toolpath_program(self, iiwa_env):
         """Test creating a program from toolpath poses"""
-        from tesseract_robotics.tesseract_common import Quaterniond
 
         manip_info = ManipulatorInfo()
         manip_info.manipulator = "manipulator"
@@ -342,10 +337,12 @@ class TestPuzzlePieceExample:
             plan_instruction = MoveInstruction(
                 CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
                 MoveInstructionType_LINEAR,
-                "CARTESIAN"
+                "CARTESIAN",
             )
             plan_instruction.setDescription(f"waypoint_{i}")
-            program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_instruction))
+            program.appendMoveInstruction(
+                MoveInstructionPoly_wrap_MoveInstruction(plan_instruction)
+            )
 
         assert len(program) == 3
 
@@ -364,6 +361,7 @@ class TestProfileDictionary:
 
         # Profiles can be used even if empty - defaults will be used
         from tesseract_robotics.tesseract_command_language import AnyPoly_wrap_ProfileDictionary
+
         profiles_any = AnyPoly_wrap_ProfileDictionary(profiles)
         assert profiles_any is not None
 
@@ -371,10 +369,6 @@ class TestProfileDictionary:
 # ============================================================================
 # Tests that run the actual example scripts
 # ============================================================================
-
-import subprocess
-import sys
-from pathlib import Path
 
 # tests/test_examples.py -> tesseract_nanobind/tests -> tesseract_nanobind -> repo root
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
@@ -384,6 +378,7 @@ LOWLEVEL_EXAMPLES_DIR = EXAMPLES_DIR / "lowlevel"
 def get_env_with_vars():
     """Get current environment with proper vars for examples"""
     import copy
+
     env = copy.copy(os.environ)
     return env
 
@@ -461,7 +456,9 @@ class TestFreespaceOMPLExampleRun:
         assert "Loaded robot" in result.stdout, f"Missing 'Loaded robot':\n{result.stdout}"
         assert "Added sphere obstacle" in result.stdout
         assert "Running planner" in result.stdout
-        assert "Planning successful" in result.stdout, f"Planning failed:\n{result.stdout}\n{result.stderr}"
+        assert "Planning successful" in result.stdout, (
+            f"Planning failed:\n{result.stdout}\n{result.stderr}"
+        )
         assert "waypoints" in result.stdout
 
 
@@ -490,7 +487,9 @@ class TestBasicCartesianExampleRun:
             env=get_env_with_vars(),
         )
         # Verify expected output (nanobind leak warnings may cause exit=1)
-        assert "Planning successful" in result.stdout, f"Planning failed:\n{result.stdout}\n{result.stderr}"
+        assert "Planning successful" in result.stdout, (
+            f"Planning failed:\n{result.stdout}\n{result.stderr}"
+        )
         assert "waypoints" in result.stdout.lower()
 
 
@@ -543,6 +542,6 @@ class TestGlassUprightExampleRun:
         )
         # Verify expected output (nanobind leak warnings may cause exit=1)
         assert "Loaded robot" in result.stdout, f"Missing 'Loaded robot':\n{result.stdout}"
-        assert "Planning successful" in result.stdout, f"Planning failed:\n{result.stdout}\n{result.stderr}"
-
-
+        assert "Planning successful" in result.stdout, (
+            f"Planning failed:\n{result.stdout}\n{result.stderr}"
+        )

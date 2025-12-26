@@ -196,7 +196,7 @@ def add_seats(robot):
         visual_meshes = createMeshFromPath(visual_mesh_path)
         if visual_meshes:
             visual.geometry = visual_meshes[0]  # Use first mesh from DAE
-        link_seat.visual.append(visual)
+        link_seat.addVisual(visual)
 
         # === COLLISION GEOMETRY ===
         # 10 pre-decomposed convex hulls for efficient collision checking
@@ -216,7 +216,7 @@ def add_seats(robot):
                 # makeConvexMesh: converts Mesh -> ConvexMesh for GJK/EPA algorithms
                 # ConvexMesh stores convex hull representation for fast collision
                 collision.geometry = makeConvexMesh(mesh)
-                link_seat.collision.append(collision)
+                link_seat.addCollision(collision)
 
         # === JOINT: attach seat to world frame ===
         joint_seat = Joint(f"joint_seat_{i + 1}")
