@@ -4,22 +4,22 @@ import numpy as np
 import pytest
 
 from tesseract_robotics.planning import (
+    CartesianTarget,
+    JointTarget,
+    MotionProgram,
+    MoveType,
+    Pose,
     Robot,
     RobotState,
-    Pose,
-    translation,
+    StateTarget,
+    box,
+    create_obstacle,
+    cylinder,
     rotation_x,
     rotation_y,
     rotation_z,
-    MotionProgram,
-    CartesianTarget,
-    JointTarget,
-    StateTarget,
-    MoveType,
-    box,
     sphere,
-    cylinder,
-    create_obstacle,
+    translation,
 )
 
 
@@ -46,9 +46,7 @@ class TestPose:
         # 90 degree rotation around Z
         t = Pose.from_xyz_quat(1, 2, 3, 0, 0, 0.707, 0.707)
         np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
-        np.testing.assert_array_almost_equal(
-            t.quaternion, [0, 0, 0.707, 0.707], decimal=3
-        )
+        np.testing.assert_array_almost_equal(t.quaternion, [0, 0, 0.707, 0.707], decimal=3)
 
     def test_from_xyz_rpy(self):
         # 90 degrees around Z
@@ -203,9 +201,7 @@ class TestRobot:
 
         # Verify FK of result matches target
         result_pose = robot.fk("manipulator", result)
-        np.testing.assert_array_almost_equal(
-            result_pose.position, target_pose.position, decimal=4
-        )
+        np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
 
     def test_ik_with_seed(self, robot):
         """Test IK with different seed configurations."""
@@ -220,9 +216,7 @@ class TestRobot:
 
         # Result should produce same end-effector pose
         result_pose = robot.fk("manipulator", result)
-        np.testing.assert_array_almost_equal(
-            result_pose.position, target_pose.position, decimal=4
-        )
+        np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
 
     def test_ik_unreachable_pose(self, robot):
         """Test IK returns None for unreachable poses."""
@@ -251,9 +245,7 @@ class TestRobot:
 
         # Verify solution is valid
         result_pose = robot.fk("manipulator", result)
-        np.testing.assert_array_almost_equal(
-            result_pose.position, target_pose.position, decimal=4
-        )
+        np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
 
 
 class TestMotionProgram:
@@ -402,14 +394,14 @@ class TestRobotLinkManagement:
 
     def test_add_link_with_geometry(self, robot):
         """Test adding a link with visual/collision geometry."""
+        from tesseract_robotics.tesseract_geometry import Box
         from tesseract_robotics.tesseract_scene_graph import (
-            Link,
+            Collision,
             Joint,
             JointType,
+            Link,
             Visual,
-            Collision,
         )
-        from tesseract_robotics.tesseract_geometry import Box
 
         # Create link with box geometry
         link = Link("test_obstacle")
@@ -437,9 +429,9 @@ class TestRobotLinkManagement:
 
     def test_add_link_using_create_fixed_joint(self, robot):
         """Test adding link using create_fixed_joint helper."""
-        from tesseract_robotics.tesseract_scene_graph import Link, Visual, Collision
-        from tesseract_robotics.tesseract_geometry import Sphere
         from tesseract_robotics.planning import create_fixed_joint
+        from tesseract_robotics.tesseract_geometry import Sphere
+        from tesseract_robotics.tesseract_scene_graph import Collision, Link, Visual
 
         # Create sphere link
         link = Link("sphere_obstacle")
@@ -564,3 +556,158 @@ class TestPlanningIntegration:
         assert result.successful
         assert len(result) > 0
         assert result.trajectory[0].positions is not None
+
+
+class TestProfileCreation:
+    """Tests for profile factory functions."""
+
+    def test_create_trajopt_default_profiles(self):
+        """Test TrajOpt profile creation with defaults."""
+        from tesseract_robotics.planning import create_trajopt_default_profiles
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+        profiles = create_trajopt_default_profiles()
+
+        assert isinstance(profiles, ProfileDictionary)
+
+    def test_create_trajopt_default_profiles_custom_names(self):
+        """Test TrajOpt profile creation with custom names."""
+        from tesseract_robotics.planning import create_trajopt_default_profiles
+
+        profiles = create_trajopt_default_profiles(profile_names=["MY_PROFILE"])
+
+        assert profiles is not None
+
+    def test_create_ompl_default_profiles(self):
+        """Test OMPL profile creation with defaults."""
+        from tesseract_robotics.planning import create_ompl_default_profiles
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+        profiles = create_ompl_default_profiles()
+
+        assert isinstance(profiles, ProfileDictionary)
+
+    def test_create_ompl_default_profiles_custom_params(self):
+        """Test OMPL profile creation with custom parameters."""
+        from tesseract_robotics.planning import create_ompl_default_profiles
+
+        profiles = create_ompl_default_profiles(
+            planning_time=10.0,
+            max_solutions=5,
+            optimize=False,
+            num_planners=2,
+        )
+
+        assert profiles is not None
+
+    def test_create_descartes_default_profiles(self):
+        """Test Descartes profile creation with defaults."""
+        from tesseract_robotics.planning import create_descartes_default_profiles
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+        profiles = create_descartes_default_profiles()
+
+        assert isinstance(profiles, ProfileDictionary)
+
+    def test_create_descartes_default_profiles_custom_params(self):
+        """Test Descartes profile creation with edge collision enabled."""
+        from tesseract_robotics.planning import create_descartes_default_profiles
+
+        profiles = create_descartes_default_profiles(
+            enable_edge_collision=True,
+            num_threads=4,
+        )
+
+        assert profiles is not None
+
+    def test_create_freespace_pipeline_profiles(self):
+        """Test freespace pipeline profile creation (OMPL + TrajOpt)."""
+        from tesseract_robotics.planning import create_freespace_pipeline_profiles
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+        profiles = create_freespace_pipeline_profiles()
+
+        assert isinstance(profiles, ProfileDictionary)
+
+    def test_create_cartesian_pipeline_profiles(self):
+        """Test cartesian pipeline profile creation (Descartes + TrajOpt)."""
+        from tesseract_robotics.planning import create_cartesian_pipeline_profiles
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+        profiles = create_cartesian_pipeline_profiles()
+
+        assert isinstance(profiles, ProfileDictionary)
+
+    def test_create_ompl_planner_configurators_default(self):
+        """Test OMPL configurator creation with defaults."""
+        from tesseract_robotics.planning import create_ompl_planner_configurators
+
+        configurators = create_ompl_planner_configurators()
+
+        assert len(configurators) == 1  # default: 1 RRTConnect
+
+    def test_create_ompl_planner_configurators_multiple(self):
+        """Test OMPL configurator creation with multiple planners."""
+        from tesseract_robotics.planning import create_ompl_planner_configurators
+
+        configurators = create_ompl_planner_configurators(
+            planners=["RRTConnect", "RRTstar"],
+            num_planners=2,
+        )
+
+        assert len(configurators) == 4  # 2 types * 2 instances
+
+    def test_create_ompl_planner_configurators_invalid_planner(self):
+        """Test OMPL configurator raises ValueError for invalid planner."""
+        from tesseract_robotics.planning import create_ompl_planner_configurators
+
+        with pytest.raises(ValueError, match="Unknown planner"):
+            create_ompl_planner_configurators(planners=["InvalidPlanner"])
+
+    def test_create_time_optimal_parameterization(self):
+        """Test TOTG parameterization creation."""
+        from tesseract_robotics.planning import create_time_optimal_parameterization
+
+        totg = create_time_optimal_parameterization(path_tolerance=0.05)
+
+        assert totg is not None
+
+    def test_create_iterative_spline_parameterization(self):
+        """Test ISP parameterization creation."""
+        from tesseract_robotics.planning import create_iterative_spline_parameterization
+
+        isp = create_iterative_spline_parameterization(add_points=False)
+
+        assert isp is not None
+
+
+class TestProgramErrors:
+    """Tests for error cases in program building."""
+
+    def test_cartesian_target_requires_pose_or_position(self):
+        """Test CartesianTarget raises ValueError when neither pose nor position given."""
+        with pytest.raises(ValueError, match="requires 'pose' or 'position'"):
+            CartesianTarget()
+
+    def test_joint_target_requires_names(self):
+        """Test JointTarget.to_waypoint raises ValueError without joint names."""
+        target = JointTarget([0, 0, 0, 0, 0, 0])
+
+        with pytest.raises(ValueError, match="requires joint names"):
+            target.to_waypoint()
+
+    def test_state_target_requires_names(self):
+        """Test StateTarget.to_waypoint raises ValueError without joint names."""
+        from tesseract_robotics.planning import StateTarget
+
+        target = StateTarget([0, 0, 0, 0, 0, 0])
+
+        with pytest.raises(ValueError, match="requires joint names"):
+            target.to_waypoint()
+
+    def test_motion_program_empty_targets_error(self):
+        """Test MotionProgram.to_composite_instruction raises ValueError on empty."""
+        program = MotionProgram("manipulator")
+
+        with pytest.raises(ValueError, match="has no targets"):
+            program.to_composite_instruction(joint_names=["j1", "j2"])
