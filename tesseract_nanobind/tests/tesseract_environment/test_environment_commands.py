@@ -109,8 +109,7 @@ class TestAddLinkCommand:
         box = Box(0.05, 0.05, 0.05)
         visual = Visual()
         visual.geometry = box
-        # Use assignment - nanobind returns copies for .visual
-        link.visual = [visual]
+        link.addVisual(visual)
 
         joint = Joint("new_joint")
         joint.type = JointType.FIXED

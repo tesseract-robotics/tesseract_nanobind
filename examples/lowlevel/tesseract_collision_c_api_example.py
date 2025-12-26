@@ -173,14 +173,13 @@ def main():
     # Visual component: for rendering/visualization (optional for collision)
     sphere_link_visual = Visual()
     sphere_link_visual.geometry = Sphere(0.1)  # 10cm radius
-    # Use assignment - nanobind returns copies for .visual/.collision
-    sphere_link.visual = [sphere_link_visual]
+    sphere_link.addVisual(sphere_link_visual)
 
     # Collision component: this is what the contact manager actually checks
     # A link without collision geometry is invisible to the collision checker
     sphere_link_collision = Collision()
     sphere_link_collision.geometry = Sphere(0.1)
-    sphere_link.collision = [sphere_link_collision]
+    sphere_link.addCollision(sphere_link_collision)
 
     # Joint connects child link to parent link with a transform
     # JointType_FIXED means no relative motion (obstacle is stationary)

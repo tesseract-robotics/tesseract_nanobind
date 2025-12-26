@@ -204,6 +204,18 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def_rw("inertial", &tsg::Link::inertial)
         .def_rw("visual", &tsg::Link::visual)
         .def_rw("collision", &tsg::Link::collision)
+        // Helper methods to avoid the .append() copy issue with vectors
+        // Usage: link.addVisual(visual) instead of link.visual.append(visual)
+        .def("addVisual", [](tsg::Link& self, const tsg::Visual& v) {
+            self.visual.push_back(std::make_shared<tsg::Visual>(v));
+        }, "visual"_a, "Add a Visual to this link")
+        .def("addCollision", [](tsg::Link& self, const tsg::Collision& c) {
+            self.collision.push_back(std::make_shared<tsg::Collision>(c));
+        }, "collision"_a, "Add a Collision to this link")
+        .def("clearVisual", [](tsg::Link& self) { self.visual.clear(); },
+            "Clear all Visual elements from this link")
+        .def("clearCollision", [](tsg::Link& self) { self.collision.clear(); },
+            "Clear all Collision elements from this link")
         .def("clear", &tsg::Link::clear)
         .def("clone", nb::overload_cast<>(&tsg::Link::clone, nb::const_))
         .def("clone", nb::overload_cast<const std::string&>(&tsg::Link::clone, nb::const_), "name"_a)

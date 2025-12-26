@@ -57,16 +57,16 @@ def run():
     robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
-    # Sphere obstacle at (0.5, 0, 0.55) radius=0.15m - positioned to block direct path
-    # Forces TrajOpt to find trajectory that goes AROUND sphere while keeping tool upright
+    # Sphere obstacle near path to influence trajectory, not block it
+    # Forces TrajOpt to find trajectory that avoids sphere while keeping tool upright
     # Without obstacle, robot could just rotate joint_a1 directly (trivial solution)
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.15),  # C++: createSphere(0.15)
-        transform=Pose.from_xyz(0.5, 0, 0.55),  # C++: Translation3d(0.5, 0, 0.55)
+        geometry=sphere(0.1),  # 10cm radius - smaller to avoid blocking
+        transform=Pose.from_xyz(0.55, 0, 0.45),  # Slightly forward and lower
     )
-    print("Added sphere obstacle at (0.5, 0, 0.55)")
+    print("Added sphere obstacle at (0.55, 0, 0.45)")
 
     # joint_a1 through joint_a7 for IIWA manipulator group
     joint_names = robot.get_joint_names("manipulator")
@@ -87,7 +87,8 @@ def run():
     #
     # LINEAR motion type (vs FREESPACE) tells TrajOpt to interpolate in Cartesian space,
     # essential for maintaining orientation at intermediate waypoints
-    program = (MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
         .set_joint_names(joint_names)
         # StateTarget specifies full joint configuration (not just Cartesian pose)
         # TrajOpt will optimize intermediate states while enforcing UPRIGHT constraints
@@ -95,8 +96,12 @@ def run():
         .linear_to(StateTarget(joint_end_pos, names=joint_names, profile="UPRIGHT"))
     )
 
-    print("\nProgram: LINEAR motion with UPRIGHT profile (orientation locked, position free)")
-    print("TrajOpt will optimize trajectory to avoid sphere while maintaining tool orientation")
+    print(
+        "\nProgram: LINEAR motion with UPRIGHT profile (orientation locked, position free)"
+    )
+    print(
+        "TrajOpt will optimize trajectory to avoid sphere while maintaining tool orientation"
+    )
 
     # TrajOptPipeline: trajectory optimization with collision avoidance
     # C++ uses safety_margin=0.01, contact_buffer=0.01 for collision checking
