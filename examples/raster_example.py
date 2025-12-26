@@ -51,8 +51,9 @@ The C++ example uses a two-stage planning approach:
 1. Descartes: samples valid IK solutions along Cartesian path
 2. TrajOpt: optimizes trajectory using Descartes solution as seed
 
-This Python example uses TrajOpt directly for simplicity, but the
-full pipeline with Descartes seeding is available in the lowlevel API.
+This Python example uses TrajOpt directly for simplicity. For the
+full Descartes+TrajOpt pipeline, see chain_example.py which uses
+CartesianPipeline with create_cartesian_pipeline_profiles().
 
 C++ SOURCE
 ----------
@@ -78,13 +79,11 @@ import sys
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
-    StateTarget,
+    MotionProgram,
     Pose,
-    box,
-    create_obstacle,
+    Robot,
+    StateTarget,
     TaskComposer,
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
@@ -142,10 +141,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     y_values = [-0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3]
 
     # Create Cartesian waypoints with constant orientation
-    waypoints = [
-        Pose.from_xyz_quat(x_const, y, z_const, *tool_quat)
-        for y in y_values
-    ]
+    waypoints = [Pose.from_xyz_quat(x_const, y, z_const, *tool_quat) for y in y_values]
     print(f"Created {len(waypoints)} waypoints")
 
     # === BUILD MOTION PROGRAM ===
@@ -156,9 +152,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # - to_end: final waypoint -> home (freespace)
     num_segments = 3
 
-    program = (MotionProgram("manipulator", tcp_frame="tool0", profile="RASTER")
-        .set_joint_names(joint_names)
-    )
+    program = MotionProgram(
+        "manipulator", tcp_frame="tool0", profile="RASTER"
+    ).set_joint_names(joint_names)
 
     # Start from home position
     program.move_to(StateTarget(home_pos, names=joint_names, profile="FREESPACE"))

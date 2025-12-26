@@ -60,7 +60,10 @@ from tesseract_robotics.planning import (
     create_obstacle,
     TaskComposer,
 )
-from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles, create_trajopt_default_profiles
+from tesseract_robotics.planning.profiles import (
+    create_freespace_pipeline_profiles,
+    create_trajopt_default_profiles,
+)
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -105,18 +108,21 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Quaternion (x=0, y=0, z=1.0, w=0) = 180 deg around Z = tool pointing down
     # C++ uses Eigen::Quaterniond(w, x, y, z) = (0, 0, 1.0, 0)
     wp1 = Pose.from_xyz_quat(0.5, -0.2, 0.62, 0, 0, 1.0, 0)  # First Cartesian waypoint
-    wp2 = Pose.from_xyz_quat(0.5, 0.3, 0.62, 0, 0, 1.0, 0)   # Second waypoint (+0.5m in Y)
+    wp2 = Pose.from_xyz_quat(
+        0.5, 0.3, 0.62, 0, 0, 1.0, 0
+    )  # Second waypoint (+0.5m in Y)
 
     # Build 4-phase motion program:
     # 1. StateTarget: Start from known joint configuration
     # 2. CartesianTarget + move_to: FREESPACE to wp1 (any collision-free path)
     # 3. CartesianTarget + linear_to: LINEAR to wp2 (straight-line Cartesian path)
     # 4. StateTarget: FREESPACE return to start joints
-    program = (MotionProgram("manipulator", tcp_frame="tool0", profile="cartesian_program")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", profile="cartesian_program")
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_pos, names=joint_names, profile="freespace_profile"))
-        .move_to(CartesianTarget(wp1, profile="freespace_profile"))   # FREESPACE to pose
-        .linear_to(CartesianTarget(wp2, profile="RASTER"))            # LINEAR Cartesian path
+        .move_to(CartesianTarget(wp1, profile="freespace_profile"))  # FREESPACE to pose
+        .linear_to(CartesianTarget(wp2, profile="RASTER"))  # LINEAR Cartesian path
         .move_to(StateTarget(joint_pos, names=joint_names, profile="freespace_profile"))
     )
 
@@ -141,6 +147,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 def main():
     results = run()
     if TesseractViewer is not None and results["result"].raw_results is not None:
+        print("\nStarting viewer at http://localhost:8000")
         viewer = TesseractViewer()
         viewer.update_environment(results["robot"].env, [0, 0, 0])
         viewer.update_trajectory(results["result"].raw_results)

@@ -102,8 +102,13 @@ Related Examples
 - pick_and_place_example.py: FK/IK for grasp pose computation
 """
 
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator, Isometry3d, Translation3d, \
-    TransformMap, Quaterniond
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    Isometry3d,
+    Translation3d,
+    Quaterniond,
+)
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
 import numpy as np
@@ -142,8 +147,12 @@ def main():
 
     # ABB IRB2400 uses OPW (analytical) kinematics solver
     # Solver is configured in abb_irb2400_plugins.yaml referenced by SRDF
-    urdf_path_str = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
-    srdf_path_str = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
+    urdf_path_str = locator.locateResource(
+        "package://tesseract_support/urdf/abb_irb2400.urdf"
+    ).getFilePath()
+    srdf_path_str = locator.locateResource(
+        "package://tesseract_support/urdf/abb_irb2400.srdf"
+    ).getFilePath()
 
     # FilesystemPath wraps std::filesystem::path for cross-platform compatibility
     urdf_path = FilesystemPath(urdf_path_str)
@@ -153,7 +162,7 @@ def main():
     assert env.init(urdf_path, srdf_path, locator)
 
     # ABB IRB2400 joint naming convention: joint_1 through joint_6
-    robot_joint_names = [f"joint_{i+1}" for i in range(6)]
+    _robot_joint_names = [f"joint_{i + 1}" for i in range(6)]  # noqa: F841
 
     # =========================================================================
     # STEP 2: Get Kinematic Group
@@ -190,14 +199,18 @@ def main():
     # Define target pose for end effector
     # Compose transform: Identity * Translation * Rotation
     # Note: Quaterniond constructor order is (w, x, y, z) - Eigen convention
-    tool0_transform2 = Isometry3d.Identity() * Translation3d(0.7, -0.1, 1) * Quaterniond(0.70711, 0, 0.7171, 0)
+    tool0_transform2 = (
+        Isometry3d.Identity()
+        * Translation3d(0.7, -0.1, 1)
+        * Quaterniond(0.70711, 0, 0.7171, 0)
+    )
 
     # KinGroupIKInput specifies a single IK request
     # Multiple inputs can be solved simultaneously for multi-chain robots
     ik = KinGroupIKInput()
-    ik.pose = tool0_transform2           # Target transform (Isometry3d)
-    ik.tip_link_name = "tool0"           # End effector link
-    ik.working_frame = "base_link"       # Reference frame for the pose
+    ik.pose = tool0_transform2  # Target transform (Isometry3d)
+    ik.tip_link_name = "tool0"  # End effector link
+    ik.working_frame = "base_link"  # Reference frame for the pose
 
     # KinGroupIKInputs is a vector - append all IK requests
     iks = KinGroupIKInputs()

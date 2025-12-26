@@ -113,6 +113,10 @@ def main():
     import tesseract_robotics
 
     test_dir = Path(__file__).parent / "tests"
+    if not test_dir.exists():
+        print(f"ERROR: Test directory not found: {test_dir}")
+        print("This may indicate an incomplete installation.")
+        return 1
     modules = get_test_modules(test_dir)
 
     report_path = Path.cwd() / "tesseract_selftest_report.txt"
