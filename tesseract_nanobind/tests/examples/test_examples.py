@@ -103,6 +103,11 @@ def test_freespace_hybrid_example():
     _load_module("freespace_hybrid_example", EXAMPLES / "freespace_hybrid_example.py").main()
 
 
+@pytest.mark.planning
+def test_chain_example():
+    _load_module("chain_example", EXAMPLES / "chain_example.py").main()
+
+
 # === Low-Level API Examples ===
 
 @pytest.mark.lowlevel
