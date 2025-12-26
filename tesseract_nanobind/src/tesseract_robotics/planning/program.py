@@ -28,6 +28,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Union
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -223,8 +224,8 @@ class StateTarget:
         return MoveInstructionType_FREESPACE
 
 
-# Type alias for any target type
-Target = CartesianTarget | JointTarget | StateTarget
+# Type alias for any target type (Union for Python 3.9 compatibility)
+Target = Union[CartesianTarget, JointTarget, StateTarget]
 
 
 class MotionProgram:
