@@ -208,7 +208,7 @@ def main():
     # Sweep joint_1 (base rotation) to move robot toward/away from obstacle
     for i in range(-5, 5):
         robot_joint_pos[0] = i * np.deg2rad(5)  # -25 to +20 degrees
-        print("Contact check at robot position: " + str(robot_joint_pos))
+        print(f"Contact check at robot position: {robot_joint_pos}")
 
         # Update state solver with new joint positions
         # This recomputes all link transforms via forward kinematics

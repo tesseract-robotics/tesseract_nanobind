@@ -134,7 +134,7 @@ def main():
         for k, v in env_info.items():
             # truncate long paths
             if len(v) > 60:
-                v = "..." + v[-57:]
+                v = f"...{v[-57:]}"
             print(f"  {k}: {v}")
 
     print(f"\nRunning {len(modules)} test modules...\n")

@@ -38,20 +38,20 @@ from tesseract_robotics.tesseract_common import (
     ManipulatorInfo,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
-from tesseract_robotics.tesseract_scene_graph import (
-    Joint,
-    Link,
-    SceneGraph,
-)
 from tesseract_robotics.tesseract_environment import (
+    Environment,
     AddLinkCommand,
     RemoveLinkCommand,
     MoveLinkCommand,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
     ChangeCollisionMarginsCommand,
+)
+from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+from tesseract_robotics.tesseract_scene_graph import (
+    Joint,
+    Link,
+    SceneGraph,
 )
 
 from tesseract_robotics.planning.transforms import Pose

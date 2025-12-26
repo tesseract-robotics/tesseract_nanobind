@@ -263,7 +263,7 @@ class TaskComposer:
         return cls(factory, locator, num_threads=num_threads, executor=executor)
 
     @property
-    def executor(self):
+    def executor(self) -> TaskflowTaskComposerExecutor:
         """Get or create task executor (lazy initialization)."""
         if self._executor is None:
             if self._num_threads is not None:
