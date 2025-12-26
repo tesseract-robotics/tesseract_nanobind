@@ -786,3 +786,152 @@ class TestProgramErrors:
 
         with pytest.raises(ValueError, match="has no targets"):
             program.to_composite_instruction(joint_names=["j1", "j2"])
+
+
+class TestTrajectoryPoint:
+    """Tests for TrajectoryPoint dataclass."""
+
+    def test_creation(self):
+        """Test basic TrajectoryPoint creation."""
+        from tesseract_robotics.planning import TrajectoryPoint
+
+        point = TrajectoryPoint(
+            joint_names=["j1", "j2", "j3"],
+            positions=np.array([0.1, 0.2, 0.3]),
+        )
+        assert len(point.joint_names) == 3
+        np.testing.assert_array_almost_equal(point.positions, [0.1, 0.2, 0.3])
+        assert point.velocities is None
+        assert point.accelerations is None
+        assert point.time is None
+
+    def test_with_velocities_and_time(self):
+        """Test TrajectoryPoint with optional fields."""
+        from tesseract_robotics.planning import TrajectoryPoint
+
+        point = TrajectoryPoint(
+            joint_names=["j1", "j2"],
+            positions=np.array([0.5, 0.6]),
+            velocities=np.array([0.1, 0.2]),
+            accelerations=np.array([0.01, 0.02]),
+            time=1.5,
+        )
+        np.testing.assert_array_almost_equal(point.velocities, [0.1, 0.2])
+        np.testing.assert_array_almost_equal(point.accelerations, [0.01, 0.02])
+        assert point.time == 1.5
+
+    def test_as_dict(self):
+        """Test TrajectoryPoint.as_dict() conversion."""
+        from tesseract_robotics.planning import TrajectoryPoint
+
+        point = TrajectoryPoint(
+            joint_names=["joint_1", "joint_2"],
+            positions=np.array([0.5, -0.3]),
+        )
+        d = point.as_dict()
+        assert d["joint_1"] == pytest.approx(0.5)
+        assert d["joint_2"] == pytest.approx(-0.3)
+
+    def test_repr(self):
+        """Test TrajectoryPoint string representation."""
+        from tesseract_robotics.planning import TrajectoryPoint
+
+        point = TrajectoryPoint(
+            joint_names=["j1"],
+            positions=np.array([0.1234]),
+            time=2.5,
+        )
+        repr_str = repr(point)
+        assert "0.1234" in repr_str
+        assert "time=2.500" in repr_str
+
+
+class TestPlanningResult:
+    """Tests for PlanningResult dataclass."""
+
+    def test_successful_result(self):
+        """Test successful PlanningResult."""
+        from tesseract_robotics.planning import TrajectoryPoint
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        traj = [
+            TrajectoryPoint(["j1"], np.array([0.0])),
+            TrajectoryPoint(["j1"], np.array([0.5])),
+            TrajectoryPoint(["j1"], np.array([1.0])),
+        ]
+        result = PlanningResult(
+            successful=True,
+            message="Planning successful",
+            trajectory=traj,
+        )
+
+        assert result.successful
+        assert bool(result) is True
+        assert len(result) == 3
+        assert result.message == "Planning successful"
+
+    def test_failed_result(self):
+        """Test failed PlanningResult."""
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        result = PlanningResult(
+            successful=False,
+            message="No solution found",
+        )
+
+        assert not result.successful
+        assert bool(result) is False
+        assert len(result) == 0
+
+    def test_iteration(self):
+        """Test iterating over PlanningResult trajectory."""
+        from tesseract_robotics.planning import TrajectoryPoint
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        traj = [
+            TrajectoryPoint(["j1"], np.array([0.1])),
+            TrajectoryPoint(["j1"], np.array([0.2])),
+        ]
+        result = PlanningResult(successful=True, trajectory=traj)
+
+        positions = [pt.positions[0] for pt in result]
+        np.testing.assert_array_almost_equal(positions, [0.1, 0.2])
+
+    def test_indexing(self):
+        """Test indexing PlanningResult trajectory."""
+        from tesseract_robotics.planning import TrajectoryPoint
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        traj = [
+            TrajectoryPoint(["j1"], np.array([0.0])),
+            TrajectoryPoint(["j1"], np.array([0.5])),
+        ]
+        result = PlanningResult(successful=True, trajectory=traj)
+
+        assert result[0].positions[0] == pytest.approx(0.0)
+        assert result[1].positions[0] == pytest.approx(0.5)
+
+    def test_to_numpy(self):
+        """Test PlanningResult.to_numpy() conversion."""
+        from tesseract_robotics.planning import TrajectoryPoint
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        traj = [
+            TrajectoryPoint(["j1", "j2"], np.array([0.0, 0.1])),
+            TrajectoryPoint(["j1", "j2"], np.array([0.5, 0.6])),
+            TrajectoryPoint(["j1", "j2"], np.array([1.0, 1.1])),
+        ]
+        result = PlanningResult(successful=True, trajectory=traj)
+
+        arr = result.to_numpy()
+        assert arr.shape == (3, 2)
+        np.testing.assert_array_almost_equal(arr[0], [0.0, 0.1])
+        np.testing.assert_array_almost_equal(arr[2], [1.0, 1.1])
+
+    def test_to_numpy_empty(self):
+        """Test to_numpy() on empty trajectory."""
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        result = PlanningResult(successful=False)
+        arr = result.to_numpy()
+        assert len(arr) == 0
