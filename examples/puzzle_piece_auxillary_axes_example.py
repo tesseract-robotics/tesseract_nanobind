@@ -202,15 +202,18 @@ def create_profiles():
     return profiles
 
 
-def main():
-    """Execute 9-DOF Cartesian path planning with auxiliary axes.
+def run(pipeline="TrajOptPipeline", num_planners=None):
+    """Run 9-DOF Cartesian path planning with auxiliary axes.
 
-    Workflow:
-    1. Load workcell with KUKA IIWA + 2-DOF positioner
-    2. Parse CSV toolpath (~50 waypoints on puzzle piece edge)
-    3. Configure TrajOpt with yaw freedom for aux axis optimization
-    4. Plan Cartesian path through all waypoints
+    Args:
+        pipeline: Pipeline name (default "TrajOptPipeline")
+        num_planners: Number of parallel planners (unused, for API compat)
+
+    Returns:
+        dict with result, robot, joint_names, planning_time, success
     """
+    import time
+
     # === LOAD WORKCELL ===
     # puzzle_piece_workcell: KUKA IIWA arm + 2-DOF positioner
     robot = Robot.from_urdf(
@@ -249,22 +252,48 @@ def main():
 
     # === PLAN WITH TRAJOPT ===
     # Custom profiles enable yaw freedom for auxiliary axis optimization
-    print("Planning with TrajOpt (9 DOF: 7 arm + 2 aux)...")
+    print(f"Planning with {pipeline} (9 DOF: 7 arm + 2 aux)...")
     composer = TaskComposer.from_config()
     profiles = create_profiles()
-    result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
 
-    assert result.successful, f"Planning failed: {result.message}"
-    print(f"Success! {len(result)} trajectory waypoints")
+    start_time = time.time()
+    try:
+        result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
+        planning_time = time.time() - start_time
 
-    # Visualize
-    if TesseractViewer is not None:
+        if result.successful:
+            print(f"Success in {planning_time:.2f}s, {len(result)} waypoints")
+        else:
+            print(f"Failed in {planning_time:.2f}s: {result.message}")
+
+    except Exception as e:
+        planning_time = time.time() - start_time
+        print(f"Exception after {planning_time:.2f}s: {e}")
+        result = None
+
+    return {
+        "result": result,
+        "robot": robot,
+        "joint_names": joint_names,
+        "planning_time": planning_time,
+        "success": result.successful if result else False,
+    }
+
+
+def main():
+    """Execute example and optionally visualize."""
+    results = run()
+
+    if TesseractViewer is not None and results.get("result"):
         print("\nViewer at http://localhost:8000")
         viewer = TesseractViewer()
-        viewer.update_environment(robot.env, [0, 0, 0])
-        viewer.update_trajectory(result.raw_results)
+        viewer.update_environment(results["robot"].env, [0, 0, 0])
+        if results["result"].raw_results is not None:
+            viewer.update_trajectory(results["result"].raw_results)
         viewer.start_serve_background()
         input("Press Enter to exit...")
+
+    return results["success"]
 
 
 if __name__ == "__main__":

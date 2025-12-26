@@ -486,26 +486,28 @@ class TaskComposer:
             )
 
             # Extract optional velocity/acceleration/time if available
+            # Note: These attributes may not exist on all StateWaypoint types
+            # (e.g., OMPL output lacks velocity/acceleration until time parameterization)
             try:
                 vel = state_wp.getVelocity()
                 if vel is not None and len(vel) > 0:
                     point.velocities = np.array(vel)
             except (AttributeError, RuntimeError):
-                pass
+                pass  # Velocity not available for this waypoint type
 
             try:
                 acc = state_wp.getAcceleration()
                 if acc is not None and len(acc) > 0:
                     point.accelerations = np.array(acc)
             except (AttributeError, RuntimeError):
-                pass
+                pass  # Acceleration not available for this waypoint type
 
             try:
                 time = state_wp.getTime()
                 if time is not None:
                     point.time = float(time)
             except (AttributeError, RuntimeError):
-                pass
+                pass  # Time not available for this waypoint type
 
             trajectory.append(point)
 
