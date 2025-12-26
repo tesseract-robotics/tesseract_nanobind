@@ -74,6 +74,7 @@ from tesseract_robotics.planning.profiles import (
     create_ompl_planner_configurators,
     create_time_optimal_parameterization,
     create_trajopt_default_profiles,
+    create_trajopt_ifopt_default_profiles,
 )
 from tesseract_robotics.planning.program import (
     CartesianTarget,
@@ -134,6 +135,7 @@ __all__ = [
     # Profiles
     "STANDARD_PROFILE_NAMES",
     "create_trajopt_default_profiles",
+    "create_trajopt_ifopt_default_profiles",
     "create_ompl_default_profiles",
     "create_ompl_planner_configurators",
     "create_descartes_default_profiles",

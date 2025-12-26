@@ -578,6 +578,15 @@ class TestProfileCreation:
 
         assert profiles is not None
 
+    def test_create_trajopt_ifopt_default_profiles(self):
+        """Test TrajOptIfopt profile creation with defaults."""
+        from tesseract_robotics.planning import create_trajopt_ifopt_default_profiles
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+        profiles = create_trajopt_ifopt_default_profiles()
+
+        assert isinstance(profiles, ProfileDictionary)
+
     def test_create_ompl_default_profiles(self):
         """Test OMPL profile creation with defaults."""
         from tesseract_robotics.planning import create_ompl_default_profiles
