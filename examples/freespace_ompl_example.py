@@ -1,8 +1,40 @@
 """
-Freespace OMPL Example (High-Level API)
+Freespace OMPL Planning Example (High-Level API)
 
-Demonstrates freespace motion planning using OMPL with the KUKA IIWA robot.
-Adds a sphere obstacle to the environment and plans a collision-free path around it.
+Demonstrates joint-space freespace motion planning using the OMPL RRTConnect algorithm.
+The robot (KUKA IIWA 7-DOF) plans a collision-free path around a sphere obstacle.
+
+Pipeline Overview:
+    1. Load KUKA IIWA robot from tesseract_support
+    2. Add sphere obstacle at (0.5, 0, 0.55) with radius 0.15m
+    3. Define start/end joint configurations (only joint_a1 changes: -0.4 to 0.4 rad)
+    4. Execute FreespacePipeline: OMPL RRTConnect -> interpolation -> time parameterization
+    5. Return collision-free joint trajectory
+
+Key Concepts:
+    - OMPL RRTConnect: Bidirectional rapidly-exploring random tree algorithm.
+      Grows trees from both start and goal, efficient for high-DOF spaces.
+    - FreespacePipeline: OMPL planning with post-processing (interpolation + timing)
+    - JointTarget: Specifies goal as joint configuration (vs CartesianTarget for poses)
+    - Joint-space planning: No Cartesian path constraints, only collision avoidance
+
+Motion Types:
+    - FREESPACE: Any collision-free path allowed (joint-space interpolation)
+    - Uses JointTarget for both start and goal waypoints
+
+C++ Source: tesseract_planning/tesseract_examples/src/freespace_ompl_example.cpp
+
+C++ Parameters (verified):
+    - Robot: KUKA LBR IIWA 14 R820 (7-DOF)
+    - Obstacle: Sphere radius=0.15m at (0.5, 0, 0.55) attached to base_link
+    - Start: joint_a1=-0.4 rad, others=[0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0]
+    - End: joint_a1=0.4 rad (same other joints)
+    - Planner: RRTConnect with configurable range and planning_time
+
+Related Examples:
+    - freespace_hybrid_example.py - OMPL + TrajOpt smoothing
+    - basic_cartesian_example.py - TrajOpt for Cartesian paths
+    - lowlevel/freespace_ompl_c_api_example.py - Same with low-level API
 """
 
 import sys
@@ -28,47 +60,65 @@ if "pytest" not in sys.modules:
 
 
 def run(pipeline="FreespacePipeline", num_planners=None):
-    """Run example and return trajectory results for testing.
+    """Run freespace OMPL planning example.
+
+    Plans a collision-free joint-space trajectory around a sphere obstacle using
+    OMPL's RRTConnect algorithm. Only joint_a1 changes (-0.4 to 0.4 rad), creating
+    a sweeping motion that must avoid the sphere.
 
     Args:
-        pipeline: Planning pipeline to use (default: FreespacePipeline)
-        num_planners: Number of parallel OMPL planners (default: all CPUs)
+        pipeline: Planning pipeline to use. Options:
+            - "FreespacePipeline" (default): OMPL RRTConnect
+            - "FreespaceHybridPipeline": OMPL + TrajOpt smoothing
+        num_planners: Number of parallel OMPL planners (default: all CPUs).
+            More planners = faster solutions but higher CPU usage.
 
     Returns:
-        dict with result, robot, joint_names
+        dict with keys:
+            - result: PlanningResult with trajectory and success status
+            - robot: Robot instance with environment state
+            - joint_names: List of 7 KUKA IIWA joint names
     """
-    # Load KUKA IIWA robot
+    # Load KUKA IIWA 7-DOF robot from tesseract_support package
+    # Joints: joint_a1 through joint_a7
     robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
-    # Add sphere obstacle
+    # Add sphere obstacle for collision avoidance
+    # C++ source: createSphere(0.15) at Translation3d(0.5, 0, 0.55)
+    # Positioned in front of robot to force non-trivial path
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.15),
-        transform=Pose.from_xyz(0.5, 0, 0.55),
+        geometry=sphere(0.15),  # 15cm radius
+        transform=Pose.from_xyz(0.5, 0, 0.55),  # In front of robot base
     )
     print("Added sphere obstacle at (0.5, 0, 0.55)")
 
-    # Get joint names
+    # Get joint names for "manipulator" planning group (defined in SRDF)
     joint_names = robot.get_joint_names("manipulator")
 
-    # Define start and end positions
+    # Start/end configurations from C++ example
+    # Only joint_a1 changes (-0.4 -> 0.4 rad = ~46 degrees)
+    # This creates a base rotation that must navigate around the sphere
     joint_start_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     joint_end_pos = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 
-    # Set initial state
+    # Set initial robot state - required before planning for IK seeding
     robot.set_joints(joint_start_pos, joint_names=joint_names)
 
-    # Create motion program
+    # Build motion program with JointTarget waypoints
+    # FREESPACE motion type = joint-space planning, no Cartesian constraints
+    # The planner finds ANY collision-free path (not necessarily shortest)
     program = (MotionProgram("manipulator", tcp_frame="tool0")
         .set_joint_names(joint_names)
-        .move_to(JointTarget(joint_start_pos))
-        .move_to(JointTarget(joint_end_pos))
+        .move_to(JointTarget(joint_start_pos))  # Start configuration
+        .move_to(JointTarget(joint_end_pos))    # Goal configuration
     )
     print(f"\nCreated program with {len(program)} waypoints")
 
-    # Plan using TaskComposer
+    # Execute planning pipeline via TaskComposer
+    # FreespacePipeline: OMPL RRTConnect -> interpolation -> time parameterization
     print(f"\nRunning planner ({pipeline})...")
     composer = TaskComposer.from_config()
     profiles = create_freespace_pipeline_profiles(num_planners=num_planners)
@@ -94,4 +144,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# test comment

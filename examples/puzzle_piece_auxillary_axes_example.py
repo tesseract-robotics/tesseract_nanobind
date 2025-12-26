@@ -1,8 +1,87 @@
 """
-Puzzle Piece Auxiliary Axes Example (High-Level API)
+Puzzle Piece Auxiliary Axes Example - 9-DOF Cartesian Path with Positioner
 
-Simplified version using high-level planning API.
-Cartesian path planning with 9-DOF (KUKA IIWA 7-DOF + 2-DOF positioner).
+This example demonstrates Cartesian path planning for a multi-chain kinematic
+system: a 7-DOF KUKA IIWA arm combined with a 2-DOF workpiece positioner.
+The positioner (auxiliary axes) can reorient the workpiece to improve
+reachability and avoid singularities during surface following operations.
+
+PIPELINE OVERVIEW
+-----------------
+1. LOAD WORKCELL: 9-DOF system (7-DOF arm + 2-DOF positioner)
+2. LOAD TOOLPATH: Parse CSV file with ~50 Cartesian waypoints (puzzle piece edge)
+3. CONFIGURE TRAJOPT: Enable yaw freedom (coeff[5]=0) for auxiliary axis optimization
+4. PLAN: TrajOpt optimizes 9-DOF trajectory following Cartesian path
+
+KEY CONCEPTS DEMONSTRATED
+-------------------------
+1. Multi-Chain Kinematics:
+   - "manipulator_aux" group: combines arm and positioner kinematic chains
+   - Arm chain: grinder_frame (TCP) on KUKA IIWA end-effector
+   - Positioner chain: "part" frame that moves with auxiliary axes
+
+2. Yaw Freedom for Auxiliary Axes:
+   - TrajOpt constraint coeff = [5,5,5,2,2,0] (x,y,z,rx,ry,rz)
+   - coeff[5]=0: yaw (rz) is FREE, not constrained
+   - Positioner can rotate workpiece around tool axis while maintaining TCP position
+   - Enables better arm configurations and singularity avoidance
+
+3. CSV Toolpath Format:
+   - puzzle_bent.csv: surface points with normals for grinding operation
+   - Columns: point_num, x, y, z, i, j, k (position + normal vector)
+   - Units: millimeters (converted to meters in code)
+   - ~50 waypoints tracing puzzle piece edge
+
+4. Frame Construction from Normal:
+   - Z-axis: surface normal from CSV (tool approach direction)
+   - X-axis: computed orthogonal to normal
+   - Y-axis: Z x X for right-handed frame
+
+ROBOT CONFIGURATION (from C++)
+------------------------------
+9 DOF joint order:
+- joint_a1 through joint_a7: KUKA IIWA arm (7 DOF)
+- joint_aux1: positioner Z-rotation (turntable)
+- joint_aux2: positioner tilt (tilting table)
+
+Initial configuration:
+- joint_a1=-0.785398 (-45deg), joint_a2=0.4, joint_a4=-1.9, joint_a6=1.0
+- Positioner at neutral (0, 0)
+
+Frames:
+- tcp_frame="grinder_frame": tool center point on arm end-effector
+- working_frame="part": workpiece frame attached to positioner
+
+TRAJOPT SETTINGS (from C++)
+---------------------------
+Plan profile (CARTESIAN):
+- cartesian_constraint_config.coeff = [5,5,5,2,2,0]
+- Position (x,y,z) tightly constrained (coeff=5)
+- Roll/pitch (rx,ry) moderately constrained (coeff=2)
+- Yaw (rz) FREE (coeff=0) - allows tool rotation
+
+Composite profile (DEFAULT):
+- collision_cost_config.safety_margin = 0.025m
+- collision_cost_config.type = SINGLE_TIMESTEP
+- Solver: OSQP, max_iter=200
+
+C++ SOURCE
+----------
+tesseract_planning/tesseract_examples/src/puzzle_piece_auxillary_axes_example.cpp
+Author: Levi Armstrong, Southwest Research Institute, July 2019
+
+USE CASES
+---------
+- Surface grinding/polishing with tool orientation freedom
+- Welding with auxiliary rotation for weld pool control
+- Machining with coordinated workpiece repositioning
+- Any process where auxiliary axes extend workspace or improve reachability
+
+RELATED EXAMPLES
+----------------
+- basic_cartesian_example.py: simple Cartesian path without auxiliary axes
+- glass_upright_example.py: orientation constraints for upright maintenance
+- raster_example.py: industrial raster patterns
 """
 
 import sys
@@ -36,7 +115,23 @@ if "pytest" not in sys.modules:
 
 
 def make_puzzle_tool_poses(robot):
-    """Load toolpath poses from puzzle_bent.csv."""
+    """Load toolpath poses from puzzle_bent.csv.
+
+    From C++ makePuzzleToolPoses(): parses CSV with position and normal data.
+
+    CSV Format:
+        Row 0-1: Headers (skipped)
+        Columns: point_num, x, y, z, i, j, k
+        Units: millimeters (converted to meters)
+
+    Frame Construction (from C++):
+        - Z-axis: surface normal (i, j, k) from CSV - tool approach direction
+        - X-axis: computed orthogonal, pointing inward toward origin
+        - Y-axis: Z x X for right-handed coordinate frame
+
+    Returns:
+        list[Pose]: ~50 Cartesian waypoints for puzzle piece edge
+    """
     resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
@@ -44,11 +139,11 @@ def make_puzzle_tool_poses(robot):
     with open(csv_path, 'r') as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
-            if lnum < 2 or len(row) < 7:  # Skip header
+            if lnum < 2 or len(row) < 7:  # Skip header rows
                 continue
 
             try:
-                # Parse x,y,z (mm) and normal i,j,k
+                # Parse x,y,z (mm) and normal i,j,k - convert mm to meters
                 x, y, z = float(row[1]) / 1000, float(row[2]) / 1000, float(row[3]) / 1000
                 i, j, k = float(row[4]), float(row[5]), float(row[6])
             except (ValueError, IndexError):
@@ -58,13 +153,15 @@ def make_puzzle_tool_poses(robot):
             norm = np.array([i, j, k])
             norm /= np.linalg.norm(norm)
 
-            # Build frame from normal (z-axis)
+            # Build orthogonal frame from surface normal
+            # Use negative position as reference to create X-axis pointing inward
             temp_x = -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
             y_axis = np.cross(norm, temp_x)
             y_axis /= np.linalg.norm(y_axis)
             x_axis = np.cross(y_axis, norm)
             x_axis /= np.linalg.norm(x_axis)
 
+            # Build rotation matrix [X|Y|Z] and create pose
             rot = np.column_stack([x_axis, y_axis, norm])
             poses.append(Pose.from_matrix_position(rot, pos))
 
@@ -72,21 +169,31 @@ def make_puzzle_tool_poses(robot):
 
 
 def create_profiles():
-    """Create TrajOpt profiles for Cartesian path following."""
+    """Create TrajOpt profiles for Cartesian path following with yaw freedom.
+
+    From C++ puzzle_piece_auxillary_axes_example.cpp profile configuration.
+
+    Key settings:
+    - cartesian_constraint_config.coeff = [5,5,5,2,2,0]
+      Position (x,y,z) tightly constrained, roll/pitch moderate, yaw FREE
+    - collision_cost (not constraint) with 25mm safety margin
+    """
     profiles = ProfileDictionary()
 
-    # Plan profile: Cartesian constraint with lower weight on tool-axis rotation
+    # Plan profile: Cartesian constraint with yaw (rz) freedom
+    # coeff = [x, y, z, rx, ry, rz] weights for pose error
+    # CRITICAL: coeff[5]=0 allows yaw rotation freedom for auxiliary axes
     plan = TrajOptDefaultPlanProfile()
     plan.joint_cost_config.enabled = False
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
 
-    # Composite profile: collision cost only
+    # Composite profile: soft collision cost (not hard constraint)
     composite = TrajOptDefaultCompositeProfile()
     composite.collision_constraint_config.enabled = False
     composite.collision_cost_config.enabled = True
-    composite.collision_cost_config.safety_margin = 0.025
+    composite.collision_cost_config.safety_margin = 0.025  # 25mm buffer
     composite.collision_cost_config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
     composite.collision_cost_config.coeff = 1.0
 
@@ -96,27 +203,42 @@ def create_profiles():
 
 
 def main():
-    # Load puzzle piece workcell with auxiliary axes
+    """Execute 9-DOF Cartesian path planning with auxiliary axes.
+
+    Workflow:
+    1. Load workcell with KUKA IIWA + 2-DOF positioner
+    2. Parse CSV toolpath (~50 waypoints on puzzle piece edge)
+    3. Configure TrajOpt with yaw freedom for aux axis optimization
+    4. Plan Cartesian path through all waypoints
+    """
+    # === LOAD WORKCELL ===
+    # puzzle_piece_workcell: KUKA IIWA arm + 2-DOF positioner
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/puzzle_piece_workcell.urdf",
         "package://tesseract_support/urdf/puzzle_piece_workcell.srdf"
     )
 
     # 9 DOF: KUKA IIWA (7) + auxiliary axes (2)
+    # Joint order must match URDF kinematic chain
     joint_names = [
         "joint_a1", "joint_a2", "joint_a3", "joint_a4",
         "joint_a5", "joint_a6", "joint_a7",
-        "joint_aux1", "joint_aux2"
+        "joint_aux1", "joint_aux2"  # Positioner: Z-rotation + tilt
     ]
+    # Initial configuration from C++ (arm slightly bent, positioner neutral)
     joint_pos = np.array([-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0, 0.0, 0.0])
     robot.set_joints(joint_pos, joint_names=joint_names)
 
-    # Load tool poses from CSV
+    # === LOAD TOOLPATH ===
+    # Parse CSV with ~50 Cartesian waypoints (puzzle piece edge grinding)
     tool_poses = make_puzzle_tool_poses(robot)
     print(f"Loaded {len(tool_poses)} tool poses")
     assert tool_poses, "No poses loaded from CSV"
 
-    # Build motion program with Cartesian waypoints
+    # === BUILD MOTION PROGRAM ===
+    # "manipulator_aux": combined kinematic group (arm + positioner)
+    # tcp_frame="grinder_frame": tool on arm end-effector
+    # working_frame="part": workpiece frame attached to positioner
     program = (MotionProgram("manipulator_aux", tcp_frame="grinder_frame", working_frame="part")
         .set_joint_names(joint_names))
 
@@ -125,7 +247,8 @@ def main():
 
     print(f"Program: {len(program)} waypoints")
 
-    # Plan with custom TrajOpt profiles for Cartesian path following
+    # === PLAN WITH TRAJOPT ===
+    # Custom profiles enable yaw freedom for auxiliary axis optimization
     print("Planning with TrajOpt (9 DOF: 7 arm + 2 aux)...")
     composer = TaskComposer.from_config()
     profiles = create_profiles()
