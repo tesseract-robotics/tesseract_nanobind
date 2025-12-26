@@ -78,6 +78,28 @@ class TrajectoryPoint:
         return f"TrajectoryPoint([{pos_str}]{time_str})"
 
 
+def _extract_array_field(getter, field_name: str) -> Optional[np.ndarray]:
+    """Extract optional array field (velocity/acceleration) from StateWaypoint."""
+    try:
+        val = getter()
+        if val is not None and len(val) > 0:
+            return np.array(val)
+    except (AttributeError, RuntimeError) as e:
+        logger.debug(f"{field_name} not available: {type(e).__name__}")
+    return None
+
+
+def _extract_time_field(getter, field_name: str) -> Optional[float]:
+    """Extract optional time field from StateWaypoint."""
+    try:
+        val = getter()
+        if val is not None:
+            return float(val)
+    except (AttributeError, RuntimeError) as e:
+        logger.debug(f"{field_name} not available: {type(e).__name__}")
+    return None
+
+
 @dataclass
 class PlanningResult:
     """
@@ -482,11 +504,6 @@ class TaskComposer:
 
             state_wp = WaypointPoly_as_StateWaypointPoly(wp)
 
-            point = TrajectoryPoint(
-                joint_names=list(state_wp.getNames()),
-                positions=np.array(state_wp.getPosition()),
-            )
-
             # Extract optional velocity/acceleration/time if available
             #
             # WHY THESE MAY BE MISSING:
@@ -502,36 +519,13 @@ class TaskComposer:
             #
             # To enable velocity/acceleration output, use a pipeline with
             # TimeOptimalTrajectoryGeneration (TOTG) or IterativeSplineParameterization
-            try:
-                vel = state_wp.getVelocity()
-                if vel is not None and len(vel) > 0:
-                    point.velocities = np.array(vel)
-            except (AttributeError, RuntimeError) as e:
-                # Velocity not available - this is normal for OMPL-only output
-                # or pipelines without time parameterization
-                logger.debug(
-                    f"Velocity not available for waypoint (expected for OMPL/non-parameterized output): {type(e).__name__}"
-                )
-
-            try:
-                acc = state_wp.getAcceleration()
-                if acc is not None and len(acc) > 0:
-                    point.accelerations = np.array(acc)
-            except (AttributeError, RuntimeError) as e:
-                # Acceleration not available - requires time parameterization
-                logger.debug(
-                    f"Acceleration not available for waypoint (requires time parameterization): {type(e).__name__}"
-                )
-
-            try:
-                time = state_wp.getTime()
-                if time is not None:
-                    point.time = float(time)
-            except (AttributeError, RuntimeError) as e:
-                # Time not available - requires time parameterization
-                logger.debug(
-                    f"Time not available for waypoint (requires time parameterization): {type(e).__name__}"
-                )
+            point = TrajectoryPoint(
+                joint_names=list(state_wp.getNames()),
+                positions=np.array(state_wp.getPosition()),
+                velocities=_extract_array_field(state_wp.getVelocity, "Velocity"),
+                accelerations=_extract_array_field(state_wp.getAcceleration, "Acceleration"),
+                time=_extract_time_field(state_wp.getTime, "Time"),
+            )
 
             trajectory.append(point)
 
