@@ -83,7 +83,6 @@ from tesseract_robotics.tesseract_scene_graph import (
 )
 from tesseract_robotics.tesseract_common import (
     VectorVector3d,
-    Isometry3d,
 )
 
 # Viewer (skip import during testing)
@@ -170,10 +169,22 @@ def create_tetrahedron_vertices_faces():
     # Vertex winding determines face normal (counter-clockwise = outward)
     faces = np.array(
         [
-            3, 0, 1, 2,  # front face
-            3, 0, 2, 3,  # left face
-            3, 0, 3, 1,  # right face
-            3, 1, 3, 2,  # bottom face (base triangle)
+            3,
+            0,
+            1,
+            2,  # front face
+            3,
+            0,
+            2,
+            3,  # left face
+            3,
+            0,
+            3,
+            1,  # right face
+            3,
+            1,
+            3,
+            2,  # bottom face (base triangle)
         ],
         dtype=np.int32,
     )
@@ -195,7 +206,7 @@ def create_pyramid_vertices_faces():
     # Square pyramid: 5 vertices (apex + 4 base corners)
     vertices = VectorVector3d()
     vertices.append(np.array([0.0, 0.0, 0.15], dtype=np.float64))  # apex at top
-    vertices.append(np.array([0.1, 0.1, 0.0], dtype=np.float64))    # base corners
+    vertices.append(np.array([0.1, 0.1, 0.0], dtype=np.float64))  # base corners
     vertices.append(np.array([0.1, -0.1, 0.0], dtype=np.float64))
     vertices.append(np.array([-0.1, -0.1, 0.0], dtype=np.float64))
     vertices.append(np.array([-0.1, 0.1, 0.0], dtype=np.float64))
@@ -204,12 +215,30 @@ def create_pyramid_vertices_faces():
     # Note: All non-triangular polygons must be triangulated
     faces = np.array(
         [
-            3, 0, 1, 2,  # front side
-            3, 0, 2, 3,  # right side
-            3, 0, 3, 4,  # back side
-            3, 0, 4, 1,  # left side
-            3, 1, 4, 3,  # base triangle 1
-            3, 1, 3, 2,  # base triangle 2
+            3,
+            0,
+            1,
+            2,  # front side
+            3,
+            0,
+            2,
+            3,  # right side
+            3,
+            0,
+            3,
+            4,  # back side
+            3,
+            0,
+            4,
+            1,  # left side
+            3,
+            1,
+            4,
+            3,  # base triangle 1
+            3,
+            1,
+            3,
+            2,  # base triangle 2
         ],
         dtype=np.int32,
     )
@@ -309,7 +338,9 @@ def run(**kwargs):
     # Here: 0x + 0y + 1z + 0 = 0, i.e., the z=0 floor plane
     # Used for ground/wall collision - everything below/behind plane collides
     plane = Plane(0, 0, 1, 0)
-    print(f"Plane: {plane.getA()}x + {plane.getB()}y + {plane.getC()}z + {plane.getD()} = 0")
+    print(
+        f"Plane: {plane.getA()}x + {plane.getB()}y + {plane.getC()}z + {plane.getD()} = 0"
+    )
     assert plane.getType() == GeometryType.PLANE
     # Note: Plane is collision-only geometry - cannot be visualized as a shape
     # It represents the half-space where ax + by + cz + d <= 0
@@ -344,7 +375,9 @@ def run(**kwargs):
     # ~10x faster than general Mesh for collision queries
     vertices, faces = create_pyramid_vertices_faces()
     convex_mesh = ConvexMesh(vertices, faces)
-    print(f"ConvexMesh: {convex_mesh.getVertexCount()} vertices, {convex_mesh.getFaceCount()} faces")
+    print(
+        f"ConvexMesh: {convex_mesh.getVertexCount()} vertices, {convex_mesh.getFaceCount()} faces"
+    )
     assert convex_mesh.getType() == GeometryType.CONVEX_MESH
     link, joint = create_geometry_link(
         "convex_mesh_link",
@@ -359,7 +392,9 @@ def run(**kwargs):
     # Positive distance = outside, negative = inside, smooth transition at surface
     vertices, faces = create_tetrahedron_vertices_faces()
     sdf_mesh = SDFMesh(vertices, faces)
-    print(f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces")
+    print(
+        f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces"
+    )
     assert sdf_mesh.getType() == GeometryType.SDF_MESH
     link, joint = create_geometry_link(
         "sdf_mesh_link",
@@ -380,6 +415,7 @@ def run(**kwargs):
 
     # TESSERACT_SUPPORT_DIR contains example meshes from tesseract_support package
     import os
+
     tesseract_support = os.environ.get("TESSERACT_SUPPORT_DIR")
     if tesseract_support:
         # createMeshFromPath returns a list because some formats (DAE) contain
@@ -392,7 +428,9 @@ def run(**kwargs):
             )
             if meshes and len(meshes) > 0:
                 loaded_mesh = meshes[0]
-                print(f"Loaded mesh: {loaded_mesh.getVertexCount()} vertices, {loaded_mesh.getFaceCount()} faces")
+                print(
+                    f"Loaded mesh: {loaded_mesh.getVertexCount()} vertices, {loaded_mesh.getFaceCount()} faces"
+                )
                 link, joint = create_geometry_link(
                     "loaded_mesh_link",
                     loaded_mesh,

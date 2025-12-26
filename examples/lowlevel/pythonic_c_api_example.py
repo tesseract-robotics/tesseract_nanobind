@@ -71,8 +71,8 @@ Related Examples
 - freespace_ompl_c_api_example.py: OMPL planning with pythonic wrappers
 - basic_cartesian_c_api_example.py: TrajOpt Cartesian planning
 """
+
 import sys
-import numpy as np
 
 from tesseract_robotics.planning import (
     Robot,
@@ -122,14 +122,16 @@ def main():
 
     # WHY dict input: Avoids joint ordering errors - the wrapper extracts
     # names and values in correct order for Environment.setState()
-    robot.set_joints({
-        "joint_1": 0.0,
-        "joint_2": 0.0,
-        "joint_3": 0.0,
-        "joint_4": 0.0,
-        "joint_5": 0.0,
-        "joint_6": 0.0,
-    })
+    robot.set_joints(
+        {
+            "joint_1": 0.0,
+            "joint_2": 0.0,
+            "joint_3": 0.0,
+            "joint_4": 0.0,
+            "joint_5": 0.0,
+            "joint_6": 0.0,
+        }
+    )
     print("   Set joints to zero position")
 
     # =========================================================================
@@ -213,19 +215,22 @@ def main():
     # WHY fluent API: Method chaining (.move_to().move_to()) mirrors how motion
     # programs are conceptualized - a sequence of waypoints to visit.
     # Returns CompositeInstruction with all poly types properly wrapped.
-    program = (MotionProgram("manipulator", tcp_frame="tool0")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0")
         .set_joint_names(robot.get_joint_names("manipulator"))
         # Start at current position (joints)
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         # Move to Cartesian target
-        .move_to(CartesianTarget(
-            Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.707, 0, 0.707, 0)
-        ))
+        .move_to(
+            CartesianTarget(Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.707, 0, 0.707, 0))
+        )
         # Another Cartesian target
-        .move_to(CartesianTarget(
-            position=[0.8, 0.2, 0.8],
-            quaternion=[0.707, 0, 0.707, 0],
-        ))
+        .move_to(
+            CartesianTarget(
+                position=[0.8, 0.2, 0.8],
+                quaternion=[0.707, 0, 0.707, 0],
+            )
+        )
         # Back to joint target
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
     )
@@ -250,7 +255,7 @@ def main():
     result = plan_freespace(robot, program)
 
     if result.successful:
-        print(f"   Planning successful!")
+        print("   Planning successful!")
         print(f"   Trajectory has {len(result)} waypoints")
 
         # WHY result iteration: PlanningResult implements __iter__ and __getitem__

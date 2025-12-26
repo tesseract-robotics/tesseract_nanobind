@@ -127,7 +127,9 @@ def main():
     # C++ equivalent: Isometry3d::Identity() * AngleAxisd(-pi/2, Y) * Translation3d(0.15, 0, 0)
     # Order: rotation applied first, then translation in rotated frame
     transform = Isometry3d.Identity()
-    transform = transform * AngleAxisd(-math.pi / 2, np.array([0, 1, 0], dtype=np.float64))
+    transform = transform * AngleAxisd(
+        -math.pi / 2, np.array([0, 1, 0], dtype=np.float64)
+    )
     transform = transform * Translation3d(0.15, 0.0, 0.0)
     new_joint.parent_to_joint_origin_transform = transform
 
@@ -135,7 +137,7 @@ def main():
     move_link_cmd = MoveLinkCommand(new_joint)
     if env.applyCommand(move_link_cmd):
         print("  Command applied successfully!")
-        print(f"  Link 4 now attached to link_1 via joint 'moved_link_joint'")
+        print("  Link 4 now attached to link_1 via joint 'moved_link_joint'")
         # Verify the new joint exists in scene graph
         joint = env.getSceneGraph().getJoint("moved_link_joint")
         if joint:

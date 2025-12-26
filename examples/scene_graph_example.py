@@ -29,10 +29,8 @@ Related Examples:
 """
 
 import sys
-import numpy as np
 
-from tesseract_robotics.planning import Robot, Pose
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+from tesseract_robotics.planning import Robot
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -61,7 +59,7 @@ def run(pipeline=None, num_planners=None):
     # The scene graph is accessible via robot.env.getSceneGraph()
     scene_graph = robot.env.getSceneGraph()
 
-    print(f"\n=== Scene Graph Structure ===")
+    print("\n=== Scene Graph Structure ===")
     print(f"Name: {scene_graph.getName()}")
     print(f"Root link: {robot.env.getRootLinkName()}")
 
@@ -73,7 +71,7 @@ def run(pipeline=None, num_planners=None):
 
     # === QUERY KINEMATIC CHAIN ===
     # For KUKA IIWA: base_link -> link_0 -> ... -> link_7 -> tool0
-    print(f"\n=== Kinematic Chain ===")
+    print("\n=== Kinematic Chain ===")
     for jname in joint_names[:4]:  # First 4 joints
         joint = scene_graph.getJoint(jname)
         if joint:
@@ -81,7 +79,7 @@ def run(pipeline=None, num_planners=None):
 
     # === QUERY LINK TRANSFORMS ===
     # Get current link positions in world frame
-    print(f"\n=== Link Transforms (first 3) ===")
+    print("\n=== Link Transforms (first 3) ===")
     state = robot.env.getState()
     for link_name in link_names[:3]:
         transform = state.link_transforms[link_name]
@@ -90,7 +88,7 @@ def run(pipeline=None, num_planners=None):
 
     # === QUERY ACTIVE JOINTS ===
     # Active joints are moveable (not fixed)
-    print(f"\n=== Active Joints ===")
+    print("\n=== Active Joints ===")
     active_joints = list(robot.env.getActiveJointNames())
     print(f"Active joints ({len(active_joints)}): {active_joints}")
 
@@ -98,9 +96,11 @@ def run(pipeline=None, num_planners=None):
     kin_info = robot.env.getKinematicGroup("manipulator")
     if kin_info:
         limits = kin_info.getLimits()
-        print(f"\nJoint limits (first 3):")
+        print("\nJoint limits (first 3):")
         for i, jname in enumerate(active_joints[:3]):
-            print(f"  {jname}: [{limits.joint_limits[i, 0]:.2f}, {limits.joint_limits[i, 1]:.2f}] rad")
+            print(
+                f"  {jname}: [{limits.joint_limits[i, 0]:.2f}, {limits.joint_limits[i, 1]:.2f}] rad"
+            )
 
     print("\n=== Scene Graph Example Complete ===")
     print("For link manipulation examples, see: lowlevel/scene_graph_c_api_example.py")

@@ -27,6 +27,7 @@ Mesh decomposition rationale:
 
 Based on: tesseract_examples/src/car_seat_example.cpp
 """
+
 import sys
 import numpy as np
 
@@ -37,7 +38,6 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 from tesseract_robotics.tesseract_common import (
-    GeneralResourceLocator,
     Isometry3d,
     AllowedCollisionMatrix,
 )
@@ -96,7 +96,7 @@ def get_predefined_positions():
         "joint_e": 0.0,
         "joint_l": 0.5,
         "joint_r": 0.0,
-        "joint_s": -3.14,   # ~-pi: shoulder fully rotated for downward reach
+        "joint_s": -3.14,  # ~-pi: shoulder fully rotated for downward reach
         "joint_t": -0.29,
         "joint_u": -1.45,
     }
@@ -133,7 +133,7 @@ def get_predefined_positions():
         "joint_e": 0.0189056,
         "joint_l": 0.801223,
         "joint_r": 0.0580309,
-        "joint_s": -0.0481182,    # Near zero: arm pointing forward
+        "joint_s": -0.0481182,  # Near zero: arm pointing forward
         "joint_t": -0.325783,
         "joint_u": -1.2813,
     }
@@ -202,8 +202,12 @@ def add_seats(robot):
         # 10 pre-decomposed convex hulls for efficient collision checking
         # Each STL is a convex piece of the original seat geometry
         for m in range(1, 11):  # seat_1.stl through seat_10.stl
-            collision_mesh_url = f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
-            collision_mesh_path = locator.locateResource(collision_mesh_url).getFilePath()
+            collision_mesh_url = (
+                f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
+            )
+            collision_mesh_path = locator.locateResource(
+                collision_mesh_url
+            ).getFilePath()
 
             meshes = createMeshFromPath(collision_mesh_path)
             for mesh in meshes:
@@ -233,7 +237,7 @@ def add_seats(robot):
         if not robot.env.applyCommand(cmd):
             raise RuntimeError(f"Failed to add {seat_name}")
 
-    print(f"Added 3 seats to environment")
+    print("Added 3 seats to environment")
 
 
 def attach_seat_to_effector(robot, seat_name="seat_1"):
@@ -282,10 +286,12 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
     # Adjacent links (in contact) should not trigger collision violations
     # "Adjacent" = expected contact, "Never" = explicitly disabled check
     acm = AllowedCollisionMatrix()
-    acm.addAllowedCollision(seat_name, "end_effector", "Adjacent")  # Gripper-object contact OK
-    acm.addAllowedCollision(seat_name, "cell_logo", "Never")        # Static environment
-    acm.addAllowedCollision(seat_name, "fence", "Never")            # Workcell boundary
-    acm.addAllowedCollision(seat_name, "link_b", "Never")           # Arm links
+    acm.addAllowedCollision(
+        seat_name, "end_effector", "Adjacent"
+    )  # Gripper-object contact OK
+    acm.addAllowedCollision(seat_name, "cell_logo", "Never")  # Static environment
+    acm.addAllowedCollision(seat_name, "fence", "Never")  # Workcell boundary
+    acm.addAllowedCollision(seat_name, "link_b", "Never")  # Arm links
     acm.addAllowedCollision(seat_name, "link_r", "Never")
     acm.addAllowedCollision(seat_name, "link_t", "Never")
 
@@ -320,7 +326,7 @@ def run():
     # URDF defines kinematic chain, SRDF defines planning groups and ACM
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/car_seat_demo.urdf",
-        "package://tesseract_support/urdf/car_seat_demo.srdf"
+        "package://tesseract_support/urdf/car_seat_demo.srdf",
     )
     print(f"Loaded robot: {robot.env.getName()}")
 
@@ -354,7 +360,8 @@ def run():
     # - "manipulator": SRDF-defined joint group
     # - tcp_frame: end_effector link for Cartesian operations
     # - StateTarget: joint-space waypoints with planning profile
-    pick_program = (MotionProgram("manipulator", tcp_frame="end_effector")
+    pick_program = (
+        MotionProgram("manipulator", tcp_frame="end_effector")
         .set_joint_names(joint_names)
         .move_to(StateTarget(start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(pick_pos, names=joint_names, profile="FREESPACE"))
@@ -384,7 +391,8 @@ def run():
     place_start_pos = get_position_vector(joint_names, positions["Pick1"])
     place_end_pos = get_position_vector(joint_names, positions["Place1"])
 
-    place_program = (MotionProgram("manipulator", tcp_frame="end_effector")
+    place_program = (
+        MotionProgram("manipulator", tcp_frame="end_effector")
         .set_joint_names(joint_names)
         .move_to(StateTarget(place_start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(place_end_pos, names=joint_names, profile="FREESPACE"))
