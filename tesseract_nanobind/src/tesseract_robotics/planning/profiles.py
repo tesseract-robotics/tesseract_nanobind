@@ -453,6 +453,8 @@ def create_freespace_pipeline_profiles(
     profile_names: Optional[List[str]] = None,
     num_planners: Optional[int] = None,
     planning_time: float = 5.0,
+    optimize: bool = True,
+    max_solutions: int = 10,
 ) -> ProfileDictionary:
     """Create profiles for FreespacePipeline (OMPL + TrajOpt).
 
@@ -476,6 +478,10 @@ def create_freespace_pipeline_profiles(
             More planners = higher success rate for difficult problems
         planning_time: OMPL planning time in seconds (default: 5.0)
             TrajOpt has no timeout (runs until convergence)
+        optimize: Continue planning to find better solutions (default: True)
+            If True, runs for full planning_time to improve solution quality
+            If False, returns first valid solution (faster, shows parallel speedup)
+        max_solutions: Stop early after finding this many solutions (default: 10)
 
     Returns:
         ProfileDictionary with both OMPL and TrajOpt profiles
@@ -502,6 +508,8 @@ def create_freespace_pipeline_profiles(
         profile_names=profile_names,
         num_planners=num_planners,
         planning_time=planning_time,
+        optimize=optimize,
+        max_solutions=max_solutions,
     )
 
     # Add TrajOpt profiles for smoothing step
