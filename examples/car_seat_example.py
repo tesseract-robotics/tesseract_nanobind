@@ -82,7 +82,7 @@ from tesseract_robotics.tesseract_scene_graph import (
     Visual,
     Collision,
 )
-from tesseract_robotics.tesseract_geometry import createMeshFromPath
+from tesseract_robotics.tesseract_geometry import createMeshFromResource
 from tesseract_robotics.tesseract_collision import makeConvexMesh
 
 TesseractViewer = None
@@ -150,18 +150,18 @@ def add_seats(robot):
     - Complex concave geometry cannot use GJK directly
     """
     locator = robot.locator
-    visual_path = locator.locateResource(
+    visual_resource = locator.locateResource(
         "package://tesseract_support/meshes/car_seat/visual/seat.dae"
-    ).getFilePath()
+    )
 
     for i in range(3):
         seat_name = f"seat_{i + 1}"
         link = Link(seat_name)
 
-        # Visual mesh
+        # Visual mesh - use createMeshFromResource to preserve resource/material info
         visual = Visual()
         visual.origin = Isometry3d.Identity()
-        visual_meshes = createMeshFromPath(visual_path)
+        visual_meshes = createMeshFromResource(visual_resource)
         if visual_meshes:
             visual.geometry = visual_meshes[0]
         # Use assignment - nanobind returns copies for .visual/.collision
@@ -173,8 +173,8 @@ def add_seats(robot):
             collision_url = (
                 f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
             )
-            collision_path = locator.locateResource(collision_url).getFilePath()
-            for mesh in createMeshFromPath(collision_path):
+            collision_resource = locator.locateResource(collision_url)
+            for mesh in createMeshFromResource(collision_resource):
                 collision = Collision()
                 collision.origin = visual.origin
                 collision.geometry = makeConvexMesh(mesh)
