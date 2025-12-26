@@ -108,12 +108,12 @@ def create_trajopt_ifopt_default_profiles(
                               profiles=profiles)
     """
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        ProfileDictionary_addTrajOptIfoptCompositeProfile,
+        ProfileDictionary_addTrajOptIfoptPlanProfile,
+        ProfileDictionary_addTrajOptIfoptSolverProfile,
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptDefaultPlanProfile,
         TrajOptIfoptOSQPSolverProfile,
-        ProfileDictionary_addTrajOptIfoptPlanProfile,
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
     )
 
     if profile_names is None:
@@ -196,8 +196,8 @@ def create_trajopt_default_profiles(
         )
     """
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
+        ProfileDictionary_addTrajOptPlanProfile,
     )
 
     if profile_names is None:
@@ -211,9 +211,7 @@ def create_trajopt_default_profiles(
         ProfileDictionary_addTrajOptCompositeProfile(
             profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
         )
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan
-        )
+        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
     return profiles
 
@@ -310,9 +308,7 @@ def create_ompl_default_profiles(
     # Register under all requested names
     profiles = ProfileDictionary()
     for name in profile_names:
-        ProfileDictionary_addOMPLProfile(
-            profiles, OMPL_DEFAULT_NAMESPACE, name, profile
-        )
+        ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, name, profile)
 
     return profiles
 
@@ -399,8 +395,7 @@ def create_ompl_planner_configurators(
 
             else:
                 raise ValueError(
-                    f"Unknown planner: {planner_name}. "
-                    f"Supported: RRTConnect, RRTstar, SBL"
+                    f"Unknown planner: {planner_name}. Supported: RRTConnect, RRTstar, SBL"
                 )
 
     return configurators
@@ -513,8 +508,8 @@ def _add_trajopt_to_profiles(
 ) -> None:
     """Add TrajOpt profiles to existing ProfileDictionary (internal helper)."""
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
+        ProfileDictionary_addTrajOptPlanProfile,
     )
 
     if profile_names is None:
@@ -527,9 +522,7 @@ def _add_trajopt_to_profiles(
         ProfileDictionary_addTrajOptCompositeProfile(
             profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
         )
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan
-        )
+        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
 
 def create_freespace_pipeline_profiles(

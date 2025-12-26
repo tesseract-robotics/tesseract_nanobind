@@ -79,3 +79,18 @@ CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
 # Note: cibuildwheel is not used because this package requires
 # pre-built tesseract C++ libraries. See .github/workflows/wheels.yml
 # for the custom CI that builds C++ deps first via colcon.
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]  # errors, pyflakes, isort, pyupgrade
+ignore = ["E501"]  # line too long (handled by formatter)
+
+[tool.ruff.lint.per-file-ignores]
+# nanobind extension modules use star imports - ruff can't see into .so files
+"src/tesseract_robotics/tesseract_*/__init__.py" = ["F403", "F405"]
+
+[tool.ruff.format]
+quote-style = "double"

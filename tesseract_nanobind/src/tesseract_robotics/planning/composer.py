@@ -33,27 +33,27 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
     from tesseract_robotics.planning.program import MotionProgram
 
-from tesseract_robotics.tesseract_common import (
-    GeneralResourceLocator,
-    FilesystemPath,
-)
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
-    ProfileDictionary,
     InstructionPoly_as_MoveInstructionPoly,
+    ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_task_composer import (
-    TaskComposerPluginFactory,
-    TaskComposerDataStorage,
-    TaskComposerExecutor,
-    TaskflowTaskComposerExecutor,
-    AnyPoly_wrap_CompositeInstruction,
-    AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_wrap_EnvironmentConst,
-    AnyPoly_as_CompositeInstruction,
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
 )
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.tesseract_task_composer import (
+    AnyPoly_as_CompositeInstruction,
+    AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_EnvironmentConst,
+    AnyPoly_wrap_ProfileDictionary,
+    TaskComposerDataStorage,
+    TaskComposerExecutor,
+    TaskComposerPluginFactory,
+    TaskflowTaskComposerExecutor,
+)
 
 
 @dataclass
@@ -301,20 +301,16 @@ class TaskComposer:
                 # Create executor with explicit thread count (capped to available cores)
                 max_threads = os.cpu_count() or 1
                 threads = min(self._num_threads, max_threads)
-                self._executor = TaskflowTaskComposerExecutor(
-                    "TaskflowExecutor", threads
-                )
+                self._executor = TaskflowTaskComposerExecutor("TaskflowExecutor", threads)
             else:
                 # Use factory (respects YAML config)
-                self._executor = self.factory.createTaskComposerExecutor(
-                    "TaskflowExecutor"
-                )
+                self._executor = self.factory.createTaskComposerExecutor("TaskflowExecutor")
         return self._executor
 
     def plan(
         self,
-        robot: "Robot",
-        program: "MotionProgram | CompositeInstruction",
+        robot: Robot,
+        program: MotionProgram | CompositeInstruction,
         pipeline: str = "TrajOptPipeline",
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
@@ -438,8 +434,8 @@ class TaskComposer:
 
     def plan_freespace(
         self,
-        robot: "Robot",
-        program: "MotionProgram | CompositeInstruction",
+        robot: Robot,
+        program: MotionProgram | CompositeInstruction,
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
@@ -460,8 +456,8 @@ class TaskComposer:
 
     def plan_ompl(
         self,
-        robot: "Robot",
-        program: "MotionProgram | CompositeInstruction",
+        robot: Robot,
+        program: MotionProgram | CompositeInstruction,
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
@@ -483,8 +479,8 @@ class TaskComposer:
 
     def plan_cartesian(
         self,
-        robot: "Robot",
-        program: "MotionProgram | CompositeInstruction",
+        robot: Robot,
+        program: MotionProgram | CompositeInstruction,
         profiles: ProfileDictionary | None = None,
     ) -> PlanningResult:
         """
@@ -500,13 +496,9 @@ class TaskComposer:
         Returns:
             PlanningResult
         """
-        return self.plan(
-            robot, program, pipeline="DescartesPipeline", profiles=profiles
-        )
+        return self.plan(robot, program, pipeline="DescartesPipeline", profiles=profiles)
 
-    def _extract_trajectory(
-        self, composite: CompositeInstruction
-    ) -> list[TrajectoryPoint]:
+    def _extract_trajectory(self, composite: CompositeInstruction) -> list[TrajectoryPoint]:
         """Extract trajectory points from CompositeInstruction."""
         trajectory = []
 
@@ -541,9 +533,7 @@ class TaskComposer:
                 joint_names=list(state_wp.getNames()),
                 positions=np.array(state_wp.getPosition()),
                 velocities=_extract_array_field(state_wp.getVelocity, "Velocity"),
-                accelerations=_extract_array_field(
-                    state_wp.getAcceleration, "Acceleration"
-                ),
+                accelerations=_extract_array_field(state_wp.getAcceleration, "Acceleration"),
                 time=_extract_time_field(state_wp.getTime, "Time"),
             )
 

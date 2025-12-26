@@ -32,24 +32,23 @@ from enum import Enum, auto
 import numpy as np
 from numpy.typing import ArrayLike
 
-from tesseract_robotics.tesseract_common import ManipulatorInfo
+from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_command_language import (
+    DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
-    JointWaypoint,
-    StateWaypoint,
-    MoveInstruction,
+    CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
+    JointWaypoint,
+    JointWaypointPoly_wrap_JointWaypoint,
+    MoveInstruction,
+    MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType,
     MoveInstructionType_FREESPACE,
     MoveInstructionType_LINEAR,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
-    DEFAULT_PROFILE_KEY,
 )
-
-from tesseract_robotics.planning.transforms import Pose
+from tesseract_robotics.tesseract_common import ManipulatorInfo
 
 
 class MoveType(Enum):
