@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Union
 
 import numpy as np
+from loguru import logger
 
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -486,28 +487,50 @@ class TaskComposer:
             )
 
             # Extract optional velocity/acceleration/time if available
-            # Note: These attributes may not exist on all StateWaypoint types
-            # (e.g., OMPL output lacks velocity/acceleration until time parameterization)
+            #
+            # WHY THESE MAY BE MISSING:
+            # - OMPL planners output only positions (no velocity/acceleration)
+            # - Time parameterization adds velocity/acceleration/time
+            # - TrajOpt may or may not include dynamics depending on profile
+            # - Simple interpolation typically lacks dynamics data
+            #
+            # PIPELINE IMPLICATIONS:
+            # - If you need velocities: ensure pipeline includes time parameterization
+            # - FreespacePipeline: OMPL → interpolation → TOTG (adds vel/acc/time)
+            # - TrajOptPipeline: may include velocity costs but not always populated
+            #
+            # To enable velocity/acceleration output, use a pipeline with
+            # TimeOptimalTrajectoryGeneration (TOTG) or IterativeSplineParameterization
             try:
                 vel = state_wp.getVelocity()
                 if vel is not None and len(vel) > 0:
                     point.velocities = np.array(vel)
-            except (AttributeError, RuntimeError):
-                pass  # Velocity not available for this waypoint type
+            except (AttributeError, RuntimeError) as e:
+                # Velocity not available - this is normal for OMPL-only output
+                # or pipelines without time parameterization
+                logger.debug(
+                    f"Velocity not available for waypoint (expected for OMPL/non-parameterized output): {type(e).__name__}"
+                )
 
             try:
                 acc = state_wp.getAcceleration()
                 if acc is not None and len(acc) > 0:
                     point.accelerations = np.array(acc)
-            except (AttributeError, RuntimeError):
-                pass  # Acceleration not available for this waypoint type
+            except (AttributeError, RuntimeError) as e:
+                # Acceleration not available - requires time parameterization
+                logger.debug(
+                    f"Acceleration not available for waypoint (requires time parameterization): {type(e).__name__}"
+                )
 
             try:
                 time = state_wp.getTime()
                 if time is not None:
                     point.time = float(time)
-            except (AttributeError, RuntimeError):
-                pass  # Time not available for this waypoint type
+            except (AttributeError, RuntimeError) as e:
+                # Time not available - requires time parameterization
+                logger.debug(
+                    f"Time not available for waypoint (requires time parameterization): {type(e).__name__}"
+                )
 
             trajectory.append(point)
 

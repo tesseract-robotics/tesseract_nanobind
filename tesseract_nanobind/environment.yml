@@ -52,6 +52,7 @@ dependencies:
   - pip:
     - colcon-common-extensions
     - vcstool
+    - loguru
 
 # Notes:
 # - Some packages require brew on macOS: swig, automake, autoconf, libtool
