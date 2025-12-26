@@ -100,7 +100,10 @@ class CartesianTarget:
                 else:
                     self.pose = Pose.from_position(pos)
             else:
-                raise ValueError("Must provide either pose or position")
+                raise ValueError(
+                    f"CartesianTarget requires 'pose' or 'position'. "
+                    f"Got pose={self.pose}, position={self.position}"
+                )
 
     def to_waypoint(self) -> CartesianWaypoint:
         """Convert to low-level CartesianWaypoint."""
@@ -151,7 +154,9 @@ class JointTarget:
         """
         names = self.names or joint_names
         if names is None:
-            raise ValueError("Joint names must be provided")
+            raise ValueError(
+                "JointTarget requires joint names. Provide via target.names or program.set_joint_names()"
+            )
         return JointWaypoint(names, self.positions)
 
     def _get_move_type(self) -> MoveInstructionType:
@@ -195,7 +200,9 @@ class StateTarget:
         """Convert to low-level StateWaypoint."""
         names = self.names or joint_names
         if names is None:
-            raise ValueError("Joint names must be provided")
+            raise ValueError(
+                "StateTarget requires joint names. Provide via target.names or program.set_joint_names()"
+            )
 
         wp = StateWaypoint(names, self.positions)
         if self.velocities is not None:

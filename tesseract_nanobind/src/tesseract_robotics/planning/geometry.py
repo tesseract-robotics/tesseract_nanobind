@@ -149,7 +149,10 @@ def mesh_from_file(
     )
 
     if meshes is None or len(meshes) == 0:
-        raise RuntimeError(f"Failed to load mesh from {filepath}")
+        raise RuntimeError(
+            f"Failed to load mesh from {filepath}. "
+            f"Check file exists and format is supported (STL, DAE, OBJ)."
+        )
 
     return meshes[0]
 

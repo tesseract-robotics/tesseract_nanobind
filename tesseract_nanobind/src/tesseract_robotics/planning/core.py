@@ -74,6 +74,7 @@ class RobotState:
     joint_accelerations: Optional[np.ndarray] = None
 
     def __post_init__(self):
+        """Convert arrays to numpy float64 for C++ interop."""
         self.joint_positions = np.asarray(self.joint_positions, dtype=np.float64)
         if self.joint_velocities is not None:
             self.joint_velocities = np.asarray(self.joint_velocities, dtype=np.float64)
