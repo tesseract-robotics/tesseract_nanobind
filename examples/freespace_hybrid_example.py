@@ -1,21 +1,29 @@
 """
-Freespace Hybrid Example
+Freespace Hybrid Example - OMPL + TrajOpt Hybrid Planning
 
-Demonstrates OMPL freespace planning with optional TrajOpt trajectory refinement.
-Combines OMPL's sampling-based planning with trajectory optimization.
+Demonstrates hybrid motion planning combining OMPL (path finding) with
+TrajOpt or TrajOptIfopt (trajectory optimization).
 
-Based on: tesseract_planning/tesseract_examples/src/freespace_hybrid_example.cpp
+Pipeline Overview:
+1. OMPL Phase: RRTConnect bidirectional search for collision-free path
+2. TrajOpt Phase (optional): Refines path for smoothness, adds velocity/jerk limits
+3. Post-processing: Time parameterization
 
-Robot Setup:
-- KUKA IIWA 7-DOF manipulator
-- Sphere obstacle at (0.5, 0, 0.55) with radius 0.15
-- Freespace motion from start to end joint configuration
+Key Concepts:
+- OMPL RRTConnect: Bidirectional rapidly-exploring random tree, grows from both ends
+- Hybrid planning: OMPL finds feasible path, TrajOpt optimizes it
+- FreespaceIfoptPipeline: Adds TrajOptIfopt smoothing with velocity/acceleration/jerk costs
+- Collision margin: 0.025m safety buffer for collision checking
 
-Key Features:
-- OMPL RRTConnect for path finding
-- Optional TrajOpt/TrajOptIfopt for trajectory smoothing
-- Configurable OMPL range and planning time
-- Dynamic obstacle avoidance
+Pipelines Available:
+- FreespacePipeline: OMPL only (fast but less smooth)
+- FreespaceIfoptPipeline: OMPL + TrajOptIfopt (smoother trajectories)
+
+C++ Source: tesseract_examples/src/freespace_hybrid_example.cpp
+
+Related Examples:
+- freespace_ompl_example.py - pure OMPL planning
+- basic_cartesian_example.py - pure TrajOpt planning
 """
 
 import sys
@@ -47,48 +55,57 @@ def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
     """Run freespace hybrid planning example.
 
     Args:
-        pipeline: Planning pipeline ("FreespacePipeline" or custom)
-        use_ifopt: Use TrajOptIfopt for trajectory refinement
-        num_planners: Number of parallel planners (unused)
+        pipeline: "FreespacePipeline" (OMPL only) or custom
+        use_ifopt: If True, use "FreespaceIfoptPipeline" (OMPL + TrajOptIfopt smoothing)
+        num_planners: Number of parallel planners (unused, for API compat)
 
     Returns:
-        dict with results
+        dict with results including trajectory, robot, and timing
     """
-    # Load KUKA IIWA robot
+    # KUKA LBR IIWA 14 R820: 7-DOF collaborative arm
+    # Uses KDL (numeric) IK solver - slower than OPW but works for 7-DOF
     robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
 
-    # Add sphere obstacle
+    # Add sphere obstacle at (0.5, 0, 0.55) with radius 0.15m
+    # This blocks the direct path, forcing OMPL to find collision-free route
     create_obstacle(
         robot,
         "sphere_attached",
-        sphere(0.15),
-        Pose.from_xyz(0.5, 0.0, 0.55)
+        sphere(0.15),  # 15cm radius sphere
+        Pose.from_xyz(0.5, 0.0, 0.55)  # Positioned in robot workspace
     )
 
-    # Joint configuration
+    # Get joint names from "manipulator" kinematic group
     joint_names = robot.get_joint_names("manipulator")
     print(f"Manipulator joints ({len(joint_names)}): {joint_names}")
 
-    # Start and end positions from C++ example
+    # Start and end joint configurations from C++ example
+    # Motion: swing joint 1 from -0.4 rad to +0.4 rad (others fixed)
+    # Path must curve around sphere obstacle
     joint_start = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     joint_end = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 
     robot.set_joints(joint_start, joint_names=joint_names)
 
-    # Create motion program
+    # Simple joint-to-joint motion program
+    # FREESPACE profile uses OMPL (RRTConnect by default)
     program = (MotionProgram("manipulator", tcp_frame="tool0", profile="FREESPACE")
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_start, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(joint_end, names=joint_names, profile="FREESPACE"))
     )
 
-    # Create profiles - OMPL for freespace planning
+    # OMPL profiles configure:
+    # - Planner: RRTConnect (bidirectional, fast for freespace)
+    # - Range: step size for tree extension
+    # - Collision margin: 0.025m safety buffer (from C++ example)
     profiles = create_ompl_default_profiles()
 
-    # Create task composer
+    # TaskComposer manages pipeline execution
     composer = TaskComposer.from_config()
 
-    # Plan
+    # Select pipeline: OMPL-only or OMPL+TrajOptIfopt
+    # TrajOptIfopt adds smoothing with coeff=1 for velocity cost
     actual_pipeline = "FreespaceIfoptPipeline" if use_ifopt else pipeline
     print(f"Planning with {actual_pipeline}...")
     start_time = time.time()
