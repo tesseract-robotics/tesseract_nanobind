@@ -1,8 +1,28 @@
 """
-Glass Upright Example
+Glass Upright Example - Orientation-Constrained Motion Planning
 
-Demonstrates constrained motion planning using TrajOpt where the robot keeps
-the tool orientation "upright" while moving. Useful for carrying a glass of water.
+Demonstrates TrajOpt planning with orientation constraints: the robot moves while
+keeping the tool "upright" (like carrying a glass of water without spilling).
+
+C++ Source: tesseract_planning/tesseract_examples/src/glass_upright_example.cpp
+
+Concept: "Upright" Constraint
+-----------------------------
+The UPRIGHT profile applies Cartesian constraints with coeff=[0,0,0,5,5,5]:
+  - Position (x,y,z): coeff=0 -> unconstrained, robot can move freely in space
+  - Orientation (rx,ry,rz): coeff=5 -> strongly constrained, must stay upright
+
+This is the inverse of typical constraints that fix position but allow rotation.
+The high orientation weights (5) penalize any deviation from the initial tool
+orientation during trajectory optimization.
+
+Pipeline Overview
+-----------------
+1. Load KUKA IIWA 7-DOF robot
+2. Add sphere obstacle to force non-trivial path (robot must go around it)
+3. Define start/end via joint states (only joint_a1 changes: -0.4 -> 0.4 rad)
+4. Plan with TrajOpt using UPRIGHT profile for orientation constraints
+5. TrajOpt optimizes trajectory while respecting orientation + collision constraints
 """
 
 import sys
@@ -27,46 +47,59 @@ if "pytest" not in sys.modules:
 
 
 def run():
-    """Run example and return trajectory results for testing.
+    """Run glass upright example with orientation-constrained planning.
+
     Returns:
-        dict with result, robot, joint_names
+        dict with result, robot, joint_names for testing/visualization
     """
-    # Load KUKA IIWA robot
+    # KUKA IIWA 14 R820: 7-DOF redundant arm (joints: joint_a1 through joint_a7)
+    # 7-DOF allows maintaining orientation while repositioning - essential for upright constraint
     robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
-    # Add sphere obstacle (one-liner vs 20+ lines before)
+    # Sphere obstacle at (0.5, 0, 0.55) radius=0.15m - positioned to block direct path
+    # Forces TrajOpt to find trajectory that goes AROUND sphere while keeping tool upright
+    # Without obstacle, robot could just rotate joint_a1 directly (trivial solution)
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.15),
-        transform=Pose.from_xyz(0.5, 0, 0.55),
+        geometry=sphere(0.15),  # C++: createSphere(0.15)
+        transform=Pose.from_xyz(0.5, 0, 0.55),  # C++: Translation3d(0.5, 0, 0.55)
     )
     print("Added sphere obstacle at (0.5, 0, 0.55)")
 
-    # Get joint names
+    # joint_a1 through joint_a7 for IIWA manipulator group
     joint_names = robot.get_joint_names("manipulator")
 
-    # Define start and end positions
+    # Start/end positions from C++ example - only joint_a1 changes (-0.4 -> 0.4 rad)
+    # This represents ~46 degrees rotation of the base joint while all other joints
+    # maintain the same configuration. The arm effectively "sweeps" horizontally
+    # while the tool orientation must remain constant (upright constraint)
     joint_start_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     joint_end_pos = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 
-    # Set initial state
+    # Set robot to start configuration for planning
     robot.set_joints(joint_start_pos, joint_names=joint_names)
 
-    # Create motion program with "UPRIGHT" profile
-    # The UPRIGHT profile will constrain orientation while allowing position changes
-    # Using LINEAR motion and StateTargets for full state specification
+    # MotionProgram with "UPRIGHT" profile - this profile name maps to TrajOpt config that sets:
+    #   coeff = [0, 0, 0, 5, 5, 5]  (position free, orientation constrained)
+    #   lower_tolerance / upper_tolerance for orientation bounds
+    #
+    # LINEAR motion type (vs FREESPACE) tells TrajOpt to interpolate in Cartesian space,
+    # essential for maintaining orientation at intermediate waypoints
     program = (MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
         .set_joint_names(joint_names)
+        # StateTarget specifies full joint configuration (not just Cartesian pose)
+        # TrajOpt will optimize intermediate states while enforcing UPRIGHT constraints
         .linear_to(StateTarget(joint_start_pos, names=joint_names, profile="UPRIGHT"))
         .linear_to(StateTarget(joint_end_pos, names=joint_names, profile="UPRIGHT"))
     )
 
-    print("\nProgram created with 'UPRIGHT' constraint profile")
-    print("The tool orientation will be constrained during motion")
+    print("\nProgram: LINEAR motion with UPRIGHT profile (orientation locked, position free)")
+    print("TrajOpt will optimize trajectory to avoid sphere while maintaining tool orientation")
 
-    # Plan using TaskComposer
+    # TrajOptPipeline: trajectory optimization with collision avoidance
+    # C++ uses safety_margin=0.01, contact_buffer=0.01 for collision checking
     print("\nRunning TrajOpt planner with upright constraint...")
     composer = TaskComposer.from_config()
     result = composer.plan(robot, program, pipeline="TrajOptPipeline")
