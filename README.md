@@ -91,8 +91,11 @@ See the `examples/` directory for:
 Enable pre-commit hook (runs test suite before each commit):
 
 ```bash
-git config core.hooksPath .githooks
+pre-commit install
+pre-commit install --hook-type pre-push
 ```
+
+that'll run the `hooks` defined in `.pre-commit-config.yaml`
 
 ## Acknowledgments
 
