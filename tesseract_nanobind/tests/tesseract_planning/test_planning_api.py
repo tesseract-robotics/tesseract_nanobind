@@ -1,4 +1,5 @@
 """Tests for the Pythonic planning API."""
+
 import numpy as np
 import pytest
 
@@ -10,7 +11,6 @@ from tesseract_robotics.planning import (
     rotation_x,
     rotation_y,
     rotation_z,
-    rotation_from_quaternion,
     MotionProgram,
     CartesianTarget,
     JointTarget,
@@ -46,35 +46,37 @@ class TestPose:
         # 90 degree rotation around Z
         t = Pose.from_xyz_quat(1, 2, 3, 0, 0, 0.707, 0.707)
         np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
-        np.testing.assert_array_almost_equal(t.quaternion, [0, 0, 0.707, 0.707], decimal=3)
+        np.testing.assert_array_almost_equal(
+            t.quaternion, [0, 0, 0.707, 0.707], decimal=3
+        )
 
     def test_from_xyz_rpy(self):
         # 90 degrees around Z
-        t = Pose.from_xyz_rpy(1, 2, 3, 0, 0, np.pi/2)
+        t = Pose.from_xyz_rpy(1, 2, 3, 0, 0, np.pi / 2)
         np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
         roll, pitch, yaw = t.rpy
-        np.testing.assert_almost_equal(yaw, np.pi/2, decimal=5)
+        np.testing.assert_almost_equal(yaw, np.pi / 2, decimal=5)
 
     def test_translation_helper(self):
         t = translation(1, 2, 3)
         np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
 
     def test_rotation_x(self):
-        t = rotation_x(np.pi/2)
+        t = rotation_x(np.pi / 2)
         # Should rotate Y to Z
         y_vec = np.array([0, 1, 0])
         rotated = t.rotation_matrix @ y_vec
         np.testing.assert_array_almost_equal(rotated, [0, 0, 1], decimal=5)
 
     def test_rotation_y(self):
-        t = rotation_y(np.pi/2)
+        t = rotation_y(np.pi / 2)
         # Should rotate Z to X
         z_vec = np.array([0, 0, 1])
         rotated = t.rotation_matrix @ z_vec
         np.testing.assert_array_almost_equal(rotated, [1, 0, 0], decimal=5)
 
     def test_rotation_z(self):
-        t = rotation_z(np.pi/2)
+        t = rotation_z(np.pi / 2)
         # Should rotate X to Y
         x_vec = np.array([1, 0, 0])
         rotated = t.rotation_matrix @ x_vec
@@ -149,6 +151,110 @@ class TestRobot:
         assert info.manipulator == "manipulator"
         assert info.tcp_frame is not None
 
+    def test_get_joint_limits(self, robot):
+        """Test retrieving joint limits for manipulator group."""
+        limits = robot.get_joint_limits("manipulator")
+
+        # ABB IRB2400 has 6 joints
+        assert len(limits) == 6
+
+        # Check that all expected joints are present
+        for i in range(1, 7):
+            joint_name = f"joint_{i}"
+            assert joint_name in limits
+
+            # Each joint should have all limit types
+            joint_limits = limits[joint_name]
+            assert "lower" in joint_limits
+            assert "upper" in joint_limits
+            assert "velocity" in joint_limits
+            assert "acceleration" in joint_limits
+
+            # Lower should be less than upper
+            assert joint_limits["lower"] < joint_limits["upper"]
+            # Velocity and acceleration should be positive
+            assert joint_limits["velocity"] > 0
+            assert joint_limits["acceleration"] > 0
+
+    def test_get_joint_limits_values(self, robot):
+        """Test specific joint limit values for ABB IRB2400."""
+        limits = robot.get_joint_limits("manipulator")
+
+        # Joint 1 limits for ABB IRB2400 (from URDF)
+        # These are typical values, may need adjustment based on actual URDF
+        j1 = limits["joint_1"]
+        assert j1["lower"] < 0  # negative lower bound
+        assert j1["upper"] > 0  # positive upper bound
+        # Typical range is about +/- 3 radians (~170 degrees)
+        assert j1["lower"] > -4.0
+        assert j1["upper"] < 4.0
+
+    def test_ik_basic(self, robot):
+        """Test basic inverse kinematics computation."""
+        # First do FK to get a known reachable pose
+        zero_joints = [0, 0, 0, 0, 0, 0]
+        target_pose = robot.fk("manipulator", zero_joints)
+
+        # Now solve IK for that pose
+        result = robot.ik("manipulator", target_pose, seed=zero_joints)
+
+        assert result is not None
+        assert len(result) == 6
+
+        # Verify FK of result matches target
+        result_pose = robot.fk("manipulator", result)
+        np.testing.assert_array_almost_equal(
+            result_pose.position, target_pose.position, decimal=4
+        )
+
+    def test_ik_with_seed(self, robot):
+        """Test IK with different seed configurations."""
+        # Get pose at non-zero configuration
+        seed_joints = [0.3, -0.5, 0.4, 0.0, 0.5, 0.0]
+        target_pose = robot.fk("manipulator", seed_joints)
+
+        # Solve IK starting from the known solution
+        result = robot.ik("manipulator", target_pose, seed=seed_joints)
+
+        assert result is not None
+
+        # Result should produce same end-effector pose
+        result_pose = robot.fk("manipulator", result)
+        np.testing.assert_array_almost_equal(
+            result_pose.position, target_pose.position, decimal=4
+        )
+
+    def test_ik_unreachable_pose(self, robot):
+        """Test IK returns None for unreachable poses."""
+        # Create a pose far outside robot workspace
+        unreachable_pose = Pose.from_xyz(10.0, 10.0, 10.0)
+
+        result = robot.ik("manipulator", unreachable_pose)
+
+        # Should return None for unreachable pose
+        assert result is None
+
+    def test_ik_no_seed_uses_current_state(self, robot):
+        """Test IK uses current robot state when no seed provided."""
+        # Set robot to known configuration
+        test_joints = [0.2, -0.3, 0.4, 0.1, 0.5, -0.2]
+        joint_names = robot.get_joint_names("manipulator")
+        robot.set_joints(test_joints, joint_names=joint_names)
+
+        # Get pose at this configuration
+        target_pose = robot.fk("manipulator", test_joints)
+
+        # Solve IK without seed - should use current state
+        result = robot.ik("manipulator", target_pose)
+
+        assert result is not None
+
+        # Verify solution is valid
+        result_pose = robot.fk("manipulator", result)
+        np.testing.assert_array_almost_equal(
+            result_pose.position, target_pose.position, decimal=4
+        )
+
 
 class TestMotionProgram:
     """Test MotionProgram builder."""
@@ -168,7 +274,8 @@ class TestMotionProgram:
         assert len(program) == 1
 
     def test_fluent_api(self):
-        program = (MotionProgram("manipulator")
+        program = (
+            MotionProgram("manipulator")
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
             .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
@@ -178,7 +285,8 @@ class TestMotionProgram:
 
     def test_to_composite_instruction(self):
         joint_names = ["j1", "j2", "j3", "j4", "j5", "j6"]
-        program = (MotionProgram("manipulator", tcp_frame="tool0")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
@@ -296,7 +404,8 @@ class TestPlanningIntegration:
         from tesseract_robotics.planning import plan_freespace
 
         joint_names = robot.get_joint_names("manipulator")
-        program = (MotionProgram("manipulator", tcp_frame="tool0")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))

@@ -23,6 +23,7 @@ Example:
     # Set joint positions
     robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ class RobotState:
         joint_velocities: Array of joint velocities (optional)
         joint_accelerations: Array of joint accelerations (optional)
     """
+
     joint_names: List[str]
     joint_positions: np.ndarray
     joint_velocities: Optional[np.ndarray] = None
@@ -79,7 +81,9 @@ class RobotState:
         if self.joint_velocities is not None:
             self.joint_velocities = np.asarray(self.joint_velocities, dtype=np.float64)
         if self.joint_accelerations is not None:
-            self.joint_accelerations = np.asarray(self.joint_accelerations, dtype=np.float64)
+            self.joint_accelerations = np.asarray(
+                self.joint_accelerations, dtype=np.float64
+            )
 
     def as_dict(self) -> Dict[str, float]:
         """Return joint positions as {name: position} dictionary."""
@@ -309,8 +313,8 @@ class Robot:
             result[name] = {
                 "lower": float(limits.joint_limits[i, 0]),
                 "upper": float(limits.joint_limits[i, 1]),
-                "velocity": float(limits.velocity_limits[i]),
-                "acceleration": float(limits.acceleration_limits[i]),
+                "velocity": float(limits.velocity_limits[i, 1]),  # upper bound
+                "acceleration": float(limits.acceleration_limits[i, 1]),  # upper bound
             }
         return result
 
@@ -489,6 +493,7 @@ class Robot:
             True if successful
         """
         from tesseract_robotics.tesseract_common import AllowedCollisionMatrix
+
         acm = AllowedCollisionMatrix()
         acm.addAllowedCollision(link1, link2, reason)
         cmd = ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD)
