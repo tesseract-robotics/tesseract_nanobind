@@ -9,10 +9,9 @@ readme = "../README.md"
 # we're keeping 3.9, since that's the python version that Rhino 8 uses
 # this is in the interest of supporting the compas.dev community
 requires-python = ">=3.9"
+# Runtime dependencies - keep in sync with requirements.txt
 dependencies = [
     "numpy>=1.21.0",
-    "pytest>=7.0",
-    "pytest-xdist>=3.0",
     "loguru>=0.7.0",
 ]
 
