@@ -1,15 +1,56 @@
 """
 Geometry Showcase Example
+=========================
 
 Demonstrates ALL geometry types available in tesseract_robotics bindings.
-Based on tesseract C++ example: create_geometries_example.cpp
 
-Geometry Types:
-1. Primitives: Box, Sphere, Cylinder, Capsule, Cone, Plane
-2. Mesh types: Mesh, ConvexMesh, SDFMesh (from vertices/faces or file)
-3. CompoundMesh (multiple meshes from single resource)
+C++ Reference:
+    tesseract_geometry/examples/create_geometries_example.cpp
 
-Each geometry is added to the scene with visual and collision components.
+Overview
+--------
+This example creates a visual gallery of every geometry type supported by
+Tesseract. Each geometry is positioned in a grid next to a KUKA IIWA robot
+for visual comparison.
+
+Geometry Types
+--------------
+**Primitives** (mathematical definitions, fast collision):
+    - Box: Axis-aligned rectangular solid (length x width x height)
+    - Sphere: Ball defined by radius
+    - Cylinder: Circular prism (radius x length)
+    - Capsule: Cylinder with hemispherical end caps - ideal for swept volumes
+    - Cone: Circular cone (radius x length)
+    - Plane: Infinite half-space (ax + by + cz + d = 0) - for collision only
+
+**Mesh Types** (from vertices/faces or files):
+    - Mesh: General triangulated surface - for complex visual geometry
+    - ConvexMesh: Convex hull - efficient collision for convex objects
+    - SDFMesh: Signed Distance Field mesh - for smooth distance queries
+
+**File Loaders**:
+    - createMeshFromPath(): Load Mesh from STL/OBJ/DAE files
+    - createConvexMeshFromPath(): Load as ConvexMesh for efficient collision
+
+Key Concepts
+------------
+1. **Visual vs Collision Geometry**: Links have separate visual (rendering) and
+   collision (physics) geometry. They can differ - e.g., use detailed mesh for
+   visual but convex hull for fast collision.
+
+2. **Geometry Types for Collision**: Primitives are fastest (analytical).
+   ConvexMesh uses GJK algorithm. General Mesh uses BVH tree (slowest).
+
+3. **Face Format**: Mesh faces use [n, v0, v1, ..., vn-1] format where n is
+   the vertex count per face (usually 3 for triangles).
+
+4. **Scale Parameter**: File loaders accept scale vector [sx, sy, sz] to
+   resize meshes on import.
+
+Related Examples
+----------------
+- scene_graph_example.py: Building kinematic chains with links/joints
+- tesseract_collision_example.py: Collision checking with geometries
 """
 
 import sys
@@ -63,18 +104,24 @@ def create_geometry_link(
     """
     Create a link with visual/collision geometry and fixed joint.
 
+    This helper demonstrates the standard pattern for adding geometry to a
+    Tesseract environment:
+    1. Create Link with name
+    2. Attach Visual (rendering) and Collision (physics) components
+    3. Create Joint connecting to parent link with transform
+
     Args:
-        name: Link name
-        geometry: Geometry object (Box, Sphere, etc.)
-        transform: Link position/orientation
-        color: RGBA color (0-1 range)
+        name: Link name (must be unique in scene graph)
+        geometry: Geometry object (Box, Sphere, Mesh, etc.)
+        transform: Link position/orientation relative to parent
+        color: RGBA color tuple (0-1 range) for visualization
 
     Returns:
-        Tuple of (Link, Joint)
+        Tuple of (Link, Joint) ready to add via robot.add_link()
     """
     link = Link(name)
 
-    # Visual
+    # Visual component: used for rendering only, can be high-detail mesh
     visual = Visual()
     visual.geometry = geometry
     material = Material(f"{name}_material")
@@ -82,12 +129,15 @@ def create_geometry_link(
     visual.material = material
     link.visual.append(visual)
 
-    # Collision
+    # Collision component: used for physics queries, often simplified geometry
+    # Here we use same geometry for both - in practice you might use
+    # detailed mesh for visual but convex hull for collision
     collision = Collision()
     collision.geometry = geometry
     link.collision.append(collision)
 
-    # Fixed joint to base
+    # Fixed joint attaches this link rigidly to the robot's base_link
+    # The transform positions the geometry in world coordinates
     joint = Joint(f"joint_{name}")
     joint.parent_link_name = "base_link"
     joint.child_link_name = name
@@ -101,24 +151,29 @@ def create_tetrahedron_vertices_faces():
     """
     Create vertices and faces for a tetrahedron (simplest 3D mesh).
 
+    A tetrahedron is the minimal closed 3D mesh: 4 vertices, 4 triangular faces.
+    This demonstrates the vertex/face data format required by Tesseract meshes.
+
     Returns:
         Tuple of (VectorVector3d vertices, numpy faces array)
     """
-    # Tetrahedron vertices
+    # VectorVector3d is the required container for mesh vertices
+    # Each vertex is a 3D point in local coordinates
     vertices = VectorVector3d()
     vertices.append(np.array([0.0, 0.0, 0.1], dtype=np.float64))  # apex
     vertices.append(np.array([0.1, 0.0, -0.05], dtype=np.float64))
     vertices.append(np.array([-0.05, 0.087, -0.05], dtype=np.float64))
     vertices.append(np.array([-0.05, -0.087, -0.05], dtype=np.float64))
 
-    # Faces: format is [num_vertices, v0, v1, v2, ...]
-    # 4 triangular faces
+    # Faces use indexed format: [vertex_count, idx0, idx1, idx2, ...]
+    # For triangles: [3, v0, v1, v2] per face
+    # Vertex winding determines face normal (counter-clockwise = outward)
     faces = np.array(
         [
-            3, 0, 1, 2,  # front
-            3, 0, 2, 3,  # left
-            3, 0, 3, 1,  # right
-            3, 1, 3, 2,  # bottom
+            3, 0, 1, 2,  # front face
+            3, 0, 2, 3,  # left face
+            3, 0, 3, 1,  # right face
+            3, 1, 3, 2,  # bottom face (base triangle)
         ],
         dtype=np.int32,
     )
@@ -130,24 +185,29 @@ def create_pyramid_vertices_faces():
     """
     Create vertices and faces for a square pyramid (for ConvexMesh demo).
 
+    A pyramid is a good test case for ConvexMesh because it's inherently convex.
+    ConvexMesh uses the GJK algorithm for collision which is much faster than
+    general mesh collision (BVH tree).
+
     Returns:
         Tuple of (VectorVector3d vertices, numpy faces array)
     """
     # Square pyramid: 5 vertices (apex + 4 base corners)
     vertices = VectorVector3d()
-    vertices.append(np.array([0.0, 0.0, 0.15], dtype=np.float64))  # apex
-    vertices.append(np.array([0.1, 0.1, 0.0], dtype=np.float64))
+    vertices.append(np.array([0.0, 0.0, 0.15], dtype=np.float64))  # apex at top
+    vertices.append(np.array([0.1, 0.1, 0.0], dtype=np.float64))    # base corners
     vertices.append(np.array([0.1, -0.1, 0.0], dtype=np.float64))
     vertices.append(np.array([-0.1, -0.1, 0.0], dtype=np.float64))
     vertices.append(np.array([-0.1, 0.1, 0.0], dtype=np.float64))
 
-    # Faces: 4 triangular sides + 1 square base (as 2 triangles)
+    # Faces: 4 triangular sides + square base (triangulated as 2 triangles)
+    # Note: All non-triangular polygons must be triangulated
     faces = np.array(
         [
-            3, 0, 1, 2,  # front
-            3, 0, 2, 3,  # right
-            3, 0, 3, 4,  # back
-            3, 0, 4, 1,  # left
+            3, 0, 1, 2,  # front side
+            3, 0, 2, 3,  # right side
+            3, 0, 3, 4,  # back side
+            3, 0, 4, 1,  # left side
             3, 1, 4, 3,  # base triangle 1
             3, 1, 3, 2,  # base triangle 2
         ],
@@ -180,9 +240,11 @@ def run(**kwargs):
     # =========================================================================
     # 1. PRIMITIVE SHAPES
     # =========================================================================
+    # Primitives use analytical formulas for collision detection - fastest option.
+    # Use these when your geometry can be approximated by simple shapes.
     print("\n--- Primitive Shapes ---")
 
-    # Box
+    # Box: defined by length (x), width (y), height (z) centered at origin
     box = Box(0.15, 0.15, 0.15)
     print(f"Box: {box.getX():.2f} x {box.getY():.2f} x {box.getZ():.2f}")
     assert box.getType() == GeometryType.BOX
@@ -218,7 +280,8 @@ def run(**kwargs):
     )
     robot.add_link(link, joint)
 
-    # Capsule (cylinder with hemispherical ends)
+    # Capsule: cylinder with hemispherical end caps
+    # Ideal for representing swept volumes or robot links - smooth collision
     capsule = Capsule(0.05, 0.15)
     print(f"Capsule: r={capsule.getRadius():.2f}, l={capsule.getLength():.2f}")
     assert capsule.getType() == GeometryType.CAPSULE
@@ -242,22 +305,28 @@ def run(**kwargs):
     )
     robot.add_link(link, joint)
 
-    # Plane (half-space: ax + by + cz + d = 0)
-    # z = 0 plane (floor)
+    # Plane: infinite half-space defined by equation ax + by + cz + d = 0
+    # Here: 0x + 0y + 1z + 0 = 0, i.e., the z=0 floor plane
+    # Used for ground/wall collision - everything below/behind plane collides
     plane = Plane(0, 0, 1, 0)
     print(f"Plane: {plane.getA()}x + {plane.getB()}y + {plane.getC()}z + {plane.getD()} = 0")
     assert plane.getType() == GeometryType.PLANE
-    # Note: Plane is a half-space for collision, typically not visualized
-    # We'll add it but it won't show as a visible object
+    # Note: Plane is collision-only geometry - cannot be visualized as a shape
+    # It represents the half-space where ax + by + cz + d <= 0
 
     # =========================================================================
     # 2. MESH TYPES (from vertices/faces)
     # =========================================================================
+    # Meshes allow arbitrary geometry but have different collision performance:
+    # - Mesh: BVH tree, handles concave shapes, slowest
+    # - ConvexMesh: GJK algorithm, requires convex shape, faster
+    # - SDFMesh: Signed distance field, smooth gradients for optimization
     print("\n--- Mesh Types (programmatic) ---")
 
     z_row2 = z_base + 0.35
 
-    # Mesh (triangulated)
+    # Mesh: general triangulated surface - supports any topology including concave
+    # Use for complex visual geometry or when collision accuracy matters more than speed
     vertices, faces = create_tetrahedron_vertices_faces()
     mesh = Mesh(vertices, faces)
     print(f"Mesh: {mesh.getVertexCount()} vertices, {mesh.getFaceCount()} faces")
@@ -270,7 +339,9 @@ def run(**kwargs):
     )
     robot.add_link(link, joint)
 
-    # ConvexMesh (efficient collision for convex shapes)
+    # ConvexMesh: efficient collision using GJK/EPA algorithms
+    # Requires geometry to be convex (no internal angles > 180 degrees)
+    # ~10x faster than general Mesh for collision queries
     vertices, faces = create_pyramid_vertices_faces()
     convex_mesh = ConvexMesh(vertices, faces)
     print(f"ConvexMesh: {convex_mesh.getVertexCount()} vertices, {convex_mesh.getFaceCount()} faces")
@@ -283,7 +354,9 @@ def run(**kwargs):
     )
     robot.add_link(link, joint)
 
-    # SDFMesh (signed distance field mesh)
+    # SDFMesh: provides signed distance field for smooth gradient queries
+    # Essential for trajectory optimization (TrajOpt) which needs distance gradients
+    # Positive distance = outside, negative = inside, smooth transition at surface
     vertices, faces = create_tetrahedron_vertices_faces()
     sdf_mesh = SDFMesh(vertices, faces)
     print(f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces")
@@ -299,20 +372,23 @@ def run(**kwargs):
     # =========================================================================
     # 3. MESH FROM FILE
     # =========================================================================
+    # Load mesh geometry from CAD files (STL, OBJ, DAE, PLY supported)
+    # Scale parameter allows resizing on import: [sx, sy, sz]
     print("\n--- Mesh Types (from file) ---")
 
     z_row3 = z_base + 0.7
 
-    # Find mesh files in tesseract_support
+    # TESSERACT_SUPPORT_DIR contains example meshes from tesseract_support package
     import os
     tesseract_support = os.environ.get("TESSERACT_SUPPORT_DIR")
     if tesseract_support:
-        # Load sphere mesh from STL file
+        # createMeshFromPath returns a list because some formats (DAE) contain
+        # multiple meshes. For single-mesh files like STL, use meshes[0].
         sphere_mesh_path = Path(tesseract_support) / "meshes" / "sphere_p25m.stl"
         if sphere_mesh_path.exists():
             meshes = createMeshFromPath(
                 str(sphere_mesh_path),
-                np.array([0.3, 0.3, 0.3]),  # scale down
+                np.array([0.3, 0.3, 0.3]),  # uniform scale to 30%
             )
             if meshes and len(meshes) > 0:
                 loaded_mesh = meshes[0]
@@ -325,12 +401,13 @@ def run(**kwargs):
                 )
                 robot.add_link(link, joint)
 
-        # Load box as ConvexMesh
+        # createConvexMeshFromPath: same as createMeshFromPath but computes
+        # convex hull automatically. Use for collision geometry of complex CAD.
         box_mesh_path = Path(tesseract_support) / "meshes" / "box_2m.stl"
         if box_mesh_path.exists():
             convex_meshes = createConvexMeshFromPath(
                 str(box_mesh_path),
-                np.array([0.05, 0.05, 0.05]),  # scale down
+                np.array([0.05, 0.05, 0.05]),  # scale to 5% (2m -> 0.1m)
             )
             if convex_meshes and len(convex_meshes) > 0:
                 loaded_convex = convex_meshes[0]
