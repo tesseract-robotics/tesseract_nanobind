@@ -40,6 +40,7 @@ Example Usage:
 
 from tesseract_robotics.planning.composer import (
     TaskComposer,
+    TrajectoryPoint,
 )
 from tesseract_robotics.planning.core import (
     Robot,
@@ -129,6 +130,7 @@ __all__ = [
     "assign_current_state_as_seed",
     # Task Composer
     "TaskComposer",
+    "TrajectoryPoint",
     # Profiles
     "STANDARD_PROFILE_NAMES",
     "create_trajopt_default_profiles",
