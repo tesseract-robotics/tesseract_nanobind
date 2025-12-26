@@ -1,0 +1,17 @@
+# Python dependencies for tesseract_robotics
+# Used by both environment.yml (conda) and pyproject.toml (pip)
+#
+# pyproject.toml [project].dependencies MUST match runtime deps below
+
+# === Runtime (also in pyproject.toml) ===
+numpy>=1.21.0
+loguru>=0.7.0
+
+# === Development/Testing ===
+pytest>=7.0
+pytest-xdist>=3.0
+pytest-benchmark>=4.0
+
+# === Build tools ===
+colcon-common-extensions
+vcstool
