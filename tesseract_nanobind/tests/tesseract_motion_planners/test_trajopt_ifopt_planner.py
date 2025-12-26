@@ -152,12 +152,14 @@ class TestTrajOptIfoptPlanner:
         cur_state = t_env.getState()
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
-        # Create profiles - disable velocity smoothing to avoid empty coeff issue
+        # Create profiles with proper velocity coefficients
         plan_profile = TrajOptIfoptDefaultPlanProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
-        composite_profile.smooth_velocities = False  # Workaround for velocity_coeff issue
-        composite_profile.smooth_accelerations = False
-        composite_profile.smooth_jerks = False
+        # Initialize coefficients to match DOF count (7 for KUKA IIWA)
+        n_joints = len(joint_names)
+        composite_profile.velocity_coeff = np.ones(n_joints)
+        composite_profile.acceleration_coeff = np.ones(n_joints)
+        composite_profile.jerk_coeff = np.ones(n_joints)
         solver_profile = TrajOptIfoptOSQPSolverProfile()
 
         profiles = ProfileDictionary()
