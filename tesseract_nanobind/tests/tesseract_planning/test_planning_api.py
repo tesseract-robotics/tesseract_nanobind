@@ -531,6 +531,57 @@ class TestRobotLinkManagement:
         result = robot.add_allowed_collision("link_3", "link_6", "UserDefined")
         assert result is True
 
+    def test_move_link(self, robot):
+        """Test relocating a link to different parent."""
+        from tesseract_robotics.tesseract_geometry import Box
+        from tesseract_robotics.tesseract_scene_graph import (
+            Collision,
+            Joint,
+            JointType,
+            Link,
+            Visual,
+        )
+
+        # First add a link attached to base_link
+        link = Link("moveable_box")
+        geometry = Box(0.1, 0.1, 0.1)
+        visual = Visual()
+        visual.geometry = geometry
+        link.visual.append(visual)
+        collision = Collision()
+        collision.geometry = geometry
+        link.collision.append(collision)
+
+        joint = Joint("moveable_box_joint")
+        joint.parent_link_name = "base_link"
+        joint.child_link_name = "moveable_box"
+        joint.type = JointType.FIXED
+
+        robot.add_link(link, joint)
+        assert "moveable_box" in robot.get_link_names()
+
+        # Now move it to a different parent (link_3)
+        new_joint = Joint("moveable_box_joint")
+        new_joint.parent_link_name = "link_3"
+        new_joint.child_link_name = "moveable_box"
+        new_joint.type = JointType.FIXED
+
+        result = robot.move_link(new_joint)
+        assert result is True
+
+    def test_scene_graph_property(self, robot):
+        """Test direct scene graph access."""
+        sg = robot.scene_graph
+        assert sg is not None
+        # Verify can query links via scene graph
+        links = sg.getLinks()
+        assert len(links) > 0
+
+    def test_set_collision_margin(self, robot):
+        """Test collision margin configuration."""
+        result = robot.set_collision_margin(0.01)
+        assert result is True
+
 
 class TestPlanningIntegration:
     """Integration tests for planning (require task composer)."""
