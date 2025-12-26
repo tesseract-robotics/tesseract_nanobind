@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 
+from loguru import logger
+
 try:
     __version__ = version("tesseract-robotics-nanobind")
 except PackageNotFoundError:
@@ -19,8 +21,8 @@ def _is_editable_install() -> bool:
         if direct_url:
             data = json.loads(direct_url)
             return data.get("dir_info", {}).get("editable", False)
-    except Exception:
-        pass
+    except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError) as e:
+        logger.debug(f"Editable install check failed: {type(e).__name__}: {e}")
     # Fallback: check if __file__ is outside site-packages
     pkg_path = Path(__file__).parent
     return "site-packages" not in str(pkg_path)
