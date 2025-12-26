@@ -99,6 +99,7 @@ def create_geometry_link(
     geometry,
     transform: Pose,
     color: tuple = (0.5, 0.5, 0.5, 1.0),
+    add_collision: bool = True,
 ) -> tuple:
     """
     Create a link with visual/collision geometry and fixed joint.
@@ -114,6 +115,7 @@ def create_geometry_link(
         geometry: Geometry object (Box, Sphere, Mesh, etc.)
         transform: Link position/orientation relative to parent
         color: RGBA color tuple (0-1 range) for visualization
+        add_collision: Whether to add collision geometry (disable for unsupported types)
 
     Returns:
         Tuple of (Link, Joint) ready to add via robot.add_link()
@@ -130,11 +132,11 @@ def create_geometry_link(
     link.visual = [visual]
 
     # Collision component: used for physics queries, often simplified geometry
-    # Here we use same geometry for both - in practice you might use
-    # detailed mesh for visual but convex hull for collision
-    collision = Collision()
-    collision.geometry = geometry
-    link.collision = [collision]
+    # Note: Some geometry types (SDFMesh, PolygonMesh) aren't supported by Bullet
+    if add_collision:
+        collision = Collision()
+        collision.geometry = geometry
+        link.collision = [collision]
 
     # Fixed joint attaches this link rigidly to the robot's base_link
     # The transform positions the geometry in world coordinates
@@ -397,11 +399,13 @@ def run(**kwargs):
         f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces"
     )
     assert sdf_mesh.getType() == GeometryType.SDF_MESH
+    # Note: SDFMesh not supported by Bullet collision checker, so skip collision
     link, joint = create_geometry_link(
         "sdf_mesh_link",
         sdf_mesh,
         Pose.from_xyz(x_offset, 1 * y_spacing, z_row2),
         color=(0.8, 0.2, 0.6, 1.0),  # magenta
+        add_collision=False,
     )
     robot.add_link(link, joint)
 
