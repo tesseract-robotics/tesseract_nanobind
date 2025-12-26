@@ -685,6 +685,51 @@ class TestPlanningIntegration:
         assert len(result) > 0
         assert result.trajectory[0].positions is not None
 
+    def test_plan_freespace_with_config(self, robot):
+        """Test freespace planning with PlannerConfig."""
+        from tesseract_robotics.planning import plan_freespace
+        from tesseract_robotics.planning.planner import PlannerConfig
+
+        config = PlannerConfig(
+            pipeline="TrajOptPipeline",
+            max_velocity_scaling=0.5,
+            collision_safety_margin=0.03,
+        )
+
+        joint_names = robot.get_joint_names("manipulator")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
+        )
+
+        result = plan_freespace(robot, program, config=config)
+
+        assert result.successful
+
+    def test_assign_current_state_as_seed(self, robot):
+        """Test assign_current_state_as_seed function."""
+        from tesseract_robotics.planning import assign_current_state_as_seed
+
+        joint_names = robot.get_joint_names("manipulator")
+
+        # Set robot to a known state
+        test_joints = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+        robot.set_joints(test_joints, joint_names=joint_names)
+
+        # Build program with Cartesian target (needs seed)
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(CartesianTarget(Pose.from_xyz(0.8, 0, 0.8)))
+        )
+
+        composite = program.to_composite_instruction(joint_names=joint_names)
+
+        # Should not raise - just sets seed on Cartesian waypoints
+        assign_current_state_as_seed(composite, robot)
+
 
 class TestProfileCreation:
     """Tests for profile factory functions."""
