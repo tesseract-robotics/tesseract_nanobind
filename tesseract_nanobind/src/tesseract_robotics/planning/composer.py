@@ -382,10 +382,11 @@ class TaskComposer:
                 raw_results=output_composite,
             )
 
-        except Exception as e:
+        except (TypeError, RuntimeError, ValueError, AttributeError, KeyError) as e:
+            logger.debug(f"Planning failed with {type(e).__name__}: {e}")
             return PlanningResult(
                 successful=False,
-                message=str(e),
+                message=f"{type(e).__name__}: {e}",
             )
 
         finally:
