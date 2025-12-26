@@ -59,26 +59,20 @@ class TestPose:
         t = translation(1, 2, 3)
         np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
 
-    def test_rotation_x(self):
-        t = rotation_x(np.pi / 2)
-        # Should rotate Y to Z
-        y_vec = np.array([0, 1, 0])
-        rotated = t.rotation_matrix @ y_vec
-        np.testing.assert_array_almost_equal(rotated, [0, 0, 1], decimal=5)
-
-    def test_rotation_y(self):
-        t = rotation_y(np.pi / 2)
-        # Should rotate Z to X
-        z_vec = np.array([0, 0, 1])
-        rotated = t.rotation_matrix @ z_vec
-        np.testing.assert_array_almost_equal(rotated, [1, 0, 0], decimal=5)
-
-    def test_rotation_z(self):
-        t = rotation_z(np.pi / 2)
-        # Should rotate X to Y
-        x_vec = np.array([1, 0, 0])
-        rotated = t.rotation_matrix @ x_vec
-        np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=5)
+    @pytest.mark.parametrize(
+        "rotation_func,input_vec,expected",
+        [
+            (rotation_x, [0, 1, 0], [0, 0, 1]),  # Y → Z
+            (rotation_y, [0, 0, 1], [1, 0, 0]),  # Z → X
+            (rotation_z, [1, 0, 0], [0, 1, 0]),  # X → Y
+        ],
+        ids=["rotation_x", "rotation_y", "rotation_z"],
+    )
+    def test_rotation_90deg(self, rotation_func, input_vec, expected):
+        """Test 90-degree rotation around each axis."""
+        t = rotation_func(np.pi / 2)
+        rotated = t.rotation_matrix @ np.array(input_vec)
+        np.testing.assert_array_almost_equal(rotated, expected, decimal=5)
 
     def test_pose_chaining(self):
         t1 = translation(1, 0, 0)
@@ -246,6 +240,27 @@ class TestRobot:
         # Verify solution is valid
         result_pose = robot.fk("manipulator", result)
         np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
+
+    def test_ik_all_solutions(self, robot):
+        """Test IK returns multiple solutions for OPW solver (ABB IRB2400)."""
+        # ABB IRB2400 uses OPW solver which can return up to 8 analytical solutions
+        # Get a reachable pose in workspace interior
+        test_joints = [0.0, 0.3, -0.3, 0.0, 0.5, 0.0]
+        target_pose = robot.fk("manipulator", test_joints)
+
+        # Get all IK solutions
+        solutions = robot.ik("manipulator", target_pose, seed=test_joints, all_solutions=True)
+
+        # OPW typically returns multiple solutions for 6-DOF industrial robots
+        assert solutions is not None
+        assert len(solutions) >= 1  # at least one solution
+
+        # Verify each solution produces correct end-effector pose
+        for sol in solutions:
+            result_pose = robot.fk("manipulator", sol)
+            np.testing.assert_array_almost_equal(
+                result_pose.position, target_pose.position, decimal=3
+            )
 
 
 class TestMotionProgram:

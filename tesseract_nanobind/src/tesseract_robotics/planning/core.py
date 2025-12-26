@@ -349,7 +349,8 @@ class Robot:
         target_pose: Pose | Isometry3d,
         seed: ArrayLike | None = None,
         tip_link: str | None = None,
-    ) -> np.ndarray | None:
+        all_solutions: bool = False,
+    ) -> np.ndarray | list[np.ndarray] | None:
         """
         Compute inverse kinematics.
 
@@ -358,9 +359,11 @@ class Robot:
             target_pose: Desired end-effector pose
             seed: Initial joint configuration (current state if None)
             tip_link: Target link name
+            all_solutions: If True, return all solutions; otherwise return first
 
         Returns:
-            Joint positions array, or None if no solution found
+            If all_solutions=False: Joint positions array, or None if no solution
+            If all_solutions=True: List of joint positions arrays, or None if none found
         """
         group = self.env.getKinematicGroup(group_name)
 
@@ -385,6 +388,9 @@ class Robot:
 
         if result is None or len(result) == 0:
             return None
+
+        if all_solutions:
+            return [np.asarray(sol) for sol in result]
 
         return result[0]
 
