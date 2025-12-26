@@ -163,3 +163,21 @@ def test_lowlevel_car_seat_example():
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_auxillary_axes_example():
     _load_module("puzzle_piece_auxillary_axes_c_api_example", LOWLEVEL_EXAMPLES / "puzzle_piece_auxillary_axes_c_api_example.py").main()
+
+
+@pytest.mark.lowlevel
+@pytest.mark.planning
+def test_lowlevel_pythonic_example():
+    _load_module("pythonic_c_api_example", LOWLEVEL_EXAMPLES / "pythonic_c_api_example.py").main()
+
+
+@pytest.mark.lowlevel
+@pytest.mark.planning
+def test_lowlevel_planning_composer_example():
+    _load_module("tesseract_planning_composer_c_api_example", LOWLEVEL_EXAMPLES / "tesseract_planning_composer_c_api_example.py").main()
+
+
+@pytest.mark.lowlevel
+@pytest.mark.planning
+def test_lowlevel_planning_lowlevel_example():
+    _load_module("tesseract_planning_lowlevel_c_api_example", LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_c_api_example.py").main()
