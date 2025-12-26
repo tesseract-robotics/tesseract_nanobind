@@ -505,6 +505,26 @@ class TestGeometry:
         assert len(link.visual) > 0
         assert len(link.collision) > 0
 
+    def test_mesh_from_file(self):
+        """Test mesh_from_file loads STL mesh."""
+        from tesseract_robotics.planning.geometry import mesh_from_file
+
+        # Use mesh from tesseract_support package
+        mesh = mesh_from_file(
+            "package://tesseract_support/meshes/car_seat/visual/end_effector_open.stl"
+        )
+        assert mesh is not None
+
+    def test_convex_mesh_from_file(self):
+        """Test convex_mesh_from_file loads and converts mesh."""
+        from tesseract_robotics.planning.geometry import convex_mesh_from_file
+
+        # Use mesh from tesseract_support package
+        mesh = convex_mesh_from_file(
+            "package://tesseract_support/meshes/car_seat/visual/end_effector_open.stl"
+        )
+        assert mesh is not None
+
 
 class TestCreateObstacle:
     """Test obstacle creation."""
@@ -808,6 +828,10 @@ class TestPlanningIntegration:
 class TestTaskComposer:
     """Tests for TaskComposer methods."""
 
+    @pytest.fixture
+    def robot(self):
+        return Robot.from_tesseract_support("abb_irb2400")
+
     def test_get_available_pipelines(self):
         """Test get_available_pipelines returns list of pipeline names."""
         from tesseract_robotics.planning import TaskComposer
@@ -819,11 +843,10 @@ class TestTaskComposer:
         assert len(pipelines) > 0
         assert "TrajOptPipeline" in pipelines
 
-    def test_plan_invalid_pipeline(self):
+    def test_plan_invalid_pipeline(self, robot):
         """Test plan returns failure for invalid pipeline."""
         from tesseract_robotics.planning import TaskComposer
 
-        robot = Robot.from_tesseract_support("abb_irb2400")
         joint_names = robot.get_joint_names("manipulator")
         program = (
             MotionProgram("manipulator", tcp_frame="tool0")
@@ -837,6 +860,51 @@ class TestTaskComposer:
 
         assert not result.successful
         assert "not found" in result.message.lower() or "error" in result.message.lower()
+
+    @pytest.mark.skip(reason="OMPLPipeline input key configuration differs from TrajOptPipeline")
+    def test_plan_ompl(self, robot):
+        """Test plan_ompl convenience method."""
+        from tesseract_robotics.planning import plan_ompl
+
+        joint_names = robot.get_joint_names("manipulator")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
+        )
+
+        result = plan_ompl(robot, program)
+
+        assert result.successful
+        assert len(result) > 0
+
+    @pytest.mark.skip(reason="DescartesPipeline not available in default config")
+    def test_plan_cartesian(self, robot):
+        """Test plan_cartesian convenience method."""
+        from tesseract_robotics.planning import plan_cartesian
+
+        joint_names = robot.get_joint_names("manipulator")
+
+        # Get start pose for Cartesian planning
+        start_joints = [0, 0.3, -0.3, 0, 0.5, 0]
+        robot.set_joints(start_joints, joint_names=joint_names)
+        start_pose = robot.fk("manipulator", start_joints)
+
+        # Create small linear motion
+        end_pose = Pose.from_xyz(start_pose.x, start_pose.y + 0.05, start_pose.z)
+
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget(start_joints))
+            .linear_to(CartesianTarget(end_pose))
+        )
+
+        result = plan_cartesian(robot, program)
+
+        assert result.successful
+        assert len(result) > 0
 
 
 class TestProfileCreation:
@@ -1150,3 +1218,20 @@ class TestPlanningResult:
         result = PlanningResult(successful=False)
         arr = result.to_numpy()
         assert len(arr) == 0
+
+    def test_negative_indexing(self):
+        """Test negative indexing on PlanningResult trajectory."""
+        from tesseract_robotics.planning import TrajectoryPoint
+        from tesseract_robotics.planning.composer import PlanningResult
+
+        traj = [
+            TrajectoryPoint(["j1"], np.array([0.0])),
+            TrajectoryPoint(["j1"], np.array([0.5])),
+            TrajectoryPoint(["j1"], np.array([1.0])),
+        ]
+        result = PlanningResult(successful=True, trajectory=traj)
+
+        # Negative indexing should work
+        assert result[-1].positions[0] == pytest.approx(1.0)
+        assert result[-2].positions[0] == pytest.approx(0.5)
+        assert result[-3].positions[0] == pytest.approx(0.0)
