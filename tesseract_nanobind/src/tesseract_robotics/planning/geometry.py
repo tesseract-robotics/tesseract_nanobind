@@ -200,12 +200,13 @@ def _add_visual_and_collision(
         material.color = np.array(color, dtype=np.float64)
         visual.material = material
 
-    link.visual.append(visual)
+    # Use assignment - nanobind returns copies for .visual/.collision
+    link.visual = [*link.visual, visual]
 
     collision = Collision()
     collision.origin = origin
     collision.geometry = geometry
-    link.collision.append(collision)
+    link.collision = [*link.collision, collision]
 
 
 def create_obstacle(
