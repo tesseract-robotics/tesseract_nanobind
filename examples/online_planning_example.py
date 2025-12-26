@@ -1,19 +1,23 @@
 """
-Online Planning Example (TrajOpt IFOPT)
+Online Planning Example
 
-Demonstrates real-time trajectory replanning as the environment changes.
-Uses TrajOptIfopt for efficient trajectory optimization.
+Demonstrates trajectory replanning as the environment changes.
+Uses TrajOpt for trajectory optimization with collision avoidance.
 
 Based on: tesseract_planning/tesseract_examples/src/online_planning_example.cpp
 
-Key Features:
-- Trajectory replanning as obstacles move
-- Uses TrajOptIfopt (SQP with OSQP solver)
-- Simulated dynamic environment
+Robot Setup:
+- Gantry (2 prismatic axes) + ABB IRB2400 (6 revolute joints) = 8 DOF manipulator
+- Human obstacle represented as joints (human_x_joint, human_y_joint)
+- Target: gantry_axis_1=5.5, gantry_axis_2=3.0, arm at home position
 
-Note: This example uses the TaskComposer pipeline interface.
-For true real-time planning with stepSQPSolver(), additional low-level
-bindings for trajopt_sqp would be needed.
+Key Features:
+- Trajectory replanning as human obstacle moves
+- Uses TrajOpt for optimization
+- Collision avoidance with moving human
+
+Note: The C++ version uses low-level trajopt_sqp with stepSQPSolver() for true
+real-time planning. This Python version uses the TaskComposer pipeline.
 """
 
 import sys
@@ -23,14 +27,10 @@ import numpy as np
 from tesseract_robotics.planning import (
     Robot,
     MotionProgram,
-    CartesianTarget,
     StateTarget,
-    Pose,
-    sphere,
-    create_obstacle,
     TaskComposer,
 )
-from tesseract_robotics.planning.profiles import create_trajopt_ifopt_default_profiles
+from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -40,47 +40,49 @@ if "pytest" not in sys.modules:
         pass
 
 
-def update_obstacle_position(robot, obstacle_name, position):
-    """Update obstacle position in the environment."""
-    from tesseract_robotics.tesseract_environment import ChangeJointOriginCommand
-    from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+def update_human_position(robot, human_x, human_y):
+    """Update human obstacle position by changing joint values.
 
-    # Create isometry transform (identity rotation + translation)
-    translation = Translation3d(position[0], position[1], position[2])
-    transform = Isometry3d.Identity() * translation
+    Unlike the KUKA version which moves a separate collision object,
+    the C++ example represents the human as joints in the model.
+    """
+    # Get current state and update human joints
+    current_state = robot.env.getState()
+    joint_names = ["human_x_joint", "human_y_joint"]
+    joint_values = np.array([human_x, human_y])
+    robot.env.setState(joint_names, joint_values)
 
-    # Apply the change (joint name is "joint_{name}")
-    cmd = ChangeJointOriginCommand(f"joint_{obstacle_name}", transform)
-    robot.env.applyCommand(cmd)
 
-
-def run(pipeline="TrajOptIfoptPipeline", num_iterations=5, num_planners=None):
-    """Run online planning example with moving obstacle.
+def run(pipeline="TrajOptPipeline", num_iterations=5, num_planners=None):
+    """Run online planning example with moving human obstacle.
 
     Args:
-        pipeline: Planning pipeline to use (default: TrajOptIfoptPipeline)
+        pipeline: Planning pipeline to use (default: TrajOptPipeline)
         num_iterations: Number of replanning iterations
         num_planners: Number of parallel planners (unused for TrajOptIfopt)
 
     Returns:
         dict with results
     """
-    # Load robot
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    # Load robot - use the dedicated online_planning_example model
+    # This is a gantry (2 prismatic) + ABB IRB2400 (6 revolute) = 8 DOF
+    robot = Robot.from_tesseract_support("online_planning_example")
 
-    # Add a "human" obstacle that will move
-    create_obstacle(robot, "human", sphere(0.15), Pose.from_xyz(0.5, 0.0, 0.5))
-
-    # Setup joint configuration
+    # Get manipulator joint names (8 DOF: gantry + arm)
+    # Note: human_x_joint and human_y_joint are in the model but not part of manipulator
     joint_names = robot.get_joint_names("manipulator")
-    home = np.array([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0])
-    robot.set_joints(home, joint_names=joint_names)
+    print(f"Manipulator joints ({len(joint_names)}): {joint_names}")
 
-    # Target pose - tool should reach this while avoiding obstacles
-    target_pose = Pose.from_xyz_quat(0.6, 0.0, 0.6, 0.0, 0.707, 0.0, 0.707)
+    # Start position - from C++ example
+    start_position = np.zeros(len(joint_names))
+    robot.set_joints(start_position, joint_names=joint_names)
 
-    # Create profiles for TrajOptIfopt
-    profiles = create_trajopt_ifopt_default_profiles()
+    # Target position - from C++ example line 169:
+    # target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0;
+    target_position = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+    # Create profiles for TrajOpt
+    profiles = create_trajopt_default_profiles()
 
     # Create task composer
     composer = TaskComposer.from_config()
@@ -89,11 +91,12 @@ def run(pipeline="TrajOptIfoptPipeline", num_iterations=5, num_planners=None):
     timings = []
 
     for iteration in range(num_iterations):
-        # Move the obstacle to simulate a dynamic environment
-        # Oscillates in Y direction
-        t = iteration * 0.5
-        obstacle_y = 0.3 * np.sin(t)
-        update_obstacle_position(robot, "human", [0.5, obstacle_y, 0.5])
+        # Move the human obstacle to simulate dynamic environment
+        # Note: Large movements cause goal collisions. Use small oscillations.
+        t = iteration * 0.2
+        human_x = 0.2 * np.sin(t)  # Limited oscillation - fails at human_x >= 0.22
+        human_y = 0.0
+        update_human_position(robot, human_x, human_y)
 
         # Get current state as start
         state = robot.get_state(joint_names)
@@ -103,7 +106,7 @@ def run(pipeline="TrajOptIfoptPipeline", num_iterations=5, num_planners=None):
         program = (MotionProgram("manipulator", tcp_frame="tool0", profile="DEFAULT")
             .set_joint_names(joint_names)
             .move_to(StateTarget(current_joints, names=joint_names, profile="DEFAULT"))
-            .move_to(CartesianTarget(target_pose, profile="DEFAULT"))
+            .move_to(StateTarget(target_position, names=joint_names, profile="DEFAULT"))
         )
 
         # Plan with timing
@@ -116,11 +119,9 @@ def run(pipeline="TrajOptIfoptPipeline", num_iterations=5, num_planners=None):
                 trajectories.append(result)
                 timings.append(planning_time)
                 print(f"Iteration {iteration + 1}: Success in {planning_time:.3f}s, "
-                      f"{len(result)} waypoints, obstacle_y={obstacle_y:.3f}")
-
-                # Update robot state to end of trajectory (simulate execution)
-                if len(result.trajectory) > 0:
-                    robot.set_joints(result.trajectory[-1].positions, joint_names=joint_names)
+                      f"{len(result)} waypoints, human_x={human_x:.3f}")
+                # Note: In C++, the robot would execute while replanning.
+                # Here we just replan from start each time as human moves.
             else:
                 print(f"Iteration {iteration + 1}: Planning failed - {result.message}")
                 timings.append(planning_time)
