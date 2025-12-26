@@ -26,27 +26,28 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import ArrayLike
 
+from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_common import (
-    GeneralResourceLocator,
     FilesystemPath,
-    ManipulatorInfo,
+    GeneralResourceLocator,
     Isometry3d,
+    ManipulatorInfo,
 )
 from tesseract_robotics.tesseract_environment import (
-    Environment,
     AddLinkCommand,
-    RemoveLinkCommand,
-    MoveLinkCommand,
+    ChangeCollisionMarginsCommand,
+    Environment,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
-    ChangeCollisionMarginsCommand,
+    MoveLinkCommand,
+    RemoveLinkCommand,
 )
 from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
 from tesseract_robotics.tesseract_scene_graph import (
@@ -54,8 +55,6 @@ from tesseract_robotics.tesseract_scene_graph import (
     Link,
     SceneGraph,
 )
-
-from tesseract_robotics.planning.transforms import Pose
 
 
 @dataclass
@@ -81,9 +80,7 @@ class RobotState:
         if self.joint_velocities is not None:
             self.joint_velocities = np.asarray(self.joint_velocities, dtype=np.float64)
         if self.joint_accelerations is not None:
-            self.joint_accelerations = np.asarray(
-                self.joint_accelerations, dtype=np.float64
-            )
+            self.joint_accelerations = np.asarray(self.joint_accelerations, dtype=np.float64)
 
     def as_dict(self) -> dict[str, float]:
         """Return joint positions as {name: position} dictionary."""

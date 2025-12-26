@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -212,7 +211,7 @@ class Pose:
         return _rotation_matrix_to_quaternion(self.matrix[:3, :3])
 
     @property
-    def rpy(self) -> Tuple[float, float, float]:
+    def rpy(self) -> tuple[float, float, float]:
         """Get roll-pitch-yaw angles in radians."""
         return _rotation_matrix_to_rpy(self.matrix[:3, :3])
 
@@ -323,9 +322,7 @@ Transform = Pose
 # Internal helper functions
 
 
-def _quaternion_to_rotation_matrix(
-    qx: float, qy: float, qz: float, qw: float
-) -> np.ndarray:
+def _quaternion_to_rotation_matrix(qx: float, qy: float, qz: float, qw: float) -> np.ndarray:
     """Convert quaternion to 3x3 rotation matrix."""
     # Normalize quaternion
     n = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
@@ -399,7 +396,7 @@ def _rpy_to_rotation_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray
     )
 
 
-def _rotation_matrix_to_rpy(R: np.ndarray) -> Tuple[float, float, float]:
+def _rotation_matrix_to_rpy(R: np.ndarray) -> tuple[float, float, float]:
     """Convert rotation matrix to roll-pitch-yaw (XYZ)."""
     sy = math.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
 

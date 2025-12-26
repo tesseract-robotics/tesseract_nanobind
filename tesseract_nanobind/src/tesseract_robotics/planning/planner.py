@@ -24,6 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+# Re-export PlanningResult from composer
+from tesseract_robotics.planning.composer import PlanningResult, TaskComposer
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     ProfileDictionary,
@@ -31,9 +33,6 @@ from tesseract_robotics.tesseract_command_language import (
 from tesseract_robotics.tesseract_motion_planners import (
     assignCurrentStateAsSeed as _assignCurrentStateAsSeed,
 )
-
-# Re-export PlanningResult from composer
-from tesseract_robotics.planning.composer import PlanningResult, TaskComposer
 
 if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
@@ -63,8 +62,8 @@ class PlannerConfig:
 
 
 def plan_freespace(
-    robot: "Robot",
-    program: "MotionProgram | CompositeInstruction",
+    robot: Robot,
+    program: MotionProgram | CompositeInstruction,
     config: PlannerConfig | None = None,
     profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
@@ -110,8 +109,8 @@ def plan_freespace(
 
 
 def plan_ompl(
-    robot: "Robot",
-    program: "MotionProgram | CompositeInstruction",
+    robot: Robot,
+    program: MotionProgram | CompositeInstruction,
     config: PlannerConfig | None = None,
     profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
@@ -159,8 +158,8 @@ def plan_ompl(
 
 
 def plan_cartesian(
-    robot: "Robot",
-    program: "MotionProgram | CompositeInstruction",
+    robot: Robot,
+    program: MotionProgram | CompositeInstruction,
     config: PlannerConfig | None = None,
     profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
@@ -206,7 +205,7 @@ def plan_cartesian(
 
 def assign_current_state_as_seed(
     program: CompositeInstruction,
-    robot: "Robot",
+    robot: Robot,
 ) -> None:
     """
     Assign current robot state as seed for Cartesian waypoints.

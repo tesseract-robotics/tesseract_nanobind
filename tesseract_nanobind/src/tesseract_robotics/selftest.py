@@ -7,14 +7,15 @@ Usage:
     tesseract_nanobind_selftest -v        # verbose - show full pytest output
     tesseract_nanobind_selftest --verbose # same as -v
 """
+
 import argparse
 import io
 import os
+import platform
 import re
 import sys
-import platform
 import time
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from pathlib import Path
 
@@ -79,6 +80,7 @@ def get_numpy_version() -> str:
     """Get numpy version if installed."""
     try:
         import numpy
+
         return numpy.__version__
     except ImportError:
         return "not installed"
@@ -101,14 +103,13 @@ def main():
         description="Run tesseract_robotics self-tests and generate a report."
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Show detailed pytest output for each module"
+        "-v", "--verbose", action="store_true", help="Show detailed pytest output for each module"
     )
     args = parser.parse_args()
     verbose = args.verbose
 
     import pytest
+
     import tesseract_robotics
 
     test_dir = Path(__file__).parent / "tests"
@@ -207,11 +208,13 @@ def main():
     for k, v in env_info.items():
         lines.append(f"  {k}: {v}")
 
-    lines.extend([
-        "",
-        "RESULTS",
-        "-" * 40,
-    ])
+    lines.extend(
+        [
+            "",
+            "RESULTS",
+            "-" * 40,
+        ]
+    )
 
     all_failures = []
     for module_name, status, passed, failed, duration, failures, output in results:
@@ -225,58 +228,66 @@ def main():
                 lines.append(f"    - {test_id}: {error_msg}")
                 all_failures.append((module_name, test_id, error_msg))
 
-    lines.extend([
-        "-" * 40,
-        f"Modules: {modules_passed} passed, {modules_failed} failed, {modules_skipped} skipped",
-        f"Tests: {total_passed} passed, {total_failed} failed",
-        "=" * 60,
-    ])
+    lines.extend(
+        [
+            "-" * 40,
+            f"Modules: {modules_passed} passed, {modules_failed} failed, {modules_skipped} skipped",
+            f"Tests: {total_passed} passed, {total_failed} failed",
+            "=" * 60,
+        ]
+    )
 
     # GitHub issue template (only if failures)
     if all_failures:
         failed_modules_summary = []
         for module_name, status, passed, failed, _, _, _ in results:
             if status == "FAIL":
-                failed_modules_summary.append(f"- {module_name} ({failed}/{passed + failed} failed)")
+                failed_modules_summary.append(
+                    f"- {module_name} ({failed}/{passed + failed} failed)"
+                )
 
         error_details = []
         for module_name, test_id, error_msg in all_failures[:10]:  # limit to 10
             error_details.append(f"{test_id}\n  {error_msg}")
 
-        lines.extend([
-            "",
-            "=" * 60,
-            "GITHUB ISSUE TEMPLATE (copy below this line)",
-            "=" * 60,
-            "",
-            "## Selftest Failure Report",
-            "",
-            "**Environment:**",
-            f"- tesseract_robotics version: {version}",
-            f"- Python: {py_version}",
-            f"- Platform: {plat}",
-            f"- NumPy: {numpy_ver}",
-            "",
-            "**Failed modules:**",
-            *failed_modules_summary,
-            "",
-            "**Error details:**",
-            "```",
-            *error_details,
-            "```",
-            "",
-            "**Steps to reproduce:**",
-            "```bash",
-            "pip install tesseract-robotics-nanobind",
-            "tesseract_nanobind_selftest",
-            "```",
-        ])
+        lines.extend(
+            [
+                "",
+                "=" * 60,
+                "GITHUB ISSUE TEMPLATE (copy below this line)",
+                "=" * 60,
+                "",
+                "## Selftest Failure Report",
+                "",
+                "**Environment:**",
+                f"- tesseract_robotics version: {version}",
+                f"- Python: {py_version}",
+                f"- Platform: {plat}",
+                f"- NumPy: {numpy_ver}",
+                "",
+                "**Failed modules:**",
+                *failed_modules_summary,
+                "",
+                "**Error details:**",
+                "```",
+                *error_details,
+                "```",
+                "",
+                "**Steps to reproduce:**",
+                "```bash",
+                "pip install tesseract-robotics-nanobind",
+                "tesseract_nanobind_selftest",
+                "```",
+            ]
+        )
 
     report_content = "\n".join(lines)
     report_path.write_text(report_content)
 
     print(f"\nReport saved to: {report_path}")
-    print(f"\nSummary: {modules_passed} modules passed, {modules_failed} failed, {modules_skipped} skipped")
+    print(
+        f"\nSummary: {modules_passed} modules passed, {modules_failed} failed, {modules_skipped} skipped"
+    )
     if all_failures:
         print("         (report contains GitHub issue template)")
 

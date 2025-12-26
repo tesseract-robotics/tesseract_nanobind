@@ -11,20 +11,16 @@ __all__ = [
     "UR10eParameters",
     "UR5eParameters",
     "UR3eParameters",
-
     # IK Input
     "KinGroupIKInput",
     "KinGroupIKInputs",
-
     # Kinematics classes
     "ForwardKinematics",
     "InverseKinematics",
     "JointGroup",
     "KinematicGroup",
-
     # Plugin factory
     "KinematicsPluginFactory",
-
     # Utility functions
     "getRedundantSolutions",
 ]

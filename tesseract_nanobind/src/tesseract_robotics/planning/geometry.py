@@ -36,26 +36,25 @@ import numpy as np
 if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
 
+from tesseract_robotics.planning.transforms import Transform
+from tesseract_robotics.tesseract_common import Isometry3d
 from tesseract_robotics.tesseract_geometry import (
     Box,
-    Sphere,
-    Cylinder,
     Cone,
-    Mesh,
     ConvexMesh,
+    Cylinder,
     Geometry,
+    Mesh,
+    Sphere,
 )
 from tesseract_robotics.tesseract_scene_graph import (
+    Collision,
     Joint,
     JointType,
     Link,
-    Visual,
-    Collision,
     Material,
+    Visual,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
-
-from tesseract_robotics.planning.transforms import Transform
 
 
 def box(x: float, y: float, z: float) -> Box:
@@ -130,8 +129,8 @@ def mesh_from_file(
     Returns:
         Mesh geometry
     """
-    from tesseract_robotics.tesseract_geometry import createMeshFromResource
     from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.tesseract_geometry import createMeshFromResource
 
     locator = GeneralResourceLocator()
     filepath = str(filepath)
