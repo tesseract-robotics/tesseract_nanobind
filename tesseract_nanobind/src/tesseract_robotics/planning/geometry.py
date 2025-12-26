@@ -180,6 +180,31 @@ def convex_mesh_from_file(
     return makeConvexMesh(mesh)
 
 
+def _add_visual_and_collision(
+    link: Link,
+    geometry: Geometry,
+    origin: Isometry3d,
+    name: str,
+    color: Optional[tuple] = None,
+) -> None:
+    """Add matching visual and collision geometry to a link."""
+    visual = Visual()
+    visual.origin = origin
+    visual.geometry = geometry
+
+    if color is not None:
+        material = Material(f"{name}_material")
+        material.color = np.array(color, dtype=np.float64)
+        visual.material = material
+
+    link.visual.append(visual)
+
+    collision = Collision()
+    collision.origin = origin
+    collision.geometry = geometry
+    link.collision.append(collision)
+
+
 def create_obstacle(
     robot: "Robot",  # Forward reference to avoid circular import
     name: str,
@@ -217,28 +242,8 @@ def create_obstacle(
     if transform is None:
         transform = Transform.identity()
 
-    isometry = transform.to_isometry()
-
-    # Create link
     link = Link(name)
-
-    # Add visual
-    visual = Visual()
-    visual.origin = isometry
-    visual.geometry = geometry
-
-    if color is not None:
-        material = Material(f"{name}_material")
-        material.color = np.array(color, dtype=np.float64)
-        visual.material = material
-
-    link.visual.append(visual)
-
-    # Add collision (same as visual)
-    collision = Collision()
-    collision.origin = isometry
-    collision.geometry = geometry
-    link.collision.append(collision)
+    _add_visual_and_collision(link, geometry, transform.to_isometry(), name, color)
 
     # Create fixed joint
     joint = Joint(f"joint_{name}")
@@ -270,31 +275,10 @@ def create_link_with_geometry(
     Returns:
         Configured Link object
     """
-    if origin is None:
-        isometry = Isometry3d.Identity()
-    else:
-        isometry = origin.to_isometry()
+    isometry = origin.to_isometry() if origin else Isometry3d.Identity()
 
     link = Link(name)
-
-    # Visual
-    visual = Visual()
-    visual.origin = isometry
-    visual.geometry = geometry
-
-    if color is not None:
-        material = Material(f"{name}_material")
-        material.color = np.array(color, dtype=np.float64)
-        visual.material = material
-
-    link.visual.append(visual)
-
-    # Collision
-    collision = Collision()
-    collision.origin = isometry
-    collision.geometry = geometry
-    link.collision.append(collision)
-
+    _add_visual_and_collision(link, geometry, isometry, name, color)
     return link
 
 
