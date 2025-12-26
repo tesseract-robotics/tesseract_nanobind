@@ -41,11 +41,12 @@ if "pytest" not in sys.modules:
         pass
 
 
-def run(pipeline="CartesianPipeline"):
+def run(pipeline="CartesianPipeline", num_planners=None):
     """Run chain planning example.
 
     Args:
         pipeline: Pipeline name (default "CartesianPipeline")
+        num_planners: Number of parallel planners (unused, for API compat)
 
     Returns:
         dict with results
