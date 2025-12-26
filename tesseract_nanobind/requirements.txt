@@ -15,3 +15,4 @@ pytest-benchmark>=4.0
 # === Build tools ===
 colcon-common-extensions
 vcstool
+pre-commit
