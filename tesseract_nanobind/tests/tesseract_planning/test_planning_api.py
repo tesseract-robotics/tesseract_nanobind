@@ -94,6 +94,13 @@ class TestPose:
         t2 = Pose.from_isometry(iso)
         np.testing.assert_array_almost_equal(t.position, t2.position)
 
+    def test_pose_repr(self):
+        """Test Pose string representation."""
+        t = Pose.from_xyz(1.5, 2.5, 3.5)
+        repr_str = repr(t)
+        assert "Pose" in repr_str
+        assert "1.5" in repr_str or "1.50" in repr_str
+
 
 class TestRobot:
     """Test Robot loading and state management."""
@@ -117,6 +124,39 @@ class TestRobot:
         assert isinstance(state, RobotState)
         assert len(state.joint_names) > 0
         assert len(state.joint_positions) == len(state.joint_names)
+
+    def test_robot_state_as_dict(self, robot):
+        """Test RobotState.as_dict() conversion."""
+        robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
+        state = robot.get_state(["joint_1", "joint_2"])
+
+        d = state.as_dict()
+        assert d["joint_1"] == pytest.approx(0.5)
+        assert d["joint_2"] == pytest.approx(-0.3)
+
+    def test_robot_state_getitem(self, robot):
+        """Test RobotState bracket access."""
+        robot.set_joints({"joint_1": 0.7})
+        state = robot.get_state(["joint_1"])
+
+        assert state["joint_1"] == pytest.approx(0.7)
+
+    def test_robot_state_getitem_missing(self, robot):
+        """Test RobotState bracket access raises KeyError for missing joint."""
+        state = robot.get_state(["joint_1"])
+
+        with pytest.raises(KeyError, match="not found"):
+            _ = state["nonexistent_joint"]
+
+    def test_robot_state_repr(self, robot):
+        """Test RobotState string representation."""
+        robot.set_joints({"joint_1": 0.1234})
+        state = robot.get_state(["joint_1"])
+
+        repr_str = repr(state)
+        assert "RobotState" in repr_str
+        assert "joint_1" in repr_str
+        assert "0.1234" in repr_str
 
     def test_set_joints_dict(self, robot):
         robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
@@ -279,6 +319,28 @@ class TestMotionProgram:
         program = MotionProgram("manipulator")
         program.move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
         assert len(program) == 1
+
+    def test_add_targets_batch(self):
+        """Test add_targets for adding multiple targets at once."""
+        targets = [
+            JointTarget([0, 0, 0, 0, 0, 0]),
+            CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)),
+            JointTarget([0.5, 0, 0, 0, 0, 0]),
+        ]
+        program = MotionProgram("manipulator").add_targets(targets)
+        assert len(program) == 3
+        assert program.targets == targets
+
+    def test_repr(self):
+        """Test MotionProgram string representation."""
+        program = MotionProgram("my_group")
+        program.move_to(JointTarget([0, 0, 0]))
+        program.move_to(JointTarget([1, 1, 1]))
+
+        repr_str = repr(program)
+        assert "MotionProgram" in repr_str
+        assert "my_group" in repr_str
+        assert "2" in repr_str  # targets count
 
     def test_fluent_api(self):
         program = (
