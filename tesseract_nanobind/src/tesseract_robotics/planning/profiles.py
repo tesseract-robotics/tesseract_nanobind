@@ -11,7 +11,7 @@ Also provides helpers for:
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 

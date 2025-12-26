@@ -178,9 +178,9 @@ def main():
 
     # Extract position and orientation from Isometry3d
     # rotation() returns 3x3 rotation matrix, Quaterniond converts to quaternion
-    print("Tool0 transform at joint position " + str(robot_joint_pos) + " is: ")
+    print(f"Tool0 transform at joint position {robot_joint_pos} is: ")
     q = Quaterniond(tool0_transform.rotation())
-    print("Translation: " + str(tool0_transform.translation().flatten()))
+    print(f"Translation: {tool0_transform.translation().flatten()}")
     # Quaternion printed as (w, x, y, z) - Eigen convention
     print(f"Rotation: {q.w()} {q.x()} {q.y()} {q.z()}")
 
@@ -212,7 +212,7 @@ def main():
     # Each solution is a numpy array of joint positions
     print(f"Found {len(ik_result)} solutions")
     for i in range(len(ik_result)):
-        print("Solution " + str(i) + ": " + str(ik_result[i].flatten()))
+        print(f"Solution {i}: {ik_result[i].flatten()}")
 
 
 if __name__ == "__main__":
