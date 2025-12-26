@@ -88,13 +88,28 @@ Related Examples
 - scene_graph_example.py: Direct scene graph manipulation
 """
 
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator, Isometry3d, Translation3d, \
-    CollisionMarginData
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    Isometry3d,
+    Translation3d,
+    CollisionMarginData,
+)
 from tesseract_robotics.tesseract_environment import Environment, AddLinkCommand
-from tesseract_robotics.tesseract_scene_graph import Joint, Link, Visual, Collision, JointType_FIXED
+from tesseract_robotics.tesseract_scene_graph import (
+    Joint,
+    Link,
+    Visual,
+    Collision,
+    JointType_FIXED,
+)
 from tesseract_robotics.tesseract_geometry import Sphere
-from tesseract_robotics.tesseract_collision import ContactResultMap, ContactTestType_ALL, \
-    ContactRequest, ContactResultVector
+from tesseract_robotics.tesseract_collision import (
+    ContactResultMap,
+    ContactTestType_ALL,
+    ContactRequest,
+    ContactResultVector,
+)
 from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
 import numpy as np
 
@@ -129,8 +144,12 @@ def main():
     env = Environment()
 
     # Locate URDF (robot geometry) and SRDF (semantic info: groups, ACM, plugins)
-    urdf_path_str = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
-    srdf_path_str = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
+    urdf_path_str = locator.locateResource(
+        "package://tesseract_support/urdf/abb_irb2400.urdf"
+    ).getFilePath()
+    srdf_path_str = locator.locateResource(
+        "package://tesseract_support/urdf/abb_irb2400.srdf"
+    ).getFilePath()
 
     # FilesystemPath wraps std::filesystem::path for cross-platform compatibility
     urdf_path = FilesystemPath(urdf_path_str)
@@ -141,7 +160,7 @@ def main():
     assert env.init(urdf_path, srdf_path, locator)
 
     # ABB IRB2400 is a 6-axis industrial robot with joints named joint_1..joint_6
-    robot_joint_names = [f"joint_{i+1}" for i in range(6)]
+    robot_joint_names = [f"joint_{i + 1}" for i in range(6)]
     robot_joint_pos = np.zeros(6)
 
     # =========================================================================
@@ -154,13 +173,14 @@ def main():
     # Visual component: for rendering/visualization (optional for collision)
     sphere_link_visual = Visual()
     sphere_link_visual.geometry = Sphere(0.1)  # 10cm radius
-    sphere_link.visual.append(sphere_link_visual)
+    # Use assignment - nanobind returns copies for .visual/.collision
+    sphere_link.visual = [sphere_link_visual]
 
     # Collision component: this is what the contact manager actually checks
     # A link without collision geometry is invisible to the collision checker
     sphere_link_collision = Collision()
     sphere_link_collision.geometry = Sphere(0.1)
-    sphere_link.collision.append(sphere_link_collision)
+    sphere_link.collision = [sphere_link_collision]
 
     # Joint connects child link to parent link with a transform
     # JointType_FIXED means no relative motion (obstacle is stationary)
@@ -221,7 +241,9 @@ def main():
 
         # Debug output: verify link poses are updating correctly
         print(f"Link 6 Pose: {scene_state.link_transforms['link_6'].matrix()}")
-        print(f"Sphere Link Pose: {scene_state.link_transforms[sphere_link.getName()].matrix()}")
+        print(
+            f"Sphere Link Pose: {scene_state.link_transforms[sphere_link.getName()].matrix()}"
+        )
 
         # Execute collision query
         # ContactTestType_ALL: find all collision pairs (vs FIRST for early-out)
@@ -250,4 +272,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-   

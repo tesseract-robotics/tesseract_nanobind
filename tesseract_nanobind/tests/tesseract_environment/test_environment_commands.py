@@ -1,42 +1,40 @@
 """Tests for Environment Command bindings"""
 
 import pytest
-import numpy as np
+
+from tesseract_robotics.tesseract_common import (
+    AllowedCollisionMatrix,
+    CollisionMarginData,
+    CollisionMarginOverrideType,
+    GeneralResourceLocator,
+    Isometry3d,
+)
 from tesseract_robotics.tesseract_environment import (
-    Environment,
-    Command,
     AddLinkCommand,
-    RemoveLinkCommand,
-    AddSceneGraphCommand,
-    RemoveJointCommand,
-    ReplaceJointCommand,
-    MoveJointCommand,
-    MoveLinkCommand,
-    ChangeJointPositionLimitsCommand,
-    ChangeJointVelocityLimitsCommand,
+    ChangeCollisionMarginsCommand,
     ChangeJointAccelerationLimitsCommand,
     ChangeJointOriginCommand,
+    ChangeJointPositionLimitsCommand,
+    ChangeJointVelocityLimitsCommand,
+    ChangeLinkCollisionEnabledCommand,
     ChangeLinkOriginCommand,
+    ChangeLinkVisibilityCommand,
+    Command,
+    Environment,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
     ModifyAllowedCollisionsType_ADD,
     ModifyAllowedCollisionsType_REMOVE,
     ModifyAllowedCollisionsType_REPLACE,
+    MoveJointCommand,
+    MoveLinkCommand,
     RemoveAllowedCollisionLinkCommand,
-    ChangeCollisionMarginsCommand,
-    ChangeLinkCollisionEnabledCommand,
-    ChangeLinkVisibilityCommand,
+    RemoveJointCommand,
+    RemoveLinkCommand,
+    ReplaceJointCommand,
 )
-from tesseract_robotics.tesseract_common import (
-    GeneralResourceLocator,
-    AllowedCollisionMatrix,
-    CollisionMarginData,
-    CollisionMarginOverrideType,
-    Isometry3d,
-)
-from tesseract_robotics.tesseract_scene_graph import Link, Joint, JointType, Visual, Collision
 from tesseract_robotics.tesseract_geometry import Box
-
+from tesseract_robotics.tesseract_scene_graph import Joint, JointType, Link, Visual
 
 SIMPLE_URDF = """
 <robot name="test_robot">
@@ -111,7 +109,8 @@ class TestAddLinkCommand:
         box = Box(0.05, 0.05, 0.05)
         visual = Visual()
         visual.geometry = box
-        link.visual.append(visual)
+        # Use assignment - nanobind returns copies for .visual
+        link.visual = [visual]
 
         joint = Joint("new_joint")
         joint.type = JointType.FIXED
@@ -218,7 +217,7 @@ class TestChangeLinkCollisionEnabledCommand:
     def test_constructor(self):
         cmd = ChangeLinkCollisionEnabledCommand("link1", False)
         assert cmd.getLinkName() == "link1"
-        assert cmd.getEnabled() == False
+        assert not cmd.getEnabled()
 
     def test_apply_command(self, env):
         cmd = ChangeLinkCollisionEnabledCommand("link1", False)
@@ -231,7 +230,7 @@ class TestChangeLinkVisibilityCommand:
     def test_constructor(self):
         cmd = ChangeLinkVisibilityCommand("link1", False)
         assert cmd.getLinkName() == "link1"
-        assert cmd.getEnabled() == False
+        assert not cmd.getEnabled()
 
     def test_apply_command(self, env):
         cmd = ChangeLinkVisibilityCommand("link1", False)
@@ -270,8 +269,13 @@ class TestChangeCollisionMarginsCommand:
     """Tests for ChangeCollisionMarginsCommand"""
 
     def test_constructor_with_default_margin(self):
-        cmd = ChangeCollisionMarginsCommand(0.01, CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN)
-        assert cmd.getCollisionMarginOverrideType() == CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
+        cmd = ChangeCollisionMarginsCommand(
+            0.01, CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
+        )
+        assert (
+            cmd.getCollisionMarginOverrideType()
+            == CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
+        )
 
     def test_constructor_with_margin_data(self):
         margin_data = CollisionMarginData(0.02)
@@ -279,7 +283,9 @@ class TestChangeCollisionMarginsCommand:
         assert cmd.getCollisionMarginOverrideType() == CollisionMarginOverrideType.REPLACE
 
     def test_apply_command(self, env):
-        cmd = ChangeCollisionMarginsCommand(0.01, CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN)
+        cmd = ChangeCollisionMarginsCommand(
+            0.01, CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
+        )
         env.applyCommand(cmd)
 
 
