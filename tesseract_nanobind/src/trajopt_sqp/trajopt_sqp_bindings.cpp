@@ -170,7 +170,7 @@ NB_MODULE(_trajopt_sqp, m) {
         .def_rw("verbosity", &tsqp::QPSolver::verbosity, "Verbosity level (0 = silent)");
 
     // ========== OSQPEigenSolver ==========
-    nb::class_<tsqp::OSQPEigenSolver>(
+    nb::class_<tsqp::OSQPEigenSolver, tsqp::QPSolver>(
         m, "OSQPEigenSolver", "OSQP-based QP solver")
         .def(nb::init<>())
         .def("init", &tsqp::OSQPEigenSolver::init, "num_vars"_a, "num_cnts"_a)
@@ -243,7 +243,7 @@ NB_MODULE(_trajopt_sqp, m) {
 
     // ========== IfoptQPProblem ==========
 
-    nb::class_<tsqp::IfoptQPProblem>(
+    nb::class_<tsqp::IfoptQPProblem, tsqp::QPProblem>(
         m, "IfoptQPProblem",
         "QP problem wrapper for ifopt::Problem (general NLP)")
         .def(nb::init<>())

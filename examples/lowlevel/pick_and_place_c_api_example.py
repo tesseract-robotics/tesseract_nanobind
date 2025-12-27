@@ -33,6 +33,7 @@ This example uses the low-level C API bindings directly to demonstrate:
 """
 
 import gc
+
 gc.disable()  # Disable GC to avoid nanobind reference leak warnings on exit
 
 import sys
@@ -40,14 +41,14 @@ import numpy as np
 
 # High-level planning API
 from tesseract_robotics.planning import (
-    Robot,           # Environment wrapper with URDF/SRDF loading
-    MotionProgram,   # Fluent API for building motion sequences
-    CartesianTarget, # Pose-based waypoint
-    StateTarget,     # Joint-space waypoint
-    Pose,            # SE(3) pose with multiple constructors
-    box,             # Box geometry factory
-    create_obstacle, # Add collision object to environment
-    TaskComposer,    # Motion planning orchestrator
+    Robot,  # Environment wrapper with URDF/SRDF loading
+    MotionProgram,  # Fluent API for building motion sequences
+    CartesianTarget,  # Pose-based waypoint
+    StateTarget,  # Joint-space waypoint
+    Pose,  # SE(3) pose with multiple constructors
+    box,  # Box geometry factory
+    create_obstacle,  # Add collision object to environment
+    TaskComposer,  # Motion planning orchestrator
 )
 
 # Low-level scene graph for link manipulation
@@ -61,10 +62,10 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
 # TrajOpt-specific profile types (C++ bindings)
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,       # Per-waypoint settings (constraint/cost)
+    TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
     TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
-    ProfileDictionary_addTrajOptPlanProfile,      # Register plan profile
-    ProfileDictionary_addTrajOptCompositeProfile, # Register composite profile
+    ProfileDictionary_addTrajOptPlanProfile,  # Register plan profile
+    ProfileDictionary_addTrajOptCompositeProfile,  # Register composite profile
 )
 
 # TrajOpt planner namespace for profile registration
@@ -185,7 +186,7 @@ def run():
     #   - Shelf structure with placement locations
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/pick_and_place_plan.urdf",
-        "package://tesseract_support/urdf/pick_and_place_plan.srdf"
+        "package://tesseract_support/urdf/pick_and_place_plan.srdf",
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
@@ -194,8 +195,13 @@ def run():
 
     # KUKA IIWA joint names (7-DOF arm)
     joint_names = [
-        "iiwa_joint_a1", "iiwa_joint_a2", "iiwa_joint_a3", "iiwa_joint_a4",
-        "iiwa_joint_a5", "iiwa_joint_a6", "iiwa_joint_a7"
+        "iiwa_joint_a1",
+        "iiwa_joint_a2",
+        "iiwa_joint_a3",
+        "iiwa_joint_a4",
+        "iiwa_joint_a5",
+        "iiwa_joint_a6",
+        "iiwa_joint_a7",
     ]
 
     # Initial joint configuration from C++: elbow bent down (-90 deg on joint 4)
@@ -213,7 +219,9 @@ def run():
         robot,
         name=LINK_BOX_NAME,
         geometry=box(box_size, box_size, box_size),
-        transform=Pose.from_xyz(box_position[0], box_position[1], box_size / 2.0 + OFFSET),
+        transform=Pose.from_xyz(
+            box_position[0], box_position[1], box_size / 2.0 + OFFSET
+        ),
         parent_link="workcell_base",  # Table frame
     )
     print(f"Added box at ({box_position[0]}, {box_position[1]}) with size {box_size}m")
@@ -247,7 +255,12 @@ def run():
 
     # ==== BUILD PICK PROGRAM ====
     # MotionProgram is a fluent builder for motion sequences
-    pick_program = (MotionProgram("manipulator", tcp_frame=LINK_END_EFFECTOR_NAME, working_frame=LINK_BASE_NAME)
+    pick_program = (
+        MotionProgram(
+            "manipulator",
+            tcp_frame=LINK_END_EFFECTOR_NAME,
+            working_frame=LINK_BASE_NAME,
+        )
         .set_joint_names(joint_names)
         # Start waypoint: joint-space start position
         .move_to(StateTarget(joint_start_pos, names=joint_names, profile="FREESPACE"))
@@ -263,7 +276,9 @@ def run():
     # ==== PLAN PICK MOTION ====
     # TaskComposer.plan() auto-seeds Cartesian waypoints using IK
     # TrajOptPipeline: seed -> trajopt optimization -> time parameterization
-    pick_result = composer.plan(robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles)
+    pick_result = composer.plan(
+        robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles
+    )
 
     if not pick_result.successful:
         print(f"PICK planning failed: {pick_result.message}")
@@ -317,11 +332,7 @@ def run():
     # Rotation: 90 deg around Z (gripper approaches shelf from front)
     # C++ Eigen::Quaterniond(w=0, x=0, y=0.7071068, z=0.7071068)
     # Equivalent rotation matrix: [[-1,0,0], [0,0,1], [0,1,0]]
-    place_rotation = np.array([
-        [-1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [0.0, 1.0, 0.0]
-    ])
+    place_rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
     # Shelf position from C++ middle_left_shelf: (-0.149, 0.731, 1.160)
     place_position = [-0.148856, 0.73085, 1.16]
     place_pose = Pose.from_matrix_position(place_rotation, place_position)
@@ -329,7 +340,9 @@ def run():
     # ==== PLACE APPROACH POSE ====
     # 25cm back from shelf in -Y direction (approach from front)
     place_approach_position = np.array(place_position) + np.array([0.0, -0.25, 0.0])
-    place_approach_pose = Pose.from_matrix_position(place_rotation, place_approach_position)
+    place_approach_pose = Pose.from_matrix_position(
+        place_rotation, place_approach_position
+    )
 
     # ==== RETREAT POSE ====
     # Reuse pick approach pose (15cm above grasp location)
@@ -337,7 +350,12 @@ def run():
 
     # ==== BUILD PLACE PROGRAM ====
     # C++ uses: LINEAR retreat, FREESPACE to approach, LINEAR to place
-    place_program = (MotionProgram("manipulator", tcp_frame=LINK_END_EFFECTOR_NAME, working_frame=LINK_BASE_NAME)
+    place_program = (
+        MotionProgram(
+            "manipulator",
+            tcp_frame=LINK_END_EFFECTOR_NAME,
+            working_frame=LINK_BASE_NAME,
+        )
         .set_joint_names(joint_names)
         # Start waypoint: final pick configuration
         .move_to(StateTarget(pick_final, names=joint_names))
@@ -353,7 +371,9 @@ def run():
     print("Running TrajOpt planner for PLACE...")
 
     # ==== PLAN PLACE MOTION ====
-    place_result = composer.plan(robot, place_program, pipeline="TrajOptPipeline", profiles=profiles)
+    place_result = composer.plan(
+        robot, place_program, pipeline="TrajOptPipeline", profiles=profiles
+    )
 
     assert place_result.successful, f"PLACE planning failed: {place_result.message}"
     print("PLACE planning successful!")

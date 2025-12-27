@@ -14,26 +14,46 @@ Use this low-level approach when you need:
 - Custom time parameterization settings
 - To bypass the TaskComposer config system
 """
+
 import sys
 import numpy as np
 
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath, Isometry3d, Translation3d, Quaterniond,
-    ManipulatorInfo, GeneralResourceLocator,
+    FilesystemPath,
+    Isometry3d,
+    Translation3d,
+    Quaterniond,
+    ManipulatorInfo,
+    GeneralResourceLocator,
 )
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
-    CartesianWaypoint, MoveInstructionType_FREESPACE, MoveInstruction,
-    CompositeInstruction, ProfileDictionary,
-    CartesianWaypointPoly_wrap_CartesianWaypoint, MoveInstructionPoly_wrap_MoveInstruction,
-    InstructionPoly_as_MoveInstructionPoly, WaypointPoly_as_StateWaypointPoly,
+    CartesianWaypoint,
+    MoveInstructionType_FREESPACE,
+    MoveInstruction,
+    CompositeInstruction,
+    ProfileDictionary,
+    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    InstructionPoly_as_MoveInstructionPoly,
+    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLMotionPlanner, OMPLRealVectorPlanProfile
-from tesseract_robotics.tesseract_time_parameterization import TimeOptimalTrajectoryGeneration, InstructionsTrajectory
+from tesseract_robotics.tesseract_motion_planners_simple import (
+    generateInterpolatedProgram,
+)
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    OMPLMotionPlanner,
+    OMPLRealVectorPlanProfile,
+)
+from tesseract_robotics.tesseract_time_parameterization import (
+    TimeOptimalTrajectoryGeneration,
+    InstructionsTrajectory,
+)
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile, TrajOptMotionPlanner,
+    TrajOptDefaultPlanProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptMotionPlanner,
 )
 
 TesseractViewer = None
@@ -53,8 +73,12 @@ def main():
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_urdf_package_url).getFilePath())
-    abb_irb2400_srdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_srdf_package_url).getFilePath())
+    abb_irb2400_urdf_fname = FilesystemPath(
+        locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
+    )
+    abb_irb2400_srdf_fname = FilesystemPath(
+        locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
+    )
 
     t_env = Environment()
 
@@ -70,26 +94,44 @@ def main():
     manip_info.working_frame = "base_link"
 
     # Set the initial state of the robot
-    joint_names = ["joint_%d" % (i+1) for i in range(6)]
-    t_env.setState(joint_names, np.ones(6)*0.1)
+    joint_names = ["joint_%d" % (i + 1) for i in range(6)]
+    t_env.setState(joint_names, np.ones(6) * 0.1)
 
     # Create the input command program waypoints
-    wp1 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.8,-0.3,1.455) * Quaterniond(0.70710678,0,0.70710678,0))
-    wp2 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.8,0.3,1.455) * Quaterniond(0.70710678,0,0.70710678,0))
+    wp1 = CartesianWaypoint(
+        Isometry3d.Identity()
+        * Translation3d(0.8, -0.3, 1.455)
+        * Quaterniond(0.70710678, 0, 0.70710678, 0)
+    )
+    wp2 = CartesianWaypoint(
+        Isometry3d.Identity()
+        * Translation3d(0.8, 0.3, 1.455)
+        * Quaterniond(0.70710678, 0, 0.70710678, 0)
+    )
 
     # Create the input command program instructions. Note the use of explicit
     # construction of the CartesianWaypointPoly using *_wrap_CartesianWaypoint
     # functions. This is required because the Python bindings do not support
     # implicit conversion from CartesianWaypoint to CartesianWaypointPoly.
-    start_instruction = MoveInstruction(CartesianWaypointPoly_wrap_CartesianWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT")
-    plan_f1 = MoveInstruction(CartesianWaypointPoly_wrap_CartesianWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT")
+    start_instruction = MoveInstruction(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+        MoveInstructionType_FREESPACE,
+        "DEFAULT",
+    )
+    plan_f1 = MoveInstruction(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+        MoveInstructionType_FREESPACE,
+        "DEFAULT",
+    )
 
     # Create the input command program. Note the use of *_wrap_MoveInstruction
     # functions. This is required because the Python bindings do not support
     # implicit conversion from MoveInstruction to MoveInstructionPoly.
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
+    program.appendMoveInstruction(
+        MoveInstructionPoly_wrap_MoveInstruction(start_instruction)
+    )
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
 
     # Initialize the OMPL planner for RRTConnect algorithm
@@ -115,7 +157,9 @@ def main():
 
     # The OMPL program does not generate dense waypoints. This function will
     # interpolate the results to generate a dense set of waypoints.
-    interpolated_results_instruction = generateInterpolatedProgram(results_instruction, t_env, 3.14, 1.0, 3.14, 10)
+    interpolated_results_instruction = generateInterpolatedProgram(
+        results_instruction, t_env, 3.14, 1.0, 3.14, 10
+    )
 
     # Create the TrajOpt planner profile configurations. TrajOpt is used to
     # optimize the sparse random program generated by OMPL.
@@ -152,7 +196,9 @@ def main():
     max_acceleration = np.hstack((-max_acceleration.T, max_acceleration.T))
     max_jerk = np.array([[1, 1, 1, 1, 1, 1]], dtype=np.float64)
     max_jerk = np.hstack((-max_jerk.T, max_jerk.T))
-    assert time_parameterization.compute(instructions_trajectory, max_velocity, max_acceleration, max_jerk)
+    assert time_parameterization.compute(
+        instructions_trajectory, max_velocity, max_acceleration, max_jerk
+    )
 
     # Get the results as a list of instructions
     trajopt_results = trajopt_results_instruction.getInstructions()
@@ -170,7 +216,9 @@ def main():
     if TesseractViewer is not None:
         viewer = TesseractViewer()
         viewer.update_environment(t_env, [0, 0, 0])
-        viewer.update_joint_positions(joint_names, np.array([1, -.2, .01, .3, -.5, 1]))
+        viewer.update_joint_positions(
+            joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1])
+        )
         viewer.start_serve_background()
         viewer.update_trajectory(trajopt_results)
         viewer.plot_trajectory(trajopt_results, manip_info, axes_length=0.05)

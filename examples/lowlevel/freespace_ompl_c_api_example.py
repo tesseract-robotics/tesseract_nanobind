@@ -81,10 +81,11 @@ def run():
     # Create motion program with FREESPACE motion type (default for JointTarget)
     # FREESPACE = joint-space planning, no Cartesian path constraints
     # The planner will find any collision-free path between configurations
-    program = (MotionProgram("manipulator", tcp_frame="tool0")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0")
         .set_joint_names(joint_names)
         .move_to(JointTarget(joint_start_pos))  # Start state
-        .move_to(JointTarget(joint_end_pos))    # Goal state
+        .move_to(JointTarget(joint_end_pos))  # Goal state
     )
     print(f"\nCreated program with {len(program)} waypoints")
 

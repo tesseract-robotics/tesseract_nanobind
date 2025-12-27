@@ -6,8 +6,10 @@ Markers:
   - @pytest.mark.basic: Basic examples (collision, kinematics, scene_graph)
   - @pytest.mark.lowlevel: Low-level API examples
 """
-from pathlib import Path
+
 import importlib.util
+from pathlib import Path
+
 import pytest
 
 ROOT_DIR = Path(__file__).parent.parent.parent.parent
@@ -25,6 +27,7 @@ def _load_module(name, path):
 
 # === Viewer Examples ===
 
+
 @pytest.mark.viewer
 def test_shapes_viewer():
     _load_module("shapes_viewer", VIEWER_EXAMPLES / "shapes_viewer.py").main()
@@ -32,7 +35,9 @@ def test_shapes_viewer():
 
 @pytest.mark.viewer
 def test_material_mesh_viewer():
-    _load_module("tesseract_material_mesh_viewer", VIEWER_EXAMPLES / "tesseract_material_mesh_viewer.py").main()
+    _load_module(
+        "tesseract_material_mesh_viewer", VIEWER_EXAMPLES / "tesseract_material_mesh_viewer.py"
+    ).main()
 
 
 @pytest.mark.viewer
@@ -43,6 +48,7 @@ def test_abb_irb2400_viewer():
 
 # === High-Level API Examples ===
 
+
 @pytest.mark.basic
 def test_collision_example():
     _load_module("tesseract_collision_example", EXAMPLES / "tesseract_collision_example.py").main()
@@ -50,7 +56,9 @@ def test_collision_example():
 
 @pytest.mark.basic
 def test_kinematics_example():
-    _load_module("tesseract_kinematics_example", EXAMPLES / "tesseract_kinematics_example.py").main()
+    _load_module(
+        "tesseract_kinematics_example", EXAMPLES / "tesseract_kinematics_example.py"
+    ).main()
 
 
 @pytest.mark.basic
@@ -85,7 +93,9 @@ def test_car_seat_example():
 
 @pytest.mark.planning
 def test_puzzle_piece_auxillary_axes_example():
-    _load_module("puzzle_piece_auxillary_axes_example", EXAMPLES / "puzzle_piece_auxillary_axes_example.py").main()
+    _load_module(
+        "puzzle_piece_auxillary_axes_example", EXAMPLES / "puzzle_piece_auxillary_axes_example.py"
+    ).main()
 
 
 @pytest.mark.planning
@@ -110,52 +120,71 @@ def test_chain_example():
 
 # === Low-Level API Examples ===
 
+
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_collision_example():
-    _load_module("tesseract_collision_c_api_example", LOWLEVEL_EXAMPLES / "tesseract_collision_c_api_example.py").main()
+    _load_module(
+        "tesseract_collision_c_api_example",
+        LOWLEVEL_EXAMPLES / "tesseract_collision_c_api_example.py",
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_kinematics_example():
-    _load_module("tesseract_kinematics_c_api_example", LOWLEVEL_EXAMPLES / "tesseract_kinematics_c_api_example.py").main()
+    _load_module(
+        "tesseract_kinematics_c_api_example",
+        LOWLEVEL_EXAMPLES / "tesseract_kinematics_c_api_example.py",
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_scene_graph_example():
-    _load_module("scene_graph_c_api_example", LOWLEVEL_EXAMPLES / "scene_graph_c_api_example.py").main()
+    _load_module(
+        "scene_graph_c_api_example", LOWLEVEL_EXAMPLES / "scene_graph_c_api_example.py"
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_freespace_ompl_example():
-    _load_module("freespace_ompl_c_api_example", LOWLEVEL_EXAMPLES / "freespace_ompl_c_api_example.py").main()
+    _load_module(
+        "freespace_ompl_c_api_example", LOWLEVEL_EXAMPLES / "freespace_ompl_c_api_example.py"
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_basic_cartesian_example():
-    _load_module("basic_cartesian_c_api_example", LOWLEVEL_EXAMPLES / "basic_cartesian_c_api_example.py").main()
+    _load_module(
+        "basic_cartesian_c_api_example", LOWLEVEL_EXAMPLES / "basic_cartesian_c_api_example.py"
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_glass_upright_example():
-    _load_module("glass_upright_c_api_example", LOWLEVEL_EXAMPLES / "glass_upright_c_api_example.py").main()
+    _load_module(
+        "glass_upright_c_api_example", LOWLEVEL_EXAMPLES / "glass_upright_c_api_example.py"
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_example():
-    _load_module("puzzle_piece_c_api_example", LOWLEVEL_EXAMPLES / "puzzle_piece_c_api_example.py").main()
+    _load_module(
+        "puzzle_piece_c_api_example", LOWLEVEL_EXAMPLES / "puzzle_piece_c_api_example.py"
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_pick_and_place_example():
-    _load_module("pick_and_place_c_api_example", LOWLEVEL_EXAMPLES / "pick_and_place_c_api_example.py").main()
+    _load_module(
+        "pick_and_place_c_api_example", LOWLEVEL_EXAMPLES / "pick_and_place_c_api_example.py"
+    ).main()
 
 
 @pytest.mark.lowlevel
@@ -167,7 +196,10 @@ def test_lowlevel_car_seat_example():
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_auxillary_axes_example():
-    _load_module("puzzle_piece_auxillary_axes_c_api_example", LOWLEVEL_EXAMPLES / "puzzle_piece_auxillary_axes_c_api_example.py").main()
+    _load_module(
+        "puzzle_piece_auxillary_axes_c_api_example",
+        LOWLEVEL_EXAMPLES / "puzzle_piece_auxillary_axes_c_api_example.py",
+    ).main()
 
 
 @pytest.mark.lowlevel
@@ -179,10 +211,16 @@ def test_lowlevel_pythonic_example():
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_planning_composer_example():
-    _load_module("tesseract_planning_composer_c_api_example", LOWLEVEL_EXAMPLES / "tesseract_planning_composer_c_api_example.py").main()
+    _load_module(
+        "tesseract_planning_composer_c_api_example",
+        LOWLEVEL_EXAMPLES / "tesseract_planning_composer_c_api_example.py",
+    ).main()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_planning_lowlevel_example():
-    _load_module("tesseract_planning_lowlevel_c_api_example", LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_c_api_example.py").main()
+    _load_module(
+        "tesseract_planning_lowlevel_c_api_example",
+        LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_c_api_example.py",
+    ).main()
