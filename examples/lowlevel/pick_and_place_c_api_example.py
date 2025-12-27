@@ -36,11 +36,11 @@ import gc
 
 gc.disable()  # Disable GC to avoid nanobind reference leak warnings on exit
 
-import sys
-import numpy as np
+import sys  # noqa: E402
+import numpy as np  # noqa: E402
 
 # High-level planning API
-from tesseract_robotics.planning import (
+from tesseract_robotics.planning import (  # noqa: E402
     Robot,  # Environment wrapper with URDF/SRDF loading
     MotionProgram,  # Fluent API for building motion sequences
     CartesianTarget,  # Pose-based waypoint
@@ -52,16 +52,16 @@ from tesseract_robotics.planning import (
 )
 
 # Low-level scene graph for link manipulation
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+from tesseract_robotics.tesseract_scene_graph import Joint, JointType  # noqa: E402
 
 # Isometry3d for 4x4 homogeneous transforms
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_common import Isometry3d  # noqa: E402
 
 # Profile dictionary for custom planner settings
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_command_language import ProfileDictionary  # noqa: E402
 
 # TrajOpt-specific profile types (C++ bindings)
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
     TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
     TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
     ProfileDictionary_addTrajOptPlanProfile,  # Register plan profile

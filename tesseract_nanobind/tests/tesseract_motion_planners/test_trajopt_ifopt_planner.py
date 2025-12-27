@@ -150,7 +150,6 @@ class TestTrajOptIfoptPlanner:
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(end_instr))
 
         # Interpolate program
-        cur_state = t_env.getState()
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
         # Create profiles with proper velocity coefficients
