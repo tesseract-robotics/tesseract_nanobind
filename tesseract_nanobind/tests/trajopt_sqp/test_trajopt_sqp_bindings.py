@@ -58,6 +58,37 @@ class TestIfoptBaseClasses:
         assert b.lower == -1.0
         assert b.upper == 1.0
 
+    def test_special_bounds(self):
+        """Test special bound constants."""
+        from tesseract_robotics import ifopt
+
+        # Unbounded (NoBound uses +/- inf)
+        nb = ifopt.NoBound
+        assert nb.lower == -ifopt.inf
+        assert nb.upper == ifopt.inf
+
+        # Zero bound (equality constraint)
+        zb = ifopt.BoundZero
+        assert zb.lower == 0.0
+        assert zb.upper == 0.0
+
+        # Greater than zero
+        gz = ifopt.BoundGreaterZero
+        assert gz.lower == 0.0
+        assert gz.upper == ifopt.inf
+
+        # Smaller than zero
+        sz = ifopt.BoundSmallerZero
+        assert sz.lower == -ifopt.inf
+        assert sz.upper == 0.0
+
+    def test_inf_constant(self):
+        """Test ifopt.inf constant."""
+        from tesseract_robotics import ifopt
+
+        # ifopt uses 1e20 as "infinity" for numerical stability
+        assert ifopt.inf == 1e20
+
     def test_variable_set_interface(self, kuka_setup):
         """Test JointPosition inherits from VariableSet."""
         _, _, joint_names, joint_limits = kuka_setup
