@@ -1,41 +1,38 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
+
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_common import (
-    Isometry3d,
-    Translation3d,
-    Quaterniond,
-    ManipulatorInfo,
-    GeneralResourceLocator,
-    FilesystemPath,
-)
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
+    CompositeInstruction,
     JointWaypoint,
-    CartesianWaypoint,
     JointWaypointPoly_wrap_JointWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    CompositeInstruction,
     MoveInstructionType_FREESPACE,
     ProfileDictionary,
 )
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    ManipulatorInfo,
+)
+from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 
 # TrajOptIfopt imports
 try:
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        TrajOptIfoptMotionPlanner,
-        TrajOptIfoptDefaultPlanProfile,
-        TrajOptIfoptDefaultCompositeProfile,
-        TrajOptIfoptOSQPSolverProfile,
-        ProfileDictionary_addTrajOptIfoptPlanProfile,
         ProfileDictionary_addTrajOptIfoptCompositeProfile,
+        ProfileDictionary_addTrajOptIfoptPlanProfile,
         ProfileDictionary_addTrajOptIfoptSolverProfile,
+        TrajOptIfoptDefaultCompositeProfile,
+        TrajOptIfoptDefaultPlanProfile,
+        TrajOptIfoptMotionPlanner,
+        TrajOptIfoptOSQPSolverProfile,
     )
+
     TRAJOPT_IFOPT_AVAILABLE = True
 except ImportError:
     TRAJOPT_IFOPT_AVAILABLE = False
@@ -48,8 +45,16 @@ TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 def kuka_iiwa_environment():
     """Load KUKA IIWA robot environment for testing."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(locator.locateResource("package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf").getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource("package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf").getFilePath())
+    urdf_path = FilesystemPath(
+        locator.locateResource(
+            "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
+        ).getFilePath()
+    )
+    srdf_path = FilesystemPath(
+        locator.locateResource(
+            "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
+        ).getFilePath()
+    )
 
     t_env = Environment()
     assert t_env.init(urdf_path, srdf_path, locator), "Failed to initialize KUKA IIWA"
@@ -77,9 +82,9 @@ class TestTrajOptIfoptProfiles:
         profile = TrajOptIfoptDefaultCompositeProfile()
         assert profile is not None
         # Check default values
-        assert hasattr(profile, 'smooth_velocities')
-        assert hasattr(profile, 'smooth_accelerations')
-        assert hasattr(profile, 'smooth_jerks')
+        assert hasattr(profile, "smooth_velocities")
+        assert hasattr(profile, "smooth_accelerations")
+        assert hasattr(profile, "smooth_jerks")
 
     def test_osqp_solver_profile(self):
         profile = TrajOptIfoptOSQPSolverProfile()
@@ -132,14 +137,10 @@ class TestTrajOptIfoptPlanner:
 
         # Create instructions
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
-            "DEFAULT"
+            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
-            "DEFAULT"
+            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT"
         )
 
         # Create program

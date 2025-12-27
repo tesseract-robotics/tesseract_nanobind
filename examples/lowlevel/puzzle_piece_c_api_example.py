@@ -65,12 +65,14 @@ def make_puzzle_tool_poses(robot):
     4. x-axis = cross(y, z) -> completes right-handed frame
     """
     # Locate CSV via resource locator (respects package:// URIs)
-    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
+    resource = robot.locator.locateResource(
+        "package://tesseract_support/urdf/puzzle_bent.csv"
+    )
     csv_path = resource.getFilePath()
 
     poses = []
 
-    with open(csv_path, 'r') as f:
+    with open(csv_path, "r") as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
             # Skip header rows (lines 0-1 contain column names)
@@ -96,7 +98,11 @@ def make_puzzle_tool_poses(robot):
 
             # Frame construction: use -position as reference for x-axis direction
             # This creates consistent orientation as tool follows curved path
-            temp_x = -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
+            temp_x = (
+                -pos / np.linalg.norm(pos)
+                if np.linalg.norm(pos) > 1e-6
+                else np.array([1, 0, 0])
+            )
 
             # Build orthonormal frame: y = z x temp_x, then x = y x z
             y_axis = np.cross(norm, temp_x)
@@ -116,7 +122,7 @@ def main():
     # URDF defines: part frame (workpiece), grinder_frame (TCP)
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/puzzle_piece_workcell.urdf",
-        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf"
+        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf",
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
@@ -146,7 +152,9 @@ def main():
     # Build motion program with Cartesian waypoints
     # - working_frame="part": poses are relative to workpiece
     # - tcp_frame="grinder_frame": tool center point for IK
-    program = MotionProgram("manipulator", tcp_frame="grinder_frame", working_frame="part")
+    program = MotionProgram(
+        "manipulator", tcp_frame="grinder_frame", working_frame="part"
+    )
     program.set_joint_names(joint_names)
 
     # Add all waypoints as linear (Cartesian) moves with custom profile
@@ -181,7 +189,9 @@ def main():
     # - coeff[5]=0: ZERO means rotation around tool Z-axis is FREE
     #   This is critical for cylindrical tools (grinders, drills) where
     #   spinning around the tool axis doesn't affect the operation
-    trajopt_plan_profile.cartesian_constraint_config.coeff = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 0.0])
+    trajopt_plan_profile.cartesian_constraint_config.coeff = np.array(
+        [10.0, 10.0, 10.0, 10.0, 10.0, 0.0]
+    )
 
     # --- Composite Profile: collision avoidance configuration ---
     trajopt_composite_profile = TrajOptDefaultCompositeProfile()
@@ -196,22 +206,30 @@ def main():
 
     # SINGLE_TIMESTEP: check collision at each waypoint only (faster)
     # Alternative: DISCRETE_CONTINUOUS checks between waypoints (slower, safer)
-    trajopt_composite_profile.collision_cost_config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
+    trajopt_composite_profile.collision_cost_config.type = (
+        CollisionEvaluatorType.SINGLE_TIMESTEP
+    )
 
     # Collision cost coefficient - higher = stronger collision avoidance
     trajopt_composite_profile.collision_cost_config.coeff = 20.0
 
     # Register profiles with TrajOpt namespace
     # "CARTESIAN" profile used by waypoints, "DEFAULT" for trajectory-wide settings
-    ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile)
-    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile)
+    ProfileDictionary_addTrajOptPlanProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile
+    )
+    ProfileDictionary_addTrajOptCompositeProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
+    )
 
     print("Running TrajOpt planner...")
 
     # Plan using TaskComposer - handles IK seeding and optimization
     # TrajOptPipeline: MinLengthTask -> DescartesMotionPlannerTask -> TrajOptMotionPlannerTask
     composer = TaskComposer.from_config()
-    result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
+    result = composer.plan(
+        robot, program, pipeline="TrajOptPipeline", profiles=profiles
+    )
 
     if not result.successful:
         print(f"Planning failed: {result.message}")

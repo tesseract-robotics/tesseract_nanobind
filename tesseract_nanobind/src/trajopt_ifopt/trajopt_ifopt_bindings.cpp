@@ -9,8 +9,13 @@
 
 #include "tesseract_nb.h"
 
+// ifopt base classes (for cross-module inheritance)
+#include <ifopt/variable_set.h>
+#include <ifopt/constraint_set.h>
+
 // trajopt_ifopt variable sets
 #include <trajopt_ifopt/variable_sets/joint_position_variable.h>
+#include <trajopt_ifopt/utils/ifopt_utils.h>
 
 // trajopt_ifopt constraints
 #include <trajopt_ifopt/constraints/cartesian_position_constraint.h>
@@ -33,8 +38,12 @@ namespace tc = trajopt_common;
 NB_MODULE(_trajopt_ifopt, m) {
     m.doc() = "trajopt_ifopt Python bindings - variables, constraints, and costs for IFOPT-based trajectory optimization";
 
+    // Import ifopt module to enable cross-module inheritance
+    nb::module_::import_("tesseract_robotics.ifopt._ifopt");
+
     // ========== JointPosition (variable set) ==========
-    nb::class_<ti::JointPosition>(m, "JointPosition")
+    // Inherits from ifopt::VariableSet for cross-module compatibility
+    nb::class_<ti::JointPosition, ifopt::VariableSet>(m, "JointPosition")
         .def(nb::init<const Eigen::Ref<const Eigen::VectorXd>&, std::vector<std::string>, const std::string&>(),
              "init_value"_a, "joint_names"_a, "name"_a = "Joint_Position",
              "Create joint position variable set with initial values and joint names")
@@ -47,7 +56,18 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("GetRows", &ti::JointPosition::GetRows,
              "Get number of variables")
         .def("GetName", &ti::JointPosition::GetName,
-             "Get the name of this variable set");
+             "Get the name of this variable set")
+        .def("SetBounds", nb::overload_cast<const Eigen::Ref<const Eigen::MatrixX2d>&>(&ti::JointPosition::SetBounds),
+             "bounds"_a, "Set joint bounds from Nx2 matrix [lower, upper]")
+        .def("GetBounds", &ti::JointPosition::GetBounds,
+             "Get the variable bounds");
+
+    // ========== Utility functions ==========
+    m.def("interpolate", &ti::interpolate, "start"_a, "end"_a, "steps"_a,
+          "Interpolate between two joint vectors, returning 'steps' waypoints");
+
+    m.def("toBounds", nb::overload_cast<const Eigen::Ref<const Eigen::MatrixX2d>&>(&ti::toBounds),
+          "limits"_a, "Convert Nx2 matrix [lower, upper] to vector of ifopt::Bounds");
 
     // ========== CartPosInfo::Type enum ==========
     nb::enum_<ti::CartPosInfo::Type>(m, "CartPosInfoType")
@@ -70,7 +90,7 @@ NB_MODULE(_trajopt_ifopt, m) {
                 "Indices to return: default {0,1,2,3,4,5}. Position: {0,1,2}, Rotation: {3,4,5}");
 
     // ========== CartPosConstraint ==========
-    nb::class_<ti::CartPosConstraint>(m, "CartPosConstraint")
+    nb::class_<ti::CartPosConstraint, ifopt::ConstraintSet>(m, "CartPosConstraint")
         .def(nb::init<const ti::CartPosInfo&, std::shared_ptr<const ti::JointPosition>, const std::string&>(),
              "info"_a, "position_var"_a, "name"_a = "CartPos",
              "Create Cartesian position constraint")
@@ -88,7 +108,7 @@ NB_MODULE(_trajopt_ifopt, m) {
                 "If true, use numeric differentiation (default: true)");
 
     // ========== JointPosConstraint ==========
-    nb::class_<ti::JointPosConstraint>(m, "JointPosConstraint")
+    nb::class_<ti::JointPosConstraint, ifopt::ConstraintSet>(m, "JointPosConstraint")
         .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::JointPosition>>&,
                       const Eigen::VectorXd&, const std::string&>(),
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointPos",
@@ -97,7 +117,7 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get current constraint values");
 
     // ========== JointVelConstraint ==========
-    nb::class_<ti::JointVelConstraint>(m, "JointVelConstraint")
+    nb::class_<ti::JointVelConstraint, ifopt::ConstraintSet>(m, "JointVelConstraint")
         .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::JointPosition>>&,
                       const Eigen::VectorXd&, const std::string&>(),
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointVel",
@@ -106,7 +126,7 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get current constraint values");
 
     // ========== JointAccelConstraint ==========
-    nb::class_<ti::JointAccelConstraint>(m, "JointAccelConstraint")
+    nb::class_<ti::JointAccelConstraint, ifopt::ConstraintSet>(m, "JointAccelConstraint")
         .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::JointPosition>>&,
                       const Eigen::VectorXd&, const std::string&>(),
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointAccel",
@@ -150,7 +170,7 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def(nb::init<std::size_t>(), "size"_a = 10);
 
     // ========== DiscreteCollisionConstraint ==========
-    nb::class_<ti::DiscreteCollisionConstraint>(m, "DiscreteCollisionConstraint")
+    nb::class_<ti::DiscreteCollisionConstraint, ifopt::ConstraintSet>(m, "DiscreteCollisionConstraint")
         .def(nb::init<std::shared_ptr<ti::DiscreteCollisionEvaluator>,
                       std::shared_ptr<const ti::JointPosition>,
                       int, bool, const std::string&>(),

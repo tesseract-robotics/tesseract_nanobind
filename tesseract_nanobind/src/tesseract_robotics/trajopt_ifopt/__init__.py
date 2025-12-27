@@ -20,4 +20,7 @@ __all__ = [  # noqa: F405
     "SingleTimestepCollisionEvaluator",
     "CollisionCache",
     "DiscreteCollisionConstraint",
+    # Utility functions
+    "interpolate",
+    "toBounds",
 ]

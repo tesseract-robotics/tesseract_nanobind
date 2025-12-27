@@ -134,7 +134,9 @@ def create_profiles():
     composite.collision_cost_config.safety_margin = 0.025  # 25mm margin
     composite.collision_cost_config.coeff = 20.0  # Weight in cost function
 
-    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
+    ProfileDictionary_addTrajOptCompositeProfile(
+        profiles, TRAJOPT_NS, "DEFAULT", composite
+    )
     return profiles
 
 
@@ -168,7 +170,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Includes: robot, table (z=0.772m), shelf structure
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/pick_and_place_plan.urdf",
-        "package://tesseract_support/urdf/pick_and_place_plan.srdf"
+        "package://tesseract_support/urdf/pick_and_place_plan.srdf",
     )
     # Set default collision margin (distance for contact reporting)
     robot.set_collision_margin(0.005)  # 5mm
@@ -209,23 +211,30 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # - Rotation matrix: [[-1,0,0], [0,1,0], [0,0,-1]]
     pick_z = BOX_SIZE + 0.772 + OFFSET
     pick_rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
-    pick_pose = Pose.from_matrix_position(pick_rotation, [box_pos[0], box_pos[1], pick_z])
+    pick_pose = Pose.from_matrix_position(
+        pick_rotation, [box_pos[0], box_pos[1], pick_z]
+    )
 
     # Approach pose: 15cm directly above pick pose (same orientation)
-    approach_pose = Pose.from_matrix_position(pick_rotation, [box_pos[0], box_pos[1], pick_z + 0.15])
+    approach_pose = Pose.from_matrix_position(
+        pick_rotation, [box_pos[0], box_pos[1], pick_z + 0.15]
+    )
 
     # Build PICK program:
     # 1. Start at home joint configuration
     # 2. FREESPACE to approach pose (any collision-free path)
     # 3. LINEAR descent to grasp pose (Cartesian precision for gripper alignment)
-    pick_program = (MotionProgram("manipulator", tcp_frame=LINK_TCP, working_frame=LINK_BASE)
+    pick_program = (
+        MotionProgram("manipulator", tcp_frame=LINK_TCP, working_frame=LINK_BASE)
         .set_joint_names(joint_names)
         .move_to(StateTarget(start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(CartesianTarget(approach_pose, profile="FREESPACE"))
         .linear_to(CartesianTarget(pick_pose, profile="CARTESIAN"))
     )
 
-    pick_result = composer.plan(robot, pick_program, pipeline=pipeline, profiles=profiles)
+    pick_result = composer.plan(
+        robot, pick_program, pipeline=pipeline, profiles=profiles
+    )
     assert pick_result.successful, f"PICK failed: {pick_result.message}"
     print(f"PICK OK: {len(pick_result)} waypoints")
 
@@ -240,8 +249,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Create FIXED joint to attach box to tool flange
     # Origin offset: box center is box_size/2 below tool (in tool Z direction)
     attach_joint = create_fixed_joint(
-        "joint_box2", LINK_TCP, LINK_BOX,
-        origin=Pose.from_xyz(0, 0, BOX_SIZE / 2)
+        "joint_box2", LINK_TCP, LINK_BOX, origin=Pose.from_xyz(0, 0, BOX_SIZE / 2)
     )
     # move_link() reparents the box - removes old joint, adds new one
     robot.move_link(attach_joint)
@@ -274,7 +282,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # 2. LINEAR retreat to approach pose (controlled extraction)
     # 3. FREESPACE transit to shelf approach (collision-aware path)
     # 4. LINEAR approach to shelf (precise placement)
-    place_program = (MotionProgram("manipulator", tcp_frame=LINK_TCP, working_frame=LINK_BASE)
+    place_program = (
+        MotionProgram("manipulator", tcp_frame=LINK_TCP, working_frame=LINK_BASE)
         .set_joint_names(joint_names)
         .move_to(StateTarget(pick_final, names=joint_names))
         .linear_to(CartesianTarget(approach_pose, profile="CARTESIAN"))  # Retreat
@@ -282,7 +291,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
         .linear_to(CartesianTarget(place_pose, profile="CARTESIAN"))  # Place
     )
 
-    place_result = composer.plan(robot, place_program, pipeline=pipeline, profiles=profiles)
+    place_result = composer.plan(
+        robot, place_program, pipeline=pipeline, profiles=profiles
+    )
     assert place_result.successful, f"PLACE failed: {place_result.message}"
     print(f"PLACE OK: {len(place_result)} waypoints")
 

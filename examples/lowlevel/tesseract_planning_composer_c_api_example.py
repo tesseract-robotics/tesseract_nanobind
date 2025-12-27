@@ -94,6 +94,7 @@ Related Examples
 - freespace_ompl_c_api_example.py: OMPL planning via TaskComposer
 - basic_cartesian_c_api_example.py: TrajOpt Cartesian planning
 """
+
 import sys
 import numpy as np
 
@@ -136,9 +137,14 @@ def main():
     # WHY MotionProgram builder: Abstracts the low-level CompositeInstruction
     # construction. Internally creates CartesianWaypoint, wraps in poly types,
     # and adds to CompositeInstruction with proper ManipulatorInfo.
-    program = (MotionProgram("manipulator", tcp_frame="tool0")
-        .set_joint_names(joint_names)  # WHY: Required for JointTarget, optional for CartesianTarget
-        .move_to(CartesianTarget(wp1))  # WHY move_to: Sets FREESPACE motion type (collision avoidance)
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0")
+        .set_joint_names(
+            joint_names
+        )  # WHY: Required for JointTarget, optional for CartesianTarget
+        .move_to(
+            CartesianTarget(wp1)
+        )  # WHY move_to: Sets FREESPACE motion type (collision avoidance)
         .move_to(CartesianTarget(wp2))
     )
 
@@ -182,7 +188,9 @@ def main():
         viewer = TesseractViewer()
         # WHY robot.env: Access underlying Environment for viewer
         viewer.update_environment(robot.env, [0, 0, 0])
-        viewer.update_joint_positions(joint_names, np.array([1, -.2, .01, .3, -.5, 1]))
+        viewer.update_joint_positions(
+            joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1])
+        )
         viewer.start_serve_background()
         # WHY raw_results: Viewer animates the CompositeInstruction directly
         viewer.update_trajectory(result.raw_results)
