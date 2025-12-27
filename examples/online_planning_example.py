@@ -201,7 +201,8 @@ def run(pipeline="TrajOptPipeline", num_iterations=5, num_planners=None):
         # --- Build Motion Program ---
         # StateTarget: plan in joint space (vs CartesianTarget for Cartesian)
         # First move_to sets start state, second sets goal
-        program = (MotionProgram("manipulator", tcp_frame="tool0", profile="DEFAULT")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0", profile="DEFAULT")
             .set_joint_names(joint_names)
             .move_to(StateTarget(current_joints, names=joint_names, profile="DEFAULT"))
             .move_to(StateTarget(target_position, names=joint_names, profile="DEFAULT"))
@@ -216,8 +217,10 @@ def run(pipeline="TrajOptPipeline", num_iterations=5, num_planners=None):
             if result.successful:
                 trajectories.append(result)
                 timings.append(planning_time)
-                print(f"Iteration {iteration + 1}: Success in {planning_time:.3f}s, "
-                      f"{len(result)} waypoints, human_x={human_x:.3f}")
+                print(
+                    f"Iteration {iteration + 1}: Success in {planning_time:.3f}s, "
+                    f"{len(result)} waypoints, human_x={human_x:.3f}"
+                )
                 # NOTE: In real online planning, the robot would execute the
                 # first segment while planning the next. Here we just measure
                 # planning time without actual execution.
@@ -239,7 +242,9 @@ def run(pipeline="TrajOptPipeline", num_iterations=5, num_planners=None):
         print("\nOnline Planning Summary:")
         print(f"  Iterations: {num_iterations}")
         print(f"  Successful: {len(trajectories)}")
-        print(f"  Average planning time: {avg_time:.3f}s ({1.0/avg_time if avg_time > 0 else 0:.1f} Hz)")
+        print(
+            f"  Average planning time: {avg_time:.3f}s ({1.0 / avg_time if avg_time > 0 else 0:.1f} Hz)"
+        )
 
     return {
         "trajectories": trajectories,

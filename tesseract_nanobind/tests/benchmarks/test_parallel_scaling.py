@@ -24,21 +24,20 @@ WHY:
 Run with: pytest tests/benchmarks/test_parallel_scaling.py -v --benchmark-enable
 Or use:   ./scripts/run_scaling_benchmarks.sh
 """
+
 import numpy as np
-import os
 import pytest
-from typing import Optional
 
 pytest.importorskip("pytest_benchmark")
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     JointTarget,
+    MotionProgram,
     Pose,
-    sphere,
-    create_obstacle,
+    Robot,
     TaskComposer,
+    create_obstacle,
+    sphere,
 )
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
 
@@ -49,11 +48,11 @@ def setup_robot_with_obstacles(num_obstacles: int = 1):
 
     # Add obstacles - more obstacles = harder problem
     obstacle_positions = [
-        (0.5, 0, 0.55),      # center
-        (0.4, 0.2, 0.45),    # front-left
-        (0.4, -0.2, 0.45),   # front-right
-        (0.6, 0.1, 0.65),    # back-upper
-        (0.3, 0, 0.35),      # low-center
+        (0.5, 0, 0.55),  # center
+        (0.4, 0.2, 0.45),  # front-left
+        (0.4, -0.2, 0.45),  # front-right
+        (0.6, 0.1, 0.65),  # back-upper
+        (0.3, 0, 0.35),  # low-center
     ]
 
     for i in range(min(num_obstacles, len(obstacle_positions))):
@@ -84,7 +83,8 @@ def plan_freespace(
 
     robot.set_joints(joint_start, joint_names=joint_names)
 
-    program = (MotionProgram("manipulator", tcp_frame="tool0")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0")
         .set_joint_names(joint_names)
         .move_to(JointTarget(joint_start))
         .move_to(JointTarget(joint_end))
@@ -179,7 +179,7 @@ class TestScalingSummary:
     @pytest.mark.parametrize("mode", ["optimize", "first_solution"])
     def test_comparison(self, benchmark, num_planners, mode):
         """Side-by-side comparison of modes."""
-        optimize = (mode == "optimize")
+        optimize = mode == "optimize"
         result = benchmark(
             plan_freespace,
             num_planners=num_planners,

@@ -72,7 +72,7 @@ def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
         robot,
         "sphere_attached",
         sphere(0.15),  # 15cm radius sphere
-        Pose.from_xyz(0.5, 0.0, 0.55)  # Positioned in robot workspace
+        Pose.from_xyz(0.5, 0.0, 0.55),  # Positioned in robot workspace
     )
 
     # Get joint names from "manipulator" kinematic group
@@ -89,7 +89,8 @@ def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
 
     # Simple joint-to-joint motion program
     # FREESPACE profile uses OMPL (RRTConnect by default)
-    program = (MotionProgram("manipulator", tcp_frame="tool0", profile="FREESPACE")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", profile="FREESPACE")
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_start, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(joint_end, names=joint_names, profile="FREESPACE"))
@@ -111,7 +112,9 @@ def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
     start_time = time.time()
 
     try:
-        result = composer.plan(robot, program, pipeline=actual_pipeline, profiles=profiles)
+        result = composer.plan(
+            robot, program, pipeline=actual_pipeline, profiles=profiles
+        )
         planning_time_actual = time.time() - start_time
 
         if result.successful:

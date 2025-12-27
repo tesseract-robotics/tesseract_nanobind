@@ -132,11 +132,13 @@ def make_puzzle_tool_poses(robot):
     Returns:
         list[Pose]: ~50 Cartesian waypoints for puzzle piece edge
     """
-    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
+    resource = robot.locator.locateResource(
+        "package://tesseract_support/urdf/puzzle_bent.csv"
+    )
     csv_path = resource.getFilePath()
 
     poses = []
-    with open(csv_path, 'r') as f:
+    with open(csv_path, "r") as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
             if lnum < 2 or len(row) < 7:  # Skip header rows
@@ -144,7 +146,11 @@ def make_puzzle_tool_poses(robot):
 
             try:
                 # Parse x,y,z (mm) and normal i,j,k - convert mm to meters
-                x, y, z = float(row[1]) / 1000, float(row[2]) / 1000, float(row[3]) / 1000
+                x, y, z = (
+                    float(row[1]) / 1000,
+                    float(row[2]) / 1000,
+                    float(row[3]) / 1000,
+                )
                 i, j, k = float(row[4]), float(row[5]), float(row[6])
             except (ValueError, IndexError):
                 continue
@@ -155,7 +161,11 @@ def make_puzzle_tool_poses(robot):
 
             # Build orthogonal frame from surface normal
             # Use negative position as reference to create X-axis pointing inward
-            temp_x = -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
+            temp_x = (
+                -pos / np.linalg.norm(pos)
+                if np.linalg.norm(pos) > 1e-6
+                else np.array([1, 0, 0])
+            )
             y_axis = np.cross(norm, temp_x)
             y_axis /= np.linalg.norm(y_axis)
             x_axis = np.cross(y_axis, norm)
@@ -198,7 +208,9 @@ def create_profiles():
     composite.collision_cost_config.coeff = 1.0
 
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, "CARTESIAN", plan)
-    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
+    ProfileDictionary_addTrajOptCompositeProfile(
+        profiles, TRAJOPT_NS, "DEFAULT", composite
+    )
     return profiles
 
 
@@ -218,15 +230,21 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # puzzle_piece_workcell: KUKA IIWA arm + 2-DOF positioner
     robot = Robot.from_urdf(
         "package://tesseract_support/urdf/puzzle_piece_workcell.urdf",
-        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf"
+        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf",
     )
 
     # 9 DOF: KUKA IIWA (7) + auxiliary axes (2)
     # Joint order must match URDF kinematic chain
     joint_names = [
-        "joint_a1", "joint_a2", "joint_a3", "joint_a4",
-        "joint_a5", "joint_a6", "joint_a7",
-        "joint_aux1", "joint_aux2"  # Positioner: Z-rotation + tilt
+        "joint_a1",
+        "joint_a2",
+        "joint_a3",
+        "joint_a4",
+        "joint_a5",
+        "joint_a6",
+        "joint_a7",
+        "joint_aux1",
+        "joint_aux2",  # Positioner: Z-rotation + tilt
     ]
     # Initial configuration from C++ (arm slightly bent, positioner neutral)
     joint_pos = np.array([-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0, 0.0, 0.0])
@@ -242,8 +260,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # "manipulator_aux": combined kinematic group (arm + positioner)
     # tcp_frame="grinder_frame": tool on arm end-effector
     # working_frame="part": workpiece frame attached to positioner
-    program = (MotionProgram("manipulator_aux", tcp_frame="grinder_frame", working_frame="part")
-        .set_joint_names(joint_names))
+    program = MotionProgram(
+        "manipulator_aux", tcp_frame="grinder_frame", working_frame="part"
+    ).set_joint_names(joint_names)
 
     for pose in tool_poses:
         program.linear_to(CartesianTarget(pose, profile="CARTESIAN"))

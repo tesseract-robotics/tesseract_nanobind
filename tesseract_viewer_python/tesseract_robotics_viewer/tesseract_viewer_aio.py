@@ -1,20 +1,18 @@
 import mimetypes
-import posixpath
 import traceback
-import os
 import numpy as np
 import json
 from tesseract_robotics import tesseract_environment
 import hashlib
-import base64
-import sys
 
 from .tesseract_env_to_gltf import tesseract_env_to_gltf, tesseract_env_to_glb
-from .util import tesseract_trajectory_to_list, trajectory_list_to_json, trajectory_list_to_frames
+from .util import (
+    tesseract_trajectory_to_list,
+    trajectory_list_to_json,
+    trajectory_list_to_frames,
+)
 import importlib_resources
 import asyncio
-import hashlib
-import weakref
 
 import aiohttp
 from aiohttp import web as aiohttp_web
@@ -22,9 +20,12 @@ from aiohttp import web as aiohttp_web
 if not mimetypes.inited:
     mimetypes.init()
 
+
 class _TesseractViewerAIOServer:
     def __init__(self):
-        self._static_pkg = importlib_resources.files('tesseract_robotics_viewer.resources.static')
+        self._static_pkg = importlib_resources.files(
+            "tesseract_robotics_viewer.resources.static"
+        )
         self.scene_gltf = None
         self.scene_glb = None
         self.trajectory_json = None
@@ -43,92 +44,148 @@ class _TesseractViewerAIOServer:
             data = data.encode("utf8")
         return hashlib.sha256(data).hexdigest()
 
-    async def start(self, host="127.0.0.1", port=8000, ssl_context = None):
+    async def start(self, host="127.0.0.1", port=8000, ssl_context=None):
         try:
             self._app = aiohttp_web.Application()
-            self._app.add_routes([aiohttp_web.get("/", self.index), aiohttp_web.get("/index.html", self.index)])
+            self._app.add_routes(
+                [
+                    aiohttp_web.get("/", self.index),
+                    aiohttp_web.get("/index.html", self.index),
+                ]
+            )
             self._app.add_routes([aiohttp_web.get("/app.js", self.app_js)])
-            self._app.add_routes([aiohttp_web.get("/tesseract_scene.gltf", self.tesseract_scene_gltf)])
-            self._app.add_routes([aiohttp_web.get("/tesseract_scene.glb", self.tesseract_scene_glb)])
-            self._app.add_routes([aiohttp_web.get("/tesseract_trajectory.json", self.tesseract_trajectory_json)])
-            self._app.add_routes([aiohttp_web.get("/tesseract_markers.json", self.tesseract_markers_json)])
-            self._app.add_routes([aiohttp_web.head("/tesseract_scene.gltf", self.tesseract_scene_gltf_head)])
-            self._app.add_routes([aiohttp_web.head("/tesseract_scene.glb", self.tesseract_scene_glb_head)])
-            self._app.add_routes([aiohttp_web.head("/tesseract_trajectory.json", self.tesseract_trajectory_json_head)])
-            self._app.add_routes([aiohttp_web.head("/tesseract_markers.json", self.tesseract_markers_json_head)])
-            self._app.add_routes([aiohttp_web.get('/websocket', self.websocket_handler)])
+            self._app.add_routes(
+                [aiohttp_web.get("/tesseract_scene.gltf", self.tesseract_scene_gltf)]
+            )
+            self._app.add_routes(
+                [aiohttp_web.get("/tesseract_scene.glb", self.tesseract_scene_glb)]
+            )
+            self._app.add_routes(
+                [
+                    aiohttp_web.get(
+                        "/tesseract_trajectory.json", self.tesseract_trajectory_json
+                    )
+                ]
+            )
+            self._app.add_routes(
+                [
+                    aiohttp_web.get(
+                        "/tesseract_markers.json", self.tesseract_markers_json
+                    )
+                ]
+            )
+            self._app.add_routes(
+                [
+                    aiohttp_web.head(
+                        "/tesseract_scene.gltf", self.tesseract_scene_gltf_head
+                    )
+                ]
+            )
+            self._app.add_routes(
+                [
+                    aiohttp_web.head(
+                        "/tesseract_scene.glb", self.tesseract_scene_glb_head
+                    )
+                ]
+            )
+            self._app.add_routes(
+                [
+                    aiohttp_web.head(
+                        "/tesseract_trajectory.json",
+                        self.tesseract_trajectory_json_head,
+                    )
+                ]
+            )
+            self._app.add_routes(
+                [
+                    aiohttp_web.head(
+                        "/tesseract_markers.json", self.tesseract_markers_json_head
+                    )
+                ]
+            )
+            self._app.add_routes(
+                [aiohttp_web.get("/websocket", self.websocket_handler)]
+            )
 
             self._runner = aiohttp_web.AppRunner(self._app)
             await self._runner.setup()
-            self._site = aiohttp_web.TCPSite(self._runner, host, port, ssl_context = ssl_context)
+            self._site = aiohttp_web.TCPSite(
+                self._runner, host, port, ssl_context=ssl_context
+            )
             await self._site.start()
 
         except:
             traceback.print_exc()
             raise
-                
+
     async def index(self, request):
         return await self.get_static_file("index.html")
 
     async def app_js(self, request):
         return await self.get_static_file("app.js")
-    
+
     async def tesseract_scene_gltf(self, request):
         if self.scene_gltf is not None:
-            r = aiohttp_web.Response(body=self.scene_gltf, content_type="model/gltf+json")
-        else:            
-            r = aiohttp_web.Response(body=b'{}', content_type="model/gltf+json")
+            r = aiohttp_web.Response(
+                body=self.scene_gltf, content_type="model/gltf+json"
+            )
+        else:
+            r = aiohttp_web.Response(body=b"{}", content_type="model/gltf+json")
         r.etag = self.scene_gltf_etag
         return r
-        
+
     async def tesseract_scene_gltf_head(self, request):
-        
         r = aiohttp_web.Response(content_type="model/gltf+json")
         r.etag = self.scene_gltf_etag
         return r
-    
+
     async def tesseract_scene_glb(self, request):
         if self.scene_glb is not None:
-            r = aiohttp_web.Response(body=self.scene_glb, content_type="application/octet-stream")
+            r = aiohttp_web.Response(
+                body=self.scene_glb, content_type="application/octet-stream"
+            )
         else:
-            r = aiohttp_web.Response(body=b'', content_type="application/octet-stream")
+            r = aiohttp_web.Response(body=b"", content_type="application/octet-stream")
         r.etag = self.scene_glb_etag
         return r
-        
+
     async def tesseract_scene_glb_head(self, request):
-        
         r = aiohttp_web.Response(content_type="application/octet-stream")
         r.etag = self.scene_glb_etag
         return r
-    
+
     async def tesseract_trajectory_json(self, request):
         if self.trajectory_json is not None:
-            r = aiohttp_web.Response(body=self.trajectory_json, content_type="application/json")
+            r = aiohttp_web.Response(
+                body=self.trajectory_json, content_type="application/json"
+            )
             r.etag = self.trajectory_json_etag
             return r
         return aiohttp_web.Response(status=404)
-    
+
     async def tesseract_trajectory_json_head(self, request):
         if self.trajectory_json is not None:
             r = aiohttp_web.Response(content_type="application/json")
             r.etag = self.trajectory_json_etag
             return
         return aiohttp_web.Response(status=404)
-    
+
     async def tesseract_markers_json(self, request):
         if self.markers_json is not None:
-            r = aiohttp_web.Response(body=self.markers_json, content_type="application/json")
+            r = aiohttp_web.Response(
+                body=self.markers_json, content_type="application/json"
+            )
             r.etag = self.markers_json_etag
             return r
         return aiohttp_web.Response(status=404)
-    
+
     async def tesseract_markers_json_head(self, request):
         if self.markers_json is not None:
             r = aiohttp_web.Response(content_type="application/json")
             r.etag = self.markers_json_etag
             return r
         return aiohttp_web.Response(status=404)
-    
+
     async def websocket_handler(self, request):
         ws = aiohttp_web.WebSocketResponse()
         await ws.prepare(request)
@@ -141,7 +198,7 @@ class _TesseractViewerAIOServer:
 
         await handler.message_listener()
         return ws
-    
+
     async def send_ws_message(self, msg):
         async with self._ws_send_lock:
             remove_list = []
@@ -163,34 +220,41 @@ class _TesseractViewerAIOServer:
         with importlib_resources.as_file(self._static_pkg / filename) as f_path:
             with open(f_path, "rb") as f:
                 contents = f.read()
-        return aiohttp_web.Response(body=contents, content_type=mimetypes.guess_type(filename)[0])
-    
+        return aiohttp_web.Response(
+            body=contents, content_type=mimetypes.guess_type(filename)[0]
+        )
+
     async def set_environment(self, scene_gltf, scene_glb):
         self.scene_gltf = scene_gltf
         self.scene_glb = scene_glb
         self.scene_gltf_etag = self.hash_bytes(self.scene_gltf)
         self.scene_glb_etag = self.hash_bytes(self.scene_glb)
 
-        await self.send_ws_message(json.dumps({
-            "command": "refresh_scene",
-        }))
+        await self.send_ws_message(
+            json.dumps(
+                {
+                    "command": "refresh_scene",
+                }
+            )
+        )
 
     async def set_trajectory(self, trajectory_json):
         self.trajectory_json = trajectory_json
         self.trajectory_json_etag = self.hash_bytes(self.trajectory_json)
-        await self.send_ws_message(json.dumps({
-            "command": "joint_trajectory",
-            "params": json.loads(trajectory_json)
-        }))
+        await self.send_ws_message(
+            json.dumps(
+                {"command": "joint_trajectory", "params": json.loads(trajectory_json)}
+            )
+        )
 
-    async def set_markers_json(self, markers_json, update_now = True):
+    async def set_markers_json(self, markers_json, update_now=True):
         self.markers_json = markers_json
         self.markers_json_etag = self.hash_bytes(self.markers_json)
         if update_now:
-            await self.send_ws_message(json.dumps({
-                "command": "markers",
-                "params": json.loads(markers_json)
-            }))
+            await self.send_ws_message(
+                json.dumps({"command": "markers", "params": json.loads(markers_json)})
+            )
+
 
 def _fix_marker_vector(v):
     if isinstance(v, list):
@@ -198,6 +262,7 @@ def _fix_marker_vector(v):
     if isinstance(v, np.ndarray):
         return v.tolist()
     return v
+
 
 def _fix_marker_color(c):
     ret = []
@@ -211,22 +276,21 @@ def _fix_marker_color(c):
         ret.append(1.0)
     return ret
 
+
 def _fix_marker_quaternion(q):
     if isinstance(q, list):
         return q
     if isinstance(q, np.ndarray):
         return q.flatten().tolist()
     return q
-    
 
 
 class _TesseractViewerAIOWebsocketConnection:
-
     def __init__(self, ws):
         self.ws = ws
         self.mutex = asyncio.Lock()
         self.loop = asyncio.get_event_loop()
-        
+
     async def start(self):
         # Start listening for incoming messages
         # self.loop.create_task(self.message_listener())
@@ -276,6 +340,7 @@ class _TesseractViewerAIOWebsocketConnection:
         async with self.mutex:
             await self.ws.close()
 
+
 class TesseractViewerAIO:
     """
     A class for viewing Tesseract environments in a web browser using a Python asyncio server.
@@ -285,8 +350,8 @@ class TesseractViewerAIO:
     are converted to JSON format and sent to the browser. The browser then renders the scene and trajectories.
 
     By default the server will listen on port 8000 on the local machine. Use http://localhost:8000 to view the
-    scene in a web browser. 
-    
+    scene in a web browser.
+
     The server can be started and stopped using the start() and close() methods. A task is created to run the server
     in the background. The server will continue to run until close() is called.
 
@@ -295,7 +360,8 @@ class TesseractViewerAIO:
     :param ssl_context: The SSL context to use for the server. Default is None.
     :type ssl_context: ssl.SSLContext
     """
-    def __init__(self, server_address = ("localhost", 8080), ssl_context = None):
+
+    def __init__(self, server_address=("localhost", 8080), ssl_context=None):
         self.server_address = server_address
         self.ssl_context = ssl_context
         self.server = _TesseractViewerAIOServer()
@@ -305,7 +371,9 @@ class TesseractViewerAIO:
         self.markers = []
         self.t_env = None
 
-    async def update_environment(self, tesseract_env, origin_offset = [0,0,0], trajectory = None):
+    async def update_environment(
+        self, tesseract_env, origin_offset=[0, 0, 0], trajectory=None
+    ):
         """
         Update the environment from a tesseract_environment.Environment object. This must be called to load the
         environment, and after the environment changes.
@@ -320,10 +388,12 @@ class TesseractViewerAIO:
 
         assert isinstance(tesseract_env, tesseract_environment.Environment)
         async with self._lock:
-            self.scene_json = tesseract_env_to_gltf(tesseract_env, origin_offset, trajectory=trajectory)
+            self.scene_json = tesseract_env_to_gltf(
+                tesseract_env, origin_offset, trajectory=trajectory
+            )
             self.scene_glb = tesseract_env_to_glb(tesseract_env, origin_offset)
             await self.server.set_environment(self.scene_json, self.scene_glb)
-    
+
     async def _update_environment_gltf(self, scene_glft, scene_glb, t_env):
         async with self._lock:
             self.scene_json = scene_glft
@@ -343,7 +413,7 @@ class TesseractViewerAIO:
             joint_names, traj = tesseract_trajectory_to_list(trajectory)
             self.trajectory_json = trajectory_list_to_json(joint_names, traj)
             await self.server.set_trajectory(self.trajectory_json)
-    
+
     async def update_trajectory_list(self, joint_names, trajectory):
         """
         Update the trajectory from a list. Each entry in the trajectory should be the joint values and the timestamp
@@ -355,7 +425,7 @@ class TesseractViewerAIO:
         :param trajectory: The trajectory to display
         :type trajectory: Union[List[List[float]], List[np.ndarray]]
         """
-        async with self._lock:            
+        async with self._lock:
             self.trajectory_json = trajectory_list_to_json(joint_names, trajectory)
             await self.server.set_trajectory(self.trajectory_json)
 
@@ -370,7 +440,11 @@ class TesseractViewerAIO:
         close() is called.
         """
         async with self._lock:
-            self.server_task = asyncio.create_task(self.server.start(self.server_address[0], self.server_address[1], self.ssl_context))
+            self.server_task = asyncio.create_task(
+                self.server.start(
+                    self.server_address[0], self.server_address[1], self.ssl_context
+                )
+            )
 
     async def close(self):
         """
@@ -381,14 +455,16 @@ class TesseractViewerAIO:
                 await self.server.close()
                 await self.server_task
 
-    def _new_marker_dict(self, marker_type, parent_link, position, quaternion, name, color, tags):
+    def _new_marker_dict(
+        self, marker_type, parent_link, position, quaternion, name, color, tags
+    ):
         if name is None:
             name = f"axes_marker_{self.marker_count}"
         self.marker_count += 1
         if tags is None:
             tags = []
         if color is None:
-            color = [1,1,1,1]
+            color = [1, 1, 1, 1]
         return {
             "marker_type": marker_type,
             "parent_link_name": parent_link,
@@ -396,15 +472,24 @@ class TesseractViewerAIO:
             "quaternion": _fix_marker_quaternion(quaternion),
             "name": name,
             "color": _fix_marker_color(color),
-            "tags": tags
+            "tags": tags,
         }
-    
+
     async def _do_append_marker(self, marker, update_now):
         self.markers.append(marker)
         await self._update_markers(self.markers, update_now)
         return marker["name"]
 
-    async def add_axes_marker(self, position, quaternion, size=0.15, parent_link = "world", name = None, tags = None, update_now = True):
+    async def add_axes_marker(
+        self,
+        position,
+        quaternion,
+        size=0.15,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add an axes marker to the scene. This is useful for visualizing coordinate frames and waypoints.
 
@@ -425,14 +510,28 @@ class TesseractViewerAIO:
         :return: The name of the marker
         :rtype: str
         """
-        async with self._lock:            
-            marker = self._new_marker_dict("axes", parent_link, position, quaternion, name, None, tags)
+        async with self._lock:
+            marker = self._new_marker_dict(
+                "axes", parent_link, position, quaternion, name, None, tags
+            )
             marker["size"] = size
             return await self._do_append_marker(marker, update_now)
-        
-    async def add_arrow_marker(self, direction, origin, length, color = None, parent_link = "world",name=None, tags=None, update_now = True, position = None, quaternion = None):
+
+    async def add_arrow_marker(
+        self,
+        direction,
+        origin,
+        length,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+        position=None,
+        quaternion=None,
+    ):
         """
-        Add an arrow marker to the scene. 
+        Add an arrow marker to the scene.
 
         :param direction: The direction of the arrow as a unit vector
         :type direction: Union[List[float], np.ndarray]
@@ -458,18 +557,30 @@ class TesseractViewerAIO:
         :rtype: str
         """
         if position is None:
-            position = [0,0,0]
+            position = [0, 0, 0]
         if quaternion is None:
-            quaternion = [1,0,0,0]
+            quaternion = [1, 0, 0, 0]
 
         async with self._lock:
-            marker = self._new_marker_dict("arrow", parent_link, position, quaternion, name, color, tags)
+            marker = self._new_marker_dict(
+                "arrow", parent_link, position, quaternion, name, color, tags
+            )
             marker["direction"] = _fix_marker_vector(direction)
             marker["origin"] = _fix_marker_vector(origin)
             marker["length"] = length
             return await self._do_append_marker(marker, update_now)
-        
-    async def add_box_marker(self, position, quaternion, size, color = None, parent_link = "world",  name=None, tags=None, update_now = True):
+
+    async def add_box_marker(
+        self,
+        position,
+        quaternion,
+        size,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a box marker to the scene.
 
@@ -493,11 +604,22 @@ class TesseractViewerAIO:
         :rtype: str
         """
         async with self._lock:
-            marker = self._new_marker_dict("box", parent_link, position, quaternion, name, color, tags)
+            marker = self._new_marker_dict(
+                "box", parent_link, position, quaternion, name, color, tags
+            )
             marker["size"] = _fix_marker_vector(size)
             return await self._do_append_marker(marker, update_now)
-        
-    async def add_sphere_marker(self, position, radius, color = None, parent_link = "world",  name=None, tags=None, update_now = True):
+
+    async def add_sphere_marker(
+        self,
+        position,
+        radius,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a sphere marker to the scene.
 
@@ -519,12 +641,25 @@ class TesseractViewerAIO:
         :rtype: str
         """
         async with self._lock:
-            quaternion = [1,0,0,0]
-            marker = self._new_marker_dict("sphere", parent_link, position, quaternion, name, color, tags)
+            quaternion = [1, 0, 0, 0]
+            marker = self._new_marker_dict(
+                "sphere", parent_link, position, quaternion, name, color, tags
+            )
             marker["radius"] = radius
             return await self._do_append_marker(marker, update_now)
-        
-    async def add_cylinder_marker(self, position, quaternion, radius, length, color = None, parent_link = "world", name=None, tags=None, update_now = True):
+
+    async def add_cylinder_marker(
+        self,
+        position,
+        quaternion,
+        radius,
+        length,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a cylinder marker to the scene.
 
@@ -550,12 +685,25 @@ class TesseractViewerAIO:
         :rtype: str
         """
         async with self._lock:
-            marker = self._new_marker_dict("cylinder", parent_link, position, quaternion, name, color, tags)
+            marker = self._new_marker_dict(
+                "cylinder", parent_link, position, quaternion, name, color, tags
+            )
             marker["radius"] = radius
             marker["length"] = length
             return await self._do_append_marker(marker, update_now)
-        
-    async def add_capsule_marker(self, position, quaternion, radius, length, color = None, parent_link = "world", name=None, tags=None, update_now = True):
+
+    async def add_capsule_marker(
+        self,
+        position,
+        quaternion,
+        radius,
+        length,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a capsule marker to the scene.
 
@@ -581,12 +729,25 @@ class TesseractViewerAIO:
         :rtype: str
         """
         async with self._lock:
-            marker = self._new_marker_dict("capsule", parent_link, position, quaternion, name, color, tags)
+            marker = self._new_marker_dict(
+                "capsule", parent_link, position, quaternion, name, color, tags
+            )
             marker["radius"] = radius
             marker["length"] = length
             return await self._do_append_marker(marker, update_now)
-        
-    async def add_lines_marker(self, vertices, color = None, linewidth = 1.0, parent_link = "world", name=None, tags=None, update_now = True, position = None, quaternion = None):
+
+    async def add_lines_marker(
+        self,
+        vertices,
+        color=None,
+        linewidth=1.0,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+        position=None,
+        quaternion=None,
+    ):
         """
         Add line segments marker to the scene.
 
@@ -608,16 +769,18 @@ class TesseractViewerAIO:
         :rtype: str
         """
         if position is None:
-            position = [0,0,0]
+            position = [0, 0, 0]
         if quaternion is None:
-            quaternion = [1,0,0,0]
+            quaternion = [1, 0, 0, 0]
 
         async with self._lock:
-            marker = self._new_marker_dict("lines", parent_link, position, quaternion, name, color, tags)
+            marker = self._new_marker_dict(
+                "lines", parent_link, position, quaternion, name, color, tags
+            )
             marker["vertices"] = [_fix_marker_vector(p) for p in vertices]
             marker["linewidth"] = linewidth
             return await self._do_append_marker(marker, update_now)
-    
+
     async def _update_markers(self, markers, update_now):
         self.markers_json = json.dumps({"markers": markers})
         await self.server.set_markers_json(self.markers_json, update_now)
@@ -634,7 +797,7 @@ class TesseractViewerAIO:
             self.markers = []
             await self._update_markers(self.markers, True)
 
-    async def clear_markers_by_tags(self, tags, update_now = True):
+    async def clear_markers_by_tags(self, tags, update_now=True):
         """
         Clear all markers with the given tags from the scene.
 
@@ -647,7 +810,7 @@ class TesseractViewerAIO:
             self.markers = [m for m in self.markers if m["tags"] != tags]
             await self._update_markers(self.markers, update_now)
 
-    async def clear_markers_by_name(self, name, update_now = True):
+    async def clear_markers_by_name(self, name, update_now=True):
         """
         Clear all markers with the given name from the scene.
 
@@ -660,9 +823,19 @@ class TesseractViewerAIO:
             self.markers = [m for m in self.markers if m["name"] != name]
             await self._update_markers(self.markers, update_now)
 
-    async def plot_trajectory(self, trajectory, manipulator_info, color = None, linewidth = 0.001, axes = True, axes_length = 0.1, tags = None, update_now = True):
+    async def plot_trajectory(
+        self,
+        trajectory,
+        manipulator_info,
+        color=None,
+        linewidth=0.001,
+        axes=True,
+        axes_length=0.1,
+        tags=None,
+        update_now=True,
+    ):
         """
-        Plot a trajectory stored in a tesseract_robotics.tesseract_command_language.CompositeInstruction to the scene. 
+        Plot a trajectory stored in a tesseract_robotics.tesseract_command_language.CompositeInstruction to the scene.
         This will draw the trajectory
         as a series of line segments and display axes at each trajectory waypoint.
 
@@ -686,9 +859,30 @@ class TesseractViewerAIO:
         :rtype: str
         """
         joint_names, trajectory = tesseract_trajectory_to_list(trajectory)
-        return await self.plot_trajectory_list(joint_names, trajectory, manipulator_info, color, linewidth, axes, axes_length, tags, update_now)            
+        return await self.plot_trajectory_list(
+            joint_names,
+            trajectory,
+            manipulator_info,
+            color,
+            linewidth,
+            axes,
+            axes_length,
+            tags,
+            update_now,
+        )
 
-    async def plot_trajectory_list(self, joint_names, trajectory, manipulator_info, color = None, linewidth = 0.001, axes = True, axes_length = 0.1, tags = None, update_now = True):
+    async def plot_trajectory_list(
+        self,
+        joint_names,
+        trajectory,
+        manipulator_info,
+        color=None,
+        linewidth=0.001,
+        axes=True,
+        axes_length=0.1,
+        tags=None,
+        update_now=True,
+    ):
         """
         Plot a trajectory stored as a list of joint positions to the scene. This will draw the trajectory
         as a series of line segments and display axes at each trajectory waypoint.
@@ -722,22 +916,35 @@ class TesseractViewerAIO:
                 tags = []
             tags.append("trajectory")
             if color is None:
-                color = [0,1,0,1]
-            trajectory_frames = trajectory_list_to_frames(t_env, manipulator_info, joint_names, trajectory)
+                color = [0, 1, 0, 1]
+            trajectory_frames = trajectory_list_to_frames(
+                t_env, manipulator_info, joint_names, trajectory
+            )
             root_link = t_env.getRootLinkName()
             points = []
             for i in range(len(trajectory_frames)):
                 points.append(trajectory_frames[i][0])
-            line_marker = self._new_marker_dict("lines", root_link, [0,0,0], [1,0,0,0], None, color, tags)
+            line_marker = self._new_marker_dict(
+                "lines", root_link, [0, 0, 0], [1, 0, 0, 0], None, color, tags
+            )
             line_marker["vertices"] = [_fix_marker_vector(p) for p in points]
             line_marker["linewidth"] = linewidth
             await self._do_append_marker(line_marker, update_now)
             if axes:
                 for i in range(len(trajectory_frames)):
-                    axes_marker = self._new_marker_dict("axes", root_link, trajectory_frames[i][0], trajectory_frames[i][1], None, None, tags)
+                    axes_marker = self._new_marker_dict(
+                        "axes",
+                        root_link,
+                        trajectory_frames[i][0],
+                        trajectory_frames[i][1],
+                        None,
+                        None,
+                        tags,
+                    )
                     axes_marker["size"] = axes_length
                     await self._do_append_marker(axes_marker, False)
             await self._update_markers(self.markers, update_now)
+
 
 async def amain():
     t = _TesseractViewerAIOServer()
@@ -751,11 +958,11 @@ async def amain():
                 "command": "add_axes_marker",
                 "params": {
                     "name": f"axes{i}",
-                    "position": [0, 0, (i%20)*.1],
+                    "position": [0, 0, (i % 20) * 0.1],
                     "quaternion": [0, 0, 0, 1],
                     "size": 0.15,
-                    "parent_link": "world"
-                }
+                    "parent_link": "world",
+                },
             }
             await t.send_ws_message(json.dumps(axes_cmd))
             pass
