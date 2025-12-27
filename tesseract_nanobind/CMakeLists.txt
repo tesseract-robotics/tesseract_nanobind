@@ -253,6 +253,7 @@ endif()
 find_package(tesseract_motion_planners QUIET COMPONENTS trajopt_ifopt)
 find_package(trajopt_ifopt QUIET)
 find_package(trajopt_sqp QUIET)
+find_package(trajopt_common QUIET)
 if(tesseract_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND trajopt_sqp_FOUND)
   message(STATUS "tesseract_motion_planners trajopt_ifopt component found - building bindings")
   add_tesseract_nanobind_extension(
@@ -268,6 +269,51 @@ if(tesseract_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND tra
   )
 else()
   message(STATUS "tesseract_motion_planners trajopt_ifopt component not found - skipping bindings")
+endif()
+
+# Add trajopt_ifopt module (variables, constraints, costs for IFOPT-based trajectory optimization)
+find_package(trajopt_common QUIET)
+if(trajopt_ifopt_FOUND AND trajopt_common_FOUND)
+  message(STATUS "trajopt_ifopt found - building bindings for variables/constraints/costs")
+  add_tesseract_nanobind_extension(
+    trajopt_ifopt
+    src/trajopt_ifopt/trajopt_ifopt_bindings.cpp
+    trajopt::trajopt_ifopt
+    trajopt::trajopt_common
+    tesseract::tesseract_kinematics_core
+    tesseract::tesseract_environment
+    tesseract::tesseract_collision_core
+    tesseract::tesseract_common
+  )
+else()
+  message(STATUS "trajopt_ifopt/trajopt_common not found - skipping bindings")
+endif()
+
+# Add trajopt_sqp module (SQP solver with stepSQPSolver for real-time planning)
+find_package(ifopt QUIET)
+if(trajopt_sqp_FOUND AND ifopt_FOUND)
+  message(STATUS "trajopt_sqp found - building SQP solver bindings")
+  add_tesseract_nanobind_extension(
+    trajopt_sqp
+    src/trajopt_sqp/trajopt_sqp_bindings.cpp
+    trajopt::trajopt_sqp
+    ifopt::ifopt_core
+    tesseract::tesseract_common
+  )
+else()
+  message(STATUS "trajopt_sqp/ifopt not found - skipping bindings")
+endif()
+
+# Add ifopt base classes module (Bounds, Component, VariableSet, ConstraintSet, CostTerm)
+if(ifopt_FOUND)
+  message(STATUS "ifopt found - building base class bindings")
+  add_tesseract_nanobind_extension(
+    ifopt
+    src/ifopt/ifopt_bindings.cpp
+    ifopt::ifopt_core
+  )
+else()
+  message(STATUS "ifopt not found - skipping base class bindings")
 endif()
 
 # Find and add tesseract_time_parameterization
