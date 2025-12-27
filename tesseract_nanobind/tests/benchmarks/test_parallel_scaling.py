@@ -113,7 +113,7 @@ class TestOptimizeModeScaling:
     @pytest.mark.parametrize("num_planners", [1, 2, 4, 8])
     def test_optimize_true(self, benchmark, num_planners):
         """optimize=True: always runs full planning_time (no scaling)."""
-        result = benchmark(
+        benchmark(
             plan_freespace,
             num_planners=num_planners,
             optimize=True,
@@ -134,7 +134,7 @@ class TestFirstSolutionScaling:
     @pytest.mark.parametrize("num_planners", [1, 2, 4, 8])
     def test_optimize_false(self, benchmark, num_planners):
         """optimize=False: exits on first solution (shows scaling)."""
-        result = benchmark(
+        benchmark(
             plan_freespace,
             num_planners=num_planners,
             optimize=False,
@@ -156,7 +156,7 @@ class TestHarderProblemScaling:
     @pytest.mark.parametrize("num_obstacles", [1, 3, 5])
     def test_difficulty_scaling(self, benchmark, num_planners, num_obstacles):
         """Test how problem difficulty affects parallel scaling."""
-        result = benchmark(
+        benchmark(
             plan_freespace,
             num_planners=num_planners,
             optimize=False,
@@ -180,7 +180,7 @@ class TestScalingSummary:
     def test_comparison(self, benchmark, num_planners, mode):
         """Side-by-side comparison of modes."""
         optimize = mode == "optimize"
-        result = benchmark(
+        benchmark(
             plan_freespace,
             num_planners=num_planners,
             optimize=optimize,
