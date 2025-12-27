@@ -299,6 +299,67 @@ class TestTrajOptSQPTypes:
         assert tsqp.ConstraintType.EQ is not None
         assert tsqp.ConstraintType.INEQ is not None
 
+    def test_sqp_parameters_full(self):
+        """Test all SQPParameters options."""
+        qp_solver = tsqp.OSQPEigenSolver()
+        solver = tsqp.TrustRegionSQPSolver(qp_solver)
+
+        # Trust region parameters
+        solver.params.initial_trust_box_size = 0.5
+        solver.params.min_trust_box_size = 1e-5
+        solver.params.trust_expand_ratio = 1.5
+        solver.params.trust_shrink_ratio = 0.5
+
+        # Convergence parameters
+        solver.params.max_iterations = 100
+        solver.params.cnt_tolerance = 1e-4
+        solver.params.min_approx_improve = 1e-6
+        solver.params.improve_ratio_threshold = 0.25
+
+        # Merit function parameters
+        solver.params.initial_merit_error_coeff = 10.0
+        solver.params.max_merit_coeff_increases = 5
+        solver.params.merit_coeff_increase_ratio = 10.0
+
+        assert solver.params.initial_trust_box_size == 0.5
+        assert solver.params.max_iterations == 100
+
+    def test_solver_status_after_solve(self, kuka_setup):
+        """Test getStatus method returns valid status after solve."""
+        _, _, joint_names, joint_limits = kuka_setup
+
+        # Build problem
+        problem = tsqp.IfoptQPProblem()
+
+        vars_list = []
+        for i in range(3):
+            pos = np.zeros(len(joint_names))
+            var = ti.JointPosition(pos, joint_names, f"Joint_{i}")
+            var.SetBounds(joint_limits)
+            vars_list.append(var)
+            problem.addVariableSet(var)
+
+        # Add velocity cost
+        vel_cost = ti.JointVelConstraint(
+            np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
+        )
+        problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
+
+        problem.setup()
+
+        qp_solver = tsqp.OSQPEigenSolver()
+        solver = tsqp.TrustRegionSQPSolver(qp_solver)
+        solver.verbose = False
+
+        # After solve, status should be converged or iteration limit
+        solver.solve(problem)
+        status = solver.getStatus()
+        assert status in [
+            tsqp.SQPStatus.NLP_CONVERGED,
+            tsqp.SQPStatus.ITERATION_LIMIT,
+            tsqp.SQPStatus.CALLBACK_STOPPED,
+        ]
+
 
 @pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestSQPIntegration:
