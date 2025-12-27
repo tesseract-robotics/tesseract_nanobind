@@ -205,7 +205,7 @@ class _TesseractViewerAIOServer:
             for ws in self._ws:
                 try:
                     await ws.send_str(msg)
-                except:
+                except Exception:
                     traceback.print_exc()
                     remove_list.append(ws)
             for ws in remove_list:
@@ -966,7 +966,7 @@ async def amain():
             }
             await t.send_ws_message(json.dumps(axes_cmd))
             pass
-        except:
+        except Exception:
             traceback.print_exc()
 
     await t.close_ws()
