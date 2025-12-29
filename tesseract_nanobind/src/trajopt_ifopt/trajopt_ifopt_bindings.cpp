@@ -24,6 +24,8 @@
 #include <trajopt_ifopt/constraints/joint_acceleration_constraint.h>
 #include <trajopt_ifopt/constraints/collision/discrete_collision_constraint.h>
 #include <trajopt_ifopt/constraints/collision/discrete_collision_evaluators.h>
+#include <trajopt_ifopt/constraints/collision/continuous_collision_constraint.h>
+#include <trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h>
 
 // trajopt_common
 #include <trajopt_common/collision_types.h>
@@ -180,4 +182,52 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("GetValues", &ti::DiscreteCollisionConstraint::GetValues)
         .def("CalcValues", &ti::DiscreteCollisionConstraint::CalcValues, "joint_vals"_a)
         .def("GetCollisionEvaluator", &ti::DiscreteCollisionConstraint::GetCollisionEvaluator);
+
+    // ========== ContinuousCollisionEvaluator (base class) ==========
+    nb::class_<ti::ContinuousCollisionEvaluator>(m, "ContinuousCollisionEvaluator")
+        .def("GetCollisionConfig", &ti::ContinuousCollisionEvaluator::GetCollisionConfig,
+             nb::rv_policy::reference_internal);
+
+    // ========== LVSDiscreteCollisionEvaluator ==========
+    // Uses discrete collision checking at interpolated points between two states
+    nb::class_<ti::LVSDiscreteCollisionEvaluator, ti::ContinuousCollisionEvaluator>(m, "LVSDiscreteCollisionEvaluator")
+        .def(nb::init<std::shared_ptr<ti::CollisionCache>,
+                      std::shared_ptr<const tesseract_kinematics::JointGroup>,
+                      std::shared_ptr<const tesseract_environment::Environment>,
+                      std::shared_ptr<const tc::TrajOptCollisionConfig>,
+                      bool>(),
+             "collision_cache"_a, "manip"_a, "env"_a, "collision_config"_a,
+             "dynamic_environment"_a = false);
+
+    // ========== LVSContinuousCollisionEvaluator ==========
+    // Uses continuous (swept) collision checking between two states
+    nb::class_<ti::LVSContinuousCollisionEvaluator, ti::ContinuousCollisionEvaluator>(m, "LVSContinuousCollisionEvaluator")
+        .def(nb::init<std::shared_ptr<ti::CollisionCache>,
+                      std::shared_ptr<const tesseract_kinematics::JointGroup>,
+                      std::shared_ptr<const tesseract_environment::Environment>,
+                      std::shared_ptr<const tc::TrajOptCollisionConfig>,
+                      bool>(),
+             "collision_cache"_a, "manip"_a, "env"_a, "collision_config"_a,
+             "dynamic_environment"_a = false);
+
+    // ========== ContinuousCollisionConstraint ==========
+    // Constraint for collision between two trajectory states
+    // Uses lambda wrapper to convert Python args to std::array
+    nb::class_<ti::ContinuousCollisionConstraint, ifopt::ConstraintSet>(m, "ContinuousCollisionConstraint")
+        .def("__init__", [](ti::ContinuousCollisionConstraint* self,
+                            std::shared_ptr<ti::ContinuousCollisionEvaluator> eval,
+                            std::shared_ptr<const ti::JointPosition> var0,
+                            std::shared_ptr<const ti::JointPosition> var1,
+                            bool fixed0, bool fixed1,
+                            int max_num_cnt, bool fixed_sparsity, const std::string& name) {
+                 std::array<std::shared_ptr<const ti::JointPosition>, 2> vars = {var0, var1};
+                 std::array<bool, 2> fixed = {fixed0, fixed1};
+                 new (self) ti::ContinuousCollisionConstraint(eval, vars, fixed, max_num_cnt, fixed_sparsity, name);
+             },
+             "collision_evaluator"_a, "position_var0"_a, "position_var1"_a,
+             "fixed0"_a = false, "fixed1"_a = false,
+             "max_num_cnt"_a = 1, "fixed_sparsity"_a = false,
+             "name"_a = "LVSCollision")
+        .def("GetValues", &ti::ContinuousCollisionConstraint::GetValues)
+        .def("GetCollisionEvaluator", &ti::ContinuousCollisionConstraint::GetCollisionEvaluator);
 }

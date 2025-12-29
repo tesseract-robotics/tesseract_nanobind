@@ -693,3 +693,76 @@ class TestAdditionalBindings:
         for v in vars_list:
             problem.addVariableSet(v)
         problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
+
+
+@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
+class TestContinuousCollisionBindings:
+    """Tests for continuous collision evaluators and constraints."""
+
+    def test_continuous_collision_evaluator_base(self):
+        """Test ContinuousCollisionEvaluator base class exists."""
+        assert hasattr(ti, "ContinuousCollisionEvaluator")
+
+    def test_lvs_discrete_collision_evaluator(self, kuka_setup):
+        """Test LVSDiscreteCollisionEvaluator creation."""
+        env, manip, joint_names, _ = kuka_setup
+
+        config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        cache = ti.CollisionCache(10)
+
+        evaluator = ti.LVSDiscreteCollisionEvaluator(cache, manip, env, config, True)
+        assert evaluator is not None
+
+        # Check base class method
+        assert evaluator.GetCollisionConfig() is not None
+
+    def test_lvs_continuous_collision_evaluator(self, kuka_setup):
+        """Test LVSContinuousCollisionEvaluator creation."""
+        env, manip, joint_names, _ = kuka_setup
+
+        config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        cache = ti.CollisionCache(10)
+
+        evaluator = ti.LVSContinuousCollisionEvaluator(cache, manip, env, config, True)
+        assert evaluator is not None
+
+    def test_continuous_collision_constraint(self, kuka_setup):
+        """Test ContinuousCollisionConstraint creation."""
+        env, manip, joint_names, joint_limits = kuka_setup
+
+        # Create two joint position variables
+        pos0 = np.zeros(len(joint_names))
+        pos1 = np.ones(len(joint_names)) * 0.1
+        var0 = ti.JointPosition(pos0, joint_names, "Joint_0")
+        var1 = ti.JointPosition(pos1, joint_names, "Joint_1")
+        var0.SetBounds(joint_limits)
+        var1.SetBounds(joint_limits)
+
+        # Create LVS evaluator
+        config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        cache = ti.CollisionCache(10)
+        evaluator = ti.LVSDiscreteCollisionEvaluator(cache, manip, env, config, True)
+
+        # Create constraint (uses two variables)
+        constraint = ti.ContinuousCollisionConstraint(
+            evaluator, var0, var1, False, False, 1, False, "LVSCollision_0_1"
+        )
+        assert constraint is not None
+
+    def test_continuous_vs_discrete_evaluator_types(self, kuka_setup):
+        """Test that continuous evaluators inherit from correct base."""
+        env, manip, _, _ = kuka_setup
+
+        config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        cache = ti.CollisionCache(10)
+
+        # Discrete evaluator inherits from DiscreteCollisionEvaluator
+        discrete = ti.SingleTimestepCollisionEvaluator(cache, manip, env, config, True)
+        assert isinstance(discrete, ti.DiscreteCollisionEvaluator)
+
+        # LVS evaluators inherit from ContinuousCollisionEvaluator
+        lvs_discrete = ti.LVSDiscreteCollisionEvaluator(cache, manip, env, config, True)
+        assert isinstance(lvs_discrete, ti.ContinuousCollisionEvaluator)
+
+        lvs_continuous = ti.LVSContinuousCollisionEvaluator(cache, manip, env, config, True)
+        assert isinstance(lvs_continuous, ti.ContinuousCollisionEvaluator)
