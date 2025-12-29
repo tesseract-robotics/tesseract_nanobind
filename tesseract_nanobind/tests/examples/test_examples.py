@@ -109,6 +109,15 @@ def test_online_planning_example():
 
 
 @pytest.mark.planning
+def test_online_planning_sqp_example():
+    """Test low-level SQP API example."""
+    result = _load_module(
+        "online_planning_sqp_example", EXAMPLES / "online_planning_sqp_example.py"
+    ).run()
+    assert result["success"]
+
+
+@pytest.mark.planning
 def test_freespace_hybrid_example():
     _load_module("freespace_hybrid_example", EXAMPLES / "freespace_hybrid_example.py").main()
 
@@ -223,4 +232,14 @@ def test_lowlevel_planning_lowlevel_example():
     _load_module(
         "tesseract_planning_lowlevel_c_api_example",
         LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_c_api_example.py",
+    ).main()
+
+
+@pytest.mark.lowlevel
+@pytest.mark.planning
+def test_lowlevel_trajopt_ifopt_example():
+    """Test OMPL + TrajOptIfopt low-level example."""
+    _load_module(
+        "tesseract_planning_lowlevel_trajopt_ifopt_example",
+        LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_trajopt_ifopt_example.py",
     ).main()
