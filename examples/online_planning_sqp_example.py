@@ -38,6 +38,8 @@ Architecture
 """
 
 import sys
+import time
+
 import numpy as np
 
 from tesseract_robotics.planning import Robot
@@ -202,11 +204,10 @@ def update_human_position(robot, human_x, human_y):
     robot.env.setState(joint_names, joint_values)
 
 
-def run(num_iterations=20, steps=10, verbose=False, use_continuous_collision=True):
-    """Run online planning with low-level SQP API.
+def run(steps=10, verbose=False, use_continuous_collision=True):
+    """Run trajectory optimization with low-level SQP API.
 
     Args:
-        num_iterations: Number of replanning cycles
         steps: Trajectory waypoints per plan
         verbose: Print debug info
         use_continuous_collision: Use LVS continuous collision (True) or discrete (False)
@@ -242,24 +243,21 @@ def run(num_iterations=20, steps=10, verbose=False, use_continuous_collision=Tru
 
     # Initial global solve
     print("Running initial global solve...")
+    t0 = time.perf_counter()
     solver.solve(problem)
+    solve_time = time.perf_counter() - t0
     x = solver.getResults().best_var_vals
-    print(f"Initial solve complete, cost: {problem.evaluateTotalExactCost(x):.4f}")
+    cost = problem.evaluateTotalExactCost(x)
+    print(f"Solve complete: cost={cost:.4f}, time={solve_time * 1000:.1f}ms")
+    print(f"Trajectory: {steps} waypoints x {len(joint_names)} joints")
 
-    # Replanning loop
-    timings = []
-    trajectories = []
+    # NOTE: stepSQPSolver() exists for incremental replanning (100+ Hz in C++)
+    # but causes segfaults in Python due to shared_ptr lifecycle issues.
+    # For true online planning, use the C++ API directly or rebuild the
+    # problem each iteration.
 
-    # NOTE: Repeated init()/solve() on same problem causes segfault due to
-    # shared_ptr lifecycle issues between Python and C++. For true online
-    # planning, rebuild the problem each iteration or use the C++ API directly.
-    # This demonstrates the solver works for a single solve.
-    print("\nLow-level SQP solver demonstration complete.")
-    print(f"Initial solution cost: {problem.evaluateTotalExactCost(x):.4f}")
-    print(f"Trajectory has {steps} waypoints x {len(joint_names)} joints")
-
-    timings = []
     trajectories = [x.copy()]
+    timings = [solve_time]
 
     return {
         "trajectories": trajectories,
