@@ -366,6 +366,50 @@ class TestTrajOptSQPTypes:
             tsqp.SQPStatus.CALLBACK_STOPPED,
         ]
 
+    def test_sqp_results_attributes(self, kuka_setup):
+        """Test SQPResults attributes are accessible after solve."""
+        _, _, joint_names, joint_limits = kuka_setup
+
+        # Build problem with constraint and cost
+        problem = tsqp.IfoptQPProblem()
+
+        vars_list = []
+        for i in range(3):
+            pos = np.zeros(len(joint_names))
+            var = ti.JointPosition(pos, joint_names, f"Joint_{i}")
+            var.SetBounds(joint_limits)
+            vars_list.append(var)
+            problem.addVariableSet(var)
+
+        # Add start constraint
+        home_coeffs = np.ones(len(joint_names)) * 5.0
+        start_pos = np.zeros(len(joint_names))
+        constraint = ti.JointPosConstraint(start_pos, [vars_list[0]], home_coeffs, "Home")
+        problem.addConstraintSet(constraint)
+
+        # Add velocity cost
+        vel_cost = ti.JointVelConstraint(
+            np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
+        )
+        problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
+
+        problem.setup()
+
+        qp_solver = tsqp.OSQPEigenSolver()
+        solver = tsqp.TrustRegionSQPSolver(qp_solver)
+        solver.verbose = False
+        solver.solve(problem)
+
+        results = solver.getResults()
+
+        # Check key attributes are accessible
+        assert results.best_var_vals is not None
+        assert results.best_exact_merit is not None
+        assert results.overall_iteration >= 0
+        # cost_names and constraint_names are lists (may be empty for simple problems)
+        assert isinstance(results.cost_names, list)
+        assert isinstance(results.constraint_names, list)
+
 
 @pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestSQPIntegration:
