@@ -150,6 +150,12 @@ class TestTrajOptIfoptTypes:
 
         assert info.source_frame == "tool0"
 
+    def test_cart_pos_info_types(self):
+        """Test CartPosInfoType enum values."""
+        assert ti.CartPosInfoType.TARGET_ACTIVE is not None
+        assert ti.CartPosInfoType.SOURCE_ACTIVE is not None
+        assert ti.CartPosInfoType.BOTH_ACTIVE is not None
+
     def test_collision_config(self):
         """Test TrajOptCollisionConfig creation."""
         config = ti.TrajOptCollisionConfig(0.1, 10.0)
