@@ -15,6 +15,11 @@ Key Difference from online_planning_example.py
 - Warm-starts from previous solution
 - Achieves real-time rates suitable for robot control
 
+Collision Checking Modes
+------------------------
+- Discrete: Single timestep collision check (SingleTimestepCollisionEvaluator)
+- Continuous: LVS (longest valid segment) between timesteps (LVSDiscreteCollisionEvaluator)
+
 Architecture
 ------------
 1. Build IFOPT problem with:
@@ -22,7 +27,7 @@ Architecture
    - JointPosConstraint for start position
    - CartPosConstraint for target pose
    - JointVelConstraint for smoothness
-   - DiscreteCollisionConstraint for safety
+   - CollisionConstraint for safety (discrete or continuous)
 
 2. Create TrustRegionSQPSolver with OSQPEigenSolver
 
@@ -50,7 +55,9 @@ if "pytest" not in sys.modules:
         pass
 
 
-def build_optimization_problem(robot, joint_names, start_pos, target_pos, steps=10):
+def build_optimization_problem(
+    robot, joint_names, start_pos, target_pos, steps=10, use_continuous_collision=True
+):
     """Build the IFOPT optimization problem.
 
     This manually constructs the trajectory optimization problem using:
@@ -63,6 +70,8 @@ def build_optimization_problem(robot, joint_names, start_pos, target_pos, steps=
         start_pos: Starting joint positions
         target_pos: Target joint positions
         steps: Number of trajectory waypoints
+        use_continuous_collision: If True, use LVS continuous collision (matches C++).
+                                  If False, use discrete single-timestep collision.
 
     Returns:
         dict with problem and all objects that must stay alive
@@ -119,24 +128,53 @@ def build_optimization_problem(robot, joint_names, start_pos, target_pos, steps=
     margin = 0.1  # 10cm safety margin
     margin_coeff = 10.0
     collision_config = ti.TrajOptCollisionConfig(margin, margin_coeff)
+    collision_config.collision_margin_buffer = 0.10  # As in C++ example
     collision_cache = ti.CollisionCache(steps)
     collision_evaluators = []
     collision_constraints = []
 
-    for i in range(1, steps):
-        collision_evaluator = ti.SingleTimestepCollisionEvaluator(
-            collision_cache,
-            manip,
-            robot.env,
-            collision_config,
-            True,  # dynamic_environment
-        )
-        collision_constraint = ti.DiscreteCollisionConstraint(
-            collision_evaluator, vars_list[i], 1, False, f"Collision_{i}"
-        )
-        problem.addConstraintSet(collision_constraint)
-        collision_evaluators.append(collision_evaluator)
-        collision_constraints.append(collision_constraint)
+    if use_continuous_collision:
+        # Use LVS (longest valid segment) collision checking between consecutive states
+        # This matches the C++ online_planning_example.cpp implementation
+        for i in range(1, steps):
+            # LVSDiscreteCollisionEvaluator checks collision at interpolated points
+            collision_evaluator = ti.LVSDiscreteCollisionEvaluator(
+                collision_cache,
+                manip,
+                robot.env,
+                collision_config,
+                True,  # dynamic_environment
+            )
+            # ContinuousCollisionConstraint takes two consecutive JointPosition variables
+            collision_constraint = ti.ContinuousCollisionConstraint(
+                collision_evaluator,
+                vars_list[i - 1],  # position_var0
+                vars_list[i],  # position_var1
+                False,  # fixed0
+                False,  # fixed1
+                1,  # max_num_cnt
+                False,  # fixed_sparsity
+                f"LVSCollision_{i - 1}_{i}",
+            )
+            problem.addConstraintSet(collision_constraint)
+            collision_evaluators.append(collision_evaluator)
+            collision_constraints.append(collision_constraint)
+    else:
+        # Use discrete single-timestep collision checking
+        for i in range(1, steps):
+            collision_evaluator = ti.SingleTimestepCollisionEvaluator(
+                collision_cache,
+                manip,
+                robot.env,
+                collision_config,
+                True,  # dynamic_environment
+            )
+            collision_constraint = ti.DiscreteCollisionConstraint(
+                collision_evaluator, vars_list[i], 1, False, f"Collision_{i}"
+            )
+            problem.addConstraintSet(collision_constraint)
+            collision_evaluators.append(collision_evaluator)
+            collision_constraints.append(collision_constraint)
 
     # Setup the problem (must be called after adding all sets)
     problem.setup()
@@ -164,13 +202,14 @@ def update_human_position(robot, human_x, human_y):
     robot.env.setState(joint_names, joint_values)
 
 
-def run(num_iterations=20, steps=10, verbose=False):
+def run(num_iterations=20, steps=10, verbose=False, use_continuous_collision=True):
     """Run online planning with low-level SQP API.
 
     Args:
         num_iterations: Number of replanning cycles
         steps: Trajectory waypoints per plan
         verbose: Print debug info
+        use_continuous_collision: Use LVS continuous collision (True) or discrete (False)
 
     Returns:
         dict with results
@@ -187,9 +226,10 @@ def run(num_iterations=20, steps=10, verbose=False):
     robot.set_joints(start_pos, joint_names=joint_names)
 
     # Build initial problem
-    print("Building optimization problem...")
+    collision_mode = "LVS continuous" if use_continuous_collision else "discrete"
+    print(f"Building optimization problem (collision: {collision_mode})...")
     problem_data = build_optimization_problem(
-        robot, joint_names, start_pos, target_pos, steps
+        robot, joint_names, start_pos, target_pos, steps, use_continuous_collision
     )
     problem = problem_data["problem"]
     problem.print()
