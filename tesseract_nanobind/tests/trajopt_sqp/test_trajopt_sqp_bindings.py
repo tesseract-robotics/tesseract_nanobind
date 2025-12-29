@@ -576,3 +576,120 @@ class TestSQPIntegration:
         results = solver.getResults()
 
         assert results.best_var_vals is not None
+
+
+@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
+class TestAdditionalBindings:
+    """Tests for additional bindings not covered elsewhere."""
+
+    def test_collision_coeff_data(self):
+        """Test CollisionCoeffData for per-link collision weights."""
+        data = ti.CollisionCoeffData()
+        assert data is not None
+        # Pair collision coefficient methods
+        assert hasattr(data, "getPairCollisionCoeff")
+        assert hasattr(data, "setPairCollisionCoeff")
+
+    def test_ifopt_problem_base(self, kuka_setup):
+        """Test IfoptProblem (base class of IfoptQPProblem)."""
+        _, _, joint_names, joint_limits = kuka_setup
+
+        # IfoptProblem is the base IFOPT interface
+        problem = tsqp.IfoptProblem()
+
+        pos = np.zeros(len(joint_names))
+        var = ti.JointPosition(pos, joint_names, "Joint_0")
+        var.SetBounds(joint_limits)
+        problem.AddVariableSet(var)
+
+        # Should have method to get variable count
+        assert problem.GetNumberOfOptimizationVariables() >= len(joint_names)
+
+    def test_qp_problem_interface(self, kuka_setup):
+        """Test QPProblem interface methods."""
+        _, _, joint_names, joint_limits = kuka_setup
+
+        problem = tsqp.IfoptQPProblem()
+
+        # Add variable
+        pos = np.zeros(len(joint_names))
+        var = ti.JointPosition(pos, joint_names, "Joint_0")
+        var.SetBounds(joint_limits)
+        problem.addVariableSet(var)
+
+        # QPProblem interface methods
+        problem.setup()
+        assert problem.getNumNLPVars() >= len(joint_names)
+
+    def test_sqp_callback_class(self):
+        """Test SQPCallback class exists and is callable."""
+        # SQPCallback is the base class for solver callbacks
+        assert hasattr(tsqp, "SQPCallback")
+        # The class itself should exist
+        callback_class = tsqp.SQPCallback
+        assert callback_class is not None
+
+    def test_qp_solver_inheritance(self):
+        """Test QPSolver base class."""
+        # OSQPEigenSolver inherits from QPSolver
+        solver = tsqp.OSQPEigenSolver()
+        assert isinstance(solver, tsqp.QPSolver)
+
+    def test_ifopt_composite(self):
+        """Test ifopt.Composite for component management."""
+        from tesseract_robotics import ifopt
+
+        # Composite is the container for components
+        assert hasattr(ifopt, "Composite")
+        composite = ifopt.Composite("test", False)
+        assert composite is not None
+
+    def test_ifopt_component_interface(self, kuka_setup):
+        """Test ifopt.Component interface via JointPosition."""
+        _, _, joint_names, _ = kuka_setup
+
+        pos = np.zeros(len(joint_names))
+        var = ti.JointPosition(pos, joint_names, "TestVar")
+
+        # Component interface
+        assert var.GetName() == "TestVar"
+        assert var.GetRows() == len(joint_names)
+
+    def test_constraint_set_interface(self, kuka_setup):
+        """Test ConstraintSet interface via JointPosConstraint."""
+        _, _, joint_names, joint_limits = kuka_setup
+
+        pos = np.zeros(len(joint_names))
+        var = ti.JointPosition(pos, joint_names, "Joint_0")
+        var.SetBounds(joint_limits)
+
+        # JointPosConstraint inherits from ConstraintSet
+        target = np.zeros(len(joint_names))
+        coeffs = np.ones(len(joint_names))
+        constraint = ti.JointPosConstraint(target, [var], coeffs, "Position")
+
+        # ConstraintSet interface
+        assert constraint.GetName() == "Position"
+        assert hasattr(constraint, "GetRows")
+
+    def test_cost_term_interface(self, kuka_setup):
+        """Test CostTerm interface via JointVelConstraint used as cost."""
+        _, _, joint_names, joint_limits = kuka_setup
+
+        # Create variables
+        vars_list = []
+        for i in range(3):
+            pos = np.zeros(len(joint_names))
+            var = ti.JointPosition(pos, joint_names, f"Joint_{i}")
+            var.SetBounds(joint_limits)
+            vars_list.append(var)
+
+        # JointVelConstraint can be used as cost
+        vel_target = np.zeros(len(joint_names))
+        vel_cost = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "VelCost")
+
+        # Adding as cost works
+        problem = tsqp.IfoptQPProblem()
+        for v in vars_list:
+            problem.addVariableSet(v)
+        problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
