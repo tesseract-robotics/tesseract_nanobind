@@ -202,13 +202,14 @@ def update_human_position(robot, human_x, human_y):
     robot.env.setState({"human_x_joint": human_x, "human_y_joint": human_y})
 
 
-def run(steps=10, verbose=False, use_continuous_collision=True):
+def run(steps=12, verbose=False, use_continuous_collision=False):
     """Run trajectory optimization with low-level SQP API.
 
     Args:
-        steps: Trajectory waypoints per plan
+        steps: Trajectory waypoints per plan (C++ default: 12)
         verbose: Print debug info
         use_continuous_collision: Use LVS continuous collision (True) or discrete (False)
+                                  C++ default: False (discrete collision)
 
     Returns:
         dict with results
@@ -234,10 +235,12 @@ def run(steps=10, verbose=False, use_continuous_collision=True):
     problem.print()
 
     # Create SQP solver with OSQP
+    # Match C++ defaults: box_size=0.01
+    box_size = 0.01
     qp_solver = tsqp.OSQPEigenSolver()
     solver = tsqp.TrustRegionSQPSolver(qp_solver)
     solver.verbose = verbose
-    solver.params.initial_trust_box_size = 0.1
+    solver.params.initial_trust_box_size = box_size
 
     # Initial global solve
     print("Running initial global solve...")
@@ -287,6 +290,9 @@ def run(steps=10, verbose=False, use_continuous_collision=True):
         solver.init(problem)
         solver.stepSQPSolver()
 
+        # Reset box size (like C++ - trust region loop can shrink it to zero)
+        solver.setBoxSize(box_size)
+
         x = solver.getResults().best_var_vals
         dt = time.perf_counter() - t0
         timings.append(dt)
@@ -310,13 +316,77 @@ def run(steps=10, verbose=False, use_continuous_collision=True):
 
 
 def main():
-    results = run(verbose=False)
+    results = run(verbose=True)
+
+    # Print trajectory comparison info
+    if results.get("trajectories"):
+        n_joints = len(results["joint_names"])
+        steps = 12  # C++ default
+        robot = results["robot"]
+        manip = robot.env.getKinematicGroup("manipulator")
+
+        print("\n=== Trajectory Results ===")
+
+        # Target pose (C++ reference)
+        target_joints = np.array([5.5, 3.0, 0, 0, 0, 0, 0, 0])
+        target_tf = manip.calcFwdKin(target_joints)["tool0"]
+        target_pos = target_tf.translation()
+
+        # Initial solve
+        traj0 = results["trajectories"][0][: steps * n_joints].reshape(steps, n_joints)
+        initial_tf = manip.calcFwdKin(traj0[-1])["tool0"]
+        initial_pos = initial_tf.translation()
+
+        # Final trajectory (after replanning)
+        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(
+            steps, n_joints
+        )
+        final_tf = manip.calcFwdKin(traj_final[-1])["tool0"]
+        final_pos = final_tf.translation()
+
+        print(f"Target TCP:  {target_pos}")
+        print(
+            f"Initial TCP: {initial_pos} (error: {np.linalg.norm(initial_pos - target_pos):.3f}m)"
+        )
+        print(
+            f"Final TCP:   {final_pos} (error: {np.linalg.norm(final_pos - target_pos):.3f}m)"
+        )
 
     if TesseractViewer is not None and results.get("trajectories"):
+        print("\n=== Starting Viewer ===")
+        print("Human obstacle: red cylinder (moving with sin wave)")
+        print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
+        print("URL: http://localhost:8000")
+
+        # Make human obstacle visible (URDF has 5% opacity by design)
+        env = results["robot"].env
+        scene = env.getSceneGraph()
+        human_link = scene.getLink("human_estop_zone")
+        for v in human_link.visual:
+            if v.material:
+                v.material.color = np.array([0.8, 0.0, 0.0, 0.7])  # 70% opaque
+
         viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
+        viewer.update_environment(env, [0, 0, 0])
+
+        # Convert trajectory to viewer format: [joint_vals..., timestamp]
+        n_joints = len(results["joint_names"])
+        steps = 12  # C++ default
+        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(
+            steps, n_joints
+        )
+        dt = 0.1  # 100ms between waypoints
+        trajectory_list = []
+        for i, wp in enumerate(traj_final):
+            # Append timestamp as last element
+            row = np.append(wp, i * dt)
+            trajectory_list.append(row)
+        viewer.update_trajectory_list(results["joint_names"], trajectory_list)
+
         viewer.start_serve_background()
-        input("Press Enter to exit...")
+
+        print("\nPress Enter to exit...")
+        input()
 
     return results["success"]
 
