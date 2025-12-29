@@ -199,9 +199,7 @@ def build_optimization_problem(
 
 def update_human_position(robot, human_x, human_y):
     """Update human obstacle position via joint values."""
-    joint_names = ["human_x_joint", "human_y_joint"]
-    joint_values = np.array([human_x, human_y])
-    robot.env.setState(joint_names, joint_values)
+    robot.env.setState({"human_x_joint": human_x, "human_y_joint": human_y})
 
 
 def run(steps=10, verbose=False, use_continuous_collision=True):
@@ -248,16 +246,59 @@ def run(steps=10, verbose=False, use_continuous_collision=True):
     solve_time = time.perf_counter() - t0
     x = solver.getResults().best_var_vals
     cost = problem.evaluateTotalExactCost(x)
-    print(f"Solve complete: cost={cost:.4f}, time={solve_time * 1000:.1f}ms")
-    print(f"Trajectory: {steps} waypoints x {len(joint_names)} joints")
-
-    # NOTE: stepSQPSolver() exists for incremental replanning (100+ Hz in C++)
-    # but causes segfaults in Python due to shared_ptr lifecycle issues.
-    # For true online planning, use the C++ API directly or rebuild the
-    # problem each iteration.
+    print(f"Initial solve: cost={cost:.4f}, time={solve_time * 1000:.1f}ms")
 
     trajectories = [x.copy()]
     timings = [solve_time]
+
+    # Online replanning loop
+    # Key insight from C++: rebuild problem each iteration with warm-start trajectory
+    num_replan = 10
+    print(f"\nOnline replanning ({num_replan} iterations)...")
+
+    n_joints = len(joint_names)
+
+    for iteration in range(num_replan):
+        # Move obstacle
+        human_x = 0.5 + 0.3 * np.sin(iteration * 0.3)
+        update_human_position(robot, human_x, 0.0)
+
+        # Extract joint values from solution (first steps*n_joints values, rest are slack)
+        joint_vals = x[: steps * n_joints]
+        traj = joint_vals.reshape(steps, n_joints)
+
+        # Rebuild problem with warm-start (like C++ setupProblem)
+        t0 = time.perf_counter()
+        problem_data = build_optimization_problem(
+            robot,
+            joint_names,
+            traj[0],  # Current start from trajectory
+            target_pos,
+            steps,
+            use_continuous_collision,
+        )
+        problem = problem_data["problem"]
+
+        # Set warm-start values
+        for i, var in enumerate(problem_data["vars_list"]):
+            var.SetVariables(traj[i])
+
+        # Single SQP step (incremental optimization)
+        solver.init(problem)
+        solver.stepSQPSolver()
+
+        x = solver.getResults().best_var_vals
+        dt = time.perf_counter() - t0
+        timings.append(dt)
+        trajectories.append(x.copy())
+
+        if verbose:
+            cost = problem.evaluateTotalExactCost(x)
+            print(f"  Iter {iteration + 1}: cost={cost:.4f}, time={dt * 1000:.1f}ms")
+
+    avg_time = np.mean(timings[1:]) * 1000
+    print(f"Replan timing: avg={avg_time:.1f}ms ({1000 / avg_time:.0f} Hz)")
+    print(f"Trajectory: {steps} waypoints x {len(joint_names)} joints")
 
     return {
         "trajectories": trajectories,
