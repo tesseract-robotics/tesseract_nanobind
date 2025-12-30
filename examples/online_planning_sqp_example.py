@@ -316,7 +316,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
 
 
 def main():
-    results = run(verbose=True)
+    results = run(verbose=False)  # Set True for solver iteration details
 
     # Print trajectory comparison info
     if results.get("trajectories"):
@@ -378,8 +378,8 @@ def main():
         dt = 0.1  # 100ms between waypoints
         trajectory_list = []
         for i, wp in enumerate(traj_final):
-            # Append timestamp as last element
-            row = np.append(wp, i * dt)
+            # Append timestamp as last element, convert to Python list for JSON
+            row = wp.tolist() + [i * dt]
             trajectory_list.append(row)
         viewer.update_trajectory_list(results["joint_names"], trajectory_list)
 
