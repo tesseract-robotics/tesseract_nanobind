@@ -354,17 +354,26 @@ def main():
 
     if TesseractViewer is not None and results.get("trajectories"):
         print("\n=== Starting Viewer ===")
-        print("Human obstacle: red cylinder (moving with sin wave)")
         print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
+        print("Human: red cylinder at FINAL position (static in viewer)")
+        print(
+            "Note: Human moved during optimization but trajectory only animates robot"
+        )
         print("URL: http://localhost:8000")
 
-        # Make human obstacle visible (URDF has 5% opacity by design)
+        # Modify visuals for better viewing
         env = results["robot"].env
         scene = env.getSceneGraph()
+
+        # Make human obstacle visible (URDF has 5% opacity by design)
         human_link = scene.getLink("human_estop_zone")
         for v in human_link.visual:
             if v.material:
                 v.material.color = np.array([0.8, 0.0, 0.0, 0.7])  # 70% opaque
+
+        # Remove robot_estop_zone visual (large cylinder obscures robot)
+        robot_zone = scene.getLink("robot_estop_zone")
+        robot_zone.visual.clear()
 
         viewer = TesseractViewer()
         viewer.update_environment(env, [0, 0, 0])
