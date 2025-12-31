@@ -1,0 +1,109 @@
+/* Custom styles for tesseract_robotics documentation */
+
+/* Code block styling */
+.md-typeset code {
+  font-size: 0.85em;
+}
+
+/* Table styling */
+.md-typeset table:not([class]) {
+  font-size: 0.85em;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-fg-color--light);
+  color: var(--md-primary-bg-color);
+}
+
+/* Admonition customization */
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  border-color: #00c853;
+}
+
+.md-typeset .tip > .admonition-title,
+.md-typeset .tip > summary {
+  background-color: rgba(0, 200, 83, 0.1);
+}
+
+/* API reference styling */
+.doc-heading {
+  font-weight: 600;
+}
+
+.doc-signature {
+  font-size: 0.9em;
+  background: var(--md-code-bg-color);
+  padding: 0.5em 1em;
+  border-radius: 0.25em;
+}
+
+/* Mermaid diagram styling */
+.mermaid {
+  text-align: center;
+  margin: 1em 0;
+}
+
+/* Grid cards for examples index */
+.grid.cards > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1em;
+  list-style: none;
+  padding: 0;
+}
+
+.grid.cards > ul > li {
+  padding: 1em;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.25em;
+}
+
+/* Keyboard shortcut styling */
+.md-typeset kbd {
+  box-shadow: 0 2px 0 1px var(--md-default-fg-color--lighter);
+}
+
+/* Performance table highlighting */
+.md-typeset table tr:has(td:first-child:contains("128 Hz")) td,
+.md-typeset table tr:has(td:first-child:contains("73 Hz")) td {
+  font-weight: 600;
+}
+
+/* Module listing styling */
+.module-table th:first-child,
+.module-table td:first-child {
+  font-family: var(--md-code-font-family);
+  font-size: 0.85em;
+}
+
+/* Dark mode adjustments */
+[data-md-color-scheme="slate"] {
+  --md-code-bg-color: #1e1e1e;
+}
+
+/* Tab content styling */
+.md-typeset .tabbed-set {
+  margin-top: 0.5em;
+}
+
+/* Collapsible details */
+.md-typeset details {
+  margin: 1em 0;
+}
+
+.md-typeset details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Warning/Error highlighting in code */
+.highlight .err {
+  background: transparent;
+  color: #f44336;
+}
+
+/* Expected output styling */
+.md-typeset details.example .highlight {
+  font-size: 0.85em;
+}

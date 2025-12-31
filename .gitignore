@@ -32,3 +32,4 @@ docs/_build/
 docs/readme.md
 tesseract_nanobind/wheelhouse/
 tesseract_nanobind/src/tesseract_robotics/.cache/
+site/
