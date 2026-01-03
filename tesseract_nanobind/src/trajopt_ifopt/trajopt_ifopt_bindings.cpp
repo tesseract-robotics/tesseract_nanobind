@@ -26,12 +26,17 @@
 #include <trajopt_ifopt/constraints/collision/discrete_collision_evaluators.h>
 #include <trajopt_ifopt/constraints/collision/continuous_collision_constraint.h>
 #include <trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h>
+#include <trajopt_ifopt/constraints/collision/discrete_collision_numerical_constraint.h>
+#include <trajopt_ifopt/constraints/joint_jerk_constraint.h>
+#include <trajopt_ifopt/constraints/cartesian_line_constraint.h>
+#include <trajopt_ifopt/constraints/inverse_kinematics_constraint.h>
 
 // trajopt_common
 #include <trajopt_common/collision_types.h>
 
 // tesseract dependencies
 #include <tesseract_kinematics/core/joint_group.h>
+#include <tesseract_kinematics/core/kinematic_group.h>
 #include <tesseract_environment/environment.h>
 
 namespace ti = trajopt_ifopt;
@@ -230,4 +235,80 @@ NB_MODULE(_trajopt_ifopt, m) {
              "name"_a = "LVSCollision")
         .def("GetValues", &ti::ContinuousCollisionConstraint::GetValues)
         .def("GetCollisionEvaluator", &ti::ContinuousCollisionConstraint::GetCollisionEvaluator);
+
+    // ========== JointJerkConstraint ==========
+    // Bounds on joint jerk (3rd derivative of position) for smoother trajectories
+    nb::class_<ti::JointJerkConstraint, ifopt::ConstraintSet>(m, "JointJerkConstraint")
+        .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::JointPosition>>&,
+                      const Eigen::VectorXd&, const std::string&>(),
+             "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointJerk",
+             "Create joint jerk constraint (requires 4+ consecutive waypoints)")
+        .def("GetValues", &ti::JointJerkConstraint::GetValues,
+             "Get current constraint values");
+
+    // ========== CartLineInfo (struct) ==========
+    // Info for constraining TCP to lie on a line segment between two poses
+    nb::class_<ti::CartLineInfo>(m, "CartLineInfo")
+        .def(nb::init<>())
+        .def_rw("manip", &ti::CartLineInfo::manip, "The joint group")
+        .def_rw("source_frame", &ti::CartLineInfo::source_frame, "TCP frame")
+        .def_rw("target_frame", &ti::CartLineInfo::target_frame, "Reference frame")
+        .def_rw("source_frame_offset", &ti::CartLineInfo::source_frame_offset, "TCP offset")
+        .def_rw("target_frame_offset1", &ti::CartLineInfo::target_frame_offset1, "Line start pose")
+        .def_rw("target_frame_offset2", &ti::CartLineInfo::target_frame_offset2, "Line end pose")
+        .def_rw("indices", &ti::CartLineInfo::indices,
+                "DOF indices to constrain: default {0,1,2,3,4,5}");
+
+    // ========== CartLineConstraint ==========
+    // Constrain TCP to lie on a line segment (for approach/retract, linear paths)
+    nb::class_<ti::CartLineConstraint, ifopt::ConstraintSet>(m, "CartLineConstraint")
+        .def(nb::init<ti::CartLineInfo, std::shared_ptr<const ti::JointPosition>,
+                      const Eigen::VectorXd&, const std::string&>(),
+             "info"_a, "position_var"_a, "coeffs"_a, "name"_a = "CartLine",
+             "Create Cartesian line constraint")
+        .def("GetValues", &ti::CartLineConstraint::GetValues,
+             "Get current constraint values")
+        .def("CalcValues", &ti::CartLineConstraint::CalcValues, "joint_vals"_a,
+             "Calculate error values for given joint values")
+        .def("GetLinePoint", &ti::CartLineConstraint::GetLinePoint,
+             "source_tf"_a, "target_tf1"_a, "target_tf2"_a,
+             "Find nearest point on line (uses SLERP for orientation)")
+        .def_rw("use_numeric_differentiation", &ti::CartLineConstraint::use_numeric_differentiation,
+                "If true, use numeric differentiation (default: true)");
+
+    // ========== DiscreteCollisionNumericalConstraint ==========
+    // Same as DiscreteCollisionConstraint but uses numerical differentiation for jacobians
+    nb::class_<ti::DiscreteCollisionNumericalConstraint, ifopt::ConstraintSet>(m, "DiscreteCollisionNumericalConstraint")
+        .def(nb::init<std::shared_ptr<ti::DiscreteCollisionEvaluator>,
+                      std::shared_ptr<const ti::JointPosition>,
+                      int, bool, const std::string&>(),
+             "collision_evaluator"_a, "position_var"_a,
+             "max_num_cnt"_a = 1, "fixed_sparsity"_a = false,
+             "name"_a = "DiscreteCollisionNumerical",
+             "Create discrete collision constraint with numerical jacobians")
+        .def("GetValues", &ti::DiscreteCollisionNumericalConstraint::GetValues)
+        .def("CalcValues", &ti::DiscreteCollisionNumericalConstraint::CalcValues, "joint_vals"_a)
+        .def("GetCollisionEvaluator", &ti::DiscreteCollisionNumericalConstraint::GetCollisionEvaluator);
+
+    // ========== InverseKinematicsInfo (struct) ==========
+    // Info for IK-based optimization constraint
+    nb::class_<ti::InverseKinematicsInfo>(m, "InverseKinematicsInfo")
+        .def(nb::init<>())
+        .def_rw("manip", &ti::InverseKinematicsInfo::manip, "The kinematic group (with IK solver)")
+        .def_rw("working_frame", &ti::InverseKinematicsInfo::working_frame, "Working frame (not currently used)")
+        .def_rw("tcp_frame", &ti::InverseKinematicsInfo::tcp_frame, "TCP frame (not currently used)")
+        .def_rw("tcp_offset", &ti::InverseKinematicsInfo::tcp_offset, "TCP offset (not currently used)");
+
+    // ========== InverseKinematicsConstraint ==========
+    // Constrain joints to stay within bounds of an IK solution
+    nb::class_<ti::InverseKinematicsConstraint, ifopt::ConstraintSet>(m, "InverseKinematicsConstraint")
+        .def(nb::init<const Eigen::Isometry3d&, ti::InverseKinematicsInfo::ConstPtr,
+                      std::shared_ptr<const ti::JointPosition>,
+                      std::shared_ptr<const ti::JointPosition>,
+                      const std::string&>(),
+             "target_pose"_a, "kinematic_info"_a, "constraint_var"_a, "seed_var"_a,
+             "name"_a = "InverseKinematics",
+             "Create IK constraint (constraint_var constrained to IK solution seeded from seed_var)")
+        .def("GetValues", &ti::InverseKinematicsConstraint::GetValues,
+             "Get current constraint values");
 }

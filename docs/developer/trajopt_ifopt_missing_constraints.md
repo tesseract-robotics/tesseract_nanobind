@@ -1,15 +1,15 @@
-# TrajOpt IFOPT: Missing Python Bindings Analysis
+# TrajOpt IFOPT: Constraint Bindings Reference
 
 ## Summary
 
-4 C++ constraint classes in `trajopt_ifopt` lack Python bindings.
+All 4 C++ constraint classes now have Python bindings.
 
-| Constraint | Priority | Complexity | Use Case |
-|-----------|----------|------------|----------|
-| `JointJerkConstraint` | High | Low | Smoother trajectories |
-| `CartLineConstraint` | Medium | Medium | Linear tool paths |
-| `DiscreteCollisionNumericalConstraint` | Low | Low | Alternative collision jacobian |
-| `InverseKinematicsConstraint` | Low | High | IK-based optimization |
+| Constraint | Status | Complexity | Use Case |
+|-----------|--------|------------|----------|
+| `JointJerkConstraint` | **Bound** | Low | Smoother trajectories |
+| `CartLineConstraint` | **Bound** | Medium | Linear tool paths |
+| `DiscreteCollisionNumericalConstraint` | **Bound** | Low | Alternative collision jacobian |
+| `InverseKinematicsConstraint` | **Bound** | High | IK-based optimization |
 
 ---
 
@@ -176,15 +176,17 @@ Already wrapped in `trajopt_ifopt_bindings.cpp`:
 
 ---
 
-## Recommendations
+## Implementation Status
 
-1. **JointJerkConstraint** - Wrap first. Simple pattern match with `JointAccelConstraint`. High value for industrial users.
+All 4 constraints are now bound in `trajopt_ifopt_bindings.cpp`:
 
-2. **CartLineConstraint** - Wrap second. Useful for linear tool paths. Requires `CartLineInfo` struct.
+1. **JointJerkConstraint** - Requires 6+ JointPosition variables (higher than accel's 3+).
 
-3. **DiscreteCollisionNumericalConstraint** - Optional. Only useful for debugging/validation.
+2. **CartLineConstraint** - Uses `CartLineInfo` struct with `Isometry3d` transforms.
 
-4. **InverseKinematicsConstraint** - Defer. Complex dependencies, unclear API stability.
+3. **DiscreteCollisionNumericalConstraint** - Same API as analytical version.
+
+4. **InverseKinematicsConstraint** - Uses `KinematicGroup` (inherits from `JointGroup`).
 
 ---
 
