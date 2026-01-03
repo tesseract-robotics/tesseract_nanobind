@@ -7,94 +7,15 @@ Fundamental examples demonstrating kinematics, collision detection, and scene gr
 Forward and inverse kinematics with the ABB IRB2400:
 
 ```python title="tesseract_kinematics_example.py"
-from tesseract_robotics.planning import Robot
-import numpy as np
-
-# Load robot
-robot = Robot.from_tesseract_support("abb_irb2400")
-env = robot.env
-
-# Get kinematic group
-manip = env.getKinematicGroup("manipulator")
-joint_names = list(manip.getJointNames())
-print(f"Joints: {joint_names}")
-
-# Forward kinematics
-joints = np.array([0.0, -0.5, 0.5, 0.0, 0.5, 0.0])
-transforms = manip.calcFwdKin(joints)
-
-tcp_pose = transforms["tool0"]
-print(f"\nTCP Position: {tcp_pose.translation()}")
-print(f"TCP Rotation:\n{tcp_pose.rotation()}")
-
-# Inverse kinematics
-target = tcp_pose
-target.translate([0.1, 0, 0])  # Move 10cm in X
-
-solutions = manip.calcInvKin(target, joints)
-if solutions:
-    print(f"\nFound {len(solutions)} IK solutions")
-    print(f"First solution: {solutions[0]}")
-else:
-    print("No IK solution found")
-
-# Joint limits
-limits = manip.getLimits()
-print(f"\nJoint limits:")
-for i, name in enumerate(joint_names):
-    lower = limits.joint_limits[i, 0]
-    upper = limits.joint_limits[i, 1]
-    print(f"  {name}: [{lower:.2f}, {upper:.2f}] rad")
+--8<-- "examples/tesseract_kinematics_example.py"
 ```
-
-??? example "Expected Output"
-    ```
-    Joints: ['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
-
-    TCP Position: [1.142  0.     1.131]
-    TCP Rotation:
-    [[ 0.878 -0.     0.479]
-     [ 0.     1.     0.   ]
-     [-0.479  0.     0.878]]
-
-    Found 2 IK solutions
-    First solution: [ 0.098 -0.435  0.464  0.     0.471 -0.098]
-
-    Joint limits:
-      joint_1: [-3.14, 3.14] rad
-      joint_2: [-1.75, 1.92] rad
-      ...
-    ```
 
 ## Collision Detection Example
 
 Check for collisions in the environment:
 
 ```python title="tesseract_collision_example.py"
-from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_collision import (
-    ContactRequest, ContactTestType
-)
-import numpy as np
-
-robot = Robot.from_tesseract_support("abb_irb2400")
-env = robot.env
-
-# Safe configuration
-safe_joints = np.zeros(6)
-print(f"Safe config collision-free: {robot.check_collision(safe_joints)}")
-
-# Self-collision configuration (extreme joint angles)
-collision_joints = np.array([0, 1.5, -2.0, 0, 1.5, 0])
-print(f"Collision config safe: {robot.check_collision(collision_joints)}")
-
-# Detailed collision info
-if not robot.check_collision(collision_joints):
-    contacts = robot.get_contacts(collision_joints)
-    print(f"\nCollisions detected: {len(contacts)}")
-    for contact in contacts:
-        print(f"  {contact.link_names[0]} <-> {contact.link_names[1]}")
-        print(f"    Distance: {contact.distance:.4f} m")
+--8<-- "examples/tesseract_collision_example.py"
 ```
 
 ## Scene Graph Example

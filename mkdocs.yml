@@ -52,7 +52,6 @@ plugins:
   - exclude:
       glob:
         - _source/*
-        - MIGRATION_NOTES.md
         - QUICKSTART.md
   - mkdocstrings:
       handlers:
@@ -105,8 +104,9 @@ markdown_extensions:
       repo: tesseract_nanobind
   - pymdownx.smartsymbols
   - pymdownx.snippets:
+      base_path: ['.', 'docs']
       auto_append:
-        - docs/includes/abbreviations.md
+        - includes/abbreviations.md
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -139,6 +139,10 @@ nav:
   - API Reference:
     - api/index.md
     - tesseract_robotics.planning: api/planning.md
+  - Developer:
+    - developer/index.md
+    - SWIG to Nanobind Migration: developer/migration.md
+    - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md
 
 extra:
   version:
