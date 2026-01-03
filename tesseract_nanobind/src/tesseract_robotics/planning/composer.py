@@ -378,7 +378,17 @@ class TaskComposer:
             )
 
         output_key = task.getOutputKeys().get("program")
-        input_key = task.getInputKeys().get("planning_input")
+        # Different pipelines use different input keys
+        input_keys = task.getInputKeys()
+        if input_keys.has("planning_input"):
+            input_key = input_keys.get("planning_input")
+        elif input_keys.has("program"):
+            input_key = input_keys.get("program")
+        else:
+            return PlanningResult(
+                successful=False,
+                message=f"Pipeline '{pipeline}' has unknown input key configuration",
+            )
 
         # Wrap data for task composer
         program_anypoly = AnyPoly_wrap_CompositeInstruction(composite)

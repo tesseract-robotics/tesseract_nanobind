@@ -861,7 +861,6 @@ class TestTaskComposer:
         assert not result.successful
         assert "not found" in result.message.lower() or "error" in result.message.lower()
 
-    @pytest.mark.skip(reason="OMPLPipeline input key configuration differs from TrajOptPipeline")
     def test_plan_ompl(self, robot):
         """Test plan_ompl convenience method."""
         from tesseract_robotics.planning import plan_ompl
@@ -879,10 +878,14 @@ class TestTaskComposer:
         assert result.successful
         assert len(result) > 0
 
-    @pytest.mark.skip(reason="DescartesPipeline not available in default config")
     def test_plan_cartesian(self, robot):
-        """Test plan_cartesian convenience method."""
-        from tesseract_robotics.planning import plan_cartesian
+        """Test plan_cartesian with TrajOpt (Descartes not in default config)."""
+        from tesseract_robotics.planning import (
+            PlannerConfig,
+            StateTarget,
+            plan_cartesian,
+        )
+        from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
         joint_names = robot.get_joint_names("manipulator")
 
@@ -891,17 +894,22 @@ class TestTaskComposer:
         robot.set_joints(start_joints, joint_names=joint_names)
         start_pose = robot.fk("manipulator", start_joints)
 
-        # Create small linear motion
-        end_pose = Pose.from_xyz(start_pose.x, start_pose.y + 0.05, start_pose.z)
+        # Create Cartesian motion (freespace to Cartesian target)
+        # Note: linear_to requires specific profile configuration that may not
+        # work for all robots; move_to with CartesianTarget is more reliable
+        end_pose = Pose.from_xyz(start_pose.x, start_pose.y + 0.1, start_pose.z)
 
         program = (
             MotionProgram("manipulator", tcp_frame="tool0")
             .set_joint_names(joint_names)
-            .move_to(JointTarget(start_joints))
-            .linear_to(CartesianTarget(end_pose))
+            .move_to(StateTarget(start_joints, names=joint_names))
+            .move_to(CartesianTarget(end_pose))
         )
 
-        result = plan_cartesian(robot, program)
+        # Use TrajOptPipeline with proper profiles
+        config = PlannerConfig(pipeline="TrajOptPipeline")
+        profiles = create_trajopt_default_profiles()
+        result = plan_cartesian(robot, program, config=config, profiles=profiles)
 
         assert result.successful
         assert len(result) > 0
