@@ -191,6 +191,60 @@ collision_config = TrajOptCollisionConfig(margin=0.1, coeff=10.0)
 collision_config.collision_margin_buffer = 0.10
 ```
 
+## Python Binding Notes
+
+### Nanobind Bindings
+
+The Python bindings are generated using [nanobind](https://github.com/wjakob/nanobind), a modern
+C++17 binding library. Almost the entire Tesseract API is available in Python. The bindings provide
+native NumPy integration for Eigen types and automatic handling of C++ smart pointers.
+
+### C++ Storage and Pointer Types
+
+The Tesseract library uses several common C++ storage and pointer patterns:
+
+- **pass-by-copy**: Objects are copied into Python and managed by Python's garbage collector.
+- **shared pointers**: Automatically reference-counted. Destroyed when no references remain.
+- **unique pointers**: Nanobind automatically extracts unique_ptr contents, so `result.release()`
+  is not needed (unlike SWIG bindings).
+
+### Template Containers
+
+The Tesseract library uses C++ container templates extensively. These are wrapped by nanobind.
+Typical examples include `std::vector`, `std::map`, and `std::unordered_map`. Each specific
+implementation of the template is wrapped, for example `std::vector<std::string>` is `StringVector`.
+Most of these templates are in `tesseract_common`, however they can be found in many modules.
+These template types roughly correspond to lists and dictionaries in Python. They can normally be
+implicitly created using lists and dictionaries, and when returned have roughly the same accessor
+methods.
+
+### Eigen Types
+
+Eigen matrices and vectors are used extensively in Tesseract. These are automatically converted
+to NumPy arrays by nanobind. This conversion works for `float64` types (`double` in C++) and
+`int32` types (`int` in C++). The conversion uses efficient buffer protocols with minimal copying.
+
+Some Eigen geometry types are wrapped as classes in the `tesseract_common` module:
+
+```python
+from tesseract_robotics.tesseract_common import Isometry3d
+import numpy as np
+
+# Identity transform
+pose = Isometry3d.Identity()
+pose.translate([0.5, 0.2, 0.3])
+
+# Get components
+position = pose.translation()  # np.array([x, y, z])
+rotation = pose.rotation()     # 3x3 rotation matrix
+matrix = pose.matrix()         # 4x4 homogeneous matrix
+
+# From 4x4 matrix
+mat = np.eye(4)
+mat[:3, 3] = [1, 2, 3]
+pose_from_matrix = Isometry3d(mat)
+```
+
 ## Next Steps
 
 - [Environment Guide](../user-guide/environment.md) - Deep dive into environments
