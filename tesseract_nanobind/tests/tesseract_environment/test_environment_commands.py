@@ -4,8 +4,6 @@ import pytest
 
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
-    CollisionMarginData,
-    CollisionMarginOverrideType,
     GeneralResourceLocator,
     Isometry3d,
 )
@@ -37,7 +35,7 @@ from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_scene_graph import Joint, JointType, Link, Visual
 
 SIMPLE_URDF = """
-<robot name="test_robot">
+<robot name="test_robot" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
   <link name="world"/>
   <link name="link1">
     <visual><geometry><box size="0.1 0.1 0.1"/></geometry></visual>
@@ -268,23 +266,25 @@ class TestChangeCollisionMarginsCommand:
     """Tests for ChangeCollisionMarginsCommand"""
 
     def test_constructor_with_default_margin(self):
-        cmd = ChangeCollisionMarginsCommand(
-            0.01, CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
-        )
-        assert (
-            cmd.getCollisionMarginOverrideType()
-            == CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
+        # 0.33 API: Simplified constructor for default margin
+        cmd = ChangeCollisionMarginsCommand(0.01)
+        # Verify command was created (no getCollisionMarginOverrideType with single arg)
+        assert cmd is not None
+
+    def test_constructor_with_pair_data(self):
+        # 0.33 API: For pair overrides, use CollisionMarginPairData
+        from tesseract_robotics.tesseract_common import (
+            CollisionMarginPairData,
+            CollisionMarginPairOverrideType,
         )
 
-    def test_constructor_with_margin_data(self):
-        margin_data = CollisionMarginData(0.02)
-        cmd = ChangeCollisionMarginsCommand(margin_data, CollisionMarginOverrideType.REPLACE)
-        assert cmd.getCollisionMarginOverrideType() == CollisionMarginOverrideType.REPLACE
+        pair_data = CollisionMarginPairData()
+        cmd = ChangeCollisionMarginsCommand(pair_data, CollisionMarginPairOverrideType.REPLACE)
+        assert cmd.getCollisionMarginPairOverrideType() == CollisionMarginPairOverrideType.REPLACE
 
     def test_apply_command(self, env):
-        cmd = ChangeCollisionMarginsCommand(
-            0.01, CollisionMarginOverrideType.OVERRIDE_DEFAULT_MARGIN
-        )
+        # 0.33 API: Simple default margin constructor
+        cmd = ChangeCollisionMarginsCommand(0.01)
         env.applyCommand(cmd)
 
 

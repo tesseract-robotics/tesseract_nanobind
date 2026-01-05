@@ -146,7 +146,8 @@ def plan_ompl(
             for point in result:
                 print(point.positions)
     """
-    config = config or PlannerConfig(pipeline="OMPLPipeline")
+    # 0.33 API: Use FreespacePipeline for OMPL planning (includes time parameterization)
+    config = config or PlannerConfig(pipeline="FreespacePipeline")
 
     composer = TaskComposer.from_config()
     return composer.plan(

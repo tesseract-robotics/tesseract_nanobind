@@ -27,7 +27,7 @@
 // tesseract_common
 #include <tesseract_common/kinematic_limits.h>
 #include <tesseract_common/resource_locator.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 
 namespace tk = tesseract_kinematics;
 namespace tcommon = tesseract_common;
@@ -91,7 +91,12 @@ NB_MODULE(_tesseract_kinematics, m) {
             }
             return py_result;
         }, "joint_angles"_a)
-        .def("calcJacobian", &tk::ForwardKinematics::calcJacobian, "joint_angles"_a, "link_name"_a)
+        // Note: In 0.33, calcJacobian has a non-virtual wrapper returning MatrixXd
+        .def("calcJacobian", [](const tk::ForwardKinematics& self,
+                                const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
+                                const std::string& link_name) {
+            return self.calcJacobian(joint_angles, link_name);
+        }, "joint_angles"_a, "link_name"_a)
         .def("getBaseLinkName", &tk::ForwardKinematics::getBaseLinkName)
         .def("getJointNames", &tk::ForwardKinematics::getJointNames)
         .def("getTipLinkNames", &tk::ForwardKinematics::getTipLinkNames)
@@ -187,9 +192,9 @@ NB_MODULE(_tesseract_kinematics, m) {
     // ========== KinematicsPluginFactory ==========
     nb::class_<tk::KinematicsPluginFactory>(m, "KinematicsPluginFactory")
         .def(nb::init<>())
-        // Constructor with fs::path and locator
+        // Constructor with std::filesystem::path and locator
         .def("__init__", [](tk::KinematicsPluginFactory* self,
-                            const tcommon::fs::path& config_path,
+                            const std::filesystem::path& config_path,
                             const tcommon::ResourceLocator& locator) {
             new (self) tk::KinematicsPluginFactory(config_path, locator);
         }, "config_path"_a, "locator"_a)

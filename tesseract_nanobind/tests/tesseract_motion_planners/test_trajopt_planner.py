@@ -1,44 +1,45 @@
 """Tests for tesseract_motion_planners_trajopt bindings."""
+
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_common import (
-    Isometry3d,
-    Translation3d,
-    Quaterniond,
-    ManipulatorInfo,
-    GeneralResourceLocator,
-    FilesystemPath,
-)
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
-    JointWaypoint,
     CartesianWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CompositeInstruction,
+    InstructionPoly_as_MoveInstructionPoly,
+    JointWaypoint,
+    JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
-    WaypointPoly_as_StateWaypointPoly,
-    CompositeInstruction,
     MoveInstructionType_FREESPACE,
     ProfileDictionary,
+    WaypointPoly_as_StateWaypointPoly,
 )
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    Isometry3d,
+    ManipulatorInfo,
+    Quaterniond,
+    Translation3d,
+)
+from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 
 # TrajOpt imports - skip tests if not available
 try:
+    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        TrajOptMotionPlanner,
-        TrajOptDefaultPlanProfile,
-        TrajOptDefaultCompositeProfile,
-        CollisionCostConfig,
-        CollisionConstraintConfig,
-        CollisionEvaluatorType,
-        ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
+        ProfileDictionary_addTrajOptPlanProfile,
+        TrajOptCollisionConfig,
+        TrajOptDefaultCompositeProfile,
+        TrajOptDefaultPlanProfile,
+        TrajOptMotionPlanner,
     )
+
     TRAJOPT_AVAILABLE = True
 except ImportError:
     TRAJOPT_AVAILABLE = False
@@ -51,8 +52,16 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 def lbr_iiwa_environment():
     """Load LBR IIWA robot environment for testing."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(locator.locateResource("package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf").getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource("package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf").getFilePath())
+    urdf_path = FilesystemPath(
+        locator.locateResource(
+            "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
+        ).getFilePath()
+    )
+    srdf_path = FilesystemPath(
+        locator.locateResource(
+            "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
+        ).getFilePath()
+    )
 
     t_env = Environment()
     assert t_env.init(urdf_path, srdf_path, locator), "Failed to initialize LBR IIWA"
@@ -107,90 +116,55 @@ class TestTrajOptProfiles:
         assert profile.avoid_singularity is True
         assert profile.avoid_singularity_coeff == 5.0
 
-        # Segment length parameters
-        profile.longest_valid_segment_fraction = 0.01
-        profile.longest_valid_segment_length = 0.1
-        assert profile.longest_valid_segment_fraction == 0.01
-        assert profile.longest_valid_segment_length == 0.1
+        # Note: longest_valid_segment_* and contact_test_type removed in 0.33
+        # These are now part of nested CollisionCheckConfig
 
         # Collision configs
         assert hasattr(profile, "collision_cost_config")
         assert hasattr(profile, "collision_constraint_config")
-        assert hasattr(profile, "contact_test_type")
 
-    def test_collision_cost_config(self):
-        config = CollisionCostConfig()
+    def test_trajopt_collision_config(self):
+        """Test TrajOptCollisionConfig (0.33 API)."""
+        config = TrajOptCollisionConfig()
         assert config is not None
         config.enabled = True
-        config.safety_margin = 0.025
-        config.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
+        config.collision_margin_buffer = 0.025
         assert config.enabled is True
-        assert config.safety_margin == 0.025
-        assert config.type == CollisionEvaluatorType.DISCRETE_CONTINUOUS
+        assert config.collision_margin_buffer == 0.025
 
-    def test_collision_cost_config_all_attributes(self):
-        """Test all CollisionCostConfig attributes."""
-        config = CollisionCostConfig()
-        config.enabled = True
-        config.use_weighted_sum = True
-        config.type = CollisionEvaluatorType.CAST_CONTINUOUS
-        config.safety_margin = 0.05
-        config.safety_margin_buffer = 0.01
-        config.coeff = 25.0
+    def test_trajopt_collision_config_attributes(self):
+        """Test TrajOptCollisionConfig attributes."""
+        config = TrajOptCollisionConfig()
+        config.enabled = False
+        config.collision_margin_buffer = 0.01
+        config.max_num_cnt = 5
 
-        assert config.enabled is True
-        assert config.use_weighted_sum is True
-        assert config.type == CollisionEvaluatorType.CAST_CONTINUOUS
-        assert config.safety_margin == 0.05
-        assert config.safety_margin_buffer == 0.01
-        assert config.coeff == 25.0
-
-    def test_collision_constraint_config(self):
-        config = CollisionConstraintConfig()
-        assert config is not None
-        config.enabled = True
-        config.safety_margin = 0.01
-        assert config.enabled is True
-        assert config.safety_margin == 0.01
-
-    def test_collision_constraint_config_all_attributes(self):
-        """Test all CollisionConstraintConfig attributes."""
-        config = CollisionConstraintConfig()
-        config.enabled = True
-        config.use_weighted_sum = False
-        config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
-        config.safety_margin = 0.02
-        config.safety_margin_buffer = 0.005
-        config.coeff = 10.0
-
-        assert config.enabled is True
-        assert config.use_weighted_sum is False
-        assert config.type == CollisionEvaluatorType.SINGLE_TIMESTEP
-        assert config.safety_margin == 0.02
-        assert config.safety_margin_buffer == 0.005
-        assert config.coeff == 10.0
+        assert config.enabled is False
+        assert config.collision_margin_buffer == 0.01
+        assert config.max_num_cnt == 5
 
     def test_collision_evaluator_type_enum(self):
-        assert CollisionEvaluatorType.SINGLE_TIMESTEP is not None
-        assert CollisionEvaluatorType.DISCRETE_CONTINUOUS is not None
-        assert CollisionEvaluatorType.CAST_CONTINUOUS is not None
+        """Test CollisionEvaluatorType enum values (now in tesseract_collision)."""
+        assert CollisionEvaluatorType.NONE is not None
+        assert CollisionEvaluatorType.DISCRETE is not None
+        assert CollisionEvaluatorType.LVS_DISCRETE is not None
+        assert CollisionEvaluatorType.CONTINUOUS is not None
+        assert CollisionEvaluatorType.LVS_CONTINUOUS is not None
 
     def test_composite_profile_with_collision_configs(self):
         """Test setting collision configs on composite profile."""
         profile = TrajOptDefaultCompositeProfile()
 
         # Create and configure collision cost
-        cost_config = CollisionCostConfig()
+        cost_config = TrajOptCollisionConfig()
         cost_config.enabled = True
-        cost_config.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
-        cost_config.safety_margin = 0.025
-        cost_config.coeff = 20.0
+        cost_config.collision_margin_buffer = 0.025
         profile.collision_cost_config = cost_config
 
         # Create and configure collision constraint
-        constraint_config = CollisionConstraintConfig()
+        constraint_config = TrajOptCollisionConfig()
         constraint_config.enabled = False
-        constraint_config.safety_margin = 0.01
+        constraint_config.collision_margin_buffer = 0.01
         profile.collision_constraint_config = constraint_config
 
         # Verify assignment
@@ -225,9 +199,7 @@ class TestTrajOptPlanning:
         wp1 = JointWaypoint(joint_names, np.array([0, 0, 0, -1.57, 0, 0, 0], dtype=np.float64))
         # End at cartesian position
         wp2 = CartesianWaypoint(
-            Isometry3d.Identity()
-            * Translation3d(-0.2, 0.4, 0.2)
-            * Quaterniond(0, 0, 1.0, 0)
+            Isometry3d.Identity() * Translation3d(-0.2, 0.4, 0.2) * Quaterniond(0, 0, 1.0, 0)
         )
 
         start_instruction = MoveInstruction(
@@ -319,12 +291,10 @@ class TestTrajOptPlanning:
         plan_profile = TrajOptDefaultPlanProfile()
         composite_profile = TrajOptDefaultCompositeProfile()
 
-        # Configure collision cost
-        collision_cost = CollisionCostConfig()
+        # Configure collision cost (0.33 API)
+        collision_cost = TrajOptCollisionConfig()
         collision_cost.enabled = True
-        collision_cost.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
-        collision_cost.safety_margin = 0.025
-        collision_cost.coeff = 20.0
+        collision_cost.collision_margin_buffer = 0.025
         composite_profile.collision_cost_config = collision_cost
 
         # Configure smoothing
@@ -348,4 +318,6 @@ class TestTrajOptPlanning:
         request.profiles = profiles
 
         response = test_planner.solve(request)
-        assert response.successful, f"TrajOpt planning with collision config failed: {response.message}"
+        assert response.successful, (
+            f"TrajOpt planning with collision config failed: {response.message}"
+        )

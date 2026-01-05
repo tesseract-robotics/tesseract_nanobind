@@ -16,10 +16,11 @@
 
 // tesseract_command_language
 #include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_command_language/profile_dictionary.h>
+#include <tesseract_common/profile_dictionary.h>
 
 namespace tp = tesseract_planning;
 namespace te = tesseract_environment;
+namespace tc = tesseract_common;
 
 NB_MODULE(_tesseract_motion_planners, m) {
     m.doc() = "tesseract_motion_planners Python bindings";
@@ -31,9 +32,10 @@ NB_MODULE(_tesseract_motion_planners, m) {
         .def_prop_rw("env",
             [](const tp::PlannerRequest& self) { return self.env; },
             [](tp::PlannerRequest& self, std::shared_ptr<const te::Environment> env) { self.env = env; })
+        // Note: ProfileDictionary moved to tesseract_common in 0.33
         .def_prop_rw("profiles",
             [](const tp::PlannerRequest& self) { return self.profiles; },
-            [](tp::PlannerRequest& self, std::shared_ptr<const tp::ProfileDictionary> profiles) { self.profiles = profiles; })
+            [](tp::PlannerRequest& self, std::shared_ptr<const tc::ProfileDictionary> profiles) { self.profiles = profiles; })
         .def_rw("instructions", &tp::PlannerRequest::instructions)
         .def_rw("verbose", &tp::PlannerRequest::verbose)
         .def_rw("format_result_as_input", &tp::PlannerRequest::format_result_as_input);

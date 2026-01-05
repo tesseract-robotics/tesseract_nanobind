@@ -25,14 +25,15 @@
 // tesseract_common
 #include <tesseract_common/any_poly.h>
 #include <tesseract_common/resource_locator.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 
 // tesseract_environment for Environment wrapper
 #include <tesseract_environment/environment.h>
 
-// tesseract_command_language for CompositeInstruction and ProfileDictionary wrappers
+// tesseract_command_language for CompositeInstruction
 #include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_command_language/profile_dictionary.h>
+// Note: ProfileDictionary moved to tesseract_common in 0.33
+#include <tesseract_common/profile_dictionary.h>
 
 namespace tp = tesseract_planning;
 namespace te = tesseract_environment;
@@ -89,9 +90,9 @@ NB_MODULE(_tesseract_task_composer, m) {
             if (uuid.is_nil())
                 return nb::none();
             auto info = self.getInfo(uuid);
-            if (!info)
+            if (!info.has_value())
                 return nb::none();
-            // Return a dict with the info
+            // Return a dict with the info (0.33: getInfo returns optional<value> not pointer)
             nb::dict result;
             result["name"] = info->name;
             result["return_value"] = info->return_value;
@@ -103,16 +104,15 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getAllInfos", [](const tp::TaskComposerNodeInfoContainer& self) -> nb::list {
             nb::list result;
             auto info_map = self.getInfoMap();
+            // 0.33: getInfoMap returns map of values, not pointers
             for (const auto& [uuid, info] : info_map) {
-                if (info) {
-                    nb::dict d;
-                    d["name"] = info->name;
-                    d["return_value"] = info->return_value;
-                    d["status_code"] = info->status_code;
-                    d["status_message"] = info->status_message;
-                    d["elapsed_time"] = info->elapsed_time;
-                    result.append(d);
-                }
+                nb::dict d;
+                d["name"] = info.name;
+                d["return_value"] = info.return_value;
+                d["status_code"] = info.status_code;
+                d["status_message"] = info.status_message;
+                d["elapsed_time"] = info.elapsed_time;
+                result.append(d);
             }
             return result;
         });
@@ -155,12 +155,20 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("waitFor", &tp::TaskComposerFuture::waitFor, "duration"_a, nb::call_guard<nb::gil_scoped_release>());
 
     // ========== TaskComposerExecutor (abstract base) ==========
+    // Note: 0.33 API change - run() now takes a context instead of data_storage + dotgraph
     nb::class_<tp::TaskComposerExecutor>(m, "TaskComposerExecutor")
         .def("getName", &tp::TaskComposerExecutor::getName)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
+                       std::shared_ptr<tp::TaskComposerContext> context) {
+            nb::gil_scoped_release release;
+            return self.run(node, context);
+        }, "node"_a, "context"_a)
+        // Legacy signature for backwards compatibility
+        .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph) {
             nb::gil_scoped_release release;
-            return self.run(node, data_storage, dotgraph);
+            auto context = std::make_shared<tp::TaskComposerContext>("run", data_storage, dotgraph);
+            return self.run(node, context);
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false)
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
@@ -175,10 +183,16 @@ NB_MODULE(_tesseract_task_composer, m) {
         // Re-expose base class methods (public run is from TaskComposerExecutor)
         .def("getName", &tp::TaskflowTaskComposerExecutor::getName)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
-                       std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph) {
-            // Release GIL to allow C++ threads to run in parallel
+                       std::shared_ptr<tp::TaskComposerContext> context) {
             nb::gil_scoped_release release;
-            return static_cast<tp::TaskComposerExecutor&>(self).run(node, data_storage, dotgraph);
+            return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
+        }, "node"_a, "context"_a)
+        // Legacy signature for backwards compatibility
+        .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
+                       std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph) {
+            nb::gil_scoped_release release;
+            auto context = std::make_shared<tp::TaskComposerContext>("run", data_storage, dotgraph);
+            return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false)
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount);
@@ -188,7 +202,7 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
     nb::class_<tp::TaskComposerPluginFactory>(m, "TaskComposerPluginFactory")
         .def("__init__", [](tp::TaskComposerPluginFactory* self, const std::string& config_str, nb::handle locator_handle) {
-            tc::fs::path config(config_str);
+            std::filesystem::path config(config_str);
             auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
             auto grl_type = common_module.attr("GeneralResourceLocator");
             if (!nb::isinstance(locator_handle, grl_type)) {
@@ -215,7 +229,7 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
     m.def("createTaskComposerPluginFactory", [](const std::string& config_str, nb::handle locator_handle) {
         // Convert config string to path
-        tc::fs::path config(config_str);
+        std::filesystem::path config(config_str);
 
         // Get the GeneralResourceLocator type from the tesseract_common module
         auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
@@ -250,7 +264,8 @@ NB_MODULE(_tesseract_task_composer, m) {
         return tc::AnyPoly(ci);
     }, "instruction"_a, "Wrap a CompositeInstruction into an AnyPoly");
 
-    m.def("AnyPoly_wrap_ProfileDictionary", [](std::shared_ptr<tp::ProfileDictionary> pd) {
+    // Note: ProfileDictionary moved to tesseract_common in 0.33
+    m.def("AnyPoly_wrap_ProfileDictionary", [](std::shared_ptr<tc::ProfileDictionary> pd) {
         return tc::AnyPoly(pd);
     }, "profiles"_a, "Wrap a ProfileDictionary shared_ptr into an AnyPoly");
 
