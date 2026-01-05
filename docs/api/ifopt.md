@@ -125,3 +125,11 @@ from tesseract_robotics.ifopt import Component
 # Common interface for all optimization components
 # GetName(), GetRows(), etc.
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.ifopt._ifopt
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

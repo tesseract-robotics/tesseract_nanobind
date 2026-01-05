@@ -295,3 +295,11 @@ upper = np.array([3.14, 3.14, 3.14])
 
 bounds = toBounds(lower, upper)  # list[Bounds]
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.trajopt_ifopt._trajopt_ifopt
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

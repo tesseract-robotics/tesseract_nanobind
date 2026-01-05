@@ -110,3 +110,11 @@ from tesseract_robotics.tesseract_task_composer import (
 | `tesseract_motion_planners_trajopt` | TrajOpt | Trajectory optimization |
 | `tesseract_motion_planners_descartes` | Descartes | Graph-based Cartesian |
 | `tesseract_motion_planners_simple` | Simple | Joint interpolation |
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

@@ -207,3 +207,11 @@ if is_collision:
             if c.distance < 0:
                 print(f"Penetration: {c.link_names} depth={-c.distance:.4f}")
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_collision._tesseract_collision
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

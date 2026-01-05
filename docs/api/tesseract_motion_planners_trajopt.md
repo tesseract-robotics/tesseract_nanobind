@@ -227,3 +227,11 @@ export TRAJOPT_LOG_THRESH=ERROR  # FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 3. **Increase safety_margin** if collisions occur
 4. **Use LVS_DISCRETE** for better collision coverage
 5. **Tune coefficients** - higher = stricter enforcement
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

@@ -232,3 +232,11 @@ def on_event(event):
 
 env.addEventCallback(Events_COMMAND_APPLIED, on_event)
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_environment._tesseract_environment
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source
