@@ -62,10 +62,11 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary  # n
 
 # TrajOpt-specific profile types (C++ bindings)
 from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
-    TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
-    TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
-    ProfileDictionary_addTrajOptPlanProfile,  # Register plan profile
     ProfileDictionary_addTrajOptCompositeProfile,  # Register composite profile
+    ProfileDictionary_addTrajOptPlanProfile,  # Register plan profile
+    TrajOptCollisionConfig,  # Collision checking config (0.33 API)
+    TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
+    TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
 )
 
 # TrajOpt planner namespace for profile registration
@@ -132,18 +133,15 @@ def create_pick_and_place_profiles():
     # Applied to entire motion sequence
     composite_profile = TrajOptDefaultCompositeProfile()
 
-    # Max distance between collision checks along trajectory
-    composite_profile.longest_valid_segment_length = 0.05  # 5cm
-
     # Collision constraint disabled - hard constraints can cause solver failures
     # when box is attached close to end-effector
     composite_profile.collision_constraint_config.enabled = False
 
     # Collision cost enabled with soft margin for gradual repulsion
-    # This allows solver to push away from obstacles without hard failure
-    composite_profile.collision_cost_config.enabled = True
-    composite_profile.collision_cost_config.safety_margin = 0.025  # 25mm
-    composite_profile.collision_cost_config.coeff = 20.0
+    # 0.33 API: Use TrajOptCollisionConfig constructor (margin, coeff)
+    # and set longest_valid_segment_length on collision_check_config
+    composite_profile.collision_cost_config = TrajOptCollisionConfig(0.025, 20.0)
+    composite_profile.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
 
     # ==== REGISTER PROFILES ====
     # "CARTESIAN" profile used by linear_to() moves
