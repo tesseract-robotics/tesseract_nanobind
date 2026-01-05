@@ -245,6 +245,67 @@ mat[:3, 3] = [1, 2, 3]
 pose_from_matrix = Isometry3d(mat)
 ```
 
+### Resource Locators
+
+Resource locators resolve `package://` URLs to file paths. The `GeneralResourceLocator` class
+searches paths in `TESSERACT_RESOURCE_PATH` to find resources.
+
+**Auto-configuration:** When you import `tesseract_robotics`, environment variables are automatically
+set to point to bundled data (if not already set):
+
+- `TESSERACT_RESOURCE_PATH` - Path for `package://` URL resolution
+- `TESSERACT_SUPPORT_DIR` - Path to bundled tesseract_support directory
+- `TESSERACT_TASK_COMPOSER_CONFIG_FILE` - Path to bundled task composer config
+
+This means `package://tesseract_support/urdf/...` URLs work out of the box.
+
+### Type Erasure Pattern
+
+The command language uses type erasure extensively. In Python, module-level utility functions
+are needed to create and cast instructions and waypoints:
+
+```python
+from tesseract_robotics.tesseract_command_language import (
+    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    InstructionPoly_as_MoveInstructionPoly,
+    WaypointPoly_as_StateWaypointPoly,
+)
+
+# Wrap a waypoint in the polymorphic type
+cart_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
+
+# Cast back to concrete type
+move_instr = InstructionPoly_as_MoveInstructionPoly(instruction)
+```
+
+`ProfileDictionary` has similar accessor functions per type:
+
+```python
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    ProfileDictionary_addProfile_OMPLPlanProfile
+)
+
+ProfileDictionary_addProfile_OMPLPlanProfile(profiles, "DEFAULT", ompl_profile)
+```
+
+### Console Bridge Logging
+
+Tesseract uses `console_bridge` for logging. Control logging level via:
+
+```python
+from tesseract_robotics.tesseract_common import (
+    getLogLevel, setLogLevel,
+    CONSOLE_BRIDGE_LOG_NONE,
+    CONSOLE_BRIDGE_LOG_ERROR,
+    CONSOLE_BRIDGE_LOG_WARN,
+    CONSOLE_BRIDGE_LOG_INFO,
+    CONSOLE_BRIDGE_LOG_DEBUG,
+)
+
+setLogLevel(CONSOLE_BRIDGE_LOG_WARN)
+```
+
 ## Next Steps
 
 - [Environment Guide](../user-guide/environment.md) - Deep dive into environments
