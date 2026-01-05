@@ -2,8 +2,8 @@
 # Build documentation using MkDocs
 #
 # Usage:
-#   ./scripts/build_docs.sh          # Build static site
-#   ./scripts/build_docs.sh serve    # Start dev server
+#   ./scripts/build_docs.sh          # Build and serve at localhost:8001
+#   ./scripts/build_docs.sh serve    # Start dev server with hot reload
 #   ./scripts/build_docs.sh deploy   # Deploy to GitHub Pages
 
 set -e
@@ -27,14 +27,24 @@ check_deps() {
     fi
 }
 
-# Build static site
+# Build static site and serve
 build() {
     echo "Building documentation..."
     check_deps
     mkdocs build
     echo ""
     echo "Documentation built in site/"
-    echo "Open site/index.html to view locally"
+    echo "Starting server at http://127.0.0.1:8001"
+
+    # Open browser (works on macOS, Linux with xdg-open, or WSL)
+    if command -v open &> /dev/null; then
+        open http://127.0.0.1:8001
+    elif command -v xdg-open &> /dev/null; then
+        xdg-open http://127.0.0.1:8001
+    fi
+
+    # Serve the built site
+    python -m http.server 8001 --directory site
 }
 
 # Start development server
