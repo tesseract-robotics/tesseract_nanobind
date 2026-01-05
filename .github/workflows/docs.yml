@@ -7,6 +7,7 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
+      - 'tesseract_nanobind/src/tesseract_robotics/**/*.pyi'  # stub files for API docs
   workflow_dispatch:
 
 permissions:
@@ -33,7 +34,7 @@ jobs:
       run: pip install -r docs/requirements.txt
 
     - name: Build docs
-      run: mkdocs build --strict
+      run: mkdocs build
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3

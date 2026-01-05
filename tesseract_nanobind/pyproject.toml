@@ -83,6 +83,7 @@ CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
 [tool.ruff]
 target-version = "py39"
 line-length = 100
+extend-exclude = ["*.pyi"]  # auto-generated stubs have C++ type strings
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]  # errors, pyflakes, isort, pyupgrade
