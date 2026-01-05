@@ -137,10 +137,19 @@ nav:
     - Online Planning: examples/online-planning.md
   - API Reference:
     - api/index.md
-    - tesseract_robotics.planning: api/planning.md
-    - tesseract_robotics.ifopt: api/ifopt.md
-    - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
-    - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
+    - High-Level:
+      - tesseract_robotics.planning: api/planning.md
+    - Core Modules:
+      - tesseract_robotics.tesseract_common: api/tesseract_common.md
+      - tesseract_robotics.tesseract_geometry: api/tesseract_geometry.md
+      - tesseract_robotics.tesseract_scene_graph: api/tesseract_scene_graph.md
+      - tesseract_robotics.tesseract_environment: api/tesseract_environment.md
+      - tesseract_robotics.tesseract_collision: api/tesseract_collision.md
+      - tesseract_robotics.tesseract_kinematics: api/tesseract_kinematics.md
+    - SQP Modules:
+      - tesseract_robotics.ifopt: api/ifopt.md
+      - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
+      - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
   - Developer:
     - developer/index.md
     - SWIG to Nanobind Migration: developer/migration.md
