@@ -198,3 +198,11 @@ setLogLevel(CONSOLE_BRIDGE_LOG_DEBUG)
 | `TransformMap` | `dict[str, Isometry3d]` - link name to transform |
 | `VectorIsometry3d` | `list[Isometry3d]` |
 | `VectorVector3d` | `list[np.ndarray]` - list of 3D points |
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_common._tesseract_common
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

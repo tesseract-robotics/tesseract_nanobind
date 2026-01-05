@@ -193,3 +193,11 @@ if solutions:
 2. **Multiple Solutions**: Most 6-DOF robots have up to 8 IK solutions
 3. **Joint Limits**: IK solvers respect joint limits
 4. **Analytical vs Numerical**: OPW (UR, ABB) is analytical and fast; KDL is numerical
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_kinematics._tesseract_kinematics
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

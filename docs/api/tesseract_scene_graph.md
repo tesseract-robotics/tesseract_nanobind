@@ -198,3 +198,11 @@ positions = state.joints  # dict[str, float]
 transforms = state.link_transforms  # dict[str, Isometry3d]
 tcp_pose = transforms["tool0"]
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

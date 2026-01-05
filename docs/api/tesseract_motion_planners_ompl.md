@@ -188,3 +188,11 @@ else:
 3. **Use simplify=True** to reduce waypoints
 4. **Lower collision resolution** (`longest_valid_segment_length`) for narrow passages
 5. **OMPL finds paths, not smooth trajectories** - use TrajOpt for smoothing
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_motion_planners_ompl._tesseract_motion_planners_ompl
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

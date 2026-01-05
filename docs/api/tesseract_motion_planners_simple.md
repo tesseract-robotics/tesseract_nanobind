@@ -89,3 +89,11 @@ if response.successful:
 1. **Use as preprocessing** for optimization-based planners
 2. **Verify collision** after planning with simple planner
 3. **Good for short motions** where collision is unlikely
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_motion_planners_simple._tesseract_motion_planners_simple
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

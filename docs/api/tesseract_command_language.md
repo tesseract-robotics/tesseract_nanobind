@@ -253,3 +253,11 @@ program.appendMoveInstruction(goal_instr)
 
 # Program is ready for TaskComposer
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_command_language._tesseract_command_language
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

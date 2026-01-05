@@ -95,3 +95,11 @@ Waypoint 1      Waypoint 2      Waypoint 3
 2. **Combine with TrajOpt** for smoothing afterward
 3. **Reduce waypoint density** if planning is too slow
 4. **Check reachability** before planning - Descartes fails if any waypoint is unreachable
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_motion_planners_descartes._tesseract_motion_planners_descartes
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

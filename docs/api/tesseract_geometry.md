@@ -182,3 +182,11 @@ copy = geom.clone()
 | `createConvexMeshFromResource(resource, scale)` | Convex from Resource |
 | `createSDFMeshFromPath(path, scale)` | Load as SDF mesh |
 | `createSDFMeshFromResource(resource, scale)` | SDF from Resource |
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_geometry._tesseract_geometry
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

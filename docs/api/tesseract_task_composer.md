@@ -250,3 +250,11 @@ result = plan(robot, program, pipeline="FreespaceMotionPipeline")
 if result.successful:
     trajectory = result.trajectory
 ```
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.tesseract_task_composer._tesseract_task_composer
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source
