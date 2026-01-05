@@ -287,3 +287,18 @@ initial_traj = interpolate(start, goal, n_steps)
 for i, var in enumerate(variables):
     var.SetVariables(initial_traj[i])
 ```
+
+## Auto-generated API Reference
+
+The following is auto-generated from the module's type stubs and docstrings.
+
+::: tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPStatus
+    options:
+      show_root_heading: true
+      show_source: false
+
+::: tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPParameters
+    options:
+      show_root_heading: true
+      show_source: false
+      members: true
