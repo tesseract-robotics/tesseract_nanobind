@@ -81,8 +81,9 @@ from tesseract_robotics.planning import (
 )
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultCompositeProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
+    TrajOptCollisionConfig,
+    TrajOptDefaultCompositeProfile,
 )
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
 
@@ -120,19 +121,16 @@ def create_profiles():
     profiles = ProfileDictionary()
     composite = TrajOptDefaultCompositeProfile()
 
-    # Max distance between collision checks along trajectory
-    # Smaller = more accurate but slower
-    composite.longest_valid_segment_length = 0.05  # 5cm
-
     # Disable hard collision constraints - they fail in tight spaces
     # when box is attached close to end-effector
     composite.collision_constraint_config.enabled = False
 
     # Enable soft collision cost with gradual repulsion
     # This allows solver to push away from obstacles without hard failure
-    composite.collision_cost_config.enabled = True
-    composite.collision_cost_config.safety_margin = 0.025  # 25mm margin
-    composite.collision_cost_config.coeff = 20.0  # Weight in cost function
+    # 0.33 API: Use constructor (margin, coeff) and set longest_valid_segment_length
+    # on collision_check_config
+    composite.collision_cost_config = TrajOptCollisionConfig(0.025, 20.0)
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
 
     ProfileDictionary_addTrajOptCompositeProfile(
         profiles, TRAJOPT_NS, "DEFAULT", composite
