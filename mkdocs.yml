@@ -138,6 +138,9 @@ nav:
   - API Reference:
     - api/index.md
     - tesseract_robotics.planning: api/planning.md
+    - tesseract_robotics.ifopt: api/ifopt.md
+    - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
+    - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
   - Developer:
     - developer/index.md
     - SWIG to Nanobind Migration: developer/migration.md

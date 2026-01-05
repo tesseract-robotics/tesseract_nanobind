@@ -37,9 +37,9 @@ Auto-generated API documentation from docstrings.
 
 | Module | Description |
 |--------|-------------|
-| `tesseract_robotics.ifopt` | Base optimization (Bounds, VariableSet, ConstraintSet) |
-| `tesseract_robotics.trajopt_ifopt` | Robotics constraints (collision, Cartesian, joints) |
-| `tesseract_robotics.trajopt_sqp` | SQP solver (TrustRegionSQPSolver, OSQP) |
+| [`tesseract_robotics.ifopt`](ifopt.md) | Base optimization (Bounds, VariableSet, ConstraintSet) |
+| [`tesseract_robotics.trajopt_ifopt`](trajopt_ifopt.md) | Robotics constraints (collision, Cartesian, joints) |
+| [`tesseract_robotics.trajopt_sqp`](trajopt_sqp.md) | SQP solver (TrustRegionSQPSolver, OSQP) |
 
 ## Import Patterns
 
