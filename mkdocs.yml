@@ -146,6 +146,14 @@ nav:
       - tesseract_robotics.tesseract_environment: api/tesseract_environment.md
       - tesseract_robotics.tesseract_collision: api/tesseract_collision.md
       - tesseract_robotics.tesseract_kinematics: api/tesseract_kinematics.md
+    - Planning Modules:
+      - tesseract_robotics.tesseract_command_language: api/tesseract_command_language.md
+      - tesseract_robotics.tesseract_motion_planners: api/tesseract_motion_planners.md
+      - tesseract_robotics.tesseract_motion_planners_ompl: api/tesseract_motion_planners_ompl.md
+      - tesseract_robotics.tesseract_motion_planners_trajopt: api/tesseract_motion_planners_trajopt.md
+      - tesseract_robotics.tesseract_motion_planners_descartes: api/tesseract_motion_planners_descartes.md
+      - tesseract_robotics.tesseract_motion_planners_simple: api/tesseract_motion_planners_simple.md
+      - tesseract_robotics.tesseract_task_composer: api/tesseract_task_composer.md
     - SQP Modules:
       - tesseract_robotics.ifopt: api/ifopt.md
       - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md

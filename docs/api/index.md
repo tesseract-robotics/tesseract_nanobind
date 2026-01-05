@@ -25,13 +25,13 @@ Auto-generated API documentation from docstrings.
 
 | Module | Description |
 |--------|-------------|
-| `tesseract_robotics.tesseract_command_language` | Waypoints, instructions |
-| `tesseract_robotics.tesseract_motion_planners` | Base planner types |
-| `tesseract_robotics.tesseract_motion_planners_ompl` | OMPL planner |
-| `tesseract_robotics.tesseract_motion_planners_trajopt` | TrajOpt planner |
-| `tesseract_robotics.tesseract_motion_planners_descartes` | Descartes planner |
-| `tesseract_robotics.tesseract_motion_planners_simple` | Simple interpolation |
-| `tesseract_robotics.tesseract_task_composer` | Task composition |
+| [`tesseract_robotics.tesseract_command_language`](tesseract_command_language.md) | Waypoints, instructions |
+| [`tesseract_robotics.tesseract_motion_planners`](tesseract_motion_planners.md) | Base planner types |
+| [`tesseract_robotics.tesseract_motion_planners_ompl`](tesseract_motion_planners_ompl.md) | OMPL planner |
+| [`tesseract_robotics.tesseract_motion_planners_trajopt`](tesseract_motion_planners_trajopt.md) | TrajOpt planner |
+| [`tesseract_robotics.tesseract_motion_planners_descartes`](tesseract_motion_planners_descartes.md) | Descartes planner |
+| [`tesseract_robotics.tesseract_motion_planners_simple`](tesseract_motion_planners_simple.md) | Simple interpolation |
+| [`tesseract_robotics.tesseract_task_composer`](tesseract_task_composer.md) | Task composition |
 
 ### Low-Level SQP Modules
 
