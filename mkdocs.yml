@@ -63,6 +63,10 @@ plugins:
             heading_level: 2
             members_order: source
             docstring_style: google
+            show_if_no_docstring: true
+            show_signature: true
+            show_signature_annotations: true
+            separate_signature: true
 
 markdown_extensions:
   # Python Markdown
