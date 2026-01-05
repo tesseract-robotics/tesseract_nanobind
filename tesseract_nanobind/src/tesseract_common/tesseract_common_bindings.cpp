@@ -16,7 +16,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract_common/allowed_collision_matrix.h>
 #include <tesseract_common/kinematic_limits.h>
 #include <tesseract_common/plugin_info.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 
 // console_bridge
 #include <console_bridge/console.h>
@@ -122,12 +122,12 @@ NB_MODULE(_tesseract_common, m) {
 
     // ========== FilesystemPath ==========
     // Wrapper for std::filesystem::path (SWIG compatibility)
-    nb::class_<tesseract_common::fs::path>(m, "FilesystemPath")
+    nb::class_<std::filesystem::path>(m, "FilesystemPath")
         .def(nb::init<>())
         .def(nb::init<const std::string&>(), "path"_a)
-        .def("string", [](const tesseract_common::fs::path& p) { return p.string(); })
-        .def("__str__", [](const tesseract_common::fs::path& p) { return p.string(); })
-        .def("__repr__", [](const tesseract_common::fs::path& p) {
+        .def("string", [](const std::filesystem::path& p) { return p.string(); })
+        .def("__str__", [](const std::filesystem::path& p) { return p.string(); })
+        .def("__repr__", [](const std::filesystem::path& p) {
             return "FilesystemPath('" + p.string() + "')";
         });
 
@@ -219,22 +219,37 @@ NB_MODULE(_tesseract_common, m) {
         .def("insertAllowedCollisionMatrix", &tesseract_common::AllowedCollisionMatrix::insertAllowedCollisionMatrix);
 
     // ========== CollisionMarginData ==========
-    nb::enum_<tesseract_common::CollisionMarginOverrideType>(m, "CollisionMarginOverrideType")
-        .value("NONE", tesseract_common::CollisionMarginOverrideType::NONE)
-        .value("REPLACE", tesseract_common::CollisionMarginOverrideType::REPLACE)
-        .value("MODIFY", tesseract_common::CollisionMarginOverrideType::MODIFY)
-        .value("OVERRIDE_DEFAULT_MARGIN", tesseract_common::CollisionMarginOverrideType::OVERRIDE_DEFAULT_MARGIN)
-        .value("OVERRIDE_PAIR_MARGIN", tesseract_common::CollisionMarginOverrideType::OVERRIDE_PAIR_MARGIN)
-        .value("MODIFY_PAIR_MARGIN", tesseract_common::CollisionMarginOverrideType::MODIFY_PAIR_MARGIN);
+    // Note: CollisionMarginOverrideType was renamed to CollisionMarginPairOverrideType in 0.33
+    // and reduced to 3 values (NONE, REPLACE, MODIFY)
+    nb::enum_<tesseract_common::CollisionMarginPairOverrideType>(m, "CollisionMarginPairOverrideType")
+        .value("NONE", tesseract_common::CollisionMarginPairOverrideType::NONE)
+        .value("REPLACE", tesseract_common::CollisionMarginPairOverrideType::REPLACE)
+        .value("MODIFY", tesseract_common::CollisionMarginPairOverrideType::MODIFY);
+
+    // Backwards-compatible alias (old name)
+    m.attr("CollisionMarginOverrideType") = m.attr("CollisionMarginPairOverrideType");
+
+    // CollisionMarginPairData - new in 0.33
+    nb::class_<tesseract_common::CollisionMarginPairData>(m, "CollisionMarginPairData")
+        .def(nb::init<>())
+        .def("setCollisionMargin", &tesseract_common::CollisionMarginPairData::setCollisionMargin)
+        .def("getCollisionMargin", &tesseract_common::CollisionMarginPairData::getCollisionMargin)
+        .def("getCollisionMargins", &tesseract_common::CollisionMarginPairData::getCollisionMargins)
+        .def("empty", &tesseract_common::CollisionMarginPairData::empty)
+        .def("clear", &tesseract_common::CollisionMarginPairData::clear);
 
     nb::class_<tesseract_common::CollisionMarginData>(m, "CollisionMarginData")
         .def(nb::init<>())
         .def(nb::init<double>())
         .def("getDefaultCollisionMargin", &tesseract_common::CollisionMarginData::getDefaultCollisionMargin)
         .def("setDefaultCollisionMargin", &tesseract_common::CollisionMarginData::setDefaultCollisionMargin)
-        .def("getPairCollisionMargin", &tesseract_common::CollisionMarginData::getPairCollisionMargin)
-        .def("setPairCollisionMargin", &tesseract_common::CollisionMarginData::setPairCollisionMargin)
-        .def("getMaxCollisionMargin", &tesseract_common::CollisionMarginData::getMaxCollisionMargin);
+        .def("getCollisionMargin", &tesseract_common::CollisionMarginData::getCollisionMargin)
+        .def("setCollisionMargin", &tesseract_common::CollisionMarginData::setCollisionMargin)
+        .def("getCollisionMarginPairData", &tesseract_common::CollisionMarginData::getCollisionMarginPairData)
+        .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract_common::CollisionMarginData::getMaxCollisionMargin, nb::const_))
+        // Backwards compatibility aliases
+        .def("getPairCollisionMargin", &tesseract_common::CollisionMarginData::getCollisionMargin)
+        .def("setPairCollisionMargin", &tesseract_common::CollisionMarginData::setCollisionMargin);
 
     // ========== KinematicLimits ==========
     nb::class_<tesseract_common::KinematicLimits>(m, "KinematicLimits")

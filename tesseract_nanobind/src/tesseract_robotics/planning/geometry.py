@@ -268,14 +268,16 @@ def create_obstacle(
     if transform is None:
         transform = Transform.identity()
 
+    # Create link with geometry at origin of link frame
     link = Link(name)
-    _add_visual_and_collision(link, geometry, transform.to_isometry(), name, color)
+    _add_visual_and_collision(link, geometry, Isometry3d.Identity(), name, color)
 
-    # Create fixed joint
+    # Create fixed joint with transform from parent to child
     joint = Joint(f"joint_{name}")
     joint.parent_link_name = parent_link
     joint.child_link_name = name
     joint.type = JointType.FIXED
+    joint.parent_to_joint_origin_transform = transform.to_isometry()
 
     return robot.add_link(link, joint)
 

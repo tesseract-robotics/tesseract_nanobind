@@ -1,6 +1,11 @@
 /**
  * @file tesseract_motion_planners_ompl_bindings.cpp
  * @brief nanobind bindings for tesseract_motion_planners OMPL
+ *
+ * NOTE: 0.33 API changes:
+ * - OMPLPlanProfile -> OMPLMoveProfile
+ * - OMPLRealVectorPlanProfile -> OMPLRealVectorMoveProfile
+ * - Profile/ProfileDictionary moved to tesseract_common
  */
 
 #include "tesseract_nb.h"
@@ -8,20 +13,21 @@
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract_motion_planners/core/types.h>
 
-// tesseract_command_language (for Profile base class)
-#include <tesseract_command_language/profile.h>
-#include <tesseract_command_language/profile_dictionary.h>
+// tesseract_common (Profile and ProfileDictionary moved here in 0.33)
+#include <tesseract_common/profile.h>
+#include <tesseract_common/profile_dictionary.h>
 
 // tesseract_motion_planners OMPL
 #include <tesseract_motion_planners/ompl/ompl_motion_planner.h>
 #include <tesseract_motion_planners/ompl/ompl_planner_configurator.h>
 #include <tesseract_motion_planners/ompl/ompl_solver_config.h>
-#include <tesseract_motion_planners/ompl/profile/ompl_real_vector_plan_profile.h>
+#include <tesseract_motion_planners/ompl/profile/ompl_real_vector_move_profile.h>
 
 // tesseract_collision for CollisionCheckConfig
 #include <tesseract_collision/core/types.h>
 
 namespace tp = tesseract_planning;
+namespace tc = tesseract_common;
 
 NB_MODULE(_tesseract_motion_planners_ompl, m) {
     m.doc() = "tesseract_motion_planners_ompl Python bindings";
@@ -92,37 +98,54 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         .def(nb::init<>())
         .def_rw("range", &tp::SBLConfigurator::range);
 
-    // ========== OMPLPlanProfile (base) ==========
-    // Import the Profile type from command_language and use it as base class
-    nb::class_<tp::OMPLPlanProfile, tp::Profile>(m, "OMPLPlanProfile")
-        .def("getKey", &tp::OMPLPlanProfile::getKey)
-        .def_static("getStaticKey", &tp::OMPLPlanProfile::getStaticKey);
+    // ========== OMPLMoveProfile (base, was OMPLPlanProfile) ==========
+    nb::class_<tp::OMPLMoveProfile, tc::Profile>(m, "OMPLMoveProfile")
+        .def("getKey", &tp::OMPLMoveProfile::getKey)
+        .def_static("getStaticKey", &tp::OMPLMoveProfile::getStaticKey);
 
-    // ========== OMPLRealVectorPlanProfile ==========
-    nb::class_<tp::OMPLRealVectorPlanProfile, tp::OMPLPlanProfile>(m, "OMPLRealVectorPlanProfile")
+    // SWIG-compatible alias
+    m.attr("OMPLPlanProfile") = m.attr("OMPLMoveProfile");
+
+    // ========== OMPLRealVectorMoveProfile (was OMPLRealVectorPlanProfile) ==========
+    nb::class_<tp::OMPLRealVectorMoveProfile, tp::OMPLMoveProfile>(m, "OMPLRealVectorMoveProfile")
         .def(nb::init<>())
-        .def_rw("solver_config", &tp::OMPLRealVectorPlanProfile::solver_config,
+        .def_rw("solver_config", &tp::OMPLRealVectorMoveProfile::solver_config,
             "The OMPL parallel planner solver config")
-        .def_rw("collision_check_config", &tp::OMPLRealVectorPlanProfile::collision_check_config,
+        .def_rw("collision_check_config", &tp::OMPLRealVectorMoveProfile::collision_check_config,
             "The collision check configuration");
 
-    // Helper to convert OMPLPlanProfile to Profile::ConstPtr for ProfileDictionary
-    // This explicitly casts to the base type for cross-module compatibility
-    m.def("OMPLPlanProfile_as_ProfileConstPtr", [](std::shared_ptr<tp::OMPLPlanProfile> profile) -> tp::Profile::ConstPtr {
-        return profile;  // implicit conversion to base class shared_ptr
-    }, "profile"_a, "Convert OMPLPlanProfile to Profile::ConstPtr for use with ProfileDictionary.addProfile");
+    // SWIG-compatible alias
+    m.attr("OMPLRealVectorPlanProfile") = m.attr("OMPLRealVectorMoveProfile");
 
-    // Helper to add OMPL plan profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addOMPLProfile", [](tp::ProfileDictionary& dict,
+    // Helper to convert OMPLMoveProfile to Profile::ConstPtr for ProfileDictionary
+    m.def("OMPLMoveProfile_as_ProfileConstPtr", [](std::shared_ptr<tp::OMPLMoveProfile> profile) -> tc::Profile::ConstPtr {
+        return profile;
+    }, "profile"_a, "Convert OMPLMoveProfile to Profile::ConstPtr for use with ProfileDictionary.addProfile");
+
+    // Legacy alias
+    m.def("OMPLPlanProfile_as_ProfileConstPtr", [](std::shared_ptr<tp::OMPLMoveProfile> profile) -> tc::Profile::ConstPtr {
+        return profile;
+    }, "profile"_a, "Convert OMPLPlanProfile to Profile::ConstPtr (legacy alias)");
+
+    // Helper to add OMPL move profile to ProfileDictionary directly
+    m.def("ProfileDictionary_addOMPLMoveProfile", [](tc::ProfileDictionary& dict,
                                                   const std::string& ns,
                                                   const std::string& profile_name,
-                                                  std::shared_ptr<tp::OMPLPlanProfile> profile) {
+                                                  std::shared_ptr<tp::OMPLMoveProfile> profile) {
         dict.addProfile(ns, profile_name, profile);
     }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add OMPL plan profile to ProfileDictionary (cross-module workaround)");
+    "Add OMPL move profile to ProfileDictionary");
+
+    // Legacy alias
+    m.def("ProfileDictionary_addOMPLProfile", [](tc::ProfileDictionary& dict,
+                                                  const std::string& ns,
+                                                  const std::string& profile_name,
+                                                  std::shared_ptr<tp::OMPLMoveProfile> profile) {
+        dict.addProfile(ns, profile_name, profile);
+    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
+    "Add OMPL plan profile to ProfileDictionary (legacy alias)");
 
     // ========== OMPLMotionPlanner ==========
-    // Note: Not binding inheritance from MotionPlanner to avoid cross-module issues
     nb::class_<tp::OMPLMotionPlanner>(m, "OMPLMotionPlanner")
         .def(nb::init<std::string>(), "name"_a)
         .def("getName", &tp::OMPLMotionPlanner::getName)

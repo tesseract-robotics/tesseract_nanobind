@@ -16,7 +16,7 @@
 #include <tesseract_common/allowed_collision_matrix.h>
 #include <tesseract_common/collision_margin_data.h>
 #include <tesseract_common/resource_locator.h>
-#include <tesseract_common/filesystem.h>
+#include <filesystem>
 #include <tesseract_common/types.h>
 
 // tesseract_geometry for collision objects
@@ -169,13 +169,16 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("contact_limit", &tc::ContactRequest::contact_limit);
 
     // ========== ContactManagerConfig ==========
-    // Note: margin_data and acm are complex types from tesseract_common
-    // Simplified binding without direct access to those members
+    // Note: 0.33 renamed margin_data_override_type → pair_margin_override_type
     nb::class_<tc::ContactManagerConfig>(m, "ContactManagerConfig")
         .def(nb::init<>())
         .def(nb::init<double>(), "default_margin"_a)
-        .def_rw("margin_data_override_type", &tc::ContactManagerConfig::margin_data_override_type)
-        .def_rw("acm_override_type", &tc::ContactManagerConfig::acm_override_type);
+        .def_rw("pair_margin_override_type", &tc::ContactManagerConfig::pair_margin_override_type)
+        .def_rw("acm_override_type", &tc::ContactManagerConfig::acm_override_type)
+        // Backwards compatibility alias
+        .def_prop_rw("margin_data_override_type",
+            [](const tc::ContactManagerConfig& c) { return c.pair_margin_override_type; },
+            [](tc::ContactManagerConfig& c, tcommon::CollisionMarginPairOverrideType v) { c.pair_margin_override_type = v; });
 
     // ========== CollisionCheckConfig ==========
     nb::class_<tc::CollisionCheckConfig>(m, "CollisionCheckConfig")
@@ -213,14 +216,19 @@ NB_MODULE(_tesseract_collision, m) {
         .def("getCollisionObjects", &tc::DiscreteContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::DiscreteContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::DiscreteContactManager::getActiveCollisionObjects)
-        .def("setDefaultCollisionMarginData", &tc::DiscreteContactManager::setDefaultCollisionMarginData,
+        // Note: 0.33 renamed setDefaultCollisionMarginData → setDefaultCollisionMargin
+        .def("setDefaultCollisionMargin", &tc::DiscreteContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
-        .def("setPairCollisionMarginData", &tc::DiscreteContactManager::setPairCollisionMarginData,
+        // Note: 0.33 renamed setPairCollisionMarginData → setCollisionMarginPair
+        .def("setCollisionMarginPair", &tc::DiscreteContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
-        .def("setCollisionMarginData", [](tc::DiscreteContactManager& self,
-                                          const tcommon::CollisionMarginData& margin_data) {
-            self.setCollisionMarginData(margin_data, tcommon::CollisionMarginOverrideType::REPLACE);
-        }, "collision_margin_data"_a)
+        .def("setCollisionMarginData", &tc::DiscreteContactManager::setCollisionMarginData,
+             "collision_margin_data"_a)
+        // Backwards compatibility aliases
+        .def("setDefaultCollisionMarginData", &tc::DiscreteContactManager::setDefaultCollisionMargin,
+             "default_collision_margin"_a)
+        .def("setPairCollisionMarginData", &tc::DiscreteContactManager::setCollisionMarginPair,
+             "name1"_a, "name2"_a, "collision_margin"_a)
         .def("getCollisionMarginData", &tc::DiscreteContactManager::getCollisionMarginData)
         .def("addCollisionObject",
              [](tc::DiscreteContactManager& self, const std::string& name, int mask_id,
@@ -252,41 +260,61 @@ NB_MODULE(_tesseract_collision, m) {
         .def("getCollisionObjects", &tc::ContinuousContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::ContinuousContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::ContinuousContactManager::getActiveCollisionObjects)
-        .def("setDefaultCollisionMarginData", &tc::ContinuousContactManager::setDefaultCollisionMarginData,
+        // Note: 0.33 renamed setDefaultCollisionMarginData → setDefaultCollisionMargin
+        .def("setDefaultCollisionMargin", &tc::ContinuousContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
-        .def("setPairCollisionMarginData", &tc::ContinuousContactManager::setPairCollisionMarginData,
+        // Note: 0.33 renamed setPairCollisionMarginData → setCollisionMarginPair
+        .def("setCollisionMarginPair", &tc::ContinuousContactManager::setCollisionMarginPair,
+             "name1"_a, "name2"_a, "collision_margin"_a)
+        // Backwards compatibility aliases
+        .def("setDefaultCollisionMarginData", &tc::ContinuousContactManager::setDefaultCollisionMargin,
+             "default_collision_margin"_a)
+        .def("setPairCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
         .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a);
 
     // ========== ContactManagersPluginFactory ==========
-    nb::class_<tc::ContactManagersPluginFactory>(m, "ContactManagersPluginFactory")
+    // Note: PluginLoader copy/move ctors aren't exported from library - cannot use nb::class_.
+    // Use a wrapper struct with shared_ptr to avoid needing copy/move semantics.
+    struct ContactManagersPluginFactoryWrapper {
+        std::shared_ptr<tc::ContactManagersPluginFactory> ptr;
+
+        ContactManagersPluginFactoryWrapper() : ptr(std::make_shared<tc::ContactManagersPluginFactory>()) {}
+        ContactManagersPluginFactoryWrapper(const std::filesystem::path& config_path, const tcommon::ResourceLocator& locator)
+            : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config_path, locator)) {}
+        ContactManagersPluginFactoryWrapper(const std::string& config, const tcommon::ResourceLocator& locator)
+            : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config, locator)) {}
+
+        void addSearchPath(const std::string& path) { ptr->addSearchPath(path); }
+        std::vector<std::string> getSearchPaths() const { return ptr->getSearchPaths(); }
+        void addSearchLibrary(const std::string& lib) { ptr->addSearchLibrary(lib); }
+        std::vector<std::string> getSearchLibraries() const { return ptr->getSearchLibraries(); }
+        bool hasDiscreteContactManagerPlugins() const { return ptr->hasDiscreteContactManagerPlugins(); }
+        std::string getDefaultDiscreteContactManagerPlugin() const { return ptr->getDefaultDiscreteContactManagerPlugin(); }
+        bool hasContinuousContactManagerPlugins() const { return ptr->hasContinuousContactManagerPlugins(); }
+        std::string getDefaultContinuousContactManagerPlugin() const { return ptr->getDefaultContinuousContactManagerPlugin(); }
+        std::unique_ptr<tc::DiscreteContactManager> createDiscreteContactManager(const std::string& name) const {
+            return ptr->createDiscreteContactManager(name);
+        }
+        std::unique_ptr<tc::ContinuousContactManager> createContinuousContactManager(const std::string& name) const {
+            return ptr->createContinuousContactManager(name);
+        }
+    };
+
+    nb::class_<ContactManagersPluginFactoryWrapper>(m, "ContactManagersPluginFactory")
         .def(nb::init<>())
-        .def("__init__", [](tc::ContactManagersPluginFactory* self,
-                            const tcommon::fs::path& config_path,
-                            const tcommon::ResourceLocator& locator) {
-            new (self) tc::ContactManagersPluginFactory(config_path, locator);
-        }, "config_path"_a, "locator"_a)
-        .def("__init__", [](tc::ContactManagersPluginFactory* self,
-                            const std::string& config,
-                            const tcommon::ResourceLocator& locator) {
-            new (self) tc::ContactManagersPluginFactory(config, locator);
-        }, "config"_a, "locator"_a)
-        .def("addSearchPath", &tc::ContactManagersPluginFactory::addSearchPath, "path"_a)
-        .def("getSearchPaths", &tc::ContactManagersPluginFactory::getSearchPaths)
-        .def("addSearchLibrary", &tc::ContactManagersPluginFactory::addSearchLibrary, "library_name"_a)
-        .def("getSearchLibraries", &tc::ContactManagersPluginFactory::getSearchLibraries)
-        .def("hasDiscreteContactManagerPlugins", &tc::ContactManagersPluginFactory::hasDiscreteContactManagerPlugins)
-        .def("getDefaultDiscreteContactManagerPlugin", &tc::ContactManagersPluginFactory::getDefaultDiscreteContactManagerPlugin)
-        .def("hasContinuousContactManagerPlugins", &tc::ContactManagersPluginFactory::hasContinuousContactManagerPlugins)
-        .def("getDefaultContinuousContactManagerPlugin", &tc::ContactManagersPluginFactory::getDefaultContinuousContactManagerPlugin)
-        .def("createDiscreteContactManager",
-             [](const tc::ContactManagersPluginFactory& self, const std::string& name) {
-                 return self.createDiscreteContactManager(name);
-             }, "name"_a)
-        .def("createContinuousContactManager",
-             [](const tc::ContactManagersPluginFactory& self, const std::string& name) {
-                 return self.createContinuousContactManager(name);
-             }, "name"_a);
+        .def(nb::init<const std::filesystem::path&, const tcommon::ResourceLocator&>(), "config_path"_a, "locator"_a)
+        .def(nb::init<const std::string&, const tcommon::ResourceLocator&>(), "config"_a, "locator"_a)
+        .def("addSearchPath", &ContactManagersPluginFactoryWrapper::addSearchPath, "path"_a)
+        .def("getSearchPaths", &ContactManagersPluginFactoryWrapper::getSearchPaths)
+        .def("addSearchLibrary", &ContactManagersPluginFactoryWrapper::addSearchLibrary, "library_name"_a)
+        .def("getSearchLibraries", &ContactManagersPluginFactoryWrapper::getSearchLibraries)
+        .def("hasDiscreteContactManagerPlugins", &ContactManagersPluginFactoryWrapper::hasDiscreteContactManagerPlugins)
+        .def("getDefaultDiscreteContactManagerPlugin", &ContactManagersPluginFactoryWrapper::getDefaultDiscreteContactManagerPlugin)
+        .def("hasContinuousContactManagerPlugins", &ContactManagersPluginFactoryWrapper::hasContinuousContactManagerPlugins)
+        .def("getDefaultContinuousContactManagerPlugin", &ContactManagersPluginFactoryWrapper::getDefaultContinuousContactManagerPlugin)
+        .def("createDiscreteContactManager", &ContactManagersPluginFactoryWrapper::createDiscreteContactManager, "name"_a)
+        .def("createContinuousContactManager", &ContactManagersPluginFactoryWrapper::createContinuousContactManager, "name"_a);
 
     // Convex hull utilities
     m.def("makeConvexMesh", &tc::makeConvexMesh, "mesh"_a,

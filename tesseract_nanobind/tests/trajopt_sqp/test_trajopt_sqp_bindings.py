@@ -705,22 +705,30 @@ class TestContinuousCollisionBindings:
 
     def test_lvs_discrete_collision_evaluator(self, kuka_setup):
         """Test LVSDiscreteCollisionEvaluator creation."""
+        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+
         env, manip, joint_names, _ = kuka_setup
 
         config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        # 0.33 API: LVSDiscreteCollisionEvaluator requires LVS_DISCRETE type
+        config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
         cache = ti.CollisionCache(10)
 
         evaluator = ti.LVSDiscreteCollisionEvaluator(cache, manip, env, config, True)
         assert evaluator is not None
 
-        # Check base class method
-        assert evaluator.GetCollisionConfig() is not None
+        # Check base class methods (GetCollisionConfig removed in 0.33)
+        assert evaluator.GetCollisionMarginBuffer() is not None
 
     def test_lvs_continuous_collision_evaluator(self, kuka_setup):
         """Test LVSContinuousCollisionEvaluator creation."""
+        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+
         env, manip, joint_names, _ = kuka_setup
 
         config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        # 0.33 API: LVSContinuousCollisionEvaluator requires CONTINUOUS or LVS_CONTINUOUS
+        config.collision_check_config.type = CollisionEvaluatorType.LVS_CONTINUOUS
         cache = ti.CollisionCache(10)
 
         evaluator = ti.LVSContinuousCollisionEvaluator(cache, manip, env, config, True)
@@ -728,6 +736,8 @@ class TestContinuousCollisionBindings:
 
     def test_continuous_collision_constraint(self, kuka_setup):
         """Test ContinuousCollisionConstraint creation."""
+        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+
         env, manip, joint_names, joint_limits = kuka_setup
 
         # Create two joint position variables
@@ -738,8 +748,9 @@ class TestContinuousCollisionBindings:
         var0.SetBounds(joint_limits)
         var1.SetBounds(joint_limits)
 
-        # Create LVS evaluator
+        # Create LVS evaluator - 0.33 API requires LVS_DISCRETE type
         config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
         cache = ti.CollisionCache(10)
         evaluator = ti.LVSDiscreteCollisionEvaluator(cache, manip, env, config, True)
 
@@ -751,20 +762,30 @@ class TestContinuousCollisionBindings:
 
     def test_continuous_vs_discrete_evaluator_types(self, kuka_setup):
         """Test that continuous evaluators inherit from correct base."""
+        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+
         env, manip, _, _ = kuka_setup
 
-        config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        # Discrete evaluator - uses default DISCRETE type
+        discrete_config = ti.TrajOptCollisionConfig(0.05, 20.0)
         cache = ti.CollisionCache(10)
-
-        # Discrete evaluator inherits from DiscreteCollisionEvaluator
-        discrete = ti.SingleTimestepCollisionEvaluator(cache, manip, env, config, True)
+        discrete = ti.SingleTimestepCollisionEvaluator(cache, manip, env, discrete_config, True)
         assert isinstance(discrete, ti.DiscreteCollisionEvaluator)
 
-        # LVS evaluators inherit from ContinuousCollisionEvaluator
-        lvs_discrete = ti.LVSDiscreteCollisionEvaluator(cache, manip, env, config, True)
+        # LVS discrete - requires LVS_DISCRETE type
+        lvs_discrete_config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        lvs_discrete_config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
+        lvs_discrete = ti.LVSDiscreteCollisionEvaluator(
+            cache, manip, env, lvs_discrete_config, True
+        )
         assert isinstance(lvs_discrete, ti.ContinuousCollisionEvaluator)
 
-        lvs_continuous = ti.LVSContinuousCollisionEvaluator(cache, manip, env, config, True)
+        # LVS continuous - requires LVS_CONTINUOUS or CONTINUOUS type
+        lvs_continuous_config = ti.TrajOptCollisionConfig(0.05, 20.0)
+        lvs_continuous_config.collision_check_config.type = CollisionEvaluatorType.LVS_CONTINUOUS
+        lvs_continuous = ti.LVSContinuousCollisionEvaluator(
+            cache, manip, env, lvs_continuous_config, True
+        )
         assert isinstance(lvs_continuous, ti.ContinuousCollisionEvaluator)
 
 

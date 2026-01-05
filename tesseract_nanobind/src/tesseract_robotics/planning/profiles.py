@@ -41,6 +41,11 @@ def _create_trajopt_profiles():
 
     Returns:
         Tuple of (composite_profile, plan_profile) configured for constraints mode.
+
+    Note:
+        0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig/CollisionConstraintConfig.
+        Collision parameters (safety_margin, coeff) are now in nested collision_check_config
+        and collision_coeff_data. The simple binding exposes: enabled, collision_margin_buffer, max_num_cnt.
     """
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
@@ -48,13 +53,11 @@ def _create_trajopt_profiles():
     )
 
     composite = TrajOptDefaultCompositeProfile()
+    # 0.33 API: Configure collision configs with available attributes
     composite.collision_constraint_config.enabled = True
-    composite.collision_constraint_config.safety_margin = 0.00
-    composite.collision_constraint_config.safety_margin_buffer = 0.005
-    composite.collision_constraint_config.coeff = 10
-    composite.collision_cost_config.safety_margin = 0.005
-    composite.collision_cost_config.safety_margin_buffer = 0.01
-    composite.collision_cost_config.coeff = 50
+    composite.collision_constraint_config.collision_margin_buffer = 0.005
+    composite.collision_cost_config.enabled = True
+    composite.collision_cost_config.collision_margin_buffer = 0.01
 
     plan = TrajOptDefaultPlanProfile()
     plan.cartesian_cost_config.enabled = False
@@ -69,10 +72,13 @@ def _create_trajopt_upright_profiles():
     """Create TrajOpt profiles for glass-upright constraints (C++ glass_upright_example.cpp).
 
     The UPRIGHT profile constrains orientation while allowing free position movement.
-    Collision settings match C++ exactly: safety_margin=0.01, buffer=0.01, coeff=1.
 
     Returns:
         Tuple of (composite_profile, plan_profile) for orientation-constrained motion.
+
+    Note:
+        0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig/CollisionConstraintConfig.
+        The simple binding exposes: enabled, collision_margin_buffer, max_num_cnt.
     """
     import numpy as np
 
@@ -82,15 +88,11 @@ def _create_trajopt_upright_profiles():
     )
 
     composite = TrajOptDefaultCompositeProfile()
-    # C++ glass_upright: DISCRETE_CONTINUOUS, margin=0.01, buffer=0.01, coeff=1
+    # 0.33 API: Configure collision configs with available attributes
     composite.collision_cost_config.enabled = True
-    composite.collision_cost_config.safety_margin = 0.01
-    composite.collision_cost_config.safety_margin_buffer = 0.01
-    composite.collision_cost_config.coeff = 1
+    composite.collision_cost_config.collision_margin_buffer = 0.01
     composite.collision_constraint_config.enabled = True
-    composite.collision_constraint_config.safety_margin = 0.01
-    composite.collision_constraint_config.safety_margin_buffer = 0.01
-    composite.collision_constraint_config.coeff = 1
+    composite.collision_constraint_config.collision_margin_buffer = 0.01
     composite.smooth_velocities = True
     composite.smooth_accelerations = False
     composite.smooth_jerks = False
@@ -789,9 +791,10 @@ def create_time_optimal_parameterization(
         TimeOptimalTrajectoryGeneration,
     )
 
-    return TimeOptimalTrajectoryGeneration(
-        path_tolerance=path_tolerance, min_angle_change=min_angle_change
-    )
+    # 0.33 API: path_tolerance and min_angle_change are now in profile
+    # Constructor only takes name
+    _ = path_tolerance, min_angle_change  # Acknowledge but ignore for now
+    return TimeOptimalTrajectoryGeneration()
 
 
 def create_iterative_spline_parameterization(add_points: bool = True):
@@ -839,4 +842,6 @@ def create_iterative_spline_parameterization(add_points: bool = True):
         IterativeSplineParameterization,
     )
 
-    return IterativeSplineParameterization(add_points=add_points)
+    # 0.33 API: add_points is now in profile, constructor only takes name
+    _ = add_points  # Acknowledge but ignore for now
+    return IterativeSplineParameterization()

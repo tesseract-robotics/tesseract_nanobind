@@ -34,6 +34,9 @@
 // trajopt_common
 #include <trajopt_common/collision_types.h>
 
+// tesseract_collision for CollisionCheckConfig (used by TrajOptCollisionConfig)
+#include <tesseract_collision/core/types.h>
+
 // tesseract dependencies
 #include <tesseract_kinematics/core/joint_group.h>
 #include <tesseract_kinematics/core/kinematic_group.h>
@@ -47,6 +50,9 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // Import ifopt module to enable cross-module inheritance
     nb::module_::import_("tesseract_robotics.ifopt._ifopt");
+
+    // Import tesseract_collision for CollisionCheckConfig type
+    nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
     // ========== JointPosition (variable set) ==========
     // Inherits from ifopt::VariableSet for cross-module compatibility
@@ -143,31 +149,46 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // ========== trajopt_common::CollisionCoeffData ==========
     nb::class_<tc::CollisionCoeffData>(m, "CollisionCoeffData")
-        .def(nb::init<double>(), "default_collision_coeff"_a = 1.0)
-        .def("setPairCollisionCoeff", &tc::CollisionCoeffData::setPairCollisionCoeff,
+        .def(nb::init<>())
+        .def(nb::init<double>(), "default_collision_coeff"_a)
+        .def("setDefaultCollisionCoeff", &tc::CollisionCoeffData::setDefaultCollisionCoeff)
+        .def("getDefaultCollisionCoeff", &tc::CollisionCoeffData::getDefaultCollisionCoeff)
+        .def("setCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
              "obj1"_a, "obj2"_a, "collision_coeff"_a)
-        .def("getPairCollisionCoeff", &tc::CollisionCoeffData::getPairCollisionCoeff,
+        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
+             "obj1"_a, "obj2"_a)
+        // Backwards compatibility aliases
+        .def("setPairCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
+             "obj1"_a, "obj2"_a, "collision_coeff"_a)
+        .def("getPairCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
              "obj1"_a, "obj2"_a);
 
     // ========== trajopt_common::TrajOptCollisionConfig ==========
     nb::class_<tc::TrajOptCollisionConfig>(m, "TrajOptCollisionConfig")
         .def(nb::init<>())
         .def(nb::init<double, double>(), "margin"_a, "coeff"_a)
+        .def_rw("enabled", &tc::TrajOptCollisionConfig::enabled)
+        .def_rw("collision_check_config", &tc::TrajOptCollisionConfig::collision_check_config)
         .def_rw("collision_coeff_data", &tc::TrajOptCollisionConfig::collision_coeff_data)
         .def_rw("collision_margin_buffer", &tc::TrajOptCollisionConfig::collision_margin_buffer)
         .def_rw("max_num_cnt", &tc::TrajOptCollisionConfig::max_num_cnt);
 
     // ========== DiscreteCollisionEvaluator (base class) ==========
+    // Note: GetCollisionConfig was removed in 0.33, replaced with individual methods
     nb::class_<ti::DiscreteCollisionEvaluator>(m, "DiscreteCollisionEvaluator")
-        .def("GetCollisionConfig", &ti::DiscreteCollisionEvaluator::GetCollisionConfig,
+        .def("GetCollisionMarginBuffer", &ti::DiscreteCollisionEvaluator::GetCollisionMarginBuffer)
+        .def("GetCollisionMarginData", &ti::DiscreteCollisionEvaluator::GetCollisionMarginData,
+             nb::rv_policy::reference_internal)
+        .def("GetCollisionCoeffData", &ti::DiscreteCollisionEvaluator::GetCollisionCoeffData,
              nb::rv_policy::reference_internal);
 
     // ========== SingleTimestepCollisionEvaluator ==========
+    // Note: 0.33 changed from shared_ptr<TrajOptCollisionConfig> to const TrajOptCollisionConfig&
     nb::class_<ti::SingleTimestepCollisionEvaluator, ti::DiscreteCollisionEvaluator>(m, "SingleTimestepCollisionEvaluator")
         .def(nb::init<std::shared_ptr<ti::CollisionCache>,
                       std::shared_ptr<const tesseract_kinematics::JointGroup>,
                       std::shared_ptr<const tesseract_environment::Environment>,
-                      std::shared_ptr<const tc::TrajOptCollisionConfig>,
+                      const tc::TrajOptCollisionConfig&,
                       bool>(),
              "collision_cache"_a, "manip"_a, "env"_a, "collision_config"_a,
              "dynamic_environment"_a = false);
@@ -189,35 +210,41 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("GetCollisionEvaluator", &ti::DiscreteCollisionConstraint::GetCollisionEvaluator);
 
     // ========== ContinuousCollisionEvaluator (base class) ==========
+    // Note: GetCollisionConfig was removed in 0.33, replaced with individual methods
     nb::class_<ti::ContinuousCollisionEvaluator>(m, "ContinuousCollisionEvaluator")
-        .def("GetCollisionConfig", &ti::ContinuousCollisionEvaluator::GetCollisionConfig,
+        .def("GetCollisionMarginBuffer", &ti::ContinuousCollisionEvaluator::GetCollisionMarginBuffer)
+        .def("GetCollisionMarginData", &ti::ContinuousCollisionEvaluator::GetCollisionMarginData,
+             nb::rv_policy::reference_internal)
+        .def("GetCollisionCoeffData", &ti::ContinuousCollisionEvaluator::GetCollisionCoeffData,
              nb::rv_policy::reference_internal);
 
     // ========== LVSDiscreteCollisionEvaluator ==========
     // Uses discrete collision checking at interpolated points between two states
+    // Note: 0.33 changed from shared_ptr<TrajOptCollisionConfig> to const TrajOptCollisionConfig&
     nb::class_<ti::LVSDiscreteCollisionEvaluator, ti::ContinuousCollisionEvaluator>(m, "LVSDiscreteCollisionEvaluator")
         .def(nb::init<std::shared_ptr<ti::CollisionCache>,
                       std::shared_ptr<const tesseract_kinematics::JointGroup>,
                       std::shared_ptr<const tesseract_environment::Environment>,
-                      std::shared_ptr<const tc::TrajOptCollisionConfig>,
+                      const tc::TrajOptCollisionConfig&,
                       bool>(),
              "collision_cache"_a, "manip"_a, "env"_a, "collision_config"_a,
              "dynamic_environment"_a = false);
 
     // ========== LVSContinuousCollisionEvaluator ==========
     // Uses continuous (swept) collision checking between two states
+    // Note: 0.33 changed from shared_ptr<TrajOptCollisionConfig> to const TrajOptCollisionConfig&
     nb::class_<ti::LVSContinuousCollisionEvaluator, ti::ContinuousCollisionEvaluator>(m, "LVSContinuousCollisionEvaluator")
         .def(nb::init<std::shared_ptr<ti::CollisionCache>,
                       std::shared_ptr<const tesseract_kinematics::JointGroup>,
                       std::shared_ptr<const tesseract_environment::Environment>,
-                      std::shared_ptr<const tc::TrajOptCollisionConfig>,
+                      const tc::TrajOptCollisionConfig&,
                       bool>(),
              "collision_cache"_a, "manip"_a, "env"_a, "collision_config"_a,
              "dynamic_environment"_a = false);
 
     // ========== ContinuousCollisionConstraint ==========
     // Constraint for collision between two trajectory states
-    // Uses lambda wrapper to convert Python args to std::array
+    // Note: 0.33 changed from array<bool,2> to two separate bool args
     nb::class_<ti::ContinuousCollisionConstraint, ifopt::ConstraintSet>(m, "ContinuousCollisionConstraint")
         .def("__init__", [](ti::ContinuousCollisionConstraint* self,
                             std::shared_ptr<ti::ContinuousCollisionEvaluator> eval,
@@ -226,8 +253,7 @@ NB_MODULE(_trajopt_ifopt, m) {
                             bool fixed0, bool fixed1,
                             int max_num_cnt, bool fixed_sparsity, const std::string& name) {
                  std::array<std::shared_ptr<const ti::JointPosition>, 2> vars = {var0, var1};
-                 std::array<bool, 2> fixed = {fixed0, fixed1};
-                 new (self) ti::ContinuousCollisionConstraint(eval, vars, fixed, max_num_cnt, fixed_sparsity, name);
+                 new (self) ti::ContinuousCollisionConstraint(eval, vars, fixed0, fixed1, max_num_cnt, fixed_sparsity, name);
              },
              "collision_evaluator"_a, "position_var0"_a, "position_var1"_a,
              "fixed0"_a = false, "fixed1"_a = false,
