@@ -51,7 +51,6 @@ plugins:
       separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
   - exclude:
       glob:
-        - _source/*
         - QUICKSTART.md
   - mkdocstrings:
       handlers:
