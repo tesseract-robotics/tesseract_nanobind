@@ -14,25 +14,37 @@ Python bindings for the Tesseract Motion Planning Framework.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     tesseract_robotics                          │
-├─────────────────────────────────────────────────────────────────┤
-│  High-Level API          │  Low-Level API                      │
-│  ─────────────────────   │  ──────────────────────────────────  │
-│  Robot class             │  tesseract_environment               │
-│  planning.Robot          │  tesseract_collision                 │
-│  planning.Planner        │  tesseract_kinematics                │
-│  planning.Composer       │  tesseract_command_language          │
-│                          │  tesseract_motion_planners           │
-│                          │  tesseract_task_composer             │
-├──────────────────────────┴──────────────────────────────────────┤
-│  SQP Modules (Real-time Optimization)                           │
-│  ─────────────────────────────────────                          │
-│  trajopt_sqp      TrustRegionSQPSolver, OSQPEigenSolver         │
-│  trajopt_ifopt    JointPosition, CartPosConstraint, Collision   │
-│  ifopt            Bounds, VariableSet, ConstraintSet            │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph high["High-Level API"]
+        Robot["Robot"]
+        Planner["Planner"]
+        Composer["Composer"]
+    end
+
+    subgraph low["Low-Level Modules"]
+        env["tesseract_environment"]
+        col["tesseract_collision"]
+        kin["tesseract_kinematics"]
+        cmd["tesseract_command_language"]
+        mp["tesseract_motion_planners"]
+        tc["tesseract_task_composer"]
+    end
+
+    subgraph sqp["SQP (Real-time Optimization)"]
+        tsqp["trajopt_sqp"]
+        tifopt["trajopt_ifopt"]
+        ifopt["ifopt"]
+    end
+
+    Robot --> env
+    Robot --> kin
+    Planner --> mp
+    Composer --> tc
+    mp --> tsqp
+    tc --> tsqp
+    tsqp --> tifopt
+    tifopt --> ifopt
 ```
 
 ## Quick Example
