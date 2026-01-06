@@ -78,7 +78,7 @@ jobs:
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-v7-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
+        key: colcon-v8-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
     - name: colcon build C++ deps (macOS)
       if: matrix.config.os == 'macos' && steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws
