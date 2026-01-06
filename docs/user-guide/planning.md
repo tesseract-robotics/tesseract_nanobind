@@ -148,11 +148,102 @@ collision_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 collision_config.collision_check_config.longest_valid_segment_length = 0.05  # For LVS modes
 ```
 
-!!! tip "Collision Cost vs Constraint"
-    - **Cost**: Soft penalty, allows small violations (faster)
-    - **Constraint**: Hard limit, must be satisfied (more reliable)
+## Costs vs Constraints (Soft vs Hard)
 
-    Use cost for initial optimization, constraint for final refinement.
+TrajOpt distinguishes between **costs** (soft constraints) and **constraints** (hard constraints):
+
+| Type | Behavior | Solver Treatment | Use When |
+|------|----------|------------------|----------|
+| **Cost** | Penalized, can be violated | Added to objective function | Preferences, nice-to-haves |
+| **Constraint** | Must be satisfied exactly | Strict equality/inequality | Safety-critical requirements |
+
+### When to Use Each
+
+**Use Costs (Soft) for:**
+
+- Collision avoidance during optimization (allows exploration)
+- Smoothness objectives (velocity, acceleration, jerk)
+- Preferred poses or configurations
+- Joint centering (stay near middle of range)
+
+**Use Constraints (Hard) for:**
+
+- Final collision check (must be collision-free)
+- Exact Cartesian poses (pick/place positions)
+- Joint limits (physical limits)
+- Orientation requirements (e.g., tool must be vertical)
+
+### Example: Collision as Cost vs Constraint
+
+```python
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    TrajOptDefaultCompositeProfile,
+)
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+
+profile = TrajOptDefaultCompositeProfile()
+
+# SOFT: Collision as cost - allows temporary violations during optimization
+# Good for finding paths through tight spaces
+profile.collision_cost_config.enabled = True
+profile.collision_cost_config.collision_margin_buffer = 0.025  # 2.5cm
+profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
+profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+
+# HARD: Collision as constraint - must be satisfied at solution
+# Guarantees collision-free result (but may fail to find solution)
+profile.collision_constraint_config.enabled = True
+profile.collision_constraint_config.collision_margin_buffer = 0.01  # 1cm (tighter)
+profile.collision_constraint_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+```
+
+!!! tip "Recommended Pattern"
+    Use **both** cost and constraint:
+
+    1. Cost with larger margin (2.5cm) guides optimization away from obstacles
+    2. Constraint with tighter margin (1cm) ensures final solution is collision-free
+
+    The cost helps the optimizer explore, while the constraint guarantees safety.
+
+### Example: Cartesian Pose as Cost vs Constraint
+
+```python
+from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
+
+plan_profile = TrajOptDefaultPlanProfile()
+
+# SOFT: Cartesian cost - "try to reach this pose"
+# Useful when exact pose isn't critical
+plan_profile.cartesian_cost_config.enabled = True
+plan_profile.cartesian_cost_config.coeff = [10, 10, 10, 5, 5, 5]  # xyz, rpy weights
+
+# HARD: Cartesian constraint - "must reach this exact pose"
+# Required for pick/place operations
+plan_profile.cartesian_constraint_config.enabled = True
+plan_profile.cartesian_constraint_config.coeff = [1, 1, 1, 1, 1, 1]
+```
+
+### Coefficient Interpretation
+
+The `coeff` values control how strongly violations are penalized:
+
+- **Higher coefficient** = stronger penalty = more important to satisfy
+- **Lower coefficient** = weaker penalty = more flexibility allowed
+
+```python
+# Position matters more than orientation
+plan_profile.cartesian_cost_config.coeff = [100, 100, 100, 1, 1, 1]
+
+# Rotation around Z is free (e.g., symmetric tool)
+plan_profile.cartesian_cost_config.coeff = [10, 10, 10, 10, 10, 0]
+```
+
+!!! warning "Hard Constraints Can Cause Failures"
+    Over-constraining a problem makes it harder (or impossible) to solve:
+
+    - Start with costs only, verify solution quality
+    - Add constraints incrementally
+    - If planning fails, check if constraints are feasible
 
 ## Descartes Planner
 
