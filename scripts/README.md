@@ -61,8 +61,31 @@ Flags:
 - `-f, --failed`: rerun only tests that failed last run (runs serial by default for easier debugging)
 - `-s, --serial`: disable parallel execution (`-n auto`)
 
-### `run_failing_tests.sh`
-Runs specific failing tests for debugging.
+### `generate_stubs.sh`
+Regenerates `.pyi` stub files for all nanobind modules using `stubgen`:
+
+```bash
+./scripts/generate_stubs.sh
+```
+
+Run after any binding changes to keep stubs in sync with actual API.
+
+### `build_docs.sh`
+Builds documentation using mkdocs:
+
+```bash
+./scripts/build_docs.sh        # build docs
+./scripts/build_docs.sh serve  # serve locally at http://localhost:8000
+```
+
+### `run_scaling_benchmarks.sh`
+Runs OMPL parallel planner scaling benchmarks (1/2/4/8 planners):
+
+```bash
+./scripts/run_scaling_benchmarks.sh
+```
+
+Tests how examples scale with parallel OMPL planners.
 
 ## Building Wheels
 
