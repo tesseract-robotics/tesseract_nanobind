@@ -96,7 +96,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
 
     # Add box obstacle at (1.0, 0, 0)
-    # C++ uses octomap point cloud; Python uses simplified box geometry
+    # C++ uses 1.0m octomap (sparse point cloud) which allows paths through gaps;
+    # Python uses 0.5m solid box since solid geometry blocks more collision space
     create_obstacle(robot, "box_obstacle", box(0.5, 0.5, 0.5), Pose.from_xyz(1.0, 0, 0))
 
     # Get joint names and set initial configuration

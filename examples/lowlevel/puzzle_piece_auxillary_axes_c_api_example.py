@@ -37,8 +37,10 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
+    TrajOptOSQPSolverProfile,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptSolverProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
@@ -230,12 +232,21 @@ def main():
         1.0
     )
 
+    # Solver profile: OSQP with C++ settings
+    trajopt_solver_profile = TrajOptOSQPSolverProfile()
+    trajopt_solver_profile.opt_params.max_iter = 200
+    trajopt_solver_profile.opt_params.min_approx_improve = 1e-3
+    trajopt_solver_profile.opt_params.min_trust_box_size = 1e-3
+
     # Register profiles with TrajOpt task namespace
     ProfileDictionary_addTrajOptPlanProfile(
         profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile
     )
     ProfileDictionary_addTrajOptCompositeProfile(
         profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
+    )
+    ProfileDictionary_addTrajOptSolverProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_solver_profile
     )
 
     print("Running TrajOpt planner with 9 DOF (7 arm + 2 auxiliary axes)...")

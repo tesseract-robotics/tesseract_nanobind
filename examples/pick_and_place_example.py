@@ -85,6 +85,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptCollisionConfig,
     TrajOptDefaultCompositeProfile,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
@@ -104,33 +105,33 @@ LINK_TCP = "iiwa_tool0"
 
 
 def create_profiles():
-    """Create TrajOpt profiles for pick-and-place motion planning.
+    """Create TrajOpt profiles for pick-and-place matching C++ settings.
 
-    Configures collision avoidance as a cost (not constraint) to allow solver
-    to push away from obstacles gradually. Hard constraints can cause failures
-    in tight spaces near attached objects.
+    C++ profile settings (from pick_and_place_example.cpp):
+        - collision_constraint: margin=0, coeff=10, LVS_DISCRETE, lvs=0.05, buffer=0.005
+        - collision_cost: margin=0.005, coeff=50, LVS_DISCRETE, lvs=0.05, buffer=0.01
 
     Returns:
         ProfileDictionary with TrajOpt composite profile for collision handling.
-
-    Profile Configuration:
-        - longest_valid_segment_length: 0.05m (5cm collision check resolution)
-        - collision_constraint: DISABLED (avoid solver failures near box)
-        - collision_cost: enabled, margin=0.025m, coeff=20 (soft repulsion)
     """
     profiles = ProfileDictionary()
     composite = TrajOptDefaultCompositeProfile()
 
-    # Disable hard collision constraints - they fail in tight spaces
-    # when box is attached close to end-effector
-    composite.collision_constraint_config.enabled = False
+    # Collision constraint (hard): margin=0, coeff=10 (matches C++)
+    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_DISCRETE
+    )
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.05
+    composite.collision_constraint_config.collision_margin_buffer = 0.005
 
-    # Enable soft collision cost with gradual repulsion
-    # This allows solver to push away from obstacles without hard failure
-    # 0.33 API: Use constructor (margin, coeff) and set longest_valid_segment_length
-    # on collision_check_config
-    composite.collision_cost_config = TrajOptCollisionConfig(0.025, 20.0)
+    # Collision cost (soft): margin=0.005, coeff=50 (matches C++)
+    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_DISCRETE
+    )
     composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
+    composite.collision_cost_config.collision_margin_buffer = 0.01
 
     ProfileDictionary_addTrajOptCompositeProfile(
         profiles, TRAJOPT_NS, "DEFAULT", composite

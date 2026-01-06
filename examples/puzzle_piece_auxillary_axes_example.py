@@ -99,9 +99,11 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
+    TrajOptOSQPSolverProfile,
     CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptSolverProfile,
 )
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
@@ -187,6 +189,7 @@ def create_profiles():
     - cartesian_constraint_config.coeff = [5,5,5,2,2,0]
       Position (x,y,z) tightly constrained, roll/pitch moderate, yaw FREE
     - collision_cost (not constraint) with 25mm safety margin
+    - solver: OSQP, max_iter=200, min_approx_improve=1e-3, min_trust_box_size=1e-3
     """
     profiles = ProfileDictionary()
 
@@ -200,23 +203,25 @@ def create_profiles():
     plan.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
 
     # Composite profile: soft collision cost (not hard constraint)
-    # 0.33 API: TrajOptCollisionConfig replaces old CollisionCostConfig/CollisionConstraintConfig
-    # - collision_margin_buffer replaces safety_margin
-    # - type is now in collision_check_config
-    # - coeff is now set via collision_coeff_data or constructor
     composite = TrajOptDefaultCompositeProfile()
     composite.collision_constraint_config.enabled = False
     composite.collision_cost_config.enabled = True
     composite.collision_cost_config.collision_margin_buffer = 0.025  # 25mm buffer
-    # 0.33 API: SINGLE_TIMESTEP renamed to DISCRETE
     composite.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.DISCRETE
     )
+
+    # Solver profile: OSQP with C++ settings
+    solver = TrajOptOSQPSolverProfile()
+    solver.opt_params.max_iter = 200
+    solver.opt_params.min_approx_improve = 1e-3
+    solver.opt_params.min_trust_box_size = 1e-3
 
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, "CARTESIAN", plan)
     ProfileDictionary_addTrajOptCompositeProfile(
         profiles, TRAJOPT_NS, "DEFAULT", composite
     )
+    ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, "DEFAULT", solver)
     return profiles
 
 
