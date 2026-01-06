@@ -127,8 +127,13 @@ def run(pipeline="FreespacePipeline", num_planners=None):
     composer = TaskComposer.from_config()
 
     # Use appropriate profiles based on pipeline
+    # C++ defaults: planning_time=60.0, planner_range=0.01, 2 planners
     if "OMPL" in pipeline or "Freespace" in pipeline:
-        profiles = create_freespace_pipeline_profiles(num_planners=num_planners)
+        profiles = create_freespace_pipeline_profiles(
+            num_planners=num_planners or 2,  # C++ uses 2
+            planning_time=60.0,
+            planner_range=0.01,  # C++ uses 0.01
+        )
     else:
         profiles = create_trajopt_default_profiles()
 
