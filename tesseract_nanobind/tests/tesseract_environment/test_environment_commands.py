@@ -310,11 +310,16 @@ class TestChangeLinkOriginCommand:
         cmd = ChangeLinkOriginCommand("link1", origin)
         assert cmd.getLinkName() == "link1"
 
-    @pytest.mark.xfail(reason="CHANGE_LINK_ORIGIN not implemented in tesseract C++ Environment")
-    def test_apply_command(self, env):
+    def test_apply_command_not_implemented(self, env):
+        """ChangeLinkOriginCommand exists but Environment.applyCommand raises RuntimeError.
+
+        The C++ Environment::applyChangeLinkOriginCommand is a stub that throws:
+        'Unhandled environment command: CHANGE_LINK_ORIGIN'
+        """
         origin = Isometry3d.Identity()
         cmd = ChangeLinkOriginCommand("link1", origin)
-        env.applyCommand(cmd)
+        with pytest.raises(RuntimeError, match="Unhandled environment command: CHANGE_LINK_ORIGIN"):
+            env.applyCommand(cmd)
 
 
 class TestMoveJointCommand:
