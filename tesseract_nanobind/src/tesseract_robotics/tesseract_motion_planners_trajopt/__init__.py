@@ -9,10 +9,12 @@ from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 from ._tesseract_motion_planners_trajopt import *
 
 __all__ = [
+    "BasicTrustRegionSQPParameters",
     "CollisionEvaluatorType",
     "ProfileDictionary_addTrajOptCompositeProfile",
     "ProfileDictionary_addTrajOptMoveProfile",
     "ProfileDictionary_addTrajOptPlanProfile",
+    "ProfileDictionary_addTrajOptSolverProfile",
     "TrajOptCartesianWaypointConfig",
     "TrajOptCollisionConfig",
     "TrajOptCompositeProfile",
@@ -22,5 +24,7 @@ __all__ = [
     "TrajOptJointWaypointConfig",
     "TrajOptMotionPlanner",
     "TrajOptMoveProfile",
+    "TrajOptOSQPSolverProfile",
     "TrajOptPlanProfile",
+    "TrajOptSolverProfile",
 ]

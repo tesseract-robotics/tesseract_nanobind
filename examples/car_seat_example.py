@@ -71,9 +71,13 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
+    ProfileDictionary_addTrajOptSolverProfile,
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultPlanProfile,
+    TrajOptOSQPSolverProfile,
 )
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_common import Isometry3d, AllowedCollisionMatrix
 from tesseract_robotics.tesseract_environment import (
     AddLinkCommand,
@@ -145,45 +149,54 @@ TRAJOPT_NS = "TrajOptMotionPlannerTask"
 def create_car_seat_profiles():
     """Create TrajOpt profiles for car seat motion planning.
 
-    The car seat is a large object with 10 convex collision hulls. When attached
-    to the end-effector, hard collision constraints can cause solver failures
-    in tight spaces. This profile:
-    - Uses LVS_CONTINUOUS for thorough collision checking with large attached objects
-    - Disables hard collision constraints (which can make solver fail)
-    - Enables soft collision cost for gradual repulsion from obstacles
-
-    Matches C++ car_seat_example.cpp profile settings:
-    - collision_cost: margin=0.005, coeff=50, LVS_CONTINUOUS
-    - collision_constraint: DISABLED (to avoid solver failures)
+    Matches C++ car_seat_example.cpp profile settings exactly:
+    - collision_constraint: margin=0, coeff=10, LVS_CONTINUOUS, LVS=0.1, buffer=0.005
+    - collision_cost: margin=0.005, coeff=50, LVS_CONTINUOUS, LVS=0.1, buffer=0.01
+    - solver: OSQP, max_iter=200, min_approx_improve=1e-3, min_trust_box_size=1e-3
 
     Returns:
         ProfileDictionary with TrajOpt profiles for FREESPACE motions.
     """
     profiles = ProfileDictionary()
 
+    # === Composite Profile (collision config) ===
     composite = TrajOptDefaultCompositeProfile()
 
-    # Disable collision checking entirely for debugging
-    # The car seat is large and complex - collision checking can cause issues
-    composite.collision_constraint_config.enabled = False
-    composite.collision_cost_config.enabled = False
+    # Collision constraint: margin=0, coeff=10
+    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_constraint_config.collision_margin_buffer = 0.005
 
-    # Enable smoothing to help the solver converge
-    composite.smooth_velocities = True
-    composite.smooth_accelerations = False
-    composite.smooth_jerks = False
+    # Collision cost: margin=0.005, coeff=50
+    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_cost_config.collision_margin_buffer = 0.01
 
+    # === Plan/Move Profile ===
     plan = TrajOptDefaultPlanProfile()
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.joint_cost_config.enabled = False
     plan.joint_constraint_config.enabled = True
 
+    # === Solver Profile (OSQP) ===
+    solver = TrajOptOSQPSolverProfile()
+    solver.opt_params.max_iter = 200
+    solver.opt_params.min_approx_improve = 1e-3
+    solver.opt_params.min_trust_box_size = 1e-3
+
     for name in ["DEFAULT", "FREESPACE"]:
         ProfileDictionary_addTrajOptCompositeProfile(
             profiles, TRAJOPT_NS, name, composite
         )
         ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
+        ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
 
     return profiles
 

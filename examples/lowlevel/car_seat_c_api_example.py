@@ -41,6 +41,17 @@ from tesseract_robotics.tesseract_common import (
     Isometry3d,
     AllowedCollisionMatrix,
 )
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptPlanProfile,
+    ProfileDictionary_addTrajOptSolverProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
+    TrajOptOSQPSolverProfile,
+)
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_environment import (
     AddLinkCommand,
     MoveLinkCommand,
@@ -63,6 +74,64 @@ if "pytest" not in sys.modules:
         from tesseract_robotics_viewer import TesseractViewer
     except ImportError:
         pass
+
+
+TRAJOPT_NS = "TrajOptMotionPlannerTask"
+
+
+def create_car_seat_profiles():
+    """Create TrajOpt profiles for car seat motion planning.
+
+    Matches C++ car_seat_example.cpp profile settings exactly:
+    - collision_constraint: margin=0, coeff=10, LVS_CONTINUOUS, LVS=0.1, buffer=0.005
+    - collision_cost: margin=0.005, coeff=50, LVS_CONTINUOUS, LVS=0.1, buffer=0.01
+    - solver: OSQP, max_iter=200, min_approx_improve=1e-3, min_trust_box_size=1e-3
+
+    Returns:
+        ProfileDictionary with TrajOpt profiles for FREESPACE motions.
+    """
+    profiles = ProfileDictionary()
+
+    # === Composite Profile (collision config) ===
+    composite = TrajOptDefaultCompositeProfile()
+
+    # Collision constraint: margin=0, coeff=10
+    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_constraint_config.collision_margin_buffer = 0.005
+
+    # Collision cost: margin=0.005, coeff=50
+    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_cost_config.collision_margin_buffer = 0.01
+
+    # === Plan/Move Profile ===
+    plan = TrajOptDefaultPlanProfile()
+    plan.cartesian_cost_config.enabled = False
+    plan.cartesian_constraint_config.enabled = True
+    plan.joint_cost_config.enabled = False
+    plan.joint_constraint_config.enabled = True
+
+    # === Solver Profile (OSQP) ===
+    solver = TrajOptOSQPSolverProfile()
+    solver.opt_params.max_iter = 200
+    solver.opt_params.min_approx_improve = 1e-3
+    solver.opt_params.min_trust_box_size = 1e-3
+
+    for name in ["DEFAULT", "FREESPACE"]:
+        ProfileDictionary_addTrajOptCompositeProfile(
+            profiles, TRAJOPT_NS, name, composite
+        )
+        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
+        ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
+
+    return profiles
 
 
 def get_predefined_positions():
@@ -349,6 +418,9 @@ def run():
     # Create task composer for TrajOpt planning
     composer = TaskComposer.from_config()
 
+    # Create TrajOpt profiles matching C++ settings
+    profiles = create_car_seat_profiles()
+
     # ==================== PHASE 2: PICK MOTION ====================
     # Plan freespace motion from Home to Pick1 (above seat_1)
     print("\n=== PICK SEAT 1 ===")
@@ -371,7 +443,9 @@ def run():
     print("Running TrajOpt planner for PICK...")
 
     # TrajOptPipeline: sequential convex optimization for collision-free motion
-    pick_result = composer.plan(robot, pick_program, pipeline="TrajOptPipeline")
+    pick_result = composer.plan(
+        robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles
+    )
 
     assert pick_result.successful, f"PICK planning failed: {pick_result.message}"
     print(f"PICK successful! {len(pick_result)} waypoints")
@@ -402,7 +476,9 @@ def run():
     print("Running TrajOpt planner for PLACE...")
 
     # Planning now accounts for attached seat_1 collision geometry
-    place_result = composer.plan(robot, place_program, pipeline="TrajOptPipeline")
+    place_result = composer.plan(
+        robot, place_program, pipeline="TrajOptPipeline", profiles=profiles
+    )
 
     assert place_result.successful, f"PLACE planning failed: {place_result.message}"
     print(f"PLACE successful! {len(place_result)} waypoints")
