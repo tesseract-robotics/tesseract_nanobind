@@ -25,7 +25,11 @@
 #include <tesseract_motion_planners/trajopt/profile/trajopt_profile.h>
 #include <tesseract_motion_planners/trajopt/profile/trajopt_default_move_profile.h>
 #include <tesseract_motion_planners/trajopt/profile/trajopt_default_composite_profile.h>
+#include <tesseract_motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h>
 #include <tesseract_motion_planners/trajopt/trajopt_waypoint_config.h>
+
+// trajopt_sco for optimizer parameters
+#include <trajopt_sco/optimizers.hpp>
 
 // trajopt_common for collision config (moved here in 0.33)
 #include <trajopt_common/collision_types.h>
@@ -109,6 +113,59 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         .def_rw("avoid_singularity", &tp::TrajOptDefaultCompositeProfile::avoid_singularity)
         .def_rw("avoid_singularity_coeff", &tp::TrajOptDefaultCompositeProfile::avoid_singularity_coeff);
 
+    // ========== sco::BasicTrustRegionSQPParameters ==========
+    nb::class_<sco::BasicTrustRegionSQPParameters>(m, "BasicTrustRegionSQPParameters")
+        .def(nb::init<>())
+        .def_rw("improve_ratio_threshold", &sco::BasicTrustRegionSQPParameters::improve_ratio_threshold,
+                "Minimum ratio exact_improve/approx_improve to accept step")
+        .def_rw("min_trust_box_size", &sco::BasicTrustRegionSQPParameters::min_trust_box_size,
+                "If trust region gets any smaller, exit and report convergence")
+        .def_rw("min_approx_improve", &sco::BasicTrustRegionSQPParameters::min_approx_improve,
+                "If model improves less than this, exit and report convergence")
+        .def_rw("min_approx_improve_frac", &sco::BasicTrustRegionSQPParameters::min_approx_improve_frac,
+                "If model improves less than this fraction, exit and report convergence")
+        .def_rw("max_iter", &sco::BasicTrustRegionSQPParameters::max_iter,
+                "The max number of iterations")
+        .def_rw("trust_shrink_ratio", &sco::BasicTrustRegionSQPParameters::trust_shrink_ratio,
+                "If improvement is less than improve_ratio_threshold, shrink trust region by this ratio")
+        .def_rw("trust_expand_ratio", &sco::BasicTrustRegionSQPParameters::trust_expand_ratio,
+                "If improvement is greater than improve_ratio_threshold, expand trust region by this ratio")
+        .def_rw("cnt_tolerance", &sco::BasicTrustRegionSQPParameters::cnt_tolerance,
+                "After convergence of penalty subproblem, if constraint violation is less than this, we're done")
+        .def_rw("max_merit_coeff_increases", &sco::BasicTrustRegionSQPParameters::max_merit_coeff_increases,
+                "Max number of times that the constraints' cost will be increased")
+        .def_rw("max_qp_solver_failures", &sco::BasicTrustRegionSQPParameters::max_qp_solver_failures,
+                "Max number of times the QP solver can fail before optimization is aborted")
+        .def_rw("merit_coeff_increase_ratio", &sco::BasicTrustRegionSQPParameters::merit_coeff_increase_ratio,
+                "Ratio that we increase coeff each time")
+        .def_rw("max_time", &sco::BasicTrustRegionSQPParameters::max_time,
+                "Max time in seconds that the optimizer will run")
+        .def_rw("initial_merit_error_coeff", &sco::BasicTrustRegionSQPParameters::initial_merit_error_coeff,
+                "Initial coefficient that is used to scale the constraints")
+        .def_rw("inflate_constraints_individually", &sco::BasicTrustRegionSQPParameters::inflate_constraints_individually,
+                "If true, merit coeffs will only be inflated for the constraints that failed")
+        .def_rw("trust_box_size", &sco::BasicTrustRegionSQPParameters::trust_box_size,
+                "Current size of trust region (component-wise)")
+        .def_rw("log_results", &sco::BasicTrustRegionSQPParameters::log_results,
+                "Log results to file")
+        .def_rw("log_dir", &sco::BasicTrustRegionSQPParameters::log_dir,
+                "Directory to store log results")
+        .def_rw("num_threads", &sco::BasicTrustRegionSQPParameters::num_threads,
+                "If greater than one, multi threaded functions are called");
+
+    // ========== TrajOptSolverProfile (base) ==========
+    nb::class_<tp::TrajOptSolverProfile, tc::Profile>(m, "TrajOptSolverProfile")
+        .def_rw("opt_params", &tp::TrajOptSolverProfile::opt_params,
+                "Optimization parameters")
+        .def("getKey", &tp::TrajOptSolverProfile::getKey)
+        .def_static("getStaticKey", &tp::TrajOptSolverProfile::getStaticKey);
+
+    // ========== TrajOptOSQPSolverProfile ==========
+    nb::class_<tp::TrajOptOSQPSolverProfile, tp::TrajOptSolverProfile>(m, "TrajOptOSQPSolverProfile")
+        .def(nb::init<>())
+        .def_rw("update_workspace", &tp::TrajOptOSQPSolverProfile::update_workspace,
+                "Update the OSQP workspace for subsequent optimizations, instead of recreating it each time");
+
     // Helper to add TrajOpt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptMoveProfile", [](tc::ProfileDictionary& dict,
                                                          const std::string& ns,
@@ -135,6 +192,15 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         dict.addProfile(ns, profile_name, profile);
     }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
     "Add TrajOpt composite profile to ProfileDictionary");
+
+    // Helper to add TrajOpt solver profile to ProfileDictionary directly
+    m.def("ProfileDictionary_addTrajOptSolverProfile", [](tc::ProfileDictionary& dict,
+                                                           const std::string& ns,
+                                                           const std::string& profile_name,
+                                                           std::shared_ptr<tp::TrajOptSolverProfile> profile) {
+        dict.addProfile(ns, profile_name, profile);
+    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
+    "Add TrajOpt solver profile to ProfileDictionary");
 
     // ========== TrajOptMotionPlanner ==========
     nb::class_<tp::TrajOptMotionPlanner>(m, "TrajOptMotionPlanner")

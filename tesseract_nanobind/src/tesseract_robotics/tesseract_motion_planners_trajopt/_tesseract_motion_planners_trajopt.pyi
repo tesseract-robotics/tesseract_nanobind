@@ -182,6 +182,122 @@ class TrajOptDefaultCompositeProfile(TrajOptCompositeProfile):
     @avoid_singularity_coeff.setter
     def avoid_singularity_coeff(self, arg: float, /) -> None: ...
 
+class BasicTrustRegionSQPParameters:
+    """Parameters for the TrajOpt SQP optimizer."""
+    def __init__(self) -> None: ...
+    @property
+    def improve_ratio_threshold(self) -> float:
+        """Minimum ratio exact_improve/approx_improve to accept step"""
+    @improve_ratio_threshold.setter
+    def improve_ratio_threshold(self, arg: float, /) -> None: ...
+    @property
+    def min_trust_box_size(self) -> float:
+        """If trust region gets any smaller, exit and report convergence"""
+    @min_trust_box_size.setter
+    def min_trust_box_size(self, arg: float, /) -> None: ...
+    @property
+    def min_approx_improve(self) -> float:
+        """If model improves less than this, exit and report convergence"""
+    @min_approx_improve.setter
+    def min_approx_improve(self, arg: float, /) -> None: ...
+    @property
+    def min_approx_improve_frac(self) -> float:
+        """If model improves less than this fraction, exit and report convergence"""
+    @min_approx_improve_frac.setter
+    def min_approx_improve_frac(self, arg: float, /) -> None: ...
+    @property
+    def max_iter(self) -> int:
+        """The max number of iterations"""
+    @max_iter.setter
+    def max_iter(self, arg: int, /) -> None: ...
+    @property
+    def trust_shrink_ratio(self) -> float:
+        """If improvement is less than improve_ratio_threshold, shrink trust region by this ratio"""
+    @trust_shrink_ratio.setter
+    def trust_shrink_ratio(self, arg: float, /) -> None: ...
+    @property
+    def trust_expand_ratio(self) -> float:
+        """If improvement is greater than improve_ratio_threshold, expand trust region by this ratio"""
+    @trust_expand_ratio.setter
+    def trust_expand_ratio(self, arg: float, /) -> None: ...
+    @property
+    def cnt_tolerance(self) -> float:
+        """After convergence of penalty subproblem, if constraint violation is less than this, we're done"""
+    @cnt_tolerance.setter
+    def cnt_tolerance(self, arg: float, /) -> None: ...
+    @property
+    def max_merit_coeff_increases(self) -> float:
+        """Max number of times that the constraints' cost will be increased"""
+    @max_merit_coeff_increases.setter
+    def max_merit_coeff_increases(self, arg: float, /) -> None: ...
+    @property
+    def max_qp_solver_failures(self) -> int:
+        """Max number of times the QP solver can fail before optimization is aborted"""
+    @max_qp_solver_failures.setter
+    def max_qp_solver_failures(self, arg: int, /) -> None: ...
+    @property
+    def merit_coeff_increase_ratio(self) -> float:
+        """Ratio that we increase coeff each time"""
+    @merit_coeff_increase_ratio.setter
+    def merit_coeff_increase_ratio(self, arg: float, /) -> None: ...
+    @property
+    def max_time(self) -> float:
+        """Max time in seconds that the optimizer will run"""
+    @max_time.setter
+    def max_time(self, arg: float, /) -> None: ...
+    @property
+    def initial_merit_error_coeff(self) -> float:
+        """Initial coefficient that is used to scale the constraints"""
+    @initial_merit_error_coeff.setter
+    def initial_merit_error_coeff(self, arg: float, /) -> None: ...
+    @property
+    def inflate_constraints_individually(self) -> bool:
+        """If true, merit coeffs will only be inflated for the constraints that failed"""
+    @inflate_constraints_individually.setter
+    def inflate_constraints_individually(self, arg: bool, /) -> None: ...
+    @property
+    def trust_box_size(self) -> float:
+        """Current size of trust region (component-wise)"""
+    @trust_box_size.setter
+    def trust_box_size(self, arg: float, /) -> None: ...
+    @property
+    def log_results(self) -> bool:
+        """Log results to file"""
+    @log_results.setter
+    def log_results(self, arg: bool, /) -> None: ...
+    @property
+    def log_dir(self) -> str:
+        """Directory to store log results"""
+    @log_dir.setter
+    def log_dir(self, arg: str, /) -> None: ...
+    @property
+    def num_threads(self) -> int:
+        """If greater than one, multi threaded functions are called"""
+    @num_threads.setter
+    def num_threads(self, arg: int, /) -> None: ...
+
+class TrajOptSolverProfile(
+    tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile
+):
+    """Base class for TrajOpt solver profiles."""
+    @property
+    def opt_params(self) -> BasicTrustRegionSQPParameters:
+        """Optimization parameters"""
+    @opt_params.setter
+    def opt_params(self, arg: BasicTrustRegionSQPParameters, /) -> None: ...
+    def getKey(self) -> int: ...
+    @staticmethod
+    def getStaticKey() -> int: ...
+
+class TrajOptOSQPSolverProfile(TrajOptSolverProfile):
+    """TrajOpt solver profile using OSQP convex solver."""
+    def __init__(self) -> None: ...
+    @property
+    def update_workspace(self) -> bool:
+        """Update the OSQP workspace for subsequent optimizations, instead of recreating it each time"""
+    @update_workspace.setter
+    def update_workspace(self, arg: bool, /) -> None: ...
+
 def ProfileDictionary_addTrajOptPlanProfile(
     dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary,
     ns: str,
@@ -197,6 +313,14 @@ def ProfileDictionary_addTrajOptCompositeProfile(
     profile: TrajOptCompositeProfile,
 ) -> None:
     """Add TrajOpt composite profile to ProfileDictionary"""
+
+def ProfileDictionary_addTrajOptSolverProfile(
+    dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary,
+    ns: str,
+    profile_name: str,
+    profile: TrajOptSolverProfile,
+) -> None:
+    """Add TrajOpt solver profile to ProfileDictionary"""
 
 class TrajOptMotionPlanner:
     def __init__(self, name: str) -> None: ...
