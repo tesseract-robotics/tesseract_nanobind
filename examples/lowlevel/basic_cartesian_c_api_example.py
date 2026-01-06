@@ -61,12 +61,12 @@ def run():
     print(f"Loaded robot: {robot}")
 
     # Add box obstacle for collision checking
-    # C++ uses an octomap (1x1x1m point cloud grid), Python uses simplified box
-    # Position: 1m in front of robot base
+    # C++ uses 1x1x1m octomap (sparse point cloud) which allows paths through gaps;
+    # Python uses 0.5m solid box since solid geometry blocks more collision space
     create_obstacle(
         robot,
         name="box_obstacle",
-        geometry=box(0.5, 0.5, 0.5),  # 50cm cube
+        geometry=box(0.5, 0.5, 0.5),  # 0.5m cube (smaller than C++ 1m octree)
         transform=Pose.from_xyz(1.0, 0, 0),
     )
     print("Added box obstacle at (1.0, 0, 0)")

@@ -68,6 +68,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
     TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
     TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType  # noqa: E402
 
 # TrajOpt planner namespace for profile registration
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -131,17 +132,24 @@ def create_pick_and_place_profiles():
 
     # ==== COMPOSITE PROFILE (trajectory-wide) ====
     # Applied to entire motion sequence
+    # C++ settings from pick_and_place_example.cpp
     composite_profile = TrajOptDefaultCompositeProfile()
 
-    # Collision constraint disabled - hard constraints can cause solver failures
-    # when box is attached close to end-effector
-    composite_profile.collision_constraint_config.enabled = False
+    # Collision constraint (hard): margin=0, coeff=10 (matches C++)
+    composite_profile.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite_profile.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_DISCRETE
+    )
+    composite_profile.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.05
+    composite_profile.collision_constraint_config.collision_margin_buffer = 0.005
 
-    # Collision cost enabled with soft margin for gradual repulsion
-    # 0.33 API: Use TrajOptCollisionConfig constructor (margin, coeff)
-    # and set longest_valid_segment_length on collision_check_config
-    composite_profile.collision_cost_config = TrajOptCollisionConfig(0.025, 20.0)
+    # Collision cost (soft): margin=0.005, coeff=50 (matches C++)
+    composite_profile.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite_profile.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_DISCRETE
+    )
     composite_profile.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
+    composite_profile.collision_cost_config.collision_margin_buffer = 0.01
 
     # ==== REGISTER PROFILES ====
     # "CARTESIAN" profile used by linear_to() moves
