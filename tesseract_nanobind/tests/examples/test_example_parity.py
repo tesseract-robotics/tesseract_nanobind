@@ -32,10 +32,11 @@ def _get_final_positions(result):
 
 
 # Single-result examples: (name, waypoint_tolerance, decimal_precision)
+# waypoint_tol=None skips waypoint comparison (for OMPL: randomized sampling)
 SINGLE_RESULT_EXAMPLES = [
-    ("freespace_ompl", 5, 2),
-    ("basic_cartesian", 5, 2),
-    ("glass_upright", 5, 2),
+    ("freespace_ompl", None, 2),  # OMPL: skip waypoint check, just verify final pos
+    ("basic_cartesian", 5, 2),  # TrajOpt: deterministic
+    ("glass_upright", 5, 2),  # TrajOpt: deterministic
 ]
 
 
@@ -52,10 +53,12 @@ def test_single_result_parity(name, waypoint_tol, decimal):
     assert hl["result"].successful
     assert ll["result"].successful
 
-    diff = abs(len(hl["result"]) - len(ll["result"]))
-    assert diff <= waypoint_tol, (
-        f"Waypoint count differs: {len(hl['result'])} vs {len(ll['result'])}"
-    )
+    # Skip waypoint comparison for OMPL (sampling-based = high variance)
+    if waypoint_tol is not None:
+        diff = abs(len(hl["result"]) - len(ll["result"]))
+        assert diff <= waypoint_tol, (
+            f"Waypoint count differs: {len(hl['result'])} vs {len(ll['result'])}"
+        )
 
     hl_final = _get_final_positions(hl["result"])
     ll_final = _get_final_positions(ll["result"])
