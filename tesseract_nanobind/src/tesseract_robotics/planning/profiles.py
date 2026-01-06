@@ -238,10 +238,10 @@ def create_trajopt_default_profiles(
     by minimizing costs (smoothness, collision distance) while satisfying
     constraints (joint limits, collision avoidance, waypoint targets).
 
-    Profile Configuration:
+    Profile Configuration (0.33 API):
         Composite Profile (applies to entire trajectory):
-        - collision_constraint: safety_margin=0.00, buffer=0.005, coeff=10
-        - collision_cost: safety_margin=0.005, buffer=0.01, coeff=50
+        - collision_constraint: margin=0.00, collision_margin_buffer=0.005, coeff=10
+        - collision_cost: margin=0.005, collision_margin_buffer=0.01, coeff=50
 
         Plan Profile (applies per waypoint):
         - cartesian_constraint: enabled (enforce Cartesian targets exactly)
@@ -296,7 +296,7 @@ def create_trajopt_upright_profiles(
     """Create TrajOpt profiles for orientation-constrained motion (glass-upright).
 
     This creates profiles matching the C++ glass_upright_example.cpp exactly:
-    - Collision: safety_margin=0.01, buffer=0.01, coeff=1 (DISCRETE_CONTINUOUS)
+    - Collision: margin=0.01, collision_margin_buffer=0.01, coeff=1 (LVS_CONTINUOUS)
     - Cartesian constraint: coeff=[0,0,0,5,5,5] (position free, orientation constrained)
 
     The UPRIGHT profile keeps tool orientation constant while allowing position to vary.

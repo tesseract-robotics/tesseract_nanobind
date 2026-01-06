@@ -40,10 +40,10 @@ Key Concepts:
     - CartesianTarget: 6D pose goal with profile selection
     - StateTarget: Joint configuration goal for state continuity
 
-TrajOpt Profile Configuration:
+TrajOpt Profile Configuration (0.33 API):
     - Cartesian constraint: coeff=[10,10,10,10,10,10] for all 6 DOF
-    - Collision cost: enabled, safety_margin=0.025m, coeff=20
-    - longest_valid_segment_length = 0.05m (5cm collision check resolution)
+    - Collision cost: enabled, collision_margin_buffer=0.025m, coeff=20
+    - collision_check_config.longest_valid_segment_length = 0.05m
 
 C++ Source: tesseract_planning/tesseract_examples/src/pick_and_place_example.cpp
 

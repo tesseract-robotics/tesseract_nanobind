@@ -17,7 +17,7 @@ Key concepts:
 C++ reference values:
 - Initial joints: [-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0]
 - Cartesian constraint coeff: [10, 10, 10, 10, 10, 0]
-- Collision cost: safety_margin=0.025m, coeff=20
+- Collision cost: collision_margin_buffer=0.025m, coeff=20 (0.33 API)
 - ManipulatorInfo: manipulator="manipulator", tcp="grinder_frame", working_frame="part"
 """
 

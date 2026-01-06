@@ -35,8 +35,8 @@ C++ Source: tesseract_planning/tesseract_examples/src/glass_upright_example.cpp
 
 C++ Profile Configuration (verified):
     Composite Profile (UPRIGHT):
-        - collision_cost: enabled, safety_margin=0.01, type=DISCRETE_CONTINUOUS
-        - collision_constraint: enabled, safety_margin=0.01
+        - collision_cost: enabled, collision_margin_buffer=0.01, type=LVS_CONTINUOUS
+        - collision_constraint: enabled, collision_margin_buffer=0.01
         - smooth_velocities: true
     Plan Profile (UPRIGHT):
         - cartesian_constraint: enabled
