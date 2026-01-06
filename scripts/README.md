@@ -48,10 +48,18 @@ Tests all 5 examples:
 Runs pytest with correct environment. Preferred way to run tests:
 
 ```bash
-./scripts/run_tests.sh                    # all tests
+./scripts/run_tests.sh                    # all tests (parallel)
+./scripts/run_tests.sh -v                 # verbose with long traceback
+./scripts/run_tests.sh -f                 # rerun only failed tests (serial)
+./scripts/run_tests.sh -s                 # run serial (no parallel)
 ./scripts/run_tests.sh -k "freespace"     # filter tests
 ./scripts/run_tests.sh -x                 # stop on first failure
 ```
+
+Flags:
+- `-v, --verbose`: verbose output with long tracebacks
+- `-f, --failed`: rerun only tests that failed last run (runs serial by default for easier debugging)
+- `-s, --serial`: disable parallel execution (`-n auto`)
 
 ### `run_failing_tests.sh`
 Runs specific failing tests for debugging.
