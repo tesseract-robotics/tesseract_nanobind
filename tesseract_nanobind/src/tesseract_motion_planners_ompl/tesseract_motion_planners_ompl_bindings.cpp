@@ -111,6 +111,8 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         .def(nb::init<>())
         .def_rw("solver_config", &tp::OMPLRealVectorMoveProfile::solver_config,
             "The OMPL parallel planner solver config")
+        .def_rw("contact_manager_config", &tp::OMPLRealVectorMoveProfile::contact_manager_config,
+            "The contact manager configuration (collision margins)")
         .def_rw("collision_check_config", &tp::OMPLRealVectorMoveProfile::collision_check_config,
             "The collision check configuration");
 

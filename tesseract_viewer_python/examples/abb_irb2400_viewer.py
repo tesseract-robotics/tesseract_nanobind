@@ -9,20 +9,38 @@ This example demonstrates:
 - Trajectory visualization
 """
 
-from tesseract_robotics.tesseract_common import FilesystemPath, Isometry3d, Translation3d, Quaterniond, \
-    ManipulatorInfo, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    Isometry3d,
+    Translation3d,
+    Quaterniond,
+    ManipulatorInfo,
+    GeneralResourceLocator,
+)
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_command_language import CartesianWaypoint, \
-    MoveInstructionType_FREESPACE, MoveInstruction, \
-    CompositeInstruction, ProfileDictionary, \
-    CartesianWaypointPoly_wrap_CartesianWaypoint, MoveInstructionPoly_wrap_MoveInstruction
+from tesseract_robotics.tesseract_command_language import (
+    CartesianWaypoint,
+    MoveInstructionType_FREESPACE,
+    MoveInstruction,
+    CompositeInstruction,
+    ProfileDictionary,
+    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    MoveInstructionPoly_wrap_MoveInstruction,
+)
 
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLMotionPlanner, OMPLRealVectorPlanProfile, \
-    ProfileDictionary_addOMPLProfile
-from tesseract_robotics.tesseract_time_parameterization import TimeOptimalTrajectoryGeneration, \
-    InstructionsTrajectory
+from tesseract_robotics.tesseract_motion_planners_simple import (
+    generateInterpolatedProgram,
+)
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    OMPLMotionPlanner,
+    OMPLRealVectorPlanProfile,
+    ProfileDictionary_addOMPLProfile,
+)
+from tesseract_robotics.tesseract_time_parameterization import (
+    TimeOptimalTrajectoryGeneration,
+    TOTGCompositeProfile,
+)
 
 # TrajOpt imports - optional, skip if not available
 try:
@@ -33,12 +51,12 @@ try:
         ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
     )
+
     TRAJOPT_AVAILABLE = True
 except ImportError:
     TRAJOPT_AVAILABLE = False
 
 import numpy as np
-import os
 import sys
 
 # Viewer (skip import in pytest)
@@ -57,8 +75,12 @@ def main():
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_urdf_package_url).getFilePath())
-    abb_irb2400_srdf_fname = FilesystemPath(locator.locateResource(abb_irb2400_srdf_package_url).getFilePath())
+    abb_irb2400_urdf_fname = FilesystemPath(
+        locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
+    )
+    abb_irb2400_srdf_fname = FilesystemPath(
+        locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
+    )
 
     t_env = Environment()
     assert t_env.init(abb_irb2400_urdf_fname, abb_irb2400_srdf_fname, locator)
@@ -73,31 +95,49 @@ def main():
         viewer = TesseractViewer()
         viewer.update_environment(t_env, [0, 0, 0])
 
-    joint_names = [f"joint_{i+1}" for i in range(6)]
+    joint_names = [f"joint_{i + 1}" for i in range(6)]
     if viewer:
-        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
+        viewer.update_joint_positions(
+            joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1])
+        )
         viewer.start_serve_background()
 
     t_env.setState(joint_names, np.ones(6) * 0.1)
 
     # Define waypoints
-    wp1 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.8, -0.3, 1.455) * Quaterniond(0.70710678, 0, 0.70710678, 0))
-    wp2 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.8, 0.3, 1.455) * Quaterniond(0.70710678, 0, 0.70710678, 0))
-    wp3 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.8, 0.5, 1.455) * Quaterniond(0.70710678, 0, 0.70710678, 0))
-
-    start_instruction = MoveInstruction(CartesianWaypointPoly_wrap_CartesianWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT")
-    plan_f1 = MoveInstruction(CartesianWaypointPoly_wrap_CartesianWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT")
-    plan_f2 = MoveInstruction(CartesianWaypointPoly_wrap_CartesianWaypoint(wp3), MoveInstructionType_FREESPACE, "DEFAULT")
-
+    wp1 = CartesianWaypoint(
+        Isometry3d.Identity()
+        * Translation3d(0.8, -0.3, 1.455)
+        * Quaterniond(0.70710678, 0, 0.70710678, 0)
+    )
+    wp2 = CartesianWaypoint(
+        Isometry3d.Identity()
+        * Translation3d(0.8, 0.3, 1.455)
+        * Quaterniond(0.70710678, 0, 0.70710678, 0)
+    )
+    start_instruction = MoveInstruction(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+        MoveInstructionType_FREESPACE,
+        "DEFAULT",
+    )
+    plan_f1 = MoveInstruction(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+        MoveInstructionType_FREESPACE,
+        "DEFAULT",
+    )
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
+    program.appendMoveInstruction(
+        MoveInstructionPoly_wrap_MoveInstruction(start_instruction)
+    )
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
 
     # OMPL planning
     plan_profile = OMPLRealVectorPlanProfile()
     profiles = ProfileDictionary()
-    ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
+    ProfileDictionary_addOMPLProfile(
+        profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile
+    )
 
     request = PlannerRequest()
     request.instructions = program
@@ -109,7 +149,9 @@ def main():
     assert response.successful
     results_instruction = response.results
 
-    interpolated_results_instruction = generateInterpolatedProgram(results_instruction, t_env, 3.14, 1.0, 3.14, 10)
+    interpolated_results_instruction = generateInterpolatedProgram(
+        results_instruction, t_env, 3.14, 1.0, 3.14, 10
+    )
 
     # TrajOpt trajectory optimization for smooth trajectories
     trajopt_success = False
@@ -124,7 +166,10 @@ def main():
             trajopt_profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_plan_profile
         )
         ProfileDictionary_addTrajOptCompositeProfile(
-            trajopt_profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
+            trajopt_profiles,
+            TRAJOPT_DEFAULT_NAMESPACE,
+            "DEFAULT",
+            trajopt_composite_profile,
         )
 
         trajopt_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
@@ -149,15 +194,23 @@ def main():
 
     # Time parameterization - only works with TrajOpt output (StateWaypointPoly)
     # OMPL returns JointWaypointPoly which InstructionsTrajectory doesn't support
+    # 0.33 API: compute() takes (CompositeInstruction, Environment, ProfileDictionary)
     if trajopt_success:
         print("Running time parameterization on TrajOpt results...")
         time_parameterization = TimeOptimalTrajectoryGeneration()
-        instructions_trajectory = InstructionsTrajectory(final_results_instruction)
-        max_velocity = np.array([2.088, 2.082, 3.27, 3.6, 3.3, 3.078])
-        vel_limits = np.column_stack((-max_velocity, max_velocity))
-        acc_limits = np.column_stack((-np.ones(6), np.ones(6)))
-        jerk_limits = np.column_stack((-np.ones(6), np.ones(6)))
-        if time_parameterization.compute(instructions_trajectory, vel_limits, acc_limits, jerk_limits):
+
+        # Create profile with velocity/acceleration scaling
+        totg_profile = TOTGCompositeProfile()
+        totg_profile.max_velocity_scaling_factor = 1.0
+        totg_profile.max_acceleration_scaling_factor = 1.0
+
+        # Create profile dictionary
+        time_profiles = ProfileDictionary()
+        time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
+
+        if time_parameterization.compute(
+            final_results_instruction, t_env, time_profiles
+        ):
             print("Time parameterization successful!")
         else:
             print("Time parameterization failed")

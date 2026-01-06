@@ -37,10 +37,10 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -219,13 +219,16 @@ def main():
         False  # Soft cost, not hard constraint
     )
     trajopt_composite_profile.collision_cost_config.enabled = True
-    trajopt_composite_profile.collision_cost_config.safety_margin = (
+    # 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig
+    trajopt_composite_profile.collision_cost_config.collision_margin_buffer = (
         0.025  # 25mm collision buffer
     )
-    trajopt_composite_profile.collision_cost_config.type = (
-        CollisionEvaluatorType.SINGLE_TIMESTEP
+    trajopt_composite_profile.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.DISCRETE  # was SINGLE_TIMESTEP
     )
-    trajopt_composite_profile.collision_cost_config.coeff = 1.0
+    trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(
+        1.0
+    )
 
     # Register profiles with TrajOpt task namespace
     ProfileDictionary_addTrajOptPlanProfile(

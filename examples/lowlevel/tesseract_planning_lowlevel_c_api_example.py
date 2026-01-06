@@ -48,7 +48,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    InstructionsTrajectory,
+    TOTGCompositeProfile,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
@@ -185,19 +185,24 @@ def main():
     trajopt_results_instruction = trajopt_response.results
 
     # The TrajOpt planner does not assign timestamps to the results. This function
-    # will assign timestamps using the TimeOptimalTrajectoryGeneration class. This
-    # class uses velocity and acceleration limits to compute timestamps for the
-    # results. The input program is modified in place (no output since input is modified).
+    # will assign timestamps using the TimeOptimalTrajectoryGeneration class.
+    # 0.33 API: TimeParameterization.compute() takes (CompositeInstruction, Environment, ProfileDictionary)
+    # instead of (InstructionsTrajectory, velocity, acceleration, jerk) arrays.
+    # Velocity/acceleration limits are set via TOTGCompositeProfile or taken from Environment.
     time_parameterization = TimeOptimalTrajectoryGeneration()
-    instructions_trajectory = InstructionsTrajectory(trajopt_results_instruction)
-    max_velocity = np.array([[2.088, 2.082, 3.27, 3.6, 3.3, 3.078]], dtype=np.float64)
-    max_velocity = np.hstack((-max_velocity.T, max_velocity.T))
-    max_acceleration = np.array([[1, 1, 1, 1, 1, 1]], dtype=np.float64)
-    max_acceleration = np.hstack((-max_acceleration.T, max_acceleration.T))
-    max_jerk = np.array([[1, 1, 1, 1, 1, 1]], dtype=np.float64)
-    max_jerk = np.hstack((-max_jerk.T, max_jerk.T))
+
+    # Create profile with velocity/acceleration scaling
+    totg_profile = TOTGCompositeProfile()
+    totg_profile.max_velocity_scaling_factor = 1.0
+    totg_profile.max_acceleration_scaling_factor = 1.0
+
+    # Create profile dictionary for time parameterization
+    # Note: namespace is "TOTG" (or any string), profile name is "DEFAULT"
+    time_profiles = ProfileDictionary()
+    time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
+
     assert time_parameterization.compute(
-        instructions_trajectory, max_velocity, max_acceleration, max_jerk
+        trajopt_results_instruction, t_env, time_profiles
     )
 
     # Get the results as a list of instructions

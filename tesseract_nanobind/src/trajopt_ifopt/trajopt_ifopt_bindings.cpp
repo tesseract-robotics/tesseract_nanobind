@@ -168,6 +168,7 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def(nb::init<>())
         .def(nb::init<double, double>(), "margin"_a, "coeff"_a)
         .def_rw("enabled", &tc::TrajOptCollisionConfig::enabled)
+        .def_rw("contact_manager_config", &tc::TrajOptCollisionConfig::contact_manager_config)
         .def_rw("collision_check_config", &tc::TrajOptCollisionConfig::collision_check_config)
         .def_rw("collision_coeff_data", &tc::TrajOptCollisionConfig::collision_coeff_data)
         .def_rw("collision_margin_buffer", &tc::TrajOptCollisionConfig::collision_margin_buffer)
