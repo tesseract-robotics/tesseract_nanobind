@@ -173,6 +173,9 @@ NB_MODULE(_tesseract_collision, m) {
     nb::class_<tc::ContactManagerConfig>(m, "ContactManagerConfig")
         .def(nb::init<>())
         .def(nb::init<double>(), "default_margin"_a)
+        .def_prop_rw("default_margin",
+            [](const tc::ContactManagerConfig& c) -> std::optional<double> { return c.default_margin; },
+            [](tc::ContactManagerConfig& c, double v) { c.default_margin = v; })
         .def_rw("pair_margin_override_type", &tc::ContactManagerConfig::pair_margin_override_type)
         .def_rw("acm_override_type", &tc::ContactManagerConfig::acm_override_type)
         // Backwards compatibility alias

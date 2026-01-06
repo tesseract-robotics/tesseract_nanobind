@@ -44,20 +44,37 @@ def _create_trajopt_profiles():
 
     Note:
         0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig/CollisionConstraintConfig.
-        Collision parameters (safety_margin, coeff) are now in nested collision_check_config
-        and collision_coeff_data. The simple binding exposes: enabled, collision_margin_buffer, max_num_cnt.
+        Must set collision_check_config.type and collision_coeff_data to match C++ examples.
+        Uses LVS_CONTINUOUS for continuous collision checking (critical for attached objects).
     """
+    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultPlanProfile,
     )
 
     composite = TrajOptDefaultCompositeProfile()
-    # 0.33 API: Configure collision configs with available attributes
+    # 0.33 API: Configure collision configs to match C++ car_seat_example.cpp
+    # LVS_CONTINUOUS: Longest Valid Segment continuous collision checking
+    # Critical for large attached objects that could pass through obstacles
+
+    # Constraint config: margin=0, coeff=10 (hard constraint at zero margin)
     composite.collision_constraint_config.enabled = True
     composite.collision_constraint_config.collision_margin_buffer = 0.005
+    composite.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_constraint_config.collision_coeff_data.setDefaultCollisionCoeff(10.0)
+
+    # Cost config: margin=0.005, coeff=50 (soft cost pushing away from obstacles)
     composite.collision_cost_config.enabled = True
     composite.collision_cost_config.collision_margin_buffer = 0.01
+    composite.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(50.0)
 
     plan = TrajOptDefaultPlanProfile()
     plan.cartesian_cost_config.enabled = False
@@ -78,23 +95,38 @@ def _create_trajopt_upright_profiles():
 
     Note:
         0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig/CollisionConstraintConfig.
-        The simple binding exposes: enabled, collision_margin_buffer, max_num_cnt.
+        Must set collision_check_config.type and collision_coeff_data to match C++.
     """
     import numpy as np
 
+    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultPlanProfile,
     )
 
     composite = TrajOptDefaultCompositeProfile()
-    # 0.33 API: Configure collision configs with available attributes
+    # 0.33 API: Configure collision configs to match C++ glass_upright_example.cpp
+    # Cost config: TrajOptCollisionConfig(0.01, 1) with DISCRETE evaluator
+    # C++ sets: contact_manager_config.default_margin = 0.01, collision_coeff_data = 1
     composite.collision_cost_config.enabled = True
+    composite.collision_cost_config.contact_manager_config.default_margin = 0.01
     composite.collision_cost_config.collision_margin_buffer = 0.01
+    composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+    composite.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(1.0)
+    # Constraint config: TrajOptCollisionConfig(0.01, 1) with DISCRETE evaluator
     composite.collision_constraint_config.enabled = True
+    composite.collision_constraint_config.contact_manager_config.default_margin = 0.01
     composite.collision_constraint_config.collision_margin_buffer = 0.01
+    composite.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.DISCRETE
+    )
+    composite.collision_constraint_config.collision_coeff_data.setDefaultCollisionCoeff(1.0)
+    # Velocity smoothing for regularization (C++ sets velocity_coeff=Ones(1))
     composite.smooth_velocities = True
+    composite.velocity_coeff = np.ones(1)
     composite.smooth_accelerations = False
+    composite.acceleration_coeff = np.ones(1)
     composite.smooth_jerks = False
 
     plan = TrajOptDefaultPlanProfile()
@@ -385,6 +417,11 @@ def create_ompl_default_profiles(
     profile.solver_config.max_solutions = max_solutions
     profile.solver_config.optimize = optimize
     profile.solver_config.simplify = simplify
+
+    # Configure collision margin for OMPL state validity check
+    # Use margin of 0.01 (10mm) - smaller than TrajOpt's margin (40mm) but enough
+    # for OMPL to find paths that are clearly collision-free
+    profile.contact_manager_config.default_margin = 0.01
 
     # Add parallel RRTConnect planners (C++ default is 2)
     profile.solver_config.clearPlanners()

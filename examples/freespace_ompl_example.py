@@ -49,7 +49,10 @@ from tesseract_robotics.planning import (
     create_obstacle,
     TaskComposer,
 )
-from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
+from tesseract_robotics.planning.profiles import (
+    create_freespace_pipeline_profiles,
+    create_trajopt_default_profiles,
+)
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -68,8 +71,8 @@ def run(pipeline="FreespacePipeline", num_planners=None):
 
     Args:
         pipeline: Planning pipeline to use. Options:
-            - "FreespacePipeline" (default): OMPL RRTConnect
-            - "FreespaceHybridPipeline": OMPL + TrajOpt smoothing
+            - "FreespacePipeline" (default): OMPL RRTConnect + TrajOpt smoothing
+            - "TrajOptPipeline": TrajOpt only (for comparison)
         num_planners: Number of parallel OMPL planners (default: all CPUs).
             More planners = faster solutions but higher CPU usage.
 
@@ -119,10 +122,16 @@ def run(pipeline="FreespacePipeline", num_planners=None):
     print(f"\nCreated program with {len(program)} waypoints")
 
     # Execute planning pipeline via TaskComposer
-    # FreespacePipeline: OMPL RRTConnect -> interpolation -> time parameterization
+    # TrajOptPipeline: TrajOpt -> contact check -> time parameterization
     print(f"\nRunning planner ({pipeline})...")
     composer = TaskComposer.from_config()
-    profiles = create_freespace_pipeline_profiles(num_planners=num_planners)
+
+    # Use appropriate profiles based on pipeline
+    if "OMPL" in pipeline or "Freespace" in pipeline:
+        profiles = create_freespace_pipeline_profiles(num_planners=num_planners)
+    else:
+        profiles = create_trajopt_default_profiles()
+
     result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
 
     assert result.successful, f"Planning failed: {result.message}"

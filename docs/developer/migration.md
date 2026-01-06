@@ -278,7 +278,7 @@ input_key = task.getInputKeys().get("planning_input")
 input_key = task.getInputKeys().get("program")
 ```
 
-## TrajOpt Profile Configuration
+## TrajOpt Profile Configuration (0.33 API)
 
 ### TrajOptDefaultPlanProfile
 
@@ -288,10 +288,10 @@ Configure waypoint-level TrajOpt behavior via config objects:
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile - waypoint constraints
 trajopt_plan_profile = TrajOptDefaultPlanProfile()
@@ -301,22 +301,61 @@ trajopt_plan_profile.cartesian_constraint_config.enabled = True
 trajopt_plan_profile.cartesian_constraint_config.coeff = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 0.0])
 
 # Composite profile - collision/smoothing
+# 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig/CollisionConstraintConfig
 trajopt_composite_profile = TrajOptDefaultCompositeProfile()
 trajopt_composite_profile.collision_constraint_config.enabled = False
 trajopt_composite_profile.collision_cost_config.enabled = True
-trajopt_composite_profile.collision_cost_config.safety_margin = 0.025
-trajopt_composite_profile.collision_cost_config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
-trajopt_composite_profile.collision_cost_config.coeff = 20.0
+# collision_margin_buffer replaces safety_margin
+trajopt_composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+# CollisionEvaluatorType is now in tesseract_collision; DISCRETE replaces SINGLE_TIMESTEP
+trajopt_composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+# collision_coeff_data.setDefaultCollisionCoeff() replaces .coeff
+trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 
 # Register profiles
 ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "CARTESIAN", trajopt_plan_profile)
 ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_profile)
 ```
 
+### 0.33 API Changes Summary
+
+**TrajOptCollisionConfig** (replaces CollisionCostConfig/CollisionConstraintConfig):
+- `collision_margin_buffer` - margin beyond contact (replaces `safety_margin`)
+- `collision_check_config.type` - collision evaluator type
+- `collision_check_config.longest_valid_segment_length` - interpolation control
+- `collision_coeff_data.setDefaultCollisionCoeff(coeff)` - collision cost coefficient
+
+**CollisionEvaluatorType** (moved to `tesseract_collision`):
+- `DISCRETE` - check at each waypoint (was `SINGLE_TIMESTEP`)
+- `LVS_DISCRETE` - longest valid segment discrete
+- `CONTINUOUS` - continuous collision checking
+- `LVS_CONTINUOUS` - longest valid segment continuous (was `DISCRETE_CONTINUOUS`)
+
+**TimeParameterization** (0.33 API):
+```python
+from tesseract_robotics.tesseract_time_parameterization import (
+    TimeOptimalTrajectoryGeneration,
+    TOTGCompositeProfile,
+)
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+# Create TOTG with profile-based configuration
+totg = TimeOptimalTrajectoryGeneration()
+totg_profile = TOTGCompositeProfile()
+totg_profile.max_velocity_scaling_factor = 1.0
+totg_profile.max_acceleration_scaling_factor = 1.0
+
+time_profiles = ProfileDictionary()
+time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
+
+# compute() now takes (CompositeInstruction, Environment, ProfileDictionary)
+success = totg.compute(composite_instruction, env, time_profiles)
+```
+
 Available config classes:
 - `TrajOptCartesianWaypointConfig` - cartesian_cost_config, cartesian_constraint_config
 - `TrajOptJointWaypointConfig` - joint_cost_config, joint_constraint_config
-- `CollisionCostConfig`, `CollisionConstraintConfig` - collision_cost_config, collision_constraint_config
+- `TrajOptCollisionConfig` - collision_cost_config, collision_constraint_config (0.33 API)
 
 ## Cartesian Path Planning with assignCurrentStateAsSeed
 

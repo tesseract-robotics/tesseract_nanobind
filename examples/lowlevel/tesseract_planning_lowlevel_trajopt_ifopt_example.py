@@ -45,7 +45,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    InstructionsTrajectory,
+    TOTGCompositeProfile,
 )
 
 # TrajOptIfopt imports (OSQP-based SQP solver)
@@ -192,18 +192,22 @@ def main():
     trajopt_results_instruction = trajopt_response.results
 
     # === Time Parameterization ===
+    # 0.33 API: TimeParameterization.compute() takes (CompositeInstruction, Environment, ProfileDictionary)
+    # instead of (InstructionsTrajectory, velocity, acceleration, jerk) arrays.
     print("Running time parameterization...")
     time_param = TimeOptimalTrajectoryGeneration()
-    trajectory = InstructionsTrajectory(trajopt_results_instruction)
 
-    max_velocity = np.array([[2.088, 2.082, 3.27, 3.6, 3.3, 3.078]], dtype=np.float64)
-    max_velocity = np.hstack((-max_velocity.T, max_velocity.T))
-    max_acceleration = np.ones((6, 2), dtype=np.float64)
-    max_acceleration[:, 0] *= -1
-    max_jerk = np.ones((6, 2), dtype=np.float64)
-    max_jerk[:, 0] *= -1
+    # Create profile with velocity/acceleration scaling
+    totg_profile = TOTGCompositeProfile()
+    totg_profile.max_velocity_scaling_factor = 1.0
+    totg_profile.max_acceleration_scaling_factor = 1.0
 
-    assert time_param.compute(trajectory, max_velocity, max_acceleration, max_jerk)
+    # Create profile dictionary for time parameterization
+    # Note: namespace is "TOTG" (or any string), profile name is "DEFAULT"
+    time_profiles = ProfileDictionary()
+    time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
+
+    assert time_param.compute(trajopt_results_instruction, t_env, time_profiles)
     print("Time parameterization complete")
 
     # Print results

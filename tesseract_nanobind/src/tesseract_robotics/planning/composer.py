@@ -407,9 +407,24 @@ class TaskComposer:
             future.wait()
 
             if not future.context.isSuccessful():
+                # Try to get more detailed error info
+                msg = "Planning failed"
+                try:
+                    # Check if there's task info with status
+                    task_infos = future.context.task_infos
+                    if task_infos:
+                        for name, info in task_infos.items():
+                            if hasattr(info, "message") and info.message:
+                                msg = f"{name}: {info.message}"
+                                break
+                            if hasattr(info, "return_value"):
+                                msg = f"{name} returned {info.return_value}"
+                                break
+                except (AttributeError, TypeError):
+                    pass
                 return PlanningResult(
                     successful=False,
-                    message="Planning failed",
+                    message=msg,
                 )
 
             # Extract results

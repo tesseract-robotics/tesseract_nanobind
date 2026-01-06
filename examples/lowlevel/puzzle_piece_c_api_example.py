@@ -36,10 +36,10 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -201,17 +201,17 @@ def main():
     trajopt_composite_profile.collision_constraint_config.enabled = False
     trajopt_composite_profile.collision_cost_config.enabled = True
 
-    # Safety margin: 25mm (0.025m) minimum clearance from obstacles
-    trajopt_composite_profile.collision_cost_config.safety_margin = 0.025
-
-    # SINGLE_TIMESTEP: check collision at each waypoint only (faster)
-    # Alternative: DISCRETE_CONTINUOUS checks between waypoints (slower, safer)
-    trajopt_composite_profile.collision_cost_config.type = (
-        CollisionEvaluatorType.SINGLE_TIMESTEP
+    # 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig
+    # collision_margin_buffer: additional margin beyond contact (25mm)
+    # collision_check_config.type: DISCRETE (was SINGLE_TIMESTEP)
+    # collision_coeff_data: per-pair coefficients (default coeff = 20.0)
+    trajopt_composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+    trajopt_composite_profile.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.DISCRETE
     )
-
-    # Collision cost coefficient - higher = stronger collision avoidance
-    trajopt_composite_profile.collision_cost_config.coeff = 20.0
+    trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(
+        20.0
+    )
 
     # Register profiles with TrajOpt namespace
     # "CARTESIAN" profile used by waypoints, "DEFAULT" for trajectory-wide settings

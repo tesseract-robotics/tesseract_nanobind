@@ -200,12 +200,18 @@ def create_profiles():
     plan.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
 
     # Composite profile: soft collision cost (not hard constraint)
+    # 0.33 API: TrajOptCollisionConfig replaces old CollisionCostConfig/CollisionConstraintConfig
+    # - collision_margin_buffer replaces safety_margin
+    # - type is now in collision_check_config
+    # - coeff is now set via collision_coeff_data or constructor
     composite = TrajOptDefaultCompositeProfile()
     composite.collision_constraint_config.enabled = False
     composite.collision_cost_config.enabled = True
-    composite.collision_cost_config.safety_margin = 0.025  # 25mm buffer
-    composite.collision_cost_config.type = CollisionEvaluatorType.SINGLE_TIMESTEP
-    composite.collision_cost_config.coeff = 1.0
+    composite.collision_cost_config.collision_margin_buffer = 0.025  # 25mm buffer
+    # 0.33 API: SINGLE_TIMESTEP renamed to DISCRETE
+    composite.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.DISCRETE
+    )
 
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, "CARTESIAN", plan)
     ProfileDictionary_addTrajOptCompositeProfile(
