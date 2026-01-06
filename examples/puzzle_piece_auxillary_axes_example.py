@@ -61,8 +61,8 @@ Plan profile (CARTESIAN):
 - Yaw (rz) FREE (coeff=0) - allows tool rotation
 
 Composite profile (DEFAULT):
-- collision_cost_config.safety_margin = 0.025m
-- collision_cost_config.type = SINGLE_TIMESTEP
+- collision_cost_config.collision_margin_buffer = 0.025m
+- collision_cost_config.collision_check_config.type = DISCRETE
 - Solver: OSQP, max_iter=200
 
 C++ SOURCE
