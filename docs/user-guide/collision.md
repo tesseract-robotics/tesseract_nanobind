@@ -128,12 +128,14 @@ graph LR
 Used in TrajOpt for efficient continuous collision approximation:
 
 ```python
-from tesseract_robotics.trajopt_common import TrajOptCollisionConfig
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
-config = TrajOptCollisionConfig()
-config.contact_margin_data.default_margin = 0.025  # 2.5cm
-config.collision_margin_buffer = 0.05  # Additional buffer for LVS
-config.longest_valid_segment_length = 0.05  # 5cm interpolation
+# 0.33 API: TrajOptCollisionConfig(margin, coeff) constructor
+config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
+config.collision_margin_buffer = 0.005  # Additional buffer beyond margin
+config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
+config.collision_check_config.longest_valid_segment_length = 0.05  # 5cm interpolation
 ```
 
 ## Contact Margins

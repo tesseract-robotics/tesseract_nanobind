@@ -237,10 +237,10 @@ from tesseract_robotics.trajopt_ifopt import (
     SingleTimestepCollisionEvaluator, DiscreteCollisionConstraint
 )
 
-# Collision configuration
-config = TrajOptCollisionConfig()
-config.contact_margin_data.default_margin = 0.025  # 2.5cm safety margin
-config.collision_coeff_data.default_coeff = 20.0   # Penalty coefficient
+# Collision configuration (0.33 API)
+# Constructor: TrajOptCollisionConfig(margin, coeff) or default
+config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
+config.collision_margin_buffer = 0.005  # Additional buffer beyond margin
 
 # Create evaluator
 cache = CollisionCache(100)  # Cache size

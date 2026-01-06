@@ -116,31 +116,36 @@ graph TD
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
-    TrajOptDefaultCompositeProfile
+    TrajOptDefaultCompositeProfile,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile (per-waypoint settings)
 plan_profile = TrajOptDefaultPlanProfile()
-plan_profile.cartesian_coeff = [5, 5, 5, 5, 5, 5]  # Position/orientation weights
+plan_profile.cartesian_constraint_config.enabled = True
+plan_profile.cartesian_constraint_config.coeff = [5, 5, 5, 5, 5, 5]  # Position/orientation weights
 
 # Composite profile (trajectory-wide settings)
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.collision_cost_config.enabled = True
-composite_profile.collision_cost_config.margin = 0.025
-composite_profile.collision_cost_config.coeff = 20.0
+composite_profile.collision_cost_config.collision_margin_buffer = 0.025  # 2.5cm buffer
+composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
+composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 composite_profile.smooth_velocities = True
 composite_profile.smooth_accelerations = True
 ```
 
-### Collision Configuration
+### Collision Configuration (0.33 API)
 
 ```python
-from tesseract_robotics.trajopt_common import TrajOptCollisionConfig
+from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
-collision_config = TrajOptCollisionConfig()
-collision_config.contact_margin_data.default_margin = 0.025  # 2.5cm
-collision_config.collision_margin_buffer = 0.05
-collision_config.type = CollisionEvaluatorType.DISCRETE
+# TrajOptCollisionConfig constructor: (margin, coeff) or default
+collision_config = TrajOptCollisionConfig(0.025, 20.0)  # margin=2.5cm, coeff=20
+collision_config.collision_margin_buffer = 0.005  # Additional buffer
+collision_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+collision_config.collision_check_config.longest_valid_segment_length = 0.05  # For LVS modes
 ```
 
 !!! tip "Collision Cost vs Constraint"
