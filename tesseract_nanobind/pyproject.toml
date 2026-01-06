@@ -20,7 +20,7 @@ authors = [
     { name = "John Wason", email = "wason@wasontech.com" },
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Topic :: Scientific/Engineering",
     "Operating System :: Unix",
     "Operating System :: POSIX",
