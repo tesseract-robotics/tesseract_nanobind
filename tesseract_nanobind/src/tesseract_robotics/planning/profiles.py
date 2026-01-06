@@ -339,11 +339,12 @@ OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 
 def create_ompl_default_profiles(
     profile_names: list[str] | None = None,
-    planning_time: float = 5.0,
+    planning_time: float = 10.0,
     max_solutions: int = 10,
     optimize: bool = True,
     simplify: bool = False,
     num_planners: int | None = None,
+    planner_range: float = 0.0,
 ) -> ProfileDictionary:
     """Create OMPL profiles with sensible defaults.
 
@@ -361,7 +362,7 @@ def create_ompl_default_profiles(
         profile_names: Profile names to register (default: OMPL_PROFILE_NAMES)
             Relevant names: ["DEFAULT", "FREESPACE"]
             (OMPL doesn't apply to Cartesian/Raster/Upright tasks)
-        planning_time: Max planning time in seconds (default: 5.0)
+        planning_time: Max planning time in seconds (default: 10.0)
             Total time budget for all parallel planners
         max_solutions: Max solutions to find before exiting (default: 10)
             Stops early if this many solutions found
@@ -371,7 +372,7 @@ def create_ompl_default_profiles(
         simplify: Simplify trajectory after planning (default: False)
             If True, removes waypoints (may violate constraints)
             If False, preserves all waypoints
-        num_planners: Number of parallel RRTConnect planners (default: CPU count)
+        num_planners: Number of parallel RRTConnect planners (default: min(4, CPU count))
             More planners = higher chance of finding solution quickly
 
     Returns:
@@ -407,9 +408,10 @@ def create_ompl_default_profiles(
     if profile_names is None:
         profile_names = OMPL_PROFILE_NAMES
 
-    # Default to CPU count for maximum parallelism
+    # Default to 4 planners - good balance for most problems
+    # Using CPU count can overwhelm system during parallel test runs
     if num_planners is None:
-        num_planners = _get_cpu_count()
+        num_planners = min(4, _get_cpu_count())
 
     # Create ONE profile with the configured settings
     profile = OMPLRealVectorPlanProfile()
@@ -426,7 +428,10 @@ def create_ompl_default_profiles(
     # Add parallel RRTConnect planners (C++ default is 2)
     profile.solver_config.clearPlanners()
     for _ in range(num_planners):
-        profile.solver_config.addPlanner(RRTConnectConfigurator())
+        cfg = RRTConnectConfigurator()
+        if planner_range > 0:
+            cfg.range = planner_range
+        profile.solver_config.addPlanner(cfg)
 
     # Register under all requested names
     profiles = ProfileDictionary()
@@ -651,9 +656,10 @@ def _add_trajopt_to_profiles(
 def create_freespace_pipeline_profiles(
     profile_names: list[str] | None = None,
     num_planners: int | None = None,
-    planning_time: float = 5.0,
+    planning_time: float = 10.0,
     optimize: bool = True,
     max_solutions: int = 10,
+    planner_range: float = 0.0,
 ) -> ProfileDictionary:
     """Create profiles for FreespacePipeline (OMPL + TrajOpt).
 
@@ -675,7 +681,7 @@ def create_freespace_pipeline_profiles(
             Standard names: ["DEFAULT", "FREESPACE", "CARTESIAN", "RASTER", "UPRIGHT"]
         num_planners: Number of parallel OMPL planners (default: CPU count)
             More planners = higher success rate for difficult problems
-        planning_time: OMPL planning time in seconds (default: 5.0)
+        planning_time: OMPL planning time in seconds (default: 10.0)
             TrajOpt has no timeout (runs until convergence)
         optimize: Continue planning to find better solutions (default: True)
             If True, runs for full planning_time to improve solution quality
@@ -709,6 +715,7 @@ def create_freespace_pipeline_profiles(
         planning_time=planning_time,
         optimize=optimize,
         max_solutions=max_solutions,
+        planner_range=planner_range,
     )
 
     # Add TrajOpt profiles for smoothing step

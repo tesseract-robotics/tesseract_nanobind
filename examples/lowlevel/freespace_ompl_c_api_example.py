@@ -35,6 +35,7 @@ from tesseract_robotics.planning import (
     create_obstacle,
     TaskComposer,
 )
+from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -92,9 +93,17 @@ def run():
     # Execute FreespacePipeline via TaskComposer
     # Pipeline: OMPL RRTConnect → interpolation → time parameterization
     # RRTConnect uses bidirectional search: grows trees from both start and goal
+    # C++ defaults: planning_time=60.0, planner_range=0.01, 2 planners
     print("\nRunning OMPL planner (FreespacePipeline)...")
     composer = TaskComposer.from_config()
-    result = composer.plan(robot, program, pipeline="FreespacePipeline")
+    profiles = create_freespace_pipeline_profiles(
+        num_planners=2,
+        planning_time=60.0,
+        planner_range=0.01,
+    )
+    result = composer.plan(
+        robot, program, pipeline="FreespacePipeline", profiles=profiles
+    )
 
     assert result.successful, f"Planning failed: {result.message}"
     print(f"Planning successful! {len(result)} waypoints")
