@@ -164,30 +164,29 @@ When a function in module B accepts a type from module A:
 
 TrajOpt bindings are optional and auto-detected at build time.
 
-### Usage
+### Usage (0.33 API)
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
-    CollisionCostConfig,
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Create profiles
 plan_profile = TrajOptDefaultPlanProfile()
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.smooth_velocities = True
 
-# Configure collision avoidance
-cost_config = CollisionCostConfig()
-cost_config.enabled = True
-cost_config.type = CollisionEvaluatorType.DISCRETE_CONTINUOUS
-cost_config.safety_margin = 0.025
-composite_profile.collision_cost_config = cost_config
+# Configure collision avoidance (0.33 API)
+# collision_cost_config is TrajOptCollisionConfig, not CollisionCostConfig
+composite_profile.collision_cost_config.enabled = True
+composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.LVS_CONTINUOUS
+composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 
 # Register profiles
 profiles = ProfileDictionary()
