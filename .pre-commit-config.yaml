@@ -8,6 +8,15 @@ repos:
 
   - repo: local
     hooks:
+      - id: stage-formatted
+        name: stage formatted files
+        entry: git add -u
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+  - repo: local
+    hooks:
       - id: pytest
         name: pytest
         entry: pytest tesseract_nanobind/tests --ignore=tesseract_nanobind/tests/benchmarks -x -q -n auto
