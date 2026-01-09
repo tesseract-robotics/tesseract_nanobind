@@ -19,7 +19,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: pytest tesseract_nanobind/tests --ignore=tesseract_nanobind/tests/benchmarks -x -q -n auto
+        entry: /opt/miniconda3/envs/tesseract_nb/bin/pytest tesseract_nanobind/tests --ignore=tesseract_nanobind/tests/benchmarks -x -q -n auto
         language: system
         pass_filenames: false
         always_run: true

@@ -30,6 +30,9 @@ class PyConstraintSet : public ifopt::ConstraintSet {
 public:
     NB_TRAMPOLINE(ifopt::ConstraintSet, 3);
 
+    // Expose protected GetVariables() to Python via this public wrapper
+    using ifopt::ConstraintSet::GetVariables;
+
     ifopt::Component::VectorXd GetValues() const override {
         NB_OVERRIDE_PURE(GetValues);
     }
@@ -116,6 +119,7 @@ NB_MODULE(_ifopt, m) {
         .def("GetValues", &ifopt::ConstraintSet::GetValues)
         .def("GetBounds", &ifopt::ConstraintSet::GetBounds)
         .def("GetJacobian", &ifopt::ConstraintSet::GetJacobian)
+        .def("GetVariables", &PyConstraintSet::GetVariables)
         .def("LinkWithVariables", &ifopt::ConstraintSet::LinkWithVariables)
         .def("FillJacobianBlock", &ifopt::ConstraintSet::FillJacobianBlock);
 

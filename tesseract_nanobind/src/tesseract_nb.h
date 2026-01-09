@@ -36,6 +36,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/eigen/dense.h>
+#include <nanobind/eigen/sparse.h>
 
 // Namespace aliases
 namespace nb = nanobind;
