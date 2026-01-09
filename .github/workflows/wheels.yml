@@ -413,11 +413,12 @@ jobs:
           source test_env/bin/activate
           pip install pytest pytest-xdist
           cd tesseract_nanobind/tesseract_nanobind
-          # Skip time_parameterization (requires boost), examples (viewer needs Qt/VTK, kinematics needs plugins)
+          # Skip time_parameterization (requires boost), examples (viewer needs Qt/VTK, kinematics needs plugins), benchmarks (needs pytest-benchmark)
           pytest tests -n auto \
             --ignore=tests/tesseract_time_parameterization \
             --ignore=tests/examples \
             --ignore=tests/tesseract_kinematics \
+            --ignore=tests/benchmarks \
             -v --tb=short
 
   publish:
