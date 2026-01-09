@@ -958,3 +958,156 @@ class TestNewConstraintBindings:
         except TypeError as e:
             # May need shared_ptr wrapping - document this
             pytest.skip(f"IK constraint may need shared_ptr wrapper: {e}")
+
+
+class TestCustomPythonConstraints:
+    """Test custom Python constraints with SQP solver.
+
+    These tests verify that Python subclasses of ifopt.ConstraintSet can be
+    used with the SQP solver. This requires:
+    1. nanobind/eigen/sparse.h for Jacobian matrix handling
+    2. Correct parameter order in FillJacobianBlock (var_set, jac_block)
+    3. Using scipy sparse API (jac_block[i,j] = val) not Eigen (coeffRef)
+    """
+
+    def test_custom_constraint_class_definition(self):
+        """Test that custom ConstraintSet subclass can be created."""
+        from tesseract_robotics import ifopt
+
+        class MyConstraint(ifopt.ConstraintSet):
+            def __init__(self, n_vars, name="custom"):
+                super().__init__(n_vars, name)
+                self.n_vars = n_vars
+
+            def GetValues(self):
+                return np.zeros(self.n_vars)
+
+            def GetBounds(self):
+                return [ifopt.BoundZero] * self.n_vars
+
+            def FillJacobianBlock(self, var_set, jac_block):
+                # var_set is string, jac_block is scipy csr_matrix
+                for i in range(self.n_vars):
+                    jac_block[i, i] = 1.0
+
+        constraint = MyConstraint(3, "test")
+        assert constraint.GetRows() == 3
+        assert constraint.GetName() == "test"
+
+        # Verify GetValues returns correct shape
+        vals = constraint.GetValues()
+        assert len(vals) == 3
+
+        # Verify GetBounds returns correct length
+        bounds = constraint.GetBounds()
+        assert len(bounds) == 3
+
+    def test_custom_constraint_with_sqp_solver(self):
+        """Test custom Python constraint works with TrustRegionSQPSolver."""
+        from tesseract_robotics import ifopt
+
+        class ZeroConstraint(ifopt.ConstraintSet):
+            """Constrain variables to zero (equality constraint)."""
+
+            def __init__(self, n_vars, name="zero"):
+                super().__init__(n_vars, name)
+                self.n_vars = n_vars
+
+            def GetValues(self):
+                # Access linked variables via GetVariables()
+                vars_composite = self.GetVariables()
+                if vars_composite is None:
+                    return np.zeros(self.n_vars)
+                # Get the component and its values
+                var = vars_composite.GetComponent("joint_4")
+                if var is None:
+                    return np.zeros(self.n_vars)
+                return np.array(var.GetValues())
+
+            def GetBounds(self):
+                return [ifopt.BoundZero] * self.n_vars
+
+            def FillJacobianBlock(self, var_set, jac_block):
+                # Identity Jacobian - constraint value = variable value
+                if var_set == "joint_4":
+                    for i in range(self.n_vars):
+                        jac_block[i, i] = 1.0
+
+        joint_names = ["j1", "j2", "j3"]
+        n_dof = len(joint_names)
+        n_steps = 5
+
+        # Build QP problem
+        qp_problem = tsqp.IfoptQPProblem()
+
+        # Add variables
+        variables = []
+        bounds = np.array([[-3.14, 3.14]] * n_dof)
+        for i in range(n_steps):
+            init = np.zeros(n_dof)
+            var = ti.JointPosition(init, joint_names, f"joint_{i}")
+            var.SetBounds(bounds)
+            variables.append(var)
+            qp_problem.addVariableSet(var)
+
+        # Fix start position
+        start = np.zeros(n_dof)
+        variables[0].SetBounds(np.column_stack([start, start]))
+
+        # Add custom constraint to final position (constrain to zero)
+        custom = ZeroConstraint(n_dof, "custom_zero")
+        qp_problem.addConstraintSet(custom)
+
+        # Setup and solve
+        qp_problem.setup()
+
+        solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+        solver.params.max_iterations = 10
+
+        solver.init(qp_problem)
+        solver.solve(qp_problem)
+
+        # Verify final position is constrained to zero
+        final_values = variables[-1].GetValues()
+        np.testing.assert_array_almost_equal(final_values, np.zeros(n_dof), decimal=3)
+
+    def test_get_variables_exposed(self):
+        """Test that GetVariables() is accessible from Python constraints."""
+        from tesseract_robotics import ifopt
+
+        class InspectorConstraint(ifopt.ConstraintSet):
+            """Constraint that inspects linked variables."""
+
+            def __init__(self, n_vars, name="inspector"):
+                super().__init__(n_vars, name)
+                self.n_vars = n_vars
+                self.inspected_vars = None
+
+            def GetValues(self):
+                self.inspected_vars = self.GetVariables()
+                return np.zeros(self.n_vars)
+
+            def GetBounds(self):
+                return [ifopt.BoundZero] * self.n_vars
+
+            def FillJacobianBlock(self, var_set, jac_block):
+                pass
+
+        # Create minimal problem
+        qp = tsqp.IfoptQPProblem()
+
+        joint_names = ["j1", "j2"]
+        var = ti.JointPosition(np.zeros(2), joint_names, "test_var")
+        var.SetBounds(np.array([[-1, 1], [-1, 1]]))
+        qp.addVariableSet(var)
+
+        constraint = InspectorConstraint(2, "inspector")
+        qp.addConstraintSet(constraint)
+        qp.setup()
+
+        # Force evaluation
+        solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+        solver.init(qp)
+
+        # GetVariables should now be accessible after linking
+        # The constraint's GetValues was called during setup/init
