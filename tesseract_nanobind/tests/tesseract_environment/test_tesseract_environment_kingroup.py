@@ -155,3 +155,50 @@ def test_tesseract_redundant_solutions_tesseract_function():
     del redun_sol, sol, redundancy_indices, limits, kin_group
     del joint_names, manip_info, env, locator
     gc.collect()
+
+
+def test_kinematic_group_single_ik_input():
+    """Test calcInvKin with single KinGroupIKInput (not collection).
+
+    This matches the API usage in tesseract_qt_py's test_upstream_api_issues.py
+    where single IK targets are solved directly.
+    """
+    import gc
+
+    env, manip_info, joint_names, locator = get_environment()
+
+    kin_group = env.getKinematicGroup(manip_info.manipulator)
+
+    # Create a target pose from FK of a known configuration
+    test_joints = np.array([0.1, 0.2, 0.1, 0.1, 0.1, 0.1])
+    fk_result = kin_group.calcFwdKin(test_joints)
+    target_pose = fk_result[manip_info.tcp_frame]
+
+    # Create single IK input (not collection)
+    ik_input = KinGroupIKInput()
+    ik_input.pose = target_pose
+    ik_input.tip_link_name = manip_info.tcp_frame
+    ik_input.working_frame = manip_info.working_frame
+
+    # Solve with single input - this is the API tesseract_qt_py uses
+    seed = np.zeros(6)
+    solutions = kin_group.calcInvKin(ik_input, seed)
+
+    assert len(solutions) >= 1, "Single IK input should return at least one solution"
+
+    # Verify solution reaches target
+    sol_fk = kin_group.calcFwdKin(solutions[0])
+    sol_pose = sol_fk[manip_info.tcp_frame]
+
+    # Poses should be close (IK solution should reach target)
+    np.testing.assert_allclose(
+        sol_pose.matrix()[:3, 3],
+        target_pose.matrix()[:3, 3],
+        atol=1e-3,
+        err_msg="IK solution should reach target position",
+    )
+
+    # Cleanup
+    del solutions, sol_fk, sol_pose, seed, ik_input, target_pose, fk_result
+    del kin_group, joint_names, manip_info, env, locator
+    gc.collect()
