@@ -409,8 +409,18 @@ jobs:
           ls -la "$PKG_DIR"/lib*_factories.so 2>/dev/null | head -5 || echo "No plugin factories"
           echo "--- Kinematics factory rpath ---"
           patchelf --print-rpath "$PKG_DIR/libtesseract_kinematics_kdl_factories.so" 2>/dev/null || echo "No rpath"
-          echo "--- Kinematics factory deps ---"
+          echo "--- Kinematics KDL factory deps ---"
           ldd "$PKG_DIR/libtesseract_kinematics_kdl_factories.so" 2>&1 | head -15
+          echo "--- Kinematics OPW factory deps ---"
+          ldd "$PKG_DIR/libtesseract_kinematics_opw_factory.so" 2>&1
+          echo "--- Missing deps in any lib ---"
+          for so in "$PKG_DIR"/*.so*; do
+            missing=$(ldd "$so" 2>&1 | grep "not found")
+            if [[ -n "$missing" ]]; then
+              echo "$(basename $so): $missing"
+            fi
+          done
+          echo "--- End missing deps check ---"
           echo "--- Checking plugin deps ---"
           ldd "$PKG_DIR/libtesseract_collision_bullet_factories.so" 2>&1 | grep "not found" || echo "All deps found"
           echo "--- Checking tesseract_common deps ---"
