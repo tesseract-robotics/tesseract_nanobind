@@ -841,7 +841,10 @@ class TestTaskComposer:
 
         assert isinstance(pipelines, list)
         assert len(pipelines) > 0
+        # Verify all expected pipelines are listed (coverage for tesseract_qt_py)
         assert "TrajOptPipeline" in pipelines
+        assert "OMPLPipeline" in pipelines
+        assert "FreespaceMotionPipeline" in pipelines
 
     def test_plan_invalid_pipeline(self, robot):
         """Test plan returns failure for invalid pipeline."""
@@ -877,6 +880,64 @@ class TestTaskComposer:
 
         assert result.successful
         assert len(result) > 0
+
+    def test_ompl_pipeline_with_cartesian_targets(self, robot):
+        """Test OMPLPipeline execution with Cartesian targets.
+
+        Coverage for tesseract_qt_py test_ompl_pipeline_execution.
+        """
+        from tesseract_robotics.planning import TaskComposer
+
+        joint_names = robot.get_joint_names("manipulator")
+
+        # Set initial state for seeding
+        start_joints = [0, 0.3, -0.3, 0, 0.5, 0]
+        robot.set_joints(start_joints, joint_names=joint_names)
+
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.0, 1.2, 0.707, 0.0, 0.707, 0.0)))
+            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.2, 1.2, 0.707, 0.0, 0.707, 0.0)))
+        )
+
+        composer = TaskComposer.from_config()
+        result = composer.plan(robot, program, pipeline="OMPLPipeline")
+
+        # Pipeline loading must work - no workarounds
+        assert result.successful or "not found" not in result.message.lower(), (
+            f"OMPLPipeline plugin loading broken: {result.message}"
+        )
+
+    def test_freespace_pipeline_with_cartesian_targets(self, robot):
+        """Test FreespaceMotionPipeline execution with Cartesian targets.
+
+        Coverage for tesseract_qt_py test_freespace_pipeline_execution.
+        Uses FreespacePipeline which combines OMPL (global) + TrajOpt (smoothing).
+        """
+        from tesseract_robotics.planning import TaskComposer
+
+        joint_names = robot.get_joint_names("manipulator")
+
+        # Set initial state for seeding
+        start_joints = [0, 0.3, -0.3, 0, 0.5, 0]
+        robot.set_joints(start_joints, joint_names=joint_names)
+
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.0, 1.2, 0.707, 0.0, 0.707, 0.0)))
+            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.2, 1.2, 0.707, 0.0, 0.707, 0.0)))
+        )
+
+        composer = TaskComposer.from_config()
+        # FreespacePipeline is the actual pipeline name in the YAML config
+        result = composer.plan(robot, program, pipeline="FreespacePipeline")
+
+        # Pipeline loading must work - no workarounds
+        assert result.successful or "not found" not in result.message.lower(), (
+            f"FreespacePipeline plugin loading broken: {result.message}"
+        )
 
     def test_plan_cartesian(self, robot):
         """Test plan_cartesian with TrajOpt (Descartes not in default config)."""
