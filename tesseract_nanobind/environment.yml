@@ -8,42 +8,42 @@ dependencies:
   # - python=3.12  # Uncomment for local dev, CI uses python-version param
 
   # Build tools
-  - cmake>=3.15
+  - cmake>=3.15,<4
   - ninja
   - make
   - pkg-config
 
-  # C++ dependencies (from wheels.yml vcpkg packages)
-  - eigen>=3.3
-  - boost-cpp
-  - console_bridge
-  - assimp
-  - urdfdom
-  - octomap
-  - orocos-kdl
-  - flann
-  - jsoncpp
-  - yaml-cpp
-  - tinyxml2
-  - bullet-cpp
-  - fcl
-  - ompl
-  - pcl
-  - ipopt
-  - gtest
-  - qpoases
-  - taskflow
-  - llvm-openmp  # OpenMP runtime (use conda's, not Homebrew's, to avoid duplicate lib crashes)
+  # C++ dependencies - pinned for C++17 compatibility and API stability
+  - eigen>=3.3,<3.5
+  - boost-cpp>=1.70,<2
+  - console_bridge>=1.0,<2
+  - assimp>=5.0,<6
+  - urdfdom>=3.0,<5
+  - octomap>=1.9,<2
+  - orocos-kdl>=1.4,<2
+  - flann>=1.9,<2
+  - jsoncpp>=1.9,<2
+  - yaml-cpp>=0.6,<1
+  - tinyxml2>=9,<11
+  - bullet-cpp>=3.21,<4
+  - fcl>=0.7,<1
+  - ompl>=1.5,<2
+  - pcl>=1.12,<2
+  - ipopt>=3.14,<4
+  - gtest>=1.10,<2
+  - qpoases>=3.2,<4
+  - taskflow>=3.6,<3.8  # 3.8+ requires C++20, we use C++17
+  - llvm-openmp>=14,<20  # OpenMP runtime (use conda's, not Homebrew's, to avoid duplicate lib crashes)
   # Note: libosqp/osqp-eigen removed - trajopt needs OSQP 0.6.x, conda has 1.0.x
   # trajopt_ext/osqp builds compatible version automatically
 
   # Python build dependencies (conda-only)
   - pip
   - pytest-benchmark
-  - setuptools
+  - setuptools>=68
   - wheel
-  - scikit-build-core>=0.10
-  - nanobind>=1.3.2
+  - scikit-build-core>=0.10,<1
+  - nanobind>=1.3.2,<3
   - patchelf
 
   # Python dependencies (via pip from requirements.txt for consistency)
