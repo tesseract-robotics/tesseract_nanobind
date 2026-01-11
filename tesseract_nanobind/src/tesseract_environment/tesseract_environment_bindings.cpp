@@ -459,17 +459,20 @@ NB_MODULE(_tesseract_environment, m) {
         // Groups
         .def("getGroupNames", &te::Environment::getGroupNames)
         .def("getGroupJointNames", &te::Environment::getGroupJointNames, "group_name"_a)
-        .def("getJointGroup", [](const te::Environment& self, const std::string& group_name) -> const tk::JointGroup& {
+        // Return unique_ptr directly - nanobind transfers ownership to Python
+        // Previously returned a reference which became dangling when the unique_ptr
+        // was destroyed at the end of the lambda, causing segfaults after setState()
+        .def("getJointGroup", [](const te::Environment& self, const std::string& group_name) {
             auto ptr = self.getJointGroup(group_name);
             if (!ptr) throw std::runtime_error("Failed to get joint group: " + group_name);
-            return *ptr;
-        }, "group_name"_a, nb::rv_policy::reference_internal)
+            return ptr;
+        }, "group_name"_a)
         .def("getKinematicGroup", [](const te::Environment& self, const std::string& group_name,
-                                      const std::string& ik_solver_name) -> const tk::KinematicGroup& {
+                                      const std::string& ik_solver_name) {
             auto ptr = self.getKinematicGroup(group_name, ik_solver_name);
             if (!ptr) throw std::runtime_error("Failed to get kinematic group: " + group_name);
-            return *ptr;
-        }, "group_name"_a, "ik_solver_name"_a = "", nb::rv_policy::reference_internal)
+            return ptr;
+        }, "group_name"_a, "ik_solver_name"_a = "")
         // TCP
         .def("findTCPOffset", &te::Environment::findTCPOffset, "manip_info"_a)
         // Contact managers
