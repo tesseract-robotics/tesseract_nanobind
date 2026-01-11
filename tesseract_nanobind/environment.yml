@@ -24,7 +24,7 @@ dependencies:
   - flann>=1.9,<2
   - jsoncpp>=1.9,<2
   - yaml-cpp>=0.6,<1
-  - tinyxml2>=9,<11
+  - tinyxml2>=10,<11  # pin to 10.x (SO version 10) for consistent wheel bundling
   - bullet-cpp>=3.21,<4
   - fcl>=0.7,<1
   - ompl>=1.5,<2
