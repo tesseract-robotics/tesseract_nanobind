@@ -188,6 +188,8 @@ colcon build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=17 \
+        -DCMAKE_CXX_VISIBILITY_PRESET=default \
+        -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
         -DBUILD_TESTING=OFF \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DINSTALL_OMPL=OFF \

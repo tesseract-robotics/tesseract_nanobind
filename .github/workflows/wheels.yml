@@ -93,6 +93,7 @@ jobs:
             --event-handlers console_cohesion+ \
             --cmake-force-configure \
             --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
             -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DTESSERACT_ENABLE_TESTING=OFF \
@@ -120,6 +121,7 @@ jobs:
             --event-handlers console_cohesion+ \
             --cmake-force-configure \
             --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
             -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DTESSERACT_ENABLE_TESTING=OFF \
