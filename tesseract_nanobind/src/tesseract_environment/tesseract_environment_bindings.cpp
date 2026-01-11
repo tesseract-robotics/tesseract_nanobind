@@ -486,6 +486,8 @@ NB_MODULE(_tesseract_environment, m) {
         })
         .def("setActiveDiscreteContactManager", &te::Environment::setActiveDiscreteContactManager, "name"_a)
         .def("setActiveContinuousContactManager", &te::Environment::setActiveContinuousContactManager, "name"_a)
+        .def("clearCachedDiscreteContactManager", &te::Environment::clearCachedDiscreteContactManager)
+        .def("clearCachedContinuousContactManager", &te::Environment::clearCachedContinuousContactManager)
         // ACM and collision
         .def("getAllowedCollisionMatrix", &te::Environment::getAllowedCollisionMatrix)
         .def("getCollisionMarginData", &te::Environment::getCollisionMarginData)

@@ -78,7 +78,7 @@ jobs:
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-v9-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
+        key: colcon-v10-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/tesseract_nanobind/environment.yml') }}
     - name: colcon build C++ deps (macOS)
       if: matrix.config.os == 'macos' && steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws
@@ -415,7 +415,7 @@ jobs:
           ldd "$PKG_DIR/libtesseract_kinematics_opw_factory.so" 2>&1
           echo "--- Missing deps in any lib ---"
           for so in "$PKG_DIR"/*.so*; do
-            missing=$(ldd "$so" 2>&1 | grep "not found")
+            missing=$(ldd "$so" 2>&1 | grep "not found" || true)
             if [[ -n "$missing" ]]; then
               echo "$(basename $so): $missing"
             fi
