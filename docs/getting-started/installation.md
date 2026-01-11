@@ -21,26 +21,15 @@ git clone https://github.com/tesseract-robotics/tesseract_nanobind.git
 cd tesseract_nanobind
 ```
 
-### 2. Create Conda Environment
+### 2. Install Dependencies and Build
 
 ```bash
-conda env create -f environment.yml
-conda activate tesseract_nb
+pixi install
+pixi run install
 ```
 
-### 3. Build C++ Dependencies
-
-```bash
-./scripts/build_tesseract_cpp.sh
-```
-
-This builds the Tesseract C++ libraries in `ws/install/`.
-
-### 4. Install Python Package
-
-```bash
-pip install -e .
-```
+This builds C++ libraries (`pixi run build-cpp`) and installs the Python package.
+C++ libs are built in `ws/install/`.
 
 ## Verify Installation
 
@@ -90,13 +79,8 @@ source env.sh
 
 ### OpenMP Crashes (macOS)
 
-If you get crashes related to OpenMP on macOS, ensure you're using conda's `llvm-openmp`:
-
-```bash
-conda install llvm-openmp
-```
-
-The build scripts are configured to use `$CONDA_PREFIX/lib/libomp.dylib`.
+If you get crashes related to OpenMP on macOS, pixi automatically installs `llvm-openmp`.
+The build scripts use `$CONDA_PREFIX/lib/libomp.dylib` (pixi sets `CONDA_PREFIX`).
 
 ### RTTI/typeinfo Errors
 

@@ -38,8 +38,7 @@ All examples are in the `examples/` directory:
 
 ```bash
 # Activate environment
-conda activate tesseract_nb
-source env.sh  # For editable installs
+pixi shell
 
 # Run an example
 python examples/freespace_ompl_example.py

@@ -211,28 +211,21 @@ When building tesseract_task_composer with planning components, CMake may fail w
 CMake Error: To use a cross-compiled Qt, please set the QT_HOST_PATH cache variable...
 ```
 
-This happens because PCL/VTK pulls in Qt6 as a dependency, and the conda Qt6 package is misconfigured on macOS.
+This happens because PCL/VTK pulls in Qt6 as a dependency, and the Qt6 package is misconfigured on macOS.
 
-**Solution:** Set `QT_HOST_PATH` to point to the conda environment:
+**Solution:** Set `QT_HOST_PATH` to point to the pixi environment:
 
 ```bash
 colcon build --merge-install --cmake-args \
     -DTESSERACT_BUILD_TASK_COMPOSER_PLANNING=ON \
-    -DQT_HOST_PATH=/opt/miniconda3/envs/tesseract_nb
+    -DQT_HOST_PATH=$CONDA_PREFIX
 ```
 
-Or add to env.sh:
-```bash
-export QT_HOST_PATH=$CONDA_PREFIX
-```
+Note: pixi sets `CONDA_PREFIX` to the environment path.
 
 ### Missing libode - RESOLVED
 
-If build fails with `library 'ode' not found`, install the Open Dynamics Engine:
-
-```bash
-conda install -c conda-forge libode
-```
+If build fails with `library 'ode' not found`, add libode to pyproject.toml dependencies (already included).
 
 ### Task Composer Planning Component
 

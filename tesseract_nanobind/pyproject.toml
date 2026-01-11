@@ -151,19 +151,19 @@ ruff = ">=0.8.0"
 pre-commit = ">=3.0"
 
 [tool.pixi.pypi-dependencies]
-# Note: tesseract-robotics-nanobind NOT listed here - it requires C++ libs built first
-# For local dev: pixi run build-cpp first, then pip install -e . --no-build-isolation
+# Note: tesseract-robotics-nanobind NOT here - use `pixi run install` (chains build-cpp -> pip install)
 numpy = ">=1.21.0"
 loguru = ">=0.7.0"
 colcon-common-extensions = "*"
 vcstool = "*"
 
 [tool.pixi.tasks]
-test = "python -m pytest tests -x -q -n auto"
+test = { cmd = "python -m pytest tests -x -q -n auto", depends-on = ["install"] }
 lint = "ruff check ."
 fmt = "ruff format ."
 build-cpp = { cmd = "zsh ../scripts/build_tesseract_cpp.sh", description = "Build tesseract C++ libs" }
-build = { depends-on = ["build-cpp"], description = "Build C++ libs then install bindings" }
+install = { cmd = "pip install -e . --no-build-isolation", depends-on = ["build-cpp"], description = "Install package (editable)" }
+build = { depends-on = ["install"], description = "Build C++ libs + install bindings" }
 
 # Python version features for CI matrix builds
 [tool.pixi.feature.py39.dependencies]
