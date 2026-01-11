@@ -151,7 +151,8 @@ ruff = ">=0.8.0"
 pre-commit = ">=3.0"
 
 [tool.pixi.pypi-dependencies]
-tesseract-robotics-nanobind = { path = ".", editable = true }
+# Note: tesseract-robotics-nanobind NOT listed here - it requires C++ libs built first
+# For local dev: pixi run build-cpp first, then pip install -e . --no-build-isolation
 numpy = ">=1.21.0"
 loguru = ">=0.7.0"
 colcon-common-extensions = "*"
