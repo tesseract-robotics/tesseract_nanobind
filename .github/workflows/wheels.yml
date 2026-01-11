@@ -397,6 +397,10 @@ jobs:
           ls "$PKG_DIR"/*.so* 2>/dev/null | wc -l
           echo "--- Plugin factories ---"
           ls -la "$PKG_DIR"/lib*_factories.so 2>/dev/null | head -5 || echo "No plugin factories"
+          echo "--- Kinematics factory rpath ---"
+          patchelf --print-rpath "$PKG_DIR/libtesseract_kinematics_kdl_factories.so" 2>/dev/null || echo "No rpath"
+          echo "--- Kinematics factory deps ---"
+          ldd "$PKG_DIR/libtesseract_kinematics_kdl_factories.so" 2>&1 | head -15
           echo "--- Checking plugin deps ---"
           ldd "$PKG_DIR/libtesseract_collision_bullet_factories.so" 2>&1 | grep "not found" || echo "All deps found"
           echo "--- Checking tesseract_common deps ---"
@@ -405,6 +409,8 @@ jobs:
           patchelf --print-rpath "$PKG_DIR/tesseract_common/_tesseract_common"*.so 2>/dev/null || readelf -d "$PKG_DIR/tesseract_common/_tesseract_common"*.so | grep RPATH || echo "No rpath found"
           echo "--- Python extension deps ---"
           ldd "$PKG_DIR/tesseract_common/_tesseract_common"*.so 2>&1 | head -10
+          echo "--- TESSERACT env vars ---"
+          python -c "import os; import tesseract_robotics; print('TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES:', os.environ.get('TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES', 'NOT SET')); print('TESSERACT_SUPPORT_DIR:', os.environ.get('TESSERACT_SUPPORT_DIR', 'NOT SET'))"
       - name: smoke test
         run: |
           source test_env/bin/activate
