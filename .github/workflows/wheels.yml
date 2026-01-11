@@ -278,7 +278,7 @@ jobs:
         # Copy all tesseract libs from ws/install/lib
         echo "Copying tesseract libs..."
         echo "Files in ws/install/lib matching *.so* (for debug):"
-        ls -la $GITHUB_WORKSPACE/ws/install/lib/*.so* | head -20
+        ls -la $GITHUB_WORKSPACE/ws/install/lib/*.so* 2>/dev/null | head -20 || true
         for lib in $GITHUB_WORKSPACE/ws/install/lib/*.so*; do
           if [[ -f "$lib" && ! -L "$lib" ]]; then
             cp "$lib" "$PKG_DIR/"
