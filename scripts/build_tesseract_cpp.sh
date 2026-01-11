@@ -1,6 +1,10 @@
 #!/bin/zsh
 # Build tesseract C++ libraries using colcon
 # KEEP IN SYNC WITH: .github/workflows/wheels.yml (authoritative reference)
+#
+# Usage:
+#   pixi run build-cpp          # recommended
+#   zsh scripts/build_tesseract_cpp.sh  # direct (requires pixi env active)
 
 set -e  # Exit on error
 
@@ -10,66 +14,33 @@ PROJECT_ROOT="$SCRIPT_DIR/.."
 cd "$PROJECT_ROOT"
 
 WORKSPACE_DIR="$PROJECT_ROOT/ws"
-PYTHON_VERSION=${PYTHON_VERSION:-"3.12"}
 
 echo "=========================================="
 echo "Tesseract C++ Build Script"
 echo "=========================================="
 echo ""
 
-# Check for conda
-if ! command -v conda &> /dev/null; then
-    echo "❌ conda not found. Please install miniconda or anaconda."
+# Check we're in a proper environment (pixi sets CONDA_PREFIX)
+if [[ -z "$CONDA_PREFIX" ]]; then
+    echo "❌ Not in a pixi/conda environment."
+    echo ""
+    echo "Run via pixi:"
+    echo "  cd tesseract_nanobind && pixi run build-cpp"
     exit 1
 fi
 
-# Auto-activate tesseract_nb environment
-ENV_NAME="tesseract_nb"
-
-if [[ "$CONDA_DEFAULT_ENV" != "$ENV_NAME" ]]; then
-    echo "Activating conda environment: $ENV_NAME"
-
-    # Check if environment exists
-    if ! conda env list | grep -q "^$ENV_NAME "; then
-        echo "❌ Environment '$ENV_NAME' not found."
-        echo ""
-        echo "Please run the setup script first:"
-        echo "  ./scripts/setup_conda_env.sh"
-        exit 1
-    fi
-
-    # Activate the environment
-    eval "$(conda shell.zsh hook)"
-    conda activate $ENV_NAME
-
-    echo "✓ Activated environment: $ENV_NAME"
-else
-    echo "✓ Already in environment: $ENV_NAME"
-fi
-
+echo "✓ Environment: $CONDA_PREFIX"
 echo "Python: $(which python)"
 echo ""
 
 # Check for required tools
 if ! command -v colcon &> /dev/null; then
-    echo "❌ colcon not found."
-    echo ""
-    echo "Please run the setup script first:"
-    echo "   ./scripts/setup_conda_env.sh"
-    echo ""
-    echo "Or install manually:"
-    echo "   pip install colcon-common-extensions"
+    echo "❌ colcon not found. Run: pixi install"
     exit 1
 fi
 
 if ! command -v vcs &> /dev/null; then
-    echo "❌ vcstool not found."
-    echo ""
-    echo "Please run the setup script first:"
-    echo "   ./scripts/setup_conda_env.sh"
-    echo ""
-    echo "Or install manually:"
-    echo "   pip install vcstool"
+    echo "❌ vcstool not found. Run: pixi install"
     exit 1
 fi
 
@@ -134,10 +105,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     # Set library paths for macOS
     export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$WORKSPACE_DIR/install/lib
 
-    # Configure OpenMP paths - use conda's llvm-openmp (not Homebrew's)
+    # Configure OpenMP paths - use pixi/conda llvm-openmp (not Homebrew's)
     # This avoids duplicate library crashes when both are loaded at runtime
     if [ -f "$CONDA_PREFIX/lib/libomp.dylib" ]; then
-        echo "✓ Found libomp at $CONDA_PREFIX/lib/libomp.dylib (conda)"
+        echo "✓ Found libomp at $CONDA_PREFIX/lib/libomp.dylib"
         OPENMP_CMAKE_ARGS=(
             -DOpenMP_CXX_INCLUDE_DIR=$CONDA_PREFIX/include
             -DOpenMP_C_INCLUDE_DIR=$CONDA_PREFIX/include
@@ -148,8 +119,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
             -DOpenMP_libomp_LIBRARY=$CONDA_PREFIX/lib/libomp.dylib
         )
     else
-        echo "⚠️  libomp not found in conda env"
-        echo "   Install with: conda install llvm-openmp"
+        echo "⚠️  libomp not found in env"
+        echo "   Install with: pixi add llvm-openmp"
         OPENMP_CMAKE_ARGS=()
     fi
     # Set rpath to @loader_path so libs find deps in same directory
@@ -170,11 +141,11 @@ fi
 echo "Building tesseract C++ libraries..."
 echo ""
 
-# Set CMAKE_PREFIX_PATH to include conda environment
+# Set CMAKE_PREFIX_PATH to include pixi environment
 export CMAKE_PREFIX_PATH="$CONDA_PREFIX:$CMAKE_PREFIX_PATH"
 echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
 
-# Set LIBRARY_PATH for linker to find conda libraries (matches CI)
+# Set LIBRARY_PATH for linker to find pixi libraries (matches CI)
 export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
 echo "LIBRARY_PATH: $LIBRARY_PATH"
 echo ""
