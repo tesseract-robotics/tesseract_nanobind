@@ -227,6 +227,18 @@ def main():
     for i in range(len(ik_result)):
         print(f"Solution {i}: {ik_result[i].flatten()}")
 
+    # =========================================================================
+    # CLEANUP: Prevent GC order segfaults
+    # =========================================================================
+    # Python's GC may destroy objects in arbitrary order at script exit.
+    # This can cause segfaults if the locator is destroyed before objects
+    # that depend on it. Explicit deletion in correct order prevents this.
+    import gc
+
+    del ik_result, ik, iks, fwdkin_result, tool0_transform
+    del kin_group, env, locator
+    gc.collect()
+
 
 if __name__ == "__main__":
     main()
