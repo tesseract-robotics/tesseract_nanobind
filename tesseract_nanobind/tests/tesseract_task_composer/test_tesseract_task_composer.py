@@ -1,7 +1,7 @@
 """Tests for tesseract_task_composer bindings."""
-import os
+
 import gc
-import pytest
+import os
 
 import tesseract_robotics
 from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
@@ -34,11 +34,16 @@ class TestTaskComposerPluginFactory:
             # Navigate from test file to repo root
             test_dir = Path(__file__).parent.resolve()
             repo_root = test_dir.parent.parent.parent
-            ws_config = repo_root / "ws/src/tesseract_planning/tesseract_task_composer/config/task_composer_plugins_no_trajopt_ifopt.yaml"
+            ws_config = (
+                repo_root
+                / "ws/src/tesseract_planning/tesseract_task_composer/config/task_composer_plugins_no_trajopt_ifopt.yaml"
+            )
             if ws_config.is_file():
                 config_file = str(ws_config)
 
-        assert config_file and Path(config_file).is_file(), f"No task composer config found. Tried env var, package config, and workspace"
+        assert config_file and Path(config_file).is_file(), (
+            "No task composer config found. Tried env var, package config, and workspace"
+        )
         config_path = FilesystemPath(config_file)
         locator = GeneralResourceLocator()
         factory = TaskComposerPluginFactory(config_path, locator)
@@ -61,5 +66,84 @@ class TestTaskComposerPluginFactory:
         del executor
         del task2
         del task1
+        del factory
+        gc.collect()
+
+    def test_all_pipelines_loadable(self):
+        """Test all 36 expected pipelines are loadable via the factory."""
+        from pathlib import Path
+
+        # Explicit list of all 36 pipelines that must be loadable
+        EXPECTED_PIPELINES = [
+            # Core pipelines
+            "CartesianPipeline",
+            "CartesianTask",
+            "FreespacePipeline",
+            "FreespaceTask",
+            "FreespaceIfoptPipeline",
+            "FreespaceIfoptTask",
+            "OMPLPipeline",
+            "OMPLTask",
+            "TrajOptPipeline",
+            "TrajOptTask",
+            "TrajOptIfoptPipeline",
+            "TrajOptIfoptTask",
+            # Descartes variants
+            "DescartesDNPCPipeline",
+            "DescartesDNPCTask",
+            "DescartesDPipeline",
+            "DescartesDTask",
+            "DescartesFNPCPipeline",
+            "DescartesFNPCTask",
+            "DescartesFPipeline",
+            "DescartesFTask",
+            # Raster variants
+            "RasterCtGlobalPipeline",
+            "RasterCtGlobalTask",
+            "RasterCtOnlyGlobalPipeline",
+            "RasterCtOnlyGlobalTask",
+            "RasterCtOnlyPipeline",
+            "RasterCtOnlyTask",
+            "RasterCtPipeline",
+            "RasterCtTask",
+            "RasterFtGlobalPipeline",
+            "RasterFtGlobalTask",
+            "RasterFtOnlyGlobalPipeline",
+            "RasterFtOnlyGlobalTask",
+            "RasterFtOnlyPipeline",
+            "RasterFtOnlyTask",
+            "RasterFtPipeline",
+            "RasterFtTask",
+        ]
+
+        # Get config file
+        config_file = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
+        if not config_file or not Path(config_file).is_file():
+            pkg_config = tesseract_robotics.get_task_composer_config_path()
+            if pkg_config.is_file():
+                config_file = str(pkg_config)
+
+        assert config_file and Path(config_file).is_file(), "No task composer config found"
+
+        locator = GeneralResourceLocator()
+        factory = TaskComposerPluginFactory(FilesystemPath(config_file), locator)
+
+        # Try to load each pipeline
+        loaded = []
+        failed = []
+        for name in EXPECTED_PIPELINES:
+            try:
+                node = factory.createTaskComposerNode(name)
+                assert node is not None
+                assert node.getName() == name
+                loaded.append(name)
+                del node
+            except Exception as e:
+                failed.append((name, str(e)))
+
+        # Report failures explicitly
+        assert not failed, f"Failed to load {len(failed)} pipelines: {failed}"
+        assert len(loaded) == 36, f"Expected 36 pipelines, loaded {len(loaded)}"
+
         del factory
         gc.collect()
