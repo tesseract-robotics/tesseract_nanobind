@@ -376,16 +376,16 @@ message(STATUS "===============================================")
 
 # ============== Install Bundled Data Files ==============
 # These are installed into the wheel so env vars can use relative paths
-# Support both local dev (../ws/src/...) and CI (../../tesseract/...) layouts
+# Support both local dev (ws/src/...) and CI layout
 
-set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../ws/src/tesseract/tesseract_support")
+set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract/tesseract_support")
 if(NOT EXISTS "${TESSERACT_SUPPORT_SRC}")
-  set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../tesseract/tesseract_support")
+  message(WARNING "tesseract_support not found at: ${TESSERACT_SUPPORT_SRC}")
 endif()
 
-set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../ws/src/tesseract_planning/tesseract_task_composer/config")
+set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract_planning/tesseract_task_composer/config")
 if(NOT EXISTS "${TASK_COMPOSER_CFG_SRC}")
-  set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../tesseract_planning/tesseract_task_composer/config")
+  message(WARNING "task_composer config not found at: ${TASK_COMPOSER_CFG_SRC}")
 endif()
 
 if(EXISTS "${TESSERACT_SUPPORT_SRC}")
