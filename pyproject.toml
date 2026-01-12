@@ -14,6 +14,7 @@ dependencies = [
     "numpy>=1.21.0",
     "loguru>=0.7.0",
     "pyyaml>=6.0",
+    "scipy>=1.7.0",  # Required for Eigen sparse matrix conversion in nanobind
 ]
 
 authors = [
@@ -156,6 +157,7 @@ pre-commit = ">=3.0"
 # Note: tesseract-robotics-nanobind NOT here - use `pixi run install` (chains build-cpp -> pip install)
 numpy = ">=1.21.0"
 loguru = ">=0.7.0"
+scipy = ">=1.7.0"  # Required for nanobind Eigen sparse matrix conversion
 colcon-common-extensions = "*"
 vcstool = "*"
 

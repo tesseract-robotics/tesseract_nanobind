@@ -19,7 +19,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: pixi run pytest tests --ignore=tests/benchmarks --ignore=tests/trajopt_sqp -x -q -n auto
+        entry: pixi run pytest tests --ignore=tests/benchmarks -x -q -n auto
         language: system
         pass_filenames: false
         always_run: true
