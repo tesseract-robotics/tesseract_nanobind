@@ -376,16 +376,20 @@ message(STATUS "===============================================")
 
 # ============== Install Bundled Data Files ==============
 # These are installed into the wheel so env vars can use relative paths
-# Support both local dev (ws/src/...) and CI layout
+# Support both:
+#   - Local dev: ws/src/tesseract/... (flat repo layout)
+#   - CI layout: ../tesseract/... (repo cloned to ws/src/tesseract_nanobind)
 
 set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract/tesseract_support")
 if(NOT EXISTS "${TESSERACT_SUPPORT_SRC}")
-  message(WARNING "tesseract_support not found at: ${TESSERACT_SUPPORT_SRC}")
+  # CI layout: repo at ws/src/tesseract_nanobind, deps at ws/src/tesseract
+  set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../tesseract/tesseract_support")
 endif()
 
 set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract_planning/tesseract_task_composer/config")
 if(NOT EXISTS "${TASK_COMPOSER_CFG_SRC}")
-  message(WARNING "task_composer config not found at: ${TASK_COMPOSER_CFG_SRC}")
+  # CI layout
+  set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../tesseract_planning/tesseract_task_composer/config")
 endif()
 
 if(EXISTS "${TESSERACT_SUPPORT_SRC}")
