@@ -833,18 +833,65 @@ class TestTaskComposer:
         return Robot.from_tesseract_support("abb_irb2400")
 
     def test_get_available_pipelines(self):
-        """Test get_available_pipelines returns list of pipeline names."""
+        """Test get_available_pipelines returns all expected pipelines from factory."""
         from tesseract_robotics.planning import TaskComposer
+
+        # Explicit list of all 36 pipelines that must be loadable
+        EXPECTED_PIPELINES = [
+            # Core pipelines
+            "CartesianPipeline",
+            "CartesianTask",
+            "FreespacePipeline",
+            "FreespaceTask",
+            "FreespaceIfoptPipeline",
+            "FreespaceIfoptTask",
+            "OMPLPipeline",
+            "OMPLTask",
+            "TrajOptPipeline",
+            "TrajOptTask",
+            "TrajOptIfoptPipeline",
+            "TrajOptIfoptTask",
+            # Descartes variants
+            "DescartesDNPCPipeline",
+            "DescartesDNPCTask",
+            "DescartesDPipeline",
+            "DescartesDTask",
+            "DescartesFNPCPipeline",
+            "DescartesFNPCTask",
+            "DescartesFPipeline",
+            "DescartesFTask",
+            # Raster variants
+            "RasterCtGlobalPipeline",
+            "RasterCtGlobalTask",
+            "RasterCtOnlyGlobalPipeline",
+            "RasterCtOnlyGlobalTask",
+            "RasterCtOnlyPipeline",
+            "RasterCtOnlyTask",
+            "RasterCtPipeline",
+            "RasterCtTask",
+            "RasterFtGlobalPipeline",
+            "RasterFtGlobalTask",
+            "RasterFtOnlyGlobalPipeline",
+            "RasterFtOnlyGlobalTask",
+            "RasterFtOnlyPipeline",
+            "RasterFtOnlyTask",
+            "RasterFtPipeline",
+            "RasterFtTask",
+        ]
 
         composer = TaskComposer.from_config()
         pipelines = composer.get_available_pipelines()
 
         assert isinstance(pipelines, list)
-        assert len(pipelines) > 0
-        # Verify all expected pipelines are listed (coverage for tesseract_qt_py)
-        assert "TrajOptPipeline" in pipelines
-        assert "OMPLPipeline" in pipelines
-        assert "FreespaceMotionPipeline" in pipelines
+        assert len(pipelines) == 36, f"Expected 36 pipelines, got {len(pipelines)}"
+
+        # Check all expected pipelines are available
+        missing = set(EXPECTED_PIPELINES) - set(pipelines)
+        assert not missing, f"Missing pipelines: {missing}"
+
+        # Check no unexpected pipelines (would indicate config change)
+        unexpected = set(pipelines) - set(EXPECTED_PIPELINES)
+        assert not unexpected, f"Unexpected pipelines: {unexpected}"
 
     def test_plan_invalid_pipeline(self, robot):
         """Test plan returns failure for invalid pipeline."""
