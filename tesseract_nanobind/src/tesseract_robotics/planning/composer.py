@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
+import yaml
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -188,6 +189,7 @@ class TaskComposer:
         locator: GeneralResourceLocator | None = None,
         num_threads: int | None = None,
         executor: TaskComposerExecutor | None = None,
+        config_path: str | Path | None = None,
     ):
         """
         Initialize TaskComposer.
@@ -197,6 +199,7 @@ class TaskComposer:
             locator: Resource locator
             num_threads: Number of threads for executor (overrides YAML config)
             executor: Pre-configured executor (overrides num_threads and YAML)
+            config_path: Path to config YAML (for get_available_pipelines)
 
         Raises:
             TypeError: If factory is not a TaskComposerPluginFactory
@@ -219,6 +222,7 @@ class TaskComposer:
         self.locator = locator or GeneralResourceLocator()
         self._num_threads = num_threads
         self._executor = executor
+        self._config_path = Path(config_path) if config_path else None
 
     @classmethod
     def from_config(
@@ -298,7 +302,9 @@ class TaskComposer:
             locator,
         )
 
-        return cls(factory, locator, num_threads=num_threads, executor=executor)
+        return cls(
+            factory, locator, num_threads=num_threads, executor=executor, config_path=config_path
+        )
 
     @property
     def executor(self) -> TaskflowTaskComposerExecutor:
@@ -575,21 +581,47 @@ class TaskComposer:
 
     def get_available_pipelines(self) -> list[str]:
         """
-        Get list of available pipeline names.
+        Get list of available pipeline names by introspecting the factory.
+
+        Actually attempts to create each node from the config to verify
+        the C++ plugin can be loaded.
 
         Returns:
-            List of pipeline names that can be used with plan():
-                - FreespaceMotionPipeline: OMPL + TrajOpt smoothing + time param
-                - CartesianMotionPipeline: Cartesian path with TrajOpt
+            List of pipeline names that can be used with plan().
+            Common pipelines include:
+                - FreespacePipeline: OMPL + TrajOpt smoothing + time param
+                - CartesianPipeline: Cartesian path with TrajOpt
                 - OMPLPipeline: OMPL sampling-based planning only
                 - TrajOptPipeline: TrajOpt optimization only
-                - DescartesPipeline: Descartes graph search
+                - DescartesFPipeline: Descartes graph search
         """
-        # Common pipelines - actual availability depends on config
-        return [
-            "FreespaceMotionPipeline",
-            "CartesianMotionPipeline",
-            "OMPLPipeline",
-            "TrajOptPipeline",
-            "DescartesPipeline",
-        ]
+        if self._config_path is None or not self._config_path.is_file():
+            return []
+
+        with open(self._config_path) as f:
+            config = yaml.safe_load(f)
+
+        candidates = []
+        if "task_composer_plugins" in config:
+            tasks = config["task_composer_plugins"].get("tasks", {}).get("plugins", {})
+            candidates = list(tasks.keys())
+
+        # Actually try to create each node to verify it's loadable
+        available = []
+        failed = []
+        for name in candidates:
+            try:
+                self.factory.createTaskComposerNode(name)
+                available.append(name)
+            except Exception as e:
+                failed.append((name, str(e)))
+
+        if failed:
+            logger.warning(
+                f"Failed to load {len(failed)} plugins: "
+                + ", ".join(f"{name}" for name, _ in failed)
+            )
+            for name, err in failed:
+                logger.debug(f"  {name}: {err}")
+
+        return sorted(available)
