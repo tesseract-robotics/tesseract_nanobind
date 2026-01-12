@@ -37,4 +37,4 @@ if [ "$PARALLEL" -eq 1 ]; then
   PARALLEL_ARGS="-n auto"
 fi
 
-exec pytest tesseract_nanobind/tests --ignore=tesseract_nanobind/tests/benchmarks $PARALLEL_ARGS $VERBOSE_ARGS $FAILED_ARGS "${REMAINING_ARGS[@]}"
+exec pytest tests --ignore=tests/benchmarks $PARALLEL_ARGS $VERBOSE_ARGS $FAILED_ARGS "${REMAINING_ARGS[@]}"

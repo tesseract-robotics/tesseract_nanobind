@@ -51,7 +51,7 @@ jobs:
       env:
         PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || '312' }}
       with:
-        manifest-path: ws/src/tesseract_nanobind/tesseract_nanobind/pyproject.toml
+        manifest-path: ws/src/tesseract_nanobind/pyproject.toml
         cache: true
         environments: ${{ env.PIXI_ENV }}
         activate-environment: ${{ env.PIXI_ENV }}
@@ -74,7 +74,7 @@ jobs:
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-v11-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-v11-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
     - name: colcon build C++ deps (macOS)
       if: matrix.config.os == 'macos' && steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws
@@ -126,7 +126,7 @@ jobs:
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
     - name: build nanobind wheel (macOS)
       if: matrix.config.os == 'macos'
-      working-directory: ws/src/tesseract_nanobind/tesseract_nanobind
+      working-directory: ws/src/tesseract_nanobind
       run: |
         export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
         export CMAKE_PREFIX_PATH=$CONDA_PREFIX:$GITHUB_WORKSPACE/ws/install
@@ -135,7 +135,7 @@ jobs:
           pip wheel . -w dist/ --no-build-isolation
     - name: build nanobind wheel (Linux)
       if: matrix.config.os == 'linux'
-      working-directory: ws/src/tesseract_nanobind/tesseract_nanobind
+      working-directory: ws/src/tesseract_nanobind
       run: |
         export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
         export CMAKE_PREFIX_PATH=$CONDA_PREFIX:$GITHUB_WORKSPACE/ws/install
@@ -144,14 +144,14 @@ jobs:
           pip wheel . -w dist/ --no-build-isolation
     - name: delocate (macOS)
       if: matrix.config.os == 'macos'
-      working-directory: ws/src/tesseract_nanobind/tesseract_nanobind
+      working-directory: ws/src/tesseract_nanobind
       run: |
         export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
         mkdir -p wheelhouse
         delocate-wheel -w wheelhouse -v dist/*.whl
     - name: bundle plugins (macOS)
       if: matrix.config.os == 'macos'
-      working-directory: ws/src/tesseract_nanobind/tesseract_nanobind
+      working-directory: ws/src/tesseract_nanobind
       run: |
         # Plugin factories are runtime-loaded (dlopen), not caught by delocate
         WHEEL_FILE=$(ls wheelhouse/tesseract*.whl)
@@ -194,11 +194,11 @@ jobs:
         # Repack wheel
         rm "$WHEEL_FILE"
         cd "$WHEEL_DIR"
-        zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/tesseract_nanobind/wheelhouse/$(basename $WHEEL_FILE)" .
+        zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/wheelhouse/$(basename $WHEEL_FILE)" .
         rm -rf "$WHEEL_DIR"
     - name: bundle plugins into wheel (Linux)
       if: matrix.config.os == 'linux'
-      working-directory: ws/src/tesseract_nanobind/tesseract_nanobind
+      working-directory: ws/src/tesseract_nanobind
       run: |
         # Plugin factories are runtime-loaded (dlopen), not caught by auditwheel
         # Bundle them BEFORE auditwheel so deps get repaired together
@@ -254,11 +254,11 @@ jobs:
         cd "$WHEEL_DIR"
         echo "Wheel contents before auditwheel:"
         find . -name "*.so" | head -20
-        zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/tesseract_nanobind/dist/$(basename $WHEEL_FILE)" .
+        zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/dist/$(basename $WHEEL_FILE)" .
         rm -rf "$WHEEL_DIR"
     - name: bundle deps (Linux)
       if: matrix.config.os == 'linux'
-      working-directory: ws/src/tesseract_nanobind/tesseract_nanobind
+      working-directory: ws/src/tesseract_nanobind
       run: |
         # With $ORIGIN rpath set at build time, just bundle all deps in package root
         # No auditwheel needed - simpler and avoids hash renaming issues
@@ -342,7 +342,7 @@ jobs:
         done
 
         # Repack wheel with updated platform tag
-        WHEELHOUSE="$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/tesseract_nanobind/wheelhouse"
+        WHEELHOUSE="$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/wheelhouse"
         mkdir -p "$WHEELHOUSE"
         WHEEL_NAME=$(basename "$WHEEL_FILE" | sed 's/linux_x86_64/manylinux_2_35_x86_64/')
         rm -f "$WHEEL_FILE"
@@ -358,7 +358,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: 'python-${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}'
-        path: ws/src/tesseract_nanobind/tesseract_nanobind/wheelhouse/tesseract*.whl
+        path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v4
@@ -436,7 +436,7 @@ jobs:
         run: |
           source test_env/bin/activate
           pip install pytest pytest-xdist scipy
-          cd tesseract_nanobind/tesseract_nanobind
+          cd tesseract_nanobind
           # Skip time_parameterization (requires boost), examples (viewer needs Qt/VTK, kinematics needs plugins), benchmarks (needs pytest-benchmark)
           pytest tests -n auto \
             --ignore=tests/tesseract_time_parameterization \

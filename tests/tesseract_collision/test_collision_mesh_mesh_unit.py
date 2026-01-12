@@ -1,0 +1,2 @@
+def addCollisionObjects(checker):
+    pass

@@ -30,6 +30,8 @@ build/
 # Sphinx docs
 docs/_build/
 docs/readme.md
-tesseract_nanobind/wheelhouse/
-tesseract_nanobind/src/tesseract_robotics/.cache/
+wheelhouse/
+src/tesseract_robotics/.cache/
 site/
+.pixi/
+pixi.lock

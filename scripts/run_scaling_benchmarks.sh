@@ -22,7 +22,7 @@ echo ""
 JSON_FILE=$(mktemp /tmp/scaling_bench_XXXXXX.json)
 
 # Run both optimize modes
-pytest tesseract_nanobind/tests/benchmarks/test_parallel_scaling.py \
+pytest tests/benchmarks/test_parallel_scaling.py \
     -k "TestOptimizeModeScaling or TestFirstSolutionScaling" \
     --benchmark-enable \
     --benchmark-min-rounds=2 \

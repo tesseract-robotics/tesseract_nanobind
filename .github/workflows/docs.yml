@@ -7,7 +7,7 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
-      - 'tesseract_nanobind/src/tesseract_robotics/**/*.pyi'  # stub files for API docs
+      - 'src/tesseract_robotics/**/*.pyi'  # stub files for API docs
   workflow_dispatch:
 
 permissions:

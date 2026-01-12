@@ -115,7 +115,7 @@ done
 
 rm "$WHEEL_FILE"
 cd "$WHEEL_DIR"
-zip -rq "$PROJECT_ROOT/tesseract_nanobind/wheelhouse/$(basename $WHEEL_FILE)" .
+zip -rq "$PROJECT_ROOT/wheelhouse/$(basename $WHEEL_FILE)" .
 cd "$PROJECT_ROOT/tesseract_nanobind"
 rm -rf "$WHEEL_DIR"
 

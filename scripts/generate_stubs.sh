@@ -9,7 +9,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SRC_DIR="$PROJECT_ROOT/tesseract_nanobind/src/tesseract_robotics"
+SRC_DIR="$PROJECT_ROOT/src/tesseract_robotics"
 
 # Module name -> subdir mapping
 # Format: "full.module.name:subdir"

@@ -13,7 +13,7 @@ JSON_SCALING=$(mktemp /tmp/bench_scaling_XXXXXX.json)
 
 # Run default pipeline tests (all 5 examples)
 echo "=== Default Pipeline Benchmarks ==="
-pytest tesseract_nanobind/tests/benchmarks \
+pytest tests/benchmarks \
     -k "TestExampleBenchmarks" \
     --benchmark-enable \
     --benchmark-min-rounds=2 \
@@ -23,7 +23,7 @@ pytest tesseract_nanobind/tests/benchmarks \
 # Run scaling tests grouped by num_planners (generates histogram)
 echo ""
 echo "=== OMPL CPU Scaling Benchmarks ==="
-pytest tesseract_nanobind/tests/benchmarks \
+pytest tests/benchmarks \
     -k "TestOMPLScaling" \
     --benchmark-enable \
     --benchmark-min-rounds=2 \
