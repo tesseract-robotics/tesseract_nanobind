@@ -146,13 +146,38 @@ context = future.context
 
 ## Available Pipelines
 
+### High-Level API (TaskComposer)
+
+The `TaskComposer` class provides user-friendly pipeline names:
+
 | Pipeline | Description |
 |----------|-------------|
-| `TrajOptPipeline` | TrajOpt optimization |
-| `OMPLPipeline` | OMPL sampling-based planning |
-| `FreespaceMotionPipeline` | OMPL + TrajOpt + time param |
-| `CartesianMotionPipeline` | Cartesian path planning |
-| `RasterMotionPipeline` | Industrial raster patterns |
+| `FreespaceMotionPipeline` | OMPL + TrajOpt smoothing + time param |
+| `CartesianMotionPipeline` | Cartesian path with TrajOpt |
+| `OMPLPipeline` | OMPL sampling-based planning only |
+| `TrajOptPipeline` | TrajOpt optimization only |
+| `DescartesPipeline` | Descartes graph search |
+
+### Raw Config Pipelines
+
+All pipelines available via `createTaskComposerNode()`:
+
+| Pipeline | Description |
+|----------|-------------|
+| `FreespacePipeline` | OMPL + TrajOpt + time param |
+| `FreespaceIfoptPipeline` | OMPL + TrajOptIfopt (OSQP) |
+| `CartesianPipeline` | Cartesian path planning |
+| `OMPLPipeline` | OMPL only |
+| `TrajOptPipeline` | TrajOpt only |
+| `TrajOptIfoptPipeline` | TrajOptIfopt (OSQP solver) |
+| `DescartesFPipeline` | Descartes forward search |
+| `DescartesDPipeline` | Descartes backward search |
+| `RasterFtPipeline` | Raster with freespace transitions |
+| `RasterCtPipeline` | Raster with cartesian transitions |
+| `RasterFtOnlyPipeline` | Raster freespace only |
+| `RasterCtOnlyPipeline` | Raster cartesian only |
+
+See `task_composer_plugins.yaml` for the full list including global variants.
 
 ## Pipeline Input/Output Keys
 
