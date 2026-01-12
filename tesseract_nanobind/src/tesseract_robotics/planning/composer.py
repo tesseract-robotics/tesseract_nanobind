@@ -159,6 +159,13 @@ class TaskComposer:
     Wraps the TaskComposerPluginFactory and handles all the AnyPoly
     boilerplate for setting up and running planning tasks.
 
+    Available Pipelines:
+        FreespaceMotionPipeline: OMPL + TrajOpt smoothing + time param (recommended)
+        CartesianMotionPipeline: Cartesian path with TrajOpt
+        OMPLPipeline: OMPL sampling-based planning only
+        TrajOptPipeline: TrajOpt optimization only
+        DescartesPipeline: Descartes graph search
+
     Example:
         composer = TaskComposer.from_config()
 
@@ -571,13 +578,18 @@ class TaskComposer:
         Get list of available pipeline names.
 
         Returns:
-            List of pipeline names that can be used with plan()
+            List of pipeline names that can be used with plan():
+                - FreespaceMotionPipeline: OMPL + TrajOpt smoothing + time param
+                - CartesianMotionPipeline: Cartesian path with TrajOpt
+                - OMPLPipeline: OMPL sampling-based planning only
+                - TrajOptPipeline: TrajOpt optimization only
+                - DescartesPipeline: Descartes graph search
         """
         # Common pipelines - actual availability depends on config
         return [
-            "TrajOptPipeline",
-            "OMPLPipeline",
-            "DescartesPipeline",
             "FreespaceMotionPipeline",
             "CartesianMotionPipeline",
+            "OMPLPipeline",
+            "TrajOptPipeline",
+            "DescartesPipeline",
         ]
