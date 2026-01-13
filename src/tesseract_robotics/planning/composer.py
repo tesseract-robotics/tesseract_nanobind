@@ -231,6 +231,7 @@ class TaskComposer:
         locator: GeneralResourceLocator | None = None,
         num_threads: int | None = None,
         executor: TaskComposerExecutor | None = None,
+        warmup: bool | list[str] = False,
     ) -> TaskComposer:
         """
         Create TaskComposer from config file.
@@ -243,6 +244,8 @@ class TaskComposer:
             locator: Resource locator
             num_threads: Number of threads for executor (overrides YAML config)
             executor: Pre-configured executor (overrides num_threads and YAML)
+            warmup: Pre-load plugins to eliminate first-call latency (~10-15s).
+                    True = load common pipelines, list = specific pipelines, False = skip.
 
         Returns:
             Initialized TaskComposer
@@ -250,6 +253,9 @@ class TaskComposer:
         Example:
             # Use YAML config (default)
             composer = TaskComposer.from_config()
+
+            # Pre-load plugins at init (recommended for interactive use)
+            composer = TaskComposer.from_config(warmup=True)
 
             # Override thread count
             composer = TaskComposer.from_config(num_threads=4)
@@ -302,9 +308,66 @@ class TaskComposer:
             locator,
         )
 
-        return cls(
+        instance = cls(
             factory, locator, num_threads=num_threads, executor=executor, config_path=config_path
         )
+
+        # Pre-load plugins if requested
+        if warmup:
+            pipelines = warmup if isinstance(warmup, list) else None
+            loaded = instance.warmup(pipelines)
+            logger.debug(f"Warmed up {len(loaded)} pipelines: {loaded}")
+
+        return instance
+
+    def warmup(self, pipelines: list[str] | None = None) -> list[str]:
+        """
+        Pre-load plugin libraries to eliminate first-call latency.
+
+        The TaskComposer uses dynamic plugin loading (boost_plugin_loader / dlopen).
+        First call to createTaskComposerNode() loads the shared library, which
+        takes 10-15 seconds. Subsequent calls are instant (cached).
+
+        Call warmup() once at application startup to amortize this cost.
+
+        Args:
+            pipelines: Specific pipelines to load, or None for commonly used ones.
+                       Pass [] (empty list) to skip loading (useful for tests).
+
+        Returns:
+            List of successfully loaded pipeline names.
+
+        Example:
+            # At application startup
+            composer = TaskComposer.from_config()
+            composer.warmup()  # Takes ~10-15s, pre-loads common pipelines
+
+            # Later planning calls are fast
+            result = composer.plan(robot, program)  # ~8s instead of ~22s
+        """
+        if pipelines is not None and len(pipelines) == 0:
+            return []
+
+        # Default to commonly used pipelines
+        if pipelines is None:
+            pipelines = [
+                "TrajOptPipeline",
+                "TrajOptIfoptPipeline",
+                "FreespacePipeline",
+                "FreespaceIfoptPipeline",
+                "CartesianPipeline",
+                "OMPLPipeline",
+            ]
+
+        loaded = []
+        for name in pipelines:
+            try:
+                self.factory.createTaskComposerNode(name)
+                loaded.append(name)
+            except Exception as e:
+                logger.debug(f"Failed to load pipeline {name}: {e}")
+
+        return loaded
 
     @property
     def executor(self) -> TaskflowTaskComposerExecutor:

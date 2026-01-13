@@ -82,28 +82,38 @@ RELATED EXAMPLES
 - basic_cartesian_example.py: simple Cartesian path without auxiliary axes
 - glass_upright_example.py: orientation constraints for upright maintenance
 - raster_example.py: industrial raster patterns
+
+PERFORMANCE NOTE
+----------------
+First planning call takes ~10-15s due to dynamic plugin loading (dlopen).
+This is inherent to the TaskComposer plugin architecture (same in C++).
+Subsequent calls in the same process are fast (~8s for this 50-waypoint path).
+
+For interactive use, call composer.warmup() or use warmup=True:
+    composer = TaskComposer.from_config(warmup=True)  # loads plugins upfront
 """
 
-import sys
 import csv
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
+    MotionProgram,
     Pose,
+    Robot,
     TaskComposer,
 )
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
-    TrajOptDefaultCompositeProfile,
-    TrajOptOSQPSolverProfile,
     CollisionEvaluatorType,
-    ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptSolverProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
+    TrajOptOSQPSolverProfile,
 )
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
@@ -112,7 +122,7 @@ TesseractViewer = None
 if "pytest" not in sys.modules:
     try:
         from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
+    except (ImportError, FileNotFoundError):
         pass
 
 
@@ -134,13 +144,11 @@ def make_puzzle_tool_poses(robot):
     Returns:
         list[Pose]: ~50 Cartesian waypoints for puzzle piece edge
     """
-    resource = robot.locator.locateResource(
-        "package://tesseract_support/urdf/puzzle_bent.csv"
-    )
+    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
     poses = []
-    with open(csv_path, "r") as f:
+    with open(csv_path) as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
             if lnum < 2 or len(row) < 7:  # Skip header rows
@@ -164,9 +172,7 @@ def make_puzzle_tool_poses(robot):
             # Build orthogonal frame from surface normal
             # Use negative position as reference to create X-axis pointing inward
             temp_x = (
-                -pos / np.linalg.norm(pos)
-                if np.linalg.norm(pos) > 1e-6
-                else np.array([1, 0, 0])
+                -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
             )
             y_axis = np.cross(norm, temp_x)
             y_axis /= np.linalg.norm(y_axis)
@@ -207,9 +213,7 @@ def create_profiles():
     composite.collision_constraint_config.enabled = False
     composite.collision_cost_config.enabled = True
     composite.collision_cost_config.collision_margin_buffer = 0.025  # 25mm buffer
-    composite.collision_cost_config.collision_check_config.type = (
-        CollisionEvaluatorType.DISCRETE
-    )
+    composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
     # Solver profile: OSQP with C++ settings
     solver = TrajOptOSQPSolverProfile()
@@ -218,9 +222,7 @@ def create_profiles():
     solver.opt_params.min_trust_box_size = 1e-3
 
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, "CARTESIAN", plan)
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_NS, "DEFAULT", composite
-    )
+    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
     ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, "DEFAULT", solver)
     return profiles
 
@@ -284,28 +286,40 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Custom profiles enable yaw freedom for auxiliary axis optimization
     print(f"Planning with {pipeline} (9 DOF: 7 arm + 2 aux)...")
     composer = TaskComposer.from_config()
+
+    # Warmup: pre-load plugins (dlopen overhead)
+    warmup_start = time.time()
+    composer.warmup([pipeline])
+    warmup_time = time.time() - warmup_start
+    print(f"Plugin warmup: {warmup_time:.2f}s")
+
     profiles = create_profiles()
 
-    start_time = time.time()
+    # Plan: actual optimization time
+    plan_start = time.time()
     try:
         result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
-        planning_time = time.time() - start_time
+        planning_time = time.time() - plan_start
 
         if result.successful:
-            print(f"Success in {planning_time:.2f}s, {len(result)} waypoints")
+            print(f"Planning: {planning_time:.2f}s ({len(result)} waypoints)")
         else:
-            print(f"Failed in {planning_time:.2f}s: {result.message}")
+            print(f"Planning failed: {planning_time:.2f}s - {result.message}")
 
     except Exception as e:
-        planning_time = time.time() - start_time
-        print(f"Exception after {planning_time:.2f}s: {e}")
+        planning_time = time.time() - plan_start
+        print(f"Planning exception: {planning_time:.2f}s - {e}")
         result = None
+
+    total_time = warmup_time + planning_time
+    print(f"Total: {total_time:.2f}s (warmup {warmup_time:.2f}s + plan {planning_time:.2f}s)")
 
     return {
         "result": result,
         "robot": robot,
         "joint_names": joint_names,
         "planning_time": planning_time,
+        "warmup_time": warmup_time,
         "success": result.successful if result else False,
     }
 

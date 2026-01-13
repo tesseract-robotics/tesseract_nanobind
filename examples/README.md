@@ -46,6 +46,17 @@ if result.successful:
     print(f"Trajectory: {len(result)} waypoints")
 ```
 
+## Performance Note
+
+First `plan()` call takes ~10-15s due to dynamic plugin loading (`dlopen`).
+Subsequent calls in the same process are fast. For interactive use:
+
+```python
+composer = TaskComposer.from_config()
+composer.warmup(["TrajOptPipeline"])  # Pre-load plugins (~10-15s)
+result = composer.plan(robot, program)  # Now fast
+```
+
 ## Low-Level API
 
 For direct access to the C++ bindings, see [lowlevel/](lowlevel/).

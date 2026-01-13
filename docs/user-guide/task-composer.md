@@ -283,21 +283,59 @@ if result.success:
 
 ## Performance Tips
 
-!!! tip "Reuse Composer"
-    Creating a Composer is expensive (plugin loading). Create once, reuse:
+### Plugin Loading Overhead
 
+!!! warning "First `plan()` call is slow (~10-15s)"
+    The Task Composer uses dynamic plugin loading (`dlopen`). The first call to
+    `plan()` loads shared libraries for TrajOpt, OMPL, collision checking, etc.
+    Subsequent calls in the same process are fast (plugins cached in memory).
+
+    This is inherent to the plugin architecture (same behavior in C++).
+
+**Use `warmup()` for interactive applications:**
+
+```python
+from tesseract_robotics.planning import TaskComposer
+
+# Option 1: Explicit warmup (recommended for timing visibility)
+composer = TaskComposer.from_config()
+composer.warmup(["TrajOptPipeline"])  # ~10-15s upfront
+result = composer.plan(robot, program)  # Now fast (~1-2s)
+
+# Option 2: warmup=True parameter
+composer = TaskComposer.from_config(warmup=True)  # Loads common pipelines
+
+# Option 3: Specific pipelines only
+composer = TaskComposer.from_config(warmup=["TrajOptPipeline", "OMPLPipeline"])
+```
+
+**When warmup helps:**
+
+- Interactive use (REPL, Jupyter) - pay once, plan many times
+- GUI/service applications - initialize at startup, fast responses after
+- Benchmarking - separate loading time from algorithm time
+
+**When warmup doesn't help:**
+
+- Single-run scripts (same total time either way)
+
+### Reuse the Composer
+
+!!! tip "Create once, reuse many times"
     ```python
     class PlanningServer:
         def __init__(self, robot):
-            self.composer = Composer(robot)  # Create once
+            self.composer = TaskComposer.from_config()
+            self.composer.warmup(["TrajOptPipeline"])  # One-time cost
+            self.robot = robot
 
-        def plan_motion(self, start, goal):
-            self.composer.clear()  # Clear previous program
-            self.composer.add_freespace(goal_joints=goal)
-            return self.composer.plan()
+        def plan_motion(self, program):
+            return self.composer.plan(self.robot, program)  # Fast
     ```
 
-!!! tip "Warm Starting"
+### Warm Starting
+
+!!! tip "Use previous solution as seed"
     For similar plans, use previous solution as seed:
 
     ```python

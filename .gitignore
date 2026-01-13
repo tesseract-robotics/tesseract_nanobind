@@ -24,6 +24,9 @@ build/
 # testing
 .pytest_cache/
 
+# profiling
+*.trace/
+
 # OS
 .DS_Store
 
