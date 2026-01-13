@@ -38,16 +38,17 @@ Related Examples:
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     JointTarget,
+    MotionProgram,
     Pose,
-    sphere,
-    create_obstacle,
+    Robot,
     TaskComposer,
+    create_obstacle,
+    sphere,
 )
 from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
@@ -56,10 +57,7 @@ from tesseract_robotics.planning.profiles import (
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run(pipeline="FreespacePipeline", num_planners=None):

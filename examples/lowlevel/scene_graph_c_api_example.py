@@ -18,16 +18,17 @@ Use Cases:
 - Testing kinematic reachability with modified chains
 """
 
-import sys
-import numpy as np
 import math
+import sys
+
+import numpy as np
 
 from tesseract_robotics.tesseract_common import (
-    GeneralResourceLocator,
+    AngleAxisd,
     FilesystemPath,
+    GeneralResourceLocator,
     Isometry3d,
     Translation3d,
-    AngleAxisd,
 )
 from tesseract_robotics.tesseract_environment import (
     Environment,
@@ -39,10 +40,7 @@ from tesseract_robotics.tesseract_scene_graph import Joint, JointType
 # Viewer (skip in pytest)
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def main():
@@ -127,9 +125,7 @@ def main():
     # C++ equivalent: Isometry3d::Identity() * AngleAxisd(-pi/2, Y) * Translation3d(0.15, 0, 0)
     # Order: rotation applied first, then translation in rotated frame
     transform = Isometry3d.Identity()
-    transform = transform * AngleAxisd(
-        -math.pi / 2, np.array([0, 1, 0], dtype=np.float64)
-    )
+    transform = transform * AngleAxisd(-math.pi / 2, np.array([0, 1, 0], dtype=np.float64))
     transform = transform * Translation3d(0.15, 0.0, 0.0)
     new_joint.parent_to_joint_origin_transform = transform
 

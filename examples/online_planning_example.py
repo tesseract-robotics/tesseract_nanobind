@@ -82,11 +82,12 @@ Related Examples
 
 import sys
 import time
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
     MotionProgram,
+    Robot,
     StateTarget,
     TaskComposer,
 )
@@ -94,10 +95,7 @@ from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def update_human_position(robot, human_x, human_y):

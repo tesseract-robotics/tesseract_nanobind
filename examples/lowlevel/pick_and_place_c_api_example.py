@@ -37,28 +37,27 @@ import gc
 gc.disable()  # Disable GC to avoid nanobind reference leak warnings on exit
 
 import sys  # noqa: E402
+
 import numpy as np  # noqa: E402
 
 # High-level planning API
 from tesseract_robotics.planning import (  # noqa: E402
-    Robot,  # Environment wrapper with URDF/SRDF loading
-    MotionProgram,  # Fluent API for building motion sequences
     CartesianTarget,  # Pose-based waypoint
-    StateTarget,  # Joint-space waypoint
+    MotionProgram,  # Fluent API for building motion sequences
     Pose,  # SE(3) pose with multiple constructors
+    Robot,  # Environment wrapper with URDF/SRDF loading
+    StateTarget,  # Joint-space waypoint
+    TaskComposer,  # Motion planning orchestrator
     box,  # Box geometry factory
     create_obstacle,  # Add collision object to environment
-    TaskComposer,  # Motion planning orchestrator
 )
-
-# Low-level scene graph for link manipulation
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType  # noqa: E402
-
-# Isometry3d for 4x4 homogeneous transforms
-from tesseract_robotics.tesseract_common import Isometry3d  # noqa: E402
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType  # noqa: E402
 
 # Profile dictionary for custom planner settings
 from tesseract_robotics.tesseract_command_language import ProfileDictionary  # noqa: E402
+
+# Isometry3d for 4x4 homogeneous transforms
+from tesseract_robotics.tesseract_common import Isometry3d  # noqa: E402
 
 # TrajOpt-specific profile types (C++ bindings)
 from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
@@ -68,7 +67,9 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
     TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
     TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType  # noqa: E402
+
+# Low-level scene graph for link manipulation
+from tesseract_robotics.tesseract_scene_graph import Joint, JointType  # noqa: E402
 
 # TrajOpt planner namespace for profile registration
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -76,10 +77,7 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 # Optional viewer (disabled during pytest)
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 # C++ constants from pick_and_place_example.cpp
 OFFSET = 0.005  # 5mm clearance above box surface
@@ -148,7 +146,9 @@ def create_pick_and_place_profiles():
     composite_profile.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_DISCRETE
     )
-    composite_profile.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
+    composite_profile.collision_cost_config.collision_check_config.longest_valid_segment_length = (
+        0.05
+    )
     composite_profile.collision_cost_config.collision_margin_buffer = 0.01
 
     # ==== REGISTER PROFILES ====
@@ -225,9 +225,7 @@ def run():
         robot,
         name=LINK_BOX_NAME,
         geometry=box(box_size, box_size, box_size),
-        transform=Pose.from_xyz(
-            box_position[0], box_position[1], box_size / 2.0 + OFFSET
-        ),
+        transform=Pose.from_xyz(box_position[0], box_position[1], box_size / 2.0 + OFFSET),
         parent_link="workcell_base",  # Table frame
     )
     print(f"Added box at ({box_position[0]}, {box_position[1]}) with size {box_size}m")
@@ -282,9 +280,7 @@ def run():
     # ==== PLAN PICK MOTION ====
     # TaskComposer.plan() auto-seeds Cartesian waypoints using IK
     # TrajOptPipeline: seed -> trajopt optimization -> time parameterization
-    pick_result = composer.plan(
-        robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles
-    )
+    pick_result = composer.plan(robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles)
 
     if not pick_result.successful:
         print(f"PICK planning failed: {pick_result.message}")
@@ -346,9 +342,7 @@ def run():
     # ==== PLACE APPROACH POSE ====
     # 25cm back from shelf in -Y direction (approach from front)
     place_approach_position = np.array(place_position) + np.array([0.0, -0.25, 0.0])
-    place_approach_pose = Pose.from_matrix_position(
-        place_rotation, place_approach_position
-    )
+    place_approach_pose = Pose.from_matrix_position(place_rotation, place_approach_position)
 
     # ==== RETREAT POSE ====
     # Reuse pick approach pose (15cm above grasp location)

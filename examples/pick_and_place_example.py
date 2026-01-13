@@ -66,36 +66,34 @@ Related Examples:
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
-    StateTarget,
+    MotionProgram,
     Pose,
-    box,
-    create_obstacle,
-    create_fixed_joint,
+    Robot,
+    StateTarget,
     TaskComposer,
+    box,
+    create_fixed_joint,
+    create_obstacle,
 )
+from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptCompositeProfile,
     TrajOptCollisionConfig,
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 OFFSET = 0.005
 BOX_SIZE = 0.1
@@ -133,9 +131,7 @@ def create_profiles():
     composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
     composite.collision_cost_config.collision_margin_buffer = 0.01
 
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_NS, "DEFAULT", composite
-    )
+    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
     return profiles
 
 
@@ -210,9 +206,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # - Rotation matrix: [[-1,0,0], [0,1,0], [0,0,-1]]
     pick_z = BOX_SIZE + 0.772 + OFFSET
     pick_rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
-    pick_pose = Pose.from_matrix_position(
-        pick_rotation, [box_pos[0], box_pos[1], pick_z]
-    )
+    pick_pose = Pose.from_matrix_position(pick_rotation, [box_pos[0], box_pos[1], pick_z])
 
     # Approach pose: 15cm directly above pick pose (same orientation)
     approach_pose = Pose.from_matrix_position(
@@ -231,9 +225,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
         .linear_to(CartesianTarget(pick_pose, profile="CARTESIAN"))
     )
 
-    pick_result = composer.plan(
-        robot, pick_program, pipeline=pipeline, profiles=profiles
-    )
+    pick_result = composer.plan(robot, pick_program, pipeline=pipeline, profiles=profiles)
     assert pick_result.successful, f"PICK failed: {pick_result.message}"
     print(f"PICK OK: {len(pick_result)} waypoints")
 
@@ -290,9 +282,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
         .linear_to(CartesianTarget(place_pose, profile="CARTESIAN"))  # Place
     )
 
-    place_result = composer.plan(
-        robot, place_program, pipeline=pipeline, profiles=profiles
-    )
+    place_result = composer.plan(robot, place_program, pipeline=pipeline, profiles=profiles)
     assert place_result.successful, f"PLACE failed: {place_result.message}"
     print(f"PLACE OK: {len(place_result)} waypoints")
 

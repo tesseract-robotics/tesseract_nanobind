@@ -26,15 +26,16 @@ Related Examples:
 
 import sys
 import time
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
+    MotionProgram,
+    Pose,
+    Robot,
     StateTarget,
     TaskComposer,
-    Pose,
 )
 from tesseract_robotics.planning.profiles import (
     create_cartesian_pipeline_profiles,
@@ -42,10 +43,7 @@ from tesseract_robotics.planning.profiles import (
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run(pipeline="CartesianPipeline", num_planners=None):

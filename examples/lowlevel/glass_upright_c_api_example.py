@@ -26,25 +26,23 @@ Pipeline Overview
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
     MotionProgram,
-    StateTarget,
     Pose,
-    sphere,
-    create_obstacle,
+    Robot,
+    StateTarget,
     TaskComposer,
+    create_obstacle,
+    sphere,
 )
 from tesseract_robotics.planning.profiles import create_trajopt_upright_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run():
@@ -98,21 +96,15 @@ def run():
         .linear_to(StateTarget(joint_end_pos, names=joint_names, profile="UPRIGHT"))
     )
 
-    print(
-        "\nProgram: LINEAR motion with UPRIGHT profile (orientation locked, position free)"
-    )
-    print(
-        "TrajOpt will optimize trajectory to avoid sphere while maintaining tool orientation"
-    )
+    print("\nProgram: LINEAR motion with UPRIGHT profile (orientation locked, position free)")
+    print("TrajOpt will optimize trajectory to avoid sphere while maintaining tool orientation")
 
     # TrajOptPipeline: trajectory optimization with collision avoidance
     # UPRIGHT profile: C++ collision (margin=0.01, buffer=0.01, coeff=1) + cartesian constraint
     print("\nRunning TrajOpt planner with upright constraint...")
     composer = TaskComposer.from_config()
     profiles = create_trajopt_upright_profiles()
-    result = composer.plan(
-        robot, program, pipeline="TrajOptPipeline", profiles=profiles
-    )
+    result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
 
     assert result.successful, f"Planning failed: {result.message}"
     print("Planning successful!")

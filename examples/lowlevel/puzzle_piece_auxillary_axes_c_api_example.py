@@ -22,34 +22,32 @@ Robot Configuration:
 - "part" working frame on positioner (moves with aux axes)
 """
 
-import sys
 import csv
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
+    MotionProgram,
     Pose,
+    Robot,
     TaskComposer,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
-    TrajOptDefaultCompositeProfile,
-    TrajOptOSQPSolverProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptSolverProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
+    TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
@@ -72,14 +70,12 @@ def make_puzzle_tool_poses(robot):
         - Y-axis: Z x X for right-handed frame
     """
     # Locate CSV via tesseract resource system (resolves package:// URIs)
-    resource = robot.locator.locateResource(
-        "package://tesseract_support/urdf/puzzle_bent.csv"
-    )
+    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
     poses = []
 
-    with open(csv_path, "r") as f:
+    with open(csv_path) as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
             # Skip header rows (first 2 lines in puzzle_bent.csv)
@@ -106,9 +102,7 @@ def make_puzzle_tool_poses(robot):
             # Construct orthogonal frame from normal:
             # Use negative position as reference to create X-axis pointing inward
             temp_x = (
-                -pos / np.linalg.norm(pos)
-                if np.linalg.norm(pos) > 1e-6
-                else np.array([1, 0, 0])
+                -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
             )
             y_axis = np.cross(norm, temp_x)
             y_axis = y_axis / np.linalg.norm(y_axis)
@@ -186,9 +180,7 @@ def main():
     # This group includes both arm and positioner chains (defined in SRDF)
     # - tcp_frame: grinder tool on arm end-effector
     # - working_frame: "part" frame attached to positioner (moves with aux axes)
-    program = MotionProgram(
-        "manipulator_aux", tcp_frame="grinder_frame", working_frame="part"
-    )
+    program = MotionProgram("manipulator_aux", tcp_frame="grinder_frame", working_frame="part")
     program.set_joint_names(joint_names)
 
     # Add all CSV waypoints as Cartesian targets
@@ -203,9 +195,7 @@ def main():
     # TrajOpt plan profile: waypoint-level constraints
     trajopt_plan_profile = TrajOptDefaultPlanProfile()
     trajopt_plan_profile.joint_cost_config.enabled = False  # No joint-space costs
-    trajopt_plan_profile.cartesian_cost_config.enabled = (
-        False  # Using constraints instead
-    )
+    trajopt_plan_profile.cartesian_cost_config.enabled = False  # Using constraints instead
     trajopt_plan_profile.cartesian_constraint_config.enabled = True
 
     # CRITICAL: coeff[5]=0 for yaw (rz) freedom
@@ -254,9 +244,7 @@ def main():
     # Plan via TaskComposer - handles seeding and post-processing
     # TrajOptPipeline: seeds Cartesian waypoints with IK, then optimizes
     composer = TaskComposer.from_config()
-    result = composer.plan(
-        robot, program, pipeline="TrajOptPipeline", profiles=profiles
-    )
+    result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
 
     if not result.successful:
         print(f"Planning failed: {result.message}")

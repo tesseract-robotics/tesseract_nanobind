@@ -120,10 +120,7 @@ TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except (ImportError, FileNotFoundError):
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def make_puzzle_tool_poses(robot):

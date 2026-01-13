@@ -76,6 +76,7 @@ RELATED EXAMPLES
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
@@ -90,10 +91,7 @@ from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None):
@@ -152,9 +150,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # - to_end: final waypoint -> home (freespace)
     num_segments = 3
 
-    program = MotionProgram(
-        "manipulator", tcp_frame="tool0", profile="RASTER"
-    ).set_joint_names(joint_names)
+    program = MotionProgram("manipulator", tcp_frame="tool0", profile="RASTER").set_joint_names(
+        joint_names
+    )
 
     # Start from home position
     program.move_to(StateTarget(home_pos, names=joint_names, profile="FREESPACE"))

@@ -29,19 +29,28 @@ Based on: tesseract_examples/src/car_seat_example.cpp
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
     MotionProgram,
+    Robot,
     StateTarget,
     TaskComposer,
 )
-from tesseract_robotics.tesseract_common import (
-    Isometry3d,
-    AllowedCollisionMatrix,
-)
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_common import (
+    AllowedCollisionMatrix,
+    Isometry3d,
+)
+from tesseract_robotics.tesseract_environment import (
+    AddLinkCommand,
+    ModifyAllowedCollisionsCommand,
+    ModifyAllowedCollisionsType,
+    MoveLinkCommand,
+)
+from tesseract_robotics.tesseract_geometry import createMeshFromPath
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
@@ -50,30 +59,18 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_environment import (
-    AddLinkCommand,
-    MoveLinkCommand,
-    ModifyAllowedCollisionsCommand,
-    ModifyAllowedCollisionsType,
-)
 from tesseract_robotics.tesseract_scene_graph import (
-    Link,
+    Collision,
     Joint,
     JointType,
+    Link,
     Visual,
-    Collision,
 )
-from tesseract_robotics.tesseract_geometry import createMeshFromPath
-from tesseract_robotics.tesseract_collision import makeConvexMesh
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
@@ -125,9 +122,7 @@ def create_car_seat_profiles():
     solver.opt_params.min_trust_box_size = 1e-3
 
     for name in ["DEFAULT", "FREESPACE"]:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_NS, name, composite
-        )
+        ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, name, composite)
         ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
         ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
 
@@ -274,9 +269,7 @@ def add_seats(robot):
             collision_mesh_url = (
                 f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
             )
-            collision_mesh_path = locator.locateResource(
-                collision_mesh_url
-            ).getFilePath()
+            collision_mesh_path = locator.locateResource(collision_mesh_url).getFilePath()
 
             meshes = createMeshFromPath(collision_mesh_path)
             for mesh in meshes:
@@ -355,9 +348,7 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
     # Adjacent links (in contact) should not trigger collision violations
     # "Adjacent" = expected contact, "Never" = explicitly disabled check
     acm = AllowedCollisionMatrix()
-    acm.addAllowedCollision(
-        seat_name, "end_effector", "Adjacent"
-    )  # Gripper-object contact OK
+    acm.addAllowedCollision(seat_name, "end_effector", "Adjacent")  # Gripper-object contact OK
     acm.addAllowedCollision(seat_name, "cell_logo", "Never")  # Static environment
     acm.addAllowedCollision(seat_name, "fence", "Never")  # Workcell boundary
     acm.addAllowedCollision(seat_name, "link_b", "Never")  # Arm links
@@ -443,9 +434,7 @@ def run():
     print("Running TrajOpt planner for PICK...")
 
     # TrajOptPipeline: sequential convex optimization for collision-free motion
-    pick_result = composer.plan(
-        robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles
-    )
+    pick_result = composer.plan(robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles)
 
     assert pick_result.successful, f"PICK planning failed: {pick_result.message}"
     print(f"PICK successful! {len(pick_result)} waypoints")

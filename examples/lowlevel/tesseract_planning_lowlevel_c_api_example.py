@@ -16,52 +16,50 @@ Use this low-level approach when you need:
 """
 
 import sys
+
 import numpy as np
 
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
-    Isometry3d,
-    Translation3d,
-    Quaterniond,
-    ManipulatorInfo,
-    GeneralResourceLocator,
-)
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    MoveInstructionType_FREESPACE,
-    MoveInstruction,
-    CompositeInstruction,
-    ProfileDictionary,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    CompositeInstruction,
     InstructionPoly_as_MoveInstructionPoly,
+    MoveInstruction,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType_FREESPACE,
+    ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import (
-    generateInterpolatedProgram,
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    Isometry3d,
+    ManipulatorInfo,
+    Quaterniond,
+    Translation3d,
 )
+from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
+)
+from tesseract_robotics.tesseract_motion_planners_simple import (
+    generateInterpolatedProgram,
+)
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
+    TrajOptMotionPlanner,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
-    TrajOptDefaultCompositeProfile,
-    TrajOptMotionPlanner,
-)
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
@@ -94,7 +92,7 @@ def main():
     manip_info.working_frame = "base_link"
 
     # Set the initial state of the robot
-    joint_names = ["joint_%d" % (i + 1) for i in range(6)]
+    joint_names = [f"joint_{i + 1}" for i in range(6)]
     t_env.setState(joint_names, np.ones(6) * 0.1)
 
     # Create the input command program waypoints
@@ -129,9 +127,7 @@ def main():
     # implicit conversion from MoveInstruction to MoveInstructionPoly.
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(start_instruction)
-    )
+    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
 
     # Initialize the OMPL planner for RRTConnect algorithm
@@ -201,9 +197,7 @@ def main():
     time_profiles = ProfileDictionary()
     time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
 
-    assert time_parameterization.compute(
-        trajopt_results_instruction, t_env, time_profiles
-    )
+    assert time_parameterization.compute(trajopt_results_instruction, t_env, time_profiles)
 
     # Get the results as a list of instructions
     trajopt_results = trajopt_results_instruction.getInstructions()
@@ -221,9 +215,7 @@ def main():
     if TesseractViewer is not None:
         viewer = TesseractViewer()
         viewer.update_environment(t_env, [0, 0, 0])
-        viewer.update_joint_positions(
-            joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1])
-        )
+        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
         viewer.start_serve_background()
         viewer.update_trajectory(trajopt_results)
         viewer.plot_trajectory(trajopt_results, manip_info, axes_length=0.05)

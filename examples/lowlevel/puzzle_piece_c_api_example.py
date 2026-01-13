@@ -21,32 +21,30 @@ C++ reference values:
 - ManipulatorInfo: manipulator="manipulator", tcp="grinder_frame", working_frame="part"
 """
 
-import sys
 import csv
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
+    MotionProgram,
     Pose,
+    Robot,
     TaskComposer,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
-    TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptPlanProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
@@ -65,14 +63,12 @@ def make_puzzle_tool_poses(robot):
     4. x-axis = cross(y, z) -> completes right-handed frame
     """
     # Locate CSV via resource locator (respects package:// URIs)
-    resource = robot.locator.locateResource(
-        "package://tesseract_support/urdf/puzzle_bent.csv"
-    )
+    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
     poses = []
 
-    with open(csv_path, "r") as f:
+    with open(csv_path) as f:
         reader = csv.reader(f)
         for lnum, row in enumerate(reader):
             # Skip header rows (lines 0-1 contain column names)
@@ -99,9 +95,7 @@ def make_puzzle_tool_poses(robot):
             # Frame construction: use -position as reference for x-axis direction
             # This creates consistent orientation as tool follows curved path
             temp_x = (
-                -pos / np.linalg.norm(pos)
-                if np.linalg.norm(pos) > 1e-6
-                else np.array([1, 0, 0])
+                -pos / np.linalg.norm(pos) if np.linalg.norm(pos) > 1e-6 else np.array([1, 0, 0])
             )
 
             # Build orthonormal frame: y = z x temp_x, then x = y x z
@@ -152,9 +146,7 @@ def main():
     # Build motion program with Cartesian waypoints
     # - working_frame="part": poses are relative to workpiece
     # - tcp_frame="grinder_frame": tool center point for IK
-    program = MotionProgram(
-        "manipulator", tcp_frame="grinder_frame", working_frame="part"
-    )
+    program = MotionProgram("manipulator", tcp_frame="grinder_frame", working_frame="part")
     program.set_joint_names(joint_names)
 
     # Add all waypoints as linear (Cartesian) moves with custom profile
@@ -227,9 +219,7 @@ def main():
     # Plan using TaskComposer - handles IK seeding and optimization
     # TrajOptPipeline: MinLengthTask -> DescartesMotionPlannerTask -> TrajOptMotionPlannerTask
     composer = TaskComposer.from_config()
-    result = composer.plan(
-        robot, program, pipeline="TrajOptPipeline", profiles=profiles
-    )
+    result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
 
     if not result.successful:
         print(f"Planning failed: {result.message}")

@@ -13,63 +13,54 @@ Comparison:
 """
 
 import sys
+
 import numpy as np
 
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
-    Isometry3d,
-    Translation3d,
-    Quaterniond,
-    ManipulatorInfo,
-    GeneralResourceLocator,
-)
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    MoveInstructionType_FREESPACE,
-    MoveInstruction,
-    CompositeInstruction,
-    ProfileDictionary,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    CompositeInstruction,
     InstructionPoly_as_MoveInstructionPoly,
+    MoveInstruction,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType_FREESPACE,
+    ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import (
-    generateInterpolatedProgram,
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    Isometry3d,
+    ManipulatorInfo,
+    Quaterniond,
+    Translation3d,
 )
+from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
+)
+from tesseract_robotics.tesseract_motion_planners_simple import (
+    generateInterpolatedProgram,
+)
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    ProfileDictionary_addTrajOptIfoptPlanProfile,
+    ProfileDictionary_addTrajOptIfoptSolverProfile,
+    TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultPlanProfile,
+    TrajOptIfoptMotionPlanner,
+    TrajOptIfoptOSQPSolverProfile,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
 
-# TrajOptIfopt imports (OSQP-based SQP solver)
-try:
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        TrajOptIfoptDefaultPlanProfile,
-        TrajOptIfoptDefaultCompositeProfile,
-        TrajOptIfoptOSQPSolverProfile,
-        TrajOptIfoptMotionPlanner,
-        ProfileDictionary_addTrajOptIfoptPlanProfile,
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
-    )
-
-    TRAJOPT_IFOPT_AVAILABLE = True
-except ImportError:
-    TRAJOPT_IFOPT_AVAILABLE = False
-
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
@@ -77,10 +68,6 @@ TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
 
 def main():
-    if not TRAJOPT_IFOPT_AVAILABLE:
-        print("TrajOptIfopt not available, skipping example")
-        return
-
     # Initialize the resource locator and environment
     locator = GeneralResourceLocator()
     urdf_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
@@ -128,17 +115,13 @@ def main():
     # Create program
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(start_instruction)
-    )
+    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
 
     # === OMPL Planning ===
     print("Running OMPL planner...")
     ompl_profiles = ProfileDictionary()
-    ompl_profiles.addProfile(
-        OMPL_DEFAULT_NAMESPACE, "DEFAULT", OMPLRealVectorPlanProfile()
-    )
+    ompl_profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", OMPLRealVectorPlanProfile())
 
     ompl_request = PlannerRequest()
     ompl_request.instructions = program
@@ -151,9 +134,7 @@ def main():
     print(f"OMPL found path with {ompl_response.results.size()} instructions")
 
     # Interpolate OMPL results
-    interpolated = generateInterpolatedProgram(
-        ompl_response.results, t_env, 3.14, 1.0, 3.14, 10
-    )
+    interpolated = generateInterpolatedProgram(ompl_response.results, t_env, 3.14, 1.0, 3.14, 10)
 
     # === TrajOptIfopt Optimization ===
     print("Running TrajOptIfopt optimizer...")
@@ -184,9 +165,7 @@ def main():
 
     trajopt_planner = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE)
     trajopt_response = trajopt_planner.solve(trajopt_request)
-    assert trajopt_response.successful, (
-        f"TrajOptIfopt failed: {trajopt_response.message}"
-    )
+    assert trajopt_response.successful, f"TrajOptIfopt failed: {trajopt_response.message}"
     print("TrajOptIfopt optimization complete")
 
     trajopt_results_instruction = trajopt_response.results
@@ -220,9 +199,7 @@ def main():
         pos = wp.getPosition().flatten()
         time = wp.getTime()
         if i < 3 or i >= len(trajopt_results) - 2:
-            print(
-                f"  [{i:2d}] t={time:.3f}s  joints={np.array2string(pos, precision=3)}"
-            )
+            print(f"  [{i:2d}] t={time:.3f}s  joints={np.array2string(pos, precision=3)}")
         elif i == 3:
             print("  ...")
 

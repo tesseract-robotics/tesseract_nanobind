@@ -61,13 +61,23 @@ RELATED EXAMPLES
 """
 
 import sys
+
 import numpy as np
 
-from tesseract_robotics.planning import Robot, MotionProgram, StateTarget, TaskComposer
+from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
 from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_common import AllowedCollisionMatrix, Isometry3d
+from tesseract_robotics.tesseract_environment import (
+    AddLinkCommand,
+    ModifyAllowedCollisionsCommand,
+    ModifyAllowedCollisionsType,
+    MoveLinkCommand,
+)
+from tesseract_robotics.tesseract_geometry import createMeshFromResource
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
@@ -76,31 +86,18 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_common import Isometry3d, AllowedCollisionMatrix
-from tesseract_robotics.tesseract_environment import (
-    AddLinkCommand,
-    MoveLinkCommand,
-    ModifyAllowedCollisionsCommand,
-    ModifyAllowedCollisionsType,
-)
 from tesseract_robotics.tesseract_scene_graph import (
-    Link,
+    Collision,
     Joint,
     JointType,
+    Link,
     Visual,
-    Collision,
 )
-from tesseract_robotics.tesseract_geometry import createMeshFromResource
-from tesseract_robotics.tesseract_collision import makeConvexMesh
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 # Predefined joint positions from C++ getPredefinedPosition()
 # All values in radians except carriage_rail (meters)
@@ -192,9 +189,7 @@ def create_car_seat_profiles():
     solver.opt_params.min_trust_box_size = 1e-3
 
     for name in ["DEFAULT", "FREESPACE"]:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_NS, name, composite
-        )
+        ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, name, composite)
         ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
         ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
 
@@ -236,9 +231,7 @@ def add_seats(robot):
 
         # Collision meshes (10 convex hulls)
         for m in range(1, 11):
-            collision_url = (
-                f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
-            )
+            collision_url = f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
             collision_resource = locator.locateResource(collision_url)
             for mesh in createMeshFromResource(collision_resource):
                 collision = Collision()
@@ -267,9 +260,7 @@ def add_seats(robot):
         seat_name = f"seat_{i + 1}"
         acm.addAllowedCollision(seat_name, "end_effector", "Adjacent")
 
-    robot.env.applyCommand(
-        ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD)
-    )
+    robot.env.applyCommand(ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD))
     print("Added 3 seats to environment")
 
 
@@ -309,9 +300,7 @@ def attach_seat(robot, seat_name="seat_1"):
     for link in ["cell_logo", "fence", "link_b", "link_r", "link_t"]:
         acm.addAllowedCollision(seat_name, link, "Never")
 
-    robot.env.applyCommand(
-        ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD)
-    )
+    robot.env.applyCommand(ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD))
     print(f"Attached {seat_name} to end effector")
 
 

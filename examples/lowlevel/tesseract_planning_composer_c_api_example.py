@@ -96,22 +96,20 @@ Related Examples
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
+    MotionProgram,
     Pose,
+    Robot,
     TaskComposer,
 )
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def main():
@@ -139,9 +137,7 @@ def main():
     # and adds to CompositeInstruction with proper ManipulatorInfo.
     program = (
         MotionProgram("manipulator", tcp_frame="tool0")
-        .set_joint_names(
-            joint_names
-        )  # WHY: Required for JointTarget, optional for CartesianTarget
+        .set_joint_names(joint_names)  # WHY: Required for JointTarget, optional for CartesianTarget
         .move_to(
             CartesianTarget(wp1)
         )  # WHY move_to: Sets FREESPACE motion type (collision avoidance)
@@ -188,9 +184,7 @@ def main():
         viewer = TesseractViewer()
         # WHY robot.env: Access underlying Environment for viewer
         viewer.update_environment(robot.env, [0, 0, 0])
-        viewer.update_joint_positions(
-            joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1])
-        )
+        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
         viewer.start_serve_background()
         # WHY raw_results: Viewer animates the CompositeInstruction directly
         viewer.update_trajectory(result.raw_results)

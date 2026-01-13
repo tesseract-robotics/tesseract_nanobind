@@ -42,19 +42,15 @@ import time
 
 import numpy as np
 
-from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_common import Isometry3d
-
 # Low-level SQP imports
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
+from tesseract_robotics.planning import Robot
+from tesseract_robotics.tesseract_common import Isometry3d
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def build_optimization_problem(
@@ -98,9 +94,7 @@ def build_optimization_problem(
 
     # Add start position constraint (first waypoint = current position)
     home_coeffs = np.ones(len(joint_names)) * 5.0
-    home_constraint = ti.JointPosConstraint(
-        start_pos, [vars_list[0]], home_coeffs, "Home_Position"
-    )
+    home_constraint = ti.JointPosConstraint(start_pos, [vars_list[0]], home_coeffs, "Home_Position")
     problem.addConstraintSet(home_constraint)
 
     # Add target pose constraint (last waypoint = target in Cartesian space)
@@ -119,9 +113,7 @@ def build_optimization_problem(
 
     # Add velocity cost (smooth motion)
     vel_target = np.zeros(len(joint_names))
-    vel_constraint = ti.JointVelConstraint(
-        vel_target, vars_list, np.ones(1), "JointVelocity"
-    )
+    vel_constraint = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "JointVelocity")
     problem.addCostSet(vel_constraint, tsqp.CostPenaltyType.SQUARED)
 
     # Add collision constraints
@@ -338,9 +330,7 @@ def main():
         initial_pos = initial_tf.translation()
 
         # Final trajectory (after replanning)
-        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(
-            steps, n_joints
-        )
+        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
         final_tf = manip.calcFwdKin(traj_final[-1])["tool0"]
         final_pos = final_tf.translation()
 
@@ -348,17 +338,13 @@ def main():
         print(
             f"Initial TCP: {initial_pos} (error: {np.linalg.norm(initial_pos - target_pos):.3f}m)"
         )
-        print(
-            f"Final TCP:   {final_pos} (error: {np.linalg.norm(final_pos - target_pos):.3f}m)"
-        )
+        print(f"Final TCP:   {final_pos} (error: {np.linalg.norm(final_pos - target_pos):.3f}m)")
 
     if TesseractViewer is not None and results.get("trajectories"):
         print("\n=== Starting Viewer ===")
         print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
         print("Human: red cylinder at FINAL position (static in viewer)")
-        print(
-            "Note: Human moved during optimization but trajectory only animates robot"
-        )
+        print("Note: Human moved during optimization but trajectory only animates robot")
         print("URL: http://localhost:8000")
 
         # Modify visuals for better viewing
@@ -381,9 +367,7 @@ def main():
         # Convert trajectory to viewer format: [joint_vals..., timestamp]
         n_joints = len(results["joint_names"])
         steps = 12  # C++ default
-        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(
-            steps, n_joints
-        )
+        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
         dt = 0.1  # 100ms between waypoints
         trajectory_list = []
         for i, wp in enumerate(traj_final):

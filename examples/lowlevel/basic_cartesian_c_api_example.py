@@ -29,25 +29,23 @@ Related Examples:
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
-    StateTarget,
+    MotionProgram,
     Pose,
+    Robot,
+    StateTarget,
+    TaskComposer,
     box,
     create_obstacle,
-    TaskComposer,
 )
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run():
@@ -81,9 +79,7 @@ def run():
     # This points the tool down toward the work surface
     # Note: Python uses (x,y,z,w) format; C++ Eigen uses (w,x,y,z)
     wp1_pose = Pose.from_xyz_quat(0.5, -0.2, 0.62, 0, 0, 1.0, 0)  # First waypoint
-    wp2_pose = Pose.from_xyz_quat(
-        0.5, 0.3, 0.62, 0, 0, 1.0, 0
-    )  # Second waypoint (Y+0.5m)
+    wp2_pose = Pose.from_xyz_quat(0.5, 0.3, 0.62, 0, 0, 1.0, 0)  # Second waypoint (Y+0.5m)
 
     # Build 4-phase motion program using fluent API:
     # Phase 1: Start from known joint state (defines initial configuration)
@@ -94,9 +90,7 @@ def run():
         MotionProgram("manipulator", tcp_frame="tool0", profile="cartesian_program")
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_pos, names=joint_names, profile="freespace_profile"))
-        .move_to(
-            CartesianTarget(wp1_pose, profile="freespace_profile")
-        )  # FREESPACE to pose
+        .move_to(CartesianTarget(wp1_pose, profile="freespace_profile"))  # FREESPACE to pose
         .linear_to(CartesianTarget(wp2_pose, profile="RASTER"))  # LINEAR between poses
         .move_to(StateTarget(joint_pos, names=joint_names, profile="freespace_profile"))
     )

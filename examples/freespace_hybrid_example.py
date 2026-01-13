@@ -28,16 +28,17 @@ Related Examples:
 
 import sys
 import time
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
     MotionProgram,
+    Pose,
+    Robot,
     StateTarget,
     TaskComposer,
-    sphere,
     create_obstacle,
-    Pose,
+    sphere,
 )
 from tesseract_robotics.planning.profiles import (
     create_ompl_default_profiles,
@@ -45,10 +46,7 @@ from tesseract_robotics.planning.profiles import (
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
@@ -112,9 +110,7 @@ def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
     start_time = time.time()
 
     try:
-        result = composer.plan(
-            robot, program, pipeline=actual_pipeline, profiles=profiles
-        )
+        result = composer.plan(robot, program, pipeline=actual_pipeline, profiles=profiles)
         planning_time_actual = time.time() - start_time
 
         if result.successful:

@@ -58,40 +58,37 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics.planning import Robot, Pose
+from tesseract_robotics.planning import Pose, Robot
+from tesseract_robotics.tesseract_common import (
+    VectorVector3d,
+)
 from tesseract_robotics.tesseract_geometry import (
     Box,
-    Sphere,
-    Cylinder,
     Capsule,
     Cone,
-    Plane,
-    Mesh,
     ConvexMesh,
-    SDFMesh,
-    createMeshFromPath,
-    createConvexMeshFromPath,
+    Cylinder,
     GeometryType,
+    Mesh,
+    Plane,
+    SDFMesh,
+    Sphere,
+    createConvexMeshFromPath,
+    createMeshFromPath,
 )
 from tesseract_robotics.tesseract_scene_graph import (
+    Collision,
     Joint,
     JointType,
     Link,
-    Visual,
-    Collision,
     Material,
-)
-from tesseract_robotics.tesseract_common import (
-    VectorVector3d,
+    Visual,
 )
 
 # Viewer (skip import during testing)
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def create_geometry_link(
@@ -340,9 +337,7 @@ def run(**kwargs):
     # Here: 0x + 0y + 1z + 0 = 0, i.e., the z=0 floor plane
     # Used for ground/wall collision - everything below/behind plane collides
     plane = Plane(0, 0, 1, 0)
-    print(
-        f"Plane: {plane.getA()}x + {plane.getB()}y + {plane.getC()}z + {plane.getD()} = 0"
-    )
+    print(f"Plane: {plane.getA()}x + {plane.getB()}y + {plane.getC()}z + {plane.getD()} = 0")
     assert plane.getType() == GeometryType.PLANE
     # Note: Plane is collision-only geometry - cannot be visualized as a shape
     # It represents the half-space where ax + by + cz + d <= 0
@@ -394,9 +389,7 @@ def run(**kwargs):
     # Positive distance = outside, negative = inside, smooth transition at surface
     vertices, faces = create_tetrahedron_vertices_faces()
     sdf_mesh = SDFMesh(vertices, faces)
-    print(
-        f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces"
-    )
+    print(f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces")
     assert sdf_mesh.getType() == GeometryType.SDF_MESH
     # Note: SDFMesh not supported by Bullet collision checker, so skip collision
     link, joint = create_geometry_link(

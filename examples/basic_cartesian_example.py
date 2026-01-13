@@ -48,17 +48,18 @@ Related Examples:
 """
 
 import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
-    StateTarget,
+    MotionProgram,
     Pose,
+    Robot,
+    StateTarget,
+    TaskComposer,
     box,
     create_obstacle,
-    TaskComposer,
 )
 from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
@@ -67,10 +68,7 @@ from tesseract_robotics.planning.profiles import (
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    try:
-        from tesseract_robotics_viewer import TesseractViewer
-    except ImportError:
-        pass
+    from tesseract_robotics_viewer import TesseractViewer
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None):
@@ -109,9 +107,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Quaternion (x=0, y=0, z=1.0, w=0) = 180 deg around Z = tool pointing down
     # C++ uses Eigen::Quaterniond(w, x, y, z) = (0, 0, 1.0, 0)
     wp1 = Pose.from_xyz_quat(0.5, -0.2, 0.62, 0, 0, 1.0, 0)  # First Cartesian waypoint
-    wp2 = Pose.from_xyz_quat(
-        0.5, 0.3, 0.62, 0, 0, 1.0, 0
-    )  # Second waypoint (+0.5m in Y)
+    wp2 = Pose.from_xyz_quat(0.5, 0.3, 0.62, 0, 0, 1.0, 0)  # Second waypoint (+0.5m in Y)
 
     # Build 4-phase motion program:
     # 1. StateTarget: Start from known joint configuration
