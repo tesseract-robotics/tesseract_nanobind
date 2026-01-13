@@ -134,6 +134,7 @@ nav:
     - Collision Detection: user-guide/collision.md
     - Motion Planning: user-guide/planning.md
     - Task Composer: user-guide/task-composer.md
+    - Serialization: user-guide/serialization.md
     - Low-Level SQP API: user-guide/low-level-sqp.md
   - Examples:
     - examples/index.md
@@ -151,6 +152,7 @@ nav:
       - tesseract_robotics.tesseract_environment: api/tesseract_environment.md
       - tesseract_robotics.tesseract_collision: api/tesseract_collision.md
       - tesseract_robotics.tesseract_kinematics: api/tesseract_kinematics.md
+      - tesseract_robotics.tesseract_serialization: api/tesseract_serialization.md
     - Planning Modules:
       - tesseract_robotics.tesseract_command_language: api/tesseract_command_language.md
       - tesseract_robotics.tesseract_motion_planners: api/tesseract_motion_planners.md
