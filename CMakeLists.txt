@@ -181,6 +181,16 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_common
 )
 
+# Add tesseract_serialization module (XML/binary serialization for root types)
+add_tesseract_nanobind_extension(
+  tesseract_serialization
+  src/tesseract_serialization/tesseract_serialization_bindings.cpp
+  tesseract::tesseract_command_language
+  tesseract::tesseract_environment
+  tesseract::tesseract_scene_graph
+  tesseract::tesseract_common
+)
+
 # Find motion planners
 find_package(tesseract_motion_planners REQUIRED COMPONENTS core simple ompl)
 
