@@ -140,7 +140,8 @@ WORKCELLS = {
         "urdf": "urdf/workcell_rail.urdf",
         "srdf": "config/workcell_rail.srdf",
         "joints": {
-            "robot_rail_joint": (-1.5, 1.5),  # Linear rail (prismatic)
+            "rail_joint_1": (0.0, 8.0),  # Linear rail (prismatic, 10m range)
+            "positioner_joint_1": (-math.pi, math.pi),  # Has positioner too
             "robot_joint_1": (-math.pi / 2, math.pi / 2),
             "robot_joint_2": (-math.pi / 4, math.pi / 4),
             "robot_joint_3": (-math.pi / 4, math.pi / 4),
