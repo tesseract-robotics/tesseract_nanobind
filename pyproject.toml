@@ -15,6 +15,8 @@ dependencies = [
     "loguru>=0.7.0",
     "pyyaml>=6.0",
     "scipy>=1.7.0",  # Required for Eigen sparse matrix conversion in nanobind
+    "opencv-contrib-python",  # Required for tesseract_robotics_viewer
+    "aiohttp",  # Required for tesseract_robotics_viewer
 ]
 
 authors = [
@@ -65,7 +67,7 @@ markers = [
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
 wheel.py-api = "cp312"
-wheel.packages = ["src/tesseract_robotics"]
+wheel.packages = ["src/tesseract_robotics", "src/tesseract_robotics_viewer"]
 cmake.version = ">=3.15"
 cmake.build-type = "Release"
 

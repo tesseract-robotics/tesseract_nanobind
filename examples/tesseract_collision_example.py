@@ -58,15 +58,16 @@ Related Examples
 """
 
 import numpy as np
-from tesseract_robotics.planning import Robot, Pose, sphere, create_fixed_joint
-from tesseract_robotics.tesseract_scene_graph import Link, Visual, Collision
+
+from tesseract_robotics.planning import Pose, Robot, create_fixed_joint, sphere
 from tesseract_robotics.tesseract_collision import (
-    ContactResultMap,
-    ContactTestType_ALL,
     ContactRequest,
+    ContactResultMap,
     ContactResultVector,
+    ContactTestType_ALL,
 )
 from tesseract_robotics.tesseract_common import CollisionMarginData
+from tesseract_robotics.tesseract_scene_graph import Collision, Link, Visual
 
 
 def main():
@@ -141,9 +142,7 @@ def main():
 
         # Debug: show current poses of relevant links
         print(f"Link 6 Pose:\n{scene_state.link_transforms['link_6'].matrix()}")
-        print(
-            f"Sphere Link Pose:\n{scene_state.link_transforms['sphere_link'].matrix()}"
-        )
+        print(f"Sphere Link Pose:\n{scene_state.link_transforms['sphere_link'].matrix()}")
 
         # Execute collision query
         # ContactTestType_ALL finds all collision pairs (vs FIRST for early-out)

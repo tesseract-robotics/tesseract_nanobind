@@ -1,21 +1,22 @@
+import asyncio
+import hashlib
+import json
 import mimetypes
 import traceback
-import numpy as np
-import json
-from tesseract_robotics import tesseract_environment
-import hashlib
-
-from .tesseract_env_to_gltf import tesseract_env_to_gltf, tesseract_env_to_glb
-from .util import (
-    tesseract_trajectory_to_list,
-    trajectory_list_to_json,
-    trajectory_list_to_frames,
-)
-import importlib_resources
-import asyncio
 
 import aiohttp
+import importlib_resources
+import numpy as np
 from aiohttp import web as aiohttp_web
+
+from tesseract_robotics import tesseract_environment
+
+from .tesseract_env_to_gltf import tesseract_env_to_glb, tesseract_env_to_gltf
+from .util import (
+    tesseract_trajectory_to_list,
+    trajectory_list_to_frames,
+    trajectory_list_to_json,
+)
 
 if not mimetypes.inited:
     mimetypes.init()
@@ -23,9 +24,7 @@ if not mimetypes.inited:
 
 class _TesseractViewerAIOServer:
     def __init__(self):
-        self._static_pkg = importlib_resources.files(
-            "tesseract_robotics_viewer.resources.static"
-        )
+        self._static_pkg = importlib_resources.files("tesseract_robotics_viewer.resources.static")
         self.scene_gltf = None
         self.scene_glb = None
         self.trajectory_json = None
@@ -61,32 +60,16 @@ class _TesseractViewerAIOServer:
                 [aiohttp_web.get("/tesseract_scene.glb", self.tesseract_scene_glb)]
             )
             self._app.add_routes(
-                [
-                    aiohttp_web.get(
-                        "/tesseract_trajectory.json", self.tesseract_trajectory_json
-                    )
-                ]
+                [aiohttp_web.get("/tesseract_trajectory.json", self.tesseract_trajectory_json)]
             )
             self._app.add_routes(
-                [
-                    aiohttp_web.get(
-                        "/tesseract_markers.json", self.tesseract_markers_json
-                    )
-                ]
+                [aiohttp_web.get("/tesseract_markers.json", self.tesseract_markers_json)]
             )
             self._app.add_routes(
-                [
-                    aiohttp_web.head(
-                        "/tesseract_scene.gltf", self.tesseract_scene_gltf_head
-                    )
-                ]
+                [aiohttp_web.head("/tesseract_scene.gltf", self.tesseract_scene_gltf_head)]
             )
             self._app.add_routes(
-                [
-                    aiohttp_web.head(
-                        "/tesseract_scene.glb", self.tesseract_scene_glb_head
-                    )
-                ]
+                [aiohttp_web.head("/tesseract_scene.glb", self.tesseract_scene_glb_head)]
             )
             self._app.add_routes(
                 [
@@ -97,21 +80,13 @@ class _TesseractViewerAIOServer:
                 ]
             )
             self._app.add_routes(
-                [
-                    aiohttp_web.head(
-                        "/tesseract_markers.json", self.tesseract_markers_json_head
-                    )
-                ]
+                [aiohttp_web.head("/tesseract_markers.json", self.tesseract_markers_json_head)]
             )
-            self._app.add_routes(
-                [aiohttp_web.get("/websocket", self.websocket_handler)]
-            )
+            self._app.add_routes([aiohttp_web.get("/websocket", self.websocket_handler)])
 
             self._runner = aiohttp_web.AppRunner(self._app)
             await self._runner.setup()
-            self._site = aiohttp_web.TCPSite(
-                self._runner, host, port, ssl_context=ssl_context
-            )
+            self._site = aiohttp_web.TCPSite(self._runner, host, port, ssl_context=ssl_context)
             await self._site.start()
 
         except:
@@ -126,9 +101,7 @@ class _TesseractViewerAIOServer:
 
     async def tesseract_scene_gltf(self, request):
         if self.scene_gltf is not None:
-            r = aiohttp_web.Response(
-                body=self.scene_gltf, content_type="model/gltf+json"
-            )
+            r = aiohttp_web.Response(body=self.scene_gltf, content_type="model/gltf+json")
         else:
             r = aiohttp_web.Response(body=b"{}", content_type="model/gltf+json")
         r.etag = self.scene_gltf_etag
@@ -141,9 +114,7 @@ class _TesseractViewerAIOServer:
 
     async def tesseract_scene_glb(self, request):
         if self.scene_glb is not None:
-            r = aiohttp_web.Response(
-                body=self.scene_glb, content_type="application/octet-stream"
-            )
+            r = aiohttp_web.Response(body=self.scene_glb, content_type="application/octet-stream")
         else:
             r = aiohttp_web.Response(body=b"", content_type="application/octet-stream")
         r.etag = self.scene_glb_etag
@@ -156,9 +127,7 @@ class _TesseractViewerAIOServer:
 
     async def tesseract_trajectory_json(self, request):
         if self.trajectory_json is not None:
-            r = aiohttp_web.Response(
-                body=self.trajectory_json, content_type="application/json"
-            )
+            r = aiohttp_web.Response(body=self.trajectory_json, content_type="application/json")
             r.etag = self.trajectory_json_etag
             return r
         return aiohttp_web.Response(status=404)
@@ -172,9 +141,7 @@ class _TesseractViewerAIOServer:
 
     async def tesseract_markers_json(self, request):
         if self.markers_json is not None:
-            r = aiohttp_web.Response(
-                body=self.markers_json, content_type="application/json"
-            )
+            r = aiohttp_web.Response(body=self.markers_json, content_type="application/json")
             r.etag = self.markers_json_etag
             return r
         return aiohttp_web.Response(status=404)
@@ -220,9 +187,7 @@ class _TesseractViewerAIOServer:
         with importlib_resources.as_file(self._static_pkg / filename) as f_path:
             with open(f_path, "rb") as f:
                 contents = f.read()
-        return aiohttp_web.Response(
-            body=contents, content_type=mimetypes.guess_type(filename)[0]
-        )
+        return aiohttp_web.Response(body=contents, content_type=mimetypes.guess_type(filename)[0])
 
     async def set_environment(self, scene_gltf, scene_glb):
         self.scene_gltf = scene_gltf
@@ -242,9 +207,7 @@ class _TesseractViewerAIOServer:
         self.trajectory_json = trajectory_json
         self.trajectory_json_etag = self.hash_bytes(self.trajectory_json)
         await self.send_ws_message(
-            json.dumps(
-                {"command": "joint_trajectory", "params": json.loads(trajectory_json)}
-            )
+            json.dumps({"command": "joint_trajectory", "params": json.loads(trajectory_json)})
         )
 
     async def set_markers_json(self, markers_json, update_now=True):
@@ -371,9 +334,7 @@ class TesseractViewerAIO:
         self.markers = []
         self.t_env = None
 
-    async def update_environment(
-        self, tesseract_env, origin_offset=[0, 0, 0], trajectory=None
-    ):
+    async def update_environment(self, tesseract_env, origin_offset=[0, 0, 0], trajectory=None):
         """
         Update the environment from a tesseract_environment.Environment object. This must be called to load the
         environment, and after the environment changes.
@@ -441,9 +402,7 @@ class TesseractViewerAIO:
         """
         async with self._lock:
             self.server_task = asyncio.create_task(
-                self.server.start(
-                    self.server_address[0], self.server_address[1], self.ssl_context
-                )
+                self.server.start(self.server_address[0], self.server_address[1], self.ssl_context)
             )
 
     async def close(self):
@@ -455,9 +414,7 @@ class TesseractViewerAIO:
                 await self.server.close()
                 await self.server_task
 
-    def _new_marker_dict(
-        self, marker_type, parent_link, position, quaternion, name, color, tags
-    ):
+    def _new_marker_dict(self, marker_type, parent_link, position, quaternion, name, color, tags):
         if name is None:
             name = f"axes_marker_{self.marker_count}"
         self.marker_count += 1

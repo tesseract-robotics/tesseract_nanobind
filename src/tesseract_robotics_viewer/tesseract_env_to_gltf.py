@@ -15,29 +15,27 @@
 # Author: John Wason (wason@wasontech.com)
 # Date: 3/25/2022
 
-import json
-import struct
-import cv2
-import numpy as np
-from tesseract_robotics import tesseract_geometry
-from tesseract_robotics.tesseract_common import Quaterniond, AngleAxisd
-import pkgutil
 import base64
 import io
+import json
+import pkgutil
+import struct
+
+import cv2
+import numpy as np
+
+from tesseract_robotics import tesseract_geometry
+from tesseract_robotics.tesseract_common import AngleAxisd, Quaterniond
 
 from .util import tesseract_trajectory_to_list
 
 
 def tesseract_env_to_gltf(t_env, origin_offset=[0, 0, 0], name=None, trajectory=None):
-    gltf_dict, gltf_buf_io = tesseract_env_to_gltf_dict_and_buf(
-        t_env, origin_offset, name
-    )
+    gltf_dict, gltf_buf_io = tesseract_env_to_gltf_dict_and_buf(t_env, origin_offset, name)
     if trajectory is not None:
         _append_trajectory_animation(gltf_dict, gltf_buf_io, trajectory)
     buf_bytes = gltf_buf_io.getvalue()
-    buf_uri = "data:application/octet-stream;base64," + base64.b64encode(
-        buf_bytes
-    ).decode("ascii")
+    buf_uri = "data:application/octet-stream;base64," + base64.b64encode(buf_bytes).decode("ascii")
     gltf_dict["buffers"] = [{"byteLength": len(buf_bytes), "uri": buf_uri}]
     return json.dumps(gltf_dict, indent=4)
 
@@ -48,9 +46,7 @@ _GLB_MAGIC = 0x46546C67
 
 
 def tesseract_env_to_glb(t_env, origin_offset=[0, 0, 0], name=None):
-    gltf_dict, gltf_buf_io = tesseract_env_to_gltf_dict_and_buf(
-        t_env, origin_offset, name
-    )
+    gltf_dict, gltf_buf_io = tesseract_env_to_gltf_dict_and_buf(t_env, origin_offset, name)
     while gltf_buf_io.tell() % 4 != 0:
         gltf_buf_io.write(b"\0")
     buf_bytes = gltf_buf_io.getvalue()
@@ -159,9 +155,7 @@ def _append_link_recursive(
     link = link_map[link_name]
 
     link_extras = {"tesseract_link": {"name": link_name}}
-    link_node, link_ind = _append_node(
-        gltf_dict, name="link_" + link_name, extras=link_extras
-    )
+    link_node, link_ind = _append_node(gltf_dict, name="link_" + link_name, extras=link_extras)
 
     child_inds = []
     visual_i = 0
@@ -213,9 +207,7 @@ def _convert_mesh(gltf_dict, gltf_buf_io, visual_node, visual_name, mesh):
     for i in range(len(vertices)):
         positions[i, :] = vertices[i].flatten()
 
-    indices = (
-        mesh.getFaces().flatten().astype(np.uint32).reshape((-1, 4))[:, 1:4].flatten()
-    )
+    indices = mesh.getFaces().flatten().astype(np.uint32).reshape((-1, 4))[:, 1:4].flatten()
 
     _, positions_ind = _append_accessor(gltf_dict, gltf_buf_io, positions)
     _, indices_ind = _append_accessor(gltf_dict, gltf_buf_io, indices)
@@ -232,9 +224,7 @@ def _convert_mesh(gltf_dict, gltf_buf_io, visual_node, visual_name, mesh):
         gltf_dict,
         "meshes",
         {
-            "primitives": [
-                {"attributes": {"POSITION": positions_ind}, "indices": indices_ind}
-            ],
+            "primitives": [{"attributes": {"POSITION": positions_ind}, "indices": indices_ind}],
             "name": visual_name + "_mesh",
         },
     )
@@ -246,9 +236,7 @@ def _convert_mesh(gltf_dict, gltf_buf_io, visual_node, visual_name, mesh):
 
     # Check if mesh has a resource with URL (meshes from createMeshFromPath may not)
     mesh_resource = mesh.getResource()
-    is_stl = mesh_resource is not None and mesh_resource.getUrl().lower().endswith(
-        ".stl"
-    )
+    is_stl = mesh_resource is not None and mesh_resource.getUrl().lower().endswith(".stl")
     if not is_stl:
         mesh_material = mesh.getMaterial()
         if mesh_material is not None:
@@ -276,22 +264,16 @@ def _convert_mesh(gltf_dict, gltf_buf_io, visual_node, visual_name, mesh):
                     tex_mimetype = "image/png"
 
                 mesh_tex_image_bytes = bytearray(mesh_tex_image.getResourceContents())
-                tex_img = cv2.imdecode(
-                    np.frombuffer(mesh_tex_image_bytes, dtype=np.uint8), flags=1
-                )
+                tex_img = cv2.imdecode(np.frombuffer(mesh_tex_image_bytes, dtype=np.uint8), flags=1)
                 img_h, img_w, _ = tex_img.shape
-                _, image_bufview_ind = _append_bufview(
-                    gltf_dict, gltf_buf_io, mesh_tex_image_bytes
-                )
+                _, image_bufview_ind = _append_bufview(gltf_dict, gltf_buf_io, mesh_tex_image_bytes)
                 _, image_ind = _append_dict_list(
                     gltf_dict,
                     "images",
                     {"mimeType": tex_mimetype, "bufferView": image_bufview_ind},
                 )
 
-                _, tex_ind = _append_dict_list(
-                    gltf_dict, "textures", {"source": image_ind}
-                )
+                _, tex_ind = _append_dict_list(gltf_dict, "textures", {"source": image_ind})
 
                 tf_material["pbrMetallicRoughness"]["baseColorTexture"] = {
                     "index": tex_ind,
@@ -310,9 +292,7 @@ def _convert_mesh(gltf_dict, gltf_buf_io, visual_node, visual_name, mesh):
     return mesh_dict, mesh_ind, tf_material
 
 
-def _apply_material(
-    gltf_dict, gltf_buf_io, mesh_dict, visual_name, tf_material, visual_material
-):
+def _apply_material(gltf_dict, gltf_buf_io, mesh_dict, visual_name, tf_material, visual_material):
     if tf_material is None:
         tf_material = {
             "name": "material_" + visual_name,
@@ -338,9 +318,7 @@ def _apply_material(
     mesh_dict["primitives"][0]["material"] = material_ind
 
 
-def _append_link_visual(
-    gltf_dict, gltf_buf_io, link_name, visual, visual_i, shapes_mesh_inds
-):
+def _append_link_visual(gltf_dict, gltf_buf_io, link_name, visual, visual_i, shapes_mesh_inds):
     visual_geom = visual.geometry
 
     visual_u_name = visual.name + str(visual_i)
@@ -353,9 +331,7 @@ def _append_link_visual(
         visual_inds = []
         for m in meshes:
             visual_name1 = visual_name + "_mesh_" + str(mesh_count)
-            visual_node1, visual_ind1 = _append_node(
-                gltf_dict, visual.origin, visual_name1
-            )
+            visual_node1, visual_ind1 = _append_node(gltf_dict, visual.origin, visual_name1)
             mesh_dict1, mesh_ind1, tf_material1 = _convert_mesh(
                 gltf_dict, gltf_buf_io, visual_node1, visual_name1, m
             )
@@ -414,9 +390,7 @@ def _append_link_visual(
             0.5 * cylinder.getLength(),
         ]
 
-    _apply_material(
-        gltf_dict, gltf_buf_io, mesh_dict, visual_name, tf_material, visual.material
-    )
+    _apply_material(gltf_dict, gltf_buf_io, mesh_dict, visual_name, tf_material, visual.material)
 
     visual_node["mesh"] = mesh_ind
 
@@ -624,14 +598,10 @@ def _append_shapes_mesh_accessors(gltf_dict, gltf_buf_io, name):
     }
 
 
-def _append_shape_mesh(
-    gltf_dict, gltf_buf_io, shape_name, visual_name, shapes_mesh_inds
-):
+def _append_shape_mesh(gltf_dict, gltf_buf_io, shape_name, visual_name, shapes_mesh_inds):
     accessors_inds = shapes_mesh_inds.get(shape_name, None)
     if accessors_inds is None:
-        accessors_inds = _append_shapes_mesh_accessors(
-            gltf_dict, gltf_buf_io, shape_name
-        )
+        accessors_inds = _append_shapes_mesh_accessors(gltf_dict, gltf_buf_io, shape_name)
         shapes_mesh_inds[shape_name] = accessors_inds
 
     mesh_dict, mesh_ind = _append_dict_list(

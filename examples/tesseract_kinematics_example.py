@@ -53,7 +53,8 @@ Related Examples
 """
 
 import numpy as np
-from tesseract_robotics.planning import Robot, Pose
+
+from tesseract_robotics.planning import Pose, Robot
 
 
 def main():

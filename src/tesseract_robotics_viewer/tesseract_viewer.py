@@ -15,31 +15,40 @@
 # Author: John Wason (wason@wasontech.com)
 # Date: 12/10/2019
 
-from __future__ import absolute_import
 
+import asyncio
+import os
 import threading
 import time
-from tesseract_robotics_viewer.tesseract_env_to_gltf import tesseract_env_to_gltf, tesseract_env_to_glb
-import importlib_resources
 import traceback
-import os
-import numpy as np
-from tesseract_robotics import tesseract_environment
-from .util import tesseract_trajectory_to_list, joint_positions_to_trajectory_json, trajectory_list_to_json
-from . import tesseract_viewer_aio
-import asyncio
 
-class TesseractViewer():
+import importlib_resources
+
+from tesseract_robotics import tesseract_environment
+from tesseract_robotics_viewer.tesseract_env_to_gltf import (
+    tesseract_env_to_glb,
+    tesseract_env_to_gltf,
+)
+
+from . import tesseract_viewer_aio
+from .util import (
+    joint_positions_to_trajectory_json,
+    tesseract_trajectory_to_list,
+    trajectory_list_to_json,
+)
+
+
+class TesseractViewer:
     """
     A class for viewing Tesseract Environments and Trajectories in a web browser
-    
+
     TesseractViewer uses ThreeJS to render the environment and trajectories in a web browser. It uses a websocket
     to communicate with the browser. The scene is converted to glTF format and sent to the browser. Trajectories
     are converted to JSON format and sent to the browser. The browser then renders the scene and trajectories.
 
     By default the server will listen on port 8000 on the local machine. Use http://localhost:8000 to view the
-    scene in a web browser. 
-    
+    scene in a web browser.
+
     The server can be started in the background using the start_serve_background() method.
 
     This class provides a synchronous interface. The TessractViewerAIO class provides an asynchronous interface, and
@@ -50,8 +59,8 @@ class TesseractViewer():
     :param ssl_context: The SSL context to use for the server. Default is None.
     :type ssl_context: ssl.SSLContext, optional
     """
-    def __init__(self, server_address = ('127.0.0.1',8000), ssl_context = None):
-        
+
+    def __init__(self, server_address=("127.0.0.1", 8000), ssl_context=None):
         self.server_address = server_address
         self.aio_viewer = tesseract_viewer_aio.TesseractViewerAIO(self.server_address, ssl_context)
 
@@ -71,7 +80,7 @@ class TesseractViewer():
     async def _a_close(self):
         if self.aio_viewer is not None:
             await self.aio_viewer.close()
-    
+
     def start_serve_background(self):
         """
         Start the web server in the background. This method returns immediately.
@@ -85,7 +94,7 @@ class TesseractViewer():
         try:
             res = asyncio.run_coroutine_threadsafe(self._a_close(), self.loop)
             res.result()
-        except:
+        except Exception:
             traceback.print_exc()
 
         if self.loop is not None:
@@ -100,12 +109,11 @@ class TesseractViewer():
         self._loop_ready_evt.set()
         self.loop.run_forever()
 
-
     async def _a_update_environment(self, scene_gltf, scene_glb, t_env):
         if self.aio_viewer is not None:
             await self.aio_viewer._update_environment_gltf(scene_gltf, scene_glb, t_env)
 
-    def update_environment(self, tesseract_env, origin_offset = [0,0,0], trajectory = None):
+    def update_environment(self, tesseract_env, origin_offset=[0, 0, 0], trajectory=None):
         """
         Update the environment from a tesseract_environment.Environment object. This must be called to load the
         environment, and after the environment changes.
@@ -120,9 +128,14 @@ class TesseractViewer():
 
         assert isinstance(tesseract_env, tesseract_environment.Environment)
         with self._lock:
-            self.scene_json = tesseract_env_to_gltf(tesseract_env, origin_offset, trajectory=trajectory)
+            self.scene_json = tesseract_env_to_gltf(
+                tesseract_env, origin_offset, trajectory=trajectory
+            )
             self.scene_glb = tesseract_env_to_glb(tesseract_env, origin_offset)
-            asyncio.run_coroutine_threadsafe(self._a_update_environment(self.scene_json, self.scene_glb, tesseract_env), self.loop).result()
+            asyncio.run_coroutine_threadsafe(
+                self._a_update_environment(self.scene_json, self.scene_glb, tesseract_env),
+                self.loop,
+            ).result()
 
     async def _a_set_trajectory(self, trajectory_json):
         if self.aio_viewer is not None:
@@ -138,8 +151,9 @@ class TesseractViewer():
         :type joint_positions: Union[List[float], np.ndarray]
         """
         self.trajectory_json = joint_positions_to_trajectory_json(joint_names, joint_positions)
-        asyncio.run_coroutine_threadsafe(self._a_set_trajectory(self.trajectory_json), self.loop).result()
-        
+        asyncio.run_coroutine_threadsafe(
+            self._a_set_trajectory(self.trajectory_json), self.loop
+        ).result()
 
     def update_trajectory(self, tesseract_trajectory):
         """
@@ -148,11 +162,13 @@ class TesseractViewer():
         :param tesseract_trajectory: The trajectory to display
         :type tesseract_trajectory: tesseract_robotics.tesseract_command_language.CompositeInstruction
         """
-        
+
         joint_names, traj = tesseract_trajectory_to_list(tesseract_trajectory)
 
         self.trajectory_json = trajectory_list_to_json(joint_names, traj)
-        asyncio.run_coroutine_threadsafe(self._a_set_trajectory(self.trajectory_json), self.loop).result()
+        asyncio.run_coroutine_threadsafe(
+            self._a_set_trajectory(self.trajectory_json), self.loop
+        ).result()
 
     def update_trajectory_list(self, joint_names, trajectory):
         """
@@ -167,8 +183,10 @@ class TesseractViewer():
         """
 
         self.trajectory_json = trajectory_list_to_json(joint_names, trajectory)
-        asyncio.run_coroutine_threadsafe(self._a_set_trajectory(self.trajectory_json), self.loop).result()
-        
+        asyncio.run_coroutine_threadsafe(
+            self._a_set_trajectory(self.trajectory_json), self.loop
+        ).result()
+
     def serve_forever(self):
         """
         Serve the web page forever. This method blocks until the server is closed.
@@ -183,7 +201,16 @@ class TesseractViewer():
         finally:
             self.close()
 
-    def add_axes_marker(self, position, quaternion, size=0.15, parent_link = "world", name = None, tags=None, update_now=True):
+    def add_axes_marker(
+        self,
+        position,
+        quaternion,
+        size=0.15,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add an axes marker to the scene. This is useful for visualizing coordinate frames and waypoints.
 
@@ -205,13 +232,30 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_axes_marker(position, quaternion, size, parent_link,name, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_axes_marker(
+                    position, quaternion, size, parent_link, name, tags, update_now
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-    
-    def add_arrow_marker(self, direction, origin, length, color = None, parent_link = "world", name = None, tags=None, update_now=True, position=None, quaternion=None):
+
+    def add_arrow_marker(
+        self,
+        direction,
+        origin,
+        length,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+        position=None,
+        quaternion=None,
+    ):
         """
-        Add an arrow marker to the scene. 
+        Add an arrow marker to the scene.
 
         :param direction: The direction of the arrow as a unit vector
         :type direction: Union[List[float], np.ndarray]
@@ -237,11 +281,35 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_arrow_marker(direction, origin, length, color, parent_link, name, tags, update_now, position, quaternion), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_arrow_marker(
+                    direction,
+                    origin,
+                    length,
+                    color,
+                    parent_link,
+                    name,
+                    tags,
+                    update_now,
+                    position,
+                    quaternion,
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-        
-    def add_box_marker(self, position, quaternion, size, color = None, parent_link = "world", name = None, tags=None, update_now=True):
+
+    def add_box_marker(
+        self,
+        position,
+        quaternion,
+        size,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a box marker to the scene.
 
@@ -265,11 +333,25 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_box_marker(position, quaternion, size, color, parent_link, name, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_box_marker(
+                    position, quaternion, size, color, parent_link, name, tags, update_now
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-        
-    def add_sphere_marker(self, position, radius, color = None, parent_link = "world", name = None, tags=None, update_now=True):
+
+    def add_sphere_marker(
+        self,
+        position,
+        radius,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a sphere marker to the scene.
 
@@ -291,11 +373,27 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_sphere_marker(position, radius, color, parent_link, name, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_sphere_marker(
+                    position, radius, color, parent_link, name, tags, update_now
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-        
-    def add_cylinder_marker(self, position, quaternion, length, radius, color = None, parent_link = "world", name = None, tags=None, update_now=True):
+
+    def add_cylinder_marker(
+        self,
+        position,
+        quaternion,
+        length,
+        radius,
+        color=None,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a cylinder marker to the scene.
 
@@ -321,12 +419,28 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_cylinder_marker(position, quaternion, length, radius, color, parent_link, name, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_cylinder_marker(
+                    position, quaternion, length, radius, color, parent_link, name, tags, update_now
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-    
+
     # capsule marker
-    def add_capsule_marker(self, position, quaternion, length, radius, color, parent_link = "world", name = None, tags=None, update_now=True):
+    def add_capsule_marker(
+        self,
+        position,
+        quaternion,
+        length,
+        radius,
+        color,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add a capsule marker to the scene.
 
@@ -352,12 +466,26 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_capsule_marker(position, quaternion, length, radius, color, parent_link, name, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_capsule_marker(
+                    position, quaternion, length, radius, color, parent_link, name, tags, update_now
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-        
+
     # lines marker
-    def add_lines_marker(self, vertices, color = None, linewidth = 1.0, parent_link = "world", name = None, tags=None, update_now=True):
+    def add_lines_marker(
+        self,
+        vertices,
+        color=None,
+        linewidth=1.0,
+        parent_link="world",
+        name=None,
+        tags=None,
+        update_now=True,
+    ):
         """
         Add line segments marker to the scene.
 
@@ -379,19 +507,26 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.add_lines_marker(vertices, color, linewidth, parent_link, name, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.add_lines_marker(
+                    vertices, color, linewidth, parent_link, name, tags, update_now
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-        
+
     def clear_all_markers(self):
         """
         Clear all markers from the scene.
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.clear_all_markers(), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.clear_all_markers(), self.loop
+            ).result()
         else:
             return None
-        
+
     def clear_markers_by_tags(self, tags, update_now=True):
         """
         Clear all markers with the given tags from the scene.
@@ -402,10 +537,12 @@ class TesseractViewer():
         :type update_now: bool, optional
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.clear_markers_by_tags(tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.clear_markers_by_tags(tags, update_now), self.loop
+            ).result()
         else:
             return None
-        
+
     def clear_markers_by_name(self, name, update_now=True):
         """
         Clear all markers with the given name from the scene.
@@ -416,22 +553,36 @@ class TesseractViewer():
         :type update_now: bool, optional
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.clear_markers_by_name(name, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.clear_markers_by_name(name, update_now), self.loop
+            ).result()
         else:
             return None
-        
+
     def send_update_markers(self):
         """
         Send an update to the scene to update all markers.
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.send_update_markers(), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.send_update_markers(), self.loop
+            ).result()
         else:
             return None
-        
-    def plot_trajectory(self, tesseract_trajectory, manipulator_info, color = None, linewidth = 0.001, axes = True, axes_length = 0.1, tags = None, update_now=True):
+
+    def plot_trajectory(
+        self,
+        tesseract_trajectory,
+        manipulator_info,
+        color=None,
+        linewidth=0.001,
+        axes=True,
+        axes_length=0.1,
+        tags=None,
+        update_now=True,
+    ):
         """
-        Plot a trajectory stored in a tesseract_robotics.tesseract_command_language.CompositeInstruction to the scene. 
+        Plot a trajectory stored in a tesseract_robotics.tesseract_command_language.CompositeInstruction to the scene.
         This will draw the trajectory
         as a series of line segments and display axes at each trajectory waypoint.
 
@@ -455,11 +606,34 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.plot_trajectory(tesseract_trajectory, manipulator_info, color, linewidth, axes, axes_length, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.plot_trajectory(
+                    tesseract_trajectory,
+                    manipulator_info,
+                    color,
+                    linewidth,
+                    axes,
+                    axes_length,
+                    tags,
+                    update_now,
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-        
-    def plot_trajectory_list(self, joint_names, trajectory, manipulator_info, color = None, linewidth = 0.001, axes = True, axes_length = 0.1, tags = None, update_now = True):
+
+    def plot_trajectory_list(
+        self,
+        joint_names,
+        trajectory,
+        manipulator_info,
+        color=None,
+        linewidth=0.001,
+        axes=True,
+        axes_length=0.1,
+        tags=None,
+        update_now=True,
+    ):
         """
         Plot a trajectory stored as a list of joint positions to the scene. This will draw the trajectory
         as a series of line segments and display axes at each trajectory waypoint.
@@ -486,10 +660,22 @@ class TesseractViewer():
         :rtype: str
         """
         if self.aio_viewer is not None:
-            return asyncio.run_coroutine_threadsafe(self.aio_viewer.plot_trajectory_list(joint_names, trajectory, manipulator_info, color, linewidth, axes, axes_length, tags, update_now), self.loop).result()
+            return asyncio.run_coroutine_threadsafe(
+                self.aio_viewer.plot_trajectory_list(
+                    joint_names,
+                    trajectory,
+                    manipulator_info,
+                    color,
+                    linewidth,
+                    axes,
+                    axes_length,
+                    tags,
+                    update_now,
+                ),
+                self.loop,
+            ).result()
         else:
             return None
-
 
     def save(self, directory, overwrite=False):
         """
@@ -501,23 +687,26 @@ class TesseractViewer():
         :param overwrite: Whether to overwrite existing files, defaults to False
         :type overwrite: bool, optional
         """
-        assert os.path.isdir(directory), "Invalid target directory %s" % directory
+        assert os.path.isdir(directory), f"Invalid target directory {directory}"
         assert self.scene_json is not None, "Tesseract environment not set"
 
-        static_pkg = importlib_resources.files('tesseract_robotics_viewer.resources.static')
+        static_pkg = importlib_resources.files("tesseract_robotics_viewer.resources.static")
         index_html = (static_pkg / "index.html").read_bytes()
         tesseract_viewer_js = (static_pkg / "tesseract_viewer.js").read_bytes()
 
-        files = {"index.html": index_html, "tesseract_viewer.js": tesseract_viewer_js,
-            "tesseract_scene.babylon": self.scene_json.encode()}
+        files = {
+            "index.html": index_html,
+            "tesseract_viewer.js": tesseract_viewer_js,
+            "tesseract_scene.babylon": self.scene_json.encode(),
+        }
         if self.trajectory_json is not None:
             files["tesseract_trajectory.json"] = self.trajectory_json.encode()
         if not overwrite:
             for k in files:
                 assert not os.path.exists(k), "File already exists"
 
-        for k,v in files.items():
-            with open(os.path.join(directory,k), "wb") as f:
+        for k, v in files.items():
+            with open(os.path.join(directory, k), "wb") as f:
                 f.write(v)
 
     def save_scene_gltf(self, fname, overwrite=False):
@@ -531,11 +720,11 @@ class TesseractViewer():
         """
         assert self.scene_json is not None, "Tesseract environment not set"
         s = self.scene_json
-        if isinstance(s,str):
+        if isinstance(s, str):
             s = s.encode()
-        
-        fmode = 'wb' if overwrite else 'xb'
-        with open(fname,fmode) as f:
+
+        fmode = "wb" if overwrite else "xb"
+        with open(fname, fmode) as f:
             f.write(s)
 
     def save_scene_glb(self, fname, overwrite=False):
@@ -549,7 +738,7 @@ class TesseractViewer():
         """
         assert self.scene_json is not None, "Tesseract environment not set"
         s = self.scene_glb
-                
-        fmode = 'wb' if overwrite else 'xb'
-        with open(fname,fmode) as f:
+
+        fmode = "wb" if overwrite else "xb"
+        with open(fname, fmode) as f:
             f.write(s)

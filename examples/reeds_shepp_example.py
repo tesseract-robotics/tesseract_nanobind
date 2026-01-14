@@ -171,9 +171,7 @@ def run(pipeline=None, num_planners=None):
 
     print(f"Reeds-Shepp: {rs_dist:.3f} m (can reverse)")
     print(f"Dubins:      {dubins_dist:.3f} m (must loop around)")
-    print(
-        f"Savings:     {dubins_dist - rs_dist:.3f} m ({100 * (1 - rs_dist / dubins_dist):.1f}%)"
-    )
+    print(f"Savings:     {dubins_dist - rs_dist:.3f} m ({100 * (1 - rs_dist / dubins_dist):.1f}%)")
 
     # Case: forward travel (similar)
     print("\n--- Case: Forward Travel ---")

@@ -1,11 +1,12 @@
 """Simple shapes viewer example using tesseract_robotics with nanobind bindings."""
 
-import sys
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
 import os
 import re
+import sys
 import traceback
+
+from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
+from tesseract_robotics.tesseract_environment import Environment
 
 # Viewer (skip import in pytest)
 TesseractViewer = None

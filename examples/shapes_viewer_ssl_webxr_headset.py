@@ -20,12 +20,13 @@ To generate a self-signed certificate, run the following command (openssl must b
 When viewed on a VR headset web browser, click the "Enter VR" button to enter VR mode.
 """
 
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
 import os
 import re
 import ssl
 import traceback
+
+from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
+from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics_viewer import TesseractViewer
 
 shapes_urdf = """
@@ -128,7 +129,7 @@ t_env.init(shapes_urdf, locator)
 
 # Create SSL context for HTTPS
 ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
+ssl_context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
 
 # Bind to all interfaces (0.0.0.0) for VR headset access
 viewer = TesseractViewer(("0.0.0.0", 8000), ssl_context)

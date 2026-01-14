@@ -9,33 +9,32 @@ This example demonstrates:
 - Trajectory visualization
 """
 
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
-    Isometry3d,
-    Translation3d,
-    Quaterniond,
-    ManipulatorInfo,
-    GeneralResourceLocator,
-)
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    MoveInstructionType_FREESPACE,
-    MoveInstruction,
-    CompositeInstruction,
-    ProfileDictionary,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CompositeInstruction,
+    MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType_FREESPACE,
+    ProfileDictionary,
 )
-
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    Isometry3d,
+    ManipulatorInfo,
+    Quaterniond,
+    Translation3d,
+)
+from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import (
-    generateInterpolatedProgram,
-)
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
     ProfileDictionary_addOMPLProfile,
+)
+from tesseract_robotics.tesseract_motion_planners_simple import (
+    generateInterpolatedProgram,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
@@ -45,19 +44,20 @@ from tesseract_robotics.tesseract_time_parameterization import (
 # TrajOpt imports - optional, skip if not available
 try:
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        TrajOptDefaultPlanProfile,
-        TrajOptDefaultCompositeProfile,
-        TrajOptMotionPlanner,
-        ProfileDictionary_addTrajOptPlanProfile,
         ProfileDictionary_addTrajOptCompositeProfile,
+        ProfileDictionary_addTrajOptPlanProfile,
+        TrajOptDefaultCompositeProfile,
+        TrajOptDefaultPlanProfile,
+        TrajOptMotionPlanner,
     )
 
     TRAJOPT_AVAILABLE = True
 except ImportError:
     TRAJOPT_AVAILABLE = False
 
-import numpy as np
 import sys
+
+import numpy as np
 
 # Viewer (skip import in pytest)
 TesseractViewer = None
@@ -97,9 +97,7 @@ def main():
 
     joint_names = [f"joint_{i + 1}" for i in range(6)]
     if viewer:
-        viewer.update_joint_positions(
-            joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1])
-        )
+        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
         viewer.start_serve_background()
 
     t_env.setState(joint_names, np.ones(6) * 0.1)
@@ -127,17 +125,13 @@ def main():
     )
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(start_instruction)
-    )
+    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
 
     # OMPL planning
     plan_profile = OMPLRealVectorPlanProfile()
     profiles = ProfileDictionary()
-    ProfileDictionary_addOMPLProfile(
-        profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile
-    )
+    ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
 
     request = PlannerRequest()
     request.instructions = program
@@ -208,9 +202,7 @@ def main():
         time_profiles = ProfileDictionary()
         time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
 
-        if time_parameterization.compute(
-            final_results_instruction, t_env, time_profiles
-        ):
+        if time_parameterization.compute(final_results_instruction, t_env, time_profiles):
             print("Time parameterization successful!")
         else:
             print("Time parameterization failed")
