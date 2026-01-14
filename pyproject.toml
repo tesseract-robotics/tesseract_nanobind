@@ -17,6 +17,7 @@ dependencies = [
     "scipy>=1.7.0",  # Required for Eigen sparse matrix conversion in nanobind
     "opencv-contrib-python",  # Required for tesseract_robotics_viewer
     "aiohttp",  # Required for tesseract_robotics_viewer
+    "importlib-resources",  # Required for tesseract_robotics_viewer
 ]
 
 authors = [
