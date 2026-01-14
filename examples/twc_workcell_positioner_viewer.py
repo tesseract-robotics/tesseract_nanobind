@@ -1,12 +1,16 @@
-"""TWC Workcell Positioner viewer example.
+"""TWC Workcell viewer example.
 
-Loads the workcell_positioner URDF from tesseract_ros_workcell and visualizes it.
-This workcell includes:
-- ABB IRB4600-60/205 robot (6-DOF) on pedestal
-- ABB IRBPA250 D1000 rotary positioner (2-DOF)
-- ATI tool changers, PushCorp EOAT, safety fence
+Loads workcell URDFs from tesseract_ros_workcell and visualizes them.
+
+Available workcells:
+- positioner: ABB IRB4600 + IRBPA250 rotary positioner (2-DOF)
+- rail: ABB IRB4600 on linear rail (1-DOF prismatic)
+
+Usage:
+    python twc_workcell_positioner_viewer.py [positioner|rail]
 """
 
+import argparse
 import math
 import os
 import re
@@ -86,37 +90,71 @@ class TwcResourceLocator(ResourceLocator):
     def load_urdf(self, urdf_path: Path) -> str:
         """Load and patch URDF for Tesseract 0.33+ compatibility.
 
-        Adds tesseract:make_convex attribute if missing.
+        Patches applied:
+        - Adds tesseract:make_convex attribute if missing
+        - Removes empty <visual>/<collision> elements (invalid URDF)
         """
         content = urdf_path.read_text()
 
-        # Already patched
-        if "tesseract:make_convex" in content:
-            return content
+        # Add tesseract namespace and make_convex attribute
+        if "tesseract:make_convex" not in content:
+            content = re.sub(
+                r'(<robot\s+name="[^"]*")',
+                r'\1 xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true"',
+                content,
+                count=1,
+            )
 
-        # Add tesseract namespace and make_convex attribute to robot element
-        return re.sub(
-            r'(<robot\s+name="[^"]*")',
-            r'\1 xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true"',
+        # Remove empty visual/collision elements (upstream bug in some URDFs)
+        # Matches: <visual>...<geometry>\s*</geometry>...</visual>
+        content = re.sub(
+            r"<visual>\s*<origin[^/]*/>\s*<geometry>\s*</geometry>\s*</visual>",
+            "",
             content,
-            count=1,
+        )
+        content = re.sub(
+            r"<collision>\s*<origin[^/]*/>\s*<geometry>\s*</geometry>\s*</collision>",
+            "",
+            content,
         )
 
+        return content
 
-def animate_joints(viewer, duration: float = 30.0, fps: float = 30.0):
-    """Animate robot and positioner joints with sinusoidal motion."""
-    # Define joints to animate with conservative limits (subset for smooth demo)
-    # Positioner: ±2π rad, Robot: varies by joint
-    animated_joints = {
-        "positioner_joint_1": (-math.pi, math.pi),
-        "positioner_joint_2": (-math.pi / 2, math.pi / 2),
-        "robot_joint_1": (-math.pi / 2, math.pi / 2),
-        "robot_joint_2": (-math.pi / 4, math.pi / 4),
-        "robot_joint_3": (-math.pi / 4, math.pi / 4),
-        "robot_joint_4": (-math.pi / 2, math.pi / 2),
-        "robot_joint_5": (-math.pi / 4, math.pi / 4),
-        "robot_joint_6": (-math.pi, math.pi),
-    }
+
+WORKCELLS = {
+    "positioner": {
+        "urdf": "urdf/workcell_positioner.urdf",
+        "srdf": "config/workcell_positioner.srdf",
+        "joints": {
+            "positioner_joint_1": (-math.pi, math.pi),
+            "positioner_joint_2": (-math.pi / 2, math.pi / 2),
+            "robot_joint_1": (-math.pi / 2, math.pi / 2),
+            "robot_joint_2": (-math.pi / 4, math.pi / 4),
+            "robot_joint_3": (-math.pi / 4, math.pi / 4),
+            "robot_joint_4": (-math.pi / 2, math.pi / 2),
+            "robot_joint_5": (-math.pi / 4, math.pi / 4),
+            "robot_joint_6": (-math.pi, math.pi),
+        },
+    },
+    "rail": {
+        "urdf": "urdf/workcell_rail.urdf",
+        "srdf": "config/workcell_rail.srdf",
+        "joints": {
+            "robot_rail_joint": (-1.5, 1.5),  # Linear rail (prismatic)
+            "robot_joint_1": (-math.pi / 2, math.pi / 2),
+            "robot_joint_2": (-math.pi / 4, math.pi / 4),
+            "robot_joint_3": (-math.pi / 4, math.pi / 4),
+            "robot_joint_4": (-math.pi / 2, math.pi / 2),
+            "robot_joint_5": (-math.pi / 4, math.pi / 4),
+            "robot_joint_6": (-math.pi, math.pi),
+        },
+    },
+}
+
+
+def animate_joints(viewer, workcell: str, duration: float = 30.0, fps: float = 30.0):
+    """Animate robot joints with sinusoidal motion."""
+    animated_joints = WORKCELLS[workcell]["joints"]
 
     # Animation loop
     dt = 1.0 / fps
@@ -146,12 +184,25 @@ def animate_joints(viewer, duration: float = 30.0, fps: float = 30.0):
 
 
 def main():
-    headless = "pytest" in sys.modules
+    parser = argparse.ArgumentParser(description="TWC Workcell Viewer")
+    parser.add_argument(
+        "workcell",
+        nargs="?",
+        default="rail",
+        choices=list(WORKCELLS.keys()),
+        help="Workcell to load (default: rail)",
+    )
+    args = parser.parse_args()
 
-    urdf_path = TWC_SUPPORT_PATH / "urdf/workcell_positioner.urdf"
-    srdf_path = TWC_SUPPORT_PATH / "config/workcell_positioner.srdf"
+    headless = "pytest" in sys.modules
+    workcell = args.workcell
+    config = WORKCELLS[workcell]
+
+    urdf_path = TWC_SUPPORT_PATH / config["urdf"]
+    srdf_path = TWC_SUPPORT_PATH / config["srdf"]
 
     print(f"Using twc_support from: {TWC_SUPPORT_PATH}")
+    print(f"Workcell: {workcell}")
     print(f"Loading URDF: {urdf_path}")
     print(f"Loading SRDF: {srdf_path}")
 
@@ -185,7 +236,7 @@ def main():
         viewer.start_serve_background()
 
         # Animate joints
-        animate_joints(viewer, duration=60.0)
+        animate_joints(viewer, workcell, duration=60.0)
 
         print("\nAnimation complete. Press Enter to exit...")
         input()
