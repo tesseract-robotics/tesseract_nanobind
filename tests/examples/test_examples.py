@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 ROOT_DIR = Path(__file__).parent.parent.parent
-VIEWER_EXAMPLES = ROOT_DIR / "tesseract_viewer_python" / "examples"
 EXAMPLES = ROOT_DIR / "examples"
+VIEWER_EXAMPLES = EXAMPLES  # Viewer examples now in main examples dir
 LOWLEVEL_EXAMPLES = EXAMPLES / "lowlevel"
 
 

@@ -17,9 +17,17 @@ repos:
 
   - repo: local
     hooks:
+      - id: typecheck
+        name: typecheck
+        entry: pixi run typecheck
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
       - id: pytest
-        name: pytest
-        entry: pixi run pytest tests --ignore=tests/benchmarks -x -q -n auto
+        name: pytest (testmon)
+        entry: pixi run pytest tests --ignore=tests/benchmarks -x -q --testmon
         language: system
         pass_filenames: false
         always_run: true

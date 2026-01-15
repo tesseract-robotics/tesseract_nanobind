@@ -132,7 +132,7 @@ class TaskComposerExecutor:
 
     def getTaskCount(self) -> int: ...
 
-class TaskflowTaskComposerExecutor:
+class TaskflowTaskComposerExecutor(TaskComposerExecutor):
     @overload
     def __init__(self, name: str = 'TaskflowExecutor', num_threads: int = 10) -> None: ...
 

@@ -174,9 +174,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
 
     // ========== TaskflowTaskComposerExecutor ==========
-    // Non-copyable (deleted copy/move). Don't specify inheritance (cross-module issue).
-    // The public run() is inherited from TaskComposerExecutor base class.
-    nb::class_<tp::TaskflowTaskComposerExecutor>(m, "TaskflowTaskComposerExecutor")
+    nb::class_<tp::TaskflowTaskComposerExecutor, tp::TaskComposerExecutor>(m, "TaskflowTaskComposerExecutor")
         .def(nb::init<std::string, size_t>(), "name"_a = "TaskflowExecutor",
              "num_threads"_a = std::thread::hardware_concurrency())
         .def(nb::init<size_t>(), "num_threads"_a)

@@ -1,5 +1,9 @@
 [build-system]
-requires = ["scikit-build-core >=0.10", "nanobind >=1.3.2", "setuptools-scm >=8"]
+requires = [
+    "scikit-build-core >=0.10",
+    "nanobind >=1.3.2",
+    "setuptools-scm >=8",
+]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -14,10 +18,10 @@ dependencies = [
     "numpy>=1.21.0",
     "loguru>=0.7.0",
     "pyyaml>=6.0",
-    "scipy>=1.7.0",  # Required for Eigen sparse matrix conversion in nanobind
-    "opencv-contrib-python",  # Required for tesseract_robotics_viewer
-    "aiohttp",  # Required for tesseract_robotics_viewer
-    "importlib-resources",  # Required for tesseract_robotics_viewer
+    "scipy>=1.7.0",          # Required for Eigen sparse matrix conversion in nanobind
+    "opencv-contrib-python", # Required for tesseract_robotics_viewer
+    "aiohttp",               # Required for tesseract_robotics_viewer
+    "importlib-resources",   # Required for tesseract_robotics_viewer
 ]
 
 authors = [
@@ -41,7 +45,7 @@ classifiers = [
     # "Programming Language :: Python :: 3.14",
     "Programming Language :: C++",
     "Programming Language :: Python :: Implementation :: CPython",
-    "License :: OSI Approved :: Apache Software License"
+    "License :: OSI Approved :: Apache Software License",
 ]
 dynamic = ["version"]
 
@@ -76,7 +80,7 @@ cmake.build-type = "Release"
 provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.setuptools_scm]
-root = "."  # git root is same as package root now
+root = "." # git root is same as package root now
 
 [tool.scikit-build.cmake.define]
 CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
@@ -88,11 +92,11 @@ CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
 [tool.ruff]
 target-version = "py39"
 line-length = 100
-extend-exclude = ["*.pyi"]  # auto-generated stubs have C++ type strings
+extend-exclude = ["*.pyi"] # auto-generated stubs have C++ type strings
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]  # errors, pyflakes, isort, pyupgrade
-ignore = ["E501"]  # line too long (handled by formatter)
+select = ["E", "F", "I", "UP"] # errors, pyflakes, isort, pyupgrade
+ignore = ["E501"]              # line too long (handled by formatter)
 
 [tool.ruff.lint.per-file-ignores]
 # nanobind extension modules use star imports - ruff can't see into .so files
@@ -138,7 +142,7 @@ pcl = ">=1.12,<2"
 ipopt = ">=3.14,<4"
 gtest = ">=1.10,<2"
 qpoases = ">=3.2,<4"
-taskflow = ">=3.6,<3.8"  # 3.8+ requires C++20
+taskflow = ">=3.6,<3.8"     # 3.8+ requires C++20
 llvm-openmp = ">=14,<20"
 
 # Python build deps
@@ -160,17 +164,36 @@ pre-commit = ">=3.0"
 # Note: tesseract-robotics-nanobind NOT here - use `pixi run install` (chains build-cpp -> pip install)
 numpy = ">=1.21.0"
 loguru = ">=0.7.0"
-scipy = ">=1.7.0"  # Required for nanobind Eigen sparse matrix conversion
+scipy = ">=1.7.0"              # Required for nanobind Eigen sparse matrix conversion
 colcon-common-extensions = "*"
 vcstool = "*"
 
+# Docs
+mkdocs-material = ">=9.0"
+mkdocstrings = { version = ">=0.24", extras = ["python"] }
+mkdocs-exclude = ">=1.0"
+
+# Type checking
+pyright = ">=1.1"
+pytest-testmon = ">=2.0"  # PyPI version for pytest>=7 compat
+
 [tool.pixi.tasks]
-test = { cmd = "python -m pytest tests -x -q -n auto", depends-on = ["install"] }
+test = { cmd = "python -m pytest tests -x -q -n auto", depends-on = [
+    "install",
+] }
 lint = "ruff check ."
 fmt = "ruff format ."
+typecheck = { cmd = "pyright src/tesseract_robotics", description = "Type check with pyright" }
 build-cpp = { cmd = "zsh scripts/build_tesseract_cpp.sh", description = "Build tesseract C++ libs" }
-install = { cmd = "pip install -e . --no-build-isolation", depends-on = ["build-cpp"], description = "Install package (editable)" }
-build = { depends-on = ["install"], description = "Build C++ libs + install bindings" }
+install = { cmd = "pip install -e . --no-build-isolation", depends-on = [
+    "build-cpp",
+], description = "Install package (editable)" }
+build = { depends-on = [
+    "install",
+], description = "Build C++ libs + install bindings" }
+docs = { cmd = "mkdocs serve --dev-addr=localhost:8000 --open", description = "Live docs server with auto-reload" }
+docs-build = { cmd = "mkdocs build", description = "Build static docs to site/" }
+
 
 # Python version features for CI matrix builds
 [tool.pixi.feature.py39.dependencies]

@@ -152,7 +152,7 @@ echo ""
 
 colcon build \
     --merge-install \
-    --packages-ignore tesseract_examples tesseract_python vhacd qpoases tesseract_nanobind tesseract_viewer_python \
+    --packages-ignore tesseract_examples tesseract_python vhacd qpoases tesseract_nanobind tesseract_viewer_python twc_application twc_motion_planning twc_msgs twc_support \
     --event-handlers console_cohesion+ \
     --cmake-force-configure \
     --cmake-args \

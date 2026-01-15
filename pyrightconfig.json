@@ -1,0 +1,25 @@
+{
+  "pythonVersion": "3.9",
+  "typeCheckingMode": "basic",
+  "include": ["src/tesseract_robotics"],
+  "exclude": [
+    "**/build",
+    "**/.pixi",
+    "**/ws",
+    "**/*.pyi",
+    "**/tesseract_serialization"
+  ],
+
+  "reportMissingModuleSource": false,
+  "reportPrivateImportUsage": false,
+  "reportInvalidTypeForm": false,
+  "reportMissingImports": false,
+  "reportAttributeAccessIssue": false,
+  "reportReturnType": false,
+  "reportOptionalMemberAccess": false,
+  "reportAssignmentType": false,
+  "reportUnsupportedDunderAll": false,
+  "reportArgumentType": false,
+
+  "useLibraryCodeForTypes": true
+}

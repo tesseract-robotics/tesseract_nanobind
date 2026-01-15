@@ -68,7 +68,7 @@ class SE2State:
         """Set yaw angle."""
         ...
 
-class _State:
+class State:
     """Opaque OMPL state pointer (use getStateAs to access)."""
     ...
 
@@ -85,25 +85,25 @@ class SE2StateSpace:
         """Get current x,y bounds."""
         ...
 
-    def allocState(self) -> _State:
+    def allocState(self) -> State:
         """Allocate a new state (must call freeState when done)."""
         ...
 
-    def freeState(self, state: _State) -> None:
+    def freeState(self, state: State) -> None:
         """Free a previously allocated state."""
         ...
 
-    def distance(self, state1: _State, state2: _State) -> float:
+    def distance(self, state1: State, state2: State) -> float:
         """Compute distance between two states."""
         ...
 
     def interpolate(
-        self, from_state: _State, to_state: _State, t: float, state: _State
+        self, from_state: State, to_state: State, t: float, state: State
     ) -> None:
         """Interpolate: state = from + t*(to-from), t in [0,1]."""
         ...
 
-    def getStateAs(self, state: _State) -> SE2State:
+    def getStateAs(self, state: State) -> SE2State:
         """Cast state to SE2State for accessing x,y,yaw."""
         ...
 
@@ -147,7 +147,7 @@ class ReedsSheppStateSpace(SE2StateSpace):
         """Create with specified minimum turning radius."""
         ...
 
-    def reedsShepp(self, state1: _State, state2: _State) -> ReedsSheppPath:
+    def reedsShepp(self, state1: State, state2: State) -> ReedsSheppPath:
         """Compute optimal Reeds-Shepp path between two states."""
         ...
 
@@ -189,7 +189,7 @@ class DubinsStateSpace(SE2StateSpace):
         """
         ...
 
-    def dubins(self, state1: _State, state2: _State) -> DubinsPath:
+    def dubins(self, state1: State, state2: State) -> DubinsPath:
         """Compute optimal Dubins path between two states."""
         ...
 
