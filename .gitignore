@@ -38,3 +38,4 @@ src/tesseract_robotics/.cache/
 site/
 .pixi/
 pixi.lock
+.testmondata
