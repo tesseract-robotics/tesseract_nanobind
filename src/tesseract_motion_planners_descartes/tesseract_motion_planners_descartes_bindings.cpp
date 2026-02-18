@@ -38,6 +38,9 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     // Import tesseract_collision for CollisionCheckConfig
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
+    // Import MotionPlanner base type for clone() return type
+    nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
     // ========== DescartesSolverProfile<double> (base for solver profiles) ==========
     nb::class_<tp::DescartesSolverProfile<double>, tc::Profile>(m, "DescartesSolverProfileD")
         .def("getKey", &tp::DescartesSolverProfile<double>::getKey)
@@ -103,5 +106,6 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         // as long as we use a single OpenMP runtime (conda's llvm-openmp, not Homebrew's)
         .def("solve", &tp::DescartesMotionPlanner<double>::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("terminate", &tp::DescartesMotionPlanner<double>::terminate)
-        .def("clear", &tp::DescartesMotionPlanner<double>::clear);
+        .def("clear", &tp::DescartesMotionPlanner<double>::clear)
+        .def("clone", [](const tp::DescartesMotionPlanner<double>& self) { return self.clone(); });
 }

@@ -74,6 +74,8 @@ class MotionPlanner:
     @staticmethod
     def checkRequest(request: PlannerRequest) -> bool: ...
 
+    def clone(self) -> MotionPlanner: ...
+
 def assignCurrentStateAsSeed(composite_instructions: "tesseract_planning::CompositeInstruction", env: "tesseract_environment::Environment") -> None:
     """
     Assign the current environment state as seed to all CartesianWaypoints in the program

@@ -55,7 +55,8 @@ NB_MODULE(_tesseract_motion_planners, m) {
         .def("terminate", &tp::MotionPlanner::terminate)
         .def("clear", &tp::MotionPlanner::clear)
         .def_static("checkRequest", nb::overload_cast<const tp::PlannerRequest&>(&tp::MotionPlanner::checkRequest),
-                    "request"_a);
+                    "request"_a)
+        .def("clone", [](const tp::MotionPlanner& self) { return self.clone(); });
 
     // ========== Utility functions ==========
     m.def("assignCurrentStateAsSeed", &tp::assignCurrentStateAsSeed,

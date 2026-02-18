@@ -101,7 +101,8 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("getJointNames", &tk::ForwardKinematics::getJointNames)
         .def("getTipLinkNames", &tk::ForwardKinematics::getTipLinkNames)
         .def("numJoints", &tk::ForwardKinematics::numJoints)
-        .def("getSolverName", &tk::ForwardKinematics::getSolverName);
+        .def("getSolverName", &tk::ForwardKinematics::getSolverName)
+        .def("clone", [](const tk::ForwardKinematics& self) { return self.clone(); });
 
     // ========== InverseKinematics (abstract) ==========
     nb::class_<tk::InverseKinematics>(m, "InverseKinematics")
@@ -120,7 +121,8 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("getBaseLinkName", &tk::InverseKinematics::getBaseLinkName)
         .def("getWorkingFrame", &tk::InverseKinematics::getWorkingFrame)
         .def("getTipLinkNames", &tk::InverseKinematics::getTipLinkNames)
-        .def("getSolverName", &tk::InverseKinematics::getSolverName);
+        .def("getSolverName", &tk::InverseKinematics::getSolverName)
+        .def("clone", [](const tk::InverseKinematics& self) { return self.clone(); });
 
     // ========== JointGroup ==========
     nb::class_<tk::JointGroup>(m, "JointGroup")

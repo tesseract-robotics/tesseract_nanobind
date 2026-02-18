@@ -37,6 +37,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // Import Profile type from tesseract_command_language for cross-module inheritance
     auto cl_module = nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
 
+    // Import MotionPlanner base type for clone() return type
+    nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
     // ========== TrajOptIfoptCartesianWaypointConfig ==========
     nb::class_<tp::TrajOptIfoptCartesianWaypointConfig>(m, "TrajOptIfoptCartesianWaypointConfig")
         .def(nb::init<>())
@@ -143,5 +146,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def("getName", &tp::TrajOptIfoptMotionPlanner::getName)
         .def("solve", &tp::TrajOptIfoptMotionPlanner::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("terminate", &tp::TrajOptIfoptMotionPlanner::terminate)
-        .def("clear", &tp::TrajOptIfoptMotionPlanner::clear);
+        .def("clear", &tp::TrajOptIfoptMotionPlanner::clear)
+        .def("clone", [](const tp::TrajOptIfoptMotionPlanner& self) { return self.clone(); });
 }

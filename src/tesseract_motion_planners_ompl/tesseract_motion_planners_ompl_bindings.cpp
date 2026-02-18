@@ -39,6 +39,9 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
     // Import tesseract_collision for CollisionCheckConfig
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
+    // Import MotionPlanner base type for clone() return type
+    nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
     // ========== OMPLSolverConfig ==========
     nb::class_<tp::OMPLSolverConfig>(m, "OMPLSolverConfig")
         .def(nb::init<>())
@@ -153,5 +156,6 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         .def("getName", &tp::OMPLMotionPlanner::getName)
         .def("solve", &tp::OMPLMotionPlanner::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("terminate", &tp::OMPLMotionPlanner::terminate)
-        .def("clear", &tp::OMPLMotionPlanner::clear);
+        .def("clear", &tp::OMPLMotionPlanner::clear)
+        .def("clone", [](const tp::OMPLMotionPlanner& self) { return self.clone(); });
 }

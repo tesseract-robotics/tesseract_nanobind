@@ -241,7 +241,8 @@ NB_MODULE(_tesseract_collision, m) {
              }, "name"_a, "mask_id"_a, "shapes"_a, "shape_poses"_a, "enabled"_a = true)
         .def("getCollisionObjectGeometries", &tc::DiscreteContactManager::getCollisionObjectGeometries, "name"_a)
         .def("getCollisionObjectGeometriesTransforms", &tc::DiscreteContactManager::getCollisionObjectGeometriesTransforms, "name"_a)
-        .def("contactTest", &tc::DiscreteContactManager::contactTest, "collisions"_a, "request"_a);
+        .def("contactTest", &tc::DiscreteContactManager::contactTest, "collisions"_a, "request"_a)
+        .def("clone", [](const tc::DiscreteContactManager& self) { return self.clone(); });
 
     // ========== ContinuousContactManager (abstract, expose key methods) ==========
     nb::class_<tc::ContinuousContactManager>(m, "ContinuousContactManager")
@@ -274,7 +275,8 @@ NB_MODULE(_tesseract_collision, m) {
              "default_collision_margin"_a)
         .def("setPairCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
-        .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a);
+        .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a)
+        .def("clone", [](const tc::ContinuousContactManager& self) { return self.clone(); });
 
     // ========== ContactManagersPluginFactory ==========
     // Note: PluginLoader copy/move ctors aren't exported from library - cannot use nb::class_.

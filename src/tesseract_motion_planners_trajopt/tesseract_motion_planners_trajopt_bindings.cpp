@@ -50,6 +50,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
     // Import tesseract_collision for CollisionEvaluatorType (moved there in 0.33)
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
+    // Import MotionPlanner base type for clone() return type
+    nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
     // Note: CollisionEvaluatorType is in tesseract_collision module - import from there
 
     // ========== TrajOptCartesianWaypointConfig ==========
@@ -208,5 +211,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         .def("getName", &tp::TrajOptMotionPlanner::getName)
         .def("solve", &tp::TrajOptMotionPlanner::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("terminate", &tp::TrajOptMotionPlanner::terminate)
-        .def("clear", &tp::TrajOptMotionPlanner::clear);
+        .def("clear", &tp::TrajOptMotionPlanner::clear)
+        .def("clone", [](const tp::TrajOptMotionPlanner& self) { return self.clone(); });
 }

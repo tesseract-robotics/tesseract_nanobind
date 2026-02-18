@@ -24,6 +24,9 @@ namespace te = tesseract_environment;
 NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.doc() = "tesseract_motion_planners_simple Python bindings";
 
+    // Import MotionPlanner base type for clone() return type
+    nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
     // ========== SimpleMotionPlanner ==========
     // Note: Not binding inheritance from MotionPlanner to avoid cross-module issues
     nb::class_<tp::SimpleMotionPlanner>(m, "SimpleMotionPlanner")
@@ -31,7 +34,8 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def("getName", &tp::SimpleMotionPlanner::getName)
         .def("solve", &tp::SimpleMotionPlanner::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("terminate", &tp::SimpleMotionPlanner::terminate)
-        .def("clear", &tp::SimpleMotionPlanner::clear);
+        .def("clear", &tp::SimpleMotionPlanner::clear)
+        .def("clone", [](const tp::SimpleMotionPlanner& self) { return self.clone(); });
 
     // ========== generateInterpolatedProgram ==========
     m.def("generateInterpolatedProgram",

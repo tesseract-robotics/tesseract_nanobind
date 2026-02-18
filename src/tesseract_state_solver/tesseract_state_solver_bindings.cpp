@@ -117,7 +117,8 @@ NB_MODULE(_tesseract_state_solver, m) {
         .def("getLinkTransform", &tsg::StateSolver::getLinkTransform, "link_name"_a)
         .def("getRelativeLinkTransform", &tsg::StateSolver::getRelativeLinkTransform,
              "from_link_name"_a, "to_link_name"_a)
-        .def("getLimits", &tsg::StateSolver::getLimits);
+        .def("getLimits", &tsg::StateSolver::getLimits)
+        .def("clone", [](const tsg::StateSolver& self) { return self.clone(); });
 
     // ========== MutableStateSolver (abstract, inherits StateSolver) ==========
     nb::class_<tsg::MutableStateSolver, tsg::StateSolver>(m, "MutableStateSolver")

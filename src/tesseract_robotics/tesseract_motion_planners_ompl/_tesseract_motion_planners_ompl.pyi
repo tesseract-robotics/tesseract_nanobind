@@ -3,6 +3,7 @@ from typing import TypeAlias
 
 import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
+import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 
 
 class OMPLSolverConfig:
@@ -169,8 +170,10 @@ class OMPLMotionPlanner:
 
     def getName(self) -> str: ...
 
-    def solve(self, request: "tesseract_planning::PlannerRequest") -> "tesseract_planning::PlannerResponse": ...
+    def solve(self, request: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerRequest) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerResponse: ...
 
     def terminate(self) -> bool: ...
 
     def clear(self) -> None: ...
+
+    def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...
