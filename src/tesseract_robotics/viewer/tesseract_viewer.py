@@ -23,12 +23,12 @@ import time
 import traceback
 
 import importlib_resources
-
-from tesseract_robotics import tesseract_environment
 from tesseract_robotics_viewer.tesseract_env_to_gltf import (
     tesseract_env_to_glb,
     tesseract_env_to_gltf,
 )
+
+from tesseract_robotics import tesseract_environment
 
 from . import tesseract_viewer_aio
 from .util import (
