@@ -21,7 +21,6 @@ import json
 import pkgutil
 import struct
 
-import cv2
 import numpy as np
 
 from tesseract_robotics import tesseract_geometry
@@ -264,8 +263,6 @@ def _convert_mesh(gltf_dict, gltf_buf_io, visual_node, visual_name, mesh):
                     tex_mimetype = "image/png"
 
                 mesh_tex_image_bytes = bytearray(mesh_tex_image.getResourceContents())
-                tex_img = cv2.imdecode(np.frombuffer(mesh_tex_image_bytes, dtype=np.uint8), flags=1)
-                img_h, img_w, _ = tex_img.shape
                 _, image_bufview_ind = _append_bufview(gltf_dict, gltf_buf_io, mesh_tex_image_bytes)
                 _, image_ind = _append_dict_list(
                     gltf_dict,
