@@ -75,17 +75,17 @@ Related Examples
 import sys
 
 from tesseract_robotics.planning import (
-    Robot,
-    MotionProgram,
     CartesianTarget,
     JointTarget,
+    MotionProgram,
     Pose,
-    translation,
-    rotation_z,
+    Robot,
     box,
-    sphere,
     create_obstacle,
     plan_freespace,
+    rotation_z,
+    sphere,
+    translation,
 )
 
 
@@ -221,9 +221,7 @@ def main():
         # Start at current position (joints)
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         # Move to Cartesian target
-        .move_to(
-            CartesianTarget(Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.707, 0, 0.707, 0))
-        )
+        .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.707, 0, 0.707, 0)))
         # Another Cartesian target
         .move_to(
             CartesianTarget(

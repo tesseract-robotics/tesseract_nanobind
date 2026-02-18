@@ -93,7 +93,7 @@ TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 OFFSET = 0.005
 BOX_SIZE = 0.1

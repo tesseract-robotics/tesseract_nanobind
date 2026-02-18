@@ -40,7 +40,7 @@ from tesseract_robotics.tesseract_scene_graph import Joint, JointType
 # Viewer (skip in pytest)
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 def main():

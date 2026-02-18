@@ -47,7 +47,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 

@@ -77,7 +77,7 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 # Optional viewer (disabled during pytest)
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 # C++ constants from pick_and_place_example.cpp
 OFFSET = 0.005  # 5mm clearance above box surface

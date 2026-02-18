@@ -34,7 +34,7 @@ from tesseract_robotics.planning import Robot
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 def run(pipeline=None, num_planners=None):

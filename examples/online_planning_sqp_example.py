@@ -50,7 +50,7 @@ from tesseract_robotics.tesseract_common import Isometry3d
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 def build_optimization_problem(

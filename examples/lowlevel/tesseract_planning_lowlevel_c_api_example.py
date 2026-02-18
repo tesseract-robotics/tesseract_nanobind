@@ -59,7 +59,7 @@ from tesseract_robotics.tesseract_time_parameterization import (
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"

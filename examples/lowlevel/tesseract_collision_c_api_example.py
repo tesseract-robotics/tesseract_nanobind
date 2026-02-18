@@ -88,30 +88,31 @@ Related Examples
 - scene_graph_example.py: Direct scene graph manipulation
 """
 
+import numpy as np
+
+from tesseract_robotics.tesseract_collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactResultVector,
+    ContactTestType_ALL,
+)
 from tesseract_robotics.tesseract_common import (
+    CollisionMarginData,
     FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
-    CollisionMarginData,
 )
-from tesseract_robotics.tesseract_environment import Environment, AddLinkCommand
+from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
+from tesseract_robotics.tesseract_geometry import Sphere
 from tesseract_robotics.tesseract_scene_graph import (
+    Collision,
     Joint,
+    JointType_FIXED,
     Link,
     Visual,
-    Collision,
-    JointType_FIXED,
-)
-from tesseract_robotics.tesseract_geometry import Sphere
-from tesseract_robotics.tesseract_collision import (
-    ContactResultMap,
-    ContactTestType_ALL,
-    ContactRequest,
-    ContactResultVector,
 )
 from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
-import numpy as np
 
 # Initialize Environment with a robot from URDF file
 # The collision checker is configured using a yaml configuration file specified by the SRDF file. This configuration
@@ -240,9 +241,7 @@ def main():
 
         # Debug output: verify link poses are updating correctly
         print(f"Link 6 Pose: {scene_state.link_transforms['link_6'].matrix()}")
-        print(
-            f"Sphere Link Pose: {scene_state.link_transforms[sphere_link.getName()].matrix()}"
-        )
+        print(f"Sphere Link Pose: {scene_state.link_transforms[sphere_link.getName()].matrix()}")
 
         # Execute collision query
         # ContactTestType_ALL: find all collision pairs (vs FIRST for early-out)

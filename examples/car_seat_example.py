@@ -97,7 +97,7 @@ from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 # Predefined joint positions from C++ getPredefinedPosition()
 # All values in radians except carriage_rail (meters)

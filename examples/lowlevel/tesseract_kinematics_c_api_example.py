@@ -102,16 +102,17 @@ Related Examples
 - pick_and_place_example.py: FK/IK for grasp pose computation
 """
 
+import numpy as np
+
 from tesseract_robotics.tesseract_common import (
     FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
-    Translation3d,
     Quaterniond,
+    Translation3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
-import numpy as np
 
 # Initialize Environment with a robot from URDF file
 # The URDF and SRDF file must be configured. The kinematics solver also requires plugin configuration,
@@ -200,9 +201,7 @@ def main():
     # Compose transform: Identity * Translation * Rotation
     # Note: Quaterniond constructor order is (w, x, y, z) - Eigen convention
     tool0_transform2 = (
-        Isometry3d.Identity()
-        * Translation3d(0.7, -0.1, 1)
-        * Quaterniond(0.70711, 0, 0.7171, 0)
+        Isometry3d.Identity() * Translation3d(0.7, -0.1, 1) * Quaterniond(0.70711, 0, 0.7171, 0)
     )
 
     # KinGroupIKInput specifies a single IK request

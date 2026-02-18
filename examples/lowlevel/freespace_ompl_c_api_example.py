@@ -40,7 +40,7 @@ from tesseract_robotics.planning.profiles import create_freespace_pipeline_profi
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 def run():

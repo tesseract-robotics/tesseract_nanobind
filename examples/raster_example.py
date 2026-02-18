@@ -91,7 +91,7 @@ from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None):

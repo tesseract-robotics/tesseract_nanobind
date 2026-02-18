@@ -70,7 +70,7 @@ from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
 
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
