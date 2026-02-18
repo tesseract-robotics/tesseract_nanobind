@@ -742,9 +742,10 @@ class TesseractViewerAIO:
         self.markers_json = json.dumps({"markers": markers})
         await self.server.set_markers_json(self.markers_json, update_now)
 
-    async def _set_markers_json(self, markers_json):
+    async def _set_markers_json(self, markers_json, update_now=True):
         async with self._lock:
-            self._update_markers(markers_json)
+            self.markers_json = markers_json
+            await self.server.set_markers_json(markers_json, update_now)
 
     async def clear_all_markers(self):
         """
