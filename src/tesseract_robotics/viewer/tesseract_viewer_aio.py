@@ -24,7 +24,7 @@ if not mimetypes.inited:
 
 class _TesseractViewerAIOServer:
     def __init__(self):
-        self._static_pkg = importlib_resources.files("tesseract_robotics_viewer.resources.static")
+        self._static_pkg = importlib_resources.files("tesseract_robotics.viewer.resources.static")
         self.scene_gltf = None
         self.scene_glb = None
         self.trajectory_json = None

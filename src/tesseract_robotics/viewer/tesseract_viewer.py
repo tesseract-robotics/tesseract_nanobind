@@ -23,7 +23,7 @@ import time
 import traceback
 
 import importlib_resources
-from tesseract_robotics_viewer.tesseract_env_to_gltf import (
+from tesseract_robotics.viewer.tesseract_env_to_gltf import (
     tesseract_env_to_glb,
     tesseract_env_to_gltf,
 )
@@ -690,7 +690,7 @@ class TesseractViewer:
         assert os.path.isdir(directory), f"Invalid target directory {directory}"
         assert self.scene_json is not None, "Tesseract environment not set"
 
-        static_pkg = importlib_resources.files("tesseract_robotics_viewer.resources.static")
+        static_pkg = importlib_resources.files("tesseract_robotics.viewer.resources.static")
         index_html = (static_pkg / "index.html").read_bytes()
         tesseract_viewer_js = (static_pkg / "tesseract_viewer.js").read_bytes()
 

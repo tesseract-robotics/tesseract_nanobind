@@ -622,7 +622,7 @@ def _append_shape_mesh(gltf_dict, gltf_buf_io, shape_name, visual_name, shapes_m
 
 def _load_shapes():
     geometries = json.loads(
-        pkgutil.get_data("tesseract_robotics_viewer.resources", "geometries.json")
+        pkgutil.get_data("tesseract_robotics.viewer.resources", "geometries.json")
     )["geometries"]
 
     geometry_names = ["cube_geometry", "sphere_geometry", "cylinder_geometry"]
