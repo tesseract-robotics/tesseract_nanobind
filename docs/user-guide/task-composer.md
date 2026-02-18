@@ -274,7 +274,7 @@ result = composer.plan()
 
 if result.success:
     # Visualize
-    from tesseract_robotics_viewer import TesseractViewer
+    from tesseract_robotics.viewer import TesseractViewer
     viewer = TesseractViewer()
     viewer.update_environment(robot.env, [0, 0, 0])
     viewer.update_trajectory(result.raw_results)

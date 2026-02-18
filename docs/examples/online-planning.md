@@ -300,7 +300,7 @@ for i in range(n_steps - 1):
 Animate trajectory in viewer:
 
 ```python
-from tesseract_robotics_viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer
 
 viewer = TesseractViewer()
 viewer.update_environment(robot.env, [0, 0, 0])

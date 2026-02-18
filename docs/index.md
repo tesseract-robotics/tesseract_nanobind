@@ -103,3 +103,4 @@ The low-level SQP API enables real-time trajectory optimization:
 - [Quickstart](getting-started/quickstart.md) - Your first motion plan
 - [Core Concepts](getting-started/concepts.md) - Understand the architecture
 - [Examples](examples/index.md) - Learn from working examples
+

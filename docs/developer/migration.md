@@ -81,7 +81,7 @@ When a method returns a type from another module (e.g., `Environment.getKinemati
 
 ## Viewer Trajectory Visualization - RESOLVED
 
-The `tesseract_robotics_viewer` module now supports:
+The `tesseract_robotics.viewer` module now supports:
 1. Both `StateWaypointPoly` and `JointWaypointPoly` waypoints (fixed in util.py)
 2. Iterating over `CompositeInstruction` using `__getitem__` (SWIG's `flatten()` not needed)
 

@@ -93,13 +93,13 @@ Most examples require:
 import tesseract_robotics
 
 # For visualization
-from tesseract_robotics_viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer
 ```
 
 Install the viewer:
 
 ```bash
-pip install tesseract_robotics_viewer
+pip install tesseract-robotics-nanobind
 ```
 
 ## Viewer Usage
@@ -107,7 +107,7 @@ pip install tesseract_robotics_viewer
 Most examples include visualization:
 
 ```python
-from tesseract_robotics_viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer
 
 viewer = TesseractViewer()
 viewer.update_environment(robot.env, [0, 0, 0])

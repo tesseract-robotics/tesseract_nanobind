@@ -341,7 +341,7 @@ if result.success:
 All examples can be visualized:
 
 ```python
-from tesseract_robotics_viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer
 
 viewer = TesseractViewer()
 viewer.update_environment(robot.env, [0, 0, 0])

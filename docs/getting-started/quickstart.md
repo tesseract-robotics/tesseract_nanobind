@@ -123,7 +123,7 @@ if result.success:
 Use the TesseractViewer to visualize robots and trajectories:
 
 ```python
-from tesseract_robotics_viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer
 
 viewer = TesseractViewer()
 viewer.update_environment(robot.env, [0, 0, 0])
