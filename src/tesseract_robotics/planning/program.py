@@ -25,6 +25,7 @@ Example:
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -317,8 +318,9 @@ class MotionProgram:
         Returns:
             Self for chaining
         """
-        target.move_type = MoveType.FREESPACE
-        return self.add_target(target)
+        t = copy.copy(target)
+        t.move_type = MoveType.FREESPACE
+        return self.add_target(t)
 
     def linear_to(self, target: Target) -> MotionProgram:
         """
@@ -332,8 +334,9 @@ class MotionProgram:
         Returns:
             Self for chaining
         """
-        target.move_type = MoveType.LINEAR
-        return self.add_target(target)
+        t = copy.copy(target)
+        t.move_type = MoveType.LINEAR
+        return self.add_target(t)
 
     def add_target(self, target: Target) -> MotionProgram:
         """

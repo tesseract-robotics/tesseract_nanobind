@@ -169,8 +169,15 @@ class Robot:
         """
         locator = locator or GeneralResourceLocator()
 
-        urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-        srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+        urdf_resource = locator.locateResource(urdf_url)
+        if urdf_resource is None:
+            raise RuntimeError(f"Could not locate URDF resource: {urdf_url}")
+        srdf_resource = locator.locateResource(srdf_url)
+        if srdf_resource is None:
+            raise RuntimeError(f"Could not locate SRDF resource: {srdf_url}")
+
+        urdf_path = FilesystemPath(urdf_resource.getFilePath())
+        srdf_path = FilesystemPath(srdf_resource.getFilePath())
 
         env = Environment()
         if not env.init(urdf_path, srdf_path, locator):

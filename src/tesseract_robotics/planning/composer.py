@@ -280,10 +280,16 @@ class TaskComposer:
                 # Fall back to TESSERACT_TASK_COMPOSER_DIR
                 composer_dir = os.environ.get("TESSERACT_TASK_COMPOSER_DIR")
                 if composer_dir:
-                    dir_path = Path(composer_dir) / "config/task_composer_plugins.yaml"
-                    tried_paths.append(f"TESSERACT_TASK_COMPOSER_DIR: {dir_path}")
-                    if dir_path.is_file():
-                        config_path = str(dir_path)
+                    composer_path = Path(composer_dir)
+                    # Try direct (env var points to config dir itself)
+                    direct = composer_path / "task_composer_plugins.yaml"
+                    # Try nested (env var points to root composer dir)
+                    nested = composer_path / "config" / "task_composer_plugins.yaml"
+                    tried_paths.append(f"TESSERACT_TASK_COMPOSER_DIR: {direct}, {nested}")
+                    if direct.is_file():
+                        config_path = str(direct)
+                    elif nested.is_file():
+                        config_path = str(nested)
 
         if config_path is None:
             # Last resort: use bundled config
@@ -389,6 +395,7 @@ class TaskComposer:
         program: MotionProgram | CompositeInstruction,
         pipeline: str = "TrajOptPipeline",
         profiles: ProfileDictionary | None = None,
+        auto_seed: bool = True,
     ) -> PlanningResult:
         """
         Plan a motion program using specified pipeline.
@@ -398,6 +405,8 @@ class TaskComposer:
             program: Motion program or CompositeInstruction
             pipeline: Pipeline name (e.g., "TrajOptPipeline", "OMPLPipeline")
             profiles: Custom profiles (uses defaults if None)
+            auto_seed: Seed Cartesian waypoints with current robot state (default: True).
+                       Set to False if you've already provided waypoint seeds.
 
         Returns:
             PlanningResult with trajectory if successful
@@ -413,8 +422,8 @@ class TaskComposer:
         else:
             composite = program
 
-        # Auto-seed Cartesian waypoints with current robot state
-        assignCurrentStateAsSeed(composite, robot.env)
+        if auto_seed:
+            assignCurrentStateAsSeed(composite, robot.env)
 
         # Setup profiles - create pipeline-specific defaults if not provided
         # Each pipeline may use multiple planners (e.g., OMPL + TrajOpt)
@@ -461,6 +470,11 @@ class TaskComposer:
             )
 
         output_key = task.getOutputKeys().get("program")
+        if output_key is None:
+            return PlanningResult(
+                successful=False,
+                message=f"Pipeline '{pipeline}' has no 'program' output key",
+            )
         # Different pipelines use different input keys
         input_keys = task.getInputKeys()
         if input_keys.has("planning_input"):
