@@ -72,6 +72,17 @@ jobs:
     - name: vcs import
       working-directory: ws/src
       run: vcs import --input tesseract_nanobind/dependencies.rosinstall --skip-existing
+    - name: patch upstream missing includes
+      working-directory: ws/src
+      run: |
+        # tesseract_planning 0.34.0 uses std::runtime_error without #include <stdexcept>
+        # Works on macOS (transitive include) but fails on Linux GCC
+        find tesseract_planning -name '*.h' -path '*/poly/*' | xargs grep -l 'std::runtime_error' | while read f; do
+          if ! grep -q '#include <stdexcept>' "$f"; then
+            sed -i '/#include <string>/a #include <stdexcept>' "$f"
+            echo "  patched: $f"
+          fi
+        done
     - name: cache colcon build
       uses: actions/cache@v4
       id: colcon-cache
@@ -93,7 +104,7 @@ jobs:
             --cmake-force-configure \
             --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
-            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
+            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_CLOUD_CLIENT=OFF -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DTESSERACT_ENABLE_TESTING=OFF \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
@@ -121,7 +132,7 @@ jobs:
             --cmake-force-configure \
             --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
-            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
+            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_CLOUD_CLIENT=OFF -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DTESSERACT_ENABLE_TESTING=OFF \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
