@@ -8,8 +8,6 @@ from tesseract_robotics import tesseract_collision, tesseract_common, tesseract_
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
-TESSERACT_SUPPORT_DIR = os.environ["TESSERACT_SUPPORT_DIR"]
-
 
 def addCollisionObjects(checker):
     # Add static box to checker
@@ -134,9 +132,8 @@ def get_plugin_factory():
     # Use _FilesystemPath (C++ binding) for ContactManagersPluginFactory which needs fs::path
     from tesseract_robotics.tesseract_common import _FilesystemPath
 
-    collision_config = _FilesystemPath(
-        TESSERACT_SUPPORT_DIR + "/urdf/" + "contact_manager_plugins.yaml"
-    )
+    support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
+    collision_config = _FilesystemPath(support_dir + "/urdf/" + "contact_manager_plugins.yaml")
     locator = TesseractSupportResourceLocator()
     return tesseract_collision.ContactManagersPluginFactory(collision_config, locator), locator
 
