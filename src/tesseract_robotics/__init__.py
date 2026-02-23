@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -76,8 +77,8 @@ def _resolve_config_paths(config_path: Path, plugin_path: str | None) -> Path:
     if not needs_patch:
         return config_path
 
-    # Generate resolved config in cache dir
-    cache_dir = Path(__file__).parent / ".cache"
+    # Generate resolved config in system temp dir (not inside package dir)
+    cache_dir = Path(tempfile.gettempdir()) / "tesseract_robotics"
     cache_dir.mkdir(exist_ok=True)
 
     # Use hash of plugin_path to allow different installs

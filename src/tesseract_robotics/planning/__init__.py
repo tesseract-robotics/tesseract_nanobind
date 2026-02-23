@@ -57,7 +57,6 @@ from tesseract_robotics.planning.geometry import (
     sphere,
 )
 from tesseract_robotics.planning.planner import (
-    PlannerConfig,
     PlanningResult,
     assign_current_state_as_seed,
     plan_cartesian,
@@ -68,6 +67,7 @@ from tesseract_robotics.planning.profiles import (
     STANDARD_PROFILE_NAMES,
     create_cartesian_pipeline_profiles,
     create_descartes_default_profiles,
+    create_freespace_ifopt_pipeline_profiles,
     create_freespace_pipeline_profiles,
     create_iterative_spline_parameterization,
     create_ompl_default_profiles,
@@ -127,7 +127,6 @@ __all__ = [
     "plan_freespace",
     "plan_ompl",
     "plan_cartesian",
-    "PlannerConfig",
     "assign_current_state_as_seed",
     # Task Composer
     "TaskComposer",
@@ -140,6 +139,7 @@ __all__ = [
     "create_ompl_planner_configurators",
     "create_descartes_default_profiles",
     "create_freespace_pipeline_profiles",
+    "create_freespace_ifopt_pipeline_profiles",
     "create_cartesian_pipeline_profiles",
     # Time Parameterization
     "create_time_optimal_parameterization",
