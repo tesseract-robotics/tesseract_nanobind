@@ -21,7 +21,6 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 # Re-export PlanningResult from composer
@@ -39,32 +38,10 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.program import MotionProgram
 
 
-@dataclass
-class PlannerConfig:
-    """
-    Configuration options for planning.
-
-    Attributes:
-        pipeline: Planning pipeline name
-        max_velocity_scaling: Scale factor for velocity limits (0-1)
-        max_acceleration_scaling: Scale factor for acceleration limits (0-1)
-        collision_safety_margin: Minimum distance from obstacles
-        smoothing: Enable trajectory smoothing
-        time_parameterization: Enable time parameterization
-    """
-
-    pipeline: str = "TrajOptPipeline"
-    max_velocity_scaling: float = 1.0
-    max_acceleration_scaling: float = 1.0
-    collision_safety_margin: float = 0.025
-    smoothing: bool = True
-    time_parameterization: bool = True
-
-
 def plan_freespace(
     robot: Robot,
     program: MotionProgram | CompositeInstruction,
-    config: PlannerConfig | None = None,
+    pipeline: str | None = None,
     profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
     """
@@ -75,7 +52,7 @@ def plan_freespace(
     Args:
         robot: Robot instance
         program: Motion program or CompositeInstruction
-        config: Planner configuration
+        pipeline: Pipeline name (default: "TrajOptPipeline")
         profiles: Custom motion profiles
 
     Returns:
@@ -97,13 +74,11 @@ def plan_freespace(
             for point in result:
                 print(point.positions)
     """
-    config = config or PlannerConfig()
-
     composer = TaskComposer.from_config()
     return composer.plan(
         robot,
         program,
-        pipeline=config.pipeline,
+        pipeline=pipeline or "TrajOptPipeline",
         profiles=profiles,
     )
 
@@ -111,7 +86,7 @@ def plan_freespace(
 def plan_ompl(
     robot: Robot,
     program: MotionProgram | CompositeInstruction,
-    config: PlannerConfig | None = None,
+    pipeline: str | None = None,
     profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
     """
@@ -121,10 +96,13 @@ def plan_ompl(
     Good for complex environments where optimization-based planners may
     get stuck in local minima.
 
+    Note: default pipeline is FreespacePipeline (OMPL + TrajOpt smoothing +
+    time parameterization). For raw OMPL output, pass pipeline="OMPLPipeline".
+
     Args:
         robot: Robot instance
         program: Motion program or CompositeInstruction
-        config: Planner configuration
+        pipeline: Pipeline name (default: "FreespacePipeline")
         profiles: Custom motion profiles
 
     Returns:
@@ -146,14 +124,11 @@ def plan_ompl(
             for point in result:
                 print(point.positions)
     """
-    # 0.33 API: Use FreespacePipeline for OMPL planning (includes time parameterization)
-    config = config or PlannerConfig(pipeline="FreespacePipeline")
-
     composer = TaskComposer.from_config()
     return composer.plan(
         robot,
         program,
-        pipeline=config.pipeline,
+        pipeline=pipeline or "FreespacePipeline",
         profiles=profiles,
     )
 
@@ -161,7 +136,7 @@ def plan_ompl(
 def plan_cartesian(
     robot: Robot,
     program: MotionProgram | CompositeInstruction,
-    config: PlannerConfig | None = None,
+    pipeline: str | None = None,
     profiles: ProfileDictionary | None = None,
 ) -> PlanningResult:
     """
@@ -172,7 +147,7 @@ def plan_cartesian(
     Args:
         robot: Robot instance
         program: Motion program with linear/Cartesian targets
-        config: Planner configuration
+        pipeline: Pipeline name (default: "DescartesPipeline")
         profiles: Custom motion profiles
 
     Returns:
@@ -193,13 +168,11 @@ def plan_cartesian(
 
         result = plan_cartesian(robot, program)
     """
-    config = config or PlannerConfig(pipeline="DescartesPipeline")
-
     composer = TaskComposer.from_config()
     return composer.plan(
         robot,
         program,
-        pipeline=config.pipeline,
+        pipeline=pipeline or "DescartesPipeline",
         profiles=profiles,
     )
 

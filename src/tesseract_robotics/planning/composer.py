@@ -418,19 +418,26 @@ class TaskComposer:
 
         # Setup profiles - create pipeline-specific defaults if not provided
         # Each pipeline may use multiple planners (e.g., OMPL + TrajOpt)
+        # IMPORTANT: Check IFOPT-specific pipelines before generic TrajOpt/Freespace
+        # to avoid "TrajOpt" in "TrajOptIfoptPipeline" matching the wrong branch
         if profiles is None:
-            if pipeline == "FreespacePipeline" or "Freespace" in pipeline:
-                # FreespacePipeline: OMPL (global planning) + TrajOpt (smoothing)
+            if "TrajOptIfopt" in pipeline:
+                from .profiles import create_trajopt_ifopt_default_profiles
+
+                profiles = create_trajopt_ifopt_default_profiles()
+            elif "FreespaceIfopt" in pipeline:
+                from .profiles import create_freespace_ifopt_pipeline_profiles
+
+                profiles = create_freespace_ifopt_pipeline_profiles()
+            elif "Freespace" in pipeline:
                 from .profiles import create_freespace_pipeline_profiles
 
                 profiles = create_freespace_pipeline_profiles()
-            elif pipeline == "CartesianPipeline" or "Cartesian" in pipeline:
-                # CartesianPipeline: Descartes (sampling) + TrajOpt (optimization)
+            elif "Cartesian" in pipeline:
                 from .profiles import create_cartesian_pipeline_profiles
 
                 profiles = create_cartesian_pipeline_profiles()
             elif "TrajOpt" in pipeline:
-                # TrajOptPipeline: TrajOpt only
                 from .profiles import create_trajopt_default_profiles
 
                 profiles = create_trajopt_default_profiles()
@@ -483,19 +490,20 @@ class TaskComposer:
             future.wait()
 
             if not future.context.isSuccessful():
-                # Try to get more detailed error info
                 msg = "Planning failed"
                 try:
-                    # Check if there's task info with status
                     task_infos = future.context.task_infos
                     if task_infos:
-                        for name, info in task_infos.items():
-                            if hasattr(info, "message") and info.message:
-                                msg = f"{name}: {info.message}"
-                                break
-                            if hasattr(info, "return_value"):
-                                msg = f"{name} returned {info.return_value}"
-                                break
+                        # Try aborting node first — most useful diagnostic
+                        aborting = task_infos.getAbortingNodeInfo()
+                        if aborting and aborting.get("status_message"):
+                            msg = f"{aborting['name']}: {aborting['status_message']}"
+                        else:
+                            # Scan all node infos for first non-empty status_message
+                            for info in task_infos.getAllInfos():
+                                if info.get("status_message"):
+                                    msg = f"{info['name']}: {info['status_message']}"
+                                    break
                 except (AttributeError, TypeError):
                     pass
                 return PlanningResult(

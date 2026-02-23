@@ -724,6 +724,90 @@ def create_freespace_pipeline_profiles(
     return profiles
 
 
+def _add_trajopt_ifopt_to_profiles(
+    profiles: ProfileDictionary,
+    profile_names: list[str] | None = None,
+) -> None:
+    """Add TrajOptIfopt profiles to existing ProfileDictionary (internal helper)."""
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        ProfileDictionary_addTrajOptIfoptCompositeProfile,
+        ProfileDictionary_addTrajOptIfoptPlanProfile,
+        ProfileDictionary_addTrajOptIfoptSolverProfile,
+        TrajOptIfoptDefaultCompositeProfile,
+        TrajOptIfoptDefaultPlanProfile,
+        TrajOptIfoptOSQPSolverProfile,
+    )
+
+    if profile_names is None:
+        profile_names = TRAJOPT_PROFILE_NAMES
+
+    composite = TrajOptIfoptDefaultCompositeProfile()
+    composite.smooth_velocities = False
+    composite.smooth_accelerations = False
+    composite.smooth_jerks = False
+
+    plan = TrajOptIfoptDefaultPlanProfile()
+    plan.cartesian_cost_config.enabled = False
+    plan.cartesian_constraint_config.enabled = True
+    plan.joint_cost_config.enabled = False
+    plan.joint_constraint_config.enabled = True
+
+    solver = TrajOptIfoptOSQPSolverProfile()
+
+    for name in profile_names:
+        ProfileDictionary_addTrajOptIfoptCompositeProfile(
+            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite
+        )
+        ProfileDictionary_addTrajOptIfoptPlanProfile(
+            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, plan
+        )
+        ProfileDictionary_addTrajOptIfoptSolverProfile(
+            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver
+        )
+
+
+def create_freespace_ifopt_pipeline_profiles(
+    profile_names: list[str] | None = None,
+    num_planners: int | None = None,
+    planning_time: float = 10.0,
+    optimize: bool = True,
+    max_solutions: int = 10,
+    planner_range: float = 0.0,
+) -> ProfileDictionary:
+    """Create profiles for FreespaceIfoptPipeline (OMPL + TrajOptIfopt).
+
+    Same two-stage approach as FreespacePipeline but uses TrajOptIfopt (SQP/OSQP)
+    instead of TrajOpt (SCO) for the optimization step.
+
+    Args:
+        profile_names: Profile names to register (default: STANDARD_PROFILE_NAMES)
+        num_planners: Number of parallel OMPL planners (default: min(4, CPU count))
+        planning_time: OMPL planning time in seconds (default: 10.0)
+        optimize: Continue planning to find better solutions (default: True)
+        max_solutions: Stop early after finding this many solutions (default: 10)
+
+    Returns:
+        ProfileDictionary with both OMPL and TrajOptIfopt profiles
+    """
+    if profile_names is None:
+        profile_names = STANDARD_PROFILE_NAMES
+
+    # Start with OMPL profiles
+    profiles = create_ompl_default_profiles(
+        profile_names=profile_names,
+        num_planners=num_planners,
+        planning_time=planning_time,
+        optimize=optimize,
+        max_solutions=max_solutions,
+        planner_range=planner_range,
+    )
+
+    # Add TrajOptIfopt profiles for smoothing step
+    _add_trajopt_ifopt_to_profiles(profiles, profile_names)
+
+    return profiles
+
+
 def create_cartesian_pipeline_profiles(
     profile_names: list[str] | None = None,
     num_threads: int | None = None,

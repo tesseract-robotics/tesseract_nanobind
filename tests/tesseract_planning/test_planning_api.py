@@ -779,16 +779,9 @@ class TestPlanningIntegration:
         assert len(result) > 0
         assert result.trajectory[0].positions is not None
 
-    def test_plan_freespace_with_config(self, robot):
-        """Test freespace planning with PlannerConfig."""
+    def test_plan_freespace_with_pipeline(self, robot):
+        """Test freespace planning with explicit pipeline."""
         from tesseract_robotics.planning import plan_freespace
-        from tesseract_robotics.planning.planner import PlannerConfig
-
-        config = PlannerConfig(
-            pipeline="TrajOptPipeline",
-            max_velocity_scaling=0.5,
-            collision_safety_margin=0.03,
-        )
 
         joint_names = robot.get_joint_names("manipulator")
         program = (
@@ -798,7 +791,7 @@ class TestPlanningIntegration:
             .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
         )
 
-        result = plan_freespace(robot, program, config=config)
+        result = plan_freespace(robot, program, pipeline="TrajOptPipeline")
 
         assert result.successful
 
@@ -989,7 +982,6 @@ class TestTaskComposer:
     def test_plan_cartesian(self, robot):
         """Test plan_cartesian with TrajOpt (Descartes not in default config)."""
         from tesseract_robotics.planning import (
-            PlannerConfig,
             StateTarget,
             plan_cartesian,
         )
@@ -1003,8 +995,6 @@ class TestTaskComposer:
         start_pose = robot.fk("manipulator", start_joints)
 
         # Create Cartesian motion (freespace to Cartesian target)
-        # Note: linear_to requires specific profile configuration that may not
-        # work for all robots; move_to with CartesianTarget is more reliable
         end_pose = Pose.from_xyz(start_pose.x, start_pose.y + 0.1, start_pose.z)
 
         program = (
@@ -1014,10 +1004,8 @@ class TestTaskComposer:
             .move_to(CartesianTarget(end_pose))
         )
 
-        # Use TrajOptPipeline with proper profiles
-        config = PlannerConfig(pipeline="TrajOptPipeline")
         profiles = create_trajopt_default_profiles()
-        result = plan_cartesian(robot, program, config=config, profiles=profiles)
+        result = plan_cartesian(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
 
         assert result.successful
         assert len(result) > 0
