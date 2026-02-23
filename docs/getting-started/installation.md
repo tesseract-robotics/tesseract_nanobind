@@ -83,13 +83,13 @@ The build fetches 9 repositories via `vcs import` from `ws/src/dependencies.rosi
 
 | Repository | Version | What it provides |
 | ---------- | ------- | ---------------- |
-| tesseract | 0.33.1 | Environment, collision detection, kinematics, scene graph |
-| tesseract_planning | 0.33.1 | Task composer, motion planning pipelines |
-| trajopt | 0.33.0 | Sequential convex trajectory optimization |
+| tesseract | 0.34.1 | Environment, collision detection, kinematics, scene graph |
+| tesseract_planning | 0.34.0 | Task composer, motion planning pipelines |
+| trajopt | 0.34.4 | Sequential convex trajectory optimization |
 | descartes_light | 0.4.9 | Cartesian planning via ladder graph search |
 | opw_kinematics | 0.5.2 | Analytical IK for 6-DOF industrial arms (ABB, KUKA, Fanuc) |
-| ifopt | 2.1.3 | Nonlinear optimization interface (OSQP/IPOPT backends) |
-| ruckig | 0.9.2 | Time-optimal trajectory parametrization |
+| ifopt | 2.1.4 | Nonlinear optimization interface (absorbed into trajopt_ifopt) |
+| ruckig | 0.15.3 | Time-optimal trajectory parametrization |
 | boost_plugin_loader | 0.4.3 | Runtime plugin loading for kinematics/collision/planners |
 | ros_industrial_cmake_boilerplate | 0.7.1 | CMake utilities shared across ROS-Industrial projects |
 
