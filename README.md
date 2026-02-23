@@ -92,14 +92,78 @@ Version follows `0.A.B.C` where `A.B` tracks the upstream [Tesseract](https://gi
 
 ## Development
 
-Enable pre-commit hook (runs test suite before each commit):
+This project uses [pixi](https://pixi.sh) exclusively for dependency management and task running — no pip, conda, or venv needed. Pixi manages both the C++ toolchain (cmake, eigen, boost, bullet, ompl, ...) and Python deps in a single lockfile.
+
+### Prerequisites
+
+Install pixi ([docs](https://pixi.sh/latest/#installation)):
 
 ```bash
+curl -fsSL https://pixi.sh/install.sh | bash
+```
+
+### First-time setup
+
+```bash
+git clone --recurse-submodules https://github.com/tesseract-robotics/tesseract_nanobind.git
+cd tesseract_nanobind
+pixi run build    # builds C++ libs + installs bindings (editable)
+```
+
+`pixi run build` chains two steps: `build-cpp` (compiles tesseract C++ via colcon) → `install` (editable pip install of the Python package). First build takes ~15 min; subsequent rebuilds are incremental.
+
+### Available tasks
+
+| Task | Description |
+|------|-------------|
+| `pixi run build` | Build C++ libs + install bindings |
+| `pixi run build-cpp` | Build only the C++ libs |
+| `pixi run install` | Editable install (assumes C++ already built) |
+| `pixi run test` | Run pytest with xdist parallelism |
+| `pixi run lint` | Lint with ruff |
+| `pixi run fmt` | Format with ruff |
+| `pixi run typecheck` | Type check with pyright |
+| `pixi run docs` | Live docs server (localhost:8000) |
+| `pixi run docs-build` | Build static docs to `site/` |
+
+### Running tests
+
+```bash
+pixi run test                              # full suite, parallel
+pixi shell && pytest tests -x --testmon    # incremental (only changed)
+```
+
+### Pre-commit hooks
+
+```bash
+pixi shell
 pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
-that'll run the `hooks` defined in `.pre-commit-config.yaml`
+This runs ruff + auto-staging on commit, and pyright + pytest on push (configured in `.pre-commit-config.yaml`).
+
+### Project layout
+
+```
+├── pyproject.toml            # package config + pixi workspace
+├── CMakeLists.txt            # nanobind build
+├── src/tesseract_robotics/   # Python package + C++ extension modules
+├── tests/                    # pytest suite
+├── examples/                 # usage examples
+├── ws/                       # C++ workspace (colcon src/ + install/)
+├── scripts/                  # build scripts (build_tesseract_cpp.sh, build_wheel.sh)
+└── docs/                     # mkdocs-material documentation
+```
+
+### Building portable wheels
+
+Editable installs bake absolute paths — not portable. For distributable wheels:
+
+```bash
+./scripts/build_wheel.sh              # builds + delocates (bundles dylibs)
+pip install wheelhouse/tesseract*.whl
+```
 
 ## Acknowledgments
 
