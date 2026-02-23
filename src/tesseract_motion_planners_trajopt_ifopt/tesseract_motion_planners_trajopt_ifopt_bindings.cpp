@@ -60,21 +60,18 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
 
     // ========== TrajOptIfoptMoveProfile (base, was TrajOptIfoptPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptMoveProfile, tc::Profile>(m, "TrajOptIfoptMoveProfile")
-        .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptIfoptMoveProfile::getStaticKey);
+        .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey);
 
     // SWIG-compatible alias
     m.attr("TrajOptIfoptPlanProfile") = m.attr("TrajOptIfoptMoveProfile");
 
     // ========== TrajOptIfoptCompositeProfile (base) ==========
     nb::class_<tp::TrajOptIfoptCompositeProfile, tc::Profile>(m, "TrajOptIfoptCompositeProfile")
-        .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptIfoptCompositeProfile::getStaticKey);
+        .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey);
 
     // ========== TrajOptIfoptSolverProfile (base) ==========
     nb::class_<tp::TrajOptIfoptSolverProfile, tc::Profile>(m, "TrajOptIfoptSolverProfile")
-        .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptIfoptSolverProfile::getStaticKey);
+        .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey);
 
     // ========== TrajOptIfoptDefaultMoveProfile (was TrajOptIfoptDefaultPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptDefaultMoveProfile, tp::TrajOptIfoptMoveProfile>(m, "TrajOptIfoptDefaultMoveProfile")

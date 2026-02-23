@@ -21,10 +21,10 @@
 #include <trajopt_sqp/trust_region_sqp_solver.h>
 #include <trajopt_sqp/sqp_callback.h>
 
-// ifopt headers for types used in QPProblem interface
-#include <ifopt/variable_set.h>
-#include <ifopt/constraint_set.h>
-#include <ifopt/problem.h>
+// trajopt_ifopt headers for types used in QPProblem interface
+#include <trajopt_ifopt/core/component.h>
+#include <trajopt_ifopt/core/constraint_set.h>
+#include <trajopt_ifopt/core/problem.h>
 
 namespace tsqp = trajopt_sqp;
 
@@ -41,30 +41,29 @@ public:
 NB_MODULE(_trajopt_sqp, m) {
     m.doc() = "trajopt_sqp Python bindings - SQP solver for trajectory optimization";
 
+    // Import trajopt_ifopt module for cross-module type resolution
+    nb::module_::import_("tesseract_robotics.trajopt_ifopt._trajopt_ifopt");
+
     // ========== Enums ==========
 
-    nb::enum_<tsqp::ConstraintType>(m, "ConstraintType", "Type of constraint")
-        .value("EQ", tsqp::ConstraintType::EQ, "Equality constraint")
-        .value("INEQ", tsqp::ConstraintType::INEQ, "Inequality constraint");
-
     nb::enum_<tsqp::CostPenaltyType>(m, "CostPenaltyType", "Penalty type for cost terms")
-        .value("SQUARED", tsqp::CostPenaltyType::SQUARED, "Squared penalty (L2)")
-        .value("ABSOLUTE", tsqp::CostPenaltyType::ABSOLUTE, "Absolute penalty (L1)")
-        .value("HINGE", tsqp::CostPenaltyType::HINGE, "Hinge penalty");
+        .value("SQUARED", tsqp::CostPenaltyType::kSquared, "Squared penalty (L2)")
+        .value("ABSOLUTE", tsqp::CostPenaltyType::kAbsolute, "Absolute penalty (L1)")
+        .value("HINGE", tsqp::CostPenaltyType::kHinge, "Hinge penalty");
 
     nb::enum_<tsqp::SQPStatus>(m, "SQPStatus", "Status codes for SQP optimization")
-        .value("RUNNING", tsqp::SQPStatus::RUNNING, "Optimization is currently running")
-        .value("NLP_CONVERGED", tsqp::SQPStatus::NLP_CONVERGED, "NLP successfully converged")
-        .value("ITERATION_LIMIT", tsqp::SQPStatus::ITERATION_LIMIT, "Reached iteration limit")
-        .value("PENALTY_ITERATION_LIMIT", tsqp::SQPStatus::PENALTY_ITERATION_LIMIT, "Reached penalty iteration limit")
-        .value("OPT_TIME_LIMIT", tsqp::SQPStatus::OPT_TIME_LIMIT, "Reached time limit")
-        .value("QP_SOLVER_ERROR", tsqp::SQPStatus::QP_SOLVER_ERROR, "QP solver failed")
-        .value("CALLBACK_STOPPED", tsqp::SQPStatus::CALLBACK_STOPPED, "Stopped by callback");
+        .value("RUNNING", tsqp::SQPStatus::kRunning, "Optimization is currently running")
+        .value("NLP_CONVERGED", tsqp::SQPStatus::kConverged, "NLP successfully converged")
+        .value("ITERATION_LIMIT", tsqp::SQPStatus::kIterationLimit, "Reached iteration limit")
+        .value("PENALTY_ITERATION_LIMIT", tsqp::SQPStatus::kPenaltyIterationLimit, "Reached penalty iteration limit")
+        .value("OPT_TIME_LIMIT", tsqp::SQPStatus::kTimeLimit, "Reached time limit")
+        .value("QP_SOLVER_ERROR", tsqp::SQPStatus::kQPSolveFailed, "QP solver failed")
+        .value("CALLBACK_STOPPED", tsqp::SQPStatus::kStoppedByCallback, "Stopped by callback");
 
     nb::enum_<tsqp::QPSolverStatus>(m, "QPSolverStatus", "Status of QP solver")
-        .value("UNITIALIZED", tsqp::QPSolverStatus::UNITIALIZED, "Solver not initialized")
-        .value("INITIALIZED", tsqp::QPSolverStatus::INITIALIZED, "Solver initialized")
-        .value("QP_ERROR", tsqp::QPSolverStatus::QP_ERROR, "QP solver error");
+        .value("UNITIALIZED", tsqp::QPSolverStatus::kUninitialized, "Solver not initialized")
+        .value("INITIALIZED", tsqp::QPSolverStatus::kInitialized, "Solver initialized")
+        .value("QP_ERROR", tsqp::QPSolverStatus::kFailed, "QP solver error");
 
     // ========== SQPParameters ==========
 
@@ -188,8 +187,6 @@ NB_MODULE(_trajopt_sqp, m) {
 
     nb::class_<tsqp::QPProblem>(m, "QPProblem",
         "Abstract base class for QP problems (convexified NLP)")
-        .def("addVariableSet", &tsqp::QPProblem::addVariableSet, "variable_set"_a,
-             "Add a set of optimization variables")
         .def("addConstraintSet", &tsqp::QPProblem::addConstraintSet, "constraint_set"_a,
              "Add a set of constraints")
         .def("addCostSet", &tsqp::QPProblem::addCostSet,
@@ -205,16 +202,12 @@ NB_MODULE(_trajopt_sqp, m) {
              "var_vals"_a, "Evaluate convexified cost at given point")
         .def("evaluateConvexCosts", &tsqp::QPProblem::evaluateConvexCosts,
              "var_vals"_a, "Evaluate individual convexified costs")
-        .def("evaluateTotalExactCost", &tsqp::QPProblem::evaluateTotalExactCost,
-             "var_vals"_a, "Evaluate exact (non-convexified) cost")
-        .def("evaluateExactCosts", &tsqp::QPProblem::evaluateExactCosts,
-             "var_vals"_a, "Evaluate individual exact costs")
+        .def("getTotalExactCost", &tsqp::QPProblem::getTotalExactCost,
+             "Get exact (non-convexified) total cost")
         .def("getExactCosts", &tsqp::QPProblem::getExactCosts,
              "Get current exact costs")
         .def("evaluateConvexConstraintViolations", &tsqp::QPProblem::evaluateConvexConstraintViolations,
              "var_vals"_a, "Evaluate convexified constraint violations")
-        .def("evaluateExactConstraintViolations", &tsqp::QPProblem::evaluateExactConstraintViolations,
-             "var_vals"_a, "Evaluate exact constraint violations")
         .def("getExactConstraintViolations", &tsqp::QPProblem::getExactConstraintViolations,
              "Get current exact constraint violations")
         .def("scaleBoxSize", &tsqp::QPProblem::scaleBoxSize, "scale"_a,
@@ -245,11 +238,9 @@ NB_MODULE(_trajopt_sqp, m) {
 
     nb::class_<tsqp::IfoptQPProblem, tsqp::QPProblem>(
         m, "IfoptQPProblem",
-        "QP problem wrapper for ifopt::Problem (general NLP)")
-        .def(nb::init<>())
-        .def(nb::init<std::shared_ptr<ifopt::Problem>>(), "nlp"_a,
-             "Construct from ifopt Problem")
-        .def("addVariableSet", &tsqp::IfoptQPProblem::addVariableSet, "variable_set"_a)
+        "QP problem wrapper for trajopt_ifopt::Problem (general NLP)")
+        .def(nb::init<std::shared_ptr<trajopt_ifopt::Problem>>(), "nlp"_a,
+             "Construct from trajopt_ifopt Problem")
         .def("addConstraintSet", &tsqp::IfoptQPProblem::addConstraintSet, "constraint_set"_a)
         .def("addCostSet", &tsqp::IfoptQPProblem::addCostSet,
              "constraint_set"_a, "penalty_type"_a)
@@ -326,19 +317,18 @@ NB_MODULE(_trajopt_sqp, m) {
         .def_rw("qp_problem", &tsqp::TrustRegionSQPSolver::qp_problem,
                 "The current QP problem");
 
-    // ========== ifopt types (minimal bindings for use with QPProblem) ==========
-    // NOTE: ifopt::VariableSet and ifopt::ConstraintSet are already bound in the
-    // _ifopt module. We only bind ifopt::Problem here since it's not in _ifopt.
+    // ========== trajopt_ifopt types (minimal bindings for use with QPProblem) ==========
+    // NOTE: trajopt_ifopt::Variables and trajopt_ifopt::ConstraintSet are already bound in the
+    // _trajopt_ifopt module. We only bind trajopt_ifopt::Problem here since it's not in _trajopt_ifopt.
 
-    // ifopt::Problem - needed to construct IfoptQPProblem
-    nb::class_<ifopt::Problem>(m, "IfoptProblem",
-        "ifopt::Problem - generic NLP with variables, costs, constraints")
-        .def(nb::init<>())
-        .def("AddVariableSet", &ifopt::Problem::AddVariableSet, "variable_set"_a)
-        .def("AddConstraintSet", &ifopt::Problem::AddConstraintSet, "constraint_set"_a)
-        .def("AddCostSet", &ifopt::Problem::AddCostSet, "cost_set"_a)
-        .def("GetNumberOfOptimizationVariables", &ifopt::Problem::GetNumberOfOptimizationVariables)
-        .def("GetNumberOfConstraints", &ifopt::Problem::GetNumberOfConstraints)
-        .def("GetVariableValues", &ifopt::Problem::GetVariableValues)
-        .def("PrintCurrent", &ifopt::Problem::PrintCurrent);
+    // trajopt_ifopt::Problem - needed to construct IfoptQPProblem
+    nb::class_<trajopt_ifopt::Problem>(m, "IfoptProblem",
+        "trajopt_ifopt::Problem - generic NLP with variables, costs, constraints")
+        .def(nb::init<trajopt_ifopt::Variables::Ptr>(), "variables"_a)
+        .def("addConstraintSet", &trajopt_ifopt::Problem::addConstraintSet, "constraint_set"_a)
+        .def("addCostSet", &trajopt_ifopt::Problem::addCostSet, "cost_set"_a)
+        .def("getNumberOfOptimizationVariables", &trajopt_ifopt::Problem::getNumberOfOptimizationVariables)
+        .def("getNumberOfConstraints", &trajopt_ifopt::Problem::getNumberOfConstraints)
+        .def("getVariableValues", &trajopt_ifopt::Problem::getVariableValues)
+        .def("printCurrent", &trajopt_ifopt::Problem::printCurrent);
 }

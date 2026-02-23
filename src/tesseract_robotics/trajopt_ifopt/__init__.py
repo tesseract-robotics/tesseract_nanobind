@@ -3,11 +3,14 @@
 from ._trajopt_ifopt import *  # noqa: F403
 
 __all__ = [  # noqa: F405
-    # Variable sets
-    "JointPosition",
+    # Variable system (0.34 redesign)
+    "Var",
+    "Node",
+    "NodesVariables",
+    # Enums
+    "BoundsType",
+    "RangeBoundHandling",
     # Cartesian position constraint
-    "CartPosInfoType",
-    "CartPosInfo",
     "CartPosConstraint",
     # Joint constraints
     "JointPosConstraint",
@@ -18,7 +21,6 @@ __all__ = [  # noqa: F405
     "TrajOptCollisionConfig",
     "DiscreteCollisionEvaluator",
     "SingleTimestepCollisionEvaluator",
-    "CollisionCache",
     "DiscreteCollisionConstraint",
     # Utility functions
     "interpolate",

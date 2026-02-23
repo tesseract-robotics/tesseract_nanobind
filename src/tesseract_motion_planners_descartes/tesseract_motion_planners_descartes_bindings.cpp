@@ -43,8 +43,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
 
     // ========== DescartesSolverProfile<double> (base for solver profiles) ==========
     nb::class_<tp::DescartesSolverProfile<double>, tc::Profile>(m, "DescartesSolverProfileD")
-        .def("getKey", &tp::DescartesSolverProfile<double>::getKey)
-        .def_static("getStaticKey", &tp::DescartesSolverProfile<double>::getStaticKey);
+        .def("getKey", &tp::DescartesSolverProfile<double>::getKey);
 
     // ========== DescartesLadderGraphSolverProfile<double> ==========
     nb::class_<tp::DescartesLadderGraphSolverProfile<double>, tp::DescartesSolverProfile<double>>(m, "DescartesLadderGraphSolverProfileD")
@@ -60,8 +59,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
 
     // ========== DescartesMoveProfile<double> (base, was DescartesPlanProfile) ==========
     nb::class_<tp::DescartesMoveProfile<double>, tc::Profile>(m, "DescartesMoveProfileD")
-        .def("getKey", &tp::DescartesMoveProfile<double>::getKey)
-        .def_static("getStaticKey", &tp::DescartesMoveProfile<double>::getStaticKey);
+        .def("getKey", &tp::DescartesMoveProfile<double>::getKey);
 
     // SWIG-compatible alias
     m.attr("DescartesPlanProfileD") = m.attr("DescartesMoveProfileD");

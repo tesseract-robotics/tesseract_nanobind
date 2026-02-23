@@ -5,17 +5,8 @@ from typing import Annotated, overload
 import numpy
 from numpy.typing import NDArray
 
-import tesseract_robotics.ifopt._ifopt
+import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
-
-class ConstraintType(enum.Enum):
-    """Type of constraint"""
-
-    EQ = 0
-    """Equality constraint"""
-
-    INEQ = 1
-    """Inequality constraint"""
 
 class CostPenaltyType(enum.Enum):
     """Penalty type for cost terms"""
@@ -427,13 +418,10 @@ class OSQPEigenSolver(QPSolver):
 class QPProblem:
     """Abstract base class for QP problems (convexified NLP)"""
 
-    def addVariableSet(self, variable_set: tesseract_robotics.ifopt._ifopt.VariableSet) -> None:
-        """Add a set of optimization variables"""
-
-    def addConstraintSet(self, constraint_set: tesseract_robotics.ifopt._ifopt.ConstraintSet) -> None:
+    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None:
         """Add a set of constraints"""
 
-    def addCostSet(self, constraint_set: tesseract_robotics.ifopt._ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None:
+    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None:
         """Add a cost term with specified penalty type"""
 
     def setup(self) -> None:
@@ -451,20 +439,14 @@ class QPProblem:
     def evaluateConvexCosts(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Evaluate individual convexified costs"""
 
-    def evaluateTotalExactCost(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> float:
-        """Evaluate exact (non-convexified) cost"""
-
-    def evaluateExactCosts(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
-        """Evaluate individual exact costs"""
+    def getTotalExactCost(self) -> float:
+        """Get exact (non-convexified) total cost"""
 
     def getExactCosts(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current exact costs"""
 
     def evaluateConvexConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Evaluate convexified constraint violations"""
-
-    def evaluateExactConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
-        """Evaluate exact constraint violations"""
 
     def getExactConstraintViolations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current exact constraint violations"""
@@ -506,20 +488,14 @@ class QPProblem:
         """Get cost names"""
 
 class IfoptQPProblem(QPProblem):
-    """QP problem wrapper for ifopt::Problem (general NLP)"""
+    """QP problem wrapper for trajopt_ifopt::Problem (general NLP)"""
 
-    @overload
-    def __init__(self) -> None: ...
-
-    @overload
     def __init__(self, nlp: IfoptProblem) -> None:
-        """Construct from ifopt Problem"""
+        """Construct from trajopt_ifopt Problem"""
 
-    def addVariableSet(self, variable_set: tesseract_robotics.ifopt._ifopt.VariableSet) -> None: ...
+    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
 
-    def addConstraintSet(self, constraint_set: tesseract_robotics.ifopt._ifopt.ConstraintSet) -> None: ...
-
-    def addCostSet(self, constraint_set: tesseract_robotics.ifopt._ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None: ...
+    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None: ...
 
     def setup(self) -> None: ...
 
@@ -632,20 +608,20 @@ class TrustRegionSQPSolver:
     def qp_problem(self, arg: QPProblem, /) -> None: ...
 
 class IfoptProblem:
-    """ifopt::Problem - generic NLP with variables, costs, constraints"""
+    """
+    trajopt_ifopt::Problem - generic NLP with variables, costs, constraints
+    """
 
-    def __init__(self) -> None: ...
+    def __init__(self, variables: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Variables) -> None: ...
 
-    def AddVariableSet(self, variable_set: tesseract_robotics.ifopt._ifopt.Component) -> None: ...
+    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
 
-    def AddConstraintSet(self, constraint_set: tesseract_robotics.ifopt._ifopt.ConstraintSet) -> None: ...
+    def addCostSet(self, cost_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
 
-    def AddCostSet(self, cost_set: tesseract_robotics.ifopt._ifopt.ConstraintSet) -> None: ...
+    def getNumberOfOptimizationVariables(self) -> int: ...
 
-    def GetNumberOfOptimizationVariables(self) -> int: ...
+    def getNumberOfConstraints(self) -> int: ...
 
-    def GetNumberOfConstraints(self) -> int: ...
+    def getVariableValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
-    def GetVariableValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
-
-    def PrintCurrent(self) -> None: ...
+    def printCurrent(self) -> None: ...

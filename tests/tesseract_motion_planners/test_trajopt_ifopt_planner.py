@@ -76,7 +76,6 @@ class TestTrajOptIfoptProfiles:
         profile = TrajOptIfoptDefaultPlanProfile()
         assert profile is not None
         assert profile.getKey() is not None
-        assert TrajOptIfoptDefaultPlanProfile.getStaticKey() is not None
 
     def test_default_composite_profile(self):
         profile = TrajOptIfoptDefaultCompositeProfile()
