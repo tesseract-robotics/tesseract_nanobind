@@ -86,6 +86,10 @@ See the `examples/` directory for:
 - `puzzle_piece_example.py` - Cartesian path following
 - And more...
 
+## Versioning
+
+Version follows `0.A.B.C` where `A.B` tracks the upstream [Tesseract](https://github.com/tesseract-robotics/tesseract) release and `C` is the nanobind patch number. For example, `0.34.1.0` wraps Tesseract `0.34.1`.
+
 ## Development
 
 Enable pre-commit hook (runs test suite before each commit):
