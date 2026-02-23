@@ -1,7 +1,7 @@
 """Tests for example script functionality
 
 These tests verify that the basic components used in examples work correctly.
-Full planning tests are skipped if TESSERACT_TASK_COMPOSER_CONFIG_FILE is not set.
+Planning tests require TESSERACT_TASK_COMPOSER_CONFIG_FILE to be set.
 """
 
 import os
@@ -440,7 +440,7 @@ class TestFreespaceOMPLExampleRun:
     def test_freespace_ompl_example_runs(self, has_task_composer_config):
         """Run the freespace OMPL example end-to-end"""
         if not has_task_composer_config:
-            pytest.skip("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set or file not found")
+            pytest.fail("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set or file not found")
 
         script = EXAMPLES_DIR / "freespace_ompl_example.py"
         assert script.exists(), f"Example script not found: {script}"
@@ -474,7 +474,7 @@ class TestBasicCartesianExampleRun:
     def test_basic_cartesian_example_runs(self, has_task_composer_config):
         """Run the basic Cartesian example end-to-end"""
         if not has_task_composer_config:
-            pytest.skip("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set or file not found")
+            pytest.fail("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set or file not found")
 
         script = EXAMPLES_DIR / "basic_cartesian_example.py"
         assert script.exists(), f"Example script not found: {script}"
@@ -528,7 +528,7 @@ class TestGlassUprightExampleRun:
     def test_glass_upright_example_runs(self, has_task_composer_config):
         """Run the glass upright example end-to-end"""
         if not has_task_composer_config:
-            pytest.skip("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set or file not found")
+            pytest.fail("TESSERACT_TASK_COMPOSER_CONFIG_FILE not set or file not found")
 
         script = EXAMPLES_DIR / "glass_upright_example.py"
         assert script.exists(), f"Example script not found: {script}"

@@ -70,13 +70,9 @@ def test_kinematic_group():
 def test_kinematic_info():
     import gc
 
-    import pytest
-
     env, manip_info, joint_names, locator = get_environment()
 
-    # Skip if getKinematicsInformation is not yet bound
-    if not hasattr(env, "getKinematicsInformation"):
-        pytest.skip("getKinematicsInformation not yet bound")
+    assert hasattr(env, "getKinematicsInformation"), "getKinematicsInformation not yet bound"
 
     kin_info = env.getKinematicsInformation()
 

@@ -14,21 +14,14 @@ Updated for 0.34 API:
 import numpy as np
 import pytest
 
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_common import (
     FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
-
-# Low-level SQP imports
-try:
-    from tesseract_robotics import trajopt_ifopt as ti
-    from tesseract_robotics import trajopt_sqp as tsqp
-
-    SQP_AVAILABLE = True
-except ImportError:
-    SQP_AVAILABLE = False
 
 
 def _make_nodes_variables(joint_names, joint_limits, initial_states, name="trajectory"):
@@ -82,7 +75,6 @@ def kuka_setup():
     return env, manip, joint_names, joint_limits
 
 
-@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestIfoptBaseClasses:
     """Test ifopt base class bindings (now in trajopt_ifopt)."""
 
@@ -118,7 +110,6 @@ class TestIfoptBaseClasses:
         assert var.name is not None
 
 
-@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestTrajOptIfoptTypes:
     """Test trajopt_ifopt constraint and variable types."""
 
@@ -211,7 +202,6 @@ class TestTrajOptIfoptTypes:
         assert constraint is not None
 
 
-@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestTrajOptSQPTypes:
     """Test trajopt_sqp solver types."""
 
@@ -358,7 +348,6 @@ class TestTrajOptSQPTypes:
         assert isinstance(results.constraint_names, list)
 
 
-@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestSQPIntegration:
     """Integration tests for SQP solver."""
 
@@ -495,7 +484,6 @@ class TestSQPIntegration:
         assert results.best_var_vals is not None
 
 
-@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestAdditionalBindings:
     """Tests for additional bindings not covered elsewhere."""
 
@@ -627,7 +615,6 @@ class TestAdditionalBindings:
         assert costs is not None
 
 
-@pytest.mark.skipif(not SQP_AVAILABLE, reason="trajopt_sqp not available")
 class TestContinuousCollisionBindings:
     """Tests for continuous collision evaluators and constraints."""
 
@@ -826,13 +813,10 @@ class TestNewConstraintBindings:
         target_mat[2, 3] = 0.5
         target = Isometry3d(target_mat)
 
-        try:
-            constraint = ti.InverseKinematicsConstraint(
-                target, info, vars_list[0], vars_list[1], "IK_0"
-            )
-            assert constraint is not None
-        except TypeError as e:
-            pytest.skip(f"IK constraint may need shared_ptr wrapper: {e}")
+        constraint = ti.InverseKinematicsConstraint(
+            target, info, vars_list[0], vars_list[1], "IK_0"
+        )
+        assert constraint is not None
 
 
 class TestConstraintSetInterface:

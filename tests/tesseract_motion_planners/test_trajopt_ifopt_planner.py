@@ -20,23 +20,15 @@ from tesseract_robotics.tesseract_common import (
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-
-# TrajOptIfopt imports
-try:
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptPlanProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
-        TrajOptIfoptDefaultCompositeProfile,
-        TrajOptIfoptDefaultPlanProfile,
-        TrajOptIfoptMotionPlanner,
-        TrajOptIfoptOSQPSolverProfile,
-    )
-
-    TRAJOPT_IFOPT_AVAILABLE = True
-except ImportError:
-    TRAJOPT_IFOPT_AVAILABLE = False
-
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    ProfileDictionary_addTrajOptIfoptPlanProfile,
+    ProfileDictionary_addTrajOptIfoptSolverProfile,
+    TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultPlanProfile,
+    TrajOptIfoptMotionPlanner,
+    TrajOptIfoptOSQPSolverProfile,
+)
 
 TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
@@ -68,7 +60,6 @@ def kuka_iiwa_environment():
     return t_env, manip_info, joint_names
 
 
-@pytest.mark.skipif(not TRAJOPT_IFOPT_AVAILABLE, reason="TrajOptIfopt not available")
 class TestTrajOptIfoptProfiles:
     """Test TrajOptIfopt profile types."""
 
@@ -112,7 +103,6 @@ class TestTrajOptIfoptProfiles:
         assert profiles is not None
 
 
-@pytest.mark.skipif(not TRAJOPT_IFOPT_AVAILABLE, reason="TrajOptIfopt not available")
 class TestTrajOptIfoptPlanner:
     """Test TrajOptIfopt planner functionality."""
 
