@@ -53,9 +53,10 @@ plugins:
       glob:
         - QUICKSTART.md
   - mkdocstrings:
+      enable_inventory: false
       handlers:
         python:
-          paths: [tesseract_nanobind/src]
+          paths: [src]
           options:
             show_source: false
             show_root_heading: true

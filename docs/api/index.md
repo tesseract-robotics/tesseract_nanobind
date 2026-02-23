@@ -37,8 +37,7 @@ Auto-generated API documentation from docstrings.
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.ifopt`](ifopt.md) | Base optimization (Bounds, VariableSet, ConstraintSet) |
-| [`tesseract_robotics.trajopt_ifopt`](trajopt_ifopt.md) | Robotics constraints (collision, Cartesian, joints) |
+| [`tesseract_robotics.trajopt_ifopt`](trajopt_ifopt.md) | Variables, constraints, costs (Var, Node, collision, Cartesian) |
 | [`tesseract_robotics.trajopt_sqp`](trajopt_sqp.md) | SQP solver (TrustRegionSQPSolver, OSQP) |
 
 ## Import Patterns
@@ -63,8 +62,7 @@ from tesseract_robotics.tesseract_geometry import Box, Sphere
 ### SQP API
 
 ```python
-from tesseract_robotics.ifopt import Bounds
-from tesseract_robotics.trajopt_ifopt import JointPosition, CartPosConstraint
+from tesseract_robotics.trajopt_ifopt import Bounds, CartPosConstraint, createNodesVariables
 from tesseract_robotics.trajopt_sqp import TrustRegionSQPSolver, OSQPEigenSolver
 ```
 

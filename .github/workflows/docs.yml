@@ -34,7 +34,7 @@ jobs:
       run: pip install -r docs/requirements.txt
 
     - name: Build docs
-      run: mkdocs build
+      run: PYTHONPATH=src mkdocs build
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
