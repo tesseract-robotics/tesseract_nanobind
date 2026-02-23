@@ -162,9 +162,10 @@ nav:
       - tesseract_robotics.tesseract_motion_planners_simple: api/tesseract_motion_planners_simple.md
       - tesseract_robotics.tesseract_task_composer: api/tesseract_task_composer.md
     - SQP Modules:
-      - tesseract_robotics.ifopt: api/ifopt.md
       - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
       - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
+  - Changes:
+    - "0.33 → 0.34": changes.md
   - Developer:
     - developer/index.md
     - SWIG to Nanobind Migration: developer/migration.md
