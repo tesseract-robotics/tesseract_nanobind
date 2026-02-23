@@ -80,18 +80,10 @@ echo ""
 echo "Workspace contents:"
 ls -1
 
-# Patch upstream missing includes
-# tesseract_planning 0.34.0 uses std::runtime_error without #include <stdexcept>
-# Works on macOS (transitive include) but fails on Linux GCC
+# Patch upstream missing includes (idempotent, portable)
 echo ""
 echo "Patching upstream sources..."
-find tesseract_planning -name '*.h' -path '*/poly/*' 2>/dev/null | xargs grep -l 'std::runtime_error' 2>/dev/null | while read f; do
-    if ! grep -q '#include <stdexcept>' "$f"; then
-        sed -i.bak '/#include <string>/a\
-#include <stdexcept>' "$f" && rm -f "$f.bak"
-        echo "  patched: $f"
-    fi
-done
+python3 "$(dirname "$0")/patch_upstream.py"
 
 # Build with colcon
 echo ""
