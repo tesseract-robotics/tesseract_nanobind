@@ -140,6 +140,9 @@ class Robot:
             env: Initialized Tesseract Environment
             locator: Resource locator (created if not provided)
         """
+        from tesseract_robotics import ensure_configured
+
+        ensure_configured()
         self.env = env
         self.locator = locator or GeneralResourceLocator()
         self._manipulator_cache: dict[str, ManipulatorInfo] = {}

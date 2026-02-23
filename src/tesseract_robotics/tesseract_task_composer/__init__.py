@@ -1,4 +1,8 @@
-from tesseract_robotics.tesseract_task_composer._tesseract_task_composer import *
+from tesseract_robotics import ensure_configured
+
+ensure_configured()
+
+from tesseract_robotics.tesseract_task_composer._tesseract_task_composer import *  # noqa: E402
 
 __all__ = [
     "TaskComposerKeys",

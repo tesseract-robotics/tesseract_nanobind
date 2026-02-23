@@ -119,6 +119,8 @@ class CartesianTarget:
         """Get low-level move instruction type."""
         if self.move_type == MoveType.LINEAR:
             return MoveInstructionType_LINEAR
+        if self.move_type == MoveType.CIRCULAR:
+            return MoveInstructionType_CIRCULAR
         return MoveInstructionType_FREESPACE
 
 
