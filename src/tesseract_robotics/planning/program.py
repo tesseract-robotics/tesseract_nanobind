@@ -45,6 +45,7 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType,
+    MoveInstructionType_CIRCULAR,
     MoveInstructionType_FREESPACE,
     MoveInstructionType_LINEAR,
     StateWaypoint,
@@ -58,6 +59,7 @@ class MoveType(Enum):
 
     FREESPACE = auto()  # Point-to-point, collision-free
     LINEAR = auto()  # Linear interpolation in Cartesian space
+    CIRCULAR = auto()  # Circular interpolation in Cartesian space
 
 
 @dataclass
@@ -167,6 +169,8 @@ class JointTarget:
     def _get_move_type(self) -> MoveInstructionType:
         if self.move_type == MoveType.LINEAR:
             return MoveInstructionType_LINEAR
+        if self.move_type == MoveType.CIRCULAR:
+            return MoveInstructionType_CIRCULAR
         return MoveInstructionType_FREESPACE
 
 
@@ -222,6 +226,8 @@ class StateTarget:
     def _get_move_type(self) -> MoveInstructionType:
         if self.move_type == MoveType.LINEAR:
             return MoveInstructionType_LINEAR
+        if self.move_type == MoveType.CIRCULAR:
+            return MoveInstructionType_CIRCULAR
         return MoveInstructionType_FREESPACE
 
 
@@ -336,6 +342,22 @@ class MotionProgram:
         """
         t = copy.copy(target)
         t.move_type = MoveType.LINEAR
+        return self.add_target(t)
+
+    def circular_to(self, target: Target) -> MotionProgram:
+        """
+        Add a circular motion to target.
+
+        Sets target move_type to CIRCULAR.
+
+        Args:
+            target: Motion target
+
+        Returns:
+            Self for chaining
+        """
+        t = copy.copy(target)
+        t.move_type = MoveType.CIRCULAR
         return self.add_target(t)
 
     def add_target(self, target: Target) -> MotionProgram:

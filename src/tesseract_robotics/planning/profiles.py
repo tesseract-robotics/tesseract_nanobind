@@ -150,7 +150,7 @@ def create_trajopt_ifopt_default_profiles(
 
     Profile Configuration:
         Composite Profile (applies to entire trajectory):
-        - smooth_velocities: True (penalize velocity changes)
+        - smooth_velocities: False (disabled; requires velocity_coeff sized to DOF)
         - smooth_accelerations: False
         - smooth_jerks: False
 
