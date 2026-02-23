@@ -118,8 +118,12 @@ class Pose:
             position: [x, y, z] position
             quaternion: [qx, qy, qz, qw] quaternion (scalar-last)
         """
-        pos = np.asarray(position)
-        quat = np.asarray(quaternion)
+        pos = np.asarray(position, dtype=float).ravel()
+        quat = np.asarray(quaternion, dtype=float).ravel()
+        if pos.shape != (3,):
+            raise ValueError(f"Position must have 3 elements, got {pos.shape}")
+        if quat.shape != (4,):
+            raise ValueError(f"Quaternion must have 4 elements, got {quat.shape}")
         return cls.from_xyz_quat(
             pos[0],
             pos[1],
