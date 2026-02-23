@@ -179,9 +179,12 @@ pyright = ">=1.1"
 pytest-testmon = ">=2.0"  # PyPI version for pytest>=7 compat
 
 [tool.pixi.tasks]
-test = { cmd = "python -m pytest tests -x -q -n auto", depends-on = [
+test = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q -n auto", depends-on = [
     "install",
 ] }
+test-benchmark = { cmd = "python -m pytest tests/benchmarks -x -q", depends-on = [
+    "install",
+], description = "Run benchmark tests (serial, no xdist)" }
 lint = "ruff check ."
 fmt = "ruff format ."
 typecheck = { cmd = "pyright src/tesseract_robotics", description = "Type check with pyright" }
