@@ -11,9 +11,6 @@ import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 class DescartesSolverProfileD(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
 
-    @staticmethod
-    def getStaticKey() -> int: ...
-
 class DescartesLadderGraphSolverProfileD(DescartesSolverProfileD):
     def __init__(self) -> None: ...
 
@@ -31,9 +28,6 @@ def cast_DescartesSolverProfileD(profile: DescartesLadderGraphSolverProfileD) ->
 
 class DescartesMoveProfileD(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
-
-    @staticmethod
-    def getStaticKey() -> int: ...
 
 DescartesPlanProfileD: TypeAlias = DescartesMoveProfileD
 

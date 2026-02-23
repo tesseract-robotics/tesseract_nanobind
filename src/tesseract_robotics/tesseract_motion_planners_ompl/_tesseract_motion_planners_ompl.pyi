@@ -120,9 +120,6 @@ class SBLConfigurator(OMPLPlannerConfigurator):
 class OMPLMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
 
-    @staticmethod
-    def getStaticKey() -> int: ...
-
 OMPLPlanProfile: TypeAlias = OMPLMoveProfile
 
 class OMPLRealVectorMoveProfile(OMPLMoveProfile):

@@ -14,7 +14,6 @@ SRC_DIR="$PROJECT_ROOT/src/tesseract_robotics"
 # Module name -> subdir mapping
 # Format: "full.module.name:subdir"
 MODULES=(
-    "tesseract_robotics.ifopt._ifopt:ifopt"
     "tesseract_robotics.tesseract_collision._tesseract_collision:tesseract_collision"
     "tesseract_robotics.tesseract_command_language._tesseract_command_language:tesseract_command_language"
     "tesseract_robotics.tesseract_common._tesseract_common:tesseract_common"

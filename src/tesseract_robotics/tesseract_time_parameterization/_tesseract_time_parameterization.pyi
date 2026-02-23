@@ -34,9 +34,6 @@ class TOTGCompositeProfile(tesseract_robotics.tesseract_command_language._tesser
     @overload
     def __init__(self, max_velocity_scaling_factor: float, max_acceleration_scaling_factor: float, path_tolerance: float, min_angle_change: float) -> None: ...
 
-    @staticmethod
-    def getStaticKey() -> int: ...
-
     @property
     def override_limits(self) -> bool: ...
 
@@ -86,9 +83,6 @@ class ISPCompositeProfile(tesseract_robotics.tesseract_command_language._tessera
     @overload
     def __init__(self, max_velocity_scaling_factor: float, max_acceleration_scaling_factor: float) -> None: ...
 
-    @staticmethod
-    def getStaticKey() -> int: ...
-
     @property
     def add_points(self) -> bool: ...
 
@@ -131,9 +125,6 @@ class ISPMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_co
 
     @overload
     def __init__(self, max_velocity_scaling_factor: float, max_acceleration_scaling_factor: float) -> None: ...
-
-    @staticmethod
-    def getStaticKey() -> int: ...
 
     @property
     def max_velocity_scaling_factor(self) -> float: ...

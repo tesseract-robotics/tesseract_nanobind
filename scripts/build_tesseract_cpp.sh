@@ -165,6 +165,7 @@ colcon build \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DINSTALL_OMPL=OFF \
         -DINSTALL_OMPL_TAG=master \
+        -DBUILD_CLOUD_CLIENT=OFF \
         -DBUILD_IPOPT=OFF \
         -DBUILD_SNOPT=OFF \
         -DBUILD_SHARED_LIBS=ON \

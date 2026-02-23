@@ -390,7 +390,7 @@ NB_MODULE(_tesseract_command_language, m) {
 
     // ========== ProfileDictionary ==========
     // Note: ProfileDictionary moved to tesseract_common in 0.33
-    // Note: key is now std::size_t (hash), use Profile::getStaticKey() to get it
+    // Note: key is now std::size_t (hash), use Profile::createKey<T>() to get it
     nb::class_<tc::ProfileDictionary>(m, "ProfileDictionary")
         .def(nb::init<>())
         .def("addProfile", nb::overload_cast<const std::string&, const std::string&, const tc::Profile::ConstPtr&>(

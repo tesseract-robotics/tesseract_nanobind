@@ -79,16 +79,14 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
 
     // ========== TrajOptMoveProfile (base, was TrajOptPlanProfile) ==========
     nb::class_<tp::TrajOptMoveProfile, tc::Profile>(m, "TrajOptMoveProfile")
-        .def("getKey", &tp::TrajOptMoveProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptMoveProfile::getStaticKey);
+        .def("getKey", &tp::TrajOptMoveProfile::getKey);
 
     // SWIG-compatible alias
     m.attr("TrajOptPlanProfile") = m.attr("TrajOptMoveProfile");
 
     // ========== TrajOptCompositeProfile (base) ==========
     nb::class_<tp::TrajOptCompositeProfile, tc::Profile>(m, "TrajOptCompositeProfile")
-        .def("getKey", &tp::TrajOptCompositeProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptCompositeProfile::getStaticKey);
+        .def("getKey", &tp::TrajOptCompositeProfile::getKey);
 
     // ========== TrajOptDefaultMoveProfile (was TrajOptDefaultPlanProfile) ==========
     nb::class_<tp::TrajOptDefaultMoveProfile, tp::TrajOptMoveProfile>(m, "TrajOptDefaultMoveProfile")
@@ -160,8 +158,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
     nb::class_<tp::TrajOptSolverProfile, tc::Profile>(m, "TrajOptSolverProfile")
         .def_rw("opt_params", &tp::TrajOptSolverProfile::opt_params,
                 "Optimization parameters")
-        .def("getKey", &tp::TrajOptSolverProfile::getKey)
-        .def_static("getStaticKey", &tp::TrajOptSolverProfile::getStaticKey);
+        .def("getKey", &tp::TrajOptSolverProfile::getKey);
 
     // ========== TrajOptOSQPSolverProfile ==========
     nb::class_<tp::TrajOptOSQPSolverProfile, tp::TrajOptSolverProfile>(m, "TrajOptOSQPSolverProfile")

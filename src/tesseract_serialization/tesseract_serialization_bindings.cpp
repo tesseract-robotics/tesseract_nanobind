@@ -1,20 +1,21 @@
 /**
  * @file tesseract_serialization_bindings.cpp
- * @brief Python bindings for tesseract Boost.Serialization (root types only)
+ * @brief Python bindings for tesseract serialization via Cereal (root types only)
  *
- * Exposes XML/binary serialization for high-level types. Boost.Serialization
+ * Exposes XML/binary serialization for high-level types. Cereal
  * recursively handles all nested types - only root entry points needed.
  */
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
-#include <boost/serialization/shared_ptr.hpp>
-
 #include <tesseract_common/serialization.h>
 #include <tesseract_command_language/composite_instruction.h>
+#include <tesseract_command_language/cereal_serialization.h>
 #include <tesseract_environment/environment.h>
+#include <tesseract_environment/cereal_serialization.h>
 #include <tesseract_scene_graph/scene_state.h>
+#include <tesseract_scene_graph/cereal_serialization.h>
 
 namespace nb = nanobind;
 using namespace tesseract_common;
@@ -24,7 +25,7 @@ using namespace tesseract_scene_graph;
 
 NB_MODULE(_tesseract_serialization, m)
 {
-    m.doc() = "Tesseract serialization bindings (XML/binary via Boost.Serialization)";
+    m.doc() = "Tesseract serialization bindings (XML/binary via Cereal)";
 
     // ============================================================
     // CompositeInstruction - Motion Programs

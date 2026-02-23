@@ -51,7 +51,6 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def(nb::init<double, double, double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a,
              "path_tolerance"_a, "min_angle_change"_a)
-        .def_static("getStaticKey", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::getStaticKey)
         .def_rw("override_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::override_limits)
         .def_rw("velocity_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::velocity_limits)
         .def_rw("acceleration_limits", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::acceleration_limits)
@@ -65,7 +64,6 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
-        .def_static("getStaticKey", &tp::IterativeSplineParameterizationCompositeProfile::getStaticKey)
         .def_rw("add_points", &tp::IterativeSplineParameterizationCompositeProfile::add_points)
         .def_rw("override_limits", &tp::IterativeSplineParameterizationCompositeProfile::override_limits)
         .def_rw("velocity_limits", &tp::IterativeSplineParameterizationCompositeProfile::velocity_limits)
@@ -78,7 +76,6 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
-        .def_static("getStaticKey", &tp::IterativeSplineParameterizationMoveProfile::getStaticKey)
         .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_velocity_scaling_factor)
         .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_acceleration_scaling_factor);
 

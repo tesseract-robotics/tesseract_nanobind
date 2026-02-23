@@ -74,7 +74,6 @@ class TestDescartesProfiles:
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
-        assert DescartesDefaultPlanProfileD.getStaticKey() is not None
 
     def test_default_plan_profile_attributes(self):
         """Test DescartesDefaultPlanProfileD attributes."""

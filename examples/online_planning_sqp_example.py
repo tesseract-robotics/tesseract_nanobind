@@ -20,18 +20,20 @@ Collision Checking Modes
 - Discrete: Single timestep collision check (SingleTimestepCollisionEvaluator)
 - Continuous: LVS (longest valid segment) between timesteps (LVSDiscreteCollisionEvaluator)
 
-Architecture
-------------
+Architecture (0.34 API)
+-----------------------
 1. Build IFOPT problem with:
-   - JointPosition variables for each waypoint
+   - Node/Var for each waypoint (replaces JointPosition)
+   - NodesVariables container (passed to IfoptProblem constructor)
    - JointPosConstraint for start position
-   - CartPosConstraint for target pose
+   - CartPosConstraint for target pose (direct params, no CartPosInfo)
    - JointVelConstraint for smoothness
-   - CollisionConstraint for safety (discrete or continuous)
+   - CollisionConstraint for safety (no CollisionCache — now internal)
 
-2. Create TrustRegionSQPSolver with OSQPEigenSolver
+2. Create IfoptQPProblem(nlp) from IfoptProblem
+3. Create TrustRegionSQPSolver with OSQPEigenSolver
 
-3. Loop:
+4. Loop:
    - Update obstacle position in environment
    - stepSQPSolver() for single SQP iteration
    - Extract trajectory from results
@@ -56,11 +58,7 @@ if "pytest" not in sys.modules:
 def build_optimization_problem(
     robot, joint_names, start_pos, target_pos, steps=10, use_continuous_collision=True
 ):
-    """Build the IFOPT optimization problem.
-
-    This manually constructs the trajectory optimization problem using:
-    - JointPosition variables for each waypoint
-    - Constraints: start position, target pose, velocity, collision
+    """Build the IFOPT optimization problem using 0.34 Var/Node API.
 
     Args:
         robot: Robot instance with environment
@@ -68,7 +66,7 @@ def build_optimization_problem(
         start_pos: Starting joint positions
         target_pos: Target joint positions
         steps: Number of trajectory waypoints
-        use_continuous_collision: If True, use LVS continuous collision (matches C++).
+        use_continuous_collision: If True, use LVS continuous collision.
                                   If False, use discrete single-timestep collision.
 
     Returns:
@@ -80,88 +78,81 @@ def build_optimization_problem(
 
     # Interpolate initial trajectory
     initial_states = ti.interpolate(start_pos, target_pos, steps)
+    bounds = ti.toBounds(joint_limits)
 
-    # Create QP problem
-    problem = tsqp.IfoptQPProblem()
+    # Create NodesVariables — factory handles Node/Var creation on C++ side
+    nodes_variables = ti.createNodesVariables(
+        "trajectory", list(joint_names), list(initial_states), bounds
+    )
+    nlp = tsqp.IfoptProblem(nodes_variables)
 
-    # Add joint position variables for each timestep
+    # Get Var references for constraints
     vars_list = []
-    for i, state in enumerate(initial_states):
-        var = ti.JointPosition(state, joint_names, f"Joint_Position_{i}")
-        var.SetBounds(joint_limits)
-        vars_list.append(var)
-        problem.addVariableSet(var)
+    for node in nodes_variables.getNodes():
+        vars_list.append(node.getVar("joints"))
 
     # Add start position constraint (first waypoint = current position)
     home_coeffs = np.ones(len(joint_names)) * 5.0
-    home_constraint = ti.JointPosConstraint(start_pos, [vars_list[0]], home_coeffs, "Home_Position")
-    problem.addConstraintSet(home_constraint)
+    home_constraint = ti.JointPosConstraint(start_pos, vars_list[0], home_coeffs, "Home_Position")
+    nlp.addConstraintSet(home_constraint)
 
     # Add target pose constraint (last waypoint = target in Cartesian space)
     target_tf = manip.calcFwdKin(target_pos)["tool0"]
-    cart_info = ti.CartPosInfo()
-    cart_info.manip = manip
-    cart_info.source_frame = "tool0"
-    cart_info.target_frame = "world"
-    cart_info.source_frame_offset = Isometry3d.Identity()
-    cart_info.target_frame_offset = target_tf
-    cart_info.type = ti.CartPosInfoType.TARGET_ACTIVE
-    cart_info.indices = np.array([0, 1, 2, 3, 4, 5], dtype=np.int32)  # Full 6-DOF
-
-    target_constraint = ti.CartPosConstraint(cart_info, vars_list[-1], "Target_Pose")
-    problem.addConstraintSet(target_constraint)
+    target_constraint = ti.CartPosConstraint(
+        vars_list[-1],
+        manip,
+        "tool0",  # source_frame
+        "world",  # target_frame
+        Isometry3d.Identity(),  # source_frame_offset
+        target_tf,  # target_frame_offset
+        "Target_Pose",
+    )
+    nlp.addConstraintSet(target_constraint)
 
     # Add velocity cost (smooth motion)
     vel_target = np.zeros(len(joint_names))
     vel_constraint = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "JointVelocity")
-    problem.addCostSet(vel_constraint, tsqp.CostPenaltyType.SQUARED)
+    nlp.addCostSet(vel_constraint)
+
+    # Create QP problem from NLP
+    problem = tsqp.IfoptQPProblem(nlp)
 
     # Add collision constraints
-    # IMPORTANT: Keep references to collision_config and collision_cache alive
-    # as the C++ side holds shared_ptr to them
     margin = 0.1  # 10cm safety margin
     margin_coeff = 10.0
     collision_config = ti.TrajOptCollisionConfig(margin, margin_coeff)
-    collision_config.collision_margin_buffer = 0.10  # As in C++ example
-    collision_cache = ti.CollisionCache(steps)
+    collision_config.collision_margin_buffer = 0.10
     collision_evaluators = []
     collision_constraints = []
 
     if use_continuous_collision:
-        # Use LVS (longest valid segment) collision checking between consecutive states
-        # This matches the C++ online_planning_example.cpp implementation
         for i in range(1, steps):
-            # LVSDiscreteCollisionEvaluator checks collision at interpolated points
             collision_evaluator = ti.LVSDiscreteCollisionEvaluator(
-                collision_cache,
                 manip,
                 robot.env,
                 collision_config,
-                True,  # dynamic_environment
+                True,
             )
-            # ContinuousCollisionConstraint takes two consecutive JointPosition variables
             collision_constraint = ti.ContinuousCollisionConstraint(
                 collision_evaluator,
-                vars_list[i - 1],  # position_var0
-                vars_list[i],  # position_var1
-                False,  # fixed0
-                False,  # fixed1
-                1,  # max_num_cnt
-                False,  # fixed_sparsity
+                vars_list[i - 1],
+                vars_list[i],
+                False,
+                False,
+                1,
+                False,
                 f"LVSCollision_{i - 1}_{i}",
             )
             problem.addConstraintSet(collision_constraint)
             collision_evaluators.append(collision_evaluator)
             collision_constraints.append(collision_constraint)
     else:
-        # Use discrete single-timestep collision checking
         for i in range(1, steps):
             collision_evaluator = ti.SingleTimestepCollisionEvaluator(
-                collision_cache,
                 manip,
                 robot.env,
                 collision_config,
-                True,  # dynamic_environment
+                True,
             )
             collision_constraint = ti.DiscreteCollisionConstraint(
                 collision_evaluator, vars_list[i], 1, False, f"Collision_{i}"
@@ -173,18 +164,17 @@ def build_optimization_problem(
     # Setup the problem (must be called after adding all sets)
     problem.setup()
 
-    # Return dict with all objects that must stay alive for the problem to work
     return {
         "problem": problem,
+        "nlp": nlp,
+        "nodes_variables": nodes_variables,
         "vars_list": vars_list,
         "target_constraint": target_constraint,
         "home_constraint": home_constraint,
         "vel_constraint": vel_constraint,
         "collision_config": collision_config,
-        "collision_cache": collision_cache,
         "collision_evaluators": collision_evaluators,
         "collision_constraints": collision_constraints,
-        "cart_info": cart_info,
         "manip": manip,
     }
 
@@ -240,14 +230,13 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     solver.solve(problem)
     solve_time = time.perf_counter() - t0
     x = solver.getResults().best_var_vals
-    cost = problem.evaluateTotalExactCost(x)
+    cost = problem.getTotalExactCost()
     print(f"Initial solve: cost={cost:.4f}, time={solve_time * 1000:.1f}ms")
 
     trajectories = [x.copy()]
     timings = [solve_time]
 
     # Online replanning loop
-    # Key insight from C++: rebuild problem each iteration with warm-start trajectory
     num_replan = 10
     print(f"\nOnline replanning ({num_replan} iterations)...")
 
@@ -258,31 +247,30 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
         human_x = 0.5 + 0.3 * np.sin(iteration * 0.3)
         update_human_position(robot, human_x, 0.0)
 
-        # Extract joint values from solution (first steps*n_joints values, rest are slack)
+        # Extract joint values from solution
         joint_vals = x[: steps * n_joints]
         traj = joint_vals.reshape(steps, n_joints)
 
-        # Rebuild problem with warm-start (like C++ setupProblem)
+        # Rebuild problem with warm-start
         t0 = time.perf_counter()
         problem_data = build_optimization_problem(
             robot,
             joint_names,
-            traj[0],  # Current start from trajectory
+            traj[0],
             target_pos,
             steps,
             use_continuous_collision,
         )
         problem = problem_data["problem"]
 
-        # Set warm-start values
-        for i, var in enumerate(problem_data["vars_list"]):
-            var.SetVariables(traj[i])
+        # Set warm-start values — flatten trajectory into decision vector
+        problem_data["nodes_variables"].setVariables(traj.flatten())
 
         # Single SQP step (incremental optimization)
         solver.init(problem)
         solver.stepSQPSolver()
 
-        # Reset box size (like C++ - trust region loop can shrink it to zero)
+        # Reset box size (trust region loop can shrink it to zero)
         solver.setBoxSize(box_size)
 
         x = solver.getResults().best_var_vals
@@ -291,7 +279,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
         trajectories.append(x.copy())
 
         if verbose:
-            cost = problem.evaluateTotalExactCost(x)
+            cost = problem.getTotalExactCost()
             print(f"  Iter {iteration + 1}: cost={cost:.4f}, time={dt * 1000:.1f}ms")
 
     avg_time = np.mean(timings[1:]) * 1000
@@ -308,28 +296,24 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
 
 
 def main():
-    results = run(verbose=False)  # Set True for solver iteration details
+    results = run(verbose=False)
 
-    # Print trajectory comparison info
     if results.get("trajectories"):
         n_joints = len(results["joint_names"])
-        steps = 12  # C++ default
+        steps = 12
         robot = results["robot"]
         manip = robot.env.getKinematicGroup("manipulator")
 
         print("\n=== Trajectory Results ===")
 
-        # Target pose (C++ reference)
         target_joints = np.array([5.5, 3.0, 0, 0, 0, 0, 0, 0])
         target_tf = manip.calcFwdKin(target_joints)["tool0"]
         target_pos = target_tf.translation()
 
-        # Initial solve
         traj0 = results["trajectories"][0][: steps * n_joints].reshape(steps, n_joints)
         initial_tf = manip.calcFwdKin(traj0[-1])["tool0"]
         initial_pos = initial_tf.translation()
 
-        # Final trajectory (after replanning)
         traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
         final_tf = manip.calcFwdKin(traj_final[-1])["tool0"]
         final_pos = final_tf.translation()
@@ -344,34 +328,28 @@ def main():
         print("\n=== Starting Viewer ===")
         print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
         print("Human: red cylinder at FINAL position (static in viewer)")
-        print("Note: Human moved during optimization but trajectory only animates robot")
         print("URL: http://localhost:8000")
 
-        # Modify visuals for better viewing
         env = results["robot"].env
         scene = env.getSceneGraph()
 
-        # Make human obstacle visible (URDF has 5% opacity by design)
         human_link = scene.getLink("human_estop_zone")
         for v in human_link.visual:
             if v.material:
-                v.material.color = np.array([0.8, 0.0, 0.0, 0.7])  # 70% opaque
+                v.material.color = np.array([0.8, 0.0, 0.0, 0.7])
 
-        # Remove robot_estop_zone visual (large cylinder obscures robot)
         robot_zone = scene.getLink("robot_estop_zone")
         robot_zone.visual.clear()
 
         viewer = TesseractViewer()
         viewer.update_environment(env, [0, 0, 0])
 
-        # Convert trajectory to viewer format: [joint_vals..., timestamp]
         n_joints = len(results["joint_names"])
-        steps = 12  # C++ default
+        steps = 12
         traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
-        dt = 0.1  # 100ms between waypoints
+        dt = 0.1
         trajectory_list = []
         for i, wp in enumerate(traj_final):
-            # Append timestamp as last element, convert to Python list for JSON
             row = wp.tolist() + [i * dt]
             trajectory_list.append(row)
         viewer.update_trajectory_list(results["joint_names"], trajectory_list)

@@ -103,8 +103,7 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
 
     // ========== OMPLMoveProfile (base, was OMPLPlanProfile) ==========
     nb::class_<tp::OMPLMoveProfile, tc::Profile>(m, "OMPLMoveProfile")
-        .def("getKey", &tp::OMPLMoveProfile::getKey)
-        .def_static("getStaticKey", &tp::OMPLMoveProfile::getStaticKey);
+        .def("getKey", &tp::OMPLMoveProfile::getKey);
 
     // SWIG-compatible alias
     m.attr("OMPLPlanProfile") = m.attr("OMPLMoveProfile");

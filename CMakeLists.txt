@@ -325,30 +325,17 @@ else()
 endif()
 
 # Add trajopt_sqp module (SQP solver with stepSQPSolver for real-time planning)
-find_package(ifopt QUIET)
-if(trajopt_sqp_FOUND AND ifopt_FOUND)
+if(trajopt_sqp_FOUND)
   message(STATUS "trajopt_sqp found - building SQP solver bindings")
   add_tesseract_nanobind_extension(
     trajopt_sqp
     src/trajopt_sqp/trajopt_sqp_bindings.cpp
     trajopt::trajopt_sqp
-    ifopt::ifopt_core
+    trajopt::trajopt_ifopt
     tesseract::tesseract_common
   )
 else()
-  message(STATUS "trajopt_sqp/ifopt not found - skipping bindings")
-endif()
-
-# Add ifopt base classes module (Bounds, Component, VariableSet, ConstraintSet, CostTerm)
-if(ifopt_FOUND)
-  message(STATUS "ifopt found - building base class bindings")
-  add_tesseract_nanobind_extension(
-    ifopt
-    src/ifopt/ifopt_bindings.cpp
-    ifopt::ifopt_core
-  )
-else()
-  message(STATUS "ifopt not found - skipping base class bindings")
+  message(STATUS "trajopt_sqp not found - skipping bindings")
 endif()
 
 # Find and add tesseract_time_parameterization

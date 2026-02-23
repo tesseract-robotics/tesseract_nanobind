@@ -84,14 +84,12 @@ class TestTrajOptProfiles:
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
-        assert TrajOptDefaultPlanProfile.getStaticKey() is not None
 
     def test_default_composite_profile(self):
         profile = TrajOptDefaultCompositeProfile()
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
-        assert TrajOptDefaultCompositeProfile.getStaticKey() is not None
         # Test default attributes
         assert hasattr(profile, "smooth_velocities")
         assert hasattr(profile, "smooth_accelerations")
