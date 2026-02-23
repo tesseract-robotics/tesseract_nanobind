@@ -209,6 +209,9 @@ class TaskComposer:
             Use TaskComposer.from_config() for simpler initialization.
             Do not pass a Robot or Environment - use the factory pattern.
         """
+        from tesseract_robotics import ensure_configured
+
+        ensure_configured()
         if not isinstance(factory, TaskComposerPluginFactory):
             type_name = type(factory).__name__
             raise TypeError(

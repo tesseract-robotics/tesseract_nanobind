@@ -1,7 +1,7 @@
 """
 tesseract_robotics - Python bindings for Tesseract motion planning.
 
-Environment Variables (auto-configured on import):
+Environment Variables (auto-configured on first use):
     TESSERACT_SUPPORT_DIR: Path to tesseract_support (URDF/meshes)
     TESSERACT_RESOURCE_PATH: Resource search path for URDFs
     TESSERACT_TASK_COMPOSER_CONFIG_FILE: Task composer YAML config
@@ -169,6 +169,17 @@ def _configure_environment():
                 os.environ[env_var] = plugin_path
 
 
+_configured = False
+
+
+def ensure_configured() -> None:
+    """Configure environment on first use. Safe to call multiple times."""
+    global _configured  # noqa: PLW0603
+    if not _configured:
+        _configure_environment()
+        _configured = True
+
+
 def get_data_path() -> Path:
     """Get path to bundled data directory."""
     return Path(__file__).parent / "data"
@@ -182,6 +193,3 @@ def get_tesseract_support_path() -> Path:
 def get_task_composer_config_path() -> Path:
     """Get path to bundled task composer config file."""
     return Path(__file__).parent / "data" / "task_composer_config" / "task_composer_plugins.yaml"
-
-
-_configure_environment()
