@@ -8,6 +8,8 @@ Verifies that Python subclasses of ConstraintSet work correctly:
 - addConstraintSet / addCostSet on IfoptProblem
 """
 
+from __future__ import annotations
+
 import numpy as np
 import scipy.sparse
 
