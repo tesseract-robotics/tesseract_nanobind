@@ -48,6 +48,37 @@
 namespace ti = trajopt_ifopt;
 namespace tc = trajopt_common;
 
+// Trampoline for ConstraintSet (enable Python subclassing)
+// Pure virtuals from Component: getValues(), getBounds()
+// Pure virtuals from Differentiable: update(), getCoefficients(), getJacobian()
+class PyConstraintSet : public ti::ConstraintSet {
+public:
+    NB_TRAMPOLINE(ti::ConstraintSet, 5);
+
+    // Expose protected getVariables() for Python access
+    using ti::ConstraintSet::getVariables;
+
+    Eigen::VectorXd getValues() const override {
+        NB_OVERRIDE_PURE(getValues);
+    }
+
+    std::vector<ti::Bounds> getBounds() const override {
+        NB_OVERRIDE_PURE(getBounds);
+    }
+
+    int update() override {
+        NB_OVERRIDE_PURE(update);
+    }
+
+    Eigen::VectorXd getCoefficients() const override {
+        NB_OVERRIDE_PURE(getCoefficients);
+    }
+
+    ti::Jacobian getJacobian() const override {
+        NB_OVERRIDE_PURE(getJacobian);
+    }
+};
+
 NB_MODULE(_trajopt_ifopt, m) {
     m.doc() = "trajopt_ifopt Python bindings - variables, constraints, and costs for IFOPT-based trajectory optimization";
 
@@ -115,10 +146,24 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("getCoefficients", &ti::Differentiable::getCoefficients,
              "Get the coefficient vector");
 
-    // ========== ConstraintSet (inherits Differentiable) ==========
-    nb::class_<ti::ConstraintSet, ti::Differentiable>(m, "ConstraintSet")
+    // ========== ConstraintSet (inherits Differentiable, with Python trampoline) ==========
+    nb::class_<ti::ConstraintSet, ti::Differentiable, PyConstraintSet>(m, "ConstraintSet")
+        .def(nb::init<std::string, int>(), "name"_a, "n_constraints"_a,
+             "Create a constraint set with name and number of constraints")
         .def("linkWithVariables", &ti::ConstraintSet::linkWithVariables, "x"_a,
-             "Connect the constraint with the optimization variables");
+             "Connect the constraint with the optimization variables")
+        .def("getVariables", &PyConstraintSet::getVariables,
+             "Get the linked optimization variables (protected in C++, exposed via trampoline)")
+        .def("getValues", &ti::ConstraintSet::getValues,
+             "Get the current constraint values")
+        .def("getBounds", &ti::ConstraintSet::getBounds,
+             "Get the constraint bounds")
+        .def("getJacobian", &ti::ConstraintSet::getJacobian,
+             "Get the constraint Jacobian (sparse matrix)")
+        .def("update", &ti::ConstraintSet::update,
+             "Recompute sizing/state for dynamic-sized components")
+        .def("getCoefficients", &ti::ConstraintSet::getCoefficients,
+             "Get the coefficient vector");
 
     // ========== Var (variable segment) ==========
     nb::class_<ti::Var>(m, "Var")
