@@ -83,7 +83,7 @@ ls -1
 # Patch upstream missing includes (idempotent, portable)
 echo ""
 echo "Patching upstream sources..."
-python3 "$(dirname "$0")/patch_upstream.py"
+python3 "$SCRIPT_DIR/patch_upstream.py"
 
 # Build with colcon
 echo ""
