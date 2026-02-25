@@ -83,8 +83,23 @@ class Differentiable(Component):
         """Get the coefficient vector"""
 
 class ConstraintSet(Differentiable):
+    def __init__(self, name: str, n_constraints: int) -> None:
+        """Create a constraint set with name and number of constraints"""
+
     def linkWithVariables(self, x: Variables) -> None:
         """Connect the constraint with the optimization variables"""
+
+    def getVariables(self) -> Variables:
+        """Get the linked optimization variables (protected in C++, exposed via trampoline)"""
+
+    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """Get the current constraint values"""
+
+    def getBounds(self) -> list[Bounds]:
+        """Get the constraint bounds"""
+
+    def getJacobian(self) -> "scipy.sparse.csr_matrix":
+        """Get the constraint Jacobian (sparse matrix)"""
 
 class Var:
     def getIdentifier(self) -> str:
