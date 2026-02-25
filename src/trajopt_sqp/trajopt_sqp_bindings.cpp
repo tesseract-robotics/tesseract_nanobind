@@ -181,7 +181,31 @@ NB_MODULE(_trajopt_sqp, m) {
         .def("updateLowerBound", &tsqp::OSQPEigenSolver::updateLowerBound, "lower_bound"_a)
         .def("updateUpperBound", &tsqp::OSQPEigenSolver::updateUpperBound, "upper_bound"_a)
         .def("updateBounds", &tsqp::OSQPEigenSolver::updateBounds,
-             "lower_bound"_a, "upper_bound"_a);
+             "lower_bound"_a, "upper_bound"_a)
+        // OSQP settings — forwarded to solver_->settings()
+        // Defaults (set in C++ constructor): polish=true, warmStart=true,
+        // adaptiveRho=true, maxIter=8192, absTol=1e-4, relTol=1e-6
+        .def("setPolish", [](tsqp::OSQPEigenSolver& self, bool v) {
+            self.solver_->settings()->setPolish(v); }, "polish"_a,
+            "Enable solution polishing (default: true)")
+        .def("setWarmStart", [](tsqp::OSQPEigenSolver& self, bool v) {
+            self.solver_->settings()->setWarmStart(v); }, "warm_start"_a,
+            "Enable warm-starting (default: true)")
+        .def("setAdaptiveRho", [](tsqp::OSQPEigenSolver& self, bool v) {
+            self.solver_->settings()->setAdaptiveRho(v); }, "adaptive_rho"_a,
+            "Enable adaptive step size (default: true)")
+        .def("setMaxIteration", [](tsqp::OSQPEigenSolver& self, int v) {
+            self.solver_->settings()->setMaxIteration(v); }, "max_iter"_a,
+            "Max OSQP iterations per QP solve (default: 8192)")
+        .def("setAbsoluteTolerance", [](tsqp::OSQPEigenSolver& self, double v) {
+            self.solver_->settings()->setAbsoluteTolerance(v); }, "abs_tol"_a,
+            "Absolute convergence tolerance (default: 1e-4)")
+        .def("setRelativeTolerance", [](tsqp::OSQPEigenSolver& self, double v) {
+            self.solver_->settings()->setRelativeTolerance(v); }, "rel_tol"_a,
+            "Relative convergence tolerance (default: 1e-6)")
+        .def("setVerbosity", [](tsqp::OSQPEigenSolver& self, bool v) {
+            self.solver_->settings()->setVerbosity(v); }, "verbose"_a,
+            "Enable OSQP console output (default: false)");
 
     // ========== QPProblem (abstract base) ==========
 

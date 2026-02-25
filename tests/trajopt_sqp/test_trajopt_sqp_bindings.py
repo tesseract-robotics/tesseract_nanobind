@@ -210,6 +210,17 @@ class TestTrajOptSQPTypes:
         solver = tsqp.OSQPEigenSolver()
         assert solver is not None
 
+    def test_osqp_solver_settings(self):
+        """Test OSQP settings setters forward to solver_->settings()."""
+        solver = tsqp.OSQPEigenSolver()
+        solver.setPolish(False)
+        solver.setWarmStart(False)
+        solver.setAdaptiveRho(False)
+        solver.setMaxIteration(4096)
+        solver.setAbsoluteTolerance(1e-5)
+        solver.setRelativeTolerance(1e-7)
+        solver.setVerbosity(False)
+
     def test_trust_region_solver_creation(self):
         """Test TrustRegionSQPSolver creation."""
         qp_solver = tsqp.OSQPEigenSolver()
