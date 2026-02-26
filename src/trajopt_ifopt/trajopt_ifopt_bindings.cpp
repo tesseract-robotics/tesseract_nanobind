@@ -200,6 +200,7 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("hasVar", &ti::Node::hasVar, "name"_a,
              "Check whether this node has a variable by name")
         .def("getVar", &ti::Node::getVar, "name"_a,
+             nb::rv_policy::reference_internal,
              "Get a variable by name")
         .def("getValues", &ti::Node::getValues,
              "Get all variable values as a single vector")
@@ -213,8 +214,10 @@ NB_MODULE(_trajopt_ifopt, m) {
     // ========== NodesVariables (main variable container, replaces JointPosition) ==========
     nb::class_<ti::NodesVariables, ti::Variables>(m, "NodesVariables")
         .def("getNode", &ti::NodesVariables::getNode, "opt_idx"_a,
+             nb::rv_policy::reference_internal,
              "Get node based on index")
         .def("getNodes", &ti::NodesVariables::getNodes,
+             nb::rv_policy::reference_internal,
              "Get all nodes")
         .def("getDim", &ti::NodesVariables::getDim,
              "Get the dimensions of every node");
