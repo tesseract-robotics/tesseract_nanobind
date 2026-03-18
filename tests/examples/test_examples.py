@@ -7,22 +7,8 @@ Markers:
   - @pytest.mark.lowlevel: Low-level API examples
 """
 
-import importlib.util
-from pathlib import Path
-
 import pytest
-
-ROOT_DIR = Path(__file__).parent.parent.parent
-EXAMPLES = ROOT_DIR / "examples"
-VIEWER_EXAMPLES = EXAMPLES  # Viewer examples now in main examples dir
-LOWLEVEL_EXAMPLES = EXAMPLES / "lowlevel"
-
-
-def _load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+import tesseract_robotics.examples
 
 
 # === Viewer Examples ===
@@ -30,20 +16,18 @@ def _load_module(name, path):
 
 @pytest.mark.viewer
 def test_shapes_viewer():
-    _load_module("shapes_viewer", VIEWER_EXAMPLES / "shapes_viewer.py").main()
+    tesseract_robotics.examples.shapes_viewer()
 
 
 @pytest.mark.viewer
 def test_material_mesh_viewer():
-    _load_module(
-        "tesseract_material_mesh_viewer", VIEWER_EXAMPLES / "tesseract_material_mesh_viewer.py"
-    ).main()
+    tesseract_robotics.examples.tesseract_material_mesh_viewer()
 
 
 @pytest.mark.viewer
 @pytest.mark.planning
 def test_abb_irb2400_viewer():
-    _load_module("abb_irb2400_viewer", VIEWER_EXAMPLES / "abb_irb2400_viewer.py").main()
+    tesseract_robotics.examples.abb_irb2400_viewer()
 
 
 # === High-Level API Examples ===
@@ -51,80 +35,72 @@ def test_abb_irb2400_viewer():
 
 @pytest.mark.basic
 def test_collision_example():
-    _load_module("tesseract_collision_example", EXAMPLES / "tesseract_collision_example.py").main()
+    tesseract_robotics.examples.tesseract_collision_example()
 
 
 @pytest.mark.basic
 def test_kinematics_example():
-    _load_module(
-        "tesseract_kinematics_example", EXAMPLES / "tesseract_kinematics_example.py"
-    ).main()
+    tesseract_robotics.examples.tesseract_kinematics_example()
 
 
 @pytest.mark.basic
 def test_geometry_showcase_example():
-    _load_module("geometry_showcase_example", EXAMPLES / "geometry_showcase_example.py").main()
+    tesseract_robotics.examples.geometry_showcase_example()
 
 
 @pytest.mark.planning
 def test_freespace_ompl_example():
-    _load_module("freespace_ompl_example", EXAMPLES / "freespace_ompl_example.py").main()
+    tesseract_robotics.examples.freespace_ompl_example()
 
 
 @pytest.mark.planning
 def test_basic_cartesian_example():
-    _load_module("basic_cartesian_example", EXAMPLES / "basic_cartesian_example.py").main()
+    tesseract_robotics.examples.basic_cartesian_example()
 
 
 @pytest.mark.planning
 def test_glass_upright_example():
-    _load_module("glass_upright_example", EXAMPLES / "glass_upright_example.py").main()
+    tesseract_robotics.examples.glass_upright_example()
 
 
 @pytest.mark.planning
 def test_pick_and_place_example():
-    _load_module("pick_and_place_example", EXAMPLES / "pick_and_place_example.py").main()
+    tesseract_robotics.examples.pick_and_place_example()
 
 
 @pytest.mark.planning
 def test_car_seat_example():
-    _load_module("car_seat_example", EXAMPLES / "car_seat_example.py").main()
+    tesseract_robotics.examples.car_seat_example()
 
 
 @pytest.mark.planning
 def test_puzzle_piece_auxillary_axes_example():
-    _load_module(
-        "puzzle_piece_auxillary_axes_example", EXAMPLES / "puzzle_piece_auxillary_axes_example.py"
-    ).main()
+    tesseract_robotics.examples.puzzle_piece_auxillary_axes_example()
 
 
 @pytest.mark.planning
 def test_raster_example():
-    _load_module("raster_example", EXAMPLES / "raster_example.py").main()
+    tesseract_robotics.examples.raster_example()
 
 
 @pytest.mark.planning
 def test_online_planning_example():
-    _load_module("online_planning_example", EXAMPLES / "online_planning_example.py").main()
+    tesseract_robotics.examples.online_planning_example()
 
 
 @pytest.mark.planning
 def test_online_planning_sqp_example():
-    """Test low-level SQP API example."""
-    result = _load_module(
-        "online_planning_sqp_example", EXAMPLES / "online_planning_sqp_example.py"
-    ).run()
-    assert result["success"]
+    tesseract_robotics.examples.online_planning_sqp_example()
 
 
 @pytest.mark.planning
 def test_freespace_hybrid_example():
-    _load_module("freespace_hybrid_example", EXAMPLES / "freespace_hybrid_example.py").main()
+    tesseract_robotics.examples.freespace_hybrid_example()
 
 
 @pytest.mark.planning
 def test_chain_example():
-    _load_module("chain_example", EXAMPLES / "chain_example.py").main()
+    tesseract_robotics.examples.chain_example()
 
 
 # === Low-Level API Examples ===
@@ -133,113 +109,82 @@ def test_chain_example():
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_collision_example():
-    _load_module(
-        "tesseract_collision_c_api_example",
-        LOWLEVEL_EXAMPLES / "tesseract_collision_c_api_example.py",
-    ).main()
+    tesseract_robotics.examples.tesseract_collision_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_kinematics_example():
-    _load_module(
-        "tesseract_kinematics_c_api_example",
-        LOWLEVEL_EXAMPLES / "tesseract_kinematics_c_api_example.py",
-    ).main()
+    tesseract_robotics.examples.tesseract_kinematics_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.basic
 def test_lowlevel_scene_graph_example():
-    _load_module(
-        "scene_graph_c_api_example", LOWLEVEL_EXAMPLES / "scene_graph_c_api_example.py"
-    ).main()
+    tesseract_robotics.examples.scene_graph_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_freespace_ompl_example():
-    _load_module(
-        "freespace_ompl_c_api_example", LOWLEVEL_EXAMPLES / "freespace_ompl_c_api_example.py"
-    ).main()
+    tesseract_robotics.examples.freespace_ompl_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_basic_cartesian_example():
-    _load_module(
-        "basic_cartesian_c_api_example", LOWLEVEL_EXAMPLES / "basic_cartesian_c_api_example.py"
-    ).main()
+    tesseract_robotics.examples.basic_cartesian_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_glass_upright_example():
-    _load_module(
-        "glass_upright_c_api_example", LOWLEVEL_EXAMPLES / "glass_upright_c_api_example.py"
-    ).main()
+    tesseract_robotics.examples.glass_upright_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_example():
-    _load_module(
-        "puzzle_piece_c_api_example", LOWLEVEL_EXAMPLES / "puzzle_piece_c_api_example.py"
-    ).main()
+    tesseract_robotics.examples.puzzle_piece_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_pick_and_place_example():
-    _load_module(
-        "pick_and_place_c_api_example", LOWLEVEL_EXAMPLES / "pick_and_place_c_api_example.py"
-    ).main()
+    tesseract_robotics.examples.pick_and_place_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_car_seat_example():
-    _load_module("car_seat_c_api_example", LOWLEVEL_EXAMPLES / "car_seat_c_api_example.py").main()
+    tesseract_robotics.examples.car_seat_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_puzzle_piece_auxillary_axes_example():
-    _load_module(
-        "puzzle_piece_auxillary_axes_c_api_example",
-        LOWLEVEL_EXAMPLES / "puzzle_piece_auxillary_axes_c_api_example.py",
-    ).main()
+    tesseract_robotics.examples.puzzle_piece_auxillary_axes_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_pythonic_example():
-    _load_module("pythonic_c_api_example", LOWLEVEL_EXAMPLES / "pythonic_c_api_example.py").main()
+    tesseract_robotics.examples.pythonic_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_planning_composer_example():
-    _load_module(
-        "tesseract_planning_composer_c_api_example",
-        LOWLEVEL_EXAMPLES / "tesseract_planning_composer_c_api_example.py",
-    ).main()
+    tesseract_robotics.examples.tesseract_planning_composer_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_planning_lowlevel_example():
-    _load_module(
-        "tesseract_planning_lowlevel_c_api_example",
-        LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_c_api_example.py",
-    ).main()
+    tesseract_robotics.examples.tesseract_planning_lowlevel_c_api_example()
 
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_trajopt_ifopt_example():
-    """Test OMPL + TrajOptIfopt low-level example."""
-    _load_module(
-        "tesseract_planning_lowlevel_trajopt_ifopt_example",
-        LOWLEVEL_EXAMPLES / "tesseract_planning_lowlevel_trajopt_ifopt_example.py",
-    ).main()
+    tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()

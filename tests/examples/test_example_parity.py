@@ -5,23 +5,9 @@ trajectories comparable to the verbose low-level examples (which more
 closely match the C++ tesseract_examples).
 """
 
-import importlib.util
-from pathlib import Path
-
 import numpy as np
 import pytest
-
-ROOT_DIR = Path(__file__).parent.parent.parent
-EXAMPLES = ROOT_DIR / "examples"
-LOWLEVEL = EXAMPLES / "lowlevel"
-
-
-def _load_module(name, path):
-    """Load a Python module from path."""
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+import tesseract_robotics.examples as examples
 
 
 def _get_final_positions(result):
@@ -44,11 +30,8 @@ SINGLE_RESULT_EXAMPLES = [
 @pytest.mark.parametrize("name,waypoint_tol,decimal", SINGLE_RESULT_EXAMPLES)
 def test_single_result_parity(name, waypoint_tol, decimal):
     """Verify single-result examples match between high-level and low-level."""
-    highlevel = _load_module(f"{name}_example", EXAMPLES / f"{name}_example.py")
-    lowlevel = _load_module(f"{name}_c_api_example", LOWLEVEL / f"{name}_c_api_example.py")
-
-    hl = highlevel.run()
-    ll = lowlevel.run()
+    hl = getattr(examples, f"{name}_example")()
+    ll = getattr(examples, f"{name}_c_api_example")()
 
     assert hl["result"].successful
     assert ll["result"].successful
@@ -69,11 +52,8 @@ def test_single_result_parity(name, waypoint_tol, decimal):
 @pytest.mark.planning
 def test_car_seat_parity():
     """Verify car_seat_example.py matches car_seat_c_api_example.py."""
-    highlevel_mod = _load_module("car_seat_example", EXAMPLES / "car_seat_example.py")
-    lowlevel_mod = _load_module("car_seat_c_api_example", LOWLEVEL / "car_seat_c_api_example.py")
-
-    highlevel = highlevel_mod.run()
-    lowlevel = lowlevel_mod.run()
+    highlevel = examples.car_seat_example()
+    lowlevel = examples.car_seat_c_api_example()
 
     # Both should succeed
     assert highlevel["pick_result"].successful
@@ -102,13 +82,8 @@ def test_car_seat_parity():
 @pytest.mark.planning
 def test_pick_and_place_parity():
     """Verify pick_and_place_example.py matches pick_and_place_c_api_example.py."""
-    highlevel_mod = _load_module("pick_and_place_example", EXAMPLES / "pick_and_place_example.py")
-    lowlevel_mod = _load_module(
-        "pick_and_place_c_api_example", LOWLEVEL / "pick_and_place_c_api_example.py"
-    )
-
-    highlevel = highlevel_mod.run()
-    lowlevel = lowlevel_mod.run()
+    highlevel = examples.pick_and_place_example()
+    lowlevel = examples.pick_and_place_c_api_example()
 
     # Both should succeed
     assert highlevel["pick_result"].successful
