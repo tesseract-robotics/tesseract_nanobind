@@ -73,8 +73,8 @@ echo "Importing Dependencies (vcstool)"
 echo "=========================================="
 cd "$WORKSPACE_DIR/src"
 
-echo "Running: vcs import --input dependencies.rosinstall"
-vcs import --input dependencies.rosinstall
+echo "Running: vcs import --shallow --input dependencies.rosinstall"
+vcs import --shallow --input dependencies.rosinstall
 
 echo ""
 echo "Workspace contents:"
