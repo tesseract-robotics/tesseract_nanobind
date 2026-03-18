@@ -135,9 +135,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     )
 else
     OPENMP_CMAKE_ARGS=()
-    # Set rpath to $ORIGIN so libs find deps in same directory
+    # Set rpath to $ORIGIN (sibling libs) and conda/pixi lib (tinyxml2, boost, etc.)
     RPATH_CMAKE_ARGS=(
-        '-DCMAKE_INSTALL_RPATH=$ORIGIN'
+        "-DCMAKE_INSTALL_RPATH=\$ORIGIN:$CONDA_PREFIX/lib"
         -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
     )
 fi
