@@ -169,6 +169,7 @@ llvm-openmp = ">=14,<20"
 # Python build deps
 pip = "*"
 setuptools = ">=68,<82"
+setuptools-scm = ">=8"
 wheel = "*"
 scikit-build-core = ">=0.10,<1"
 nanobind = ">=1.3.2,<3"
