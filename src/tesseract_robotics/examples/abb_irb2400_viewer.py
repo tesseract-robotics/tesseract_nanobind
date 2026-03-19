@@ -40,6 +40,7 @@ from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
+from tesseract_robotics.viewer import TesseractViewer
 
 # TrajOpt imports - optional, skip if not available
 try:
@@ -59,10 +60,6 @@ import sys
 
 import numpy as np
 
-# Viewer (skip import in pytest)
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"

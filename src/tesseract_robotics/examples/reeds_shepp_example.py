@@ -78,8 +78,10 @@ def run(pipeline=None, num_planners=None):
 
     # Set workspace bounds (x: -20 to 20, y: -20 to 20)
     bounds = RealVectorBounds(2)
-    bounds.setLow(-20.0)
-    bounds.setHigh(20.0)
+    bounds.setLow(0, -20.0)
+    bounds.setLow(1, -20.0)
+    bounds.setHigh(0, 20.0)
+    bounds.setHigh(1, 20.0)
     rs.setBounds(bounds)
 
     # Allocate states
