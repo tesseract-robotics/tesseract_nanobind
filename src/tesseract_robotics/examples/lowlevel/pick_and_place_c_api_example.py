@@ -283,8 +283,7 @@ def run():
     pick_result = composer.plan(robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles)
 
     if not pick_result.successful:
-        print(f"PICK planning failed: {pick_result.message}")
-        return False
+        raise RuntimeError(f"PICK planning failed: {pick_result.message}")
 
     print("PICK planning successful!")
     print(f"Pick trajectory has {len(pick_result)} waypoints")

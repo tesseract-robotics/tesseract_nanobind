@@ -22,11 +22,7 @@ import numpy as np
 
 from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
 from tesseract_robotics.tesseract_environment import Environment
-
-# Viewer (skip import in pytest)
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer
 
 
 def _find_twc_support() -> Path:
