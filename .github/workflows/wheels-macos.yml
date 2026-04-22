@@ -12,12 +12,14 @@ on:
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +30,7 @@ jobs:
   build:
     runs-on: macos-14
     strategy:
-      fail-fast: false
+      fail-fast: true  # one failure aborts the others — save CI minutes during iteration
       matrix:
         python: ['3.9', '3.10', '3.11', '3.12']
     defaults:

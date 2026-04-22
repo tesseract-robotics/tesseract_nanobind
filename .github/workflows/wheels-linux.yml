@@ -12,12 +12,14 @@ on:
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+      - '.github/workflows/wheels-macos.yml'
   pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+      - '.github/workflows/wheels-macos.yml'
   workflow_dispatch:
 
 concurrency:
