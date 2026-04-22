@@ -106,7 +106,7 @@ done
 processed=()
 while (( ${#queue[@]} )); do
     current="${queue[1]}"
-    queue=("${queue[@]:2}")  # zsh shift
+    queue=("${queue[@]:1}")  # zsh: skip first element (offset counts elements to skip)
 
     # Skip if already processed
     if [[ " ${processed[*]} " == *" $current "* ]]; then
@@ -139,6 +139,24 @@ while (( ${#queue[@]} )); do
         fi
     done < <(otool -L "$current" | tail -n +2 | awk '{print $1}' | grep '^@rpath/' || true)
 done
+
+# Assert every plugin factory has zero @rpath/ deps — catches the class of bugs
+# where install_name rewriting misses one. Fails the build immediately instead
+# of surfacing 20 min later in test-wheel.
+echo "Asserting no @rpath/ remains in plugin factories..."
+fail=0
+for f in "$DYLIBS_DIR"/*_factor*.dylib; do
+    if otool -L "$f" 2>&1 | grep -q '@rpath/'; then
+        echo "  BUG: $(basename $f) still has @rpath/ deps"
+        otool -L "$f" | grep '@rpath/' | sed 's/^/    /'
+        fail=1
+    fi
+done
+if (( fail )); then
+    echo "❌ install_name rewriting incomplete — see above"
+    exit 1
+fi
+echo "  all plugin factories cleanly resolved via @loader_path/"
 
 # Patch task_composer_config YAMLs (resolved at runtime by __init__.py)
 echo "Patching task composer configs..."
