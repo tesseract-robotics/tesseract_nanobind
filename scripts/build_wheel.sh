@@ -121,11 +121,13 @@ while (( ${#queue[@]} )); do
     fi
 
     # Walk @rpath/ deps
+    modified=0
     while read -r dep; do
         [[ -z "$dep" ]] && continue
         base="${dep#@rpath/}"
         # Rewrite the reference
         install_name_tool -change "$dep" "@loader_path/$base" "$current" 2>/dev/null || true
+        modified=1
         # Ensure the target dep is bundled in .dylibs/
         if [[ ! -f "$DYLIBS_DIR/$base" ]]; then
             for src_dir in "$PROJECT_ROOT/ws/install/lib" "$CONDA_PREFIX/lib"; do
@@ -138,6 +140,12 @@ while (( ${#queue[@]} )); do
             done
         fi
     done < <(otool -L "$current" | tail -n +2 | awk '{print $1}' | grep '^@rpath/' || true)
+
+    # Re-sign ad-hoc after install_name_tool: macOS hardened runtime kills
+    # dlopen of dylibs with invalidated linker signatures (exit 137 / SIGKILL).
+    if (( modified )) || [[ "$current_id" == @rpath/* ]]; then
+        codesign --force --sign - "$current" 2>/dev/null || true
+    fi
 done
 
 # Assert every plugin factory has zero @rpath/ deps — catches the class of bugs
