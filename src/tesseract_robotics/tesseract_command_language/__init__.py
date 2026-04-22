@@ -1,10 +1,6 @@
 """tesseract_command_language Python bindings (nanobind)"""
 
-from tesseract_robotics import ensure_configured
-
-ensure_configured()
-
-from tesseract_robotics.tesseract_command_language._tesseract_command_language import *  # noqa: E402
+from tesseract_robotics.tesseract_command_language._tesseract_command_language import *
 
 # Re-export AnyPoly wrappers from tesseract_task_composer for convenience
 # (examples import these from command_language for SWIG compatibility)

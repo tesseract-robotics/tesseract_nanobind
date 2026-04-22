@@ -193,3 +193,10 @@ def get_tesseract_support_path() -> Path:
 def get_task_composer_config_path() -> Path:
     """Get path to bundled task composer config file."""
     return Path(__file__).parent / "data" / "task_composer_config" / "task_composer_plugins.yaml"
+
+
+# Run at import of tesseract_robotics itself so env vars are set before any
+# submodule is loaded. Submodules used to trigger ensure_configured() from
+# their own __init__.py, but that missed direct imports of e.g.
+# `tesseract_kinematics` which then couldn't find plugins.
+ensure_configured()
