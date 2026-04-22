@@ -474,7 +474,7 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        pattern: python-*-linux-*  # TODO: change back to python-* after PyPI size limit increase
+        pattern: python-*
         merge-multiple: true
         path: dist/
     - name: List wheels
