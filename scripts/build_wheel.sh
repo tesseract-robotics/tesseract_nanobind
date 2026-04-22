@@ -13,7 +13,7 @@ if [[ "$1" == "--dev" ]]; then
     DEV_MODE=true
 fi
 
-cd "$PROJECT_ROOT/tesseract_nanobind"
+cd "$PROJECT_ROOT"
 
 # Set library paths
 export DYLD_LIBRARY_PATH="$PROJECT_ROOT/ws/install/lib:$CONDA_PREFIX/lib"
@@ -116,7 +116,7 @@ done
 rm "$WHEEL_FILE"
 cd "$WHEEL_DIR"
 zip -rq "$PROJECT_ROOT/wheelhouse/$(basename $WHEEL_FILE)" .
-cd "$PROJECT_ROOT/tesseract_nanobind"
+cd "$PROJECT_ROOT"
 rm -rf "$WHEEL_DIR"
 
 echo ""
