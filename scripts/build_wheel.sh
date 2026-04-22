@@ -91,8 +91,54 @@ for plugin in "${PLUGINS[@]}"; do
     fi
 done
 
-echo "Fixing plugin rpaths..."
-delocate-path "$WHEEL_DIR/tesseract_robotics/.dylibs" -L "$PROJECT_ROOT/ws/install/lib:$CONDA_PREFIX/lib"
+# Rewrite @rpath/libX.dylib refs to @loader_path/libX.dylib on all plugins + their transitive
+# deps that we need to bundle. Mirrors what patchelf does for Linux — no delocate dance, no
+# SameFileError edge cases.
+echo "Resolving plugin transitive deps + rewriting install_names..."
+DYLIBS_DIR="$WHEEL_DIR/tesseract_robotics/.dylibs"
+
+# Work queue of dylibs to process (plugins + any of their deps we still need to fetch)
+for plugin in "${PLUGINS[@]}"; do
+    [[ -f "$DYLIBS_DIR/$plugin" ]] || continue
+    queue+=("$DYLIBS_DIR/$plugin")
+done
+
+processed=()
+while (( ${#queue[@]} )); do
+    current="${queue[1]}"
+    queue=("${queue[@]:2}")  # zsh shift
+
+    # Skip if already processed
+    if [[ " ${processed[*]} " == *" $current "* ]]; then
+        continue
+    fi
+    processed+=("$current")
+
+    # Rewrite this dylib's own install id (if @rpath) to @loader_path
+    current_id=$(otool -D "$current" | tail -1)
+    if [[ "$current_id" == @rpath/* ]]; then
+        install_name_tool -id "@loader_path/${current_id#@rpath/}" "$current" 2>/dev/null || true
+    fi
+
+    # Walk @rpath/ deps
+    while read -r dep; do
+        [[ -z "$dep" ]] && continue
+        base="${dep#@rpath/}"
+        # Rewrite the reference
+        install_name_tool -change "$dep" "@loader_path/$base" "$current" 2>/dev/null || true
+        # Ensure the target dep is bundled in .dylibs/
+        if [[ ! -f "$DYLIBS_DIR/$base" ]]; then
+            for src_dir in "$PROJECT_ROOT/ws/install/lib" "$CONDA_PREFIX/lib"; do
+                if [[ -f "$src_dir/$base" ]]; then
+                    cp "$src_dir/$base" "$DYLIBS_DIR/$base"
+                    echo "  Copied dep: $base"
+                    queue+=("$DYLIBS_DIR/$base")
+                    break
+                fi
+            done
+        fi
+    done < <(otool -L "$current" | tail -n +2 | awk '{print $1}' | grep '^@rpath/' || true)
+done
 
 # Patch task_composer_config YAMLs (resolved at runtime by __init__.py)
 echo "Patching task composer configs..."
