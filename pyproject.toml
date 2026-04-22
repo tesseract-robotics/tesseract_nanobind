@@ -210,6 +210,7 @@ lint = "ruff check ."
 fmt = "ruff format ."
 typecheck = { cmd = "pyright src/tesseract_robotics", description = "Type check with pyright" }
 build-cpp = { cmd = "zsh scripts/build_tesseract_cpp.sh", description = "Build tesseract C++ libs" }
+build-wheel = { cmd = "zsh scripts/build_wheel.sh", description = "Build portable wheel (macOS: delocate + plugins + YAML patch)" }
 install = { cmd = "pip install -e . --no-build-isolation", depends-on = [
     "build-cpp",
 ], description = "Install package (editable)" }
