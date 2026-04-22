@@ -4,7 +4,7 @@
 
 **Goal:** Build macOS arm64 wheels on CI via a second workflow file that invokes the same pixi tasks used locally, eliminating sync drift between CI inline YAML and `scripts/build_wheel.sh`.
 
-**Architecture:** Split `wheels.yml` into two workflows — `wheels.yml` (Linux-only, stripped of macOS branches) and `wheels-macos.yml` (new, macOS arm64 only, calls `pixi run build-cpp` + `pixi run build-wheel`). Refactor `scripts/build_wheel.sh` to drop its `conda create --clone` block so it runs in the active pixi env (local and CI). Add a `build-wheel` pixi task.
+**Architecture:** Split `wheels-linux.yml` into two workflows — `wheels-linux.yml` (Linux-only, stripped of macOS branches) and `wheels-macos.yml` (new, macOS arm64 only, calls `pixi run build-cpp` + `pixi run build-wheel`). Refactor `scripts/build_wheel.sh` to drop its `conda create --clone` block so it runs in the active pixi env (local and CI). Add a `build-wheel` pixi task.
 
 **Tech Stack:** GitHub Actions, pixi, colcon, pip, delocate, `pypa/gh-action-pypi-publish`.
 
@@ -24,7 +24,7 @@ Four files touched:
 - `scripts/build_wheel.sh` — refactor: strip the `conda create --clone` block, make the portable path run in the active env.
 - `pyproject.toml` — add pixi task `build-wheel`.
 - `.github/workflows/wheels-macos.yml` — new file.
-- `.github/workflows/wheels.yml` — strip all macOS-conditional branches, simplify to Linux-only.
+- `.github/workflows/wheels-linux.yml` — strip all macOS-conditional branches, simplify to Linux-only.
 
 Each is its own commit. After commit 3 (CI split), running both workflows validates the whole thing end-to-end.
 
@@ -366,14 +366,14 @@ git -c user.name="Jelle Feringa" -c user.email="jelleferinga@gmail.com" \
 
 ---
 
-## Task 4: Strip macOS branches from `wheels.yml`
+## Task 4: Strip macOS branches from `wheels-linux.yml`
 
 **Files:**
-- Modify: `.github/workflows/wheels.yml`
+- Modify: `.github/workflows/wheels-linux.yml`
 
 **Goal:** Remove every `if: matrix.config.os == 'macos'` step and the macOS matrix entry. Simplify `matrix.config` away entirely since there's only one config left (Linux x64). The workflow ends up covering Linux only.
 
-- [ ] **Step 1: Rewrite `wheels.yml`**
+- [ ] **Step 1: Rewrite `wheels-linux.yml`**
 
 Replace the entire file contents. The result should be Linux-only. Exact content:
 
@@ -716,7 +716,7 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
 ```
 
-Key differences from the prior `wheels.yml`:
+Key differences from the prior `wheels-linux.yml`:
 - Workflow `name` renamed to `Build & Test (Linux)` to mirror the macOS workflow.
 - `strategy.matrix` no longer has a `config` nest — just `python`. Runner is fixed at `ubuntu-22.04` for `build` and `ubuntu-24.04` for `test-wheel`.
 - All macOS-conditional steps removed.
@@ -732,7 +732,7 @@ Run:
 ```bash
 python -c "
 import yaml
-d = yaml.safe_load(open('.github/workflows/wheels.yml'))
+d = yaml.safe_load(open('.github/workflows/wheels-linux.yml'))
 print('jobs:', list(d['jobs']))
 print('build runs-on:', d['jobs']['build']['runs-on'])
 print('build matrix:', d['jobs']['build']['strategy']['matrix'])
@@ -754,7 +754,7 @@ publish pattern: python-*-linux-*
 
 Run:
 ```bash
-grep -n "matrix\.config\|macos\|DYLD" .github/workflows/wheels.yml || echo "clean"
+grep -n "matrix\.config\|macos\|DYLD" .github/workflows/wheels-linux.yml || echo "clean"
 ```
 Expected: `clean` — no macOS-related references in the Linux workflow.
 
@@ -762,10 +762,10 @@ Expected: `clean` — no macOS-related references in the Linux workflow.
 
 Run:
 ```bash
-git add .github/workflows/wheels.yml
+git add .github/workflows/wheels-linux.yml
 git -c user.name="Jelle Feringa" -c user.email="jelleferinga@gmail.com" \
   commit --author="Jelle Feringa <jelleferinga@gmail.com>" \
-  -m "ci: strip macos from wheels.yml (moved to wheels-macos.yml)"
+  -m "ci: strip macos from wheels-linux.yml (moved to wheels-macos.yml)"
 ```
 
 ---
@@ -784,7 +784,7 @@ git log --oneline origin/main..HEAD
 
 Expected (most recent first): 4 new commits on top of the spec commit:
 ```
-<sha> ci: strip macos from wheels.yml (moved to wheels-macos.yml)
+<sha> ci: strip macos from wheels-linux.yml (moved to wheels-macos.yml)
 <sha> ci: add wheels-macos.yml (runs pixi tasks, no sync drift)
 <sha> feat(pixi): add build-wheel task
 <sha> refactor: strip conda clone from build_wheel.sh, run in active env
@@ -816,7 +816,7 @@ Publish macOS arm64 wheels to PyPI by splitting CI into two workflows that reuse
 - `refactor: strip conda clone from build_wheel.sh, run in active env` — wheel-build script now works in either local pixi shell or CI-activated pixi env.
 - `feat(pixi): add build-wheel task` — new pixi task wrapping `scripts/build_wheel.sh`.
 - `ci: add wheels-macos.yml` — new workflow; macOS jobs invoke `pixi run build-cpp` + `pixi run build-wheel`.
-- `ci: strip macos from wheels.yml` — Linux-only workflow, macOS branches moved to new file.
+- `ci: strip macos from wheels-linux.yml` — Linux-only workflow, macOS branches moved to new file.
 
 Unblocked by PyPI filesize limit increase to 250 MB.
 
@@ -825,7 +825,7 @@ Plan: `docs/superpowers/plans/2026-04-22-macos-wheels-to-pypi.md`
 
 ## Test plan
 
-- [ ] PR CI green on all `wheels.yml` jobs (Linux build + test-wheel, py3.9–3.12)
+- [ ] PR CI green on all `wheels-linux.yml` jobs (Linux build + test-wheel, py3.9–3.12)
 - [ ] PR CI green on all `wheels-macos.yml` jobs (macOS build + test-wheel, py3.9–3.12 / py3.9+3.12)
 - [ ] `python-3.12-macos-arm64` artifact: size < 250 MB, 9 plugin factories in `.dylibs/`, YAMLs patched to `@PLUGIN_PATH@`
 - [ ] On tag: both workflows' `publish` jobs upload to PyPI, all 8 wheels visible on pypi.org
@@ -896,7 +896,7 @@ git branch -d jf/macos-wheels-to-pypi 2>/dev/null || true
 
 Trigger each workflow on main:
 ```bash
-gh workflow run wheels.yml --repo tesseract-robotics/tesseract_nanobind --ref main
+gh workflow run wheels-linux.yml --repo tesseract-robotics/tesseract_nanobind --ref main
 gh workflow run wheels-macos.yml --repo tesseract-robotics/tesseract_nanobind --ref main
 ```
 
@@ -912,7 +912,7 @@ git push origin 0.34.1.1
 
 - [ ] **Step 6: Watch publish**
 
-Two tag-triggered runs now in flight — one on `wheels.yml`, one on `wheels-macos.yml`. Both have `publish` jobs gated on `refs/tags/*`. Watch each:
+Two tag-triggered runs now in flight — one on `wheels-linux.yml`, one on `wheels-macos.yml`. Both have `publish` jobs gated on `refs/tags/*`. Watch each:
 ```bash
 gh run watch <linux-run-id> --repo tesseract-robotics/tesseract_nanobind
 gh run watch <macos-run-id> --repo tesseract-robotics/tesseract_nanobind
@@ -953,7 +953,7 @@ Expected: selftest passes, imports succeed.
 
 Two-step revert:
 1. Delete `.github/workflows/wheels-macos.yml`.
-2. `git revert` Tasks 4 (`wheels.yml` strip), 2 (pixi task), 1 (`build_wheel.sh`) in reverse order.
+2. `git revert` Tasks 4 (`wheels-linux.yml` strip), 2 (pixi task), 1 (`build_wheel.sh`) in reverse order.
 3. If a broken macOS wheel reached PyPI: yank via PyPI web UI.
 
 No database state, no external system coupling.
