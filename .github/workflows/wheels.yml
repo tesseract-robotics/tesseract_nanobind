@@ -394,6 +394,9 @@ jobs:
           - os: linux
             arch: x64
             runner: ubuntu-24.04  # needs glibc 2.39 to match build env
+          - os: macos
+            arch: arm64
+            runner: macos-14
     steps:
       - uses: actions/checkout@v4
         with:
