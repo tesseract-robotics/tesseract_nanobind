@@ -46,14 +46,14 @@ if $DEV_MODE; then
     exit 0
 fi
 
-# Full portable build with temp env
-BUILD_ENV="tesseract_wheel_build_$$"
-echo "Building portable wheel..."
-echo "Using temporary env: $BUILD_ENV"
-
-eval "$(conda shell.zsh hook)"
-conda create -n "$BUILD_ENV" --clone tesseract_nb -y
-conda activate "$BUILD_ENV"
+# Full portable build in the active env (pixi locally, pixi-activated in CI).
+# Historical conda-clone isolation was removed — pixi already provides isolation
+# via its per-env pyproject.toml features.
+echo "Building portable wheel in active env: ${CONDA_PREFIX:-NO ENV}"
+if [[ -z "$CONDA_PREFIX" ]]; then
+    echo "❌ No active pixi/conda env. Run via 'pixi shell' or 'pixi run build-wheel'."
+    exit 1
+fi
 
 pip install delocate setuptools-scm
 
@@ -118,9 +118,6 @@ cd "$WHEEL_DIR"
 zip -rq "$PROJECT_ROOT/wheelhouse/$(basename $WHEEL_FILE)" .
 cd "$PROJECT_ROOT/tesseract_nanobind"
 rm -rf "$WHEEL_DIR"
-
-conda deactivate
-conda env remove -n "$BUILD_ENV" -y
 
 echo ""
 echo "Portable wheel: wheelhouse/"
