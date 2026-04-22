@@ -25,6 +25,21 @@ from pathlib import Path
 
 from loguru import logger
 
+# Windows DLL directory registration — must run before any C extension import.
+# Python 3.8+ on Windows removed PATH-based DLL search; os.add_dll_directory is the
+# replacement. Attribute only exists on Windows, so getattr-probe avoids pyright
+# platform-narrowing while being purely feature-detection.
+_add_dll_dir = getattr(os, "add_dll_directory", None)
+if _add_dll_dir is not None:
+    _pkg_dir = Path(__file__).parent.resolve()
+    _libs_dir = _pkg_dir.parent / "tesseract_robotics.libs"
+    if _libs_dir.is_dir():
+        _add_dll_dir(str(_libs_dir))
+    _add_dll_dir(str(_pkg_dir))
+    del _pkg_dir, _libs_dir
+del _add_dll_dir
+
+
 try:
     __version__ = version("tesseract-robotics-nanobind")
 except PackageNotFoundError:
@@ -124,15 +139,21 @@ def _configure_environment():
     editable = _is_editable_install()
 
     if not plugin_path:
-        # Check for bundled plugins (Linux wheel - plugins in package root)
+        # Check for bundled plugins — layout differs per platform:
+        #   Linux   : plugins in package root (libfoo.so)
+        #   macOS   : plugins in .dylibs subdir (delocate-repaired)
+        #   Windows : plugins in package root (foo.dll, no lib prefix)
         bundled_plugin = pkg_dir / "libtesseract_collision_bullet_factories.so"
-        dylibs_dir = pkg_dir / ".dylibs"  # macOS bundled (delocate-repaired)
+        dylibs_dir = pkg_dir / ".dylibs"
+        bundled_plugin_win = pkg_dir / "tesseract_collision_bullet_factories.dll"
         ws_install_lib = project_root / "ws" / "install" / "lib"
 
         if bundled_plugin.exists():
             plugin_path = str(pkg_dir)
         elif dylibs_dir.is_dir():
             plugin_path = str(dylibs_dir)
+        elif bundled_plugin_win.exists():
+            plugin_path = str(pkg_dir)
         elif editable and ws_install_lib.is_dir():
             plugin_path = str(ws_install_lib)
 
