@@ -1,15 +1,11 @@
 """tesseract_environment Python bindings (nanobind)"""
 
-from tesseract_robotics import ensure_configured
-
-ensure_configured()
-
 # Import dependencies first to register their types for cross-module access
-import tesseract_robotics.tesseract_common  # noqa: E402, F401 - needed for CollisionMarginData, ACM
-import tesseract_robotics.tesseract_kinematics  # noqa: E402, F401 - needed for getKinematicGroup
-import tesseract_robotics.tesseract_scene_graph  # noqa: E402, F401
-import tesseract_robotics.tesseract_srdf  # noqa: E402, F401 - needed for getKinematicsInformation
-from tesseract_robotics.tesseract_environment._tesseract_environment import *  # noqa: E402
+import tesseract_robotics.tesseract_common  # noqa: F401 - needed for CollisionMarginData, ACM
+import tesseract_robotics.tesseract_kinematics  # noqa: F401 - needed for getKinematicGroup
+import tesseract_robotics.tesseract_scene_graph  # noqa: F401
+import tesseract_robotics.tesseract_srdf  # noqa: F401 - needed for getKinematicsInformation
+from tesseract_robotics.tesseract_environment._tesseract_environment import *
 
 # Re-export AnyPoly_wrap_EnvironmentConst from tesseract_task_composer for convenience
 try:
