@@ -1,6 +1,11 @@
 #!/bin/zsh
 # Build tesseract C++ libraries using colcon
-# KEEP IN SYNC WITH: .github/workflows/wheels.yml (authoritative reference)
+#
+# This script is the source of truth for the C++ build. It is invoked by:
+#   - pixi run build-cpp (local dev)
+#   - .github/workflows/wheels-macos.yml (CI macOS)
+# .github/workflows/wheels-linux.yml has its own inline colcon invocation —
+# unifying them is out of scope for now.
 #
 # Usage:
 #   pixi run build-cpp          # recommended

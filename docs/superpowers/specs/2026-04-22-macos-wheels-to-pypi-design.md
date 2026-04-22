@@ -6,9 +6,9 @@
 
 ## Context
 
-`wheels.yml` historically carried Linux x64 wheels. It contained a commented-out macOS arm64 matrix entry and full macOS build/delocate/plugin-bundle/YAML-patch steps, all disabled because macOS wheels exceeded PyPI's 100 MB per-file ceiling. PyPI has now granted a 250 MB limit, removing the size blocker.
+`wheels-linux.yml` historically carried Linux x64 wheels. It contained a commented-out macOS arm64 matrix entry and full macOS build/delocate/plugin-bundle/YAML-patch steps, all disabled because macOS wheels exceeded PyPI's 100 MB per-file ceiling. PyPI has now granted a 250 MB limit, removing the size blocker.
 
-A first attempt enabled macOS in-place on `wheels.yml` (three surgical edits). It surfaced problems that are all symptoms of a single root cause: **`wheels.yml`'s colcon invocation had drifted out of sync with `scripts/build_tesseract_cpp.sh` (the local C++ build script)** and `wheels.yml`'s wheel-build inline shell had drifted out of sync with `scripts/build_wheel.sh` (the local wheel-build script). The local scripts build clean on macOS; the CI inline duplication does not. Every macOS CI failure in the first attempt (`sed -i` portability, `DYLD_LIBRARY_PATH` poisoning of Apple `git`, `osqp_eigen` falling through to the pre-release `csc_set_data` code path because `try_compile` behaved differently) traced back to some divergence between those two codepaths.
+A first attempt enabled macOS in-place on `wheels-linux.yml` (three surgical edits). It surfaced problems that are all symptoms of a single root cause: **`wheels-linux.yml`'s colcon invocation had drifted out of sync with `scripts/build_tesseract_cpp.sh` (the local C++ build script)** and `wheels-linux.yml`'s wheel-build inline shell had drifted out of sync with `scripts/build_wheel.sh` (the local wheel-build script). The local scripts build clean on macOS; the CI inline duplication does not. Every macOS CI failure in the first attempt (`sed -i` portability, `DYLD_LIBRARY_PATH` poisoning of Apple `git`, `osqp_eigen` falling through to the pre-release `csc_set_data` code path because `try_compile` behaved differently) traced back to some divergence between those two codepaths.
 
 Maintaining two codepaths — one in CI YAML, one in local shell scripts — is a maintenance trap. We've already paid for it. The fix is structural, not a one-line patch.
 
@@ -19,7 +19,7 @@ Publish macOS arm64 wheels to PyPI on tagged releases, alongside existing Linux 
 ## Scope
 
 **In scope:**
-- Split `.github/workflows/wheels.yml` into two workflow files: `wheels.yml` (Linux, existing flow preserved) and `wheels-macos.yml` (macOS arm64).
+- Split `.github/workflows/wheels-linux.yml` into two workflow files: `wheels-linux.yml` (Linux, existing flow preserved) and `wheels-macos.yml` (macOS arm64).
 - `wheels-macos.yml` invokes the build via `pixi run build-cpp` (already calls `scripts/build_tesseract_cpp.sh`) and `pixi run build-wheel` (new pixi task wrapping `scripts/build_wheel.sh`).
 - Refactor `scripts/build_wheel.sh` to drop the `conda create --clone tesseract_nb` block. The "portable" (non-`--dev`) path runs in the currently-active env (pixi locally, pixi-activated in CI).
 - Add a `build-wheel` pixi task in `pyproject.toml` that runs `zsh scripts/build_wheel.sh`.
@@ -32,7 +32,7 @@ Publish macOS arm64 wheels to PyPI on tagged releases, alongside existing Linux 
 - Wheel size reduction.
 - Migration to `macos-15` runners.
 - Test.pypi.org dry-run plumbing.
-- Refactoring Linux build out of `wheels.yml` into its own script. Current Linux inline shell works; out of scope for this change.
+- Refactoring Linux build out of `wheels-linux.yml` into its own script. Current Linux inline shell works; out of scope for this change.
 
 ## Design
 
@@ -40,7 +40,7 @@ Publish macOS arm64 wheels to PyPI on tagged releases, alongside existing Linux 
 
 ```
 .github/workflows/
-  wheels.yml          # Linux x64 only, existing flow preserved
+  wheels-linux.yml          # Linux x64 only, existing flow preserved
   wheels-macos.yml    # NEW — macOS arm64, thin wrapper around pixi tasks
 scripts/
   build_tesseract_cpp.sh  # UNCHANGED — already portable, called via `pixi run build-cpp`
@@ -139,7 +139,7 @@ jobs:
 
 The macOS publish job runs on `macos-14` (not `ubuntu-latest` like the Linux one) only so we don't need to serialize Linux and macOS publishes. They run in parallel on tag.
 
-### `wheels.yml` cleanup
+### `wheels-linux.yml` cleanup
 
 Remove all macOS-conditional branches — the workflow becomes Linux-only:
 - Strip `brew (macOS)` step (entirely Linux now).
@@ -165,9 +165,9 @@ Remove all macOS-conditional branches — the workflow becomes Linux-only:
    - Refactored `scripts/build_wheel.sh`
    - New `build-wheel` pixi task in `pyproject.toml`
    - New `.github/workflows/wheels-macos.yml`
-   - Stripped `.github/workflows/wheels.yml`
+   - Stripped `.github/workflows/wheels-linux.yml`
 2. PR CI runs:
-   - `wheels.yml` → Linux build + test-wheel (should stay green, same flow as before)
+   - `wheels-linux.yml` → Linux build + test-wheel (should stay green, same flow as before)
    - `wheels-macos.yml` → macOS build + test-wheel (new — this is the test)
 3. Inspect the macOS build artifact (`python-3.12-macos-arm64`):
    - Wheel size < 250 MB.
@@ -191,14 +191,14 @@ Remove all macOS-conditional branches — the workflow becomes Linux-only:
 
 Two-commit revert restores Linux-only publishing:
 1. Delete `wheels-macos.yml`.
-2. `git revert` the `wheels.yml` cleanup and `build_wheel.sh` refactor commits.
+2. `git revert` the `wheels-linux.yml` cleanup and `build_wheel.sh` refactor commits.
 3. Yank the broken macOS release via PyPI web UI if it reached PyPI.
 
 No database migrations, no external system state.
 
 ## Lessons from the first attempt (for posterity)
 
-The initial approach made three surgical YAML edits to enable macOS in `wheels.yml`. In chronological order, CI surfaced:
+The initial approach made three surgical YAML edits to enable macOS in `wheels-linux.yml`. In chronological order, CI surfaced:
 
 1. `sed -i '...' file` in the "patch upstream missing includes" step — portable only on GNU sed; BSD sed (macOS) interprets the first arg after `-i` as the backup extension. Fix was platform-guard the step (only Linux needs the patch anyway).
 2. `DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:...` — shadowed Apple system `git`'s library resolution, causing CMake's `FindGit` to return empty. Fix was swap to `DYLD_FALLBACK_LIBRARY_PATH`.
