@@ -143,6 +143,7 @@ cmake = ">=3.15,<4"
 ninja = "*"
 make = "*"
 pkg-config = "*"
+git = "*"  # needed by setuptools-scm for version derivation; CI pixi envs don't see system git
 
 # C++ dependencies - pinned for C++17 compatibility and API stability
 eigen = ">=3.3,<3.5"
