@@ -1,12 +1,12 @@
-name: Build & Test
+name: Build & Test (Linux)
 
 on:
   push:
     branches:
       - main
     tags:
-      - '[0-9]+.[0-9]+.[0-9]+'      # e.g. 0.6.1
-      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'  # e.g. 0.34.1.0
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -22,19 +22,11 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.config.runner }}
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         python: ['3.9', '3.10', '3.11', '3.12']
-        config:
-        - os: linux
-          arch: x64
-          runner: ubuntu-22.04
-        # macOS disabled: wheels exceed PyPI size limit
-        # - os: macos
-        #   arch: arm64
-        #   runner: macos-14
     defaults:
       run:
         shell: bash -el {0}
@@ -42,11 +34,6 @@ jobs:
     - uses: actions/checkout@v4
       with:
         path: ws/src/tesseract_nanobind
-    - name: brew (macOS)
-      if: matrix.config.os == 'macos'
-      run: |
-        brew install automake autoconf libtool
-        # Note: libomp comes from pixi (llvm-openmp) to avoid duplicate library crashes
     - name: setup pixi
       uses: prefix-dev/setup-pixi@v0.8.0
       env:
@@ -89,37 +76,9 @@ jobs:
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-v11-py${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
-    - name: colcon build C++ deps (macOS)
-      if: matrix.config.os == 'macos' && steps.colcon-cache.outputs.cache-hit != 'true'
-      working-directory: ws
-      run: |
-        export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
-        export CMAKE_PREFIX_PATH=$CONDA_PREFIX:$GITHUB_WORKSPACE/ws/install
-        export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
-        export CMAKE_POLICY_VERSION_MINIMUM=3.5
-
-        colcon build --merge-install \
-            --packages-ignore tesseract_python tesseract_examples vhacd qpoases tesseract_nanobind tesseract_viewer_python twc_application twc_motion_planning twc_msgs twc_support \
-            --event-handlers console_cohesion+ \
-            --cmake-force-configure \
-            --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
-            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_CLOUD_CLIENT=OFF -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
-            -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
-            -DTESSERACT_ENABLE_TESTING=OFF \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DCMAKE_INSTALL_RPATH=@loader_path \
-            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-            -DQT_HOST_PATH=$CONDA_PREFIX \
-            -DOpenMP_CXX_INCLUDE_DIR=$CONDA_PREFIX/include \
-            -DOpenMP_C_INCLUDE_DIR=$CONDA_PREFIX/include \
-            -DOpenMP_CXX_LIB_NAMES=libomp -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp" \
-            -DOpenMP_C_LIB_NAMES=libomp -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp" \
-            -DOpenMP_libomp_LIBRARY=$CONDA_PREFIX/lib/libomp.dylib
-    - name: colcon build C++ deps (Linux)
-      if: matrix.config.os == 'linux' && steps.colcon-cache.outputs.cache-hit != 'true'
+        key: colcon-linux-v11-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+    - name: colcon build C++ deps
+      if: steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws
       run: |
         export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
@@ -139,17 +98,7 @@ jobs:
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             '-DCMAKE_INSTALL_RPATH=$ORIGIN' \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
-    - name: build nanobind wheel (macOS)
-      if: matrix.config.os == 'macos'
-      working-directory: ws/src/tesseract_nanobind
-      run: |
-        export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
-        export CMAKE_PREFIX_PATH=$CONDA_PREFIX:$GITHUB_WORKSPACE/ws/install
-        pip install delocate setuptools-scm
-        CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0" \
-          pip wheel . -w dist/ --no-build-isolation
-    - name: build nanobind wheel (Linux)
-      if: matrix.config.os == 'linux'
+    - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
       run: |
         export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
@@ -157,73 +106,15 @@ jobs:
         pip install auditwheel setuptools-scm
         CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5" \
           pip wheel . -w dist/ --no-build-isolation
-    - name: delocate (macOS)
-      if: matrix.config.os == 'macos'
-      working-directory: ws/src/tesseract_nanobind
-      run: |
-        export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
-        mkdir -p wheelhouse
-        delocate-wheel -w wheelhouse -v dist/*.whl
-    - name: bundle plugins (macOS)
-      if: matrix.config.os == 'macos'
-      working-directory: ws/src/tesseract_nanobind
-      run: |
-        # Plugin factories are runtime-loaded (dlopen), not caught by delocate
-        WHEEL_FILE=$(ls wheelhouse/tesseract*.whl)
-        WHEEL_DIR=$(mktemp -d)
-        unzip -q "$WHEEL_FILE" -d "$WHEEL_DIR"
-
-        PLUGINS=(
-          libtesseract_collision_bullet_factories.dylib
-          libtesseract_collision_fcl_factories.dylib
-          libtesseract_kinematics_core_factories.dylib
-          libtesseract_kinematics_kdl_factories.dylib
-          libtesseract_kinematics_opw_factory.dylib
-          libtesseract_kinematics_ur_factory.dylib
-          libtesseract_task_composer_factories.dylib
-          libtesseract_task_composer_planning_factories.dylib
-          libtesseract_task_composer_taskflow_factories.dylib
-        )
-
-        for plugin in "${PLUGINS[@]}"; do
-          if [[ -f "$GITHUB_WORKSPACE/ws/install/lib/$plugin" ]]; then
-            cp "$GITHUB_WORKSPACE/ws/install/lib/$plugin" "$WHEEL_DIR/tesseract_robotics/.dylibs/"
-            echo "  Added: $plugin"
-          fi
-        done
-
-        # Fix rpaths in newly added plugins
-        export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
-        delocate-path "$WHEEL_DIR/tesseract_robotics/.dylibs" -L "$GITHUB_WORKSPACE/ws/install/lib:$CONDA_PREFIX/lib"
-
-        # Patch task_composer_config YAMLs only (resolved at runtime by __init__.py)
-        # Robot YAMLs (tesseract_support) are NOT patched - they use env var plugin paths
-        echo "Patching task composer configs..."
-        for yaml_file in "$WHEEL_DIR/tesseract_robotics/data/task_composer_config"/*.yaml; do
-          if [[ -f "$yaml_file" ]] && grep -q '/usr/local/lib' "$yaml_file"; then
-            sed -i '' 's|/usr/local/lib|"@PLUGIN_PATH@"|g' "$yaml_file"
-            echo "  Patched: $(basename $yaml_file)"
-          fi
-        done
-
-        # Repack wheel
-        rm "$WHEEL_FILE"
-        cd "$WHEEL_DIR"
-        zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/wheelhouse/$(basename $WHEEL_FILE)" .
-        rm -rf "$WHEEL_DIR"
-    - name: bundle plugins into wheel (Linux)
-      if: matrix.config.os == 'linux'
+    - name: bundle plugins into wheel
       working-directory: ws/src/tesseract_nanobind
       run: |
         # Plugin factories are runtime-loaded (dlopen), not caught by auditwheel
         # Bundle them BEFORE auditwheel so deps get repaired together
-        # Put in tesseract_robotics/ (not .libs/) so auditwheel repairs them
         WHEEL_FILE=$(ls dist/tesseract*.whl)
         WHEEL_DIR=$(mktemp -d)
         unzip -q "$WHEEL_FILE" -d "$WHEEL_DIR"
 
-        # Put plugins directly in package dir so auditwheel repairs them
-        # (auditwheel doesn't repair .so files in subdirectories properly)
         PLUGINS_DIR="$WHEEL_DIR/tesseract_robotics"
 
         PLUGINS=(
@@ -258,7 +149,6 @@ jobs:
         echo "Removing hardcoded search_paths from robot YAMLs..."
         find "$WHEEL_DIR/tesseract_robotics/data/tesseract_support" -name "*.yaml" -type f | while read yaml_file; do
           if grep -q 'search_paths:' "$yaml_file"; then
-            # Remove search_paths: line and following lines with - /path
             sed -i '/search_paths:/d; /^[[:space:]]*- \/.*$/d' "$yaml_file"
             echo "  Removed search_paths from: $(basename $yaml_file)"
           fi
@@ -271,12 +161,9 @@ jobs:
         find . -name "*.so" | head -20
         zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/dist/$(basename $WHEEL_FILE)" .
         rm -rf "$WHEEL_DIR"
-    - name: bundle deps (Linux)
-      if: matrix.config.os == 'linux'
+    - name: bundle deps
       working-directory: ws/src/tesseract_nanobind
       run: |
-        # With $ORIGIN rpath set at build time, just bundle all deps in package root
-        # No auditwheel needed - simpler and avoids hash renaming issues
         pip install patchelf
 
         WHEEL_FILE=$(ls dist/tesseract*.whl)
@@ -286,7 +173,6 @@ jobs:
 
         echo "Bundling all .so dependencies into package root..."
 
-        # Copy all tesseract libs from ws/install/lib
         echo "Copying tesseract libs..."
         echo "Files in ws/install/lib matching *.so* (for debug):"
         ls -la $GITHUB_WORKSPACE/ws/install/lib/*.so* 2>/dev/null | head -20 || true
@@ -295,7 +181,6 @@ jobs:
             cp "$lib" "$PKG_DIR/"
             echo "  Copied: $(basename $lib)"
           elif [[ -L "$lib" ]]; then
-            # Also copy symlink targets
             target=$(readlink -f "$lib")
             if [[ -f "$target" ]]; then
               cp "$target" "$PKG_DIR/$(basename $lib)"
@@ -304,11 +189,9 @@ jobs:
           fi
         done
 
-        # Find and copy all external deps (from conda, etc)
         echo "Finding and copying external deps..."
         export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
 
-        # Get all deps of all .so files in package
         deps_file=$(mktemp)
         for so in "$PKG_DIR"/*.so*; do
           if [[ -f "$so" ]]; then
@@ -316,7 +199,6 @@ jobs:
           fi
         done
 
-        # Copy unique deps that aren't system libs
         sort -u "$deps_file" | while read dep; do
           if [[ -f "$dep" && "$dep" != /lib* && "$dep" != /usr/lib* ]]; then
             base=$(basename "$dep")
@@ -328,7 +210,6 @@ jobs:
         done
         rm "$deps_file"
 
-        # Set $ORIGIN rpath on all bundled libs in package root
         echo "Setting rpath on all libs..."
         for lib in "$PKG_DIR"/*.so*; do
           if [[ -f "$lib" && ! -L "$lib" ]]; then
@@ -336,15 +217,12 @@ jobs:
           fi
         done
 
-        # Set $ORIGIN/.. rpath on Python extensions in subdirectories
-        # These need to find libs in the parent (package root) directory
         echo "Patching Python extensions in subdirectories..."
         find "$PKG_DIR" -mindepth 2 -name "*.so" -type f | while read ext; do
           patchelf --set-rpath '$ORIGIN/..' "$ext" 2>/dev/null || true
           echo "  Patched: $(basename $ext)"
         done
 
-        # Verify no missing deps
         echo "Checking for missing deps..."
         for so in "$PKG_DIR"/*.so*; do
           if [[ -f "$so" && ! -L "$so" ]]; then
@@ -356,7 +234,6 @@ jobs:
           fi
         done
 
-        # Repack wheel with updated platform tag
         WHEELHOUSE="$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/wheelhouse"
         mkdir -p "$WHEELHOUSE"
         WHEEL_NAME=$(basename "$WHEEL_FILE" | sed 's/linux_x86_64/manylinux_2_35_x86_64/')
@@ -372,29 +249,24 @@ jobs:
     - name: archive wheels
       uses: actions/upload-artifact@v4
       with:
-        name: 'python-${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}'
+        name: python-${{ matrix.python }}-linux-x64
         path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: 'build-logs-${{ matrix.config.os }}-${{ matrix.config.arch }}'
-        path: "**/*.log"
+        name: build-logs-linux-x64-py${{ matrix.python }}
+        path: '**/*.log'
         retention-days: 2
 
   test-wheel:
     needs: build
-    runs-on: ${{ matrix.config.runner }}
-    # py3.9 has intermittent GC segfaults with pytest-xdist; don't block CI
+    runs-on: ubuntu-24.04
     continue-on-error: ${{ matrix.python == '3.9' }}
     strategy:
       fail-fast: false
       matrix:
         python: ['3.9', '3.12']
-        config:
-          - os: linux
-            arch: x64
-            runner: ubuntu-24.04  # needs glibc 2.39 to match build env
     steps:
       - uses: actions/checkout@v4
         with:
@@ -404,7 +276,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - uses: actions/download-artifact@v4
         with:
-          name: python-${{ matrix.python }}-${{ matrix.config.os }}-${{ matrix.config.arch }}
+          name: python-${{ matrix.python }}-linux-x64
           path: wheelhouse/
       - name: install wheel in virgin env
         run: |
@@ -420,12 +292,6 @@ jobs:
           ls "$PKG_DIR"/*.so* 2>/dev/null | wc -l
           echo "--- Plugin factories ---"
           ls -la "$PKG_DIR"/lib*_factories.so 2>/dev/null | head -5 || echo "No plugin factories"
-          echo "--- Kinematics factory rpath ---"
-          patchelf --print-rpath "$PKG_DIR/libtesseract_kinematics_kdl_factories.so" 2>/dev/null || echo "No rpath"
-          echo "--- Kinematics KDL factory deps ---"
-          ldd "$PKG_DIR/libtesseract_kinematics_kdl_factories.so" 2>&1 | head -15
-          echo "--- Kinematics OPW factory deps ---"
-          ldd "$PKG_DIR/libtesseract_kinematics_opw_factory.so" 2>&1
           echo "--- Missing deps in any lib ---"
           for so in "$PKG_DIR"/*.so*; do
             missing=$(ldd "$so" 2>&1 | grep "not found" || true)
@@ -434,16 +300,6 @@ jobs:
             fi
           done
           echo "--- End missing deps check ---"
-          echo "--- Checking plugin deps ---"
-          ldd "$PKG_DIR/libtesseract_collision_bullet_factories.so" 2>&1 | grep "not found" || echo "All deps found"
-          echo "--- Checking tesseract_common deps ---"
-          ldd "$PKG_DIR/libtesseract_common.so" 2>&1 | grep "not found" || echo "All deps found"
-          echo "--- Python extension rpath ---"
-          patchelf --print-rpath "$PKG_DIR/tesseract_common/_tesseract_common"*.so 2>/dev/null || readelf -d "$PKG_DIR/tesseract_common/_tesseract_common"*.so | grep RPATH || echo "No rpath found"
-          echo "--- Python extension deps ---"
-          ldd "$PKG_DIR/tesseract_common/_tesseract_common"*.so 2>&1 | head -10
-          echo "--- TESSERACT env vars ---"
-          python -c "import os; import tesseract_robotics; print('TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES:', os.environ.get('TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES', 'NOT SET')); print('TESSERACT_SUPPORT_DIR:', os.environ.get('TESSERACT_SUPPORT_DIR', 'NOT SET'))"
       - name: smoke test
         run: |
           source test_env/bin/activate
@@ -454,7 +310,6 @@ jobs:
           source test_env/bin/activate
           pip install pytest pytest-xdist scipy
           cd tesseract_nanobind
-          # Skip time_parameterization (requires boost), examples (viewer needs Qt/VTK, kinematics needs plugins), benchmarks (needs pytest-benchmark)
           pytest tests -n auto \
             --ignore=tests/tesseract_time_parameterization \
             --ignore=tests/examples \
@@ -472,7 +327,7 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        pattern: python-*-linux-*  # TODO: change back to python-* after PyPI size limit increase
+        pattern: python-*-linux-*
         merge-multiple: true
         path: dist/
     - name: List wheels
