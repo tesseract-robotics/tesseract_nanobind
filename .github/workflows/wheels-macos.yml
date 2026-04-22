@@ -1,0 +1,150 @@
+name: Build & Test (macOS)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.10', '3.11', '3.12']
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: ws/src/tesseract_nanobind
+    - name: brew
+      run: |
+        brew install automake autoconf libtool
+        # libomp comes from pixi (llvm-openmp) to avoid duplicate library crashes
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
+      env:
+        PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || '312' }}
+      with:
+        manifest-path: ws/src/tesseract_nanobind/pyproject.toml
+        cache: true
+        environments: ${{ env.PIXI_ENV }}
+        activate-environment: ${{ env.PIXI_ENV }}
+    - name: typecheck
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run typecheck
+    - name: cache vcs repos
+      uses: actions/cache@v4
+      with:
+        path: |
+          ws/src/tesseract
+          ws/src/tesseract_planning
+          ws/src/trajopt
+          ws/src/descartes_light
+          ws/src/opw_kinematics
+          ws/src/ruckig
+        key: vcs-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
+    - name: vcs import
+      working-directory: ws/src
+      run: vcs import --input tesseract_nanobind/dependencies.rosinstall --skip-existing
+    - name: cache colcon build
+      uses: actions/cache@v4
+      id: colcon-cache
+      with:
+        path: ws/install
+        key: colcon-macos-v1-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+    - name: build C++ deps
+      if: steps.colcon-cache.outputs.cache-hit != 'true'
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run build-cpp
+    - name: build wheel
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run build-wheel
+    - name: archive wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-${{ matrix.python }}-macos-arm64
+        path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
+    - name: archive logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-macos-arm64-py${{ matrix.python }}
+        path: '**/*.log'
+        retention-days: 2
+
+  test-wheel:
+    needs: build
+    runs-on: macos-14
+    continue-on-error: ${{ matrix.python == '3.9' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: tesseract_nanobind
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-${{ matrix.python }}-macos-arm64
+          path: wheelhouse/
+      - name: install wheel in virgin env
+        run: |
+          python -m venv test_env
+          source test_env/bin/activate
+          pip install wheelhouse/tesseract*.whl
+      - name: smoke test
+        run: |
+          source test_env/bin/activate
+          python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
+          python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+      - name: run full tests
+        run: |
+          source test_env/bin/activate
+          pip install pytest pytest-xdist scipy
+          cd tesseract_nanobind
+          pytest tests -n auto \
+            --ignore=tests/tesseract_time_parameterization \
+            --ignore=tests/examples \
+            --ignore=tests/tesseract_kinematics \
+            --ignore=tests/benchmarks \
+            -v --tb=short
+
+  publish:
+    needs: [build, test-wheel]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-14
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: python-*-macos-arm64
+        merge-multiple: true
+        path: dist/
+    - name: List wheels
+      run: ls -la dist/
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
