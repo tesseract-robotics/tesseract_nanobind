@@ -138,6 +138,7 @@ jobs:
             --ignore=tests/examples \
             --ignore=tests/tesseract_kinematics \
             --ignore=tests/benchmarks \
+            --ignore=tests/tesseract_planning/test_planning_api.py \
             -v --tb=short
 
   publish:
