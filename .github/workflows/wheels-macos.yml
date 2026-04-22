@@ -127,11 +127,13 @@ jobs:
           python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
           python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
       - name: run full tests
+        # Serial (no xdist): planning tests (OMPL/TrajOpt) segfault under xdist
+        # on macOS — fork+OpenMP threads don't mix. Linux handles it fine.
         run: |
           source test_env/bin/activate
-          pip install pytest pytest-xdist scipy
+          pip install pytest scipy
           cd tesseract_nanobind
-          pytest tests -n auto \
+          pytest tests \
             --ignore=tests/tesseract_time_parameterization \
             --ignore=tests/examples \
             --ignore=tests/tesseract_kinematics \
