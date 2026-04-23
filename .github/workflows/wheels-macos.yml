@@ -134,11 +134,7 @@ jobs:
           pip install pytest scipy
           cd tesseract_nanobind
           pytest tests \
-            --ignore=tests/tesseract_time_parameterization \
-            --ignore=tests/examples \
-            --ignore=tests/tesseract_kinematics \
             --ignore=tests/benchmarks \
-            --ignore=tests/tesseract_planning/test_planning_api.py \
             -v --tb=short
 
   publish:

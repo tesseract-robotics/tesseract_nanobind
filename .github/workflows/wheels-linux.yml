@@ -318,9 +318,6 @@ jobs:
           pip install pytest pytest-xdist scipy
           cd tesseract_nanobind
           pytest tests -n auto \
-            --ignore=tests/tesseract_time_parameterization \
-            --ignore=tests/examples \
-            --ignore=tests/tesseract_kinematics \
             --ignore=tests/benchmarks \
             -v --tb=short
 
