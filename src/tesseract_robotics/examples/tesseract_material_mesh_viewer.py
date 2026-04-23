@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Mesh viewer example demonstrating GLB and DAE mesh loading with materials."""
 
 import sys

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Puzzle Piece Auxiliary Axes Example - 9-DOF Cartesian Path with Positioner
 
@@ -106,8 +107,8 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_collision import CollisionEvaluatorType
 from tesseract.tesseract_motion_planners_trajopt import (
-    CollisionEvaluatorType,
     ProfileDictionary_addTrajOptCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptSolverProfile,

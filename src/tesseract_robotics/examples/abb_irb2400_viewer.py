@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 ABB IRB2400 motion planning example with viewer.
 

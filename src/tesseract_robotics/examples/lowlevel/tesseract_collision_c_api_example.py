@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Low-Level Collision Checking Example (C-API Style)
 ===================================================

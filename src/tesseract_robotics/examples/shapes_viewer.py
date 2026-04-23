@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Simple shapes viewer example using tesseract_robotics with nanobind bindings."""
 
 import os

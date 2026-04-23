@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Car Seat Example - Complex Multi-Step Pick & Place with Dynamic Mesh Objects
 
@@ -66,7 +67,7 @@ from tesseract.tesseract_scene_graph import (
     Link,
     Visual,
 )
-from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:

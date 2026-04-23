@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Pythonic API Example - High-Level Wrapper over C++ Bindings
 

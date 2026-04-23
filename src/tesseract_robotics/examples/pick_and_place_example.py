@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Pick and Place Example (High-Level API)
 
@@ -85,9 +86,9 @@ from tesseract.tesseract_collision import CollisionEvaluatorType
 from tesseract.tesseract_command_language import ProfileDictionary
 from tesseract.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptCompositeProfile,
-    TrajOptCollisionConfig,
     TrajOptDefaultCompositeProfile,
 )
+from tesseract.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 

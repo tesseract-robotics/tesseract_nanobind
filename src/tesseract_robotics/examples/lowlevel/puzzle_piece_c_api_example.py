@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Puzzle Piece Example - Low-level C API version
 
