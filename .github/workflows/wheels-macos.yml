@@ -147,7 +147,7 @@ jobs:
     # pypa/gh-action-pypi-publish is hard-Linux-only. The artifacts are already
     # built for macOS arm64 — we just download and twine-upload them from Linux.
     runs-on: ubuntu-latest
-    environment: pypi
+    environment: macos
     permissions:
       id-token: write
     steps:
