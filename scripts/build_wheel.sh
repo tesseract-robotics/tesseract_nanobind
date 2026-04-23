@@ -125,16 +125,31 @@ while (( ${#queue[@]} )); do
     while read -r dep; do
         [[ -z "$dep" ]] && continue
         base="${dep#@rpath/}"
-        # Rewrite the reference
-        install_name_tool -change "$dep" "@loader_path/$base" "$current" 2>/dev/null || true
+        # If the source lib is a SONAME symlink (e.g. libompl.17.dylib ->
+        # libompl.1.6.0.dylib), rewrite the reference to point at the real
+        # target directly and bundle only the target. Shipping both under two
+        # names makes dyld load two copies of the library, and anything with
+        # singleton state (OMPL RNG, OSQP workspace, TrajOpt solver) crashes
+        # on first use. Can't ship the symlink — pip's wheel installer
+        # dereferences symlinks on extract. See GH #48.
+        canonical="$base"
+        for src_dir in "$PROJECT_ROOT/ws/install/lib" "$CONDA_PREFIX/lib"; do
+            if [[ -L "$src_dir/$base" ]]; then
+                canonical=$(readlink "$src_dir/$base")
+                break
+            elif [[ -e "$src_dir/$base" ]]; then
+                break
+            fi
+        done
+        install_name_tool -change "$dep" "@loader_path/$canonical" "$current" 2>/dev/null || true
         modified=1
-        # Ensure the target dep is bundled in .dylibs/
-        if [[ ! -f "$DYLIBS_DIR/$base" ]]; then
+        # Ensure the canonical target is bundled in .dylibs/
+        if [[ ! -e "$DYLIBS_DIR/$canonical" ]]; then
             for src_dir in "$PROJECT_ROOT/ws/install/lib" "$CONDA_PREFIX/lib"; do
-                if [[ -f "$src_dir/$base" ]]; then
-                    cp "$src_dir/$base" "$DYLIBS_DIR/$base"
-                    echo "  Copied dep: $base"
-                    queue+=("$DYLIBS_DIR/$base")
+                if [[ -f "$src_dir/$canonical" ]]; then
+                    cp "$src_dir/$canonical" "$DYLIBS_DIR/$canonical"
+                    queue+=("$DYLIBS_DIR/$canonical")
+                    echo "  Copied dep: $canonical"
                     break
                 fi
             done
