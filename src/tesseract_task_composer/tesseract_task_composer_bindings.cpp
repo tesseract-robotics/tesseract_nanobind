@@ -35,9 +35,76 @@
 // Note: ProfileDictionary moved to tesseract_common in 0.33
 #include <tesseract_common/profile_dictionary.h>
 
+// console_bridge for log output visible alongside the rest of tesseract's logging
+#include <console_bridge/console.h>
+
+// Plugin-dylib pinning: on macOS the TaskComposerPluginFactory dlclose's every
+// plugin dylib it loaded when the factory is GC'd. Re-dlopen'ing those dylibs
+// corrupts static state inside OMPL / OSQP / TrajOpt and crashes the next
+// compute call (GH #48). The fix is to observe which dylibs get loaded during
+// createTaskComposer{Node,Executor} and immediately re-open them with
+// RTLD_NODELETE, pinning them for the process lifetime so dlclose becomes a
+// no-op. Linux is unaffected (glibc / underlying deps tolerate the cycle) and
+// Windows support will land when the Windows wheel does (#40).
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <dlfcn.h>
+#include <cstdio>
+#include <mutex>
+#include <string>
+#include <unordered_set>
+#endif
+
 namespace tp = tesseract_planning;
 namespace te = tesseract_environment;
 namespace tc = tesseract_common;
+
+#ifdef __APPLE__
+namespace {
+
+std::unordered_set<std::string> snapshot_loaded_dylibs() {
+    std::unordered_set<std::string> libs;
+    const uint32_t n = _dyld_image_count();
+    libs.reserve(n);
+    for (uint32_t i = 0; i < n; ++i) {
+        if (const char* name = _dyld_get_image_name(i)) {
+            libs.emplace(name);
+        }
+    }
+    return libs;
+}
+
+// Pin any dylib loaded since `before`. Only logs the first time a given path
+// is pinned, so repeated createTaskComposer* calls stay quiet after warmup.
+void pin_newly_loaded_dylibs(const std::unordered_set<std::string>& before) {
+    static std::mutex mu;
+    static std::unordered_set<std::string> already_pinned;
+
+    auto after = snapshot_loaded_dylibs();
+    std::lock_guard<std::mutex> guard(mu);
+    for (const auto& path : after) {
+        if (before.count(path) || already_pinned.count(path)) {
+            continue;
+        }
+        // RTLD_NODELETE: any later dlclose leaves the library mapped.
+        // Handle is intentionally leaked for the process lifetime.
+        void* handle = ::dlopen(path.c_str(), RTLD_LAZY | RTLD_NODELETE);
+        if (handle == nullptr) {
+            CONSOLE_BRIDGE_logWarn("tesseract_nanobind: failed to pin plugin dylib '%s': %s",
+                                   path.c_str(), dlerror());
+            continue;
+        }
+        already_pinned.insert(path);
+        const auto slash = path.find_last_of('/');
+        const char* basename = slash == std::string::npos ? path.c_str() : path.c_str() + slash + 1;
+        // stderr rather than console_bridge::logInform because tesseract's
+        // default log threshold suppresses anything below ERROR.
+        std::fprintf(stderr, "[tesseract_nanobind] pinned plugin dylib %s (GH #48)\n", basename);
+    }
+}
+
+}  // anonymous namespace
+#endif  // __APPLE__
 
 NB_MODULE(_tesseract_task_composer, m) {
     m.doc() = "tesseract_task_composer Python bindings";
@@ -198,6 +265,16 @@ NB_MODULE(_tesseract_task_composer, m) {
     // ========== TaskComposerPluginFactory ==========
     // Move-only class (deleted copy, has move). Use unique_ptr internally to handle moves.
     // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
+    //
+    // createTaskComposer{Node,Executor} triggers dlopen of plugin dylibs via
+    // boost_plugin_loader. On macOS those dylibs are pinned with RTLD_NODELETE
+    // immediately after the call so the factory's own dlclose (on destruction)
+    // cannot unload them. See the comment block at the top of the file and GH #48.
+    //
+    // keep_alive<0, 1> is defense-in-depth lifetime hygiene: a returned node /
+    // executor dispatches through vtables that live in the factory's plugin
+    // dylibs, so it logically depends on the factory even though the pinning
+    // already makes that safe.
     nb::class_<tp::TaskComposerPluginFactory>(m, "TaskComposerPluginFactory")
         .def("__init__", [](tp::TaskComposerPluginFactory* self, const std::string& config_str, nb::handle locator_handle) {
             std::filesystem::path config(config_str);
@@ -211,12 +288,26 @@ NB_MODULE(_tesseract_task_composer, m) {
         }, "config"_a, "locator"_a,
              "Create from config file path (string) and GeneralResourceLocator")
         .def("createTaskComposerExecutor", [](tp::TaskComposerPluginFactory& self, const std::string& name) {
-            return self.createTaskComposerExecutor(name);
-        }, "name"_a, nb::rv_policy::move,
+#ifdef __APPLE__
+            auto before = snapshot_loaded_dylibs();
+#endif
+            auto executor = self.createTaskComposerExecutor(name);
+#ifdef __APPLE__
+            pin_newly_loaded_dylibs(before);
+#endif
+            return executor;
+        }, "name"_a, nb::rv_policy::move, nb::keep_alive<0, 1>(),
            "Create a task composer executor by name")
         .def("createTaskComposerNode", [](tp::TaskComposerPluginFactory& self, const std::string& name) {
-            return self.createTaskComposerNode(name);
-        }, "name"_a, nb::rv_policy::move,
+#ifdef __APPLE__
+            auto before = snapshot_loaded_dylibs();
+#endif
+            auto node = self.createTaskComposerNode(name);
+#ifdef __APPLE__
+            pin_newly_loaded_dylibs(before);
+#endif
+            return node;
+        }, "name"_a, nb::rv_policy::move, nb::keep_alive<0, 1>(),
            "Create a task composer node by name")
         .def("hasTaskComposerExecutorPlugins", &tp::TaskComposerPluginFactory::hasTaskComposerExecutorPlugins)
         .def("hasTaskComposerNodePlugins", &tp::TaskComposerPluginFactory::hasTaskComposerNodePlugins)

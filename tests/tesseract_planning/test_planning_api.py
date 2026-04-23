@@ -1339,3 +1339,61 @@ class TestPlanningResult:
         assert result[-1].positions[0] == pytest.approx(1.0)
         assert result[-2].positions[0] == pytest.approx(0.5)
         assert result[-3].positions[0] == pytest.approx(0.0)
+
+
+class TestPluginLifetime:
+    """Regression tests for GH #48 — plugin dylibs must stay loaded across GC.
+
+    The fix pins every plugin dylib with RTLD_NODELETE the moment it's loaded,
+    so dlclose during factory destruction is a no-op and the OMPL / OSQP /
+    TrajOpt static state inside those dylibs is initialized exactly once per
+    process. These tests exercise the factory-churn patterns that would
+    otherwise crash on macOS.
+    """
+
+    @pytest.fixture
+    def robot(self):
+        return Robot.from_tesseract_support("abb_irb2400")
+
+    def _simple_program(self, robot):
+        joint_names = robot.get_joint_names("manipulator")
+        return (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
+        )
+
+    def test_plan_survives_factory_gc(self, robot):
+        """Plan must run cleanly after a prior composer was dropped and GC'd.
+
+        Repro of the macOS crash pattern: construct composer, plan, drop, gc,
+        then plan again. Without the pinning fix, the second plan segfaults
+        because the first composer's destruction dlclose'd plugin dylibs that
+        the second compute still dispatches into.
+        """
+        import gc
+
+        from tesseract_robotics.planning import TaskComposer, plan_freespace
+
+        program = self._simple_program(robot)
+
+        composer = TaskComposer.from_config()
+        first = composer.plan(robot, program, pipeline="TrajOptPipeline")
+        assert first.successful
+        del composer
+        gc.collect()
+
+        second = plan_freespace(robot, program)
+        assert second.successful
+
+    def test_repeated_plans_across_composers(self, robot):
+        """Many plan cycles through separate TaskComposer instances must not crash."""
+        from tesseract_robotics.planning import TaskComposer
+
+        program = self._simple_program(robot)
+        for _ in range(3):
+            composer = TaskComposer.from_config()
+            result = composer.plan(robot, program, pipeline="TrajOptPipeline")
+            assert result.successful
+            del composer
