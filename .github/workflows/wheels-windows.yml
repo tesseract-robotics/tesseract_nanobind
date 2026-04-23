@@ -65,7 +65,20 @@ jobs:
       shell: bash -el {0}
       run: conda install -y osqp
 
+    # Explicit cache of the installed/ output — johnwason/vcpkg-action's own
+    # caching was empirically silent-failing on our key (no vcpkg-* entries
+    # ever landed in `gh cache list` despite two successful vcpkg runs).
+    # Caching installed/ directly makes it observable and lets the 4 matrix
+    # jobs share one cache key (vcpkg output doesn't depend on Python version).
+    - name: cache vcpkg installed
+      id: vcpkg-cache
+      uses: actions/cache@v4
+      with:
+        path: vcpkg/installed
+        key: vcpkg-installed-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**', 'ws/src/tesseract_nanobind/.github/workflows/wheels-windows.yml') }}
+
     - name: vcpkg install C++ deps
+      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
       uses: johnwason/vcpkg-action@v7
       with:
         # Mirror of tesseract_python upstream's Windows vcpkg list, extended with
@@ -82,8 +95,6 @@ jobs:
         triplet: x64-windows-v143-release
         extra-args: --clean-after-build --overlay-triplets=${{ github.workspace }}/ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets
         token: ${{ github.token }}
-        cache-key: vcpkg-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**') }}
-        github-binarycache: true
 
     - name: activate MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -146,6 +157,24 @@ jobs:
         while IFS= read -r f; do
           add_include "$f" stdexcept stdexcept
         done < <(find ifopt \( -name '*.h' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l -E 'std::(runtime_error|logic_error|invalid_argument|out_of_range)' {} +)
+
+        # opw_kinematics: add_executable(opw_kinematics_node src/test.cpp) lives
+        # OUTSIDE the OPW_ENABLE_TESTING guard — an upstream CMakeLists bug. On
+        # Windows MSVC + vcpkg Eigen3, the INTERFACE include from Eigen3::Eigen
+        # doesn't propagate to the test target for reasons unclear, so it fails
+        # to find "Eigen/Dense". We don't need this test binary; short-circuit it.
+        F=opw_kinematics/CMakeLists.txt
+        if [ -f "$F" ] && grep -q 'add_executable.*opw_kinematics_node' "$F"; then
+          # Insert if(FALSE) above the test block and endif() after it. The
+          # test block runs from "# Create test executable" through the
+          # "target_code_coverage" block whose closing paren is on a line
+          # matching ENABLE OPW_ENABLE_CODE_COVERAGE for the _node target.
+          sed -i '/# Create test executable/i if(FALSE)  # patched: skip stray test exe on windows' "$F"
+          # After the executable block, the next top-level line is "# Install" or similar.
+          # Insert endif() right before that.
+          sed -i '/# Install/i endif()  # patched: close if(FALSE)' "$F"
+          echo "  patched: $F"
+        fi
 
     - name: cache colcon build
       uses: actions/cache@v4
