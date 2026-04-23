@@ -116,25 +116,36 @@ jobs:
     - name: patch upstream missing includes
       working-directory: ws/src
       run: |
-        # Same patch as Linux — tesseract_planning 0.34.0 std::runtime_error fix
-        find tesseract_planning -name '*.h' -path '*/poly/*' | xargs grep -l 'std::runtime_error' 2>/dev/null | while read f; do
-          if ! grep -q '#include <stdexcept>' "$f"; then
-            sed -i '/#include <string>/a #include <stdexcept>' "$f"
-            echo "  patched stdexcept: $f"
-          fi
-        done
+        # MSVC is strict about transitive stdlib includes — GCC/Clang let
+        # libstdc++ headers pull in <cassert>/<stdexcept> via other includes,
+        # but MSVC's STL does not. Insert the missing include after the last
+        # existing #include line in each offending file.
+        add_include() {
+          local file=$1 header=$2 tag=$3
+          grep -qE "#include[[:space:]]*<${header//./\\.}>" "$file" && return
+          local last
+          last=$(grep -n '^#include' "$file" | tail -1 | cut -d: -f1)
+          [ -z "$last" ] && return
+          { head -n "$last" "$file"; echo "#include <${header}>"; tail -n "+$((last + 1))" "$file"; } > "$file.new"
+          mv "$file.new" "$file"
+          echo "  patched ${tag}: $file"
+        }
 
-        # MSVC is strict about transitive includes — any ifopt header using
-        # assert() without <cassert> fails with C3861 on Windows (works on
-        # GCC/Clang because libstdc++ headers pull it in transitively).
+        # tesseract_planning 0.34.0: poly/*.h uses std::runtime_error
         while IFS= read -r f; do
-          grep -qE '#include[[:space:]]*<(cassert|assert\.h)>' "$f" && continue
-          last=$(grep -n '^#include' "$f" | tail -1 | cut -d: -f1)
-          [ -z "$last" ] && continue
-          { head -n "$last" "$f"; echo '#include <cassert>'; tail -n "+$((last + 1))" "$f"; } > "$f.new"
-          mv "$f.new" "$f"
-          echo "  patched cassert: $f"
-        done < <(find ifopt -name '*.h' -exec grep -l 'assert(' {} +)
+          add_include "$f" stdexcept stdexcept
+        done < <(find tesseract_planning -name '*.h' -path '*/poly/*' -exec grep -l 'std::runtime_error' {} +)
+
+        # ifopt 2.1.4: assert() usage in headers + source files
+        while IFS= read -r f; do
+          add_include "$f" cassert cassert
+        done < <(find ifopt \( -name '*.h' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l 'assert(' {} +)
+
+        # ifopt 2.1.4: variable_set.h (and any other ifopt header) using
+        # std::runtime_error / std::logic_error / std::invalid_argument
+        while IFS= read -r f; do
+          add_include "$f" stdexcept stdexcept
+        done < <(find ifopt \( -name '*.h' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l -E 'std::(runtime_error|logic_error|invalid_argument|out_of_range)' {} +)
 
     - name: cache colcon build
       uses: actions/cache@v4
