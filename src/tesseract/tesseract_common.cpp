@@ -120,17 +120,6 @@ NB_MODULE(tesseract_common, m) {
             return self.toRotationMatrix();
         });
 
-    // ========== FilesystemPath ==========
-    // Wrapper for std::filesystem::path (SWIG compatibility)
-    nb::class_<std::filesystem::path>(m, "FilesystemPath")
-        .def(nb::init<>())
-        .def(nb::init<const std::string&>(), "path"_a)
-        .def("string", [](const std::filesystem::path& p) { return p.string(); })
-        .def("__str__", [](const std::filesystem::path& p) { return p.string(); })
-        .def("__repr__", [](const std::filesystem::path& p) {
-            return "FilesystemPath('" + p.string() + "')";
-        });
-
     // Note: TransformMap (std::map<string, Isometry3d>) is handled automatically by nanobind's
     // stl/map type caster - Python dict with Isometry3d values will convert automatically
 
