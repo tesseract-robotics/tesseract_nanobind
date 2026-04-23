@@ -25,6 +25,20 @@ from pathlib import Path
 
 from loguru import logger
 
+# Windows: register DLL directories before any C extension import.
+# Python 3.8+ on Windows removed PATH-based DLL search; os.add_dll_directory is
+# the replacement. Attribute only exists on Windows, so the getattr probe is both
+# feature-detection and platform-narrowing avoidance for pyright.
+_add_dll_dir = getattr(os, "add_dll_directory", None)
+if _add_dll_dir is not None:
+    _pkg_dir = Path(__file__).parent.resolve()
+    _libs_dir = _pkg_dir.parent / "tesseract_robotics.libs"  # delvewheel output
+    if _libs_dir.is_dir():
+        _add_dll_dir(str(_libs_dir))
+    _add_dll_dir(str(_pkg_dir))
+    del _pkg_dir, _libs_dir
+del _add_dll_dir
+
 try:
     __version__ = version("tesseract-robotics-nanobind")
 except PackageNotFoundError:
@@ -118,21 +132,25 @@ def _configure_environment():
     _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir, ws_resource, use_parent=True)
 
     # Plugin search paths - env var, bundled plugins, or ws/install/lib
-    # Linux: pkg_dir (all deps bundled in package root with $ORIGIN rpath)
-    # macOS: .dylibs (delocate-repaired)
+    # Linux:   pkg_dir (all deps bundled in package root with $ORIGIN rpath)
+    # macOS:   .dylibs (delocate-repaired)
+    # Windows: pkg_dir (plugin factory DLLs bundled there; delvewheel libs go to
+    #          sibling tesseract_robotics.libs/ but plugin dlopen targets pkg_dir)
     plugin_path = os.environ.get("TESSERACT_PLUGIN_PATH")  # explicit override
     editable = _is_editable_install()
 
     if not plugin_path:
-        # Check for bundled plugins (Linux wheel - plugins in package root)
         bundled_plugin = pkg_dir / "libtesseract_collision_bullet_factories.so"
-        dylibs_dir = pkg_dir / ".dylibs"  # macOS bundled (delocate-repaired)
+        dylibs_dir = pkg_dir / ".dylibs"
+        bundled_plugin_win = pkg_dir / "tesseract_collision_bullet_factories.dll"
         ws_install_lib = project_root / "ws" / "install" / "lib"
 
         if bundled_plugin.exists():
             plugin_path = str(pkg_dir)
         elif dylibs_dir.is_dir():
             plugin_path = str(dylibs_dir)
+        elif bundled_plugin_win.exists():
+            plugin_path = str(pkg_dir)
         elif editable and ws_install_lib.is_dir():
             plugin_path = str(ws_install_lib)
 
