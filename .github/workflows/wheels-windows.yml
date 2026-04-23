@@ -1,0 +1,334 @@
+name: Build & Test (Windows)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
+      - '.github/workflows/wheels-macos.yml'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
+      - '.github/workflows/wheels-macos.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: true
+      matrix:
+        python: ['3.9', '3.10', '3.11', '3.12']
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: ws/src/tesseract_nanobind
+        fetch-depth: 0  # setuptools-scm needs tag history for version derivation
+
+    - name: enable long paths
+      shell: pwsh
+      run: git config --global core.longpaths true
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        architecture: x64
+
+    - uses: conda-incubator/setup-miniconda@v3
+      with:
+        auto-update-conda: false
+        miniforge-version: latest
+        activate-environment: osqp-env
+        channels: conda-forge
+        channel-priority: strict
+
+    - name: conda install osqp
+      shell: bash -el {0}
+      run: conda install -y osqp
+
+    - name: vcpkg install C++ deps
+      uses: johnwason/vcpkg-action@v7
+      with:
+        # Mirror of tesseract_python upstream's Windows vcpkg list, extended with
+        # ompl + taskflow + jsoncpp + gperftools (our extra runtime deps) and
+        # ccd + flann (transitively needed by fcl / pcl).
+        pkgs: >-
+          boost-dll boost-program-options boost-serialization boost-filesystem
+          boost-stacktrace boost-algorithm boost-format boost-graph
+          tinyxml2 console-bridge assimp urdfdom octomap orocos-kdl pcl
+          flann jsoncpp yaml-cpp eigen3 openblas cereal
+          fcl ompl taskflow
+          bullet3[multithreading,double-precision,rtti]
+          ccd[double-precision] gperftools
+        triplet: x64-windows-v143-release
+        extra-args: --clean-after-build --overlay-triplets=${{ github.workspace }}/ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets
+        token: ${{ github.token }}
+        cache-key: vcpkg-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**') }}
+        github-binarycache: true
+
+    - name: activate MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+        toolset: "14.4"  # v143
+
+    - name: pip build tools
+      run: python -m pip install --upgrade pip delvewheel setuptools-scm vcstool colcon-common-extensions
+
+    - name: cache vcs repos
+      uses: actions/cache@v4
+      with:
+        path: |
+          ws/src/tesseract
+          ws/src/tesseract_planning
+          ws/src/trajopt
+          ws/src/descartes_light
+          ws/src/opw_kinematics
+          ws/src/ifopt
+          ws/src/ruckig
+          ws/src/boost_plugin_loader
+          ws/src/ros_industrial_cmake_boilerplate
+        key: vcs-win-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
+
+    - name: vcs import
+      working-directory: ws/src
+      run: vcs import --input tesseract_nanobind/dependencies.rosinstall --skip-existing
+
+    - name: patch upstream missing includes
+      working-directory: ws/src
+      run: |
+        # Same patch as Linux — tesseract_planning 0.34.0 std::runtime_error fix
+        find tesseract_planning -name '*.h' -path '*/poly/*' | xargs grep -l 'std::runtime_error' 2>/dev/null | while read f; do
+          if ! grep -q '#include <stdexcept>' "$f"; then
+            sed -i '/#include <string>/a #include <stdexcept>' "$f"
+            echo "  patched: $f"
+          fi
+        done
+
+    - name: cache colcon build
+      uses: actions/cache@v4
+      id: colcon-cache
+      with:
+        path: ws/install
+        key: colcon-win-v143-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+
+    - name: colcon build C++ deps
+      if: steps.colcon-cache.outputs.cache-hit != 'true'
+      working-directory: ws
+      env:
+        CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1"
+      run: |
+        set -e
+        VCPKG_INSTALL="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release"
+        CONDA_LIB="$CONDA/envs/osqp-env/Library"
+        export CMAKE_PREFIX_PATH="$VCPKG_INSTALL;$CONDA_LIB"
+        export PATH="$VCPKG_INSTALL/bin:$CONDA_LIB/bin:$PATH"
+        colcon build --merge-install \
+          --packages-ignore tesseract_python tesseract_examples vhacd qpoases tesseract_nanobind tesseract_viewer_python twc_workcell_positioner_viewer \
+          --event-handlers console_cohesion+ \
+          --cmake-force-configure \
+          --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
+            -DINSTALL_OMPL=OFF -DBUILD_CLOUD_CLIENT=OFF -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
+            -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
+            -DTESSERACT_ENABLE_TESTING=OFF \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DNO_OPENCL=ON \
+            -DVCPKG_APPLOCAL_DEPS=OFF
+
+    - name: build nanobind wheel
+      working-directory: ws/src/tesseract_nanobind
+      env:
+        CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1"
+      run: |
+        set -e
+        VCPKG_INSTALL="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release"
+        CONDA_LIB="$CONDA/envs/osqp-env/Library"
+        INSTALL="$GITHUB_WORKSPACE/ws/install"
+        export CMAKE_PREFIX_PATH="$INSTALL;$CONDA_LIB;$VCPKG_INSTALL"
+        export PATH="$INSTALL/bin:$CONDA_LIB/bin:$VCPKG_INSTALL/bin:$PATH"
+        export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+        pip wheel . -w dist/ --no-build-isolation
+
+    - name: bundle plugins then delvewheel repair
+      working-directory: ws/src/tesseract_nanobind
+      run: |
+        set -e
+        WHEEL_FILE=$(ls dist/tesseract*.whl)
+        WHEEL_DIR=$(mktemp -d)
+        unzip -q "$WHEEL_FILE" -d "$WHEEL_DIR"
+        PKG_DIR="$WHEEL_DIR/tesseract_robotics"
+
+        echo "=== Bundling plugin factory DLLs into package dir ==="
+        # Plugin factories are dlopen-loaded at runtime — invisible to delvewheel's
+        # static dep scan. Drop them in the package dir first so delvewheel's next
+        # repair pass resolves their transitive DLL deps too.
+        for plugin in \
+          tesseract_collision_bullet_factories \
+          tesseract_collision_fcl_factories \
+          tesseract_kinematics_core_factories \
+          tesseract_kinematics_kdl_factories \
+          tesseract_kinematics_opw_factory \
+          tesseract_kinematics_ur_factory \
+          tesseract_task_composer_factories \
+          tesseract_task_composer_planning_factories \
+          tesseract_task_composer_taskflow_factories; do
+          src="$GITHUB_WORKSPACE/ws/install/bin/${plugin}.dll"
+          if [[ -f "$src" ]]; then
+            cp "$src" "$PKG_DIR/"
+            echo "  Added: ${plugin}.dll"
+          else
+            echo "  MISSING: ${plugin}.dll (expected at $src)"
+          fi
+        done
+
+        echo "=== Patching task_composer_config YAMLs ==="
+        for yaml_file in "$PKG_DIR/data/task_composer_config"/*.yaml; do
+          if [[ -f "$yaml_file" ]] && grep -q '/usr/local/lib' "$yaml_file"; then
+            sed -i 's|/usr/local/lib|"@PLUGIN_PATH@"|g' "$yaml_file"
+            echo "  Patched: $(basename "$yaml_file")"
+          fi
+        done
+
+        echo "=== Stripping search_paths from tesseract_support YAMLs ==="
+        find "$PKG_DIR/data/tesseract_support" -name "*.yaml" -type f 2>/dev/null | while read yaml_file; do
+          if grep -q 'search_paths:' "$yaml_file"; then
+            sed -i '/search_paths:/d; /^[[:space:]]*- \/.*$/d' "$yaml_file"
+            echo "  Stripped: $(basename "$yaml_file")"
+          fi
+        done
+
+        rm "$WHEEL_FILE"
+        (cd "$WHEEL_DIR" && zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/$WHEEL_FILE" .)
+        rm -rf "$WHEEL_DIR"
+
+        echo "=== delvewheel repair ==="
+        mkdir -p wheelhouse
+        VCPKG_BIN="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release/bin"
+        CONDA_BIN="$CONDA/envs/osqp-env/Library/bin"
+        INSTALL_BIN="$GITHUB_WORKSPACE/ws/install/bin"
+        delvewheel repair -v \
+          --add-path "$INSTALL_BIN;$VCPKG_BIN;$CONDA_BIN" \
+          -w wheelhouse "$WHEEL_FILE"
+
+        echo "=== Wheel contents ==="
+        ls -la wheelhouse/
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: python-${{ matrix.python }}-windows-x64
+        path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
+
+    - if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-windows-x64-py${{ matrix.python }}
+        path: '**/*.log'
+        retention-days: 2
+
+  test-wheel:
+    needs: build
+    runs-on: windows-2022
+    # py3.9 has intermittent GC segfaults with pytest-xdist; don't block CI (matches Linux/macOS policy)
+    continue-on-error: ${{ matrix.python == '3.9' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.12']
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: tesseract_nanobind
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+        architecture: x64
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: python-${{ matrix.python }}-windows-x64
+        path: wheelhouse
+
+    - name: install wheel in clean venv
+      run: |
+        set -e
+        python -m venv test_env
+        source test_env/Scripts/activate
+        python -m pip install --upgrade pip
+        pip install wheelhouse/tesseract*.whl
+        pip install pytest pytest-xdist scipy
+
+    - name: smoke test
+      run: |
+        set -e
+        source test_env/Scripts/activate
+        python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
+        python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+        # trajopt_ifopt is the canary — proves the hybrid vcpkg+conda-forge integration worked
+        python -c "from tesseract_robotics import trajopt_ifopt; print('trajopt_ifopt OK')"
+
+    - name: debug DLLs on failure
+      if: failure()
+      run: |
+        source test_env/Scripts/activate
+        PKG_DIR=$(python -c "import tesseract_robotics, pathlib; print(pathlib.Path(tesseract_robotics.__file__).parent)")
+        echo "=== Package dir ==="
+        ls "$PKG_DIR" 2>/dev/null || true
+        echo "=== Sibling .libs dir ==="
+        ls "$PKG_DIR/../tesseract_robotics.libs" 2>/dev/null || echo "none"
+        echo "=== DLLs under site-packages ==="
+        find "$PKG_DIR" -name "*.dll" 2>/dev/null | head -30
+
+    - name: run tests
+      run: |
+        source test_env/Scripts/activate
+        cd tesseract_nanobind
+        pytest tests -n auto \
+          --ignore=tests/tesseract_time_parameterization \
+          --ignore=tests/examples \
+          --ignore=tests/tesseract_kinematics \
+          --ignore=tests/benchmarks \
+          -v --tb=short
+
+  publish:
+    needs: [build, test-wheel]
+    if: startsWith(github.ref, 'refs/tags/')
+    # pypa/gh-action-pypi-publish is hard-Linux-only. The artifacts are already
+    # built for Windows x64 — we just download and twine-upload them from Linux.
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: python-*-windows-x64
+        merge-multiple: true
+        path: dist/
+    - name: List wheels
+      run: ls -la dist/
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
