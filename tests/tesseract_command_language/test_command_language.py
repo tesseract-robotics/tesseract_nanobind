@@ -16,6 +16,7 @@ from tesseract_robotics.tesseract_command_language import (
     JointWaypointPoly_wrap_JointWaypoint,
     # Instructions
     MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionPoly_wrap_MoveInstruction,
     # Enums
     MoveInstructionType,
@@ -220,6 +221,106 @@ class TestCompositeInstruction:
 
         assert len(program) == 2
         assert not program.empty()
+
+
+class TestNestedCompositeInstruction:
+    """Test nesting one CompositeInstruction inside another."""
+
+    @staticmethod
+    def _make_move_instr(x: float) -> MoveInstructionPoly:
+        wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(x, 0.0, 1.0))
+        mi = MoveInstruction(
+            CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
+            MoveInstructionType_FREESPACE,
+            "DEFAULT",
+        )
+        return MoveInstructionPoly_wrap_MoveInstruction(mi)
+
+    def test_push_back_composite(self):
+        """push_back accepts a CompositeInstruction as a nested child."""
+        outer = CompositeInstruction("DEFAULT")
+        inner = CompositeInstruction("DEFAULT")
+        inner.setDescription("approach")
+        inner.push_back(self._make_move_instr(0.1))
+
+        outer.push_back(inner)
+
+        assert len(outer) == 1
+        child = outer[0]
+        assert child.isCompositeInstruction()
+        assert not child.isMoveInstruction()
+
+    def test_mixed_children(self):
+        """push_back can interleave move instructions and nested composites."""
+        outer = CompositeInstruction("DEFAULT")
+        inner = CompositeInstruction("DEFAULT")
+        inner.setDescription("approach")
+
+        outer.push_back(inner)
+        outer.push_back(self._make_move_instr(0.5))
+
+        assert len(outer) == 2
+        assert outer[0].isCompositeInstruction()
+        assert outer[1].isMoveInstruction()
+
+    def test_as_composite_instruction_round_trip(self):
+        """asCompositeInstruction extracts the composite payload with its
+        description + children intact."""
+        outer = CompositeInstruction("DEFAULT")
+        inner = CompositeInstruction("DEFAULT")
+        inner.setDescription("to_end")
+        inner.push_back(self._make_move_instr(1.0))
+
+        outer.push_back(inner)
+        recovered = outer[0].asCompositeInstruction()
+
+        assert recovered.getDescription() == "to_end"
+        assert len(recovered) == 1
+
+    def test_as_composite_instruction_wrong_type_raises(self):
+        """Calling asCompositeInstruction on a move-instruction payload
+        raises RuntimeError, matching asMoveInstruction's error style."""
+        import pytest
+
+        outer = CompositeInstruction("DEFAULT")
+        outer.push_back(self._make_move_instr(0.0))
+
+        move_ip = outer[0]
+        assert move_ip.isMoveInstruction()
+
+        with pytest.raises(RuntimeError):
+            move_ip.asCompositeInstruction()
+
+    def test_raster_like_dispatch_structure(self):
+        """Full RasterMotionTask-style structure: outer composite whose
+        children are description-tagged sub-composites that a dispatcher
+        routes to different sub-pipelines."""
+        outer = CompositeInstruction("DEFAULT")
+
+        approach = CompositeInstruction("DEFAULT")
+        approach.setDescription("approach")
+        approach.push_back(self._make_move_instr(0.0))
+
+        raster = CompositeInstruction("DEFAULT")
+        raster.setDescription("Raster Index 0")
+        raster.push_back(self._make_move_instr(0.1))
+        raster.push_back(self._make_move_instr(0.2))
+
+        to_end = CompositeInstruction("DEFAULT")
+        to_end.setDescription("to_end")
+        to_end.push_back(self._make_move_instr(0.3))
+
+        outer.push_back(approach)
+        outer.push_back(raster)
+        outer.push_back(to_end)
+
+        assert len(outer) == 3
+        descriptions = []
+        for i in range(len(outer)):
+            child_ip = outer[i]
+            assert child_ip.isCompositeInstruction()
+            descriptions.append(child_ip.asCompositeInstruction().getDescription())
+        assert descriptions == ["approach", "Raster Index 0", "to_end"]
 
 
 class TestProfileDictionary:
