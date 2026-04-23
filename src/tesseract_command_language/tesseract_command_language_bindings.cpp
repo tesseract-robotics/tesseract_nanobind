@@ -205,6 +205,8 @@ NB_MODULE(_tesseract_command_language, m) {
     // ========== InstructionPoly ==========
     nb::class_<tp::InstructionPoly>(m, "InstructionPoly")
         .def(nb::init<>())
+        .def(nb::init<const tp::MoveInstructionPoly&>(), "instruction"_a)
+        .def(nb::init<const tp::CompositeInstruction&>(), "instruction"_a)
         .def("getDescription", &tp::InstructionPoly::getDescription)
         .def("setDescription", &tp::InstructionPoly::setDescription, "description"_a)
         .def("print", &tp::InstructionPoly::print, "prefix"_a = "")
@@ -216,7 +218,12 @@ NB_MODULE(_tesseract_command_language, m) {
             if (!self.isMoveInstruction())
                 throw std::runtime_error("InstructionPoly is not a MoveInstruction");
             return self.as<tp::MoveInstructionPoly>();
-        }, "Cast to MoveInstructionPoly. Raises RuntimeError if not a move instruction.");
+        }, "Cast to MoveInstructionPoly. Raises RuntimeError if not a move instruction.")
+        .def("asCompositeInstruction", [](tp::InstructionPoly& self) -> tp::CompositeInstruction {
+            if (!self.isCompositeInstruction())
+                throw std::runtime_error("InstructionPoly is not a CompositeInstruction");
+            return self.as<tp::CompositeInstruction>();
+        }, "Cast to CompositeInstruction. Raises RuntimeError if not a composite instruction.");
 
     // ========== MoveInstructionPoly ==========
     // Note: Not binding as subclass due to nanobind cross-module limitations
@@ -271,6 +278,12 @@ NB_MODULE(_tesseract_command_language, m) {
         if (!ip.isMoveInstruction())
             throw std::runtime_error("InstructionPoly is not a MoveInstruction");
         return ip.as<tp::MoveInstructionPoly>();
+    }, "instruction"_a);
+
+    m.def("InstructionPoly_as_CompositeInstruction", [](tp::InstructionPoly& ip) -> tp::CompositeInstruction {
+        if (!ip.isCompositeInstruction())
+            throw std::runtime_error("InstructionPoly is not a CompositeInstruction");
+        return ip.as<tp::CompositeInstruction>();
     }, "instruction"_a);
 
     m.def("WaypointPoly_as_StateWaypointPoly", [](tp::WaypointPoly& wp) -> tp::StateWaypointPoly {
@@ -361,9 +374,14 @@ NB_MODULE(_tesseract_command_language, m) {
             return self.getInstructions();
         }, nb::rv_policy::reference_internal)
         .def("setInstructions", &tp::CompositeInstruction::setInstructions, "instructions"_a)
-        // Note: 0.33 removed appendMoveInstruction - use push_back instead
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::InstructionPoly& ip) {
+            self.push_back(ip);
+        }, "instruction"_a)
         .def("push_back", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
             self.push_back(mi);
+        }, "instruction"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::CompositeInstruction& ci) {
+            self.push_back(ci);
         }, "instruction"_a)
         // SWIG-compatible alias
         .def("appendMoveInstruction", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
@@ -413,4 +431,12 @@ NB_MODULE(_tesseract_command_language, m) {
         dict.addProfile(ns, profile_name, profile);
     }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
     "Add a profile to the dictionary (cross-module helper)");
+
+    // Python-side convertibility: lets any API accepting an InstructionPoly
+    // (push_back, setInstructions, function parameters) be called with a
+    // MoveInstructionPoly or a CompositeInstruction directly. Pairs with
+    // the InstructionPoly(nb::init<const SubType&>()) constructors bound
+    // above. Must come after all three class bindings.
+    nb::implicitly_convertible<tp::MoveInstructionPoly, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::CompositeInstruction, tp::InstructionPoly>();
 }

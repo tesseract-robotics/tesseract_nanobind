@@ -1,3 +1,5 @@
+"""tesseract_command_language Python bindings"""
+
 from collections.abc import Iterator, Sequence
 import enum
 from typing import Annotated, overload
@@ -244,7 +246,14 @@ def JointWaypointPoly_wrap_JointWaypoint(waypoint: JointWaypoint) -> JointWaypoi
 def StateWaypointPoly_wrap_StateWaypoint(waypoint: StateWaypoint) -> StateWaypointPoly: ...
 
 class InstructionPoly:
+    @overload
     def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, instruction: MoveInstructionPoly) -> None: ...
+
+    @overload
+    def __init__(self, instruction: CompositeInstruction) -> None: ...
 
     def getDescription(self) -> str: ...
 
@@ -261,6 +270,11 @@ class InstructionPoly:
     def asMoveInstruction(self) -> MoveInstructionPoly:
         """
         Cast to MoveInstructionPoly. Raises RuntimeError if not a move instruction.
+        """
+
+    def asCompositeInstruction(self) -> CompositeInstruction:
+        """
+        Cast to CompositeInstruction. Raises RuntimeError if not a composite instruction.
         """
 
 class MoveInstructionPoly:
@@ -313,6 +327,8 @@ class MoveInstructionPoly:
 def MoveInstructionPoly_wrap_MoveInstruction(instruction: MoveInstruction) -> MoveInstructionPoly: ...
 
 def InstructionPoly_as_MoveInstructionPoly(instruction: InstructionPoly) -> MoveInstructionPoly: ...
+
+def InstructionPoly_as_CompositeInstruction(instruction: InstructionPoly) -> CompositeInstruction: ...
 
 def WaypointPoly_as_StateWaypointPoly(waypoint: WaypointPoly) -> StateWaypointPoly: ...
 
@@ -405,7 +421,14 @@ class CompositeInstruction:
 
     def setInstructions(self, instructions: Sequence[InstructionPoly]) -> None: ...
 
+    @overload
+    def push_back(self, instruction: InstructionPoly) -> None: ...
+
+    @overload
     def push_back(self, instruction: MoveInstructionPoly) -> None: ...
+
+    @overload
+    def push_back(self, instruction: CompositeInstruction) -> None: ...
 
     def appendMoveInstruction(self, mi: MoveInstructionPoly) -> None: ...
 
