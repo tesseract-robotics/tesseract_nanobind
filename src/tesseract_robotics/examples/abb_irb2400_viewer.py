@@ -9,7 +9,7 @@ This example demonstrates:
 - Trajectory visualization
 """
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
@@ -18,25 +18,24 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType_FREESPACE,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
     ProfileDictionary_addOMPLProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
@@ -44,7 +43,7 @@ from tesseract_robotics.viewer import TesseractViewer
 
 # TrajOpt imports - optional, skip if not available
 try:
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract.tesseract_motion_planners_trajopt import (
         ProfileDictionary_addTrajOptCompositeProfile,
         ProfileDictionary_addTrajOptPlanProfile,
         TrajOptDefaultCompositeProfile,
@@ -72,12 +71,8 @@ def main():
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = FilesystemPath(
-        locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
-    )
-    abb_irb2400_srdf_fname = FilesystemPath(
-        locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
-    )
+    abb_irb2400_urdf_fname = locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
+    abb_irb2400_srdf_fname = locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
 
     t_env = Environment()
     assert t_env.init(abb_irb2400_urdf_fname, abb_irb2400_srdf_fname, locator)

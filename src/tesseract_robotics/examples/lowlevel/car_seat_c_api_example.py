@@ -38,20 +38,20 @@ from tesseract_robotics.planning import (
     StateTarget,
     TaskComposer,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
+from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_common import (
     AllowedCollisionMatrix,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract.tesseract_environment import (
     AddLinkCommand,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
     MoveLinkCommand,
 )
-from tesseract_robotics.tesseract_geometry import createMeshFromPath
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_geometry import createMeshFromPath
+from tesseract.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptSolverProfile,
@@ -59,7 +59,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract.tesseract_scene_graph import (
     Collision,
     Joint,
     JointType,

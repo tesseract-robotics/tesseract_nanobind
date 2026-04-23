@@ -60,14 +60,14 @@ Related Examples
 import numpy as np
 
 from tesseract_robotics.planning import Pose, Robot, create_fixed_joint, sphere
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
     ContactTestType_ALL,
 )
-from tesseract_robotics.tesseract_common import CollisionMarginData
-from tesseract_robotics.tesseract_scene_graph import Collision, Link, Visual
+from tesseract.tesseract_common import CollisionMarginData
+from tesseract.tesseract_scene_graph import Collision, Link, Visual
 
 
 def main():

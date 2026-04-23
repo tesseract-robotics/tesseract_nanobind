@@ -20,8 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract.tesseract_common import ResourceLocator, SimpleLocatedResource
+from tesseract.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 

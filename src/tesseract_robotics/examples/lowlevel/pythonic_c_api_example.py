@@ -12,7 +12,7 @@ Pipeline Overview
 The high-level API abstracts three major pain points of the raw C++ bindings:
 
 1. Environment Setup (Robot class)
-   Low-level: 10+ lines with FilesystemPath, GeneralResourceLocator, Environment.init()
+    Low-level: 10+ lines with GeneralResourceLocator and Environment.init()
    High-level: Robot.from_tesseract_support("abb_irb2400")
 
 2. Poly-Type Wrapping (MotionProgram class)
@@ -97,7 +97,7 @@ def main():
     # =========================================================================
     # 1. Load Robot
     # =========================================================================
-    # WHY: The low-level API requires FilesystemPath, GeneralResourceLocator,
+    # WHY: The low-level API requires GeneralResourceLocator and explicit
     # and explicit Environment.init() calls. Robot.from_tesseract_support()
     # encapsulates all this and resolves package:// URLs automatically.
     # Compare with tesseract_planning_lowlevel_c_api_example.py lines 52-62.

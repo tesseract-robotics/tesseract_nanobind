@@ -2,8 +2,8 @@
 
 import sys
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract.tesseract_common import GeneralResourceLocator
+from tesseract.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
     
 

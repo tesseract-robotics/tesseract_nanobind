@@ -24,7 +24,7 @@ import traceback
 
 import importlib_resources
 
-from tesseract_robotics import tesseract_environment
+from tesseract import tesseract_environment
 from tesseract_robotics.viewer.tesseract_env_to_gltf import (
     tesseract_env_to_glb,
     tesseract_env_to_gltf,
@@ -160,7 +160,7 @@ class TesseractViewer:
         Update the trajectory to display. The trajectory will be animated based on the timestamps in the trajectory.
 
         :param tesseract_trajectory: The trajectory to display
-        :type tesseract_trajectory: tesseract_robotics.tesseract_command_language.CompositeInstruction
+        :type tesseract_trajectory: tesseract.tesseract_command_language.CompositeInstruction
         """
 
         joint_names, traj = tesseract_trajectory_to_list(tesseract_trajectory)
@@ -582,14 +582,14 @@ class TesseractViewer:
         update_now=True,
     ):
         """
-        Plot a trajectory stored in a tesseract_robotics.tesseract_command_language.CompositeInstruction to the scene.
+        Plot a trajectory stored in a tesseract.tesseract_command_language.CompositeInstruction to the scene.
         This will draw the trajectory
         as a series of line segments and display axes at each trajectory waypoint.
 
         :param tesseract_trajectory: The trajectory to plot
-        :type tesseract_trajectory: tesseract_robotics.tesseract_command_language.CompositeInstruction
+        :type tesseract_trajectory: tesseract.tesseract_command_language.CompositeInstruction
         :param manipulator_info: The manipulator info for the manipulator that generated the trajectory
-        :type manipulator_info: tesseract_robotics.tesseract_kinematics.ManipulatorInfo
+        :type manipulator_info: tesseract.tesseract_kinematics.ManipulatorInfo
         :param color: The color of the trajectory, defaults to white
         :type color: Union[List[float], np.ndarray], optional
         :param linewidth: The width of the trajectory line segments, defaults to 0.001
@@ -643,7 +643,7 @@ class TesseractViewer:
         :param trajectory: The trajectory to plot
         :type trajectory: Union[List[List[float]], List[np.ndarray]]
         :param manipulator_info: The manipulator info for the manipulator that generated the trajectory
-        :type manipulator_info: tesseract_robotics.tesseract_kinematics.ManipulatorInfo
+        :type manipulator_info: tesseract.tesseract_kinematics.ManipulatorInfo
         :param color: The color of the trajectory, defaults to white
         :type color: Union[List[float], np.ndarray], optional
         :param linewidth: The width of the trajectory line segments, defaults to 0.001

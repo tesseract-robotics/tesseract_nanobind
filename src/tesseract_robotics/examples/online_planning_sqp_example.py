@@ -46,10 +46,10 @@ import time
 import numpy as np
 
 # Low-level SQP imports
-from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics import trajopt_sqp as tsqp
+from tesseract import trajopt_ifopt as ti
+from tesseract import trajopt_sqp as tsqp
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract.tesseract_common import Isometry3d
 
 TesseractViewer = None
 if "pytest" not in sys.modules:

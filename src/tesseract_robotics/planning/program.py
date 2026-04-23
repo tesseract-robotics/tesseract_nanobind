@@ -35,7 +35,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from tesseract_robotics.planning.transforms import Pose
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
@@ -51,7 +51,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
 )
-from tesseract_robotics.tesseract_common import ManipulatorInfo
+from tesseract.tesseract_common import ManipulatorInfo
 
 
 class MoveType(Enum):

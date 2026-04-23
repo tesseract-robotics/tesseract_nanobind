@@ -51,16 +51,16 @@ from tesseract_robotics.planning import (  # noqa: E402
     box,  # Box geometry factory
     create_obstacle,  # Add collision object to environment
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType  # noqa: E402
+from tesseract.tesseract_collision import CollisionEvaluatorType  # noqa: E402
 
 # Profile dictionary for custom planner settings
-from tesseract_robotics.tesseract_command_language import ProfileDictionary  # noqa: E402
+from tesseract.tesseract_command_language import ProfileDictionary  # noqa: E402
 
 # Isometry3d for 4x4 homogeneous transforms
-from tesseract_robotics.tesseract_common import Isometry3d  # noqa: E402
+from tesseract.tesseract_common import Isometry3d  # noqa: E402
 
 # TrajOpt-specific profile types (C++ bindings)
-from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
+from tesseract.tesseract_motion_planners_trajopt import (  # noqa: E402
     ProfileDictionary_addTrajOptCompositeProfile,  # Register composite profile
     ProfileDictionary_addTrajOptPlanProfile,  # Register plan profile
     TrajOptCollisionConfig,  # Collision checking config (0.33 API)
@@ -69,7 +69,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
 )
 
 # Low-level scene graph for link manipulation
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType  # noqa: E402
+from tesseract.tesseract_scene_graph import Joint, JointType  # noqa: E402
 
 # TrajOpt planner namespace for profile registration
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"

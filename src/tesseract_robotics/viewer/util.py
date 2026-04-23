@@ -2,12 +2,12 @@ import json
 
 import numpy as np
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     InstructionPoly_as_MoveInstructionPoly,
     WaypointPoly_as_JointWaypointPoly,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Quaterniond
+from tesseract.tesseract_common import Quaterniond
 
 
 def tesseract_trajectory_to_list(tesseract_trajectory):
