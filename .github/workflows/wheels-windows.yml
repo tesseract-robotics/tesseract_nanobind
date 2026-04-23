@@ -120,9 +120,21 @@ jobs:
         find tesseract_planning -name '*.h' -path '*/poly/*' | xargs grep -l 'std::runtime_error' 2>/dev/null | while read f; do
           if ! grep -q '#include <stdexcept>' "$f"; then
             sed -i '/#include <string>/a #include <stdexcept>' "$f"
-            echo "  patched: $f"
+            echo "  patched stdexcept: $f"
           fi
         done
+
+        # MSVC is strict about transitive includes — any ifopt header using
+        # assert() without <cassert> fails with C3861 on Windows (works on
+        # GCC/Clang because libstdc++ headers pull it in transitively).
+        while IFS= read -r f; do
+          grep -qE '#include[[:space:]]*<(cassert|assert\.h)>' "$f" && continue
+          last=$(grep -n '^#include' "$f" | tail -1 | cut -d: -f1)
+          [ -z "$last" ] && continue
+          { head -n "$last" "$f"; echo '#include <cassert>'; tail -n "+$((last + 1))" "$f"; } > "$f.new"
+          mv "$f.new" "$f"
+          echo "  patched cassert: $f"
+        done < <(find ifopt -name '*.h' -exec grep -l 'assert(' {} +)
 
     - name: cache colcon build
       uses: actions/cache@v4
