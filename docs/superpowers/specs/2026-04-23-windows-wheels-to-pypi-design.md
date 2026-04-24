@@ -165,3 +165,18 @@ No database migrations, no external system state. Pure CI change.
 - `from tesseract_robotics import trajopt_ifopt` succeeds from the wheel in a clean venv — proves full feature parity.
 - `publish` uploads 4 `*-win_amd64.whl` wheels alongside Linux and macOS wheels on the next tagged release.
 - No regression in `wheels-linux.yml` / `wheels-macos.yml` jobs.
+
+## Follow-up: align with upstream tesseract-org Windows CI pattern
+
+The current workflow hand-rolls the vcpkg+colcon orchestration. Upstream `tesseract/windows.yml` and `tesseract_planning/windows.yml` instead compose `johnwason/vcpkg-action@v7` + `ilammy/msvc-dev-cmd@v1` + `tesseract-robotics/colcon-action@v14`. Our first two are already aligned; the third is not.
+
+**Why not now:** changing structure mid-iteration (while ifopt/bigobj/etc. patches are still being discovered) would force another cold vcpkg (~60 min) on every structural edit, slowing the hunt for real failures. Refactoring on a green baseline is cheaper.
+
+**Planned refactor (post-green, separate PR):**
+
+- Replace the hand-rolled colcon invocation in the C++ workspace build step with `tesseract-robotics/colcon-action@v14`, passing our patches step as `before-script`, our CXXFLAGS + cmake flags as `target-args`, and `rosdep-enabled: false` / `add-ros-ppa: false` to skip ROS-isms.
+- Our nanobind repo stays out of the colcon build via `--packages-ignore tesseract_robotics` in `target-args`. The subsequent `pip wheel` step builds it.
+- Keep our wheel-build/delvewheel/test-wheel/publish stages verbatim — no upstream analog, no reason to change.
+- Divergence we knowingly retain: `-DTESSERACT_BUILD_TRAJOPT_IFOPT=ON` plus the ifopt include patches. Upstream `tesseract_planning/windows.yml` disables trajopt_ifopt on Windows; we cannot (feature parity requirement from this PR). Document the divergence inline in the workflow.
+
+**Expected reduction:** ~40–60 lines removed from `wheels-windows.yml`. No behaviour change intended.
