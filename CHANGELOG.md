@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `CompositeInstruction.push_back` now accepts a `CompositeInstruction` in addition to a plain `Instruction`, enabling nested composites (e.g. raster programs) to be built from Python the same way they are in C++ ([#51], [6d17314]).
   - contributed by [@Joelkang]
+- **SimplePlanner profiles** configurable from Python — `SimplePlannerCompositeProfile` plus seven concrete move profiles (`FixedSize`, `FixedSizeAssign`, `FixedSizeAssignNoIK`, `LVS`, `LVSNoIK`, `LVSAssign`, `LVSAssignNoIK`), with `ProfileDictionary_addSimplePlannerMoveProfile` / `…CompositeProfile` helpers for registration ([#54], [e2bf837]).
+  - contributed by [@Joelkang]
+- **task_composer planning-node profiles** exposed through a new `tesseract_task_composer_planning` module: `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, and `UpsampleTrajectoryProfile`. Heavy TrajOpt-typed members on `FixStateCollisionProfile` (OSQP settings, SQP params, coeff data) are intentionally skipped — configure those via YAML or C++ ([#56], [62cd2cd]).
+  - contributed by [@Joelkang]
+- **`ConstantTCPSpeedParameterization`** (KDL-based, constant TCP-speed time parameterization) bound alongside its `ConstantTCPSpeedCompositeProfile` ([#55], [f4f981d]).
+  - contributed by [@Joelkang]
 
 ### In progress
 
@@ -58,15 +64,21 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#49]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/49
 [#50]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/50
 [#51]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/51
+[#54]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/54
+[#55]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/55
+[#56]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/56
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993
 [590343f]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/590343f93dc4b82fae92f56d038cdb5ba41a511d
+[62cd2cd]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/62cd2cdd02f9c711d78726d1993d7585a8d54141
 [6d17314]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/6d17314a0b5aa1db45ffb9d9b18a8b3e048d3d06
 [7f53185]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/7f531851ce70a2564251761f560020d768e3e940
 [87ce68e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/87ce68ed5d015ae596a9047d629ed26f8595e3b0
 [a1d7607]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/a1d7607afa7d03cd27e845059cb455eb74a4d7ec
 [d80e689]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/d80e689f559f560aeb5e5b28cb332e942d15ecef
 [e26df2a]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/e26df2a10d37b9d4ffb689a384e6bad490b2fb7d
+[e2bf837]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/e2bf837c61b307157eb8cc3313e34f772c7d1b27
+[f4f981d]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/f4f981d161a59d7d4367139e5eb79a4c3a6b1eef
 [@Joelkang]: https://github.com/Joelkang
 [@marip8]: https://github.com/marip8
