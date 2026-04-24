@@ -18,6 +18,19 @@ Patches applied:
    not propagating through the nested cmake), so it falls back to csc_set_data
    which doesn't exist in osqp v1.0.0 final. We know we're building osqp v1.0.0
    final (pinned in trajopt_ext/osqp), so force OSQP_IS_V1_FINAL=ON directly.
+
+3. Upstream .cpp/.h files use std::as_const without #include <utility>.
+   GCC 13+ libstdc++ tightened transitive includes so files with minimal
+   includes no longer get <utility> pulled in for free. Scanned workspace-wide
+   via the shared _patch_missing_include helper (see patch 1).
+
+4. Some upstream CMake macros bake `-mno-avx` directly into a multi-line
+   set(<COMPILE_OPTIONS> ...) list (e.g. descartes_light core-macros). The
+   flag is x86-only — aarch64/armv7l GCC errors out with "unrecognized
+   command-line option '-mno-avx'". opw_kinematics, tesseract_common, and
+   trajopt_common already guard the flag via execute_process(uname -p) +
+   if(NOT CMAKE_SYSTEM_NAME2 MATCHES "aarch64" AND NOT ... "armv7l" AND NOT
+   ... "unknown"). Apply the same guard wherever it's missing.
 """
 
 import re
@@ -112,6 +125,20 @@ def patch_stdexcept_includes(ws: Path) -> tuple[int, int]:
     return _patch_missing_include(ws, _STDEXCEPT_RE, "<stdexcept>", "#include <stdexcept>")
 
 
+
+def patch_utility_includes(ws: Path) -> tuple[int, int]:
+    """Add #include <utility> to files using std::as_const.
+
+    Relies on the shared _patch_missing_include helper introduced on staging
+    (the <stdexcept> generalization); merge staging in before running.
+
+    Returns (patched_count, anchor_failures).
+    """
+    # std::as_const lives in <utility>.
+    _AS_CONST_RE = re.compile(r"\bstd::as_const\b")
+    return _patch_missing_include(ws, _AS_CONST_RE, "<utility>", "#include <utility>")
+
+
 def patch_osqp_eigen_final_flag(ws: Path) -> bool:
     """Force OSQP_IS_V1_FINAL=ON in trajopt's osqp_eigen ExternalProject_Add.
 
@@ -143,6 +170,114 @@ def patch_osqp_eigen_final_flag(ws: Path) -> bool:
     return True
 
 
+_MNO_AVX_GUARD_MARKER = "# tesseract_nanobind: guard -mno-avx (x86-only) for aarch64/armv7l"
+
+
+def _find_enclosing_set(lines: list[str], idx: int) -> Optional[tuple[str, int, int]]:
+    """If lines[idx] is a continuation `-mno-avx` inside a multi-line set(VAR ...),
+    return (var_name, set_open_idx, set_close_idx). Else None.
+
+    Detects "continuation" by paren balance: walk backwards counting `)` minus `(`,
+    and the line where balance first goes negative is the enclosing `set(` opener.
+    """
+    if lines[idx].strip() != "-mno-avx":
+        return None
+
+    balance = lines[idx].count(")") - lines[idx].count("(")
+    for j in range(idx - 1, -1, -1):
+        balance += lines[j].count(")") - lines[j].count("(")
+        if balance < 0:
+            m = re.match(r"^\s*set\(\s*([A-Za-z_][A-Za-z0-9_]*)\b", lines[j])
+            if not m:
+                return None
+            var_name = m.group(1)
+            fwd = lines[j].count("(") - lines[j].count(")")
+            for k in range(j + 1, len(lines)):
+                fwd += lines[k].count("(") - lines[k].count(")")
+                if fwd == 0:
+                    return var_name, j, k
+            return None
+    return None
+
+
+def _build_mno_avx_guard(indent: str, var_name: str) -> str:
+    """The opw_kinematics_macros.cmake guard, parameterized for any compile-options var."""
+    return (
+        f'{indent}{_MNO_AVX_GUARD_MARKER}\n'
+        f'{indent}execute_process(COMMAND uname -p OUTPUT_VARIABLE CMAKE_SYSTEM_NAME2)\n'
+        f'{indent}if(NOT CMAKE_SYSTEM_NAME2 MATCHES "aarch64"\n'
+        f'{indent}   AND NOT CMAKE_SYSTEM_NAME2 MATCHES "armv7l"\n'
+        f'{indent}   AND NOT CMAKE_SYSTEM_NAME2 MATCHES "unknown")\n'
+        f'{indent}  list(APPEND {var_name} -mno-avx)\n'
+        f'{indent}endif()\n'
+    )
+
+
+def patch_mno_avx_guards(ws: Path) -> tuple[int, int]:
+    """Wrap unguarded `-mno-avx` in the (NOT aarch64/armv7l/unknown) guard.
+
+    Scans every CMakeLists.txt and *.cmake in the workspace, finds `-mno-avx`
+    inlined into a multi-line set(VAR ...) list, removes it, and appends a
+    guarded list(APPEND VAR -mno-avx) right after the set's closing paren.
+    Single-line set(VAR -mno-avx) usages (the opw/tesseract/trajopt pattern,
+    already inside an if-NOT block) are skipped automatically because they
+    don't match the "continuation line" detector.
+
+    Returns (files_patched, files_skipped_or_clean).
+    """
+    targets = sorted(set(list(ws.rglob("*.cmake")) + list(ws.rglob("CMakeLists.txt"))))
+
+    patched = 0
+    skipped = 0
+    for path in targets:
+        # Skip build artifacts if any happen to be under the workspace tree
+        if any(part in ("build", ".git") for part in path.parts):
+            continue
+        try:
+            text = path.read_text()
+        except (UnicodeDecodeError, OSError):
+            continue
+        if "-mno-avx" not in text:
+            continue
+        if _MNO_AVX_GUARD_MARKER in text:
+            skipped += 1
+            continue
+
+        lines = text.splitlines(keepends=True)
+        sites = []
+        for i in range(len(lines)):
+            info = _find_enclosing_set(lines, i)
+            if info is not None:
+                sites.append((i, info))
+
+        if not sites:
+            # File contains -mno-avx but only in already-guarded single-line form.
+            skipped += 1
+            continue
+
+        lines_to_remove = {i for i, _ in sites}
+        inserts_after: dict[int, str] = {}
+        for _, (var_name, open_idx, close_idx) in sites:
+            indent = re.match(r"^(\s*)", lines[open_idx]).group(1)
+            # Multiple sites in the same file may share a close_idx in pathological
+            # cases — collapse to a single guard insertion.
+            inserts_after.setdefault(close_idx, _build_mno_avx_guard(indent, var_name))
+
+        out: list[str] = []
+        for i, line in enumerate(lines):
+            if i in lines_to_remove:
+                continue
+            out.append(line)
+            if i in inserts_after:
+                out.append(inserts_after[i])
+
+        path.write_text("".join(out))
+        print(f"  patched: {path.relative_to(ws)} ({len(sites)} site{'s' if len(sites) != 1 else ''})")
+        patched += 1
+
+    return patched, skipped
+
+
 def main():
     ws = Path.cwd()
 
@@ -156,6 +291,20 @@ def main():
     print("Patch 2: trajopt osqp_eigen (force OSQP_IS_V1_FINAL=ON)")
     if not patch_osqp_eigen_final_flag(ws):
         print("  already patched (or file missing)")
+
+    print("Patch 3: tesseract_planning poly sources (<utility>)")
+    patched, skipped = patch_utility_includes(ws)
+    if patched == 0:
+        print("  all sources already patched (or no patches needed)")
+    else:
+        print(f"  {patched} patched, {skipped} skipped")
+
+    print("Patch 4: guard unguarded -mno-avx for aarch64/armv7l")
+    patched, skipped = patch_mno_avx_guards(ws)
+    if patched == 0:
+        print("  all CMake files already guarded (or no -mno-avx found)")
+    else:
+        print(f"  {patched} patched, {skipped} already-guarded/clean")
 
 
 if __name__ == "__main__":
