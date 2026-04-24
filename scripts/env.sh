@@ -20,6 +20,7 @@ export QT_HOST_PATH=$CONDA_PREFIX
 
 # Library paths
 export DYLD_LIBRARY_PATH="$SCRIPT_DIR/ws/install/lib:$DYLD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$SCRIPT_DIR/.pixi/envs/default/lib:$LD_LIBRARY_PATH"
 
 # Tesseract resource paths
 export TESSERACT_SUPPORT_DIR="$SCRIPT_DIR/ws/src/tesseract/tesseract_support"
@@ -33,6 +34,7 @@ export TESSERACT_PLUGIN_PATH="$SCRIPT_DIR/ws/install/lib"
 
 echo "Environment set up:"
 echo "  DYLD_LIBRARY_PATH includes: $SCRIPT_DIR/ws/install/lib"
+echo "  LD_LIBRARY_PATH includes: $SCRIPT_DIR/.pixi/envs/default/lib"
 echo "  TESSERACT_SUPPORT_DIR: $TESSERACT_SUPPORT_DIR"
 echo "  TESSERACT_RESOURCE_PATH: $TESSERACT_RESOURCE_PATH"
 echo ""
