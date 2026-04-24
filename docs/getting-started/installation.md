@@ -3,7 +3,7 @@
 ## Users: Install from PyPI
 
 ```bash
-pip install tesseract-robotics
+pip install tesseract-robotics-nanobind
 ```
 
 The wheel bundles all C++ dependencies (~50MB). No compiler needed.
