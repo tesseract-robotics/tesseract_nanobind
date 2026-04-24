@@ -1,144 +1,152 @@
 # Quickstart
 
-This guide walks you through your first motion planning task.
+This guide walks you through your first motion planning task using the high-level `tesseract_robotics.planning` API.
 
 ## Load a Robot
 
 ```python
 from tesseract_robotics.planning import Robot
-import numpy as np
 
-# Load a bundled example robot (ABB IRB2400)
+# Load a bundled example robot (ABB IRB2400, KUKA LBR IIWA, etc.)
 robot = Robot.from_tesseract_support("abb_irb2400")
 
-# Or load from your own URDF/SRDF files
+# Or from your own URDF/SRDF via package:// URLs
 robot = Robot.from_urdf(
-    urdf_path="/path/to/robot.urdf",
-    srdf_path="/path/to/robot.srdf"
+    urdf_url="package://my_robot/urdf/robot.urdf",
+    srdf_url="package://my_robot/urdf/robot.srdf",
 )
+
+# Or from local files
+robot = Robot.from_files("/path/to/robot.urdf", "/path/to/robot.srdf")
 ```
 
 ## Forward Kinematics
 
-Compute the TCP (Tool Center Point) pose from joint values:
-
 ```python
-# Home position (6 joints for ABB IRB2400)
+import numpy as np
+
 joints = np.zeros(6)
-
-# Get TCP pose as Isometry3d (4x4 transform)
-tcp_pose = robot.fk(joints, group="manipulator")
-
-print(f"Position: {tcp_pose.translation()}")
-print(f"Rotation matrix:\n{tcp_pose.rotation()}")
+# group_name is the first positional argument; tip_link defaults to the chain's tip.
+tcp_pose = robot.fk("manipulator", joints)
+print(f"Position: {tcp_pose.position}")
+print(f"Quaternion (scalar-last, matches scipy): {tcp_pose.quaternion}")
 ```
 
 ## Inverse Kinematics
 
-Find joint values that achieve a target TCP pose:
-
 ```python
-# Create target pose (translate TCP by 10cm in X)
-target = robot.fk(joints)
-target.translate([0.1, 0, 0])
+from tesseract_robotics.planning import Pose
 
-# Solve IK (may return multiple solutions)
-solutions = robot.ik(target, group="manipulator")
+# Scalar-last quaternion convention (matches scipy.spatial.transform.Rotation)
+target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, 0.0, 0.0)
+ik_solution = robot.ik("manipulator", target, seed=joints)
 
-if solutions:
-    print(f"Found {len(solutions)} IK solutions")
-    print(f"First solution: {solutions[0]}")
+if ik_solution is not None:
+    print(f"IK solution: {ik_solution}")
 else:
-    print("No IK solution found - target may be unreachable")
+    print("Unreachable target")
 ```
 
 ## Collision Checking
 
-Check if a configuration is collision-free:
+Use the environment's discrete contact manager directly:
 
 ```python
-# Check current configuration
-is_safe = robot.check_collision(joints)
-print(f"Collision-free: {is_safe}")
-
-# Get detailed collision results
-contacts = robot.get_contacts(joints)
-for contact in contacts:
-    print(f"Contact between {contact.link_names}: {contact.distance:.3f}m")
-```
-
-## Motion Planning
-
-Plan a collision-free path between configurations:
-
-```python
-from tesseract_robotics.planning import Planner
-
-# Define start and goal
-start = np.zeros(6)
-goal = np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])
-
-# Create planner and plan
-planner = Planner(robot)
-trajectory = planner.plan(
-    start=start,
-    goal=goal,
-    planner="ompl",  # Options: ompl, trajopt, trajopt_ifopt, simple
-    profile="DEFAULT"
+from tesseract_robotics.tesseract_collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactTestType_ALL,
 )
 
-if trajectory:
-    print(f"Planned trajectory with {len(trajectory)} waypoints")
+robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
 
-    # Access waypoints
-    for i, waypoint in enumerate(trajectory):
-        print(f"  Waypoint {i}: {waypoint.positions}")
+manager = robot.env.getDiscreteContactManager()
+manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
+
+contacts = ContactResultMap()
+manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+print(f"Collision-free: {contacts.size() == 0}")
 ```
 
-## Using the Composer (Advanced)
-
-For complex multi-step tasks, use the TaskComposer:
+## Motion Planning (freespace)
 
 ```python
-from tesseract_robotics.planning import Composer
+from tesseract_robotics.planning import (
+    MotionProgram, JointTarget, CartesianTarget, plan_freespace,
+)
 
-# Create composer with robot
-composer = Composer(robot)
+program = (
+    MotionProgram("manipulator")
+    .move_to(JointTarget(np.zeros(6)))
+    .move_to(CartesianTarget(target))
+)
 
-# Add waypoints
-composer.add_freespace(goal_joints=np.array([0.5, 0, 0, 0, 0, 0]))
-composer.add_cartesian(goal_pose=target_pose)
-composer.add_freespace(goal_joints=start)
-
-# Execute planning
-result = composer.plan()
-
-if result.success:
-    trajectories = result.get_trajectories()
-    print(f"Planned {len(trajectories)} trajectory segments")
+result = plan_freespace(robot, program)
+if result.successful:
+    for i, state in enumerate(result.trajectory):
+        print(f"[{i}] {state.positions}")
 ```
 
-## Visualization
+## Cartesian Planning (Descartes)
 
-Use the TesseractViewer to visualize robots and trajectories:
+The same `program` works with different planning backends — here Descartes for dense Cartesian toolpaths:
+
+```python
+from tesseract_robotics.planning import plan_cartesian
+
+result = plan_cartesian(robot, program)
+```
+
+## OMPL Planning (pure sampling)
+
+Or OMPL for pure sampling-based search:
+
+```python
+from tesseract_robotics.planning import plan_ompl
+
+result = plan_ompl(robot, program)
+```
+
+## Using the Task Composer (Advanced)
+
+For multi-stage pipelines (sampling then optimization then time parameterization):
+
+```python
+from tesseract_robotics.planning import TaskComposer
+
+composer = TaskComposer.from_config()
+composer.warmup(["TrajOptPipeline"])  # optional: pay plugin load cost up front
+result = composer.plan(robot, program, pipeline="TrajOptPipeline")
+```
+
+See [`TaskComposer.get_available_pipelines()`](../user-guide/task-composer.md) for the full list of 36 pipelines.
+
+## Visualization
 
 ```python
 from tesseract_robotics.viewer import TesseractViewer
 
 viewer = TesseractViewer()
 viewer.update_environment(robot.env, [0, 0, 0])
-
-# Animate a trajectory
-if trajectory:
-    viewer.update_trajectory(trajectory.raw_results)
+if result.successful:
+    viewer.update_trajectory(result.raw_results)
 
 viewer.start_serve_background()
 print("Open http://localhost:8000 in your browser")
 input("Press Enter to exit...")
 ```
 
+## Installation
+
+```bash
+pip install tesseract-robotics-nanobind
+```
+
+See [Installation](installation.md) for developer-mode setup via pixi.
+
 ## Next Steps
 
-- [Core Concepts](concepts.md) - Understand the architecture
-- [Motion Planning Guide](../user-guide/planning.md) - Deep dive into planners
-- [Examples](../examples/index.md) - Learn from working examples
+- [Core Concepts](concepts.md) — Understand the architecture
+- [Motion Planning Guide](../user-guide/planning.md) — Deep dive into planners
+- [Examples](../examples/index.md) — Working examples
