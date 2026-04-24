@@ -30,7 +30,7 @@ jobs:
   build:
     runs-on: windows-2022
     strategy:
-      fail-fast: true  # iteration-friendly: one failure aborts the rest
+      fail-fast: false  # don't kill siblings on transient network failures
       matrix:
         python: ['3.9', '3.10', '3.11', '3.12']
     defaults:
