@@ -1,193 +1,101 @@
 # tesseract_robotics.planning
 
-High-level planning API for robot motion planning.
+High-level planning API. See the [Planning User Guide](../user-guide/planning.md)
+and [TaskComposer User Guide](../user-guide/task-composer.md) for walkthroughs.
+
+## Classes
+
+### Robot
+
+Entry point for working with a robot — loads URDF/SRDF, exposes FK/IK, state
+management, and access to the underlying `Environment`.
+
+```python
+from tesseract_robotics.planning import Robot
+
+# Bundled test robots
+robot = Robot.from_tesseract_support("abb_irb2400")
+
+# From URDF/SRDF (package:// or file:// URLs)
+robot = Robot.from_urdf(
+    "package://my_robot/urdf/robot.urdf",
+    "package://my_robot/urdf/robot.srdf",
+)
+
+# FK / IK
+pose = robot.fk([0, 0, 0, 0, 0, 0], group="manipulator")
+solutions = robot.ik(target_pose, group="manipulator")
+
+# Access the underlying Environment
+env = robot.env
+```
+
+### MotionProgram
+
+Builder for motion sequences. Chain `.move_to(...)` calls with `JointTarget`,
+`CartesianTarget`, or `StateTarget` waypoints.
+
+```python
+from tesseract_robotics.planning import (
+    MotionProgram,
+    JointTarget,
+    CartesianTarget,
+    Pose,
+)
+
+program = (
+    MotionProgram("manipulator")
+    .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+    .move_to(CartesianTarget(Pose.from_xyz(0.5, 0.0, 0.5)))
+    .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
+)
+```
+
+### TaskComposer
+
+Orchestrates multi-stage planning pipelines.
+See [TaskComposer User Guide](../user-guide/task-composer.md) for the full
+workflow (including pipeline warmup).
+
+```python
+from tesseract_robotics.planning import TaskComposer
+
+composer = TaskComposer.from_config(warmup=True)  # ~10-15s one-time cost
+result = composer.plan(robot, program, pipeline="TrajOptPipeline")
+```
+
+### Pose
+
+Scalar-last (`qx, qy, qz, qw`) quaternion convention — matches scipy's
+`Rotation.as_quat()`.
+
+```python
+from tesseract_robotics.planning import Pose
+
+pose = Pose.from_xyz_quat(0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0)
+print(pose.quaternion)  # [qx, qy, qz, qw]
+```
+
+## Functions
+
+| Function | Pipeline default | Description |
+|---|---|---|
+| `plan_freespace(robot, program)` | `TrajOptPipeline` | Optimization-based freespace motion |
+| `plan_ompl(robot, program)` | `FreespacePipeline` | OMPL sampling + TrajOpt smoothing |
+| `plan_cartesian(robot, program)` | `DescartesPipeline` | Descartes Cartesian path search |
+| `assign_current_state_as_seed(program, robot)` | — | Seed Cartesian waypoints with the current robot state |
+
+All three `plan_*` helpers accept an optional `pipeline=` override and a
+`profiles=` `ProfileDictionary`.
+
+## Module API
 
 ::: tesseract_robotics.planning
     options:
       show_root_heading: true
       show_source: false
       members_order: source
-      heading_level: 2
+      heading_level: 3
       docstring_style: google
       show_signature_annotations: true
       separate_signature: true
-
-## Classes
-
-### Robot
-
-The main entry point for working with a robot.
-
-```python
-from tesseract_robotics.planning import Robot
-
-# Load from bundled models
-robot = Robot.from_tesseract_support("abb_irb2400")
-
-# Load from URDF/SRDF
-robot = Robot.from_urdf("robot.urdf", "robot.srdf")
-
-# Access environment
-env = robot.env
-
-# Forward kinematics
-pose = robot.fk(joints, group="manipulator")
-
-# Inverse kinematics
-solutions = robot.ik(target_pose, group="manipulator")
-
-# Collision checking
-is_safe = robot.check_collision(joints)
-contacts = robot.get_contacts(joints)
-```
-
-#### Methods
-
-| Method | Description |
-|--------|-------------|
-| `from_tesseract_support(name)` | Load bundled robot model |
-| `from_urdf(urdf, srdf)` | Load from URDF/SRDF files |
-| `fk(joints, group)` | Forward kinematics |
-| `ik(pose, group, seed)` | Inverse kinematics |
-| `check_collision(joints)` | Collision check (bool) |
-| `get_contacts(joints)` | Detailed collision info |
-| `get_joint_names(group)` | Joint names for group |
-| `get_joint_limits(group)` | Position/velocity limits |
-
-### Planner
-
-Motion planner wrapper.
-
-```python
-from tesseract_robotics.planning import Planner
-
-planner = Planner(robot)
-
-# Joint-space planning
-trajectory = planner.plan(
-    start=start_joints,
-    goal=goal_joints,
-    planner="ompl"
-)
-
-# Cartesian planning
-trajectory = planner.plan(
-    start=start_joints,
-    goal=goal_pose,  # Isometry3d
-    planner="trajopt"
-)
-
-# Refine existing trajectory
-smooth = planner.refine(trajectory, planner="trajopt")
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `start` | `np.ndarray` | Start joint configuration |
-| `goal` | `np.ndarray` or `Isometry3d` | Goal (joint or Cartesian) |
-| `planner` | `str` | Planner type: ompl, trajopt, descartes, simple |
-| `profile` | `str` | Profile name (default: "DEFAULT") |
-
-### Composer
-
-Task composition for complex sequences.
-
-```python
-from tesseract_robotics.planning import Composer
-
-composer = Composer(robot)
-
-# Add motion segments
-composer.add_freespace(goal_joints=via_point)
-composer.add_cartesian(goal_pose=target_pose)
-composer.add_linear(goal_joints=final_joints)
-
-# Plan all segments
-result = composer.plan()
-
-if result.success:
-    trajectories = result.get_trajectories()
-```
-
-#### Methods
-
-| Method | Description |
-|--------|-------------|
-| `add_freespace(goal_joints)` | Add freespace motion |
-| `add_cartesian(goal_pose)` | Add Cartesian motion |
-| `add_linear(goal_pose)` | Add linear Cartesian motion |
-| `clear()` | Clear all segments |
-| `plan()` | Execute planning pipeline |
-
-### Trajectory
-
-Planned trajectory result.
-
-```python
-if trajectory:
-    for waypoint in trajectory:
-        print(f"Positions: {waypoint.positions}")
-        print(f"Velocities: {waypoint.velocities}")
-        print(f"Time: {waypoint.time}")
-```
-
-#### Attributes
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `positions` | `np.ndarray` | Joint positions |
-| `velocities` | `np.ndarray` | Joint velocities |
-| `accelerations` | `np.ndarray` | Joint accelerations |
-| `time` | `float` | Time from start (seconds) |
-
-### ComposerResult
-
-Result from Composer.plan().
-
-```python
-result = composer.plan()
-
-if result.success:
-    print(f"Planned {len(result.get_trajectories())} segments")
-else:
-    print(f"Failed: {result.message}")
-```
-
-#### Attributes
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `success` | `bool` | Planning succeeded |
-| `message` | `str` | Error message if failed |
-| `raw_results` | object | Raw TaskComposer output |
-
-#### Methods
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `get_trajectories()` | `list[Trajectory]` | Extract trajectories |
-
-## Enums
-
-### PlannerType
-
-```python
-from tesseract_robotics.planning import PlannerType
-
-PlannerType.OMPL       # Sampling-based (OMPL)
-PlannerType.TRAJOPT    # Optimization (TrajOpt)
-PlannerType.DESCARTES  # Graph search (Descartes)
-PlannerType.SIMPLE     # Interpolation
-```
-
-### MotionType
-
-```python
-from tesseract_robotics.planning import MotionType
-
-MotionType.FREESPACE  # Any collision-free path
-MotionType.LINEAR     # Straight Cartesian line
-MotionType.CIRCULAR   # Circular arc
-```
