@@ -65,20 +65,18 @@ jobs:
       shell: bash -el {0}
       run: conda install -y osqp
 
-    # Explicit cache of the installed/ output — johnwason/vcpkg-action's own
-    # caching was empirically silent-failing on our key (no vcpkg-* entries
-    # ever landed in `gh cache list` despite two successful vcpkg runs).
-    # Caching installed/ directly makes it observable and lets the 4 matrix
-    # jobs share one cache key (vcpkg output doesn't depend on Python version).
-    # save-always is critical: vcpkg succeeds in step 7 but colcon (step 14)
-    # can fail during iteration — without save-always, cache never persists.
-    - name: cache vcpkg installed
+    # Split cache/restore and cache/save so that on a job-failure path (vcpkg
+    # succeeds but colcon or wheel-build fails during iteration), the vcpkg
+    # binaries still persist to the cache — enabling the NEXT run to restore
+    # them in seconds instead of paying another cold 60-min install.
+    # `save-always: true` on actions/cache@v4 is deprecated and silently no-ops.
+    # The save step with `if: always()` is the supported replacement.
+    - name: restore vcpkg cache
       id: vcpkg-cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: vcpkg/installed
         key: vcpkg-installed-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**', 'ws/src/tesseract_nanobind/.github/workflows/wheels-windows.yml') }}
-        save-always: true
 
     - name: vcpkg install C++ deps
       if: steps.vcpkg-cache.outputs.cache-hit != 'true'
@@ -98,6 +96,13 @@ jobs:
         triplet: x64-windows-v143-release
         extra-args: --clean-after-build --overlay-triplets=${{ github.workspace }}/ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets
         token: ${{ github.token }}
+
+    - name: save vcpkg cache
+      if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: vcpkg/installed
+        key: vcpkg-installed-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**', 'ws/src/tesseract_nanobind/.github/workflows/wheels-windows.yml') }}
 
     - name: activate MSVC
       uses: ilammy/msvc-dev-cmd@v1
