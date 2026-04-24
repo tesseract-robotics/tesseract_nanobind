@@ -179,6 +179,25 @@ jobs:
         path: ws/install
         key: colcon-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
+    - name: patch exported cmake configs for windows linking
+      # tesseract (and friends) export CMake targets with INTERFACE_LINK_LIBRARIES
+      # containing bare "yaml-cpp" instead of the namespaced "yaml-cpp::yaml-cpp"
+      # target that conda-forge exports. On Windows this causes downstream
+      # consumers (our nanobind bindings) to fail linking with LNK1181. Patch
+      # the exported .cmake configs in-place to use the namespaced target.
+      # Runs after both cache restore AND fresh colcon build so the patched
+      # configs are always present for the wheel build step below.
+      working-directory: ws/install
+      run: |
+        find . -name '*.cmake' -type f | while read f; do
+          # Replace bare "yaml-cpp" in ;-delimited list contexts (standard form
+          # of INTERFACE_LINK_LIBRARIES values in exported configs).
+          if grep -q '[";]yaml-cpp[";]' "$f" 2>/dev/null; then
+            sed -i -E 's/(["\;])yaml-cpp(["\;])/\1yaml-cpp::yaml-cpp\2/g' "$f"
+            echo "  patched: $f"
+          fi
+        done
+
     - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
       env:
