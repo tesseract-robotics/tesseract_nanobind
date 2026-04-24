@@ -1,464 +1,141 @@
 # Low-Level SQP API
 
-The low-level SQP (Sequential Quadratic Programming) API enables real-time trajectory optimization at 100+ Hz.
+Real-time trajectory optimization via Sequential Quadratic Programming. Use this when you need sub-10ms optimizer steps for online replanning — lower-level than `TaskComposer`, higher-control than `plan_cartesian`.
 
-## Overview
+## When to reach for this
 
-```mermaid
-graph LR
-    A[Problem Setup] --> B[TrustRegionSQPSolver]
-    B --> C[OSQP QP Solver]
-    C --> D[Optimized Trajectory]
+| Situation | Use |
+|---|---|
+| Offline, one-shot plan | `plan_freespace` / `plan_cartesian` |
+| Multi-stage pipeline (sampling → optimize → time-param) | `TaskComposer` |
+| **Online replanning with moving obstacle, ~100 Hz** | **Low-level SQP (this page)** |
 
-    subgraph "Per Timestep"
-        E[JointPosition Variables]
-        F[Collision Constraints]
-        G[Cartesian Constraints]
-        H[Velocity/Accel Costs]
-    end
-
-    E --> B
-    F --> B
-    G --> B
-    H --> B
-```
-
-## Performance
-
-| Configuration | Update Rate |
-|---------------|-------------|
-| Without collision | 128 Hz |
-| Discrete collision | 73 Hz |
-| LVS continuous collision | 5-10 Hz |
+Measured step rates for a reference 8-DOF gantry problem are printed at runtime by
+[`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) — run it locally to see numbers on your machine.
 
 ## Modules
 
-Three modules provide the SQP functionality:
-
 | Module | Purpose |
-|--------|---------|
-| `tesseract_robotics.ifopt` | Base optimization classes (Bounds, VariableSet, ConstraintSet) |
-| `tesseract_robotics.trajopt_ifopt` | Robotics-specific constraints (collision, Cartesian, joint limits) |
-| `tesseract_robotics.trajopt_sqp` | SQP solver (TrustRegionSQPSolver, OSQPEigenSolver) |
+|---|---|
+| `tesseract_robotics.trajopt_ifopt` | Variables (`Var`, `Node`, `NodesVariables`), constraints (joint, Cartesian, collision), factory helpers |
+| `tesseract_robotics.trajopt_sqp` | `IfoptProblem` (NLP), `IfoptQPProblem` (QP wrapper), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
 
-## Basic Example
+The standalone `tesseract_robotics.ifopt` module was **removed in 0.34**.
+All types merged into `tesseract_robotics.trajopt_ifopt`. See the
+[0.33 → 0.34 migration guide](../changes.md) for details.
 
-```python
-import numpy as np
-from tesseract_robotics.planning import Robot
-from tesseract_robotics.ifopt import Bounds
-from tesseract_robotics.trajopt_ifopt import (
-    JointPosition, CartPosConstraint, CartPosInfo, CartPosInfoType,
-    TrajOptCollisionConfig, CollisionCache, SingleTimestepCollisionEvaluator,
-    DiscreteCollisionConstraint
-)
-from tesseract_robotics.trajopt_sqp import (
-    TrustRegionSQPSolver, OSQPEigenSolver, IfoptQPProblem,
-    SQPParameters, CostPenaltyType
-)
+## Variable Hierarchy (0.34+)
 
-# Load robot
-robot = Robot.from_tesseract_support("abb_irb2400")
-env = robot.env
-manip = env.getKinematicGroup("manipulator")
+The `JointPosition` class is gone. Variables now use a three-level hierarchy:
 
-# Problem parameters
-n_steps = 10
-joint_names = list(manip.getJointNames())
-n_joints = len(joint_names)
+- **`Var`** — a single variable (e.g., joint values at one waypoint)
+- **`Node`** — groups multiple `Var`s (e.g., joints + velocities at one waypoint)
+- **`NodesVariables`** — container of `Node`s passed to the problem constructor
 
-# Get joint limits
-limits = manip.getLimits()
-lower = limits.joint_limits[:, 0]
-upper = limits.joint_limits[:, 1]
-
-# Create QP problem
-qp_problem = IfoptQPProblem()
-
-# Add joint position variables for each timestep
-variables = []
-for i in range(n_steps):
-    var = JointPosition(
-        np.zeros(n_joints),  # Initial values
-        joint_names,
-        f"joint_pos_{i}"
-    )
-    var.SetBounds([Bounds(lower[j], upper[j]) for j in range(n_joints)])
-    variables.append(var)
-    qp_problem.addVariableSet(var)
-
-# Add Cartesian goal constraint (last waypoint)
-target_pose = robot.fk(np.array([0.5, -0.3, 0.4, 0, 0.3, 0]))
-cart_info = CartPosInfo(
-    manip, "tool0", "base_link",
-    target_pose, CartPosInfoType.FULL
-)
-cart_constraint = CartPosConstraint(cart_info, variables[-1], "cart_goal")
-qp_problem.addConstraintSet(cart_constraint)
-
-# Configure solver
-solver = TrustRegionSQPSolver(OSQPEigenSolver())
-solver.params.max_iterations = 100
-solver.params.min_approx_improve = 1e-3
-solver.params.initial_trust_box_size = 0.1
-
-# Solve
-solver.init(qp_problem)
-solver.solve(qp_problem)
-
-# Extract trajectory
-trajectory = np.array([var.GetValues() for var in variables])
-```
-
-## Variables
-
-### JointPosition
-
-Represents joint values at a single timestep:
+Build the full hierarchy with `createNodesVariables`:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import JointPosition
-from tesseract_robotics.ifopt import Bounds
+from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
 
-# Create variable
-var = JointPosition(
-    initial_values,  # np.array of joint values
-    joint_names,     # List of joint names
-    "waypoint_0"     # Unique name
-)
-
-# Set bounds
-bounds = [Bounds(lower[i], upper[i]) for i in range(n_joints)]
-var.SetBounds(bounds)
-
-# Access values
-values = var.GetValues()
-var.SetVariables(new_values)
-```
-
-### Bounds
-
-Define variable limits:
-
-```python
-from tesseract_robotics.ifopt import Bounds
-
-# Position bound
-pos_bound = Bounds(-3.14, 3.14)
-
-# Special bounds
-no_bound = Bounds.NoBound()      # (-inf, inf)
-zero = Bounds.BoundZero()        # (0, 0)
-positive = Bounds.BoundGreaterZero()  # (0, inf)
-negative = Bounds.BoundSmallerZero()  # (-inf, 0)
-```
-
-## Constraints
-
-### CartPosConstraint
-
-Constrain end-effector pose:
-
-```python
-from tesseract_robotics.trajopt_ifopt import (
-    CartPosConstraint, CartPosInfo, CartPosInfoType
-)
-
-# Full 6-DOF constraint
-cart_info = CartPosInfo(
-    manip,           # Kinematic group
-    "tool0",         # Target link
-    "base_link",     # Source link
-    target_pose,     # Isometry3d target
-    CartPosInfoType.FULL
-)
-
-constraint = CartPosConstraint(cart_info, joint_var, "cart_goal")
-qp_problem.addConstraintSet(constraint)
-```
-
-CartPosInfoType options:
-
-| Type | Constrains |
-|------|------------|
-| `FULL` | Position + Orientation (6 DOF) |
-| `POSITION_ONLY` | Position only (3 DOF) |
-
-### JointPosConstraint
-
-Limit joint positions:
-
-```python
-from tesseract_robotics.trajopt_ifopt import JointPosConstraint
-
-constraint = JointPosConstraint(
-    joint_var,
-    target_values,
-    [0, 1, 2],  # Indices to constrain
-    "joint_pos"
+bounds = Bounds(-3.14, 3.14)
+nodes_variables = createNodesVariables(
+    "trajectory", joint_names, initial_states, bounds,
 )
 ```
 
-### JointVelConstraint
-
-Limit joint velocities between timesteps:
+Get `Var` references for passing to constraints:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import JointVelConstraint
-
-constraint = JointVelConstraint(
-    var_prev, var_next,  # Adjacent timesteps
-    velocity_limits,      # Max velocities
-    "joint_vel"
-)
+vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 ```
 
-### JointAccelConstraint
-
-Limit joint accelerations:
+## Problem Setup
 
 ```python
-from tesseract_robotics.trajopt_ifopt import JointAccelConstraint
-
-constraint = JointAccelConstraint(
-    var_prev, var_curr, var_next,  # Three consecutive timesteps
-    accel_limits,
-    "joint_accel"
-)
+--8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:setup"
 ```
 
-### DiscreteCollisionConstraint
+## Constraints and Costs
 
-Avoid collisions at a single timestep:
+The `build_optimization_problem` function shows the full 0.34 pattern — `NodesVariables`
+factory, `IfoptProblem` (NLP) for joint/Cartesian constraints, then `IfoptQPProblem(nlp)`
+wrapping for collision constraints, followed by `problem.setup()`:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import (
-    TrajOptCollisionConfig, CollisionCache,
-    SingleTimestepCollisionEvaluator, DiscreteCollisionConstraint
-)
-
-# Collision configuration (0.33 API)
-# Constructor: TrajOptCollisionConfig(margin, coeff) or default
-config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
-config.collision_margin_buffer = 0.005  # Additional buffer beyond margin
-
-# Create evaluator
-cache = CollisionCache(100)  # Cache size
-evaluator = SingleTimestepCollisionEvaluator(
-    cache, manip, env, config
-)
-
-# Add constraint
-collision_constraint = DiscreteCollisionConstraint(
-    evaluator, joint_var, "collision"
-)
-qp_problem.addConstraintSet(collision_constraint)
+--8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
 ```
 
-### ContinuousCollisionConstraint
+Available constraint types in `tesseract_robotics.trajopt_ifopt`:
 
-Avoid collisions between consecutive timesteps:
+| Constraint | Purpose |
+|---|---|
+| `JointPosConstraint` | Target joint values at specific waypoints |
+| `JointVelConstraint` | Velocity limits across waypoints |
+| `JointAccelConstraint` | Acceleration limits |
+| `JointJerkConstraint` | Jerk (3rd derivative) limits — smoother motion |
+| `CartPosConstraint` | TCP pose at a waypoint |
+| `CartLineConstraint` | TCP on a line segment |
+| `DiscreteCollisionConstraint` | Collision at single timesteps |
+| `DiscreteCollisionNumericalConstraint` | Alt. collision jacobian |
+| `ContinuousCollisionConstraint` | Collision across segments (LVS) |
+| `InverseKinematicsConstraint` | IK-based optimization |
+
+Available collision evaluators:
+
+| Evaluator | Pairs with |
+|---|---|
+| `SingleTimestepCollisionEvaluator` | `DiscreteCollisionConstraint` |
+| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete) |
+| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous) |
+
+## SQP Solver Loop
+
+The solver loop: initial global `solve`, then per-tick `setVariables` + `stepSQPSolver`
+for warm-started incremental optimization. `setBoxSize` resets the trust region each
+tick (trust-region shrinking can drive the box to zero):
 
 ```python
-from tesseract_robotics.trajopt_ifopt import (
-    LVSDiscreteCollisionEvaluator, ContinuousCollisionConstraint
-)
-
-# LVS evaluator (samples along segment)
-evaluator = LVSDiscreteCollisionEvaluator(
-    cache, manip, env, config,
-    dynamic_environment=False
-)
-
-# Constraint between adjacent variables
-constraint = ContinuousCollisionConstraint(
-    evaluator,
-    var_prev, var_next,
-    fixed0=False, fixed1=False,
-    max_num_cnt=3,
-    name="continuous_collision"
-)
+--8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:sqp_loop"
 ```
 
-## Solver Configuration
+## Warm-Starting
 
-### SQPParameters
+Between solver steps, update `NodesVariables` with the previous solution:
 
 ```python
-from tesseract_robotics.trajopt_sqp import SQPParameters, CostPenaltyType
-
-params = SQPParameters()
-
-# Convergence criteria
-params.max_iterations = 100
-params.min_approx_improve = 1e-3
-params.min_approx_improve_frac = 1e-4
-params.min_trust_box_size = 1e-4
-
-# Trust region
-params.initial_trust_box_size = 0.1
-params.trust_shrink_ratio = 0.1
-params.trust_expand_ratio = 1.5
-
-# Penalty method
-params.initial_constraint_penalty = 10.0
-params.constraint_penalty_type = CostPenaltyType.SQUARED
+nodes_variables.setVariables(trajectory.flatten())
+solver.init(problem)
+solver.stepSQPSolver()
 ```
 
-### Solver Methods
+The example above rebuilds the problem each tick because the obstacle pose is baked
+into collision constraints. If your scene is static, you can reuse the same problem
+and only call `setVariables` + `stepSQPSolver`.
 
-```python
-solver = TrustRegionSQPSolver(OSQPEigenSolver())
-solver.params = params
+## Python Subclassing
 
-# Initialize with problem
-solver.init(qp_problem)
+You can subclass `ConstraintSet` from Python to define custom constraints — the
+trampoline landed in 0.34.1.1 (see the
+[CHANGELOG](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/CHANGELOG.md)).
+`scipy` is required at runtime because nanobind's sparse-matrix conversion
+goes through `scipy.sparse`.
 
-# Solve to convergence
-status = solver.solve(qp_problem)
+## Migrating from 0.33
 
-# Or take single step (for real-time)
-status = solver.stepSQPSolver(qp_problem)
+If you have 0.33 SQP code, see the [full migration guide](../changes.md) —
+critical items:
 
-# Reset trust region after step
-solver.setBoxSize(params.initial_trust_box_size)
-```
+- `from tesseract_robotics import ifopt` → `from tesseract_robotics import trajopt_ifopt`
+- `JointPosition(...)` → `createNodesVariables(...)` + `Var` refs
+- `IfoptQPProblem()` → `IfoptProblem(nodes_variables)` + `IfoptQPProblem(nlp)`
+- `CartPosInfo` struct removed — `CartPosConstraint` takes args directly
+- `CollisionCache` removed — caching is internal
+- `getTotalExactCost()` / `getExactCosts()` take no arguments
+- `getStaticKey()` → `getKey()` (instance method on profiles)
+- Call `problem.setup()` after adding all constraint/cost sets
 
-## Real-Time Planning Pattern
+## See also
 
-For online/incremental planning, rebuild the problem each iteration:
-
-```python
-def plan_step(current_joints, target_pose, obstacle_pose):
-    """Single planning iteration (~10-70ms)."""
-
-    # 1. Update environment with new obstacle position
-    update_obstacle(env, obstacle_pose)
-
-    # 2. Build fresh problem
-    qp_problem = IfoptQPProblem()
-
-    # Add variables (warm-start from previous solution)
-    variables = []
-    for i in range(n_steps):
-        if i == 0:
-            init = current_joints  # Fix start
-        else:
-            init = previous_trajectory[i]  # Warm-start
-        var = JointPosition(init, joint_names, f"joint_pos_{i}")
-        var.SetBounds(joint_bounds)
-        variables.append(var)
-        qp_problem.addVariableSet(var)
-
-    # Fix start position
-    for j in range(n_joints):
-        variables[0].SetBounds([Bounds(current_joints[j], current_joints[j])])
-
-    # Add constraints
-    add_collision_constraints(qp_problem, variables)
-    add_cartesian_goal(qp_problem, variables[-1], target_pose)
-
-    # 3. Solve incrementally
-    solver.init(qp_problem)
-    solver.stepSQPSolver(qp_problem)
-    solver.setBoxSize(0.01)  # Reset trust region
-
-    # 4. Extract trajectory
-    trajectory = np.array([var.GetValues() for var in variables])
-    return trajectory
-```
-
-!!! warning "Rebuild Problem Each Iteration"
-    Due to shared_ptr lifecycle issues, you must rebuild the QP problem
-    each iteration. Reusing the same problem causes segfaults.
-
-## Results and Status
-
-### SQPStatus
-
-```python
-from tesseract_robotics.trajopt_sqp import SQPStatus
-
-status = solver.solve(qp_problem)
-
-if status == SQPStatus.CONVERGED:
-    print("Optimization converged")
-elif status == SQPStatus.ITERATION_LIMIT:
-    print("Hit iteration limit")
-elif status == SQPStatus.CALLBACK_STOPPED:
-    print("Stopped by callback")
-```
-
-### SQPResults
-
-```python
-results = solver.getResults()
-
-print(f"Final cost: {results.overall_cost}")
-print(f"Iterations: {results.iterations}")
-print(f"Best variables: {results.best_var_vals}")
-```
-
-## Callbacks
-
-Monitor optimization progress:
-
-```python
-from tesseract_robotics.trajopt_sqp import SQPCallback
-
-class MyCallback(SQPCallback):
-    def __call__(self, iteration, cost, constraint_violation):
-        print(f"Iter {iteration}: cost={cost:.4f}, viol={constraint_violation:.6f}")
-        return True  # Continue optimization
-
-solver.registerCallback(MyCallback())
-```
-
-## Velocity Smoothing Cost
-
-Add velocity smoothing as a cost:
-
-```python
-from tesseract_robotics.trajopt_ifopt import JointVelConstraint
-from tesseract_robotics.ifopt import Bounds
-
-# Create "constraint" with slack (acts as cost)
-for i in range(n_steps - 1):
-    vel_cost = JointVelConstraint(
-        variables[i], variables[i+1],
-        velocity_limits,
-        f"vel_cost_{i}"
-    )
-    # Set loose bounds to make it a soft cost
-    vel_cost.SetBounds([Bounds(-1e10, 1e10)] * n_joints)
-    qp_problem.addConstraintSet(vel_cost)
-```
-
-## Complete Online Planning Example
-
-See `examples/online_planning_sqp_example.py` for a complete example that:
-
-1. Loads ABB IRB2400 with human obstacle
-2. Moves obstacle along a trajectory
-3. Replans at 73 Hz using discrete collision
-4. Visualizes in TesseractViewer
-
-```python
-# Run the example
-python examples/online_planning_sqp_example.py
-```
-
-## Comparison: High-Level vs Low-Level
-
-| Aspect | Task Composer | Low-Level SQP |
-|--------|---------------|---------------|
-| Setup complexity | Low | High |
-| Planning time | 100ms - 10s | 1-20ms |
-| Real-time capable | No | Yes |
-| Collision handling | Automatic | Manual |
-| Use case | Offline planning | Online control |
-
-## Next Steps
-
-- [Online Planning Example](../examples/online-planning.md) - Full walkthrough
-- [Task Composer](task-composer.md) - High-level alternative
+- [`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) — full working example
+- [Online Planning examples](../examples/online-planning.md)
+- [0.33 → 0.34 Migration Guide](../changes.md)

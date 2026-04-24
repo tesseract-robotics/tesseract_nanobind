@@ -39,6 +39,7 @@ Architecture (0.34 API)
    - Extract trajectory from results
 """
 
+# --8<-- [start:setup]
 import sys
 import time
 
@@ -53,8 +54,10 @@ from tesseract_robotics.tesseract_common import Isometry3d
 TesseractViewer = None
 if "pytest" not in sys.modules:
     from tesseract_robotics.viewer import TesseractViewer
+# --8<-- [end:setup]
 
 
+# --8<-- [start:problem]
 def build_optimization_problem(
     robot, joint_names, start_pos, target_pos, steps=10, use_continuous_collision=True
 ):
@@ -179,6 +182,9 @@ def build_optimization_problem(
     }
 
 
+# --8<-- [end:problem]
+
+
 def update_human_position(robot, human_x, human_y):
     """Update human obstacle position via joint values."""
     robot.env.setState({"human_x_joint": human_x, "human_y_joint": human_y})
@@ -216,6 +222,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     problem = problem_data["problem"]
     problem.print()
 
+    # --8<-- [start:sqp_loop]
     # Create SQP solver with OSQP
     # Match C++ defaults: box_size=0.01
     box_size = 0.01
@@ -281,6 +288,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
         if verbose:
             cost = problem.getTotalExactCost()
             print(f"  Iter {iteration + 1}: cost={cost:.4f}, time={dt * 1000:.1f}ms")
+    # --8<-- [end:sqp_loop]
 
     avg_time = np.mean(timings[1:]) * 1000
     print(f"Replan timing: avg={avg_time:.1f}ms ({1000 / avg_time:.0f} Hz)")
