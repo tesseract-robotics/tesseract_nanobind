@@ -88,6 +88,7 @@ def run(pipeline="CartesianPipeline", num_planners=None):
     wp5 = Pose.from_xyz_quat(1.0, -0.2, 0.8, *quat_down)
     wp6 = Pose.from_xyz_quat(1.0, 0.2, 0.8, *quat_down)
 
+    # --8<-- [start:descartes_then_trajopt]
     # Build motion program with FREESPACE and CARTESIAN segments
     # FREESPACE profile: uses OMPL sampling-based planner (handles obstacles)
     # CARTESIAN profile: uses Descartes ladder graph (optimal IK selection)
@@ -132,6 +133,7 @@ def run(pipeline="CartesianPipeline", num_planners=None):
         planning_time = time.time() - start_time
         print(f"Exception after {planning_time:.2f}s: {e}")
         result = None
+    # --8<-- [end:descartes_then_trajopt]
 
     return {
         "result": result,

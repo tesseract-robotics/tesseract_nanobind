@@ -196,6 +196,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     else:
         profiles = create_profiles()
 
+    # --8<-- [start:full_workflow]
     # ==================== PICK PHASE ====================
     # Motion: start -> approach (15cm above) -> grasp (on box)
     print("\n=== PICK ===")
@@ -285,6 +286,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     place_result = composer.plan(robot, place_program, pipeline=pipeline, profiles=profiles)
     assert place_result.successful, f"PLACE failed: {place_result.message}"
     print(f"PLACE OK: {len(place_result)} waypoints")
+    # --8<-- [end:full_workflow]
 
     return {
         "pick_result": pick_result,

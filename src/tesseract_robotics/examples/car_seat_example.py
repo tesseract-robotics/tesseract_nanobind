@@ -386,6 +386,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     else:
         profiles = create_car_seat_profiles()
 
+    # --8<-- [start:multi_step]
     # === PHASE 2: PICK MOTION ===
     # Plan freespace motion from Home to Pick1 (above seat_1)
     pick_result = plan_motion(
@@ -404,6 +405,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     place_result = plan_motion(
         robot, composer, joint_names, pick_pos, place_pos, "PLACE", pipeline, profiles
     )
+    # --8<-- [end:multi_step]
 
     return {
         "pick_result": pick_result,
