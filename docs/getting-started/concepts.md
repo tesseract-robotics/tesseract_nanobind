@@ -168,8 +168,20 @@ profiles.addProfile("ompl", "my_profile", ompl_profile)
 Checks collision at a single configuration:
 
 ```python
-# Check if configuration is collision-free
-is_safe = robot.check_collision(joint_values)
+from tesseract_robotics.tesseract_collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactTestType_ALL,
+)
+
+robot.set_joints(joint_values_dict)
+manager = robot.env.getDiscreteContactManager()
+manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
+
+contacts = ContactResultMap()
+manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+is_safe = contacts.size() == 0
 ```
 
 ### Continuous Collision
