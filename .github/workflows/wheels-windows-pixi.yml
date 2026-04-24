@@ -131,9 +131,11 @@ jobs:
           echo "  patched: $F (skipped opw_kinematics_node test exe)"
         fi
 
-    - name: cache colcon build
-      uses: actions/cache@v4
+    # Split restore+save so colcon output persists even if a later step
+    # (wheel build, delvewheel) fails — same reason as vcpkg cache split.
+    - name: restore colcon cache
       id: colcon-cache
+      uses: actions/cache/restore@v4
       with:
         path: ws/install
         key: colcon-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
@@ -167,6 +169,15 @@ jobs:
             -DTESSERACT_ENABLE_TESTING=OFF \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DNO_OPENCL=ON
+
+    - name: save colcon cache
+      # Runs after colcon build succeeds, before wheel build. If wheel build
+      # later fails, cache is already saved so next iteration skips colcon.
+      if: steps.colcon-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ws/install
+        key: colcon-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
     - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
