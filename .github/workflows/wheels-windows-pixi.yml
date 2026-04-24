@@ -185,18 +185,17 @@ jobs:
         CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1 /bigobj"
       run: |
         CONDA_LIB="$CONDA_PREFIX/Library"
+        # tesseract_common's exported CMake config (tesseract_commonTargets.cmake)
+        # emits INTERFACE_LINK_LIBRARIES "yaml-cpp" — a BARE name, not the modern
+        # namespaced target "yaml-cpp::yaml-cpp" that conda-forge's yaml-cpp
+        # exports. MSBuild's link.exe then tries to find bare yaml-cpp.lib on
+        # the library search path and fails. Side-step by dropping yaml-cpp.lib
+        # directly into ws/install/lib (same dir as tesseract_common.lib) so the
+        # bare-name linker search hits it. Upstream fix would patch tesseract's
+        # target_link_libraries(... yaml-cpp) → yaml-cpp::yaml-cpp.
+        cp "$CONDA_LIB/lib/yaml-cpp.lib" "$GITHUB_WORKSPACE/ws/install/lib/" || true
         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/ws/install;$CONDA_LIB"
         export PATH="$GITHUB_WORKSPACE/ws/install/bin:$CONDA_LIB/bin:$PATH"
-        # LIB needs Windows-style paths (backslashes, ;-separated) because
-        # it's read by MSBuild/link.exe (native Windows tools), not by bash.
-        # cygpath -w converts POSIX → Windows path; $(...) expansion happens
-        # before the export so MSBuild sees the final Windows form.
-        WIN_INSTALL_LIB=$(cygpath -w "$GITHUB_WORKSPACE/ws/install/lib")
-        WIN_CONDA_LIB=$(cygpath -w "$CONDA_LIB/lib")
-        export LIB="${WIN_INSTALL_LIB};${WIN_CONDA_LIB};${LIB:-}"
-        # CMAKE_LIBRARY_PATH also, so scikit-build-core / CMake find yaml-cpp
-        # transitively during MSBuild's link phase.
-        export CMAKE_LIBRARY_PATH="$GITHUB_WORKSPACE/ws/install/lib;$CONDA_LIB/lib"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
 
