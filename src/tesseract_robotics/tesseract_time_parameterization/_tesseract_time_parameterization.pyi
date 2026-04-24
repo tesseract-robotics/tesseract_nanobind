@@ -1,3 +1,5 @@
+"""tesseract_time_parameterization Python bindings"""
+
 from typing import Annotated, overload
 
 import numpy
@@ -148,3 +150,49 @@ class TimeOptimalTrajectoryGeneration(TimeParameterization):
 
 class IterativeSplineParameterization(TimeParameterization):
     def __init__(self, name: str = 'ISP') -> None: ...
+
+class ConstantTCPSpeedCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, max_translational_velocity: float, max_rotational_velocity: float, max_translational_acceleration: float, max_rotational_acceleration: float, max_velocity_scaling_factor: float = 1.0, max_acceleration_scaling_factor: float = 1.0) -> None: ...
+
+    @property
+    def max_translational_velocity(self) -> float: ...
+
+    @max_translational_velocity.setter
+    def max_translational_velocity(self, arg: float, /) -> None: ...
+
+    @property
+    def max_rotational_velocity(self) -> float: ...
+
+    @max_rotational_velocity.setter
+    def max_rotational_velocity(self, arg: float, /) -> None: ...
+
+    @property
+    def max_translational_acceleration(self) -> float: ...
+
+    @max_translational_acceleration.setter
+    def max_translational_acceleration(self, arg: float, /) -> None: ...
+
+    @property
+    def max_rotational_acceleration(self) -> float: ...
+
+    @max_rotational_acceleration.setter
+    def max_rotational_acceleration(self, arg: float, /) -> None: ...
+
+    @property
+    def max_velocity_scaling_factor(self) -> float: ...
+
+    @max_velocity_scaling_factor.setter
+    def max_velocity_scaling_factor(self, arg: float, /) -> None: ...
+
+    @property
+    def max_acceleration_scaling_factor(self) -> float: ...
+
+    @max_acceleration_scaling_factor.setter
+    def max_acceleration_scaling_factor(self, arg: float, /) -> None: ...
+
+class ConstantTCPSpeedParameterization(TimeParameterization):
+    def __init__(self, name: str = 'ConstantTCPSpeed') -> None: ...
