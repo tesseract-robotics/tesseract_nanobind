@@ -264,16 +264,23 @@ else:
 
 ## High-Level Alternative
 
-For simpler usage, use the `tesseract_robotics.planning` module:
+For most users the `tesseract_robotics.planning` module is simpler:
 
 ```python
-from tesseract_robotics.planning import Robot, plan
+from tesseract_robotics.planning import Robot, TaskComposer, plan_freespace
 
 robot = Robot.from_tesseract_support("abb_irb2400")
-result = plan(robot, program, pipeline="FreespaceMotionPipeline")
+
+# One-liner — picks pipeline defaults per entry point
+result = plan_freespace(robot, program)
+
+# Or reuse a composer to amortize plugin loading across calls
+composer = TaskComposer.from_config(warmup=True)
+result = composer.plan(robot, program, pipeline="TrajOptPipeline")
 
 if result.successful:
-    trajectory = result.trajectory
+    for point in result:
+        print(point.positions)
 ```
 
 ## Auto-generated API Reference

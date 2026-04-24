@@ -50,10 +50,12 @@ from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint, CartesianWaypointPoly, CartesianWaypointPoly_wrap_CartesianWaypoint
 )
 from tesseract_robotics.tesseract_common import Isometry3d
+import numpy as np
 
-# Create target pose
-pose = Isometry3d.Identity()
-pose.translate([0.5, 0.2, 0.3])
+# Create target pose (build the 4x4 matrix then wrap)
+mat = np.eye(4)
+mat[:3, 3] = [0.5, 0.2, 0.3]
+pose = Isometry3d(mat)
 
 # Create waypoint
 wp = CartesianWaypoint(pose)
@@ -141,9 +143,13 @@ program.setManipulatorInfo(manip_info)
 program.appendMoveInstruction(move1)
 program.appendMoveInstruction(move2)
 
+# push_back accepts either a single Instruction or a nested CompositeInstruction
+# (0.35+) so raster-style programs can be built the same way they are in C++:
+program.push_back(sub_composite)
+
 # Iterate instructions
-for i in range(len(program)):
-    instr = program[i]
+for instr in program.getInstructions():
+    pass
 ```
 
 ### CompositeInstructionOrder
@@ -216,6 +222,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
     CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
     MoveInstruction, MoveInstructionType,
+    MoveInstructionPoly_wrap_MoveInstruction,
     CompositeInstruction,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo, Isometry3d
@@ -224,8 +231,10 @@ import numpy as np
 # Setup
 joint_names = ["j1", "j2", "j3", "j4", "j5", "j6"]
 start_joints = np.zeros(6)
-goal_pose = Isometry3d.Identity()
-goal_pose.translate([0.5, 0.2, 0.3])
+
+goal_mat = np.eye(4)
+goal_mat[:3, 3] = [0.5, 0.2, 0.3]
+goal_pose = Isometry3d(goal_mat)
 
 # Create waypoints
 start_wp = StateWaypointPoly_wrap_StateWaypoint(
@@ -235,9 +244,13 @@ goal_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(
     CartesianWaypoint(goal_pose)
 )
 
-# Create instructions
-start_instr = MoveInstruction(start_wp, MoveInstructionType.FREESPACE, "DEFAULT")
-goal_instr = MoveInstruction(goal_wp, MoveInstructionType.LINEAR, "DEFAULT")
+# Create instructions (wrap in MoveInstructionPoly before appending)
+start_instr = MoveInstructionPoly_wrap_MoveInstruction(
+    MoveInstruction(start_wp, MoveInstructionType.FREESPACE, "DEFAULT")
+)
+goal_instr = MoveInstructionPoly_wrap_MoveInstruction(
+    MoveInstruction(goal_wp, MoveInstructionType.LINEAR, "DEFAULT")
+)
 
 # Create program
 program = CompositeInstruction("DEFAULT")

@@ -63,9 +63,11 @@ on the QP problem (no arguments) — the 0.33
 ## Parameters and Results
 
 - `SQPParameters` — configure iteration limits, trust region, penalty
-  coefficients.
-- `SQPResults` — `status`, `overall_cost`, `best_var_vals`, `cost_names`,
-  `constraint_names`.
+  coefficients. Mutated via `solver.params` before `solve()`.
+- `SQPResults` — the solver's iteration state. Notable attributes:
+  `best_var_vals`, `best_exact_merit`, `best_costs`, `best_constraint_violations`,
+  `cost_names`, `constraint_names`, plus the various iteration counters.
+- Solver status: `solver.getStatus()` returns the `SQPStatus` enum.
 
 ## Enums
 
@@ -85,11 +87,13 @@ The 0.33 `ConstraintType` enum was removed; if you referenced it, drop the usage
 
 ## Callbacks
 
+Override `execute(problem, results)` — return `False` to stop the solver.
+
 ```python
 class MyCallback(tsqp.SQPCallback):
-    def __call__(self, problem, results):
-        print(f"iter {results.best_var_vals}")
-        return True  # False stops the solver
+    def execute(self, problem, results):
+        print(f"iter {results.overall_iteration}: best_merit={results.best_exact_merit}")
+        return True
 
 solver.registerCallback(MyCallback())
 ```
