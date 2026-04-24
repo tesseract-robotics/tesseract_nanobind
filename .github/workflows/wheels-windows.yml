@@ -1,27 +1,11 @@
 name: Build & Test (Windows)
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-      - '.github/workflows/wheels-linux.yml'
-      - '.github/workflows/wheels-macos.yml'
-  pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-      - '.github/workflows/wheels-linux.yml'
-      - '.github/workflows/wheels-macos.yml'
+  # Temporarily workflow_dispatch-only while the conda-forge alternative
+  # (wheels-windows-conda.yml) is being evaluated. The vcpkg approach is
+  # slow to iterate (~80 min cold vcpkg per run) and the conda approach
+  # mirrors wheels-{linux,macos}.yml. Re-enable push/pull_request triggers
+  # once one of the two is chosen as the canonical Windows workflow.
   workflow_dispatch:
 
 concurrency:
