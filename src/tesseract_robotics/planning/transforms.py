@@ -97,8 +97,13 @@ class Pose:
         Create pose from position and quaternion.
 
         Args:
-            x, y, z: Position coordinates
-            qx, qy, qz, qw: Quaternion components (scalar-last convention)
+            x: X position.
+            y: Y position.
+            z: Z position.
+            qx: Quaternion X component.
+            qy: Quaternion Y component.
+            qz: Quaternion Z component.
+            qw: Quaternion W component (scalar-last convention).
         """
         mat = np.eye(4)
         mat[:3, 3] = [x, y, z]
@@ -148,8 +153,12 @@ class Pose:
         Create pose from position and roll-pitch-yaw angles.
 
         Args:
-            x, y, z: Position coordinates
-            roll, pitch, yaw: Euler angles in radians (XYZ convention)
+            x: X position.
+            y: Y position.
+            z: Z position.
+            roll: Roll angle in radians.
+            pitch: Pitch angle in radians.
+            yaw: Yaw angle in radians (XYZ convention).
         """
         mat = np.eye(4)
         mat[:3, 3] = [x, y, z]

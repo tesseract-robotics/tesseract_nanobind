@@ -1,13 +1,21 @@
 name: Docs
 
 on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'CHANGELOG.md'
+      - '.github/workflows/docs.yml'
+      - 'src/tesseract_robotics/**/*.pyi'
   push:
     branches: [main]
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'CHANGELOG.md'
       - '.github/workflows/docs.yml'
-      - 'src/tesseract_robotics/**/*.pyi'  # stub files for API docs
+      - 'src/tesseract_robotics/**/*.pyi'
   workflow_dispatch:
 
 permissions:
@@ -16,7 +24,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: docs-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -33,15 +41,17 @@ jobs:
     - name: Install dependencies
       run: pip install -r docs/requirements.txt
 
-    - name: Build docs
-      run: PYTHONPATH=src mkdocs build
+    - name: Build docs (strict)
+      run: PYTHONPATH=src mkdocs build --strict
 
     - name: Upload artifact
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/upload-pages-artifact@v3
       with:
         path: site
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

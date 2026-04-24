@@ -52,6 +52,8 @@ plugins:
   - exclude:
       glob:
         - QUICKSTART.md
+        - superpowers/**
+        - plans/**
   - mkdocstrings:
       enable_inventory: false
       handlers:

@@ -12,6 +12,7 @@ Also provides helpers for:
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
@@ -442,7 +443,9 @@ def create_ompl_default_profiles(
 
 
 def create_ompl_planner_configurators(
-    planners: list[str] | None = None, num_planners: int | None = None, **kwargs
+    planners: list[str] | None = None,
+    num_planners: int | None = None,
+    **kwargs: float | bool,
 ) -> list:
     """Create OMPL planner configurators with custom parameters.
 
@@ -873,7 +876,7 @@ def create_cartesian_pipeline_profiles(
 def create_time_optimal_parameterization(
     path_tolerance: float = 0.1,
     min_angle_change: float = 0.001,
-):
+) -> Any:
     """Create Time-Optimal Trajectory Generation (TOTG) parameterization.
 
     TOTG finds the time-optimal trajectory that respects velocity, acceleration,
@@ -925,7 +928,9 @@ def create_time_optimal_parameterization(
     return TimeOptimalTrajectoryGeneration()
 
 
-def create_iterative_spline_parameterization(add_points: bool = True):
+def create_iterative_spline_parameterization(
+    add_points: bool = True,
+) -> Any:
     """Create Iterative Spline Parameterization (ISP).
 
     ISP iteratively fits a spline to the trajectory while respecting velocity,
