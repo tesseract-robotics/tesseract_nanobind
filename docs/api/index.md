@@ -8,7 +8,7 @@ Auto-generated API documentation from docstrings.
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.planning`](planning.md) | Robot, Planner, Composer classes |
+| [`tesseract_robotics.planning`](planning.md) | `Robot`, `MotionProgram`, `TaskComposer`, `plan_freespace`/`plan_ompl`/`plan_cartesian` |
 
 ### Core Modules
 
@@ -45,10 +45,25 @@ Auto-generated API documentation from docstrings.
 ### High-Level (Recommended)
 
 ```python
-from tesseract_robotics.planning import Robot, Planner, Composer
+from tesseract_robotics.planning import (
+    Robot,
+    MotionProgram,
+    JointTarget,
+    plan_freespace,
+    TaskComposer,
+)
 
 robot = Robot.from_tesseract_support("abb_irb2400")
-planner = Planner(robot)
+program = (
+    MotionProgram("manipulator")
+    .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+    .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
+)
+result = plan_freespace(robot, program)
+
+# Or reuse a composer (amortizes plugin loading):
+composer = TaskComposer.from_config(warmup=True)
+result = composer.plan(robot, program, pipeline="TrajOptPipeline")
 ```
 
 ### Direct Module Access

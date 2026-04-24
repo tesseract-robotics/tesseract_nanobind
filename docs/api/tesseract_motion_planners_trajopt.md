@@ -12,12 +12,17 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
     TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
     TrajOptPlanProfile, TrajOptCompositeProfile,
-    TrajOptCollisionConfig,  # 0.33 API
+    TrajOptCollisionConfig,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 ```
+
+!!! note "`TrajOptCollisionConfig` lives in `trajopt_ifopt`"
+    It's defined in `tesseract_robotics.trajopt_ifopt` (trajopt_common) and
+    re-exported from `tesseract_motion_planners_trajopt` for convenience. Import
+    from either location.
 
 ## TrajOptMotionPlanner
 
@@ -46,7 +51,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultP
 
 profile = TrajOptDefaultPlanProfile()
 
-# Cartesian waypoint config (0.33 API)
+# Cartesian waypoint config
 profile.cartesian_constraint_config.enabled = True
 profile.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 2.0])  # xyz, rpy weights
 
@@ -54,9 +59,8 @@ profile.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 2
 profile.cartesian_cost_config.enabled = True
 profile.cartesian_cost_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 2.0])
 
-# Joint waypoint config
-profile.joint_constraint_config.enabled = True
-profile.joint_constraint_config.coeff = np.ones(6)  # weight per joint
+# Joint waypoint config (uses joint_cost_config / joint_*_config too)
+# (availability depends on profile subtype; see source for current attributes)
 ```
 
 ### TrajOptDefaultCompositeProfile
