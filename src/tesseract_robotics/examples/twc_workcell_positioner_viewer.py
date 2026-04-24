@@ -195,6 +195,7 @@ def main():
     workcell = args.workcell
     config = WORKCELLS[workcell]
 
+    # --8<-- [start:load_workcell]
     urdf_path = TWC_SUPPORT_PATH / config["urdf"]
     srdf_path = TWC_SUPPORT_PATH / config["srdf"]
 
@@ -221,6 +222,7 @@ def main():
     if not success:
         print("ERROR: Failed to initialize environment")
         sys.exit(1)
+    # --8<-- [end:load_workcell]
 
     print(f"Environment initialized: {t_env.getName()}")
     print(f"Links: {len(list(t_env.getLinkNames()))}")

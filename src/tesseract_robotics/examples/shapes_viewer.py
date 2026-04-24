@@ -9,7 +9,6 @@ from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedRe
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
-
 shapes_urdf = """
 <robot name="multipleshapes">
 
@@ -105,16 +104,20 @@ class TesseractSupportResourceLocator(ResourceLocator):
 def main():
     HEADLESS = "pytest" in sys.modules
 
+    # --8<-- [start:setup]
     t_env = Environment()
 
     # locator must be kept alive by maintaining a reference
     locator = TesseractSupportResourceLocator()
     t_env.init(shapes_urdf, locator)
+    # --8<-- [end:setup]
 
     if not HEADLESS:
+        # --8<-- [start:serve]
         viewer = TesseractViewer()
         viewer.update_environment(t_env, [0, 0, 0])
         viewer.start_serve_background()
+        # --8<-- [end:serve]
         input("Press Enter to exit...")
     else:
         print("shapes_viewer.py: PASSED")

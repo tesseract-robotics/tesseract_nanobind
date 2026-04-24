@@ -60,7 +60,6 @@ import sys
 
 import numpy as np
 
-
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
@@ -68,6 +67,7 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 def main():
     HEADLESS = "pytest" in sys.modules
 
+    # --8<-- [start:load_robot]
     # Load robot
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
@@ -86,6 +86,7 @@ def main():
     manip_info.tcp_frame = "tool0"
     manip_info.manipulator = "manipulator"
     manip_info.working_frame = "base_link"
+    # --8<-- [end:load_robot]
 
     viewer = None
     if not HEADLESS:
@@ -125,6 +126,7 @@ def main():
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
     program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
 
+    # --8<-- [start:plan_and_animate]
     # OMPL planning
     plan_profile = OMPLRealVectorPlanProfile()
     profiles = ProfileDictionary()
@@ -143,6 +145,7 @@ def main():
     interpolated_results_instruction = generateInterpolatedProgram(
         results_instruction, t_env, 3.14, 1.0, 3.14, 10
     )
+    # --8<-- [end:plan_and_animate]
 
     # TrajOpt trajectory optimization for smooth trajectories
     trajopt_success = False
