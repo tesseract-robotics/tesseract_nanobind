@@ -70,12 +70,15 @@ jobs:
     # ever landed in `gh cache list` despite two successful vcpkg runs).
     # Caching installed/ directly makes it observable and lets the 4 matrix
     # jobs share one cache key (vcpkg output doesn't depend on Python version).
+    # save-always is critical: vcpkg succeeds in step 7 but colcon (step 14)
+    # can fail during iteration — without save-always, cache never persists.
     - name: cache vcpkg installed
       id: vcpkg-cache
       uses: actions/cache@v4
       with:
         path: vcpkg/installed
         key: vcpkg-installed-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**', 'ws/src/tesseract_nanobind/.github/workflows/wheels-windows.yml') }}
+        save-always: true
 
     - name: vcpkg install C++ deps
       if: steps.vcpkg-cache.outputs.cache-hit != 'true'
@@ -164,16 +167,13 @@ jobs:
         # doesn't propagate to the test target for reasons unclear, so it fails
         # to find "Eigen/Dense". We don't need this test binary; short-circuit it.
         F=opw_kinematics/CMakeLists.txt
-        if [ -f "$F" ] && grep -q 'add_executable.*opw_kinematics_node' "$F"; then
-          # Insert if(FALSE) above the test block and endif() after it. The
-          # test block runs from "# Create test executable" through the
-          # "target_code_coverage" block whose closing paren is on a line
-          # matching ENABLE OPW_ENABLE_CODE_COVERAGE for the _node target.
-          sed -i '/# Create test executable/i if(FALSE)  # patched: skip stray test exe on windows' "$F"
-          # After the executable block, the next top-level line is "# Install" or similar.
-          # Insert endif() right before that.
-          sed -i '/# Install/i endif()  # patched: close if(FALSE)' "$F"
-          echo "  patched: $F"
+        # File has literal ${PROJECT_NAME}_node (CMake variable), match "# Create test executable"
+        if [ -f "$F" ] && grep -q '^# Create test executable' "$F"; then
+          # Wrap the "# Create test executable" block with if(FALSE)/endif().
+          # Block ends just before the "# Install" comment on the next top-level line.
+          sed -i '/^# Create test executable/i if(FALSE)  # patched: skip stray test exe on windows' "$F"
+          sed -i '/^# Install/i endif()  # patched: close if(FALSE)' "$F"
+          echo "  patched: $F (skipped opw_kinematics_node test exe)"
         fi
 
     - name: cache colcon build
