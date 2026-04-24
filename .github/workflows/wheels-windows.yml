@@ -187,7 +187,9 @@ jobs:
       if: steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws
       env:
-        CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1"
+        # /bigobj — cereal_serialization.cpp (tesseract_common) instantiates
+        # enough templates to exceed MSVC's default COFF section limit (C1128).
+        CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1 /bigobj"
       run: |
         set -e
         VCPKG_INSTALL="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release"
@@ -210,7 +212,9 @@ jobs:
     - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
       env:
-        CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1"
+        # /bigobj — cereal_serialization.cpp (tesseract_common) instantiates
+        # enough templates to exceed MSVC's default COFF section limit (C1128).
+        CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1 /bigobj"
       run: |
         set -e
         VCPKG_INSTALL="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release"

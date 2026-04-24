@@ -1,13 +1,13 @@
 name: Build & Test (Linux)
 
 on:
-  # push-only (no pull_request): pull_request evaluates paths-ignore against the
-  # full PR diff, so any PR that ever touched a non-ignored file would re-run
-  # this workflow on every subsequent push — including Windows-only changes.
-  # push events check only the latest push's diff, giving per-commit gating.
+  # Temporarily restricted to main + tags (no feature-branch pushes) while the
+  # Windows workflow is still being stabilised — avoids running Linux/macOS CI
+  # on every Windows-specific iteration commit. Restore full triggers once
+  # wheels-windows.yml is green on main.
   push:
     branches:
-      - '**'
+      - main
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'

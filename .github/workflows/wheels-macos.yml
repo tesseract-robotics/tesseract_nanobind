@@ -1,10 +1,10 @@
 name: Build & Test (macOS)
 
 on:
-  # push-only (no pull_request): see wheels-linux.yml comment for why.
+  # See wheels-linux.yml: temporarily main+tags only while Windows stabilises.
   push:
     branches:
-      - '**'
+      - main
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
