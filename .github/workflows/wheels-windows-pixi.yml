@@ -187,8 +187,16 @@ jobs:
         CONDA_LIB="$CONDA_PREFIX/Library"
         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/ws/install;$CONDA_LIB"
         export PATH="$GITHUB_WORKSPACE/ws/install/bin:$CONDA_LIB/bin:$PATH"
-        # Same LIB search path reason as colcon step above
-        export LIB="$GITHUB_WORKSPACE/ws/install/lib;$CONDA_LIB/lib;${LIB:-}"
+        # LIB needs Windows-style paths (backslashes, ;-separated) because
+        # it's read by MSBuild/link.exe (native Windows tools), not by bash.
+        # cygpath -w converts POSIX → Windows path; $(...) expansion happens
+        # before the export so MSBuild sees the final Windows form.
+        WIN_INSTALL_LIB=$(cygpath -w "$GITHUB_WORKSPACE/ws/install/lib")
+        WIN_CONDA_LIB=$(cygpath -w "$CONDA_LIB/lib")
+        export LIB="${WIN_INSTALL_LIB};${WIN_CONDA_LIB};${LIB:-}"
+        # CMAKE_LIBRARY_PATH also, so scikit-build-core / CMake find yaml-cpp
+        # transitively during MSBuild's link phase.
+        export CMAKE_LIBRARY_PATH="$GITHUB_WORKSPACE/ws/install/lib;$CONDA_LIB/lib"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
 
