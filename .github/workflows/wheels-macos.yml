@@ -1,21 +1,13 @@
 name: Build & Test (macOS)
 
 on:
+  # push-only (no pull_request): see wheels-linux.yml comment for why.
   push:
     branches:
-      - main
+      - '**'
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-      - '.github/workflows/wheels-linux.yml'
-      - '.github/workflows/wheels-windows.yml'
-      - '.github/workflows/vcpkg_triplets/**'
-  pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
