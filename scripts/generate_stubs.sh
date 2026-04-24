@@ -30,6 +30,7 @@ MODULES=(
     "tesseract_robotics.tesseract_srdf._tesseract_srdf:tesseract_srdf"
     "tesseract_robotics.tesseract_state_solver._tesseract_state_solver:tesseract_state_solver"
     "tesseract_robotics.tesseract_task_composer._tesseract_task_composer:tesseract_task_composer"
+    "tesseract_robotics.tesseract_task_composer_planning._tesseract_task_composer_planning:tesseract_task_composer_planning"
     "tesseract_robotics.tesseract_time_parameterization._tesseract_time_parameterization:tesseract_time_parameterization"
     "tesseract_robotics.tesseract_urdf._tesseract_urdf:tesseract_urdf"
     "tesseract_robotics.trajopt_ifopt._trajopt_ifopt:trajopt_ifopt"
