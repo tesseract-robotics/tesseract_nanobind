@@ -166,7 +166,8 @@ nav:
     - SQP Modules:
       - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
       - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
-  - Changes:
+  - Changelog: CHANGELOG.md
+  - Migration Guides:
     - "0.33 → 0.34": changes.md
   - Developer:
     - developer/index.md
@@ -193,7 +194,6 @@ extra_css:
 
 extra_javascript:
   - javascripts/mathjax.js
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
-copyright: Copyright &copy; 2024-2025 Tesseract Robotics
+copyright: Copyright &copy; 2024-2026 Tesseract Robotics
