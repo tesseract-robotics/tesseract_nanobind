@@ -207,18 +207,17 @@ jobs:
         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/ws/install;$CONDA_LIB"
         export PATH="$GITHUB_WORKSPACE/ws/install/bin:$CONDA_LIB/bin:$PATH"
 
-        # tesseract_common's exported CMake config has INTERFACE_LINK_LIBRARIES
-        # "yaml-cpp" (bare name, not yaml-cpp::yaml-cpp target). CMake passes
-        # bare "yaml-cpp" to MSBuild which turns it into yaml-cpp.lib on the
-        # linker's library search path. MSBuild's default search path does NOT
-        # include conda's Library/lib, so the lib isn't found. Inject the
-        # conda lib dir via CMAKE_{EXE,SHARED}_LINKER_FLAGS so MSBuild bakes
-        # /LIBPATH:... into every vcxproj it generates. Paths must be Windows-
-        # style for MSVC link.exe.
+        # Upstream CMakeLists link some deps by bare name (yaml-cpp, ode_double,
+        # etc.) rather than via namespaced IMPORTED targets. CMake passes the
+        # bare name to MSBuild which expects <name>.lib on the linker search
+        # path. The LIB env var is THE mechanism link.exe uses for that path.
+        # We set it in Windows form (cygpath -w + ;-separated) because the
+        # Git Bash default (POSIX :-separated) is ignored by native link.exe.
         WIN_CONDA_LIB=$(cygpath -w "$CONDA_LIB/lib")
         WIN_INSTALL_LIB=$(cygpath -w "$GITHUB_WORKSPACE/ws/install/lib")
-        LIBPATH_FLAGS="/LIBPATH:${WIN_CONDA_LIB} /LIBPATH:${WIN_INSTALL_LIB}"
-        export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_SHARED_LINKER_FLAGS=${LIBPATH_FLAGS} -DCMAKE_EXE_LINKER_FLAGS=${LIBPATH_FLAGS} -DCMAKE_MODULE_LINKER_FLAGS=${LIBPATH_FLAGS}"
+        export LIB="${WIN_CONDA_LIB};${WIN_INSTALL_LIB};${LIB:-}"
+        echo "LIB=$LIB"
+        export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
 
     - name: bundle plugins then delvewheel repair
