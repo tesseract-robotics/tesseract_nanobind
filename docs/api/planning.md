@@ -22,9 +22,9 @@ robot = Robot.from_urdf(
     "package://my_robot/urdf/robot.srdf",
 )
 
-# FK / IK
-pose = robot.fk([0, 0, 0, 0, 0, 0], group="manipulator")
-solutions = robot.ik(target_pose, group="manipulator")
+# FK / IK — group_name is the first positional argument
+pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
+solution = robot.ik("manipulator", target_pose, seed=[0, 0, 0, 0, 0, 0])
 
 # Access the underlying Environment
 env = robot.env
