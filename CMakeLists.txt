@@ -431,7 +431,7 @@ endif()
 if(EXISTS "${TESSERACT_SUPPORT_SRC}")
   message(STATUS "Installing tesseract_support from: ${TESSERACT_SUPPORT_SRC}")
   install(DIRECTORY "${TESSERACT_SUPPORT_SRC}/"
-    DESTINATION tesseract_robotics/data/tesseract_support
+    DESTINATION tesseract/tesseract_support
     FILES_MATCHING
     PATTERN "*.urdf" PATTERN "*.srdf" PATTERN "*.yaml" PATTERN "*.xacro"
     PATTERN "*.stl" PATTERN "*.STL" PATTERN "*.dae" PATTERN "*.ply" PATTERN "*.obj" PATTERN "*.csv"
@@ -444,7 +444,7 @@ endif()
 if(EXISTS "${TASK_COMPOSER_CFG_SRC}")
   message(STATUS "Installing task_composer config from: ${TASK_COMPOSER_CFG_SRC}")
   install(DIRECTORY "${TASK_COMPOSER_CFG_SRC}/"
-    DESTINATION tesseract_robotics/data/task_composer_config
+    DESTINATION tesseract/tesseract_support/task_composer_config
     FILES_MATCHING PATTERN "*.yaml" PATTERN "*.schema")
 else()
   message(WARNING "task_composer config not found at ${TASK_COMPOSER_CFG_SRC}")
