@@ -1,6 +1,11 @@
 # Motion Planning
 
-tesseract_robotics provides multiple motion planners for different use cases.
+tesseract_robotics provides multiple motion planners for different use cases. The
+high-level `tesseract_robotics.planning` API exposes three module-level entry
+points — `plan_freespace`, `plan_ompl`, and `plan_cartesian` — each accepting a
+`MotionProgram` describing the waypoints. Under the hood these dispatch to
+`TaskComposer` pipelines, so you can drop down to `TaskComposer.plan(...)` when
+you need a specific pipeline variant.
 
 ## Planner Comparison
 
@@ -14,50 +19,77 @@ tesseract_robotics provides multiple motion planners for different use cases.
 
 ## Quick Planning
 
+All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
+`JointTarget` / `CartesianTarget` waypoints.
+
 === "OMPL (Freespace)"
 
+    `plan_ompl` defaults to the `FreespacePipeline` — OMPL RRTConnect for path
+    finding, TrajOpt for smoothing, and time parameterization.
+
     ```python
-    from tesseract_robotics.planning import Robot, Planner
     import numpy as np
+    from tesseract_robotics.planning import (
+        Robot, MotionProgram, JointTarget, plan_ompl,
+    )
 
     robot = Robot.from_tesseract_support("abb_irb2400")
-    planner = Planner(robot)
-
-    start = np.zeros(6)
-    goal = np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])
-
-    trajectory = planner.plan(
-        start=start,
-        goal=goal,
-        planner="ompl"
+    program = (
+        MotionProgram("manipulator")
+        .move_to(JointTarget(np.zeros(6)))
+        .move_to(JointTarget(np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])))
     )
+
+    result = plan_ompl(robot, program)
+    if result.successful:
+        for state in result.trajectory:
+            print(state.positions)
     ```
 
-=== "TrajOpt (Cartesian)"
+=== "TrajOpt (Freespace)"
+
+    `plan_freespace` drives the `TrajOptPipeline` — pure optimization-based
+    freespace planning. Ideal when the direct path is roughly correct and just
+    needs smoothing plus collision margin enforcement.
 
     ```python
-    from tesseract_robotics.tesseract_common import Isometry3d
+    from tesseract_robotics.planning import plan_freespace
 
-    target_pose = Isometry3d.Identity()
-    target_pose.translate([0.8, 0.2, 0.5])
+    result = plan_freespace(robot, program)
+    ```
 
-    trajectory = planner.plan(
-        start=start,
-        goal=target_pose,  # Cartesian goal
-        planner="trajopt"
+=== "Cartesian (Descartes)"
+
+    `plan_cartesian` drives the `DescartesPipeline` — Descartes graph search for
+    precise Cartesian paths, with TrajOpt smoothing. Use this when the program
+    contains `CartesianTarget` waypoints and you need tool-pose accuracy.
+
+    ```python
+    from tesseract_robotics.planning import CartesianTarget, Pose, plan_cartesian
+
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0")
+        .move_to(CartesianTarget(Pose.from_xyz(0.5, -0.2, 0.5)))
+        .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
     )
+
+    result = plan_cartesian(robot, program)
     ```
 
 === "Hybrid (OMPL + TrajOpt)"
 
+    For hybrid planning (OMPL for global search, TrajOpt for local refinement)
+    use the `FreespacePipeline` directly via `TaskComposer` — it chains OMPL,
+    TrajOpt, and time parameterization in one call.
+
     ```python
-    # OMPL finds path, TrajOpt smooths it
-    trajectory = planner.plan(
-        start=start,
-        goal=goal,
-        planner="freespace_hybrid"
-    )
+    from tesseract_robotics.planning import TaskComposer
+
+    composer = TaskComposer.from_config()
+    result = composer.plan(robot, program, pipeline="FreespacePipeline")
     ```
+
+    `plan_ompl(robot, program)` is a shortcut for exactly this pipeline.
 
 ## OMPL Planner
 
@@ -76,16 +108,25 @@ graph LR
 
 ### OMPL Profiles
 
+Profiles control per-call planner behaviour. The `create_ompl_default_profiles`
+helper packages sensible defaults (parallel RRTConnect with a 10 s budget):
+
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import (
-    OMPLDefaultPlanProfile
+from tesseract_robotics.planning.profiles import create_ompl_default_profiles
+
+profiles = create_ompl_default_profiles(
+    planning_time=5.0,   # Max planning time (seconds)
+    num_planners=4,      # Parallel RRTConnect instances
+    max_solutions=10,    # Stop after this many solutions
+    optimize=True,       # Continue improving until timeout
 )
 
-profile = OMPLDefaultPlanProfile()
-profile.planning_time = 5.0  # Max planning time (seconds)
-profile.simplify = True      # Simplify path after planning
-profile.collision_check_config.contact_margin = 0.02  # 2cm margin
+result = plan_ompl(robot, program, profiles=profiles)
 ```
+
+For freespace-pipeline use (OMPL + TrajOpt together), use
+`create_freespace_pipeline_profiles` — same arguments plus the TrajOpt smoothing
+profile in the same dictionary.
 
 ### Available OMPL Planners
 
@@ -97,6 +138,8 @@ profile.collision_check_config.contact_margin = 0.02  # 2cm margin
 | `PRM` | Probabilistic Roadmap |
 | `LazyPRM` | Lazy collision checking PRM |
 | `BKPIECE` | Bi-directional KPIECE |
+
+Use `create_ompl_planner_configurators` to mix planner types inside one profile.
 
 ## TrajOpt Planner
 
@@ -135,7 +178,7 @@ composite_profile.smooth_velocities = True
 composite_profile.smooth_accelerations = True
 ```
 
-### Collision Configuration (0.33 API)
+### Collision Configuration
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
@@ -147,6 +190,9 @@ collision_config.collision_margin_buffer = 0.005  # Additional buffer
 collision_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 collision_config.collision_check_config.longest_valid_segment_length = 0.05  # For LVS modes
 ```
+
+`TrajOptCollisionConfig` lives in `trajopt_ifopt` (trajopt_common) and is
+re-exported from `tesseract_motion_planners_trajopt`, so either import works.
 
 ## Costs vs Constraints (Soft vs Hard)
 
@@ -268,34 +314,36 @@ Best for:
 - Machining toolpaths
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_descartes import (
-    DescartesDefaultPlanProfile
+from tesseract_robotics.planning.profiles import create_descartes_default_profiles
+
+profiles = create_descartes_default_profiles(
+    enable_collision=True,        # Check vertex (waypoint) collisions
+    enable_edge_collision=False,  # Check transition collisions (slower)
+    num_threads=4,                # Parallel IK solving
 )
 
-profile = DescartesDefaultPlanProfile()
-profile.num_threads = 4  # Parallel IK solving
+result = plan_cartesian(robot, program, profiles=profiles)
 ```
 
 ## Motion Types
 
+Motion type is set via the `MotionProgram` builder methods:
+
 ### Freespace Motion
 
-Any collision-free path between configurations:
+Any collision-free path between configurations. Use `move_to(...)`:
 
 ```python
-from tesseract_robotics.tesseract_command_language import (
-    MoveInstruction, MoveInstructionType
-)
-
-move = MoveInstruction(waypoint, MoveInstructionType.FREESPACE, "DEFAULT")
+program.move_to(JointTarget(joint_values))
+program.move_to(CartesianTarget(pose))  # freespace to pose
 ```
 
 ### Linear Motion
 
-Straight-line Cartesian path:
+Straight-line Cartesian path. Use `linear_to(...)`:
 
 ```python
-move = MoveInstruction(waypoint, MoveInstructionType.LINEAR, "DEFAULT")
+program.linear_to(CartesianTarget(pose))
 ```
 
 !!! warning "Linear Motion Requirements"
@@ -307,125 +355,159 @@ move = MoveInstruction(waypoint, MoveInstructionType.LINEAR, "DEFAULT")
 
 ### Circular Motion
 
-Arc motion (specialized planners):
+Arc motion (specialized planners). Use `circular_to(...)`:
 
 ```python
-move = MoveInstruction(waypoint, MoveInstructionType.CIRCULAR, "DEFAULT")
+program.circular_to(CartesianTarget(pose))
 ```
 
 ## Program Structure
 
-Complex motions are defined as programs:
+Use the `MotionProgram` builder — it handles all the poly-type wrapping
+automatically. For reference, the equivalent low-level call would be:
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    CompositeInstruction, MoveInstruction,
-    StateWaypointPoly, CartesianWaypointPoly
+    CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CompositeInstruction, MoveInstruction, MoveInstructionType_LINEAR,
+    MoveInstructionPoly_wrap_MoveInstruction,
 )
 
-# Create program
-program = CompositeInstruction("DEFAULT")
-
-# Add start state
-start_wp = StateWaypointPoly.wrap_StateWaypoint(
-    StateWaypoint(joint_names, start_joints)
-)
-program.appendMoveInstruction(
-    MoveInstruction(start_wp, MoveInstructionType.START, "DEFAULT")
-)
-
-# Add goal waypoints
+composite = CompositeInstruction("DEFAULT")
 for pose in waypoints:
-    cart_wp = CartesianWaypointPoly.wrap_CartesianWaypoint(
-        CartesianWaypoint(pose)
+    wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
+    instr = MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(wp, MoveInstructionType_LINEAR, "DEFAULT")
     )
-    program.appendMoveInstruction(
-        MoveInstruction(cart_wp, MoveInstructionType.LINEAR, "DEFAULT")
-    )
+    composite.appendMoveInstruction(instr)
 ```
+
+The `MotionProgram` fluent API builds exactly the same structure with far less
+ceremony, and the planning entry points accept either form.
 
 ## Planning with Constraints
 
 ### Orientation Constraints
 
-Keep end-effector upright (e.g., carrying a glass):
+Keep end-effector upright (e.g., carrying a glass). The `UPRIGHT` profile is
+pre-baked by `create_trajopt_upright_profiles`:
 
 ```python
-# In TrajOpt profile
-profile.cartesian_coeff = [1, 1, 1, 10, 10, 1]  # High rotation weights
+from tesseract_robotics.planning.profiles import create_trajopt_upright_profiles
+
+profiles = create_trajopt_upright_profiles()
+result = plan_freespace(robot, program, profiles=profiles)
+```
+
+Equivalent manual setup:
+
+```python
+# In TrajOpt plan profile — position free (0), orientation constrained (5)
+plan_profile.cartesian_constraint_config.coeff = [0, 0, 0, 5, 5, 5]
 ```
 
 ### Joint Constraints
 
-Limit specific joints:
+Weight individual joints to lock or favour them:
 
 ```python
-# Lock joint 1
-profile.joint_coeff = [100, 1, 1, 1, 1, 1]  # High weight on joint 1
+# High weight on joint 1 - strongly discouraged from moving
+plan_profile.joint_constraint_config.coeff = [100, 1, 1, 1, 1, 1]
 ```
 
 ## Handling Planning Failures
 
 ```python
-trajectory = planner.plan(start, goal, planner="ompl")
+result = plan_freespace(robot, program)
 
-if trajectory is None:
-    print("Planning failed!")
+if not result.successful:
+    print(f"Planning failed: {result.message}")
 
     # Debug strategies:
+
     # 1. Check if start/goal are collision-free
-    print(f"Start collision-free: {robot.check_collision(start)}")
-    print(f"Goal collision-free: {robot.check_collision(goal)}")
-
-    # 2. Increase planning time
-    trajectory = planner.plan(
-        start, goal,
-        planner="ompl",
-        planning_time=10.0
+    from tesseract_robotics.tesseract_collision import (
+        ContactRequest, ContactResultMap, ContactTestType_ALL,
     )
+    manager = robot.env.getDiscreteContactManager()
+    manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+    manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
+    contacts = ContactResultMap()
+    manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+    print(f"Collision-free: {contacts.size() == 0}")
 
-    # 3. Try different planner
-    trajectory = planner.plan(start, goal, planner="trajopt")
+    # 2. Try a different backend
+    result = plan_ompl(robot, program)       # sampling-based (OMPL + TrajOpt)
+    result = plan_cartesian(robot, program)  # graph search (Descartes)
+
+    # 3. Increase planning time on OMPL
+    from tesseract_robotics.planning.profiles import create_ompl_default_profiles
+    profiles = create_ompl_default_profiles(planning_time=30.0)
+    result = plan_ompl(robot, program, profiles=profiles)
 ```
 
 ## Trajectory Output
 
 ```python
-if trajectory:
-    print(f"Waypoints: {len(trajectory)}")
+if result.successful:
+    print(f"Waypoints: {len(result.trajectory)}")
 
-    for i, waypoint in enumerate(trajectory):
-        print(f"  [{i}] positions: {waypoint.positions}")
-        print(f"       velocities: {waypoint.velocities}")
-        print(f"       time: {waypoint.time}")
+    for i, state in enumerate(result.trajectory):
+        print(f"  [{i}] positions:     {state.positions}")
+        print(f"       velocities:    {state.velocities}")
+        print(f"       accelerations: {state.accelerations}")
+        print(f"       time:          {state.time}")
 ```
+
+Each `TrajectoryPoint` carries `joint_names`, `positions`, and optionally
+`velocities`, `accelerations`, and `time` (time from start, seconds). Velocities
+and timing are populated by pipelines that include time parameterization
+(`FreespacePipeline`, `CartesianPipeline`, etc.); pure OMPL output has positions
+only. `result.to_numpy()` returns an `(N, num_joints)` array of positions.
 
 ## Performance Tips
 
-!!! tip "Warm-Start TrajOpt"
-    Provide an initial trajectory for faster convergence:
+!!! tip "Warm-Start via FreespacePipeline"
+    The `FreespacePipeline` (what `plan_ompl` runs by default) already does
+    warm-start internally: OMPL finds a feasible path, TrajOpt then refines it
+    in the same call. If you only need a sampling solution, pass
+    `pipeline="OMPLPipeline"` to drop the TrajOpt step.
 
     ```python
-    # Use OMPL solution as TrajOpt initial guess
-    initial = planner.plan(start, goal, planner="ompl")
-    refined = planner.refine(initial, planner="trajopt")
+    from tesseract_robotics.planning import plan_ompl
+
+    # Default: OMPL + TrajOpt refinement
+    result = plan_ompl(robot, program)
+
+    # Raw OMPL output (no refinement)
+    result = plan_ompl(robot, program, pipeline="OMPLPipeline")
     ```
 
-!!! tip "Reduce Search Space"
+!!! tip "Pre-Load Plugins"
+    First `plan_*()` call takes ~10–15 s due to plugin `dlopen`. In interactive
+    or long-running sessions, warm up once at startup:
+
     ```python
-    # Tighter joint limits for faster planning
-    profile.joint_limits_scale = 0.8  # 80% of full limits
+    from tesseract_robotics.planning import TaskComposer
+
+    composer = TaskComposer.from_config(warmup=True)  # ~10–15s once
+    # Subsequent composer.plan() calls are fast
     ```
 
 !!! tip "Profile Caching"
-    Profiles are expensive to create. Cache and reuse:
+    Profile factory helpers do real work — cache and reuse the returned
+    `ProfileDictionary`:
 
     ```python
+    from tesseract_robotics.planning.profiles import (
+        create_freespace_pipeline_profiles,
+    )
+
     # Create once
-    self.ompl_profile = OMPLDefaultPlanProfile()
+    self.freespace_profiles = create_freespace_pipeline_profiles()
 
     # Reuse for all plans
-    trajectory = planner.plan(..., profile=self.ompl_profile)
+    result = plan_ompl(robot, program, profiles=self.freespace_profiles)
     ```
 
 ## Next Steps
