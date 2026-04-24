@@ -3,7 +3,7 @@ import os
 import numpy as np
 import numpy.testing as nptest
 
-from tesseract_robotics import (
+from tesseract import (
     tesseract_common,
     tesseract_kinematics,
     tesseract_state_solver,
@@ -21,11 +21,8 @@ def get_scene_graph():
 
 
 def get_plugin_factory():
-    # Use _FilesystemPath (C++ binding) for KinematicsPluginFactory which needs fs::path
-    from tesseract_robotics.tesseract_common import _FilesystemPath
-
     support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
-    kin_config = _FilesystemPath(support_dir + "/urdf/" + "abb_irb2400_plugins.yaml")
+    kin_config = support_dir + "/urdf/" + "abb_irb2400_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_kinematics.KinematicsPluginFactory(kin_config, locator), locator
 

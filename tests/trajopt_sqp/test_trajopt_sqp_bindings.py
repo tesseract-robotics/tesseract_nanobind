@@ -14,14 +14,13 @@ Updated for 0.34 API:
 import numpy as np
 import pytest
 
-from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract import trajopt_ifopt as ti
+from tesseract import trajopt_sqp as tsqp
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract.tesseract_environment import Environment
 
 
 def _make_nodes_variables(joint_names, joint_limits, initial_states, name="trajectory"):
@@ -54,16 +53,12 @@ def _make_problem(nodes_variables, vars_list, joint_names, constraints=None, cos
 def kuka_setup():
     """Load KUKA IIWA robot environment."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
-        locator.locateResource(
-            "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
-        ).getFilePath()
-    )
-    srdf_path = FilesystemPath(
-        locator.locateResource(
-            "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
-        ).getFilePath()
-    )
+    urdf_path = locator.locateResource(
+        "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
+    ).getFilePath()
+    srdf_path = locator.locateResource(
+        "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
+    ).getFilePath()
 
     env = Environment()
     assert env.init(urdf_path, srdf_path, locator)
@@ -624,7 +619,7 @@ class TestContinuousCollisionBindings:
 
     def test_lvs_discrete_collision_evaluator(self, kuka_setup):
         """Test LVSDiscreteCollisionEvaluator creation (0.34: no cache)."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract.tesseract_collision import CollisionEvaluatorType
 
         env, manip, joint_names, _ = kuka_setup
 
@@ -637,7 +632,7 @@ class TestContinuousCollisionBindings:
 
     def test_lvs_continuous_collision_evaluator(self, kuka_setup):
         """Test LVSContinuousCollisionEvaluator creation (0.34: no cache)."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract.tesseract_collision import CollisionEvaluatorType
 
         env, manip, joint_names, _ = kuka_setup
 
@@ -649,7 +644,7 @@ class TestContinuousCollisionBindings:
 
     def test_continuous_collision_constraint(self, kuka_setup):
         """Test ContinuousCollisionConstraint creation."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract.tesseract_collision import CollisionEvaluatorType
 
         env, manip, joint_names, joint_limits = kuka_setup
 
@@ -670,7 +665,7 @@ class TestContinuousCollisionBindings:
 
     def test_continuous_vs_discrete_evaluator_types(self, kuka_setup):
         """Test that continuous evaluators inherit from correct base."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract.tesseract_collision import CollisionEvaluatorType
 
         env, manip, _, _ = kuka_setup
 

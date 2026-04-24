@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse
 
-from tesseract_robotics.trajopt_ifopt import (
+from tesseract.trajopt_ifopt import (
     Bounds,
     ConstraintSet,
     createNodesVariables,
@@ -217,7 +217,7 @@ class TestConstraintSetInIfoptProblem:
 
     def test_add_constraint_to_nlp(self):
         """Python constraint can be added as constraint set."""
-        from tesseract_robotics.trajopt_sqp import IfoptProblem
+        from tesseract.trajopt_sqp import IfoptProblem
 
         nodes = _make_nodes_variables(3, 2)
         nlp = IfoptProblem(nodes)
@@ -226,7 +226,7 @@ class TestConstraintSetInIfoptProblem:
 
     def test_add_cost_to_nlp(self):
         """Python constraint can be added as cost set."""
-        from tesseract_robotics.trajopt_sqp import IfoptProblem
+        from tesseract.trajopt_sqp import IfoptProblem
 
         nodes = _make_nodes_variables(3, 2)
         nlp = IfoptProblem(nodes)
@@ -235,7 +235,7 @@ class TestConstraintSetInIfoptProblem:
 
     def test_constraint_and_cost_together(self):
         """Both constraint and cost can coexist on same problem."""
-        from tesseract_robotics.trajopt_sqp import IfoptProblem
+        from tesseract.trajopt_sqp import IfoptProblem
 
         nodes = _make_nodes_variables(3, 2)
         nlp = IfoptProblem(nodes)

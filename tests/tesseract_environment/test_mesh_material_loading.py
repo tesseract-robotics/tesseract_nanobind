@@ -1,6 +1,6 @@
 import numpy.testing as nptest
 
-from tesseract_robotics import tesseract_urdf
+from tesseract import tesseract_urdf
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 

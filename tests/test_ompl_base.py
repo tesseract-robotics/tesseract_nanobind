@@ -7,14 +7,14 @@ class TestRealVectorBounds:
     """Tests for RealVectorBounds."""
 
     def test_constructor(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds
+        from ompl.base import RealVectorBounds
 
         bounds = RealVectorBounds(2)
         assert len(bounds.low) == 2
         assert len(bounds.high) == 2
 
     def test_setLow_setHigh_all(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds
+        from ompl.base import RealVectorBounds
 
         bounds = RealVectorBounds(3)
         bounds.setLow(-5.0)
@@ -24,7 +24,7 @@ class TestRealVectorBounds:
         assert all(v == 10.0 for v in bounds.high)
 
     def test_setLow_setHigh_indexed(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds
+        from ompl.base import RealVectorBounds
 
         bounds = RealVectorBounds(2)
         bounds.setLow(0, -1.0)
@@ -38,7 +38,7 @@ class TestRealVectorBounds:
         assert bounds.high[1] == 4.0
 
     def test_getVolume(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds
+        from ompl.base import RealVectorBounds
 
         bounds = RealVectorBounds(2)
         bounds.setLow(-1.0)
@@ -47,7 +47,7 @@ class TestRealVectorBounds:
         assert abs(bounds.getVolume() - 4.0) < 1e-9
 
     def test_getDifference(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds
+        from ompl.base import RealVectorBounds
 
         bounds = RealVectorBounds(2)
         bounds.setLow(0, 0.0)
@@ -64,7 +64,7 @@ class TestSE2StateSpace:
     """Tests for SE2StateSpace."""
 
     def test_alloc_free_state(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, SE2StateSpace
+        from ompl.base import RealVectorBounds, SE2StateSpace
 
         ss = SE2StateSpace()
         bounds = RealVectorBounds(2)
@@ -77,7 +77,7 @@ class TestSE2StateSpace:
         ss.freeState(state)
 
     def test_state_getters_setters(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, SE2StateSpace
+        from ompl.base import RealVectorBounds, SE2StateSpace
 
         ss = SE2StateSpace()
         bounds = RealVectorBounds(2)
@@ -99,7 +99,7 @@ class TestSE2StateSpace:
         ss.freeState(state)
 
     def test_setXY(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, SE2StateSpace
+        from ompl.base import RealVectorBounds, SE2StateSpace
 
         ss = SE2StateSpace()
         bounds = RealVectorBounds(2)
@@ -117,7 +117,7 @@ class TestSE2StateSpace:
         ss.freeState(state)
 
     def test_distance(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, SE2StateSpace
+        from ompl.base import RealVectorBounds, SE2StateSpace
 
         ss = SE2StateSpace()
         bounds = RealVectorBounds(2)
@@ -142,7 +142,7 @@ class TestSE2StateSpace:
         ss.freeState(s2)
 
     def test_interpolate(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, SE2StateSpace
+        from ompl.base import RealVectorBounds, SE2StateSpace
 
         ss = SE2StateSpace()
         bounds = RealVectorBounds(2)
@@ -174,19 +174,19 @@ class TestReedsSheppStateSpace:
     """Tests for ReedsSheppStateSpace."""
 
     def test_constructor_default(self):
-        from tesseract_robotics.ompl_base import ReedsSheppStateSpace
+        from ompl.base import ReedsSheppStateSpace
 
         rs = ReedsSheppStateSpace()  # default turningRadius=1.0
         assert rs is not None
 
     def test_constructor_custom_radius(self):
-        from tesseract_robotics.ompl_base import ReedsSheppStateSpace
+        from ompl.base import ReedsSheppStateSpace
 
         rs = ReedsSheppStateSpace(turningRadius=2.5)
         assert rs is not None
 
     def test_reedsShepp_path(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, ReedsSheppStateSpace
+        from ompl.base import RealVectorBounds, ReedsSheppStateSpace
 
         rs = ReedsSheppStateSpace(turningRadius=1.0)
         bounds = RealVectorBounds(2)
@@ -214,7 +214,7 @@ class TestReedsSheppStateSpace:
         rs.freeState(s2)
 
     def test_reedsShepp_turn(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, ReedsSheppStateSpace
+        from ompl.base import RealVectorBounds, ReedsSheppStateSpace
 
         rs = ReedsSheppStateSpace(turningRadius=1.0)
         bounds = RealVectorBounds(2)
@@ -243,7 +243,7 @@ class TestReedsSheppStateSpace:
         rs.freeState(s2)
 
     def test_distance_equals_path_length(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, ReedsSheppStateSpace
+        from ompl.base import RealVectorBounds, ReedsSheppStateSpace
 
         rs = ReedsSheppStateSpace(turningRadius=1.5)
         bounds = RealVectorBounds(2)
@@ -272,7 +272,7 @@ class TestReedsSheppStateSpace:
         rs.freeState(s2)
 
     def test_interpolate(self):
-        from tesseract_robotics.ompl_base import RealVectorBounds, ReedsSheppStateSpace
+        from ompl.base import RealVectorBounds, ReedsSheppStateSpace
 
         rs = ReedsSheppStateSpace(turningRadius=1.0)
         bounds = RealVectorBounds(2)
@@ -306,7 +306,7 @@ class TestReedsSheppStateSpace:
         rs.freeState(interp)
 
     def test_path_segment_types(self):
-        from tesseract_robotics.ompl_base import ReedsSheppPathSegmentType
+        from ompl.base import ReedsSheppPathSegmentType
 
         # Verify enum values exist and are distinct
         types = [
@@ -323,26 +323,26 @@ class TestDubinsStateSpace:
     """Tests for DubinsStateSpace."""
 
     def test_constructor_default(self):
-        from tesseract_robotics.ompl_base import DubinsStateSpace
+        from ompl.base import DubinsStateSpace
 
         dubins = DubinsStateSpace()
         assert dubins is not None
 
     def test_constructor_custom(self):
-        from tesseract_robotics.ompl_base import DubinsStateSpace
+        from ompl.base import DubinsStateSpace
 
         dubins = DubinsStateSpace(turningRadius=2.0, isSymmetric=True)
         assert dubins is not None
 
     def test_isMetricSpace(self):
-        from tesseract_robotics.ompl_base import DubinsStateSpace
+        from ompl.base import DubinsStateSpace
 
         dubins = DubinsStateSpace()
         # Dubins distance is NOT a proper metric
         assert dubins.isMetricSpace() is False
 
     def test_dubins_path(self):
-        from tesseract_robotics.ompl_base import DubinsStateSpace, RealVectorBounds
+        from ompl.base import DubinsStateSpace, RealVectorBounds
 
         dubins = DubinsStateSpace(turningRadius=1.0)
         bounds = RealVectorBounds(2)
@@ -368,7 +368,7 @@ class TestDubinsStateSpace:
         dubins.freeState(s2)
 
     def test_dubins_turn(self):
-        from tesseract_robotics.ompl_base import DubinsStateSpace, RealVectorBounds
+        from ompl.base import DubinsStateSpace, RealVectorBounds
 
         dubins = DubinsStateSpace(turningRadius=1.0)
         bounds = RealVectorBounds(2)
@@ -395,7 +395,7 @@ class TestDubinsStateSpace:
         dubins.freeState(s2)
 
     def test_path_segment_types(self):
-        from tesseract_robotics.ompl_base import DubinsPathSegmentType
+        from ompl.base import DubinsPathSegmentType
 
         # Verify enum values exist and are distinct
         types = [
@@ -411,7 +411,7 @@ class TestReedsSheppVsDubins:
     """Compare Reeds-Shepp and Dubins for the same problem."""
 
     def test_reeds_shepp_shorter_when_reverse_helps(self):
-        from tesseract_robotics.ompl_base import (
+        from ompl.base import (
             DubinsStateSpace,
             RealVectorBounds,
             ReedsSheppStateSpace,

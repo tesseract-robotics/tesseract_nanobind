@@ -1,7 +1,7 @@
 import os
 
 import tesseract_robotics  # noqa: F401 - triggers env var setup
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract.tesseract_common import GeneralResourceLocator
 
 
 def TesseractSupportResourceLocator():

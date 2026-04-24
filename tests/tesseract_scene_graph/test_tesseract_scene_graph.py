@@ -2,8 +2,8 @@ import os
 
 import numpy as np
 
-import tesseract_robotics.tesseract_scene_graph as sg
-from tesseract_robotics import tesseract_common, tesseract_srdf
+import tesseract.tesseract_scene_graph as sg
+from tesseract import tesseract_common, tesseract_srdf
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
