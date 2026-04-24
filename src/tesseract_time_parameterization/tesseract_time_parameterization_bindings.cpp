@@ -14,6 +14,8 @@
 #include <tesseract_time_parameterization/totg/time_optimal_trajectory_generation_profiles.h>
 #include <tesseract_time_parameterization/isp/iterative_spline_parameterization.h>
 #include <tesseract_time_parameterization/isp/iterative_spline_parameterization_profiles.h>
+#include <tesseract_time_parameterization/kdl/constant_tcp_speed_parameterization.h>
+#include <tesseract_time_parameterization/kdl/constant_tcp_speed_parameterization_profiles.h>
 
 // tesseract_command_language
 #include <tesseract_command_language/composite_instruction.h>
@@ -93,4 +95,25 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     // ========== IterativeSplineParameterization ==========
     nb::class_<tp::IterativeSplineParameterization, tp::TimeParameterization>(m, "IterativeSplineParameterization")
         .def(nb::init<std::string>(), "name"_a = "ISP");
+
+    // ========== ConstantTCPSpeedParameterizationCompositeProfile ==========
+    nb::class_<tp::ConstantTCPSpeedParameterizationCompositeProfile, tc::Profile>(m, "ConstantTCPSpeedCompositeProfile")
+        .def(nb::init<>())
+        .def(nb::init<double, double, double, double, double, double>(),
+             "max_translational_velocity"_a,
+             "max_rotational_velocity"_a,
+             "max_translational_acceleration"_a,
+             "max_rotational_acceleration"_a,
+             "max_velocity_scaling_factor"_a = 1.0,
+             "max_acceleration_scaling_factor"_a = 1.0)
+        .def_rw("max_translational_velocity", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_translational_velocity)
+        .def_rw("max_rotational_velocity", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_velocity)
+        .def_rw("max_translational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_translational_acceleration)
+        .def_rw("max_rotational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_acceleration)
+        .def_rw("max_velocity_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_velocity_scaling_factor)
+        .def_rw("max_acceleration_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_acceleration_scaling_factor);
+
+    // ========== ConstantTCPSpeedParameterization ==========
+    nb::class_<tp::ConstantTCPSpeedParameterization, tp::TimeParameterization>(m, "ConstantTCPSpeedParameterization")
+        .def(nb::init<std::string>(), "name"_a = "ConstantTCPSpeed");
 }

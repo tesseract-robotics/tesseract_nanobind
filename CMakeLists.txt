@@ -346,6 +346,7 @@ add_tesseract_nanobind_extension(
   src/tesseract_time_parameterization/tesseract_time_parameterization_bindings.cpp
   tesseract::tesseract_time_parameterization_isp
   tesseract::tesseract_time_parameterization_totg
+  tesseract::tesseract_time_parameterization_kdl
   tesseract::tesseract_time_parameterization_core
   tesseract::tesseract_command_language
   tesseract::tesseract_common
