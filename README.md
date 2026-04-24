@@ -91,6 +91,8 @@ See the `examples/` directory for:
 
 Version follows `0.A.B.C` where `A.B` tracks the upstream [Tesseract](https://github.com/tesseract-robotics/tesseract) release and `C` is the nanobind patch number. For example, `0.34.1.0` wraps Tesseract `0.34.1`.
 
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
 ## Development
 
 This project uses [pixi](https://pixi.sh) exclusively for dependency management and task running — no pip, conda, or venv needed. Pixi manages both the C++ toolchain (cmake, eigen, boost, bullet, ompl, ...) and Python deps in a single lockfile.
