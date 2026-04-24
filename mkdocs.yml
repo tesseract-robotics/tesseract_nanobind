@@ -137,6 +137,7 @@ nav:
     - Task Composer: user-guide/task-composer.md
     - Serialization: user-guide/serialization.md
     - Low-Level SQP API: user-guide/low-level-sqp.md
+    - Viewer: user-guide/viewer.md
   - Examples:
     - examples/index.md
     - Basic Examples: examples/basic.md
