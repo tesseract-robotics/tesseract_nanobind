@@ -6,6 +6,20 @@ name: Build & Test (Windows pixi)
 # wheels-windows.yml.
 
 on:
+  # During pixi evaluation, trigger on this branch + dispatch. Once promoted
+  # to canonical (replacing wheels-windows.yml), broaden to main + tags + PRs.
+  push:
+    branches:
+      - 'gh-40-windows-build'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
+      - '.github/workflows/wheels-macos.yml'
+      - '.github/workflows/wheels-windows.yml'
+      - '.github/workflows/vcpkg_triplets/**'
   workflow_dispatch:
 
 concurrency:
