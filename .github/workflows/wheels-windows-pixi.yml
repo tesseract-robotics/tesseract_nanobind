@@ -185,18 +185,21 @@ jobs:
         CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1 /bigobj"
       run: |
         CONDA_LIB="$CONDA_PREFIX/Library"
-        # tesseract_common's exported CMake config (tesseract_commonTargets.cmake)
-        # emits INTERFACE_LINK_LIBRARIES "yaml-cpp" — a BARE name, not the modern
-        # namespaced target "yaml-cpp::yaml-cpp" that conda-forge's yaml-cpp
-        # exports. MSBuild's link.exe then tries to find bare yaml-cpp.lib on
-        # the library search path and fails. Side-step by dropping yaml-cpp.lib
-        # directly into ws/install/lib (same dir as tesseract_common.lib) so the
-        # bare-name linker search hits it. Upstream fix would patch tesseract's
-        # target_link_libraries(... yaml-cpp) → yaml-cpp::yaml-cpp.
-        cp "$CONDA_LIB/lib/yaml-cpp.lib" "$GITHUB_WORKSPACE/ws/install/lib/" || true
         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/ws/install;$CONDA_LIB"
         export PATH="$GITHUB_WORKSPACE/ws/install/bin:$CONDA_LIB/bin:$PATH"
-        export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+
+        # tesseract_common's exported CMake config has INTERFACE_LINK_LIBRARIES
+        # "yaml-cpp" (bare name, not yaml-cpp::yaml-cpp target). CMake passes
+        # bare "yaml-cpp" to MSBuild which turns it into yaml-cpp.lib on the
+        # linker's library search path. MSBuild's default search path does NOT
+        # include conda's Library/lib, so the lib isn't found. Inject the
+        # conda lib dir via CMAKE_{EXE,SHARED}_LINKER_FLAGS so MSBuild bakes
+        # /LIBPATH:... into every vcxproj it generates. Paths must be Windows-
+        # style for MSVC link.exe.
+        WIN_CONDA_LIB=$(cygpath -w "$CONDA_LIB/lib")
+        WIN_INSTALL_LIB=$(cygpath -w "$GITHUB_WORKSPACE/ws/install/lib")
+        LIBPATH_FLAGS="/LIBPATH:${WIN_CONDA_LIB} /LIBPATH:${WIN_INSTALL_LIB}"
+        export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_SHARED_LINKER_FLAGS=${LIBPATH_FLAGS} -DCMAKE_EXE_LINKER_FLAGS=${LIBPATH_FLAGS} -DCMAKE_MODULE_LINKER_FLAGS=${LIBPATH_FLAGS}"
         pip wheel . -w dist/ --no-build-isolation
 
     - name: bundle plugins then delvewheel repair
