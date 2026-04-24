@@ -38,32 +38,36 @@ response = planner.solve(request)
 
 ### OMPLRealVectorPlanProfile
 
-Configure OMPL planning behavior.
+Configure OMPL planning behavior. The profile has three sub-configs:
+`solver_config`, `collision_check_config`, and `contact_manager_config`.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorPlanProfile
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    OMPLRealVectorPlanProfile, RRTConnectConfigurator,
+)
 
 profile = OMPLRealVectorPlanProfile()
 
-# Planning time
-profile.planning_time = 5.0  # seconds
+# Solver settings
+profile.solver_config.planning_time = 5.0   # seconds
+profile.solver_config.simplify = True       # simplify path after planning
+profile.solver_config.optimize = True       # run path optimization
 
-# Simplification
-profile.simplify = True
+# Add planner configurator(s)
+profile.solver_config.addPlanner(RRTConnectConfigurator())
 
-# State validation resolution
+# State-validation resolution (for collision checking)
 profile.collision_check_config.longest_valid_segment_length = 0.01
-
-# Add planner configurator
-profile.planners = [RRTConnectConfigurator()]
 ```
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `planning_time` | `float` | 5.0 | Max planning time (seconds) |
-| `simplify` | `bool` | True | Simplify path after planning |
-| `optimize` | `bool` | True | Run path optimization |
-| `planners` | `list` | `[RRTConnect]` | Planner configurators |
+| Attribute | Config | Description |
+|---|---|---|
+| `solver_config.planning_time` | solver | Max planning time (seconds) |
+| `solver_config.simplify` | solver | Simplify path after planning |
+| `solver_config.optimize` | solver | Run path optimization |
+| `solver_config.max_solutions` | solver | Cap on returned paths |
+| `collision_check_config.longest_valid_segment_length` | collision | State-validation resolution |
+| `collision_check_config.type` | collision | `CollisionEvaluatorType` (discrete vs continuous) |
 
 ## Planner Configurators
 
@@ -77,7 +81,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import RRTConnectConfigur
 config = RRTConnectConfigurator()
 config.range = 0.0  # 0 = auto
 
-profile.planners = [config]
+profile.solver_config.addPlanner(config)
 ```
 
 ### RRTstarConfigurator
@@ -91,7 +95,7 @@ config = RRTstarConfigurator()
 config.range = 0.0
 config.goal_bias = 0.05
 
-profile.planners = [config]
+profile.solver_config.addPlanner(config)
 ```
 
 ### SBLConfigurator
@@ -104,7 +108,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import SBLConfigurator
 config = SBLConfigurator()
 config.range = 0.0
 
-profile.planners = [config]
+profile.solver_config.addPlanner(config)
 ```
 
 ## OMPLPlannerType
@@ -134,12 +138,12 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
 
 # Create profile
 profile = OMPLRealVectorPlanProfile()
-profile.planning_time = 10.0
-profile.planners = [RRTConnectConfigurator()]
+profile.solver_config.planning_time = 10.0
+profile.solver_config.addPlanner(RRTConnectConfigurator())
 
-# Add to dictionary
+# Add to dictionary (dict, namespace, profile_name, profile)
 profiles = ProfileDictionary()
-ProfileDictionary_addOMPLProfile(profiles, "DEFAULT", profile)
+ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", profile)
 
 # Use with planner request
 request.profiles = profiles
@@ -157,12 +161,12 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
 # Configure OMPL profile
 profile = OMPLRealVectorPlanProfile()
-profile.planning_time = 5.0
-profile.simplify = True
-profile.planners = [RRTConnectConfigurator()]
+profile.solver_config.planning_time = 5.0
+profile.solver_config.simplify = True
+profile.solver_config.addPlanner(RRTConnectConfigurator())
 
 profiles = ProfileDictionary()
-ProfileDictionary_addOMPLProfile(profiles, "DEFAULT", profile)
+ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", profile)
 
 # Create request
 request = PlannerRequest()

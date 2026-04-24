@@ -12,12 +12,18 @@ from tesseract_robotics.tesseract_environment import Environment
 # Create empty environment
 env = Environment()
 
-# Initialize from URDF/SRDF
-env.init(urdf_string, srdf_string, locator)
+# From URDF + SRDF paths (+ ResourceLocator for mesh resolution)
+env.init(urdf_path, srdf_path, locator)
 
-# Or use Robot helper
+# Or from raw XML strings
+env.initFromUrdfSrdf(urdf_xml, srdf_xml, locator)
+
+# Or use the high-level Robot helper (takes BOTH URDF and SRDF)
 from tesseract_robotics.planning import Robot
-robot = Robot.from_urdf("robot.urdf", "robot.srdf")
+robot = Robot.from_urdf(
+    "package://my_robot/urdf/robot.urdf",
+    "package://my_robot/urdf/robot.srdf",
+)
 env = robot.env
 ```
 
@@ -41,10 +47,9 @@ joint = env.getJoint("joint_1")
 state = env.getState()
 joint_positions = state.joints
 
-# Set joint state
-env.setState(["joint_1", "joint_2"], [0.5, -0.3])
-# Or with dict
-env.setState({"joint_1": 0.5, "joint_2": -0.3})
+# Set joint state — two overloads
+env.setState({"joint_1": 0.5, "joint_2": -0.3})          # dict form
+env.setState(["joint_1", "joint_2"], np.array([0.5, -0.3]))  # names + values
 
 # Get link transform
 tcp = env.getLinkTransform("tool0")
@@ -93,7 +98,7 @@ Add a new link to the scene.
 
 ```python
 from tesseract_robotics.tesseract_environment import AddLinkCommand
-from tesseract_robotics.tesseract_scene_graph import Link, Joint
+from tesseract_robotics.tesseract_scene_graph import Link, Joint, JointType
 
 link = Link("obstacle")
 # ... configure link with visual/collision
@@ -136,9 +141,12 @@ Change a joint's transform.
 
 ```python
 from tesseract_robotics.tesseract_environment import ChangeJointOriginCommand
+from tesseract_robotics.tesseract_common import Isometry3d
+import numpy as np
 
-new_origin = Isometry3d.Identity()
-new_origin.translate([0.1, 0, 0])
+mat = np.eye(4)
+mat[:3, 3] = [0.1, 0, 0]
+new_origin = Isometry3d(mat)
 
 cmd = ChangeJointOriginCommand("obstacle_joint", new_origin)
 env.applyCommand(cmd)
@@ -203,12 +211,18 @@ Update collision margins.
 
 ```python
 from tesseract_robotics.tesseract_environment import ChangeCollisionMarginsCommand
-from tesseract_robotics.tesseract_common import CollisionMarginData
 
-margins = CollisionMarginData()
-margins.setDefaultCollisionMargin(0.05)
+# Simplified 0.34 constructor — just pass the new default margin
+cmd = ChangeCollisionMarginsCommand(0.05)
+env.applyCommand(cmd)
 
-cmd = ChangeCollisionMarginsCommand(margins)
+# Or override per-pair margins via CollisionMarginPairData
+from tesseract_robotics.tesseract_common import (
+    CollisionMarginPairData, CollisionMarginPairOverrideType
+)
+pair_data = CollisionMarginPairData()
+pair_data.setCollisionMargin("link_a", "link_b", 0.1)
+cmd = ChangeCollisionMarginsCommand(pair_data, CollisionMarginPairOverrideType.REPLACE)
 env.applyCommand(cmd)
 ```
 

@@ -6,7 +6,7 @@ Common types, utilities, and resource handling.
 
 ### Isometry3d
 
-Rigid body transformation (rotation + translation).
+Eigen rigid-body transform (rotation + translation). Raw C++ binding.
 
 ```python
 from tesseract_robotics.tesseract_common import Isometry3d
@@ -15,36 +15,54 @@ import numpy as np
 # Identity transform
 pose = Isometry3d.Identity()
 
-# From 4x4 matrix
+# From a 4x4 matrix
 mat = np.eye(4)
 mat[:3, 3] = [0.5, 0.2, 0.3]
 pose = Isometry3d(mat)
 
-# Access components
+# Access components (translation() / rotation() / matrix() are METHODS)
 position = pose.translation()  # np.array([x, y, z])
 rotation = pose.rotation()     # 3x3 rotation matrix
 matrix = pose.matrix()         # 4x4 homogeneous matrix
 
-# Transform operations
-pose.translate([0.1, 0, 0])    # translate in place
-pose.rotate(rotation_matrix)   # rotate in place
-combined = pose1 * pose2       # compose transforms
+# Compose
+combined = pose1 * pose2
 ```
+
+!!! tip "Prefer `planning.Pose` for authoring"
+    For building/serializing transforms in Python, use
+    `tesseract_robotics.planning.Pose` — it accepts scalar-last quaternions
+    (`qx, qy, qz, qw`, matching scipy's `Rotation.as_quat()`) and offers
+    `from_xyz_quat`, `from_rpy`, etc. Convert to an `Isometry3d` when calling
+    the raw C++ API.
+
+    ```python
+    from tesseract_robotics.planning import Pose
+    pose = Pose.from_xyz_quat(0.5, 0.2, 0.3, 0, 0, 0, 1)
+    iso = Isometry3d(pose.matrix)
+    ```
 
 ### Quaterniond
 
-Quaternion rotation (w, x, y, z).
+Eigen quaternion, **scalar-first** (`w, x, y, z`) — matches Eigen's C++
+convention.
 
 ```python
 from tesseract_robotics.tesseract_common import Quaterniond
 
-q = Quaterniond(w=1.0, x=0.0, y=0.0, z=0.0)  # identity
-q = Quaterniond.Identity()
+q = Quaterniond(1.0, 0.0, 0.0, 0.0)  # identity: w, x, y, z
 
 # Access
 print(f"w={q.w()}, x={q.x()}, y={q.y()}, z={q.z()}")
 rotation_matrix = q.toRotationMatrix()
 ```
+
+!!! warning "Quaternion conventions differ"
+    - `Quaterniond` (raw Eigen) is **scalar-first** (`w, x, y, z`).
+    - `planning.Pose.quaternion` is **scalar-last** (`qx, qy, qz, qw`),
+      matching scipy.
+
+    Reorder components when crossing the boundary.
 
 ### AngleAxisd
 

@@ -26,9 +26,10 @@ link = graph.getLink("base_link")
 joint = graph.getJoint("joint_1")
 
 # Kinematic queries
-children = graph.getChildren("base_link")
-parent = graph.getParent("tool0")
+child_joints = graph.getJointChildrenNames("base_link")
+child_links = graph.getLinkChildrenNames("base_link")
 path = graph.getShortestPath("base_link", "tool0")
+root = graph.getRoot()
 ```
 
 ## Link

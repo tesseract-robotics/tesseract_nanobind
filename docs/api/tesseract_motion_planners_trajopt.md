@@ -59,8 +59,9 @@ profile.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 2
 profile.cartesian_cost_config.enabled = True
 profile.cartesian_cost_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 2.0])
 
-# Joint waypoint config (uses joint_cost_config / joint_*_config too)
-# (availability depends on profile subtype; see source for current attributes)
+# Joint waypoint config
+profile.joint_constraint_config.enabled = True
+profile.joint_constraint_config.coeff = np.ones(6)  # weight per joint
 ```
 
 ### TrajOptDefaultCompositeProfile
@@ -73,10 +74,10 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 profile = TrajOptDefaultCompositeProfile()
 
-# Collision avoidance (0.33 API: TrajOptCollisionConfig)
+# Collision avoidance — collision_*_config is a TrajOptCollisionConfig
 profile.collision_cost_config.enabled = True
-profile.collision_cost_config.collision_margin_buffer = 0.025  # was safety_margin
-profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)  # was .coeff
+profile.collision_cost_config.collision_margin_buffer = 0.025
+profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
 profile.collision_constraint_config.enabled = False  # use cost, not constraint
@@ -90,11 +91,12 @@ profile.velocity_coeff = np.ones(6)
 profile.acceleration_coeff = np.ones(6)
 ```
 
-## Collision Configuration (0.33 API)
+## Collision Configuration
 
 ### TrajOptCollisionConfig
 
-Replaces the old `CollisionCostConfig` and `CollisionConstraintConfig`.
+Replaces the 0.33 `CollisionCostConfig` / `CollisionConstraintConfig`.
+See [changes](../changes.md) for the full migration notes.
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
@@ -111,13 +113,15 @@ config.collision_check_config.longest_valid_segment_length = 0.05  # for LVS mod
 ### CollisionEvaluatorType
 
 !!! note "Module Location"
-    `CollisionEvaluatorType` moved to `tesseract_collision` in 0.33 API.
+    `CollisionEvaluatorType` lives in
+    `tesseract_robotics.tesseract_collision` (re-exported from the TrajOpt
+    module for convenience).
 
 | Type | Description | Speed |
 |------|-------------|-------|
-| `DISCRETE` | Check at waypoints only (was `SINGLE_TIMESTEP`) | Fast |
-| `LVS_DISCRETE` | Interpolate between waypoints | Medium |
-| `LVS_CONTINUOUS` | Swept volume check (was `DISCRETE_CONTINUOUS`) | Slow |
+| `DISCRETE` | Check at waypoints only | Fast |
+| `LVS_DISCRETE` | Interpolate between waypoints, discrete checks | Medium |
+| `LVS_CONTINUOUS` | Swept volume check, LVS interpolation | Slow |
 | `CONTINUOUS` | Full continuous collision | Slowest |
 
 ## Waypoint Configurations
@@ -188,7 +192,7 @@ from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 import numpy as np
 
-# Configure profiles (0.33 API)
+# Configure profiles
 plan_profile = TrajOptDefaultPlanProfile()
 plan_profile.cartesian_constraint_config.enabled = True
 plan_profile.cartesian_constraint_config.coeff = np.array([10, 10, 10, 5, 5, 5])

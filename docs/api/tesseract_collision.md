@@ -20,7 +20,8 @@ my_manager = manager.clone()
 # Set collision objects state
 my_manager.setCollisionObjectsTransform(link_transforms)
 
-# Run collision check
+# Run collision check — fills ContactResultMap
+result_map = ContactResultMap()
 my_manager.contactTest(result_map, request)
 ```
 
@@ -44,6 +45,7 @@ my_manager.setCollisionObjectsTransform(
 )
 
 # Run continuous collision check
+result_map = ContactResultMap()
 my_manager.contactTest(result_map, request)
 ```
 
@@ -79,16 +81,19 @@ request.type = ContactTestType.LIMITED  # up to max contacts
 Single contact between two objects.
 
 ```python
-from tesseract_robotics.tesseract_collision import ContactResult
+from tesseract_robotics.tesseract_collision import ContactResult, ContactResultVector
 
-# After contactTest()
-for key, results in result_map.items():
-    for contact in results:
-        print(f"Contact: {contact.link_names[0]} <-> {contact.link_names[1]}")
-        print(f"  Distance: {contact.distance}")
-        print(f"  Point A: {contact.nearest_points[0]}")
-        print(f"  Point B: {contact.nearest_points[1]}")
-        print(f"  Normal: {contact.normal}")
+# ContactResultMap is a nested map (link_a → link_b → list[ContactResult]).
+# Flatten it to iterate individual contacts.
+result_vector = ContactResultVector()
+result_map.flattenMoveResults(result_vector)   # or flattenCopyResults()
+
+for contact in result_vector:
+    print(f"Contact: {contact.link_names[0]} <-> {contact.link_names[1]}")
+    print(f"  Distance: {contact.distance}")
+    print(f"  Point A: {contact.nearest_points[0]}")
+    print(f"  Point B: {contact.nearest_points[1]}")
+    print(f"  Normal: {contact.normal}")
 ```
 
 | Attribute | Type | Description |
@@ -101,7 +106,9 @@ for key, results in result_map.items():
 
 ### ContactResultMap
 
-Dictionary of contacts by link pair.
+Nested map: `link_a → link_b → list[ContactResult]`. Exposes `size()`,
+`empty()`, `count()`, `clear()`, `getSummary()`, and
+`flattenCopyResults()` / `flattenMoveResults()` for iteration.
 
 ```python
 from tesseract_robotics.tesseract_collision import ContactResultMap
@@ -109,22 +116,22 @@ from tesseract_robotics.tesseract_collision import ContactResultMap
 result_map = ContactResultMap()
 manager.contactTest(result_map, request)
 
-# Iterate results
-for pair_key, contacts in result_map.items():
-    print(f"Pair {pair_key}: {len(contacts)} contacts")
+print(f"{result_map.size()} contact pairs")
+print(result_map.getSummary())
 ```
 
 ### ContactResultVector
 
-List of contact results.
+Flat list of `ContactResult`. Use this for iteration.
 
 ```python
 from tesseract_robotics.tesseract_collision import ContactResultVector
 
-# Flatten all contacts
 all_contacts = ContactResultVector()
-for contacts in result_map.values():
-    all_contacts.extend(contacts)
+result_map.flattenMoveResults(all_contacts)   # or flattenCopyResults to keep map data
+
+for contact in all_contacts:
+    print(contact.distance, contact.link_names)
 ```
 
 ## Configuration
@@ -182,7 +189,7 @@ CollisionEvaluatorType.CONTINUOUS         # continuous
 
 ```python
 from tesseract_robotics.tesseract_collision import (
-    ContactRequest, ContactTestType, ContactResultMap
+    ContactRequest, ContactTestType, ContactResultMap, ContactResultVector
 )
 
 # Setup
@@ -191,7 +198,7 @@ request = ContactRequest()
 request.type = ContactTestType.ALL
 
 # Set state
-env.setState(joint_values)
+env.setState({"joint_1": 0.0, "joint_2": 0.0})
 state = env.getState()
 manager.setCollisionObjectsTransform(state.link_transforms)
 
@@ -200,12 +207,12 @@ results = ContactResultMap()
 manager.contactTest(results, request)
 
 # Process results
-is_collision = len(results) > 0
-if is_collision:
-    for contacts in results.values():
-        for c in contacts:
-            if c.distance < 0:
-                print(f"Penetration: {c.link_names} depth={-c.distance:.4f}")
+if not results.empty():
+    contacts = ContactResultVector()
+    results.flattenMoveResults(contacts)
+    for c in contacts:
+        if c.distance < 0:
+            print(f"Penetration: {c.link_names} depth={-c.distance:.4f}")
 ```
 
 ## Auto-generated API Reference

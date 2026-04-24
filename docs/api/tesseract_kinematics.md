@@ -58,49 +58,43 @@ print(f"TCP rotation:\n{tcp_pose.rotation()}")
 
 ## Inverse Kinematics
 
-Compute joint values for target pose.
+Compute joint values for a target pose. `calcInvKin` takes a `KinGroupIKInput`
+(not a raw `Isometry3d`) — it bundles the target pose with the tip link and
+working frame.
 
 ```python
 from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+import numpy as np
 
 manip = env.getKinematicGroup("manipulator")
 
-# Target pose
-target = Isometry3d.Identity()
-target.translate([0.5, 0.2, 0.3])
+# Build target
+mat = np.eye(4)
+mat[:3, 3] = [0.5, 0.2, 0.3]
+target_pose = Isometry3d(mat)
 
-# Seed (initial guess)
+ik_input = KinGroupIKInput(target_pose, "base_link", "tool0")
 seed = np.zeros(6)
 
-# Solve IK
-solutions = manip.calcInvKin(target, seed)
+solutions = manip.calcInvKin(ik_input, seed)
 
 if solutions:
     print(f"Found {len(solutions)} solutions")
     best = solutions[0]
-    print(f"Solution: {best}")
 else:
     print("No IK solution found")
 ```
 
-### KinGroupIKInput
-
-Batch IK for multiple targets.
+### Batch IK — KinGroupIKInputs
 
 ```python
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
+from tesseract_robotics.tesseract_kinematics import KinGroupIKInputs
 
-# Single IK input
-ik_input = KinGroupIKInput()
-ik_input.pose = target_pose
-ik_input.tip_link_name = "tool0"
-ik_input.working_frame = "base_link"
-
-# Multiple inputs
 inputs = KinGroupIKInputs()
 inputs.append(ik_input)
+inputs.append(another_input)
 
-# Solve
 solutions = manip.calcInvKin(inputs, seed)
 ```
 
@@ -114,12 +108,12 @@ from tesseract_robotics.tesseract_kinematics import getRedundantSolutions
 # Initial solution
 solution = solutions[0]
 
-# Get redundant solutions (considering joint limits)
+# Get redundant solutions by adding ±2π to redundancy-capable joints
+# Signature: getRedundantSolutions(sol, limits[:, 0:2], redundancy_capable_joint_indices)
 redundant = getRedundantSolutions(
     solution,
-    limits.joint_limits[:, 0],  # lower
-    limits.joint_limits[:, 1],  # upper
-    np.array([2*np.pi] * 6)     # resolution
+    limits.joint_limits,       # N×2 matrix (lower, upper per joint)
+    [5],                       # redundant joint indices (e.g., last wrist joint)
 )
 ```
 
@@ -158,6 +152,8 @@ from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
 
 ```python
 from tesseract_robotics.planning import Robot
+from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
 import numpy as np
 
 # Load robot
@@ -169,12 +165,13 @@ joints = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 fk = manip.calcFwdKin(joints)
 current_pose = fk["tool0"]
 
-# Move 10cm in X
-target = Isometry3d(current_pose.matrix())
-target.translate([0.1, 0, 0])
+# Move 10cm in X — build a new 4x4 matrix
+mat = current_pose.matrix().copy()
+mat[0, 3] += 0.1
+target_pose = Isometry3d(mat)
 
 # Solve IK
-solutions = manip.calcInvKin(target, joints)
+solutions = manip.calcInvKin(KinGroupIKInput(target_pose, "base_link", "tool0"), joints)
 
 if solutions:
     # Verify solution
@@ -182,7 +179,7 @@ if solutions:
     check_pose = fk_check["tool0"]
 
     error = np.linalg.norm(
-        target.translation() - check_pose.translation()
+        target_pose.translation() - check_pose.translation()
     )
     print(f"Position error: {error:.6f} m")
 ```
