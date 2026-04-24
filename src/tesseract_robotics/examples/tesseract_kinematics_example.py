@@ -58,6 +58,7 @@ from tesseract_robotics.planning import Pose, Robot
 
 
 def main():
+    # --8<-- [start:fk_ik]
     # =========================================================================
     # STEP 1: Load Robot with Kinematic Solver
     # =========================================================================
@@ -107,6 +108,7 @@ def main():
     print(f"\nFound {len(ik_solutions)} solution(s)")
     for i, sol in enumerate(ik_solutions):
         print(f"Solution {i}: {sol}")
+    # --8<-- [end:fk_ik]
 
 
 if __name__ == "__main__":

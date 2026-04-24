@@ -142,6 +142,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     waypoints = [Pose.from_xyz_quat(x_const, y, z_const, *tool_quat) for y in y_values]
     print(f"Created {len(waypoints)} waypoints")
 
+    # --8<-- [start:build_program]
     # === BUILD MOTION PROGRAM ===
     # Raster structure (from C++ example):
     # - from_start: home -> first waypoint (freespace)
@@ -173,7 +174,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     program.move_to(StateTarget(home_pos, names=joint_names, profile="FREESPACE"))
 
     print(f"Created program with {len(program)} waypoints ({num_segments} segments)")
+    # --8<-- [end:build_program]
 
+    # --8<-- [start:plan]
     # === PLAN WITH TRAJOPT ===
     # TrajOpt optimizes the trajectory for smooth motion and collision avoidance
     print(f"\nRunning planner ({pipeline})...")
@@ -183,6 +186,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     assert result.successful, f"Planning failed: {result.message}"
     print(f"Planning successful! {len(result)} waypoints")
+    # --8<-- [end:plan]
 
     return {"result": result, "robot": robot, "joint_names": joint_names}
 

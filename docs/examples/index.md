@@ -34,55 +34,64 @@ Learn tesseract_robotics through working examples.
 
 ## Running Examples
 
-All examples are in the `examples/` directory:
+Examples install as console scripts via `[project.scripts]` in `pyproject.toml`.
+Once the package is installed (via `pip` or `pixi install`) they are on `PATH`:
 
 ```bash
 # Activate environment
 pixi shell
 
-# Run an example
-python examples/freespace_ompl_example.py
+# Run an example (installed console script)
+tesseract_freespace_ompl_example
+
+# Or via Python module invocation
+pixi run python -m tesseract_robotics.examples.freespace_ompl_example
 ```
+
+Every example module has both `main()` and `run()` entry points — `main()`
+handles optional viewer launch, `run()` returns results for testing / reuse.
 
 ## Example Index
 
 ### Basic
 
-| Example | Description |
-|---------|-------------|
-| `tesseract_kinematics_example.py` | FK/IK with joint groups |
-| `tesseract_collision_example.py` | Discrete collision checking |
-| `scene_graph_example.py` | Scene graph manipulation |
-| `geometry_showcase_example.py` | All geometry types |
+| Example | Console script | Description |
+|---------|----------------|-------------|
+| `tesseract_kinematics_example.py` | `tesseract_kinematics_example` | FK/IK with joint groups |
+| `tesseract_collision_example.py` | `tesseract_collision_example` | Discrete collision checking |
+| `scene_graph_example.py` | `tesseract_scene_graph_example` | Scene graph manipulation |
+| `geometry_showcase_example.py` | `tesseract_geometry_showcase_example` | All geometry types |
+| `reeds_shepp_example.py` | `tesseract_reeds_shepp_example` | Reeds-Shepp path for differential-drive |
 
 ### Planning
 
-| Example | Description |
-|---------|-------------|
-| `freespace_ompl_example.py` | OMPL freespace motion |
-| `basic_cartesian_example.py` | Cartesian path with TrajOpt |
-| `glass_upright_example.py` | Orientation constraints |
-| `pick_and_place_example.py` | Pick, attach, place workflow |
-| `car_seat_example.py` | Complex multi-step planning |
-| `raster_example.py` | Industrial raster patterns |
-| `puzzle_piece_auxillary_axes_example.py` | 9-DOF with external axis |
-| `freespace_hybrid_example.py` | OMPL + TrajOpt hybrid |
-| `chain_example.py` | Descartes + TrajOpt chaining |
+| Example | Console script | Description |
+|---------|----------------|-------------|
+| `freespace_ompl_example.py` | `tesseract_freespace_ompl_example` | OMPL freespace motion |
+| `basic_cartesian_example.py` | `tesseract_basic_cartesian_example` | Cartesian path with TrajOpt |
+| `glass_upright_example.py` | `tesseract_glass_upright_example` | Orientation constraints |
+| `pick_and_place_example.py` | `tesseract_pick_and_place_example` | Pick, attach, place workflow |
+| `car_seat_example.py` | `tesseract_car_seat_example` | Complex multi-step planning |
+| `raster_example.py` | `tesseract_raster_example` | Industrial raster patterns |
+| `puzzle_piece_auxillary_axes_example.py` | `tesseract_puzzle_piece_auxillary_axes_example` | 9-DOF with external axis |
+| `freespace_hybrid_example.py` | `tesseract_freespace_hybrid_example` | OMPL + TrajOpt hybrid |
+| `chain_example.py` | `tesseract_chain_example` | Descartes + TrajOpt chaining |
 
 ### Real-Time
 
-| Example | Description |
-|---------|-------------|
-| `online_planning_example.py` | TaskComposer replanning |
-| `online_planning_sqp_example.py` | Low-level SQP (73 Hz) |
+| Example | Console script | Description |
+|---------|----------------|-------------|
+| `online_planning_example.py` | `tesseract_online_planning_example` | TaskComposer replanning |
+| `online_planning_sqp_example.py` | `tesseract_online_planning_sqp_example` | Low-level SQP (73 Hz) |
 
 ### Visualization
 
-| Example | Description |
-|---------|-------------|
-| `shapes_viewer.py` | Basic shapes in viewer |
-| `tesseract_material_mesh_viewer.py` | Materials and meshes |
-| `abb_irb2400_viewer.py` | Robot visualization |
+| Example | Console script | Description |
+|---------|----------------|-------------|
+| `shapes_viewer.py` | `tesseract_shapes_viewer` | Basic shapes in viewer |
+| `tesseract_material_mesh_viewer.py` | `tesseract_material_mesh_viewer` | Materials and meshes |
+| `abb_irb2400_viewer.py` | `tesseract_abb_irb2400_viewer` | Robot visualization |
+| `twc_workcell_positioner_viewer.py` | `tesseract_twc_workcell_positioner_viewer` | Industrial workcell (positioner, requires submodule) |
 
 ## Prerequisites
 
@@ -96,7 +105,7 @@ import tesseract_robotics
 from tesseract_robotics.viewer import TesseractViewer
 ```
 
-Install the viewer:
+Install the package:
 
 ```bash
 pip install tesseract-robotics-nanobind
