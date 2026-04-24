@@ -38,7 +38,9 @@ pixi run python -m pytest tests/trajopt_sqp/test_trajopt_sqp_bindings.py -v
 pixi run python -m pytest --testmon
 
 # Run an example
-pixi run python examples/freespace_ompl_example.py
+pixi run tesseract_freespace_ompl_example
+# or
+pixi run python -m tesseract_robotics.examples.freespace_ompl_example
 
 # Interactive shell (all env vars set)
 pixi shell
@@ -152,7 +154,7 @@ graph TD
 
     subgraph "Python API"
         I[tesseract_robotics.planning]
-        J[Robot, Planner, Composer]
+        J[Robot, MotionProgram, TaskComposer,<br/>plan_freespace / plan_ompl / plan_cartesian]
     end
 
     A --> E

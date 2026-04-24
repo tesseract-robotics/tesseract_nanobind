@@ -1,8 +1,11 @@
-# TrajOpt IFOPT: Constraint Bindings Reference
+# Constraint Bindings Completion (0.34)
+
+All 4 C++ constraint classes now have Python bindings, completed during the 0.34 upgrade.
+This page remains as a historical record of which constraints landed and their use cases.
+
+Current bindings live in [`src/trajopt_ifopt/trajopt_ifopt_bindings.cpp`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/trajopt_ifopt/trajopt_ifopt_bindings.cpp).
 
 ## Summary
-
-All 4 C++ constraint classes now have Python bindings.
 
 | Constraint | Status | Complexity | Use Case |
 |-----------|--------|------------|----------|
@@ -24,9 +27,9 @@ All 4 C++ constraint classes now have Python bindings.
 **Constructor:**
 ```cpp
 JointJerkConstraint(
-    const Eigen::VectorXd& targets,                              // jerk targets per DOF
-    const std::vector<std::shared_ptr<const JointPosition>>& position_vars,  // 4+ consecutive waypoints
-    const Eigen::VectorXd& coeffs,                               // weights per DOF
+    const Eigen::VectorXd& targets,                          // jerk targets per DOF
+    const std::vector<std::shared_ptr<const Var>>& position_vars,  // 4+ consecutive waypoints
+    const Eigen::VectorXd& coeffs,                           // weights per DOF
     const std::string& name = "JointJerk"
 );
 ```
@@ -63,7 +66,7 @@ struct CartLineInfo {
 ```cpp
 CartLineConstraint(
     CartLineInfo info,
-    std::shared_ptr<const JointPosition> position_var,
+    std::shared_ptr<const Var> position_var,
     const Eigen::VectorXd& coeffs,
     const std::string& name = "CartLine"
 );
@@ -100,7 +103,7 @@ Eigen::Isometry3d GetLinePoint(
 ```cpp
 DiscreteCollisionNumericalConstraint(
     std::shared_ptr<DiscreteCollisionEvaluator> collision_evaluator,
-    std::shared_ptr<const JointPosition> position_var,
+    std::shared_ptr<const Var> position_var,
     int max_num_cnt = 1,
     bool fixed_sparsity = false,
     const std::string& name = "DiscreteCollisionNumerical"
@@ -139,8 +142,8 @@ struct InverseKinematicsInfo {
 InverseKinematicsConstraint(
     const Eigen::Isometry3d& target_pose,
     InverseKinematicsInfo::ConstPtr kinematic_info,
-    std::shared_ptr<const JointPosition> constraint_var,  // variable being constrained
-    std::shared_ptr<const JointPosition> seed_var,        // seed for IK (usually adjacent waypoint)
+    std::shared_ptr<const Var> constraint_var,  // variable being constrained
+    std::shared_ptr<const Var> seed_var,        // seed for IK (usually adjacent waypoint)
     const std::string& name = "InverseKinematics"
 );
 ```
