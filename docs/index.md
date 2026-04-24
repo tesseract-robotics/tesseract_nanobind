@@ -18,8 +18,9 @@ Python bindings for the Tesseract Motion Planning Framework.
 graph TB
     subgraph high["High-Level API"]
         Robot["Robot"]
-        Planner["Planner"]
-        Composer["Composer"]
+        MP["MotionProgram"]
+        PF["plan_freespace / plan_ompl / plan_cartesian"]
+        TC["TaskComposer"]
     end
 
     subgraph low["Low-Level Modules"]
@@ -34,47 +35,47 @@ graph TB
     subgraph sqp["SQP (Real-time Optimization)"]
         tsqp["trajopt_sqp"]
         tifopt["trajopt_ifopt"]
-        ifopt["ifopt"]
     end
 
     Robot --> env
     Robot --> kin
-    Planner --> mp
-    Composer --> tc
+    MP --> cmd
+    PF --> mp
+    TC --> tc
     mp --> tsqp
     tc --> tsqp
     tsqp --> tifopt
-    tifopt --> ifopt
 ```
 
 ## Quick Example
 
 ```python
-from tesseract_robotics.planning import Robot
 import numpy as np
+from tesseract_robotics.planning import (
+    Robot, MotionProgram, JointTarget, CartesianTarget, Pose, plan_freespace,
+)
 
-# Load robot from URDF
-robot = Robot.from_urdf("robot.urdf", "robot.srdf")
+# Load a bundled robot
+robot = Robot.from_tesseract_support("abb_irb2400")
 
-# Forward kinematics
-joints = np.array([0.0, -0.5, 0.5, 0.0, 0.5, 0.0])
-tcp_pose = robot.fk(joints, group="manipulator")
-print(f"TCP position: {tcp_pose.translation()}")
+# Forward kinematics (note: group_name is first positional arg)
+joints = np.zeros(6)
+tcp_pose = robot.fk("manipulator", joints)
+print(f"TCP position: {tcp_pose.position}")
 
 # Inverse kinematics
-target = tcp_pose
-target.translate([0.1, 0, 0])  # Move 10cm in X
-solutions = robot.ik(target, group="manipulator")
+target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, 0.0, 0.0)
+ik_solution = robot.ik("manipulator", target, seed=joints)
 
-# Check for collisions
-is_collision_free = robot.check_collision(solutions[0])
-
-# Plan motion
-trajectory = robot.plan(
-    start=joints,
-    goal=solutions[0],
-    planner="ompl"
+# Plan a freespace motion
+program = (
+    MotionProgram("manipulator")
+    .move_to(JointTarget(joints))
+    .move_to(CartesianTarget(target))
 )
+result = plan_freespace(robot, program)
+if result.successful:
+    print(f"Found trajectory with {len(result.trajectory)} waypoints")
 ```
 
 ## Planners
@@ -89,13 +90,10 @@ trajectory = robot.plan(
 
 ## Performance
 
-The low-level SQP API enables real-time trajectory optimization:
-
-| Configuration | Rate |
-|---------------|------|
-| Without collision | 128 Hz |
-| With discrete collision | 73 Hz |
-| With LVS continuous collision | 5-10 Hz |
+The low-level SQP API enables real-time trajectory optimization.
+Rates depend on problem size and collision mode. See
+[`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py)
+which prints measured rates for a reference 6-DOF problem on your machine.
 
 ## Next Steps
 
