@@ -150,6 +150,12 @@ jobs:
         CONDA_LIB="$CONDA_PREFIX/Library"
         export CMAKE_PREFIX_PATH="$CONDA_LIB;$GITHUB_WORKSPACE/ws/install"
         export PATH="$CONDA_LIB/bin:$PATH"
+        # MSVC link.exe library search path. Needed because some upstream
+        # CMakeLists (e.g. tesseract common) link libs by bare name
+        # (yaml-cpp) instead of namespaced target (yaml-cpp::yaml-cpp);
+        # conda-forge only populates the namespaced form, so the bare name
+        # falls through to linker's search path.
+        export LIB="$CONDA_LIB/lib;${LIB:-}"
         colcon build --merge-install \
           --packages-ignore tesseract_python tesseract_examples vhacd qpoases tesseract_nanobind tesseract_viewer_python twc_workcell_positioner_viewer \
           --event-handlers console_cohesion+ \
@@ -170,6 +176,8 @@ jobs:
         CONDA_LIB="$CONDA_PREFIX/Library"
         export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/ws/install;$CONDA_LIB"
         export PATH="$GITHUB_WORKSPACE/ws/install/bin:$CONDA_LIB/bin:$PATH"
+        # Same LIB search path reason as colcon step above
+        export LIB="$GITHUB_WORKSPACE/ws/install/lib;$CONDA_LIB/lib;${LIB:-}"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
 
