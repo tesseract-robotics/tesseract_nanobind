@@ -65,6 +65,12 @@ jobs:
     - name: pip build tools
       run: python -m pip install --upgrade pip delvewheel
 
+    - name: install zip CLI
+      shell: pwsh
+      run: |
+        choco install zip -y --no-progress
+        zip --version
+
     - name: cache vcs repos
       uses: actions/cache@v4
       with:
@@ -198,6 +204,13 @@ jobs:
           fi
         done
 
+    - name: restore nanobind wheel build cache
+      id: nanobind-build-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ws/src/tesseract_nanobind/build
+        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
+
     - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
       env:
@@ -219,6 +232,13 @@ jobs:
         echo "LIB=$LIB"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
+
+    - name: save nanobind wheel build cache
+      if: steps.nanobind-build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ws/src/tesseract_nanobind/build
+        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
 
     - name: bundle plugins then delvewheel repair
       working-directory: ws/src/tesseract_nanobind
@@ -261,20 +281,7 @@ jobs:
         done
 
         rm "$WHEEL_FILE"
-        REPACKED_WHEEL="$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/$WHEEL_FILE"
-        export WHEEL_DIR REPACKED_WHEEL
-        python - <<'PY'
-        import os
-        import zipfile
-        from pathlib import Path
-
-        wheel_dir = Path(os.environ["WHEEL_DIR"])
-        wheel_file = Path(os.environ["REPACKED_WHEEL"])
-        with zipfile.ZipFile(wheel_file, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for path in sorted(wheel_dir.rglob("*")):
-                if path.is_file():
-                    archive.write(path, path.relative_to(wheel_dir).as_posix())
-        PY
+        (cd "$WHEEL_DIR" && zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/$WHEEL_FILE" .)
         rm -rf "$WHEEL_DIR"
 
         echo "=== delvewheel repair ==="
