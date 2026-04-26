@@ -261,7 +261,20 @@ jobs:
         done
 
         rm "$WHEEL_FILE"
-        (cd "$WHEEL_DIR" && zip -rq "$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/$WHEEL_FILE" .)
+        REPACKED_WHEEL="$GITHUB_WORKSPACE/ws/src/tesseract_nanobind/$WHEEL_FILE"
+        export WHEEL_DIR REPACKED_WHEEL
+        python - <<'PY'
+        import os
+        import zipfile
+        from pathlib import Path
+
+        wheel_dir = Path(os.environ["WHEEL_DIR"])
+        wheel_file = Path(os.environ["REPACKED_WHEEL"])
+        with zipfile.ZipFile(wheel_file, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(wheel_dir.rglob("*")):
+                if path.is_file():
+                    archive.write(path, path.relative_to(wheel_dir).as_posix())
+        PY
         rm -rf "$WHEEL_DIR"
 
         echo "=== delvewheel repair ==="
