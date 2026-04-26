@@ -99,10 +99,14 @@ def _resolve_config_paths(config_path: Path, plugin_path: str | None) -> Path:
     path_hash = hashlib.md5(plugin_path.encode()).hexdigest()[:8]
     resolved_path = cache_dir / f"{config_path.stem}_{path_hash}.yaml"
 
+    # YAML double-quoted strings treat backslashes as escapes, so Windows paths
+    # must be written with forward slashes.
+    yaml_plugin_path = plugin_path.replace("\\", "/")
+
     # Only regenerate if source changed or cache missing
     if not resolved_path.exists() or resolved_path.stat().st_mtime < config_path.stat().st_mtime:
-        resolved_content = content.replace("@PLUGIN_PATH@", plugin_path)
-        resolved_content = resolved_content.replace("/usr/local/lib", plugin_path)
+        resolved_content = content.replace("@PLUGIN_PATH@", yaml_plugin_path)
+        resolved_content = resolved_content.replace("/usr/local/lib", yaml_plugin_path)
         resolved_path.write_text(resolved_content)
 
     return resolved_path

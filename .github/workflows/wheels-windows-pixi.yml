@@ -144,7 +144,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ws/install
-        key: colcon-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
     - name: colcon build C++ deps
       if: steps.colcon-cache.outputs.cache-hit != 'true'
@@ -170,6 +170,7 @@ jobs:
           --cmake-force-configure \
           --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
+            -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON \
             -DINSTALL_OMPL=OFF -DBUILD_CLOUD_CLIENT=OFF -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DTESSERACT_ENABLE_TESTING=OFF \
@@ -183,7 +184,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ws/install
-        key: colcon-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
     - name: patch exported cmake configs for windows linking
       # tesseract (and friends) export CMake targets with INTERFACE_LINK_LIBRARIES
@@ -261,7 +262,18 @@ jobs:
           tesseract_task_composer_planning_factories \
           tesseract_task_composer_taskflow_factories; do
           src="$GITHUB_WORKSPACE/ws/install/bin/${plugin}.dll"
-          [ -f "$src" ] && cp "$src" "$PKG_DIR/" && echo "  Added: ${plugin}.dll" || echo "  MISSING: ${plugin}.dll"
+          if [ -f "$src" ]; then
+            cp "$src" "$PKG_DIR/${plugin}.dll"
+            cp "$src" "$PKG_DIR/lib${plugin}.dll"
+            echo "  Added: ${plugin}.dll and lib${plugin}.dll"
+            if [ "$plugin" = "tesseract_kinematics_opw_factory" ]; then
+              cp "$src" "$PKG_DIR/tesseract_kinematics_opw_factories.dll"
+              cp "$src" "$PKG_DIR/libtesseract_kinematics_opw_factories.dll"
+              echo "  Added OPW plural aliases for bundled support YAMLs"
+            fi
+          else
+            echo "  MISSING: ${plugin}.dll"
+          fi
         done
 
         echo "=== Patching task_composer_config YAMLs ==="
