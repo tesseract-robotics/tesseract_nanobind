@@ -19,25 +19,34 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from loguru import logger
 
-# Windows: register DLL directories before any C extension import.
-# Python 3.8+ on Windows removed PATH-based DLL search; os.add_dll_directory is
-# the replacement. Attribute only exists on Windows, so the getattr probe is both
-# feature-detection and platform-narrowing avoidance for pyright.
-_add_dll_dir = getattr(os, "add_dll_directory", None)
-if _add_dll_dir is not None:
+# Windows: extend the DLL search path before any C extension import.
+#
+# os.add_dll_directory() (delvewheel auto-injects one for tesseract_robotics_nanobind.libs/)
+# only takes effect for LoadLibrary calls that opt in via LOAD_LIBRARY_SEARCH_USER_DIRS.
+# Plain LoadLibrary("foo.dll") from C++ — which is what boost::dll (and therefore
+# boost_plugin_loader) does — uses the legacy DLL search order, which respects PATH
+# but NOT add_dll_directory. So plugin DLLs LoadLibrary fine in pkg_dir, but their
+# transitive imports of bundled deps in tesseract_robotics_nanobind.libs/ go
+# unresolved and every plugin instantiation fails with "Failed to load symbol 'X'".
+#
+# Prepending PATH covers boost::dll's plain LoadLibrary; add_dll_directory keeps the
+# Python-native loader paths working in parallel.
+if sys.platform == "win32":
     _pkg_dir = Path(__file__).parent.resolve()
-    _libs_dir = _pkg_dir.parent / "tesseract_robotics.libs"  # delvewheel output
-    if _libs_dir.is_dir():
-        _add_dll_dir(str(_libs_dir))
-    _add_dll_dir(str(_pkg_dir))
-    del _pkg_dir, _libs_dir
-del _add_dll_dir
+    # delvewheel uses the project metadata name (tesseract-robotics-nanobind), not
+    # the Python package name (tesseract_robotics).
+    _libs_dir = _pkg_dir.parent / "tesseract_robotics_nanobind.libs"
+    _extra = [str(_pkg_dir)] + ([str(_libs_dir)] if _libs_dir.is_dir() else [])
+    os.environ["PATH"] = os.pathsep.join(filter(None, [*_extra, os.environ.get("PATH")]))
+    for _d in _extra:
+        os.add_dll_directory(_d)  # type: ignore[attr-defined]
 
 try:
     __version__ = version("tesseract-robotics-nanobind")

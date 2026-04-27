@@ -351,7 +351,11 @@ jobs:
         mkdir -p wheelhouse
         CONDA_BIN="$CONDA_PREFIX/Library/bin"
         INSTALL_BIN="$GITHUB_WORKSPACE/ws/install/bin"
-        delvewheel repair -v --add-path "$INSTALL_BIN;$CONDA_BIN" -w wheelhouse "$WHEEL_FILE"
+        # --analyze-existing: also scan the plugin factory DLLs we copied into
+        # the package dir (delvewheel only walks .pyd imports by default, so
+        # without this the plugins ship with unhashed dep names that Windows
+        # can't resolve at runtime).
+        delvewheel repair -v --analyze-existing --add-path "$INSTALL_BIN;$CONDA_BIN" -w wheelhouse "$WHEEL_FILE"
 
         echo "=== Wheel contents ==="
         ls -la wheelhouse/
