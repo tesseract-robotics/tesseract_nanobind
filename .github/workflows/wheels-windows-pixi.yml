@@ -186,6 +186,57 @@ jobs:
         path: ws/install
         key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
+    - name: verify plugin factory exports
+      # diagnostic gate: dumpbin every plugin DLL, assert the symbols
+      # boost_plugin_loader resolves via GetProcAddress are present.
+      # without them, test-wheel fails with `Failed to load symbol '<sym>'`
+      # and every kinematics/collision/task-composer plugin is broken.
+      # this catches it 30s after build instead of 2-3 min into test-wheel.
+      working-directory: ws/install/bin
+      run: |
+        echo "=== Symbols boost_plugin_loader looks up at runtime ==="
+        expected_syms=(
+          OPWInvKinFactory
+          URInvKinFactory
+          BulletDiscreteBVHManagerFactory
+          BulletDiscreteSimpleManagerFactory
+          BulletCastBVHManagerFactory
+          BulletCastSimpleManagerFactory
+          FCLDiscreteBVHManagerFactory
+        )
+        missing=()
+        for sym in "${expected_syms[@]}"; do
+          hits=""
+          for dll in *.dll; do
+            if dumpbin //EXPORTS "$dll" 2>/dev/null | grep -wq "$sym"; then
+              hits="$hits $dll"
+            fi
+          done
+          if [ -n "$hits" ]; then
+            printf "  %-45s FOUND in:%s\n" "$sym" "$hits"
+          else
+            printf "  %-45s NOT EXPORTED\n" "$sym"
+            missing+=("$sym")
+          fi
+        done
+
+        echo ""
+        echo "=== All exports per plugin DLL ==="
+        for dll in *factor*.dll; do
+          [ -f "$dll" ] || continue
+          echo "--- $dll ---"
+          dumpbin //EXPORTS "$dll" 2>/dev/null \
+            | awk '/ordinal[[:space:]]+hint/{flag=1; next} flag && /^[[:space:]]+[0-9]+/ {print "  " $NF}' \
+            | head -60
+          echo ""
+        done
+
+        if [ "${#missing[@]}" -gt 0 ]; then
+          echo "ERROR: ${#missing[@]} plugin factory symbol(s) not exported."
+          echo "boost_plugin_loader fails GetProcAddress -> all dependent plugins broken at runtime."
+          exit 1
+        fi
+
     - name: patch exported cmake configs for windows linking
       # tesseract (and friends) export CMake targets with INTERFACE_LINK_LIBRARIES
       # containing bare "yaml-cpp" instead of the namespaced "yaml-cpp::yaml-cpp"
