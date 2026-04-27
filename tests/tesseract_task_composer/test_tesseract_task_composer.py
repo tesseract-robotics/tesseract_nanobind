@@ -2,10 +2,38 @@
 
 import gc
 import os
+from pathlib import Path
+
+import pytest
 
 import tesseract_robotics
 from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
+from tesseract_robotics.tesseract_task_composer import (
+    TaskComposerNodeInfoContainer,
+    TaskComposerPluginFactory,
+)
+
+
+def _resolve_task_composer_config():
+    """Resolve task composer plugin config via env var, package data, or workspace."""
+    env_cfg = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
+    if env_cfg and Path(env_cfg).is_file():
+        return env_cfg
+
+    pkg_config = tesseract_robotics.get_task_composer_config_path()
+    if pkg_config.is_file():
+        return str(pkg_config)
+
+    test_dir = Path(__file__).parent.resolve()
+    repo_root = test_dir.parent.parent
+    ws_config = (
+        repo_root
+        / "ws/src/tesseract_planning/tesseract_task_composer/config/task_composer_plugins.yaml"
+    )
+    if ws_config.is_file():
+        return str(ws_config)
+
+    return None
 
 
 class TestTaskComposerPluginFactory:
@@ -157,3 +185,64 @@ class TestTaskComposerPluginFactory:
 
         del factory
         gc.collect()
+
+
+class TestDotgraph:
+    """Test dotgraph generation on TaskComposerNode."""
+
+    @pytest.fixture
+    def pipeline_node(self):
+        config_file = _resolve_task_composer_config()
+        assert config_file, "No task composer config found"
+        locator = GeneralResourceLocator()
+        factory = TaskComposerPluginFactory(FilesystemPath(config_file), locator)
+        node = factory.createTaskComposerNode("TrajOptPipeline")
+        assert node is not None
+        yield node, factory
+        del node
+        del factory
+        gc.collect()
+
+    def test_get_dotgraph_returns_valid_dot(self, pipeline_node):
+        node, _ = pipeline_node
+        dot = node.getDotgraph()
+        assert isinstance(dot, str)
+        assert dot.startswith("digraph TaskComposer {")
+        assert dot.rstrip().endswith("}")
+        assert "TrajOptPipeline" in dot
+
+    def test_get_dotgraph_with_empty_results(self, pipeline_node):
+        node, _ = pipeline_node
+        results = TaskComposerNodeInfoContainer()
+        dot = node.getDotgraph(results)
+        assert isinstance(dot, str)
+        assert dot.startswith("digraph TaskComposer {")
+        assert "TrajOptPipeline" in dot
+
+    def test_save_dotgraph_writes_file(self, pipeline_node, tmp_path):
+        node, _ = pipeline_node
+        out = tmp_path / "graph.dot"
+        ok = node.saveDotgraph(str(out))
+        assert ok is True
+        assert out.is_file()
+        contents = out.read_text()
+        assert contents.startswith("digraph TaskComposer {")
+        assert "TrajOptPipeline" in contents
+        # File output should match in-memory output
+        assert contents == node.getDotgraph()
+
+    def test_save_dotgraph_with_results(self, pipeline_node, tmp_path):
+        node, _ = pipeline_node
+        out = tmp_path / "graph_results.dot"
+        results = TaskComposerNodeInfoContainer()
+        ok = node.saveDotgraph(str(out), results)
+        assert ok is True
+        assert out.is_file()
+        assert out.read_text().startswith("digraph TaskComposer {")
+
+    def test_save_dotgraph_invalid_path_returns_false(self, pipeline_node, tmp_path):
+        node, _ = pipeline_node
+        bad = tmp_path / "nonexistent_dir" / "graph.dot"
+        ok = node.saveDotgraph(str(bad))
+        assert ok is False
+        assert not bad.exists()

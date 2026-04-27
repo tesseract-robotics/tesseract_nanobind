@@ -8,6 +8,9 @@
 #include <nanobind/stl/chrono.h>
 #include <nanobind/stl/optional.h>
 
+#include <fstream>
+#include <sstream>
+
 // tesseract_task_composer core
 #include <tesseract_task_composer/core/task_composer_context.h>
 #include <tesseract_task_composer/core/task_composer_data_storage.h>
@@ -147,7 +150,8 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def_prop_ro("return_value", [](const tp::TaskComposerNodeInfo& self) { return self.return_value; })
         .def_prop_ro("status_code", [](const tp::TaskComposerNodeInfo& self) { return self.status_code; })
         .def_prop_ro("status_message", [](const tp::TaskComposerNodeInfo& self) { return self.status_message; })
-        .def_prop_ro("elapsed_time", [](const tp::TaskComposerNodeInfo& self) { return self.elapsed_time; });
+        .def_prop_ro("elapsed_time", [](const tp::TaskComposerNodeInfo& self) { return self.elapsed_time; })
+        .def_prop_ro("dotgraph", [](const tp::TaskComposerNodeInfo& self) { return self.dotgraph; });
 
     // ========== TaskComposerNodeInfoContainer ==========
     nb::class_<tp::TaskComposerNodeInfoContainer>(m, "TaskComposerNodeInfoContainer")
@@ -209,7 +213,40 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getInputKeys", &tp::TaskComposerNode::getInputKeys, nb::rv_policy::reference)
         .def("getOutputKeys", &tp::TaskComposerNode::getOutputKeys, nb::rv_policy::reference)
         .def("setInputKeys", &tp::TaskComposerNode::setInputKeys, "input_keys"_a)
-        .def("setOutputKeys", &tp::TaskComposerNode::setOutputKeys, "output_keys"_a);
+        .def("setOutputKeys", &tp::TaskComposerNode::setOutputKeys, "output_keys"_a)
+        .def("getDotgraph", [](const tp::TaskComposerNode& self) {
+            std::ostringstream oss;
+            auto sub = self.dump(oss);
+            oss << sub;
+            return oss.str();
+        }, "Generate a DOT graph string for this task")
+        .def("getDotgraph", [](const tp::TaskComposerNode& self,
+                               const tp::TaskComposerNodeInfoContainer& results) {
+            std::ostringstream oss;
+            auto info_map = results.getInfoMap();
+            auto sub = self.dump(oss, nullptr, info_map);
+            oss << sub;
+            return oss.str();
+        }, "results"_a, "Generate a DOT graph string with task results annotations")
+        .def("saveDotgraph", [](const tp::TaskComposerNode& self, const std::string& filepath) {
+            std::ofstream out(filepath);
+            if (!out.is_open())
+                return false;
+            auto sub = self.dump(out);
+            out << sub;
+            return out.good();
+        }, "filepath"_a, "Write the DOT graph for this task to the given file path")
+        .def("saveDotgraph", [](const tp::TaskComposerNode& self, const std::string& filepath,
+                                const tp::TaskComposerNodeInfoContainer& results) {
+            std::ofstream out(filepath);
+            if (!out.is_open())
+                return false;
+            auto info_map = results.getInfoMap();
+            auto sub = self.dump(out, nullptr, info_map);
+            out << sub;
+            return out.good();
+        }, "filepath"_a, "results"_a,
+           "Write the DOT graph (with task results annotations) for this task to the given file path");
 
     // ========== TaskComposerFuture ==========
     nb::class_<tp::TaskComposerFuture>(m, "TaskComposerFuture")
