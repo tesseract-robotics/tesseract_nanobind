@@ -1,3 +1,5 @@
+"""tesseract_task_composer Python bindings"""
+
 from collections.abc import Sequence
 import datetime
 from typing import overload
@@ -54,6 +56,9 @@ class TaskComposerNodeInfo:
     @property
     def elapsed_time(self) -> float: ...
 
+    @property
+    def dotgraph(self) -> str: ...
+
 class TaskComposerNodeInfoContainer:
     def __init__(self) -> None: ...
 
@@ -103,6 +108,24 @@ class TaskComposerNode:
     def setInputKeys(self, input_keys: TaskComposerKeys) -> None: ...
 
     def setOutputKeys(self, output_keys: TaskComposerKeys) -> None: ...
+
+    @overload
+    def getDotgraph(self) -> str:
+        """Generate a DOT graph string for this task"""
+
+    @overload
+    def getDotgraph(self, results: TaskComposerNodeInfoContainer) -> str:
+        """Generate a DOT graph string with task results annotations"""
+
+    @overload
+    def saveDotgraph(self, filepath: str) -> bool:
+        """Write the DOT graph for this task to the given file path"""
+
+    @overload
+    def saveDotgraph(self, filepath: str, results: TaskComposerNodeInfoContainer) -> bool:
+        """
+        Write the DOT graph (with task results annotations) for this task to the given file path
+        """
 
 class TaskComposerFuture:
     @property
