@@ -23,6 +23,22 @@ using namespace tesseract_planning;
 using namespace tesseract_environment;
 using namespace tesseract_scene_graph;
 
+// Force the cereal polymorphic-type registration TU from
+// tesseract_command_language to be linked into this .pyd.
+//
+// Upstream tesseract_command_language/src/cereal_serialization.cpp ends with
+// CEREAL_REGISTER_DYNAMIC_INIT(tesseract_command_language_cereal). On Linux
+// and macOS, the TU survives anyway via more permissive linker dead-stripping
+// rules. On Windows MSVC, the TU has no externally-referenced symbols inside
+// our .pyd (we include the header but never name the registration symbols),
+// and the linker drops it — so MoveInstructionPoly, CompositeInstruction, etc.
+// never register and serialization fails at runtime with
+// "Trying to save an unregistered polymorphic type".
+//
+// CEREAL_FORCE_DYNAMIC_INIT emits a static-init in this TU that calls the
+// upstream dummy function, defeating the strip.
+CEREAL_FORCE_DYNAMIC_INIT(tesseract_command_language_cereal)
+
 NB_MODULE(_tesseract_serialization, m)
 {
     m.doc() = "Tesseract serialization bindings (XML/binary via Cereal)";
