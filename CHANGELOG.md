@@ -17,10 +17,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`ConstantTCPSpeedParameterization`** (KDL-based, constant TCP-speed time parameterization) bound alongside its `ConstantTCPSpeedCompositeProfile` ([#55], [f4f981d]).
   - contributed by [@Joelkang]
 
-### In progress
+## [0.34.1.6] - 2026-04-27 — PyPI README refresh
 
-- **Windows x64 wheels** — targeted for this release, pending the next upstream [tesseract-planning][tesseract-planning] release with the Windows-compatibility changes we depend on. A working CI pipeline is being prepared in [`wheels-windows.yml`][#50]; tracked by [#40].
-  - **Call for contributors:** if you have Windows build experience (MSVC, delocate-style DLL bundling, or CI troubleshooting), please comment on [#40] — help is actively welcome.
+Same wheels as 0.34.1.5; recut so the published wheel's README metadata includes the Windows build badge alongside Linux and macOS on PyPI's project page.
+
+### Changed
+
+- README badge row includes a Windows build badge ([6656815]).
+
+## [0.34.1.5] - 2026-04-27 — Windows x64 wheels debut
+
+First complete cross-platform PyPI release: Linux, macOS, **and** Windows wheels for Python 3.9–3.12. Closes the long-running [#40] Windows wheels initiative ([#58]).
+
+### Added
+
+- **Windows x64 wheels** published to PyPI via the new `wheels-windows.yml` workflow. Mirrors `wheels-{linux,macos}.yml`; sources C++ deps from conda-forge via pixi; bundles plugin DLLs via `delvewheel repair --analyze-existing` ([f9c122d], [3e3a2e4]).
+- `__init__.py` prepends the package dir and `tesseract_robotics_nanobind.libs/` to `PATH` on Windows — required because `boost::dll`'s plain `LoadLibrary` ignores `os.add_dll_directory` ([006ce38]).
+- Cereal polymorphic types re-registered in the `tesseract_serialization` binding TU — MSVC instantiates the cereal registry per-DLL, so upstream's registrations don't reach the consumer `.pyd` without re-registration ([af88515]).
+- New developer doc `docs/developer/windows-wheels.md` capturing four Windows wheel packaging gotchas surfaced during the gh-40 diagnosis ([fe5ad75]).
+
+### Removed
+
+- vcpkg-based `wheels-windows.yml` variant (workflow_dispatch-only, never green) replaced by the conda-forge / pixi pipeline of the same name ([3e3a2e4]).
+
+## [0.34.1.4] - 2026-04-27 [YANKED] — partial cross-platform release
+
+**Yanked.** Linux and macOS wheels published successfully; Windows wheels built and tested but the publish job hit a PyPI Trusted Publisher configuration mismatch and didn't upload. Superseded by 0.34.1.5.
 
 ## [0.34.1.2] - 2026-04-23 — macOS arm64 stability
 
@@ -55,7 +77,10 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 
 - Python 3.9 compatibility for example modules via `from __future__ import annotations` ([87ce68e]).
 
-[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.2...HEAD
+[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.6...HEAD
+[0.34.1.6]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.5...0.34.1.6
+[0.34.1.5]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.4...0.34.1.5
+[0.34.1.4]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.2...0.34.1.4
 [0.34.1.2]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.1...0.34.1.2
 [0.34.1.1]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.0...0.34.1.1
 [tesseract-planning]: https://github.com/tesseract-robotics/tesseract_planning
@@ -67,6 +92,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#54]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/54
 [#55]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/55
 [#56]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/56
+[#58]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/58
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993
@@ -80,5 +106,11 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [e26df2a]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/e26df2a10d37b9d4ffb689a384e6bad490b2fb7d
 [e2bf837]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/e2bf837c61b307157eb8cc3313e34f772c7d1b27
 [f4f981d]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/f4f981d161a59d7d4367139e5eb79a4c3a6b1eef
+[006ce38]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/006ce38
+[3e3a2e4]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/3e3a2e4
+[6656815]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/6656815
+[af88515]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/af88515
+[f9c122d]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/f9c122d
+[fe5ad75]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/fe5ad75
 [@Joelkang]: https://github.com/Joelkang
 [@marip8]: https://github.com/marip8
