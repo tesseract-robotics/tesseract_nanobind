@@ -2,10 +2,12 @@ from tesseract_robotics.tesseract_time_parameterization._tesseract_time_paramete
 
 __all__ = [
     "InstructionsTrajectory",
+    "TOTGCompositeProfile",
     "ISPCompositeProfile",
     "ISPMoveProfile",
-    "IterativeSplineParameterization",
-    "TimeOptimalTrajectoryGeneration",
     "TimeParameterization",
-    "TOTGCompositeProfile",
+    "TimeOptimalTrajectoryGeneration",
+    "IterativeSplineParameterization",
+    "ConstantTCPSpeedCompositeProfile",
+    "ConstantTCPSpeedParameterization",
 ]
