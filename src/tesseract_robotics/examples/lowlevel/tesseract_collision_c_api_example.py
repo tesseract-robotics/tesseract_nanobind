@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Low-Level Collision Checking Example (C-API Style)
 ===================================================
@@ -90,29 +91,28 @@ Related Examples
 
 import numpy as np
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
     ContactTestType_ALL,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     CollisionMarginData,
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
-from tesseract_robotics.tesseract_geometry import Sphere
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract.tesseract_environment import AddLinkCommand, Environment
+from tesseract.tesseract_geometry import Sphere
+from tesseract.tesseract_scene_graph import (
     Collision,
     Joint,
     JointType_FIXED,
     Link,
     Visual,
 )
-from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
+from tesseract.tesseract_state_solver import OFKTStateSolver
 
 # Initialize Environment with a robot from URDF file
 # The collision checker is configured using a yaml configuration file specified by the SRDF file. This configuration
@@ -152,9 +152,8 @@ def main():
         "package://tesseract_support/urdf/abb_irb2400.srdf"
     ).getFilePath()
 
-    # FilesystemPath wraps std::filesystem::path for cross-platform compatibility
-    urdf_path = FilesystemPath(urdf_path_str)
-    srdf_path = FilesystemPath(srdf_path_str)
+    urdf_path = urdf_path_str
+    srdf_path = srdf_path_str
 
     # init() parses URDF/SRDF and loads configured plugins (collision, kinematics)
     # Returns False if parsing fails - always check return value

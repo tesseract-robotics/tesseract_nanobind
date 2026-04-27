@@ -34,18 +34,17 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
     from tesseract_robotics.planning.program import MotionProgram
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CompositeInstruction,
     InstructionPoly_as_MoveInstructionPoly,
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
 )
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_motion_planners import assignCurrentStateAsSeed
+from tesseract.tesseract_task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
@@ -264,7 +263,7 @@ class TaskComposer:
             composer = TaskComposer.from_config(num_threads=4)
 
             # Use custom executor
-            from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+            from tesseract.tesseract_task_composer import TaskflowTaskComposerExecutor
             executor = TaskflowTaskComposerExecutor("MyExecutor", 8)
             composer = TaskComposer.from_config(executor=executor)
         """
@@ -313,7 +312,7 @@ class TaskComposer:
             )
 
         factory = TaskComposerPluginFactory(
-            FilesystemPath(str(config_path)),
+            str(config_path),
             locator,
         )
 

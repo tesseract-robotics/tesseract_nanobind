@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Low-Level Planning with TrajOptIfopt (OSQP-based SQP)
 
@@ -16,7 +17,7 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
@@ -27,24 +28,23 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptCompositeProfile,
     ProfileDictionary_addTrajOptIfoptPlanProfile,
     ProfileDictionary_addTrajOptIfoptSolverProfile,
@@ -53,7 +53,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
@@ -72,8 +72,8 @@ def main():
     locator = GeneralResourceLocator()
     urdf_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
     srdf_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-    urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locator.locateResource(urdf_url).getFilePath()
+    srdf_path = locator.locateResource(srdf_url).getFilePath()
 
     t_env = Environment()
     assert t_env.init(urdf_path, srdf_path, locator)

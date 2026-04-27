@@ -2,7 +2,7 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract.tesseract_time_parameterization import (
     ConstantTCPSpeedCompositeProfile,
     ConstantTCPSpeedParameterization,
     TimeParameterization,

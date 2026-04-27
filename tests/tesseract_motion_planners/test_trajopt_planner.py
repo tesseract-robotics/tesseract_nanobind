@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
@@ -16,22 +16,21 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_simple import generateInterpolatedProgram
 
 # TrajOpt imports - skip tests if not available
 try:
-    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract.tesseract_collision import CollisionEvaluatorType
+    from tesseract.tesseract_motion_planners_trajopt import (
         ProfileDictionary_addTrajOptCompositeProfile,
         ProfileDictionary_addTrajOptPlanProfile,
         TrajOptCollisionConfig,
@@ -52,16 +51,12 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 def lbr_iiwa_environment():
     """Load LBR IIWA robot environment for testing."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
-        locator.locateResource(
-            "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
-        ).getFilePath()
-    )
-    srdf_path = FilesystemPath(
-        locator.locateResource(
-            "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
-        ).getFilePath()
-    )
+    urdf_path = locator.locateResource(
+        "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
+    ).getFilePath()
+    srdf_path = locator.locateResource(
+        "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
+    ).getFilePath()
 
     t_env = Environment()
     assert t_env.init(urdf_path, srdf_path, locator), "Failed to initialize LBR IIWA"

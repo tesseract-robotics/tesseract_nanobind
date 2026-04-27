@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CompositeInstruction,
     JointWaypoint,
     JointWaypointPoly_wrap_JointWaypoint,
@@ -20,7 +20,7 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     WaypointPoly_as_JointWaypointPoly,
 )
-from tesseract_robotics.tesseract_serialization import (
+from tesseract.tesseract_serialization import (
     composite_instruction_from_binary,
     composite_instruction_from_file,
     composite_instruction_from_xml,

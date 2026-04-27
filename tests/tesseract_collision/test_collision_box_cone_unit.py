@@ -4,7 +4,7 @@ import os
 import numpy as np
 import numpy.testing as nptest
 
-from tesseract_robotics import tesseract_collision, tesseract_common, tesseract_geometry
+from tesseract import tesseract_collision, tesseract_common, tesseract_geometry
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -129,11 +129,8 @@ def run_test(checker):
 
 
 def get_plugin_factory():
-    # Use _FilesystemPath (C++ binding) for ContactManagersPluginFactory which needs fs::path
-    from tesseract_robotics.tesseract_common import _FilesystemPath
-
     support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
-    collision_config = _FilesystemPath(support_dir + "/urdf/" + "contact_manager_plugins.yaml")
+    collision_config = support_dir + "/urdf/" + "contact_manager_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_collision.ContactManagersPluginFactory(collision_config, locator), locator
 

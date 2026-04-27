@@ -23,8 +23,8 @@ import struct
 
 import numpy as np
 
-from tesseract_robotics import tesseract_geometry
-from tesseract_robotics.tesseract_common import AngleAxisd, Quaterniond
+from tesseract import tesseract_geometry
+from tesseract.tesseract_common import AngleAxisd, Quaterniond
 
 from .util import tesseract_trajectory_to_list
 

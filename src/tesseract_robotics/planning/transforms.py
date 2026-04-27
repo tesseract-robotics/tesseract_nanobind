@@ -25,7 +25,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike
 
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract.tesseract_common import Isometry3d
 
 
 @dataclass

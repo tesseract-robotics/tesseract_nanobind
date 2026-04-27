@@ -12,6 +12,7 @@
 #include <functional>
 #include <variant>
 #include <optional>
+#include <initializer_list>
 #include <stdexcept>
 
 // Eigen
@@ -41,6 +42,30 @@
 // Namespace aliases
 namespace nb = nanobind;
 using namespace nb::literals;
+
+namespace tesseract_nb {
+
+inline nb::module_ import_module_in_context(const nb::module_& current_module, const char* module_name)
+{
+	std::string importer_name = nb::cast<std::string>(current_module.attr("__name__"));
+	auto dot = importer_name.rfind('.');
+	if (dot != std::string::npos)
+	{
+		auto package_name = importer_name.substr(0, dot);
+		auto fq_name = package_name + "." + module_name;
+		return nb::module_::import_(fq_name.c_str());
+	}
+	return nb::module_::import_(module_name);
+}
+
+inline void import_modules_in_context(const nb::module_& current_module,
+									  std::initializer_list<const char*> module_names)
+{
+	for (const char* module_name : module_names)
+		import_module_in_context(current_module, module_name);
+}
+
+}  // namespace tesseract_nb
 
 // Note: Eigen::Isometry3d is bound as an explicit class in tesseract_common_bindings.cpp
 // for SWIG API compatibility (tests expect .matrix() method etc.)

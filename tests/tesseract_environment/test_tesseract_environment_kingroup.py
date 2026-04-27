@@ -2,9 +2,9 @@ import os
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import FilesystemPath, ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import (
+from tesseract.tesseract_common import ManipulatorInfo
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_kinematics import (
     KinGroupIKInput,
     KinGroupIKInputs,
 )
@@ -16,8 +16,8 @@ def get_environment():
     env = Environment()
     locator = TesseractSupportResourceLocator()
     tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
-    urdf_path = FilesystemPath(os.path.join(tesseract_support, "urdf/abb_irb2400.urdf"))
-    srdf_path = FilesystemPath(os.path.join(tesseract_support, "urdf/abb_irb2400.srdf"))
+    urdf_path = os.path.join(tesseract_support, "urdf/abb_irb2400.urdf")
+    srdf_path = os.path.join(tesseract_support, "urdf/abb_irb2400.srdf")
     assert env.init(urdf_path, srdf_path, locator)
     manip_info = ManipulatorInfo()
     manip_info.manipulator = "manipulator"
@@ -132,7 +132,7 @@ def test_tesseract_redundant_solutions_tesseract_function():
     limits = kin_group.getLimits()
     redundancy_indices = list(kin_group.getRedundancyCapableJointIndices())
 
-    import tesseract_robotics.tesseract_kinematics as tes_com
+    import tesseract.tesseract_kinematics as tes_com
 
     sol = np.ones(6) * np.deg2rad(5)  # 1D array, not 2D
     redun_sol = tes_com.getRedundantSolutions(sol, limits.joint_limits, redundancy_indices)

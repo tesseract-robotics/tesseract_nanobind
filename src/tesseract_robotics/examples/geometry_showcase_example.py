@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Geometry Showcase Example
 =========================
@@ -59,10 +60,10 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics.planning import Pose, Robot
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     VectorVector3d,
 )
-from tesseract_robotics.tesseract_geometry import (
+from tesseract.tesseract_geometry import (
     Box,
     Capsule,
     Cone,
@@ -76,7 +77,7 @@ from tesseract_robotics.tesseract_geometry import (
     createConvexMeshFromPath,
     createMeshFromPath,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract.tesseract_scene_graph import (
     Collision,
     Joint,
     JointType,

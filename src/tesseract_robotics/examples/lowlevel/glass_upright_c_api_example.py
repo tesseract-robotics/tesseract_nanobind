@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Glass Upright Example - Orientation-Constrained Motion Planning
 

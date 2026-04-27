@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Low-Level Planning Example (Advanced)
 
@@ -19,7 +20,7 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
@@ -30,29 +31,28 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultPlanProfile,
     TrajOptMotionPlanner,
 )
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
@@ -71,12 +71,8 @@ def main():
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = FilesystemPath(
-        locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
-    )
-    abb_irb2400_srdf_fname = FilesystemPath(
-        locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
-    )
+    abb_irb2400_urdf_fname = locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
+    abb_irb2400_srdf_fname = locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
 
     t_env = Environment()
 

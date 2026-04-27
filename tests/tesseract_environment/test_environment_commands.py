@@ -2,12 +2,12 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     AllowedCollisionMatrix,
     GeneralResourceLocator,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract.tesseract_environment import (
     AddLinkCommand,
     ChangeCollisionMarginsCommand,
     ChangeJointAccelerationLimitsCommand,
@@ -31,8 +31,8 @@ from tesseract_robotics.tesseract_environment import (
     RemoveLinkCommand,
     ReplaceJointCommand,
 )
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType, Link, Visual
+from tesseract.tesseract_geometry import Box
+from tesseract.tesseract_scene_graph import Joint, JointType, Link, Visual
 
 SIMPLE_URDF = """
 <robot name="test_robot" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
@@ -273,7 +273,7 @@ class TestChangeCollisionMarginsCommand:
 
     def test_constructor_with_pair_data(self):
         # 0.33 API: For pair overrides, use CollisionMarginPairData
-        from tesseract_robotics.tesseract_common import (
+        from tesseract.tesseract_common import (
             CollisionMarginPairData,
             CollisionMarginPairOverrideType,
         )

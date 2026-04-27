@@ -37,8 +37,8 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
 
 from tesseract_robotics.planning.transforms import Transform
-from tesseract_robotics.tesseract_common import Isometry3d
-from tesseract_robotics.tesseract_geometry import (
+from tesseract.tesseract_common import Isometry3d
+from tesseract.tesseract_geometry import (
     Box,
     Cone,
     ConvexMesh,
@@ -47,7 +47,7 @@ from tesseract_robotics.tesseract_geometry import (
     Mesh,
     Sphere,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract.tesseract_scene_graph import (
     Collision,
     Joint,
     JointType,
@@ -129,8 +129,8 @@ def mesh_from_file(
     Returns:
         Mesh geometry
     """
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
-    from tesseract_robotics.tesseract_geometry import createMeshFromResource
+    from tesseract.tesseract_common import GeneralResourceLocator
+    from tesseract.tesseract_geometry import createMeshFromResource
 
     locator = GeneralResourceLocator()
     filepath = str(filepath)
@@ -177,8 +177,8 @@ def convex_mesh_from_file(
     Returns:
         ConvexMesh geometry
     """
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
-    from tesseract_robotics.tesseract_geometry import createConvexMeshFromPath
+    from tesseract.tesseract_common import GeneralResourceLocator
+    from tesseract.tesseract_geometry import createConvexMeshFromPath
 
     locator = GeneralResourceLocator()
     filepath = str(filepath)

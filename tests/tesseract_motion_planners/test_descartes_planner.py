@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
@@ -14,21 +14,20 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_simple import generateInterpolatedProgram
 
 # Descartes imports - skip tests if not available
 try:
-    from tesseract_robotics.tesseract_motion_planners_descartes import (
+    from tesseract.tesseract_motion_planners_descartes import (
         DescartesDefaultPlanProfileD,
         DescartesMotionPlannerD,
         cast_DescartesPlanProfileD,
@@ -46,12 +45,8 @@ DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 def abb_irb2400_environment():
     """Load ABB IRB2400 robot environment for testing (has OPW kinematics)."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
-        locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
-    )
-    srdf_path = FilesystemPath(
-        locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
-    )
+    urdf_path = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
+    srdf_path = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
 
     t_env = Environment()
     assert t_env.init(urdf_path, srdf_path, locator), "Failed to initialize ABB IRB2400"

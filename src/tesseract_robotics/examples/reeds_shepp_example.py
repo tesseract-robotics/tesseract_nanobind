@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Reeds-Shepp Path Planning Example
 
@@ -29,7 +30,7 @@ Reference:
 
 import math
 
-from tesseract_robotics.ompl_base import (
+from ompl.base import (
     DubinsStateSpace,
     RealVectorBounds,
     ReedsSheppPathSegmentType,

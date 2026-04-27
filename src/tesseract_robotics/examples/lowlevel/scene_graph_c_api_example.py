@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Scene Graph Example
 
@@ -23,19 +24,18 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     AngleAxisd,
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract.tesseract_environment import (
     Environment,
     MoveJointCommand,
     MoveLinkCommand,
 )
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+from tesseract.tesseract_scene_graph import Joint, JointType
 
 # Viewer (skip in pytest)
 TesseractViewer = None
@@ -56,8 +56,8 @@ def main():
     # Load KUKA IIWA 7-DOF robot
     urdf_url = "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
     srdf_url = "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
-    urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locator.locateResource(urdf_url).getFilePath()
+    srdf_path = locator.locateResource(srdf_url).getFilePath()
 
     # Initialize environment (loads URDF/SRDF, builds scene graph)
     env = Environment()

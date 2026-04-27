@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Freespace OMPL Planning Example (High-Level API)
 
