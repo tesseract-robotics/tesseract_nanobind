@@ -19,11 +19,34 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from loguru import logger
+
+# Windows: extend the DLL search path before any C extension import.
+#
+# os.add_dll_directory() (delvewheel auto-injects one for tesseract_robotics_nanobind.libs/)
+# only takes effect for LoadLibrary calls that opt in via LOAD_LIBRARY_SEARCH_USER_DIRS.
+# Plain LoadLibrary("foo.dll") from C++ — which is what boost::dll (and therefore
+# boost_plugin_loader) does — uses the legacy DLL search order, which respects PATH
+# but NOT add_dll_directory. So plugin DLLs LoadLibrary fine in pkg_dir, but their
+# transitive imports of bundled deps in tesseract_robotics_nanobind.libs/ go
+# unresolved and every plugin instantiation fails with "Failed to load symbol 'X'".
+#
+# Prepending PATH covers boost::dll's plain LoadLibrary; add_dll_directory keeps the
+# Python-native loader paths working in parallel.
+if sys.platform == "win32":
+    _pkg_dir = Path(__file__).parent.resolve()
+    # delvewheel uses the project metadata name (tesseract-robotics-nanobind), not
+    # the Python package name (tesseract_robotics).
+    _libs_dir = _pkg_dir.parent / "tesseract_robotics_nanobind.libs"
+    _extra = [str(_pkg_dir)] + ([str(_libs_dir)] if _libs_dir.is_dir() else [])
+    os.environ["PATH"] = os.pathsep.join(filter(None, [*_extra, os.environ.get("PATH")]))
+    for _d in _extra:
+        os.add_dll_directory(_d)  # type: ignore[attr-defined]
 
 try:
     __version__ = version("tesseract-robotics-nanobind")
@@ -85,10 +108,14 @@ def _resolve_config_paths(config_path: Path, plugin_path: str | None) -> Path:
     path_hash = hashlib.md5(plugin_path.encode()).hexdigest()[:8]
     resolved_path = cache_dir / f"{config_path.stem}_{path_hash}.yaml"
 
+    # YAML double-quoted strings treat backslashes as escapes, so Windows paths
+    # must be written with forward slashes.
+    yaml_plugin_path = plugin_path.replace("\\", "/")
+
     # Only regenerate if source changed or cache missing
     if not resolved_path.exists() or resolved_path.stat().st_mtime < config_path.stat().st_mtime:
-        resolved_content = content.replace("@PLUGIN_PATH@", plugin_path)
-        resolved_content = resolved_content.replace("/usr/local/lib", plugin_path)
+        resolved_content = content.replace("@PLUGIN_PATH@", yaml_plugin_path)
+        resolved_content = resolved_content.replace("/usr/local/lib", yaml_plugin_path)
         resolved_path.write_text(resolved_content)
 
     return resolved_path
@@ -118,21 +145,25 @@ def _configure_environment():
     _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir, ws_resource, use_parent=True)
 
     # Plugin search paths - env var, bundled plugins, or ws/install/lib
-    # Linux: pkg_dir (all deps bundled in package root with $ORIGIN rpath)
-    # macOS: .dylibs (delocate-repaired)
+    # Linux:   pkg_dir (all deps bundled in package root with $ORIGIN rpath)
+    # macOS:   .dylibs (delocate-repaired)
+    # Windows: pkg_dir (plugin factory DLLs bundled there; delvewheel libs go to
+    #          sibling tesseract_robotics.libs/ but plugin dlopen targets pkg_dir)
     plugin_path = os.environ.get("TESSERACT_PLUGIN_PATH")  # explicit override
     editable = _is_editable_install()
 
     if not plugin_path:
-        # Check for bundled plugins (Linux wheel - plugins in package root)
         bundled_plugin = pkg_dir / "libtesseract_collision_bullet_factories.so"
-        dylibs_dir = pkg_dir / ".dylibs"  # macOS bundled (delocate-repaired)
+        dylibs_dir = pkg_dir / ".dylibs"
+        bundled_plugin_win = pkg_dir / "tesseract_collision_bullet_factories.dll"
         ws_install_lib = project_root / "ws" / "install" / "lib"
 
         if bundled_plugin.exists():
             plugin_path = str(pkg_dir)
         elif dylibs_dir.is_dir():
             plugin_path = str(dylibs_dir)
+        elif bundled_plugin_win.exists():
+            plugin_path = str(pkg_dir)
         elif editable and ws_install_lib.is_dir():
             plugin_path = str(ws_install_lib)
 
