@@ -13,6 +13,9 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - '.github/workflows/wheels-macos.yml'
+      - '.github/workflows/wheels-windows.yml'
+      - '.github/workflows/wheels-windows-pixi.yml'
+      - '.github/workflows/vcpkg_triplets/**'
   pull_request:
     paths-ignore:
       - '**.md'
@@ -20,6 +23,9 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - '.github/workflows/wheels-macos.yml'
+      - '.github/workflows/wheels-windows.yml'
+      - '.github/workflows/wheels-windows-pixi.yml'
+      - '.github/workflows/vcpkg_triplets/**'
   workflow_dispatch:
 
 concurrency:
