@@ -1,16 +1,26 @@
 name: Build & Test (Windows pixi)
 
-# Experimental alternative to wheels-windows.yml using pixi for deps
-# (conda-forge under the hood) — same shape as wheels-linux.yml /
-# wheels-macos.yml. Dispatched manually for now. If stable, replaces
-# wheels-windows.yml.
+# Canonical Windows wheel pipeline. Sources C++ deps from conda-forge via pixi.
+# Mirrors the shape of wheels-linux.yml / wheels-macos.yml. The vcpkg-based
+# wheels-windows.yml is retained as a dispatch-only fallback.
 
 on:
-  # During pixi evaluation, trigger on this branch + dispatch. Once promoted
-  # to canonical (replacing wheels-windows.yml), broaden to main + tags + PRs.
   push:
     branches:
-      - 'gh-40-windows-build'
+      - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
+      - '.github/workflows/wheels-macos.yml'
+      - '.github/workflows/wheels-windows.yml'
+      - '.github/workflows/vcpkg_triplets/**'
+  pull_request:
     paths-ignore:
       - '**.md'
       - 'docs/**'
