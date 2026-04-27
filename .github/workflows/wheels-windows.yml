@@ -1,11 +1,30 @@
 name: Build & Test (Windows)
 
+# Canonical Windows wheel pipeline. Sources C++ deps from conda-forge via pixi.
+# Mirrors the shape of wheels-linux.yml / wheels-macos.yml.
+
 on:
-  # Temporarily workflow_dispatch-only while the conda-forge alternative
-  # (wheels-windows-conda.yml) is being evaluated. The vcpkg approach is
-  # slow to iterate (~80 min cold vcpkg per run) and the conda approach
-  # mirrors wheels-{linux,macos}.yml. Re-enable push/pull_request triggers
-  # once one of the two is chosen as the canonical Windows workflow.
+  push:
+    branches:
+      - main
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
+      - '.github/workflows/wheels-macos.yml'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - '.github/workflows/wheels-linux.yml'
+      - '.github/workflows/wheels-macos.yml'
   workflow_dispatch:
 
 concurrency:
@@ -16,77 +35,31 @@ jobs:
   build:
     runs-on: windows-2022
     strategy:
-      fail-fast: true
+      fail-fast: false  # don't kill siblings on transient network failures
       matrix:
         python: ['3.9', '3.10', '3.11', '3.12']
     defaults:
       run:
-        shell: bash
+        shell: bash -el {0}  # Git Bash is pre-installed on windows-2022
     steps:
     - uses: actions/checkout@v4
       with:
         path: ws/src/tesseract_nanobind
-        fetch-depth: 0  # setuptools-scm needs tag history for version derivation
+        fetch-depth: 0  # setuptools-scm tag history
 
     - name: enable long paths
       shell: pwsh
       run: git config --global core.longpaths true
 
-    - uses: actions/setup-python@v5
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
+      env:
+        PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || '312' }}
       with:
-        python-version: ${{ matrix.python }}
-        architecture: x64
-
-    - uses: conda-incubator/setup-miniconda@v3
-      with:
-        auto-update-conda: false
-        miniforge-version: latest
-        activate-environment: osqp-env
-        channels: conda-forge
-        channel-priority: strict
-
-    - name: conda install osqp
-      shell: bash -el {0}
-      run: conda install -y osqp
-
-    # Split cache/restore and cache/save so that on a job-failure path (vcpkg
-    # succeeds but colcon or wheel-build fails during iteration), the vcpkg
-    # binaries still persist to the cache — enabling the NEXT run to restore
-    # them in seconds instead of paying another cold 60-min install.
-    # `save-always: true` on actions/cache@v4 is deprecated and silently no-ops.
-    # The save step with `if: always()` is the supported replacement.
-    - name: restore vcpkg cache
-      id: vcpkg-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: vcpkg/installed
-        key: vcpkg-installed-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**', 'ws/src/tesseract_nanobind/.github/workflows/wheels-windows.yml') }}
-
-    - name: vcpkg install C++ deps
-      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
-      uses: johnwason/vcpkg-action@v7
-      with:
-        # Mirror of tesseract_python upstream's Windows vcpkg list, extended with
-        # ompl + taskflow + jsoncpp + gperftools (our extra runtime deps) and
-        # ccd + flann (transitively needed by fcl / pcl).
-        pkgs: >-
-          boost-dll boost-program-options boost-serialization boost-filesystem
-          boost-stacktrace boost-algorithm boost-format boost-graph
-          tinyxml2 console-bridge assimp urdfdom octomap orocos-kdl pcl
-          flann jsoncpp yaml-cpp eigen3 openblas cereal
-          fcl ompl taskflow
-          bullet3[multithreading,double-precision,rtti]
-          ccd[double-precision] gperftools
-        triplet: x64-windows-v143-release
-        extra-args: --clean-after-build --overlay-triplets=${{ github.workspace }}/ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets
-        token: ${{ github.token }}
-
-    - name: save vcpkg cache
-      if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: vcpkg/installed
-        key: vcpkg-installed-win-v143-${{ hashFiles('ws/src/tesseract_nanobind/.github/workflows/vcpkg_triplets/**', 'ws/src/tesseract_nanobind/.github/workflows/wheels-windows.yml') }}
+        manifest-path: ws/src/tesseract_nanobind/pyproject.toml
+        cache: true
+        environments: ${{ env.PIXI_ENV }}
+        activate-environment: ${{ env.PIXI_ENV }}
 
     - name: activate MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -95,7 +68,13 @@ jobs:
         toolset: "14.4"  # v143
 
     - name: pip build tools
-      run: python -m pip install --upgrade pip delvewheel setuptools-scm vcstool colcon-common-extensions
+      run: python -m pip install --upgrade pip delvewheel
+
+    - name: install zip CLI
+      shell: pwsh
+      run: |
+        choco install zip -y --no-progress
+        zip --version
 
     - name: cache vcs repos
       uses: actions/cache@v4
@@ -119,10 +98,9 @@ jobs:
     - name: patch upstream missing includes
       working-directory: ws/src
       run: |
-        # MSVC is strict about transitive stdlib includes — GCC/Clang let
-        # libstdc++ headers pull in <cassert>/<stdexcept> via other includes,
-        # but MSVC's STL does not. Insert the missing include after the last
-        # existing #include line in each offending file.
+        # MSVC is strict about transitive stdlib includes. GCC/Clang pull in
+        # <cassert>/<stdexcept> via libstdc++ headers; MSVC does not. Scan the
+        # whole set of upstream source trees colcon will build, not just ifopt.
         add_include() {
           local file=$1 header=$2 tag=$3
           grep -qE "#include[[:space:]]*<${header//./\\.}>" "$file" && return
@@ -134,85 +112,191 @@ jobs:
           echo "  patched ${tag}: $file"
         }
 
-        # tesseract_planning 0.34.0: poly/*.h uses std::runtime_error
-        while IFS= read -r f; do
-          add_include "$f" stdexcept stdexcept
-        done < <(find tesseract_planning -name '*.h' -path '*/poly/*' -exec grep -l 'std::runtime_error' {} +)
+        # Source trees that colcon will build and that may have MSVC-strict issues.
+        TREES="tesseract tesseract_planning trajopt ifopt opw_kinematics"
 
-        # ifopt 2.1.4: assert() usage in headers + source files
-        while IFS= read -r f; do
-          add_include "$f" cassert cassert
-        done < <(find ifopt \( -name '*.h' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l 'assert(' {} +)
+        # assert() needs <cassert>
+        for tree in $TREES; do
+          [ -d "$tree" ] || continue
+          while IFS= read -r f; do
+            add_include "$f" cassert cassert
+          done < <(find "$tree" \( -name '*.h' -o -name '*.hpp' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l 'assert(' {} + 2>/dev/null)
+        done
 
-        # ifopt 2.1.4: variable_set.h (and any other ifopt header) using
-        # std::runtime_error / std::logic_error / std::invalid_argument
-        while IFS= read -r f; do
-          add_include "$f" stdexcept stdexcept
-        done < <(find ifopt \( -name '*.h' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l -E 'std::(runtime_error|logic_error|invalid_argument|out_of_range)' {} +)
+        # std::runtime_error, std::logic_error, etc. need <stdexcept>
+        for tree in $TREES; do
+          [ -d "$tree" ] || continue
+          while IFS= read -r f; do
+            add_include "$f" stdexcept stdexcept
+          done < <(find "$tree" \( -name '*.h' -o -name '*.hpp' -o -name '*.cc' -o -name '*.cpp' \) -exec grep -l -E 'std::(runtime_error|logic_error|invalid_argument|out_of_range|domain_error|length_error|overflow_error)' {} + 2>/dev/null)
+        done
 
-        # opw_kinematics: add_executable(opw_kinematics_node src/test.cpp) lives
-        # OUTSIDE the OPW_ENABLE_TESTING guard — an upstream CMakeLists bug. On
-        # Windows MSVC + vcpkg Eigen3, the INTERFACE include from Eigen3::Eigen
-        # doesn't propagate to the test target for reasons unclear, so it fails
-        # to find "Eigen/Dense". We don't need this test binary; short-circuit it.
+        # opw_kinematics: add_executable(${PROJECT_NAME}_node src/test.cpp) is
+        # outside its OPW_ENABLE_TESTING guard. On MSVC+conda-forge Eigen the
+        # INTERFACE include from Eigen3::Eigen doesn't propagate to the test
+        # target, so it fails to find "Eigen/Dense". Short-circuit it.
         F=opw_kinematics/CMakeLists.txt
-        # File has literal ${PROJECT_NAME}_node (CMake variable), match "# Create test executable"
         if [ -f "$F" ] && grep -q '^# Create test executable' "$F"; then
-          # Wrap the "# Create test executable" block with if(FALSE)/endif().
-          # Block ends just before the "# Install" comment on the next top-level line.
-          sed -i '/^# Create test executable/i if(FALSE)  # patched: skip stray test exe on windows' "$F"
+          sed -i '/^# Create test executable/i if(FALSE)  # patched: skip stray test exe' "$F"
           sed -i '/^# Install/i endif()  # patched: close if(FALSE)' "$F"
           echo "  patched: $F (skipped opw_kinematics_node test exe)"
         fi
 
-    - name: cache colcon build
-      uses: actions/cache@v4
+    # Split restore+save so colcon output persists even if a later step
+    # (wheel build, delvewheel) fails — same reason as vcpkg cache split.
+    - name: restore colcon cache
       id: colcon-cache
+      uses: actions/cache/restore@v4
       with:
         path: ws/install
-        key: colcon-win-v143-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
     - name: colcon build C++ deps
       if: steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws
       env:
-        # /bigobj — cereal_serialization.cpp (tesseract_common) instantiates
-        # enough templates to exceed MSVC's default COFF section limit (C1128).
+        # /bigobj — tesseract_common cereal serialization exceeds COFF section limit
+        # EIGEN_DONT_ALIGN/VECTORIZE — MSVC ABI boundaries don't respect Eigen alignment
         CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1 /bigobj"
       run: |
-        set -e
-        VCPKG_INSTALL="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release"
-        CONDA_LIB="$CONDA/envs/osqp-env/Library"
-        export CMAKE_PREFIX_PATH="$VCPKG_INSTALL;$CONDA_LIB"
-        export PATH="$VCPKG_INSTALL/bin:$CONDA_LIB/bin:$PATH"
+        # conda-forge Windows binaries live under $CONDA_PREFIX/Library (not $CONDA_PREFIX)
+        CONDA_LIB="$CONDA_PREFIX/Library"
+        export CMAKE_PREFIX_PATH="$CONDA_LIB;$GITHUB_WORKSPACE/ws/install"
+        export PATH="$CONDA_LIB/bin:$PATH"
+        # MSVC link.exe library search path. Needed because some upstream
+        # CMakeLists (e.g. tesseract common) link libs by bare name
+        # (yaml-cpp) instead of namespaced target (yaml-cpp::yaml-cpp);
+        # conda-forge only populates the namespaced form, so the bare name
+        # falls through to linker's search path.
+        export LIB="$CONDA_LIB/lib;${LIB:-}"
         colcon build --merge-install \
           --packages-ignore tesseract_python tesseract_examples vhacd qpoases tesseract_nanobind tesseract_viewer_python twc_workcell_positioner_viewer \
           --event-handlers console_cohesion+ \
           --cmake-force-configure \
           --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_VISIBILITY_PRESET=default -DCMAKE_VISIBILITY_INLINES_HIDDEN=OFF \
+            -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON \
             -DINSTALL_OMPL=OFF -DBUILD_CLOUD_CLIENT=OFF -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DTESSERACT_ENABLE_TESTING=OFF \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DNO_OPENCL=ON \
-            -DVCPKG_APPLOCAL_DEPS=OFF
+            -DNO_OPENCL=ON
+
+    - name: save colcon cache
+      # Runs after colcon build succeeds, before wheel build. If wheel build
+      # later fails, cache is already saved so next iteration skips colcon.
+      if: steps.colcon-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ws/install
+        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+
+    # Plugin-factory export verification is preserved as a commented recipe.
+    # Used during gh-40 iteration to fail fast when MSVC stripped factory
+    # symbols; once the export situation stabilised it became redundant.
+    # Uncomment below if you suspect the symbols boost_plugin_loader looks up
+    # via GetProcAddress are missing from the built DLLs.
+    #
+    # - name: verify plugin factory exports
+    #   working-directory: ws/install/bin
+    #   run: |
+    #     echo "=== Symbols boost_plugin_loader looks up at runtime ==="
+    #     expected_syms=(
+    #       OPWInvKinFactory
+    #       URInvKinFactory
+    #       BulletDiscreteBVHManagerFactory
+    #       BulletDiscreteSimpleManagerFactory
+    #       BulletCastBVHManagerFactory
+    #       BulletCastSimpleManagerFactory
+    #       FCLDiscreteBVHManagerFactory
+    #     )
+    #     missing=()
+    #     for sym in "${expected_syms[@]}"; do
+    #       hits=""
+    #       for dll in *.dll; do
+    #         if dumpbin //EXPORTS "$dll" 2>/dev/null | grep -wq "$sym"; then
+    #           hits="$hits $dll"
+    #         fi
+    #       done
+    #       if [ -n "$hits" ]; then
+    #         printf "  %-45s FOUND in:%s\n" "$sym" "$hits"
+    #       else
+    #         printf "  %-45s NOT EXPORTED\n" "$sym"
+    #         missing+=("$sym")
+    #       fi
+    #     done
+    #
+    #     echo ""
+    #     echo "=== All exports per plugin DLL ==="
+    #     for dll in *factor*.dll; do
+    #       [ -f "$dll" ] || continue
+    #       echo "--- $dll ---"
+    #       dumpbin //EXPORTS "$dll" 2>/dev/null \
+    #         | awk '/ordinal[[:space:]]+hint/{flag=1; next} flag && /^[[:space:]]+[0-9]+/ {print "  " $NF}' \
+    #         | head -60
+    #       echo ""
+    #     done
+    #
+    #     if [ "${#missing[@]}" -gt 0 ]; then
+    #       echo "ERROR: ${#missing[@]} plugin factory symbol(s) not exported."
+    #       echo "boost_plugin_loader fails GetProcAddress -> all dependent plugins broken at runtime."
+    #       exit 1
+    #     fi
+
+    - name: patch exported cmake configs for windows linking
+      # tesseract (and friends) export CMake targets with INTERFACE_LINK_LIBRARIES
+      # containing bare "yaml-cpp" instead of the namespaced "yaml-cpp::yaml-cpp"
+      # target that conda-forge exports. On Windows this causes downstream
+      # consumers (our nanobind bindings) to fail linking with LNK1181. Patch
+      # the exported .cmake configs in-place to use the namespaced target.
+      # Runs after both cache restore AND fresh colcon build so the patched
+      # configs are always present for the wheel build step below.
+      working-directory: ws/install
+      run: |
+        find . -name '*.cmake' -type f | while read f; do
+          # Replace bare "yaml-cpp" in ;-delimited list contexts (standard form
+          # of INTERFACE_LINK_LIBRARIES values in exported configs).
+          if grep -q '[";]yaml-cpp[";]' "$f" 2>/dev/null; then
+            sed -i -E 's/(["\;])yaml-cpp(["\;])/\1yaml-cpp::yaml-cpp\2/g' "$f"
+            echo "  patched: $f"
+          fi
+        done
+
+    - name: restore nanobind wheel build cache
+      id: nanobind-build-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ws/src/tesseract_nanobind/build
+        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
 
     - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
       env:
-        # /bigobj — cereal_serialization.cpp (tesseract_common) instantiates
-        # enough templates to exceed MSVC's default COFF section limit (C1128).
         CXXFLAGS: "-DEIGEN_DONT_ALIGN=1 -DEIGEN_DONT_VECTORIZE=1 /bigobj"
       run: |
-        set -e
-        VCPKG_INSTALL="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release"
-        CONDA_LIB="$CONDA/envs/osqp-env/Library"
-        INSTALL="$GITHUB_WORKSPACE/ws/install"
-        export CMAKE_PREFIX_PATH="$INSTALL;$CONDA_LIB;$VCPKG_INSTALL"
-        export PATH="$INSTALL/bin:$CONDA_LIB/bin:$VCPKG_INSTALL/bin:$PATH"
+        CONDA_LIB="$CONDA_PREFIX/Library"
+        export CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/ws/install;$CONDA_LIB"
+        export PATH="$GITHUB_WORKSPACE/ws/install/bin:$CONDA_LIB/bin:$PATH"
+
+        # Upstream CMakeLists link some deps by bare name (yaml-cpp, ode_double,
+        # etc.) rather than via namespaced IMPORTED targets. CMake passes the
+        # bare name to MSBuild which expects <name>.lib on the linker search
+        # path. The LIB env var is THE mechanism link.exe uses for that path.
+        # We set it in Windows form (cygpath -w + ;-separated) because the
+        # Git Bash default (POSIX :-separated) is ignored by native link.exe.
+        WIN_CONDA_LIB=$(cygpath -w "$CONDA_LIB/lib")
+        WIN_INSTALL_LIB=$(cygpath -w "$GITHUB_WORKSPACE/ws/install/lib")
+        export LIB="${WIN_CONDA_LIB};${WIN_INSTALL_LIB};${LIB:-}"
+        echo "LIB=$LIB"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
+
+    - name: save nanobind wheel build cache
+      if: steps.nanobind-build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ws/src/tesseract_nanobind/build
+        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
 
     - name: bundle plugins then delvewheel repair
       working-directory: ws/src/tesseract_nanobind
@@ -224,9 +308,6 @@ jobs:
         PKG_DIR="$WHEEL_DIR/tesseract_robotics"
 
         echo "=== Bundling plugin factory DLLs into package dir ==="
-        # Plugin factories are dlopen-loaded at runtime — invisible to delvewheel's
-        # static dep scan. Drop them in the package dir first so delvewheel's next
-        # repair pass resolves their transitive DLL deps too.
         for plugin in \
           tesseract_collision_bullet_factories \
           tesseract_collision_fcl_factories \
@@ -238,11 +319,17 @@ jobs:
           tesseract_task_composer_planning_factories \
           tesseract_task_composer_taskflow_factories; do
           src="$GITHUB_WORKSPACE/ws/install/bin/${plugin}.dll"
-          if [[ -f "$src" ]]; then
-            cp "$src" "$PKG_DIR/"
-            echo "  Added: ${plugin}.dll"
+          if [ -f "$src" ]; then
+            cp "$src" "$PKG_DIR/${plugin}.dll"
+            cp "$src" "$PKG_DIR/lib${plugin}.dll"
+            echo "  Added: ${plugin}.dll and lib${plugin}.dll"
+            if [ "$plugin" = "tesseract_kinematics_opw_factory" ]; then
+              cp "$src" "$PKG_DIR/tesseract_kinematics_opw_factories.dll"
+              cp "$src" "$PKG_DIR/libtesseract_kinematics_opw_factories.dll"
+              echo "  Added OPW plural aliases for bundled support YAMLs"
+            fi
           else
-            echo "  MISSING: ${plugin}.dll (expected at $src)"
+            echo "  MISSING: ${plugin}.dll"
           fi
         done
 
@@ -268,32 +355,32 @@ jobs:
 
         echo "=== delvewheel repair ==="
         mkdir -p wheelhouse
-        VCPKG_BIN="$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-v143-release/bin"
-        CONDA_BIN="$CONDA/envs/osqp-env/Library/bin"
+        CONDA_BIN="$CONDA_PREFIX/Library/bin"
         INSTALL_BIN="$GITHUB_WORKSPACE/ws/install/bin"
-        delvewheel repair -v \
-          --add-path "$INSTALL_BIN;$VCPKG_BIN;$CONDA_BIN" \
-          -w wheelhouse "$WHEEL_FILE"
+        # --analyze-existing: also scan the plugin factory DLLs we copied into
+        # the package dir (delvewheel only walks .pyd imports by default, so
+        # without this the plugins ship with unhashed dep names that Windows
+        # can't resolve at runtime).
+        delvewheel repair -v --analyze-existing --add-path "$INSTALL_BIN;$CONDA_BIN" -w wheelhouse "$WHEEL_FILE"
 
         echo "=== Wheel contents ==="
         ls -la wheelhouse/
 
     - uses: actions/upload-artifact@v4
       with:
-        name: python-${{ matrix.python }}-windows-x64
+        name: python-${{ matrix.python }}-windows-x64-pixi
         path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
 
     - if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: build-logs-windows-x64-py${{ matrix.python }}
+        name: build-logs-windows-x64-pixi-py${{ matrix.python }}
         path: '**/*.log'
         retention-days: 2
 
   test-wheel:
     needs: build
     runs-on: windows-2022
-    # py3.9 has intermittent GC segfaults with pytest-xdist; don't block CI (matches Linux/macOS policy)
     continue-on-error: ${{ matrix.python == '3.9' }}
     strategy:
       fail-fast: false
@@ -301,25 +388,22 @@ jobs:
         python: ['3.9', '3.12']
     defaults:
       run:
-        shell: bash
+        shell: bash -el {0}
     steps:
     - uses: actions/checkout@v4
       with:
         path: tesseract_nanobind
-
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python }}
         architecture: x64
-
     - uses: actions/download-artifact@v4
       with:
-        name: python-${{ matrix.python }}-windows-x64
+        name: python-${{ matrix.python }}-windows-x64-pixi
         path: wheelhouse
 
     - name: install wheel in clean venv
       run: |
-        set -e
         python -m venv test_env
         source test_env/Scripts/activate
         python -m pip install --upgrade pip
@@ -328,24 +412,10 @@ jobs:
 
     - name: smoke test
       run: |
-        set -e
         source test_env/Scripts/activate
         python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
         python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
-        # trajopt_ifopt is the canary — proves the hybrid vcpkg+conda-forge integration worked
         python -c "from tesseract_robotics import trajopt_ifopt; print('trajopt_ifopt OK')"
-
-    - name: debug DLLs on failure
-      if: failure()
-      run: |
-        source test_env/Scripts/activate
-        PKG_DIR=$(python -c "import tesseract_robotics, pathlib; print(pathlib.Path(tesseract_robotics.__file__).parent)")
-        echo "=== Package dir ==="
-        ls "$PKG_DIR" 2>/dev/null || true
-        echo "=== Sibling .libs dir ==="
-        ls "$PKG_DIR/../tesseract_robotics.libs" 2>/dev/null || echo "none"
-        echo "=== DLLs under site-packages ==="
-        find "$PKG_DIR" -name "*.dll" 2>/dev/null | head -30
 
     - name: run tests
       run: |
@@ -364,13 +434,13 @@ jobs:
     # pypa/gh-action-pypi-publish is hard-Linux-only. The artifacts are already
     # built for Windows x64 — we just download and twine-upload them from Linux.
     runs-on: ubuntu-latest
-    environment: pypi
+    environment: windows
     permissions:
       id-token: write
     steps:
     - uses: actions/download-artifact@v4
       with:
-        pattern: python-*-windows-x64
+        pattern: python-*-windows-x64-pixi
         merge-multiple: true
         path: dist/
     - name: List wheels
