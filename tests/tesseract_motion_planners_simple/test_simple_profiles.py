@@ -10,8 +10,6 @@ import pytest
 
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_simple import (
-    ProfileDictionary_addSimplePlannerCompositeProfile,
-    ProfileDictionary_addSimplePlannerMoveProfile,
     SimplePlannerCompositeProfile,
     SimplePlannerFixedSizeAssignMoveProfile,
     SimplePlannerFixedSizeAssignNoIKMoveProfile,
@@ -125,16 +123,11 @@ class TestProfileDictionaryHelpers:
     def test_add_move_profile(self):
         d = ProfileDictionary()
         profile = SimplePlannerFixedSizeMoveProfile(5, 8)
-        # Should register without raising
-        ProfileDictionary_addSimplePlannerMoveProfile(
-            d, "ns", "DEFAULT", profile
-        )
+        d.addProfile("ns", "DEFAULT", profile)
         assert d.hasProfile(profile.getKey(), "ns", "DEFAULT") is True
 
     def test_add_composite_profile(self):
         d = ProfileDictionary()
         profile = SimplePlannerCompositeProfile()
-        ProfileDictionary_addSimplePlannerCompositeProfile(
-            d, "ns", "DEFAULT", profile
-        )
+        d.addProfile("ns", "DEFAULT", profile)
         assert d.hasProfile(profile.getKey(), "ns", "DEFAULT") is True

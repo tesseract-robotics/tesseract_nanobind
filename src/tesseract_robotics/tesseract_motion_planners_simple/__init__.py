@@ -3,4 +3,13 @@ from tesseract_robotics.tesseract_motion_planners_simple._tesseract_motion_plann
 __all__ = [
     "SimpleMotionPlanner",
     "generateInterpolatedProgram",
+    "SimplePlannerMoveProfile",
+    "SimplePlannerCompositeProfile",
+    "SimplePlannerFixedSizeMoveProfile",
+    "SimplePlannerFixedSizeAssignMoveProfile",
+    "SimplePlannerFixedSizeAssignNoIKMoveProfile",
+    "SimplePlannerLVSMoveProfile",
+    "SimplePlannerLVSNoIKMoveProfile",
+    "SimplePlannerLVSAssignMoveProfile",
+    "SimplePlannerLVSAssignNoIKMoveProfile",
 ]
