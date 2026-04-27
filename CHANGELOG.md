@@ -4,18 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] — targeting 0.35.0.0
-
-### Added
-
-- `CompositeInstruction.push_back` now accepts a `CompositeInstruction` in addition to a plain `Instruction`, enabling nested composites (e.g. raster programs) to be built from Python the same way they are in C++ ([#51], [6d17314]).
-  - contributed by [@Joelkang]
-- **SimplePlanner profiles** configurable from Python — `SimplePlannerCompositeProfile` plus seven concrete move profiles (`FixedSize`, `FixedSizeAssign`, `FixedSizeAssignNoIK`, `LVS`, `LVSNoIK`, `LVSAssign`, `LVSAssignNoIK`), with `ProfileDictionary_addSimplePlannerMoveProfile` / `…CompositeProfile` helpers for registration ([#54], [e2bf837]).
-  - contributed by [@Joelkang]
-- **task_composer planning-node profiles** exposed through a new `tesseract_task_composer_planning` module: `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, and `UpsampleTrajectoryProfile`. Heavy TrajOpt-typed members on `FixStateCollisionProfile` (OSQP settings, SQP params, coeff data) are intentionally skipped — configure those via YAML or C++ ([#56], [62cd2cd]).
-  - contributed by [@Joelkang]
-- **`ConstantTCPSpeedParameterization`** (KDL-based, constant TCP-speed time parameterization) bound alongside its `ConstantTCPSpeedCompositeProfile` ([#55], [f4f981d]).
-  - contributed by [@Joelkang]
+## [Unreleased]
 
 ## [0.34.1.6] - 2026-04-27 — PyPI README refresh
 
@@ -25,9 +14,9 @@ Same wheels as 0.34.1.5; recut so the published wheel's README metadata includes
 
 - README badge row includes a Windows build badge ([6656815]).
 
-## [0.34.1.5] - 2026-04-27 — Windows x64 wheels debut
+## [0.34.1.5] - 2026-04-27 — Windows x64 wheels debut + Python profile bindings
 
-First complete cross-platform PyPI release: Linux, macOS, **and** Windows wheels for Python 3.9–3.12. Closes the long-running [#40] Windows wheels initiative ([#58]).
+First complete cross-platform PyPI release: Linux, macOS, **and** Windows wheels for Python 3.9–3.12. Closes the long-running [#40] Windows wheels initiative ([#58]). Also ships a batch of profile-binding contributions from [@Joelkang] that had been queued in Unreleased.
 
 ### Added
 
@@ -35,6 +24,14 @@ First complete cross-platform PyPI release: Linux, macOS, **and** Windows wheels
 - `__init__.py` prepends the package dir and `tesseract_robotics_nanobind.libs/` to `PATH` on Windows — required because `boost::dll`'s plain `LoadLibrary` ignores `os.add_dll_directory` ([006ce38]).
 - Cereal polymorphic types re-registered in the `tesseract_serialization` binding TU — MSVC instantiates the cereal registry per-DLL, so upstream's registrations don't reach the consumer `.pyd` without re-registration ([af88515]).
 - New developer doc `docs/developer/windows-wheels.md` capturing four Windows wheel packaging gotchas surfaced during the gh-40 diagnosis ([fe5ad75]).
+- `CompositeInstruction.push_back` now accepts a `CompositeInstruction` in addition to a plain `Instruction`, enabling nested composites (e.g. raster programs) to be built from Python the same way they are in C++ ([#51], [6d17314]).
+  - contributed by [@Joelkang]
+- **SimplePlanner profiles** configurable from Python — `SimplePlannerCompositeProfile` plus seven concrete move profiles (`FixedSize`, `FixedSizeAssign`, `FixedSizeAssignNoIK`, `LVS`, `LVSNoIK`, `LVSAssign`, `LVSAssignNoIK`), with `ProfileDictionary_addSimplePlannerMoveProfile` / `…CompositeProfile` helpers for registration ([#54], [e2bf837]).
+  - contributed by [@Joelkang]
+- **task_composer planning-node profiles** exposed through a new `tesseract_task_composer_planning` module: `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, and `UpsampleTrajectoryProfile`. Heavy TrajOpt-typed members on `FixStateCollisionProfile` (OSQP settings, SQP params, coeff data) are intentionally skipped — configure those via YAML or C++ ([#56], [62cd2cd]).
+  - contributed by [@Joelkang]
+- **`ConstantTCPSpeedParameterization`** (KDL-based, constant TCP-speed time parameterization) bound alongside its `ConstantTCPSpeedCompositeProfile` ([#55], [f4f981d]).
+  - contributed by [@Joelkang]
 
 ### Removed
 
