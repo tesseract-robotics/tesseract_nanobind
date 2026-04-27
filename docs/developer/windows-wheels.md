@@ -72,3 +72,39 @@ real cause.
     *before* assuming an export issue. The CI workflow's
     `verify plugin factory exports` step runs this check automatically and
     fails fast if the export table is the problem.
+
+## Cereal polymorphic registration
+
+!!! warning "Cereal's polymorphic registry is per-DLL on Windows MSVC — consumers must re-register types in their own TU"
+    cereal stores its polymorphic-type registry in class-template statics
+    (`StaticObject<InputBindingMap<Archive>>`,
+    `StaticObject<OutputBindingMap<Archive>>`, ...). Linux and macOS linkers
+    dedupe these template instantiations across shared libraries, giving the
+    process one shared registry. **MSVC does not** — each DLL gets its own
+    copy of every template static, with no automatic dllexport/dllimport
+    plumbing in cereal headers to share them.
+
+    Consequence: an upstream library (e.g. `tesseract_command_language.dll`)
+    that calls `CEREAL_REGISTER_TYPE` populates **its own** registry only.
+    A downstream `.pyd` that does serialization reads from **its own** empty
+    registry and fails at runtime with
+    `RuntimeError: Trying to save an unregistered polymorphic type`. The
+    type really is registered upstream — just not in the registry the
+    consumer actually consults.
+
+    `CEREAL_FORCE_DYNAMIC_INIT` is **not enough** on its own. It anchors
+    upstream's registration TU to keep the linker from stripping it, but
+    doesn't bridge the registry gap on the consumer side.
+
+    The actual Windows fix is to **mirror upstream's registration block in
+    the consumer TU**. For tesseract_command_language types
+    (`MoveInstructionPoly`, `CompositeInstruction`, etc.) that means copying
+    every `CEREAL_REGISTER_TYPE` and `CEREAL_REGISTER_POLYMORPHIC_RELATION`
+    line from upstream
+    `tesseract_command_language/src/cereal_serialization.cpp` into our
+    binding. Re-registration is a no-op on Linux/macOS (cereal tolerates
+    duplicate registrations of the same `{type, archive}` pair) and
+    populates the consumer's per-DLL registry on Windows. See
+    `src/tesseract_serialization/tesseract_serialization_bindings.cpp` for
+    the canonical placement; keep `CEREAL_FORCE_DYNAMIC_INIT(LibName)` as
+    belt-and-suspenders on the producer side.
