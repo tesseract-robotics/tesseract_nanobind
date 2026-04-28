@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Work around jsoncpp CMake config requiring older CMake policy
-cmake_policy(SET CMP0167 OLD)
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum CMake policy version")
 
 project(tesseract_nanobind LANGUAGES CXX)
