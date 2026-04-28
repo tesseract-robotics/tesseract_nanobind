@@ -399,8 +399,16 @@ NB_MODULE(_tesseract_task_composer, m) {
         return tc::AnyPoly(env);
     }, "environment"_a, "Wrap a const Environment shared_ptr into an AnyPoly");
 
+    m.def("AnyPoly_wrap_TaskComposerDataStorage", [](std::shared_ptr<tp::TaskComposerDataStorage> ds) {
+        return tc::AnyPoly(ds);
+    }, "data_storage"_a, "Wrap a TaskComposerDataStorage shared_ptr into an AnyPoly");
+
     // ========== AnyPoly unwrap functions ==========
     m.def("AnyPoly_as_CompositeInstruction", [](const tc::AnyPoly& ap) -> tp::CompositeInstruction {
         return ap.as<tp::CompositeInstruction>();
     }, "any_poly"_a, "Extract a CompositeInstruction from an AnyPoly");
+
+    m.def("AnyPoly_as_TaskComposerDataStorage", [](const tc::AnyPoly& ap) {
+        return ap.as<tp::TaskComposerDataStorage::Ptr>();
+    }, "any_poly"_a, "Extract a TaskComposerDataStorage from an AnyPoly");
 }

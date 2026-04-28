@@ -18,5 +18,7 @@ __all__ = [
     "AnyPoly_wrap_CompositeInstruction",
     "AnyPoly_wrap_ProfileDictionary",
     "AnyPoly_wrap_EnvironmentConst",
+    "AnyPoly_wrap_TaskComposerDataStorage",
     "AnyPoly_as_CompositeInstruction",
+    "AnyPoly_as_TaskComposerDataStorage",
 ]

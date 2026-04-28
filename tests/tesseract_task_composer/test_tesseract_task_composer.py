@@ -246,3 +246,81 @@ class TestDotgraph:
         ok = node.saveDotgraph(str(bad))
         assert ok is False
         assert not bad.exists()
+
+
+class TestAnyPolyDataStorage:
+    """AnyPoly_wrap/as_TaskComposerDataStorage — used to navigate sub-task storages
+    that the framework nests under a parent's data_storage keyed by node UUID."""
+
+    def test_anypoly_wrap_data_storage_not_null(self):
+        from tesseract_robotics.tesseract_task_composer import (
+            AnyPoly_wrap_TaskComposerDataStorage,
+            createTaskComposerDataStorage,
+        )
+
+        ds = createTaskComposerDataStorage()
+        any_poly = AnyPoly_wrap_TaskComposerDataStorage(ds)
+        assert any_poly is not None
+        assert not any_poly.isNull()
+
+    def test_anypoly_roundtrip_data_storage(self):
+        """Wrap a DataStorage in AnyPoly, unwrap, confirm we got the same instance back."""
+        from tesseract_robotics.tesseract_task_composer import (
+            AnyPoly_as_TaskComposerDataStorage,
+            AnyPoly_wrap_TaskComposerDataStorage,
+            createTaskComposerDataStorage,
+        )
+
+        ds = createTaskComposerDataStorage()
+        ds.setName("sub_storage")
+
+        recovered = AnyPoly_as_TaskComposerDataStorage(
+            AnyPoly_wrap_TaskComposerDataStorage(ds)
+        )
+        assert recovered is not None
+        assert recovered.getName() == "sub_storage"
+
+        # Mutate via the recovered handle; original sees it -> shared_ptr semantics preserved.
+        recovered.setName("mutated")
+        assert ds.getName() == "mutated"
+
+    def test_navigate_nested_sub_task_storage(self):
+        """Mirror the real pattern: parent stores a sub-storage as AnyPoly under a
+        UUID key; navigate parent.getData(uuid) -> as_TaskComposerDataStorage ->
+        getData('input_data') to recover the mid-pipeline AnyPoly that the
+        framework would have placed there (e.g. RasterSimple's densified output)."""
+        from tesseract_robotics.tesseract_command_language import (
+            CompositeInstruction,
+        )
+        from tesseract_robotics.tesseract_task_composer import (
+            AnyPoly_as_CompositeInstruction,
+            AnyPoly_as_TaskComposerDataStorage,
+            AnyPoly_wrap_CompositeInstruction,
+            AnyPoly_wrap_TaskComposerDataStorage,
+            createTaskComposerDataStorage,
+        )
+
+        sub_storage = createTaskComposerDataStorage()
+        program = CompositeInstruction("DENSIFIED")
+        sub_storage.setData("input_data", AnyPoly_wrap_CompositeInstruction(program))
+
+        parent = createTaskComposerDataStorage()
+        fake_uuid = "deadbeef" * 4
+        parent.setData(fake_uuid, AnyPoly_wrap_TaskComposerDataStorage(sub_storage))
+
+        recovered_sub = AnyPoly_as_TaskComposerDataStorage(parent.getData(fake_uuid))
+        recovered_program = AnyPoly_as_CompositeInstruction(
+            recovered_sub.getData("input_data")
+        )
+        assert recovered_program.getProfile() == "DENSIFIED"
+
+    def test_unwrap_null_anypoly_raises(self):
+        """A null AnyPoly cannot be unwrapped — verify the binding surfaces the error
+        rather than returning a silently-null shared_ptr."""
+        from tesseract_robotics.tesseract_task_composer import (
+            AnyPoly,
+            AnyPoly_as_TaskComposerDataStorage,
+        )
+
+        with pytest.raises(Exception):
+            AnyPoly_as_TaskComposerDataStorage(AnyPoly())
