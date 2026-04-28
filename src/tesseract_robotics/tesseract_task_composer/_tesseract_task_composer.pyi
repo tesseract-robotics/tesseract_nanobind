@@ -213,5 +213,11 @@ def AnyPoly_wrap_ProfileDictionary(profiles: "tesseract_common::ProfileDictionar
 def AnyPoly_wrap_EnvironmentConst(environment: "tesseract_environment::Environment") -> AnyPoly:
     """Wrap a const Environment shared_ptr into an AnyPoly"""
 
+def AnyPoly_wrap_TaskComposerDataStorage(data_storage: TaskComposerDataStorage) -> AnyPoly:
+    """Wrap a TaskComposerDataStorage shared_ptr into an AnyPoly"""
+
 def AnyPoly_as_CompositeInstruction(any_poly: AnyPoly) -> "tesseract_planning::CompositeInstruction":
     """Extract a CompositeInstruction from an AnyPoly"""
+
+def AnyPoly_as_TaskComposerDataStorage(any_poly: AnyPoly) -> TaskComposerDataStorage:
+    """Extract a TaskComposerDataStorage from an AnyPoly"""
