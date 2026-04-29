@@ -296,6 +296,7 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
 | **Capsule** | Fast | Medium |
 | **Mesh** | Slow | High |
 | **ConvexMesh** | Medium | High |
+| **Octree** | Medium | Voxel-discrete |
 
 !!! tip "Use Convex Decomposition"
     For complex meshes, use `makeConvexMesh` to build a convex hull:
@@ -313,6 +314,75 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
 
     convex = convex_mesh_from_file("/path/to/mesh.stl")
     ```
+
+## Point Clouds as Collision Obstacles
+
+Sensor-derived obstacles — depth-camera scans, LiDAR, fused mapping output —
+go through a `tesseract_geometry.Octree`. Each occupied voxel becomes a
+sub-shape the discrete contact manager checks against the robot, so
+planners and collision queries treat the cloud just like any other
+geometry.
+
+**1. Build the octree and attach it as a link.** 
+
+Load your points into a `PointCloud`, pass it through `createOctree`, and wrap
+the result in `tesseract_geometry.Octree`. Then hand the geometry to
+`create_obstacle()`.
+
+```python
+import numpy as np
+from tesseract_robotics.planning import Pose, create_obstacle
+from tesseract_robotics.tesseract_geometry import (
+    Octree, OctreeSubType, PointCloud, createOctree,
+)
+
+# verts: (N, 3) float64 ndarray — pulled from your loader of choice
+pc = PointCloud()
+for x, y, z in verts:
+    pc.addPoint(float(x), float(y), float(z))
+
+# resolution = leaf edge length in metres; smaller = finer = more sub-shapes
+octree = Octree(createOctree(pc, resolution=0.02, prune=True, binary=True),
+                OctreeSubType.BOX, pruned=True, binary_octree=True)
+
+create_obstacle(
+    robot,
+    name="scan",
+    geometry=octree,
+    transform=Pose.from_xyz(1.3, 0.3, 0.0),
+)
+```
+
+`OctreeSubType` picks the per-leaf primitive — `BOX` is the cheap default,
+`SPHERE_INSIDE`/`SPHERE_OUTSIDE` use inscribed/circumscribed spheres if you
+need rounder swept volumes.
+
+**2. Margins.** The discrete contact manager applies a margin to every pair
+(see [Contact Margins](#contact-margins)). For an octree obstacle the
+defaults work fine — set a single value on the manager:
+
+```python
+manager = robot.env.getDiscreteContactManager()
+manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2 cm safety buffer
+```
+
+TrajOpt-based planners route around the cloud out of the box —
+`create_trajopt_default_profiles()` enables both the collision cost
+(`coeff=50`) and the collision constraint (`coeff=10`) against every
+geometry in the env, including the octree. No octree-specific tuning
+needed.
+
+!!! tip "Choosing a resolution"
+    The leaf size is the dominant cost knob — halving it roughly 8×s the
+    sub-shape count. A 1–2 cm leaf is a typical starting point for
+    depth-camera scans of a tabletop workspace; coarsen aggressively for
+    full-room scans. At sub-centimetre resolutions TrajOpt can saturate
+    its iteration budget; coarsen until the planner converges.
+
+For a full collision-aware vs. collision-disabled comparison with a viewer
+walkthrough, see the
+[Point cloud → Octree](../examples/basic.md#point-cloud-octree) example.
 
 ## Debugging Collisions
 

@@ -61,6 +61,7 @@ handles optional viewer launch, `run()` returns results for testing / reuse.
 | `tesseract_collision_example.py` | `tesseract_collision_example` | Discrete collision checking |
 | `scene_graph_example.py` | `tesseract_scene_graph_example` | Scene graph manipulation |
 | `geometry_showcase_example.py` | `tesseract_geometry_showcase_example` | All geometry types |
+| `pointcloud_octree_collision_example.py` | `tesseract_pointcloud_octree_collision_example` | Point cloud → Octree → TrajOpt with collision on/off, toggleable in the viewer |
 | `reeds_shepp_example.py` | `tesseract_reeds_shepp_example` | Reeds-Shepp path for differential-drive |
 
 ### Planning

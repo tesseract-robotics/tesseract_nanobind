@@ -9,6 +9,7 @@ from .geometry_showcase_example import run as geometry_showcase_example
 from .glass_upright_example import run as glass_upright_example
 from .online_planning_example import run as online_planning_example
 from .online_planning_sqp_example import run as online_planning_sqp_example
+from .pointcloud_octree_collision_example import run as pointcloud_octree_collision_example
 from .pick_and_place_example import run as pick_and_place_example
 from .puzzle_piece_auxillary_axes_example import run as puzzle_piece_auxillary_axes_example
 from .raster_example import run as raster_example
