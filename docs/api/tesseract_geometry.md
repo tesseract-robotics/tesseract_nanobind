@@ -111,6 +111,74 @@ from tesseract_robotics.tesseract_geometry import CompoundMesh
 compound = CompoundMesh(meshes)
 ```
 
+## Octree
+
+Occupancy octree from 3D sensor data, backed by [octomap](https://octomap.github.io/).
+
+### PointCloud → Octree
+
+```python
+from tesseract_robotics.tesseract_geometry import (
+    PointCloud, Octree, OctreeSubType, createOctree,
+)
+
+# Build a point cloud and convert to an octomap OcTree
+pc = PointCloud()
+pc.addPoint(0.0, 0.0, 0.0)
+pc.addPoint(0.1, 0.0, 0.0)
+pc.addPoint(0.0, 0.1, 0.0)
+
+ot = createOctree(pc, resolution=0.05, prune=True, binary=True)
+
+# Wrap in a tesseract Octree geometry
+octree = Octree(ot, OctreeSubType.BOX, pruned=True, binary_octree=True)
+print(octree.calcNumSubShapes())
+```
+
+### Building an Octree directly
+
+```python
+from tesseract_robotics.tesseract_geometry import OcTree
+
+ot = OcTree(0.05)  # leaf resolution
+ot.updateNode(0.0, 0.0, 0.0, True)
+ot.updateNode(0.1, 0.0, 0.0, True)
+ot.updateInnerOccupancy()
+ot.toMaxLikelihood()
+ot.writeBinary("/tmp/scene.bt")
+
+# Load back from file
+loaded = OcTree("/tmp/scene.bt")
+```
+
+| OctreeSubType | Description |
+|---------------|-------------|
+| `BOX` | Each occupied voxel becomes a box |
+| `SPHERE_INSIDE` | Inscribed sphere per voxel |
+| `SPHERE_OUTSIDE` | Circumscribed sphere per voxel |
+
+## Utilities & Conversions
+
+```python
+from tesseract_robotics.tesseract_geometry import (
+    Box, Sphere, isIdentical, extractVertices, toTriangleMesh,
+)
+from tesseract_robotics.tesseract_common import Isometry3d
+
+origin = Isometry3d()
+box = Box(1, 1, 1)
+
+# Compare two geometries structurally
+isIdentical(box, Box(1, 1, 1))   # True
+isIdentical(box, Sphere(1))      # False
+
+# Extract vertices (primitives are converted to a mesh first)
+verts = extractVertices(box, origin)        # 8 verts
+
+# Convert a primitive to a triangle Mesh
+mesh = toTriangleMesh(box, tolerance=0.01, origin=origin)
+```
+
 ## Mesh Materials
 
 ### MeshMaterial
@@ -170,6 +238,7 @@ copy = geom.clone()
 | `MESH` | Triangle mesh |
 | `CONVEX_MESH` | Convex hull |
 | `SDF_MESH` | Signed distance field |
+| `OCTREE` | Occupancy octree |
 | `COMPOUND_MESH` | Multiple meshes |
 
 ## Factory Functions
@@ -182,6 +251,7 @@ copy = geom.clone()
 | `createConvexMeshFromResource(resource, scale)` | Convex from Resource |
 | `createSDFMeshFromPath(path, scale)` | Load as SDF mesh |
 | `createSDFMeshFromResource(resource, scale)` | SDF from Resource |
+| `createOctree(point_cloud, resolution, prune, binary)` | Build an octomap OcTree from a `PointCloud` |
 
 ## Auto-generated API Reference
 
