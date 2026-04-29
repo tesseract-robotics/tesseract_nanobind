@@ -18,8 +18,11 @@
 import base64
 import io
 import json
+import os
 import pkgutil
 import struct
+import tempfile
+import warnings
 
 import numpy as np
 
@@ -309,10 +312,88 @@ def _apply_material(gltf_dict, gltf_buf_io, mesh_dict, visual_name, tf_material,
             "roughnessFactor": 0.3,
             "metallicFactor": 0.3,
         }
+    elif visual_material is not None:
+        # The mesh has its own embedded material (e.g. from a .dae file) AND
+        # the caller set a Visual.material override. Honour the override:
+        # replace baseColorFactor so callers can tint robot links by mutating
+        # Visual.material.color.
+        tf_material.setdefault("pbrMetallicRoughness", {})["baseColorFactor"] = (
+            visual_material.color.flatten().tolist()
+        )
 
     material_dict, material_ind = _append_dict_list(gltf_dict, "materials", tf_material)
 
     mesh_dict["primitives"][0]["material"] = material_ind
+
+
+def _iter_octomap_bt_leaves(bt_bytes, tree_depth=16):
+    """Yield ``(cx, cy, cz, size)`` for every occupied leaf in an OctoMap ``.bt`` stream.
+
+    OctoMap's binary format encodes each inner node as 16 bits = 8 children
+    x 2 bits. The 2-bit codes (bit ``i*2`` low, bit ``i*2+1`` high) are:
+    ``(0,0)`` unknown, ``(1,0)`` free leaf, ``(0,1)`` occupied leaf,
+    ``(1,1)`` inner node (recurse). Inner nodes are written depth-first in
+    child order 0..7. The root covers ``resolution * 2**tree_depth`` centred
+    at the origin; child ``i``'s octant is ``(i & 1, i & 2, i & 4) -> (x, y, z)``.
+    """
+    sep = b"data\n"
+    idx = bt_bytes.find(sep)
+    if idx < 0:
+        raise ValueError("malformed .bt stream: no 'data' line in header")
+    header = bt_bytes[:idx].decode("ascii", errors="replace")
+    binary = bt_bytes[idx + len(sep) :]
+
+    resolution = None
+    for line in header.splitlines():
+        line = line.strip()
+        if line.startswith("res "):
+            resolution = float(line.split()[1])
+            break
+    if resolution is None:
+        raise ValueError("malformed .bt stream: no 'res' line in header")
+
+    root_size = resolution * (1 << tree_depth)
+    pos = 0
+    stack = [(0.0, 0.0, 0.0, root_size)]
+    while stack:
+        cx, cy, cz, size = stack.pop()
+        if pos + 2 > len(binary):
+            raise ValueError("truncated .bt stream while walking tree")
+        bits = binary[pos] | (binary[pos + 1] << 8)
+        pos += 2
+        child_size = size * 0.5
+        offset = size * 0.25
+        # Process in reverse so DFS visits child 0 first (stack ordering).
+        for i in range(7, -1, -1):
+            code = (bits >> (i * 2)) & 0b11
+            if code == 0b00:
+                continue  # absent
+            ccx = cx + (offset if (i & 1) else -offset)
+            ccy = cy + (offset if (i & 2) else -offset)
+            ccz = cz + (offset if (i & 4) else -offset)
+            if code == 0b10:
+                yield (ccx, ccy, ccz, child_size)
+            elif code == 0b11:
+                stack.append((ccx, ccy, ccz, child_size))
+            # 0b01 = free leaf: ignore
+
+
+def _octree_voxels(tg_octree):
+    """Return ``(centers, sizes)`` numpy arrays for occupied voxels in ``tg_octree``."""
+    octomap_tree = tg_octree.getOctree()
+    with tempfile.NamedTemporaryFile(suffix=".bt", delete=False) as f:
+        path = f.name
+    try:
+        octomap_tree.writeBinary(path)
+        with open(path, "rb") as f:
+            data = f.read()
+    finally:
+        os.unlink(path)
+    leaves = list(_iter_octomap_bt_leaves(data))
+    if not leaves:
+        return np.empty((0, 3)), np.empty((0,))
+    arr = np.asarray(leaves, dtype=np.float64)
+    return arr[:, :3], arr[:, 3]
 
 
 def _append_link_visual(gltf_dict, gltf_buf_io, link_name, visual, visual_i, shapes_mesh_inds):
@@ -386,6 +467,40 @@ def _append_link_visual(gltf_dict, gltf_buf_io, link_name, visual, visual_i, sha
             cylinder.getRadius(),
             0.5 * cylinder.getLength(),
         ]
+
+    elif isinstance(visual_geom, tesseract_geometry.Octree):
+        # Render each occupied voxel as an instance of the shared cube mesh.
+        # The voxel size already accounts for the leaf extent, so we scale the
+        # unit cube by 0.5 * size (the cube primitive spans [-1, 1]^3 — same
+        # convention as the Box branch above).
+        centers, sizes = _octree_voxels(visual_geom)
+        mesh_dict, mesh_ind = _append_shape_mesh(
+            gltf_dict, gltf_buf_io, "cube_geometry", visual_name, shapes_mesh_inds
+        )
+        _apply_material(gltf_dict, gltf_buf_io, mesh_dict, visual_name, None, visual.material)
+        child_inds = []
+        for i in range(centers.shape[0]):
+            s = 0.5 * float(sizes[i])
+            voxel_node = {
+                "name": f"{visual_name}_voxel_{i}",
+                "translation": [float(centers[i, 0]), float(centers[i, 1]), float(centers[i, 2])],
+                "scale": [s, s, s],
+                "mesh": mesh_ind,
+            }
+            _, child_ind = _append_dict_list(gltf_dict, "nodes", voxel_node)
+            child_inds.append(child_ind)
+        if child_inds:
+            visual_node["children"] = child_inds
+        return [visual_node], [visual_ind]
+
+    else:
+        warnings.warn(
+            f"tesseract_env_to_gltf: unsupported visual geometry "
+            f"{type(visual_geom).__name__} on link {link_name!r}; "
+            "rendering skipped.",
+            stacklevel=2,
+        )
+        return [visual_node], [visual_ind]
 
     _apply_material(gltf_dict, gltf_buf_io, mesh_dict, visual_name, tf_material, visual.material)
 

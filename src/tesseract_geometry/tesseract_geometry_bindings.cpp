@@ -20,7 +20,14 @@
 #include <tesseract_geometry/impl/sdf_mesh.h>
 #include <tesseract_geometry/impl/compound_mesh.h>
 #include <tesseract_geometry/impl/mesh_material.h>
+#include <tesseract_geometry/impl/octree.h>
+#include <tesseract_geometry/impl/octree_utils.h>
 #include <tesseract_geometry/mesh_parser.h>
+#include <tesseract_geometry/utils.h>
+#include <tesseract_geometry/conversions.h>
+
+// octomap
+#include <octomap/OcTree.h>
 
 // tesseract_common
 #include <tesseract_common/types.h>
@@ -244,6 +251,79 @@ NB_MODULE(_tesseract_geometry, m) {
         .def("getResource", &tg::CompoundMesh::getResource, "Get the resource used to create this mesh")
         .def("getScale", &tg::CompoundMesh::getScale, "Get the scale applied to the mesh");
 
+    // octomap::OcTree - minimal binding so callers can construct/load and
+    // pass it to tesseract_geometry::Octree
+    nb::class_<octomap::OcTree>(m, "OcTree")
+        .def(nb::init<double>(), "resolution"_a,
+             "Create an empty octomap OcTree with the given leaf resolution")
+        .def(nb::init<std::string>(), "filename"_a,
+             "Load an octomap OcTree from a .bt or .ot file")
+        .def("getResolution", &octomap::OcTree::getResolution, "Get the leaf resolution")
+        .def("size", &octomap::OcTree::size, "Get the total number of nodes")
+        .def("getNumLeafNodes", &octomap::OcTree::getNumLeafNodes, "Get the number of leaf nodes")
+        .def("updateNode", [](octomap::OcTree& self, double x, double y, double z, bool occupied, bool lazy_eval) {
+            self.updateNode(x, y, z, occupied, lazy_eval);
+        }, "x"_a, "y"_a, "z"_a, "occupied"_a, "lazy_eval"_a = false,
+        "Insert/update a node at the given coordinate")
+        .def("updateInnerOccupancy", &octomap::OcTree::updateInnerOccupancy,
+             "Recompute inner occupancies after lazy updates")
+        .def("toMaxLikelihood", &octomap::OcTree::toMaxLikelihood,
+             "Convert occupancy probabilities to a binary maximum-likelihood representation")
+        .def("writeBinary", [](octomap::OcTree& self, const std::string& filename) {
+            return self.writeBinary(filename);
+        }, "filename"_a, "Write the octree to a binary .bt file");
+
+    // OctreeSubType enum
+    nb::enum_<tg::OctreeSubType>(m, "OctreeSubType")
+        .value("BOX", tg::OctreeSubType::BOX)
+        .value("SPHERE_INSIDE", tg::OctreeSubType::SPHERE_INSIDE)
+        .value("SPHERE_OUTSIDE", tg::OctreeSubType::SPHERE_OUTSIDE);
+
+    // PointCloud::Point
+    nb::class_<tg::PointCloud::Point>(m, "PointCloudPoint")
+        .def(nb::init<>())
+        .def(nb::init<double, double, double>(), "x"_a, "y"_a, "z"_a)
+        .def_rw("x", &tg::PointCloud::Point::x)
+        .def_rw("y", &tg::PointCloud::Point::y)
+        .def_rw("z", &tg::PointCloud::Point::z);
+
+    // PointCloud
+    nb::class_<tg::PointCloud>(m, "PointCloud")
+        .def(nb::init<>())
+        .def_rw("points", &tg::PointCloud::points)
+        .def("addPoint", &tg::PointCloud::addPoint, "x"_a, "y"_a, "z"_a,
+             "Add a point to the cloud");
+
+    // Octree
+    nb::class_<tg::Octree, tg::Geometry>(m, "Octree")
+        .def("__init__", [](tg::Octree* self,
+                            std::shared_ptr<octomap::OcTree> octree,
+                            tg::OctreeSubType sub_type,
+                            bool pruned,
+                            bool binary_octree) {
+            new (self) tg::Octree(std::shared_ptr<const octomap::OcTree>(octree), sub_type, pruned, binary_octree);
+        }, "octree"_a, "sub_type"_a, "pruned"_a = false, "binary_octree"_a = false,
+        "Create an Octree geometry wrapping an octomap OcTree")
+        .def("getOctree", &tg::Octree::getOctree, nb::rv_policy::reference_internal,
+             "Get the underlying octomap OcTree")
+        .def("getSubType", &tg::Octree::getSubType, "Get the sub-shape type")
+        .def("getPruned", &tg::Octree::getPruned, "Whether the octree was pruned")
+        .def("calcNumSubShapes", &tg::Octree::calcNumSubShapes,
+             "Calculate the number of sub-shapes (expensive)")
+        .def("__eq__", &tg::Octree::operator==)
+        .def("__ne__", &tg::Octree::operator!=)
+        .def_static("prune", &tg::Octree::prune, "octree"_a,
+                    "Prune the octomap OcTree using tesseract's occupancy-threshold rule");
+
+    // Octree utility: build an octomap::OcTree from a PointCloud
+    m.def("createOctree", [](const tg::PointCloud& point_cloud,
+                             double resolution,
+                             bool prune,
+                             bool binary) -> std::shared_ptr<octomap::OcTree> {
+        return tg::createOctree(point_cloud, resolution, prune, binary);
+    }, "point_cloud"_a, "resolution"_a, "prune"_a, "binary"_a = true,
+    "Build an octomap OcTree from a PointCloud");
+
     // Mesh loading functions
     m.def("createMeshFromPath", [](const std::string& path,
                                    const Eigen::Vector3d& scale,
@@ -293,4 +373,19 @@ NB_MODULE(_tesseract_geometry, m) {
         return tg::createMeshFromResource<tg::SDFMesh>(resource, scale, triangulate, flatten);
     }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
     "Load SDFMesh from resource (e.g., package:// URL)");
+
+    // Utilities
+    m.def("isIdentical", &tg::isIdentical, "geom1"_a, "geom2"_a,
+          "Check if two geometries are identical");
+
+    m.def("extractVertices", &tg::extractVertices, "geom"_a, "origin"_a,
+          "Extract vertices from a geometry, transforming primitives to a mesh first");
+
+    // Conversions
+    m.def("toTriangleMesh", [](const tg::Geometry& geom,
+                               double tolerance,
+                               const Eigen::Isometry3d& origin) {
+        return tg::toTriangleMesh(geom, tolerance, origin);
+    }, "geom"_a, "tolerance"_a, "origin"_a,
+    "Convert a primitive geometry to a triangle Mesh");
 }

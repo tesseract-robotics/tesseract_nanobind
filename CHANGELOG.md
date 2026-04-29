@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- contributed by [@Joelkang]
+
+  - `Octree` geometry bindings (plus `octomap::OcTree`, `OctreeSubType`, `PointCloud`, `createOctree`) and the remaining `tesseract_geometry` utilities (`isIdentical`, `extractVertices`, `toTriangleMesh`).
+
 ## [0.34.1.7] - 2026-05-09 — command_language I/O instructions + TaskComposer introspection
 
 Python API surface expansion: `tesseract_command_language` gains its remaining I/O and pacing instruction types (`Wait`, `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) — closing the gap that previously forced raster and pick-and-place pipelines through C++ or YAML — alongside TaskComposer DAG visualisation via GraphViz DOT output and `TaskComposerDataStorage` introspection helpers. Welcomes [@seonixx] (Simon White) as a new contributor.

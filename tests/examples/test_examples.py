@@ -48,6 +48,18 @@ def test_geometry_showcase_example():
     tesseract_robotics.examples.geometry_showcase_example()
 
 
+@pytest.mark.basic
+def test_pointcloud_octree_collision_example():
+    # The shipped sample.ply lives in the source tree (docs/assets/) — it
+    # isn't bundled with the wheel — so pass the repo-root path explicitly
+    # rather than relying on the example's source-checkout default.
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    cloud = repo_root / "docs" / "assets" / "sample.ply"
+    tesseract_robotics.examples.pointcloud_octree_collision_example(cloud)
+
+
 @pytest.mark.planning
 def test_freespace_ompl_example():
     tesseract_robotics.examples.freespace_ompl_example()

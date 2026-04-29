@@ -179,6 +179,63 @@ def test_convex_mesh():
     assert geom_clone.getFaceCount() == 1
 
 
+def test_octree():
+    pc = tesseract_geometry.PointCloud()
+    pc.addPoint(0.0, 0.0, 0.0)
+    pc.addPoint(0.1, 0.0, 0.0)
+    pc.addPoint(0.0, 0.1, 0.0)
+
+    ot = tesseract_geometry.createOctree(pc, 0.05, True, True)
+    nptest.assert_almost_equal(ot.getResolution(), 0.05)
+    assert ot.getNumLeafNodes() == 3
+
+    geom = tesseract_geometry.Octree(
+        ot, tesseract_geometry.OctreeSubType.BOX, True, True
+    )
+    assert geom.getType() == tesseract_geometry.GeometryType.OCTREE
+    assert geom.getSubType() == tesseract_geometry.OctreeSubType.BOX
+    assert geom.getPruned() is True
+    assert geom.calcNumSubShapes() == 3
+
+    geom_clone = geom.clone()
+    assert geom_clone.getType() == tesseract_geometry.GeometryType.OCTREE
+
+
+def test_geometry_utils_and_conversions():
+    box = tesseract_geometry.Box(1, 1, 1)
+    sphere = tesseract_geometry.Sphere(1)
+
+    assert tesseract_geometry.isIdentical(box, tesseract_geometry.Box(1, 1, 1))
+    assert not tesseract_geometry.isIdentical(box, sphere)
+
+    origin = tesseract_common.Isometry3d()
+    verts = tesseract_geometry.extractVertices(box, origin)
+    assert len(verts) == 8
+
+    mesh = tesseract_geometry.toTriangleMesh(box, 0.01, origin)
+    assert mesh.getVertexCount() == 8
+    assert mesh.getFaceCount() == 12
+
+    sphere_mesh = tesseract_geometry.toTriangleMesh(sphere, 0.05, origin)
+    assert sphere_mesh.getVertexCount() > 0
+    assert sphere_mesh.getFaceCount() > 0
+
+
+def test_octree_direct_construction():
+    ot = tesseract_geometry.OcTree(0.05)
+    ot.updateNode(0.0, 0.0, 0.0, True)
+    ot.updateNode(0.1, 0.0, 0.0, True)
+    ot.updateInnerOccupancy()
+    ot.toMaxLikelihood()
+    assert ot.size() > 0
+
+    geom = tesseract_geometry.Octree(
+        ot, tesseract_geometry.OctreeSubType.SPHERE_INSIDE
+    )
+    assert geom.getSubType() == tesseract_geometry.OctreeSubType.SPHERE_INSIDE
+    assert geom.getPruned() is False
+
+
 def test_sdf_mesh():
     vertices = tesseract_common.VectorVector3d()
     vertices.append(np.array([1, 1, 0], dtype=np.float64))
