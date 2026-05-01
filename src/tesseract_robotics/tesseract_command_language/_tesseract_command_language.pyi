@@ -255,6 +255,21 @@ class InstructionPoly:
     @overload
     def __init__(self, instruction: CompositeInstruction) -> None: ...
 
+    @overload
+    def __init__(self, instruction: WaitInstruction) -> None: ...
+
+    @overload
+    def __init__(self, instruction: TimerInstruction) -> None: ...
+
+    @overload
+    def __init__(self, instruction: SetAnalogInstruction) -> None: ...
+
+    @overload
+    def __init__(self, instruction: SetDigitalInstruction) -> None: ...
+
+    @overload
+    def __init__(self, instruction: SetToolInstruction) -> None: ...
+
     def getDescription(self) -> str: ...
 
     def setDescription(self, description: str) -> None: ...
@@ -264,6 +279,16 @@ class InstructionPoly:
     def isCompositeInstruction(self) -> bool: ...
 
     def isMoveInstruction(self) -> bool: ...
+
+    def isWaitInstruction(self) -> bool: ...
+
+    def isTimerInstruction(self) -> bool: ...
+
+    def isSetAnalogInstruction(self) -> bool: ...
+
+    def isSetDigitalInstruction(self) -> bool: ...
+
+    def isSetToolInstruction(self) -> bool: ...
 
     def isNull(self) -> bool: ...
 
@@ -275,6 +300,31 @@ class InstructionPoly:
     def asCompositeInstruction(self) -> CompositeInstruction:
         """
         Cast to CompositeInstruction. Raises RuntimeError if not a composite instruction.
+        """
+
+    def asWaitInstruction(self) -> WaitInstruction:
+        """
+        Cast to WaitInstruction. Raises RuntimeError if not a wait instruction.
+        """
+
+    def asTimerInstruction(self) -> TimerInstruction:
+        """
+        Cast to TimerInstruction. Raises RuntimeError if not a timer instruction.
+        """
+
+    def asSetAnalogInstruction(self) -> SetAnalogInstruction:
+        """
+        Cast to SetAnalogInstruction. Raises RuntimeError if not a set analog instruction.
+        """
+
+    def asSetDigitalInstruction(self) -> SetDigitalInstruction:
+        """
+        Cast to SetDigitalInstruction. Raises RuntimeError if not a set digital instruction.
+        """
+
+    def asSetToolInstruction(self) -> SetToolInstruction:
+        """
+        Cast to SetToolInstruction. Raises RuntimeError if not a set tool instruction.
         """
 
 class MoveInstructionPoly:
@@ -329,6 +379,16 @@ def MoveInstructionPoly_wrap_MoveInstruction(instruction: MoveInstruction) -> Mo
 def InstructionPoly_as_MoveInstructionPoly(instruction: InstructionPoly) -> MoveInstructionPoly: ...
 
 def InstructionPoly_as_CompositeInstruction(instruction: InstructionPoly) -> CompositeInstruction: ...
+
+def InstructionPoly_as_WaitInstruction(instruction: InstructionPoly) -> WaitInstruction: ...
+
+def InstructionPoly_as_TimerInstruction(instruction: InstructionPoly) -> TimerInstruction: ...
+
+def InstructionPoly_as_SetAnalogInstruction(instruction: InstructionPoly) -> SetAnalogInstruction: ...
+
+def InstructionPoly_as_SetDigitalInstruction(instruction: InstructionPoly) -> SetDigitalInstruction: ...
+
+def InstructionPoly_as_SetToolInstruction(instruction: InstructionPoly) -> SetToolInstruction: ...
 
 def WaypointPoly_as_StateWaypointPoly(waypoint: WaypointPoly) -> StateWaypointPoly: ...
 
@@ -394,6 +454,119 @@ class MoveInstruction:
 
     def setDescription(self, description: str) -> None: ...
 
+class WaitInstructionType(enum.Enum):
+    TIME = 0
+
+    DIGITAL_INPUT_HIGH = 1
+
+    DIGITAL_INPUT_LOW = 2
+
+    DIGITAL_OUTPUT_HIGH = 3
+
+    DIGITAL_OUTPUT_LOW = 4
+
+class WaitInstruction:
+    @overload
+    def __init__(self, time: float) -> None:
+        """Construct a TIME-mode wait of `time` seconds."""
+
+    @overload
+    def __init__(self, type: WaitInstructionType, io: int) -> None:
+        """
+        Construct a digital-IO wait. `type` is one of the DIGITAL_* modes; `io` is the IO index.
+        """
+
+    def getWaitType(self) -> WaitInstructionType: ...
+
+    def setWaitType(self, type: WaitInstructionType) -> None: ...
+
+    def getWaitTime(self) -> float: ...
+
+    def setWaitTime(self, time: float) -> None: ...
+
+    def getWaitIO(self) -> int: ...
+
+    def setWaitIO(self, io: int) -> None: ...
+
+    def getDescription(self) -> str: ...
+
+    def setDescription(self, description: str) -> None: ...
+
+    def print(self, prefix: str = '') -> None: ...
+
+class TimerInstructionType(enum.Enum):
+    DIGITAL_OUTPUT_HIGH = 0
+
+    DIGITAL_OUTPUT_LOW = 1
+
+class TimerInstruction:
+    def __init__(self, type: TimerInstructionType, time: float, io: int) -> None:
+        """
+        Construct a timer that, after `time` seconds, drives digital output `io` HIGH or LOW per `type`.
+        """
+
+    def getTimerType(self) -> TimerInstructionType: ...
+
+    def setTimerType(self, type: TimerInstructionType) -> None: ...
+
+    def getTimerTime(self) -> float: ...
+
+    def setTimerTime(self, time: float) -> None: ...
+
+    def getTimerIO(self) -> int: ...
+
+    def setTimerIO(self, io: int) -> None: ...
+
+    def getDescription(self) -> str: ...
+
+    def setDescription(self, description: str) -> None: ...
+
+    def print(self, prefix: str = '') -> None: ...
+
+class SetAnalogInstruction:
+    def __init__(self, key: str, index: int, value: float) -> None:
+        """Set analog channel identified by (key, index) to `value`."""
+
+    def getKey(self) -> str: ...
+
+    def getIndex(self) -> int: ...
+
+    def getValue(self) -> float: ...
+
+    def getDescription(self) -> str: ...
+
+    def setDescription(self, description: str) -> None: ...
+
+    def print(self, prefix: str = '') -> None: ...
+
+class SetDigitalInstruction:
+    def __init__(self, key: str, index: int, value: bool) -> None:
+        """Set digital channel identified by (key, index) to `value`."""
+
+    def getKey(self) -> str: ...
+
+    def getIndex(self) -> int: ...
+
+    def getValue(self) -> bool: ...
+
+    def getDescription(self) -> str: ...
+
+    def setDescription(self, description: str) -> None: ...
+
+    def print(self, prefix: str = '') -> None: ...
+
+class SetToolInstruction:
+    def __init__(self, tool_id: int) -> None:
+        """Activate the tool with the given ID."""
+
+    def getTool(self) -> int: ...
+
+    def getDescription(self) -> str: ...
+
+    def setDescription(self, description: str) -> None: ...
+
+    def print(self, prefix: str = '') -> None: ...
+
 class CompositeInstruction:
     @overload
     def __init__(self) -> None: ...
@@ -429,6 +602,21 @@ class CompositeInstruction:
 
     @overload
     def push_back(self, instruction: CompositeInstruction) -> None: ...
+
+    @overload
+    def push_back(self, instruction: WaitInstruction) -> None: ...
+
+    @overload
+    def push_back(self, instruction: TimerInstruction) -> None: ...
+
+    @overload
+    def push_back(self, instruction: SetAnalogInstruction) -> None: ...
+
+    @overload
+    def push_back(self, instruction: SetDigitalInstruction) -> None: ...
+
+    @overload
+    def push_back(self, instruction: SetToolInstruction) -> None: ...
 
     def appendMoveInstruction(self, mi: MoveInstructionPoly) -> None: ...
 

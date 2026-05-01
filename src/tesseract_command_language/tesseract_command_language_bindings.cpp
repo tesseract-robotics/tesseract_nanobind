@@ -15,6 +15,12 @@
 #include <tesseract_command_language/state_waypoint.h>
 #include <tesseract_command_language/move_instruction.h>
 #include <tesseract_command_language/composite_instruction.h>
+#include <tesseract_command_language/wait_instruction.h>
+#include <tesseract_command_language/timer_instruction.h>
+#include <tesseract_command_language/set_analog_instruction.h>
+#include <tesseract_command_language/set_digital_instruction.h>
+#include <tesseract_command_language/set_tool_instruction.h>
+#include <tesseract_command_language/instruction_type.h>
 #include <tesseract_common/profile.h>
 #include <tesseract_common/profile_dictionary.h>
 #include <tesseract_command_language/constants.h>
@@ -207,11 +213,21 @@ NB_MODULE(_tesseract_command_language, m) {
         .def(nb::init<>())
         .def(nb::init<const tp::MoveInstructionPoly&>(), "instruction"_a)
         .def(nb::init<const tp::CompositeInstruction&>(), "instruction"_a)
+        .def(nb::init<const tp::WaitInstruction&>(), "instruction"_a)
+        .def(nb::init<const tp::TimerInstruction&>(), "instruction"_a)
+        .def(nb::init<const tp::SetAnalogInstruction&>(), "instruction"_a)
+        .def(nb::init<const tp::SetDigitalInstruction&>(), "instruction"_a)
+        .def(nb::init<const tp::SetToolInstruction&>(), "instruction"_a)
         .def("getDescription", &tp::InstructionPoly::getDescription)
         .def("setDescription", &tp::InstructionPoly::setDescription, "description"_a)
         .def("print", &tp::InstructionPoly::print, "prefix"_a = "")
         .def("isCompositeInstruction", &tp::InstructionPoly::isCompositeInstruction)
         .def("isMoveInstruction", &tp::InstructionPoly::isMoveInstruction)
+        .def("isWaitInstruction", &tp::isWaitInstruction)
+        .def("isTimerInstruction", &tp::isTimerInstruction)
+        .def("isSetAnalogInstruction", &tp::isSetAnalogInstruction)
+        .def("isSetDigitalInstruction", &tp::isSetDigitalInstruction)
+        .def("isSetToolInstruction", &tp::isSetToolInstruction)
         .def("isNull", &tp::InstructionPoly::isNull)
         // Note: In 0.33, use .as<T>() for type casting
         .def("asMoveInstruction", [](tp::InstructionPoly& self) -> tp::MoveInstructionPoly {
@@ -223,7 +239,32 @@ NB_MODULE(_tesseract_command_language, m) {
             if (!self.isCompositeInstruction())
                 throw std::runtime_error("InstructionPoly is not a CompositeInstruction");
             return self.as<tp::CompositeInstruction>();
-        }, "Cast to CompositeInstruction. Raises RuntimeError if not a composite instruction.");
+        }, "Cast to CompositeInstruction. Raises RuntimeError if not a composite instruction.")
+        .def("asWaitInstruction", [](tp::InstructionPoly& self) -> tp::WaitInstruction {
+            if (!tp::isWaitInstruction(self))
+                throw std::runtime_error("InstructionPoly is not a WaitInstruction");
+            return self.as<tp::WaitInstruction>();
+        }, "Cast to WaitInstruction. Raises RuntimeError if not a wait instruction.")
+        .def("asTimerInstruction", [](tp::InstructionPoly& self) -> tp::TimerInstruction {
+            if (!tp::isTimerInstruction(self))
+                throw std::runtime_error("InstructionPoly is not a TimerInstruction");
+            return self.as<tp::TimerInstruction>();
+        }, "Cast to TimerInstruction. Raises RuntimeError if not a timer instruction.")
+        .def("asSetAnalogInstruction", [](tp::InstructionPoly& self) -> tp::SetAnalogInstruction {
+            if (!tp::isSetAnalogInstruction(self))
+                throw std::runtime_error("InstructionPoly is not a SetAnalogInstruction");
+            return self.as<tp::SetAnalogInstruction>();
+        }, "Cast to SetAnalogInstruction. Raises RuntimeError if not a set analog instruction.")
+        .def("asSetDigitalInstruction", [](tp::InstructionPoly& self) -> tp::SetDigitalInstruction {
+            if (!tp::isSetDigitalInstruction(self))
+                throw std::runtime_error("InstructionPoly is not a SetDigitalInstruction");
+            return self.as<tp::SetDigitalInstruction>();
+        }, "Cast to SetDigitalInstruction. Raises RuntimeError if not a set digital instruction.")
+        .def("asSetToolInstruction", [](tp::InstructionPoly& self) -> tp::SetToolInstruction {
+            if (!tp::isSetToolInstruction(self))
+                throw std::runtime_error("InstructionPoly is not a SetToolInstruction");
+            return self.as<tp::SetToolInstruction>();
+        }, "Cast to SetToolInstruction. Raises RuntimeError if not a set tool instruction.");
 
     // ========== MoveInstructionPoly ==========
     // Note: Not binding as subclass due to nanobind cross-module limitations
@@ -284,6 +325,36 @@ NB_MODULE(_tesseract_command_language, m) {
         if (!ip.isCompositeInstruction())
             throw std::runtime_error("InstructionPoly is not a CompositeInstruction");
         return ip.as<tp::CompositeInstruction>();
+    }, "instruction"_a);
+
+    m.def("InstructionPoly_as_WaitInstruction", [](tp::InstructionPoly& ip) -> tp::WaitInstruction {
+        if (!tp::isWaitInstruction(ip))
+            throw std::runtime_error("InstructionPoly is not a WaitInstruction");
+        return ip.as<tp::WaitInstruction>();
+    }, "instruction"_a);
+
+    m.def("InstructionPoly_as_TimerInstruction", [](tp::InstructionPoly& ip) -> tp::TimerInstruction {
+        if (!tp::isTimerInstruction(ip))
+            throw std::runtime_error("InstructionPoly is not a TimerInstruction");
+        return ip.as<tp::TimerInstruction>();
+    }, "instruction"_a);
+
+    m.def("InstructionPoly_as_SetAnalogInstruction", [](tp::InstructionPoly& ip) -> tp::SetAnalogInstruction {
+        if (!tp::isSetAnalogInstruction(ip))
+            throw std::runtime_error("InstructionPoly is not a SetAnalogInstruction");
+        return ip.as<tp::SetAnalogInstruction>();
+    }, "instruction"_a);
+
+    m.def("InstructionPoly_as_SetDigitalInstruction", [](tp::InstructionPoly& ip) -> tp::SetDigitalInstruction {
+        if (!tp::isSetDigitalInstruction(ip))
+            throw std::runtime_error("InstructionPoly is not a SetDigitalInstruction");
+        return ip.as<tp::SetDigitalInstruction>();
+    }, "instruction"_a);
+
+    m.def("InstructionPoly_as_SetToolInstruction", [](tp::InstructionPoly& ip) -> tp::SetToolInstruction {
+        if (!tp::isSetToolInstruction(ip))
+            throw std::runtime_error("InstructionPoly is not a SetToolInstruction");
+        return ip.as<tp::SetToolInstruction>();
     }, "instruction"_a);
 
     m.def("WaypointPoly_as_StateWaypointPoly", [](tp::WaypointPoly& wp) -> tp::StateWaypointPoly {
@@ -356,6 +427,78 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getDescription", &tp::MoveInstruction::getDescription)
         .def("setDescription", &tp::MoveInstruction::setDescription, "description"_a);
 
+    // ========== WaitInstructionType ==========
+    nb::enum_<tp::WaitInstructionType>(m, "WaitInstructionType")
+        .value("TIME", tp::WaitInstructionType::TIME)
+        .value("DIGITAL_INPUT_HIGH", tp::WaitInstructionType::DIGITAL_INPUT_HIGH)
+        .value("DIGITAL_INPUT_LOW", tp::WaitInstructionType::DIGITAL_INPUT_LOW)
+        .value("DIGITAL_OUTPUT_HIGH", tp::WaitInstructionType::DIGITAL_OUTPUT_HIGH)
+        .value("DIGITAL_OUTPUT_LOW", tp::WaitInstructionType::DIGITAL_OUTPUT_LOW);
+
+    // ========== WaitInstruction ==========
+    nb::class_<tp::WaitInstruction>(m, "WaitInstruction")
+        .def(nb::init<double>(), "time"_a, "Construct a TIME-mode wait of `time` seconds.")
+        .def(nb::init<tp::WaitInstructionType, int>(), "type"_a, "io"_a,
+             "Construct a digital-IO wait. `type` is one of the DIGITAL_* modes; `io` is the IO index.")
+        .def("getWaitType", &tp::WaitInstruction::getWaitType)
+        .def("setWaitType", &tp::WaitInstruction::setWaitType, "type"_a)
+        .def("getWaitTime", &tp::WaitInstruction::getWaitTime)
+        .def("setWaitTime", &tp::WaitInstruction::setWaitTime, "time"_a)
+        .def("getWaitIO", &tp::WaitInstruction::getWaitIO)
+        .def("setWaitIO", &tp::WaitInstruction::setWaitIO, "io"_a)
+        .def("getDescription", &tp::WaitInstruction::getDescription)
+        .def("setDescription", &tp::WaitInstruction::setDescription, "description"_a)
+        .def("print", &tp::WaitInstruction::print, "prefix"_a = "");
+
+    // ========== TimerInstructionType ==========
+    nb::enum_<tp::TimerInstructionType>(m, "TimerInstructionType")
+        .value("DIGITAL_OUTPUT_HIGH", tp::TimerInstructionType::DIGITAL_OUTPUT_HIGH)
+        .value("DIGITAL_OUTPUT_LOW", tp::TimerInstructionType::DIGITAL_OUTPUT_LOW);
+
+    // ========== TimerInstruction ==========
+    nb::class_<tp::TimerInstruction>(m, "TimerInstruction")
+        .def(nb::init<tp::TimerInstructionType, double, int>(), "type"_a, "time"_a, "io"_a,
+             "Construct a timer that, after `time` seconds, drives digital output `io` HIGH or LOW per `type`.")
+        .def("getTimerType", &tp::TimerInstruction::getTimerType)
+        .def("setTimerType", &tp::TimerInstruction::setTimerType, "type"_a)
+        .def("getTimerTime", &tp::TimerInstruction::getTimerTime)
+        .def("setTimerTime", &tp::TimerInstruction::setTimerTime, "time"_a)
+        .def("getTimerIO", &tp::TimerInstruction::getTimerIO)
+        .def("setTimerIO", &tp::TimerInstruction::setTimerIO, "io"_a)
+        .def("getDescription", &tp::TimerInstruction::getDescription)
+        .def("setDescription", &tp::TimerInstruction::setDescription, "description"_a)
+        .def("print", &tp::TimerInstruction::print, "prefix"_a = "");
+
+    // ========== SetAnalogInstruction ==========
+    nb::class_<tp::SetAnalogInstruction>(m, "SetAnalogInstruction")
+        .def(nb::init<std::string, int, double>(), "key"_a, "index"_a, "value"_a,
+             "Set analog channel identified by (key, index) to `value`.")
+        .def("getKey", &tp::SetAnalogInstruction::getKey)
+        .def("getIndex", &tp::SetAnalogInstruction::getIndex)
+        .def("getValue", &tp::SetAnalogInstruction::getValue)
+        .def("getDescription", &tp::SetAnalogInstruction::getDescription)
+        .def("setDescription", &tp::SetAnalogInstruction::setDescription, "description"_a)
+        .def("print", &tp::SetAnalogInstruction::print, "prefix"_a = "");
+
+    // ========== SetDigitalInstruction ==========
+    nb::class_<tp::SetDigitalInstruction>(m, "SetDigitalInstruction")
+        .def(nb::init<std::string, int, bool>(), "key"_a, "index"_a, "value"_a,
+             "Set digital channel identified by (key, index) to `value`.")
+        .def("getKey", &tp::SetDigitalInstruction::getKey)
+        .def("getIndex", &tp::SetDigitalInstruction::getIndex)
+        .def("getValue", &tp::SetDigitalInstruction::getValue)
+        .def("getDescription", &tp::SetDigitalInstruction::getDescription)
+        .def("setDescription", &tp::SetDigitalInstruction::setDescription, "description"_a)
+        .def("print", &tp::SetDigitalInstruction::print, "prefix"_a = "");
+
+    // ========== SetToolInstruction ==========
+    nb::class_<tp::SetToolInstruction>(m, "SetToolInstruction")
+        .def(nb::init<int>(), "tool_id"_a, "Activate the tool with the given ID.")
+        .def("getTool", &tp::SetToolInstruction::getTool)
+        .def("getDescription", &tp::SetToolInstruction::getDescription)
+        .def("setDescription", &tp::SetToolInstruction::setDescription, "description"_a)
+        .def("print", &tp::SetToolInstruction::print, "prefix"_a = "");
+
     // ========== CompositeInstruction ==========
     nb::class_<tp::CompositeInstruction>(m, "CompositeInstruction")
         .def(nb::init<>())
@@ -374,14 +517,34 @@ NB_MODULE(_tesseract_command_language, m) {
             return self.getInstructions();
         }, nb::rv_policy::reference_internal)
         .def("setInstructions", &tp::CompositeInstruction::setInstructions, "instructions"_a)
+        // Per-type push_back overloads exist primarily for static type-checkers:
+        // nb::implicitly_convertible<T, InstructionPoly> handles dispatch at runtime,
+        // but stub generators emit each .def with its declared signature, so without
+        // explicit overloads, a callsite like `composite.push_back(MoveInstructionPoly(...))`
+        // would type-check as an error even though it works at runtime.
         .def("push_back", [](tp::CompositeInstruction& self, const tp::InstructionPoly& ip) {
             self.push_back(ip);
         }, "instruction"_a)
         .def("push_back", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
-            self.push_back(mi);
+            self.push_back(tp::InstructionPoly(mi));
         }, "instruction"_a)
         .def("push_back", [](tp::CompositeInstruction& self, const tp::CompositeInstruction& ci) {
-            self.push_back(ci);
+            self.push_back(tp::InstructionPoly(ci));
+        }, "instruction"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::WaitInstruction& wi) {
+            self.push_back(tp::InstructionPoly(wi));
+        }, "instruction"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::TimerInstruction& ti) {
+            self.push_back(tp::InstructionPoly(ti));
+        }, "instruction"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::SetAnalogInstruction& si) {
+            self.push_back(tp::InstructionPoly(si));
+        }, "instruction"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::SetDigitalInstruction& si) {
+            self.push_back(tp::InstructionPoly(si));
+        }, "instruction"_a)
+        .def("push_back", [](tp::CompositeInstruction& self, const tp::SetToolInstruction& si) {
+            self.push_back(tp::InstructionPoly(si));
         }, "instruction"_a)
         // SWIG-compatible alias
         .def("appendMoveInstruction", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
@@ -439,4 +602,12 @@ NB_MODULE(_tesseract_command_language, m) {
     // above. Must come after all three class bindings.
     nb::implicitly_convertible<tp::MoveInstructionPoly, tp::InstructionPoly>();
     nb::implicitly_convertible<tp::CompositeInstruction, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::MoveInstructionPoly, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::CompositeInstruction, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::WaitInstruction, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::TimerInstruction, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::SetAnalogInstruction, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::SetDigitalInstruction, tp::InstructionPoly>();
+    nb::implicitly_convertible<tp::SetToolInstruction, tp::InstructionPoly>();
+
 }

@@ -11,6 +11,12 @@ from tesseract_robotics.tesseract_command_language import (
     # Poly wrappers
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
+    # Non-motion instruction casts
+    InstructionPoly_as_SetAnalogInstruction,
+    InstructionPoly_as_SetDigitalInstruction,
+    InstructionPoly_as_SetToolInstruction,
+    InstructionPoly_as_TimerInstruction,
+    InstructionPoly_as_WaitInstruction,
     # Waypoint types
     JointWaypoint,
     JointWaypointPoly_wrap_JointWaypoint,
@@ -24,8 +30,16 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType_LINEAR,
     # Other
     ProfileDictionary,
+    SetAnalogInstruction,
+    SetDigitalInstruction,
+    SetToolInstruction,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
+    TimerInstruction,
+    TimerInstructionType,
+    # Non-motion instructions
+    WaitInstruction,
+    WaitInstructionType,
 )
 from tesseract_robotics.tesseract_common import (
     Isometry3d,
@@ -490,3 +504,264 @@ class TestAnyPolyWrappers:
         assert recovered is not None
         assert len(recovered) == 2
         assert recovered.getProfile() == "MY_PROFILE"
+
+
+class TestWaitInstruction:
+    """Test WaitInstruction: construction, predicates, casts, implicit
+    conversion, and a scan-style integration use-case."""
+
+    def test_time_constructor(self):
+        wi = WaitInstruction(0.5)
+        assert wi.getWaitType() == WaitInstructionType.TIME
+        assert wi.getWaitTime() == 0.5
+
+    def test_digital_constructor(self):
+        wi = WaitInstruction(WaitInstructionType.DIGITAL_INPUT_HIGH, 3)
+        assert wi.getWaitType() == WaitInstructionType.DIGITAL_INPUT_HIGH
+        assert wi.getWaitIO() == 3
+
+    def test_setters_round_trip(self):
+        wi = WaitInstruction(0.0)
+        wi.setWaitType(WaitInstructionType.DIGITAL_OUTPUT_LOW)
+        wi.setWaitIO(7)
+        wi.setWaitTime(1.25)
+        assert wi.getWaitType() == WaitInstructionType.DIGITAL_OUTPUT_LOW
+        assert wi.getWaitIO() == 7
+        assert wi.getWaitTime() == 1.25
+
+    def test_predicate_and_implicit_conversion(self):
+        """push_back(WaitInstruction) goes through implicit conversion to
+        InstructionPoly; isWaitInstruction is the only predicate that fires."""
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(WaitInstruction(0.5))
+
+        ip = composite[0]
+        assert ip.isWaitInstruction()
+        assert not ip.isMoveInstruction()
+        assert not ip.isCompositeInstruction()
+        assert not ip.isTimerInstruction()
+        assert not ip.isSetAnalogInstruction()
+        assert not ip.isSetDigitalInstruction()
+        assert not ip.isSetToolInstruction()
+
+    def test_round_trip_cast(self):
+        """as method and module-level helper both recover the value."""
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(WaitInstruction(0.5))
+        ip = composite[0]
+
+        from_method = ip.asWaitInstruction()
+        from_helper = InstructionPoly_as_WaitInstruction(ip)
+        assert from_method.getWaitType() == WaitInstructionType.TIME
+        assert from_method.getWaitTime() == 0.5
+        assert from_helper.getWaitTime() == from_method.getWaitTime()
+
+    def test_wrong_type_cast_raises(self):
+        import pytest
+
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(WaitInstruction(0.5))
+        wait_ip = composite[0]
+
+        with pytest.raises(RuntimeError):
+            wait_ip.asMoveInstruction()
+        with pytest.raises(RuntimeError):
+            wait_ip.asTimerInstruction()
+
+    def test_scan_program_interleaves_moves_and_waits(self):
+        """Concrete usage: a scan program where each move is followed by a
+        wait for the camera-done IO line."""
+        from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+
+        program = CompositeInstruction("DEFAULT")
+        for x in (0.0, 0.1, 0.2):
+            wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(x, 0.0, 0.5))
+            mi = MoveInstruction(
+                CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
+                MoveInstructionType_FREESPACE,
+                "DEFAULT",
+            )
+            program.push_back(MoveInstructionPoly_wrap_MoveInstruction(mi))
+            program.push_back(WaitInstruction(WaitInstructionType.DIGITAL_INPUT_HIGH, 1))
+
+        assert len(program) == 6
+        for i in range(len(program)):
+            child = program[i]
+            if i % 2 == 0:
+                assert child.isMoveInstruction()
+            else:
+                assert child.isWaitInstruction()
+                assert child.asWaitInstruction().getWaitType() == WaitInstructionType.DIGITAL_INPUT_HIGH
+
+
+class TestTimerInstruction:
+    """Test TimerInstruction: construction, predicates, casts, implicit conversion."""
+
+    def test_constructor(self):
+        ti = TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_HIGH, 2.0, 4)
+        assert ti.getTimerType() == TimerInstructionType.DIGITAL_OUTPUT_HIGH
+        assert ti.getTimerTime() == 2.0
+        assert ti.getTimerIO() == 4
+
+    def test_setters_round_trip(self):
+        ti = TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_HIGH, 1.0, 0)
+        ti.setTimerType(TimerInstructionType.DIGITAL_OUTPUT_LOW)
+        ti.setTimerTime(3.5)
+        ti.setTimerIO(9)
+        assert ti.getTimerType() == TimerInstructionType.DIGITAL_OUTPUT_LOW
+        assert ti.getTimerTime() == 3.5
+        assert ti.getTimerIO() == 9
+
+    def test_predicate_and_implicit_conversion(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_HIGH, 1.0, 0))
+
+        ip = composite[0]
+        assert ip.isTimerInstruction()
+        assert not ip.isWaitInstruction()
+        assert not ip.isMoveInstruction()
+
+    def test_round_trip_cast(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_LOW, 2.0, 3))
+        ip = composite[0]
+
+        from_method = ip.asTimerInstruction()
+        from_helper = InstructionPoly_as_TimerInstruction(ip)
+        assert from_method.getTimerType() == TimerInstructionType.DIGITAL_OUTPUT_LOW
+        assert from_method.getTimerTime() == 2.0
+        assert from_method.getTimerIO() == 3
+        assert from_helper.getTimerTime() == from_method.getTimerTime()
+
+    def test_wrong_type_cast_raises(self):
+        import pytest
+
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_HIGH, 1.0, 0))
+        ip = composite[0]
+
+        with pytest.raises(RuntimeError):
+            ip.asWaitInstruction()
+
+
+class TestSetAnalogInstruction:
+    """Test SetAnalogInstruction: construction, predicates, casts, implicit conversion."""
+
+    def test_constructor(self):
+        si = SetAnalogInstruction("speed", 1, 0.75)
+        assert si.getKey() == "speed"
+        assert si.getIndex() == 1
+        assert si.getValue() == 0.75
+
+    def test_predicate_and_implicit_conversion(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetAnalogInstruction("speed", 1, 0.75))
+
+        ip = composite[0]
+        assert ip.isSetAnalogInstruction()
+        assert not ip.isSetDigitalInstruction()
+        assert not ip.isMoveInstruction()
+
+    def test_round_trip_cast(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetAnalogInstruction("speed", 1, 0.75))
+        ip = composite[0]
+
+        from_method = ip.asSetAnalogInstruction()
+        from_helper = InstructionPoly_as_SetAnalogInstruction(ip)
+        assert (from_method.getKey(), from_method.getIndex(), from_method.getValue()) == (
+            "speed",
+            1,
+            0.75,
+        )
+        assert from_helper.getKey() == from_method.getKey()
+
+    def test_wrong_type_cast_raises(self):
+        import pytest
+
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetAnalogInstruction("k", 0, 0.0))
+        ip = composite[0]
+
+        with pytest.raises(RuntimeError):
+            ip.asSetDigitalInstruction()
+
+
+class TestSetDigitalInstruction:
+    """Test SetDigitalInstruction: construction, predicates, casts, implicit conversion."""
+
+    def test_constructor(self):
+        si = SetDigitalInstruction("gripper", 2, True)
+        assert si.getKey() == "gripper"
+        assert si.getIndex() == 2
+        assert si.getValue() is True
+
+    def test_predicate_and_implicit_conversion(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetDigitalInstruction("gripper", 2, True))
+
+        ip = composite[0]
+        assert ip.isSetDigitalInstruction()
+        assert not ip.isSetAnalogInstruction()
+        assert not ip.isMoveInstruction()
+
+    def test_round_trip_cast(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetDigitalInstruction("gripper", 2, True))
+        ip = composite[0]
+
+        from_method = ip.asSetDigitalInstruction()
+        from_helper = InstructionPoly_as_SetDigitalInstruction(ip)
+        assert (from_method.getKey(), from_method.getIndex(), from_method.getValue()) == (
+            "gripper",
+            2,
+            True,
+        )
+        assert from_helper.getKey() == from_method.getKey()
+
+    def test_wrong_type_cast_raises(self):
+        import pytest
+
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetDigitalInstruction("k", 0, True))
+        ip = composite[0]
+
+        with pytest.raises(RuntimeError):
+            ip.asSetAnalogInstruction()
+
+
+class TestSetToolInstruction:
+    """Test SetToolInstruction: construction, predicates, casts, implicit conversion."""
+
+    def test_constructor(self):
+        si = SetToolInstruction(5)
+        assert si.getTool() == 5
+
+    def test_predicate_and_implicit_conversion(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetToolInstruction(5))
+
+        ip = composite[0]
+        assert ip.isSetToolInstruction()
+        assert not ip.isSetAnalogInstruction()
+        assert not ip.isMoveInstruction()
+
+    def test_round_trip_cast(self):
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetToolInstruction(5))
+        ip = composite[0]
+
+        from_method = ip.asSetToolInstruction()
+        from_helper = InstructionPoly_as_SetToolInstruction(ip)
+        assert from_method.getTool() == 5
+        assert from_helper.getTool() == from_method.getTool()
+
+    def test_wrong_type_cast_raises(self):
+        import pytest
+
+        composite = CompositeInstruction("DEFAULT")
+        composite.push_back(SetToolInstruction(5))
+        ip = composite[0]
+
+        with pytest.raises(RuntimeError):
+            ip.asMoveInstruction()
