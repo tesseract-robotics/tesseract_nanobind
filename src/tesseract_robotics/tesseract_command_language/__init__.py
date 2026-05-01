@@ -46,6 +46,7 @@ __all__ = [
     "SetToolInstruction",
     # Instruction helpers (SWIG compatibility)
     "MoveInstructionPoly_wrap_MoveInstruction",
+    "InstructionPoly_as_CompositeInstruction",
     "InstructionPoly_as_MoveInstructionPoly",
     "InstructionPoly_as_WaitInstruction",
     "InstructionPoly_as_TimerInstruction",
