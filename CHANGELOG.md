@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `Octree` geometry bindings (plus `octomap::OcTree`, `OctreeSubType`, `PointCloud`, `createOctree`) and the remaining `tesseract_geometry` utilities (`isIdentical`, `extractVertices`, `toTriangleMesh`).
+
 ## [0.34.1.6] - 2026-04-27 — PyPI README refresh
 
 Same wheels as 0.34.1.5; recut so the published wheel's README metadata includes the Windows build badge alongside Linux and macOS on PyPI's project page.

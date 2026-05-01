@@ -26,8 +26,19 @@ __all__ = [
     "ConvexMesh",
     "SDFMesh",
     "CompoundMesh",
+    # Octree
+    "OcTree",
+    "OctreeSubType",
+    "PointCloud",
+    "PointCloudPoint",
+    "Octree",
+    "createOctree",
     # Mesh loading functions
     "createMeshFromPath",
     "createConvexMeshFromPath",
     "createSDFMeshFromPath",
+    # Utilities / conversions
+    "isIdentical",
+    "extractVertices",
+    "toTriangleMesh",
 ]

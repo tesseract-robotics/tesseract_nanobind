@@ -1,3 +1,5 @@
+"""tesseract_geometry Python bindings"""
+
 from collections.abc import Sequence
 import enum
 from typing import Annotated, overload
@@ -263,6 +265,109 @@ class CompoundMesh(Geometry):
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
         """Get the scale applied to the mesh"""
 
+class OcTree:
+    @overload
+    def __init__(self, resolution: float) -> None:
+        """Create an empty octomap OcTree with the given leaf resolution"""
+
+    @overload
+    def __init__(self, filename: str) -> None:
+        """Load an octomap OcTree from a .bt or .ot file"""
+
+    def getResolution(self) -> float:
+        """Get the leaf resolution"""
+
+    def size(self) -> int:
+        """Get the total number of nodes"""
+
+    def getNumLeafNodes(self) -> int:
+        """Get the number of leaf nodes"""
+
+    def updateNode(self, x: float, y: float, z: float, occupied: bool, lazy_eval: bool = False) -> None:
+        """Insert/update a node at the given coordinate"""
+
+    def updateInnerOccupancy(self) -> None:
+        """Recompute inner occupancies after lazy updates"""
+
+    def toMaxLikelihood(self) -> None:
+        """
+        Convert occupancy probabilities to a binary maximum-likelihood representation
+        """
+
+    def writeBinary(self, filename: str) -> bool:
+        """Write the octree to a binary .bt file"""
+
+class OctreeSubType(enum.Enum):
+    BOX = 0
+
+    SPHERE_INSIDE = 1
+
+    SPHERE_OUTSIDE = 2
+
+class PointCloudPoint:
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, x: float, y: float, z: float) -> None: ...
+
+    @property
+    def x(self) -> float: ...
+
+    @x.setter
+    def x(self, arg: float, /) -> None: ...
+
+    @property
+    def y(self) -> float: ...
+
+    @y.setter
+    def y(self, arg: float, /) -> None: ...
+
+    @property
+    def z(self) -> float: ...
+
+    @z.setter
+    def z(self, arg: float, /) -> None: ...
+
+class PointCloud:
+    def __init__(self) -> None: ...
+
+    @property
+    def points(self) -> list[PointCloudPoint]: ...
+
+    @points.setter
+    def points(self, arg: Sequence[PointCloudPoint], /) -> None: ...
+
+    def addPoint(self, x: float, y: float, z: float) -> None:
+        """Add a point to the cloud"""
+
+class Octree(Geometry):
+    def __init__(self, octree: OcTree, sub_type: OctreeSubType, pruned: bool = False, binary_octree: bool = False) -> None:
+        """Create an Octree geometry wrapping an octomap OcTree"""
+
+    def getOctree(self) -> OcTree:
+        """Get the underlying octomap OcTree"""
+
+    def getSubType(self) -> OctreeSubType:
+        """Get the sub-shape type"""
+
+    def getPruned(self) -> bool:
+        """Whether the octree was pruned"""
+
+    def calcNumSubShapes(self) -> int:
+        """Calculate the number of sub-shapes (expensive)"""
+
+    def __eq__(self, arg: Octree, /) -> bool: ...
+
+    def __ne__(self, arg: Octree, /) -> bool: ...
+
+    @staticmethod
+    def prune(octree: OcTree) -> None:
+        """Prune the octomap OcTree using tesseract's occupancy-threshold rule"""
+
+def createOctree(point_cloud: PointCloud, resolution: float, prune: bool, binary: bool = True) -> OcTree:
+    """Build an octomap OcTree from a PointCloud"""
+
 def createMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
     """Load mesh from file and return vector of Mesh geometries"""
 
@@ -280,3 +385,14 @@ def createConvexMeshFromResource(resource: "tesseract_common::Resource", scale: 
 
 def createSDFMeshFromResource(resource: "tesseract_common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
     """Load SDFMesh from resource (e.g., package:// URL)"""
+
+def isIdentical(geom1: Geometry, geom2: Geometry) -> bool:
+    """Check if two geometries are identical"""
+
+def extractVertices(geom: Geometry, origin: "Eigen::Transform<double, 3, 1, 0>") -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+    """
+    Extract vertices from a geometry, transforming primitives to a mesh first
+    """
+
+def toTriangleMesh(geom: Geometry, tolerance: float, origin: "Eigen::Transform<double, 3, 1, 0>") -> Mesh:
+    """Convert a primitive geometry to a triangle Mesh"""
