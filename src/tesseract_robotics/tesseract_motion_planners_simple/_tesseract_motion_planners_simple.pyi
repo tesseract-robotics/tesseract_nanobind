@@ -202,9 +202,3 @@ class SimplePlannerLVSAssignNoIKMoveProfile(SimplePlannerMoveProfile):
 
     @max_steps.setter
     def max_steps(self, arg: int, /) -> None: ...
-
-def ProfileDictionary_addSimplePlannerMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: SimplePlannerMoveProfile) -> None:
-    """Add a simple planner move profile to ProfileDictionary"""
-
-def ProfileDictionary_addSimplePlannerCompositeProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: SimplePlannerCompositeProfile) -> None:
-    """Add a simple planner composite profile to ProfileDictionary"""

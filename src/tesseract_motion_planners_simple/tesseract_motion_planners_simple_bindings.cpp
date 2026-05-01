@@ -151,19 +151,4 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def_rw("rotation_longest_valid_segment_length", &tp::SimplePlannerLVSAssignNoIKMoveProfile::rotation_longest_valid_segment_length)
         .def_rw("min_steps", &tp::SimplePlannerLVSAssignNoIKMoveProfile::min_steps)
         .def_rw("max_steps", &tp::SimplePlannerLVSAssignNoIKMoveProfile::max_steps);
-
-    // ========== ProfileDictionary helpers ==========
-    m.def("ProfileDictionary_addSimplePlannerMoveProfile",
-          [](tc::ProfileDictionary& dict, const std::string& ns, const std::string& profile_name,
-             std::shared_ptr<tp::SimplePlannerMoveProfile> profile) {
-              dict.addProfile(ns, profile_name, profile);
-          }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-          "Add a simple planner move profile to ProfileDictionary");
-
-    m.def("ProfileDictionary_addSimplePlannerCompositeProfile",
-          [](tc::ProfileDictionary& dict, const std::string& ns, const std::string& profile_name,
-             std::shared_ptr<tp::SimplePlannerCompositeProfile> profile) {
-              dict.addProfile(ns, profile_name, profile);
-          }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-          "Add a simple planner composite profile to ProfileDictionary");
 }
