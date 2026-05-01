@@ -160,6 +160,108 @@ for instr in program.getInstructions():
 | `UNORDERED` | Can be reordered |
 | `ORDERED_AND_REVERTED` | Sequence, can reverse |
 
+## Non-Motion Instructions
+
+Programs can also contain non-motion instructions: timed waits, IO handshakes,
+analog/digital setpoint changes, and tool changes. These are typically passed
+through the planning pipeline unchanged and acted on at runtime by the
+trajectory executor.
+
+Concrete instruction types (`WaitInstruction`, `TimerInstruction`,
+`SetAnalogInstruction`, `SetDigitalInstruction`, `SetToolInstruction`) can be
+pushed directly into a `CompositeInstruction` via `push_back` — implicit
+conversion to `InstructionPoly` is registered so no explicit wrap is needed.
+
+### WaitInstruction
+
+Pause execution for a fixed duration or until an IO line transitions.
+
+```python
+from tesseract_robotics.tesseract_command_language import (
+    WaitInstruction, WaitInstructionType,
+)
+
+# Time-based wait
+program.push_back(WaitInstruction(0.5))  # wait 0.5 seconds
+
+# IO handshake — wait until digital input 3 goes high
+program.push_back(WaitInstruction(WaitInstructionType.DIGITAL_INPUT_HIGH, 3))
+```
+
+| `WaitInstructionType` | Behaviour |
+|-----------------------|-----------|
+| `TIME` | Wait `time` seconds |
+| `DIGITAL_INPUT_HIGH` / `DIGITAL_INPUT_LOW` | Block until input `io` is high / low |
+| `DIGITAL_OUTPUT_HIGH` / `DIGITAL_OUTPUT_LOW` | Block until output `io` is high / low |
+
+### TimerInstruction
+
+Start a timer that, on expiry, drives a digital output high or low.
+
+```python
+from tesseract_robotics.tesseract_command_language import (
+    TimerInstruction, TimerInstructionType,
+)
+
+program.push_back(
+    TimerInstruction(TimerInstructionType.DIGITAL_OUTPUT_HIGH, 2.0, 4)
+)
+```
+
+### SetAnalogInstruction / SetDigitalInstruction
+
+Drive an analog or digital channel.
+
+```python
+from tesseract_robotics.tesseract_command_language import (
+    SetAnalogInstruction, SetDigitalInstruction,
+)
+
+# Analog: set channel ("speed", index 1) to 0.75
+program.push_back(SetAnalogInstruction("speed", 1, 0.75))
+
+# Digital: open the gripper
+program.push_back(SetDigitalInstruction("gripper", 2, True))
+```
+
+### SetToolInstruction
+
+Activate a tool by ID.
+
+```python
+from tesseract_robotics.tesseract_command_language import SetToolInstruction
+
+program.push_back(SetToolInstruction(5))
+```
+
+### Iteration and dispatch
+
+When iterating a `CompositeInstruction`, each child is an `InstructionPoly`.
+Use the `is*Instruction` predicates to dispatch and `as*Instruction` to obtain
+the concrete value.
+
+```python
+for i in range(len(program)):
+    child = program[i]
+    if child.isMoveInstruction():
+        mi = child.asMoveInstruction()
+    elif child.isWaitInstruction():
+        wi = child.asWaitInstruction()
+    elif child.isTimerInstruction():
+        ti = child.asTimerInstruction()
+    elif child.isSetAnalogInstruction():
+        si = child.asSetAnalogInstruction()
+    elif child.isSetDigitalInstruction():
+        si = child.asSetDigitalInstruction()
+    elif child.isSetToolInstruction():
+        si = child.asSetToolInstruction()
+    elif child.isCompositeInstruction():
+        sub = child.asCompositeInstruction()
+```
+
+`as*Instruction` raises `RuntimeError` if the underlying type does not match —
+always guard with the matching `is*Instruction` predicate.
+
 ## Profiles
 
 ### ProfileDictionary
@@ -200,6 +302,12 @@ AnyPoly_wrap_CompositeInstruction(program)
 AnyPoly_wrap_ProfileDictionary(profiles)
 ```
 
+`CompositeInstruction.push_back` accepts any concrete instruction type
+(`MoveInstructionPoly`, `CompositeInstruction`, `WaitInstruction`,
+`TimerInstruction`, `SetAnalogInstruction`, `SetDigitalInstruction`,
+`SetToolInstruction`) directly — implicit conversion to `InstructionPoly`
+removes the need for an explicit wrap call.
+
 ### Unwrapping (polymorphic → concrete)
 
 ```python
@@ -210,10 +318,18 @@ WaypointPoly_as_JointWaypointPoly(wp_poly)
 
 # Instructions
 InstructionPoly_as_MoveInstructionPoly(instr_poly)
+InstructionPoly_as_WaitInstruction(instr_poly)
+InstructionPoly_as_TimerInstruction(instr_poly)
+InstructionPoly_as_SetAnalogInstruction(instr_poly)
+InstructionPoly_as_SetDigitalInstruction(instr_poly)
+InstructionPoly_as_SetToolInstruction(instr_poly)
 
 # AnyPoly
 AnyPoly_as_CompositeInstruction(any_poly)
 ```
+
+These free functions mirror the `as*Instruction` methods on `InstructionPoly`
+and raise `RuntimeError` when the underlying type does not match.
 
 ## Complete Example
 
