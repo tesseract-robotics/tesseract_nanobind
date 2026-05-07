@@ -137,6 +137,8 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("hasKey", &tp::TaskComposerDataStorage::hasKey, "key"_a)
         .def("setData", &tp::TaskComposerDataStorage::setData, "key"_a, "data"_a)
         .def("getData", nb::overload_cast<const std::string&>(&tp::TaskComposerDataStorage::getData, nb::const_), "key"_a)
+        .def("getAllData", nb::overload_cast<>(&tp::TaskComposerDataStorage::getData, nb::const_),
+             "Return every entry as a dict {key: AnyPoly}.")
         .def("removeData", &tp::TaskComposerDataStorage::removeData, "key"_a);
 
     // Factory function that returns shared_ptr (useful when passing to executor.run)

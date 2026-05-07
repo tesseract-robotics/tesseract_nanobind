@@ -35,6 +35,9 @@ class TaskComposerDataStorage:
 
     def getData(self, key: str) -> AnyPoly: ...
 
+    def getAllData(self) -> dict[str, AnyPoly]:
+        """Return every entry as a dict {key: AnyPoly}."""
+
     def removeData(self, key: str) -> None: ...
 
 def createTaskComposerDataStorage() -> TaskComposerDataStorage:
