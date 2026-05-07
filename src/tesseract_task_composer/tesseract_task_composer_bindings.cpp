@@ -5,6 +5,7 @@
 
 #include "tesseract_nb.h"
 #include <nanobind/stl/unordered_map.h>
+#include <nanobind/stl/vector.h>
 #include <nanobind/stl/chrono.h>
 #include <nanobind/stl/optional.h>
 
@@ -37,6 +38,10 @@
 #include <tesseract_command_language/composite_instruction.h>
 // Note: ProfileDictionary moved to tesseract_common in 0.33
 #include <tesseract_common/profile_dictionary.h>
+
+// tesseract_collision for ContactResultMap (DiscreteContactCheckTask saves
+// std::vector<ContactResultMap> on its node info's data_storage)
+#include <tesseract_collision/core/types.h>
 
 // console_bridge for log output visible alongside the rest of tesseract's logging
 #include <console_bridge/console.h>
@@ -171,6 +176,7 @@ NB_MODULE(_tesseract_task_composer, m) {
             result["status_code"] = info->status_code;
             result["status_message"] = info->status_message;
             result["elapsed_time"] = info->elapsed_time;
+            result["data_storage"] = info->data_storage;
             return result;
         })
         .def("getAllInfos", [](const tp::TaskComposerNodeInfoContainer& self) -> nb::list {
@@ -184,6 +190,7 @@ NB_MODULE(_tesseract_task_composer, m) {
                 d["status_code"] = info.status_code;
                 d["status_message"] = info.status_message;
                 d["elapsed_time"] = info.elapsed_time;
+                d["data_storage"] = info.data_storage;
                 result.append(d);
             }
             return result;
@@ -412,4 +419,12 @@ NB_MODULE(_tesseract_task_composer, m) {
     m.def("AnyPoly_as_TaskComposerDataStorage", [](const tc::AnyPoly& ap) {
         return ap.as<tp::TaskComposerDataStorage::Ptr>();
     }, "any_poly"_a, "Extract a TaskComposerDataStorage from an AnyPoly");
+
+    m.def("AnyPoly_as_ContactResultMapVector",
+          [](const tc::AnyPoly& ap) -> std::vector<tesseract_collision::ContactResultMap> {
+        return ap.as<std::vector<tesseract_collision::ContactResultMap>>();
+    }, "any_poly"_a,
+       "Extract a std::vector<ContactResultMap> from an AnyPoly. "
+       "DiscreteContactCheckTask saves its per-step contact results under "
+       "the 'contact_results' key on its node info's data_storage in this form.");
 }

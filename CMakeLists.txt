@@ -367,6 +367,7 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_task_composer_taskflow
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
+  tesseract::tesseract_collision_core
   tesseract::tesseract_common
 )
 
