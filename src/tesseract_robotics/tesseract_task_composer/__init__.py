@@ -21,4 +21,5 @@ __all__ = [
     "AnyPoly_wrap_TaskComposerDataStorage",
     "AnyPoly_as_CompositeInstruction",
     "AnyPoly_as_TaskComposerDataStorage",
+    "AnyPoly_as_ContactResultMapVector",
 ]
