@@ -22,6 +22,7 @@ from tesseract_robotics.tesseract_command_language import (
 
 from .rapid_writer import (
     Comment,
+    JointTarget,
     Module,
     MoveAbsJ,
     MoveJ,
@@ -204,7 +205,7 @@ def _emit_move(move: MoveInstructionPoly, profiles: dict[str, RapidProfile]) -> 
         joint = WaypointPoly_as_JointWaypointPoly(waypoint)
         # Joint waypoints always emit MoveAbsJ regardless of LINEAR/FREESPACE
         # (controller can't do Cartesian interpolation when target is in joint space).
-        MoveAbsJ(joint.getPosition(), profile)
+        MoveAbsJ(JointTarget(joint.getPosition()), profile)
         return
 
     raise UnsupportedInstructionError(
