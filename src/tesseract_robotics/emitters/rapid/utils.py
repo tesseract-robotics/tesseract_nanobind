@@ -1,5 +1,5 @@
 """RAPID code generation low-level helpers — RAPID-native primitive formatters,
-the `RapidType` storage-class enum, and the `MOTION_TYPES` axis-monitoring enum.
+the `RapidType` storage-class enum, and the `MotionType` axis-monitoring enum.
 
 The RAPID-domain bundles (`RapidProfile`, `RapidTarget`) and the DSL classes
 live in `rapid_writer.py`. This module is pure helpers — no tesseract imports
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from enum import Enum
+from enum import Enum, IntEnum
 from math import pi
 from typing import Any
 
@@ -46,17 +46,16 @@ class RapidType(str, Enum):
         return self.value
 
 
-def get_quat(q: Sequence[float] | Any) -> Sequence[float]:
-    """Coerce a quaternion-like value into a sequence ordered `[w, x, y, z]`.
+def get_quat(q: Sequence[float]) -> Sequence[float]:
+    """Coerce a quaternion-like value into a list ordered `[w, x, y, z]`.
 
-    Accepts list/tuple of 4 floats (assumed already in W,X,Y,Z order) or any
-    object exposing a `wxyz` attribute.
+    Expects a 4-float list/tuple already in W,X,Y,Z (scalar-first) order — the
+    RAPID convention. Tesseract callers must reorder from scalar-last
+    `[qx,qy,qz,qw]` before passing.
     """
-    if isinstance(q, (list, tuple)):
-        return list(q)
-    if hasattr(q, "wxyz"):
-        return q.wxyz
-    raise TypeError(f"cannot convert {type(q).__name__} to a RAPID quaternion list")
+    if not isinstance(q, (list, tuple)) or len(q) != 4:
+        raise TypeError(f"quaternion must be a 4-element list/tuple in [w,x,y,z] order; got {q!r}")
+    return list(q)
 
 
 def get_rapid_bool(val: Any) -> str:
@@ -76,14 +75,13 @@ def radians_to_quadrant(angle: float) -> int:
     return int(((angle * 2.0) / pi) - 1.0)
 
 
-class MOTION_TYPES:
-    """Integer enum-style constants accepted by `Conf` to select Cartesian vs joint
-    configuration monitoring."""
+class MotionType(IntEnum):
+    """RAPID motion-type selector — used by `Conf` to choose ConfL vs ConfJ."""
 
-    linear: int = 1
-    joint: int = 2
-    circle: int = 3
-    absolute_joints: int = 4
+    LINEAR = 1
+    JOINT = 2
+    CIRCULAR = 3
+    ABSOLUTE_JOINTS = 4
 
 
 def format_ext_axis(external_axis: Sequence[float] | None = None) -> str:

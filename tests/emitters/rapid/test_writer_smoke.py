@@ -33,8 +33,8 @@ def test_module_proc_moveabsj_emits_expected_lines():
     rapid = rpdw.RapidWriter()
     with rpdw.Module("YO"):
         with rpdw.Proc("main"):
-            rpdw.MoveAbsJ([0, 0, 0, 0, 0, 0])
-            rpdw.MoveAbsJ([math.pi / 2, 0, 0, 0, 0, 0])
+            rpdw.MoveAbsJ(rpdw.JointTarget([0, 0, 0, 0, 0, 0]))
+            rpdw.MoveAbsJ(rpdw.JointTarget([math.pi / 2, 0, 0, 0, 0, 0]))
             rpdw.Comment("done")
             rpdw.Stop()
 
@@ -166,3 +166,20 @@ def test_target_carries_config_and_external_axis():
     out = rapid.getvalue()
     assert "[2, 0, 1, 0]" in out
     assert "[1.57,1.57,9E+09,9E+09,9E+09,9E+09]" in out
+
+
+def test_config_neutral_for_known_robot():
+    """`Config.neutral_for("abb_irb2400")` returns the registered known-good
+    neutral axis-quadrant config for that robot."""
+    from tesseract_robotics.emitters.rapid.rapid_writer import Config
+
+    cfg = Config.neutral_for("abb_irb2400")
+    assert str(cfg) == "[1, 0, 0, 0]"
+
+
+def test_config_neutral_for_unknown_robot_raises():
+    """Unregistered robot names fail loud with the known-robots list."""
+    from tesseract_robotics.emitters.rapid.rapid_writer import Config
+
+    with pytest.raises(ValueError, match="no neutral Config registered"):
+        Config.neutral_for("unregistered_robot")

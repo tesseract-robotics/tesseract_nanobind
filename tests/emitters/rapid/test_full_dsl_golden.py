@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tesseract_robotics.emitters.rapid import RapidTarget
+from tesseract_robotics.emitters.rapid import JointTarget, RapidTarget
 from tesseract_robotics.emitters.rapid.rapid_writer import (
     AssignVariable,
     Comment,
@@ -76,7 +76,7 @@ def test_full_dsl_golden() -> None:
                     MoveL(target_default)
                     MoveJ(target_with_ext)
                     MoveC(target_default, target_default)
-                    MoveAbsJ([0, 0, 0, 0, 0, 0], external_axis=ExternalAxis(ext_axe))
+                    MoveAbsJ(JointTarget([0, 0, 0, 0, 0, 0], ExternalAxis(ext_axe)))
                     rapid.write(f"{bB} := False;")
                     Robtarget("target01", target_default)
                     Robtarget("target02", target_with_ext)
