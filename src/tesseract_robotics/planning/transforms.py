@@ -1,86 +1,90 @@
 """
 Pose helpers for creating poses and transformations.
 
-Provides a clean API for creating transformation matrices without needing
-to manipulate numpy arrays directly or chain Isometry3d operations.
+Thin Pythonic wrapper around `tesseract_common.Isometry3d`. All transform
+math delegates to Eigen — this module owns the construction API, not the
+linear algebra.
 
 Example:
     from tesseract_robotics.planning import Pose, translation, rotation_z
 
-    # Create pose from components
     pose = Pose.from_xyz_rpy(0.5, 0.0, 0.3, 0, 0, 1.57)
-
-    # Or use helper functions
     pose = translation(0.5, 0.0, 0.3) @ rotation_z(1.57)
-
-    # Convert to Isometry3d for low-level API
     isometry = pose.to_isometry()
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import ArrayLike
 
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_common import (
+    X_AXIS,
+    Y_AXIS,
+    Z_AXIS,
+    AngleAxisd,
+    Isometry3d,
+    Quaterniond,
+)
+
+# Minimum quaternion magnitude before normalisation is considered ill-posed.
+# Below this the implied rotation is undefined and `.normalized()` would
+# produce NaN. We refuse rather than silently corrupt the resulting pose.
+_QUAT_MIN_NORM = 1e-12
 
 
-@dataclass
 class Pose:
-    """
-    A 3D pose (position + orientation).
+    """A 3D pose backed by `Isometry3d`.
 
-    This class provides a Pythonic interface for working with 3D poses,
-    wrapping numpy arrays and providing convenient factory methods.
-
-    Attributes:
-        matrix: 4x4 homogeneous transformation matrix
+    Value-type semantics: constructing from an existing `Isometry3d`
+    defensively copies, and every accessor (`matrix`, `position`,
+    `rotation_matrix`, `quaternion`) returns a fresh numpy array.
+    A `Pose` cannot be mutated from outside through any of its members.
 
     Example:
-        # From position and orientation
         p = Pose.from_xyz_quat(0.5, 0, 0.3, 0, 0, 0.707, 0.707)
-
-        # From numpy matrix
-        p = Pose(np.eye(4))
-
-        # Chain poses (compose transformations)
-        result = p1 @ p2
-
-        # Access components
-        pos = p.position  # [x, y, z]
-        rot = p.rotation_matrix  # 3x3
+        p = Pose(np.eye(4))               # from 4x4 matrix
+        p = Pose(Isometry3d.Identity())   # from Eigen directly (copied)
+        result = p1 @ p2                  # compose
     """
 
-    matrix: np.ndarray
+    __slots__ = ("_iso",)
 
-    def __post_init__(self):
-        """Validate and convert matrix to numpy array."""
-        self.matrix = np.asarray(self.matrix, dtype=np.float64)
-        if self.matrix.shape != (4, 4):
-            raise ValueError(f"Pose matrix must be 4x4, got {self.matrix.shape}")
+    def __init__(self, matrix: ArrayLike | Isometry3d):
+        """Build from a 4x4 homogeneous matrix or an Isometry3d.
+
+        Passing an `Isometry3d` makes a defensive copy — subsequent
+        mutation of the caller's instance does not affect this `Pose`.
+        """
+        if isinstance(matrix, Isometry3d):
+            self._iso = Isometry3d(matrix)  # copy ctor — no aliasing
+            return
+        mat = np.asarray(matrix, dtype=np.float64)
+        if mat.shape != (4, 4):
+            raise ValueError(f"Pose matrix must be 4x4, got {mat.shape}")
+        self._iso = Isometry3d(mat)
+
+    # ----- Factories ----------------------------------------------------
 
     @classmethod
     def identity(cls) -> Pose:
-        """Create identity pose (no rotation, no translation)."""
-        return cls(np.eye(4))
+        """Identity pose (no rotation, no translation)."""
+        return cls(Isometry3d.Identity())
 
     @classmethod
     def from_xyz(cls, x: float, y: float, z: float) -> Pose:
-        """Create pure translation pose."""
-        mat = np.eye(4)
-        mat[:3, 3] = [x, y, z]
-        return cls(mat)
+        """Pure translation pose."""
+        return cls(Isometry3d(np.array([x, y, z], dtype=np.float64), Quaterniond.Identity()))
 
     @classmethod
     def from_position(cls, position: ArrayLike) -> Pose:
-        """Create pure translation from position array [x, y, z]."""
-        pos = np.asarray(position)
+        """Pure translation pose from a 3-element position array."""
+        pos = np.asarray(position, dtype=np.float64).ravel()
         if pos.shape != (3,):
             raise ValueError(f"Position must have 3 elements, got {pos.shape}")
-        return cls.from_xyz(pos[0], pos[1], pos[2])
+        return cls(Isometry3d(pos, Quaterniond.Identity()))
 
     @classmethod
     def from_xyz_quat(
@@ -93,50 +97,33 @@ class Pose:
         qz: float,
         qw: float,
     ) -> Pose:
-        """
-        Create pose from position and quaternion.
+        """Pose from position and scalar-last quaternion (qx, qy, qz, qw).
 
-        Args:
-            x: X position.
-            y: Y position.
-            z: Z position.
-            qx: Quaternion X component.
-            qy: Quaternion Y component.
-            qz: Quaternion Z component.
-            qw: Quaternion W component (scalar-last convention).
+        The quaternion is normalised so callers can pass un-normalised
+        values. Zero-magnitude quaternions are rejected (would otherwise
+        yield NaN under normalisation).
         """
-        mat = np.eye(4)
-        mat[:3, 3] = [x, y, z]
-        mat[:3, :3] = _quaternion_to_rotation_matrix(qx, qy, qz, qw)
-        return cls(mat)
+        return cls(
+            Isometry3d(
+                np.array([x, y, z], dtype=np.float64),
+                _safe_quaternion(qw, qx, qy, qz),
+            )
+        )
 
     @classmethod
-    def from_position_quaternion(
-        cls,
-        position: ArrayLike,
-        quaternion: ArrayLike,
-    ) -> Pose:
-        """
-        Create pose from position and quaternion arrays.
-
-        Args:
-            position: [x, y, z] position
-            quaternion: [qx, qy, qz, qw] quaternion (scalar-last)
-        """
-        pos = np.asarray(position, dtype=float).ravel()
-        quat = np.asarray(quaternion, dtype=float).ravel()
+    def from_position_quaternion(cls, position: ArrayLike, quaternion: ArrayLike) -> Pose:
+        """Pose from position [x,y,z] and quaternion [qx,qy,qz,qw] (scalar-last)."""
+        pos = np.asarray(position, dtype=np.float64).ravel()
+        quat = np.asarray(quaternion, dtype=np.float64).ravel()
         if pos.shape != (3,):
             raise ValueError(f"Position must have 3 elements, got {pos.shape}")
         if quat.shape != (4,):
             raise ValueError(f"Quaternion must have 4 elements, got {quat.shape}")
-        return cls.from_xyz_quat(
-            pos[0],
-            pos[1],
-            pos[2],
-            quat[0],
-            quat[1],
-            quat[2],
-            quat[3],
+        return cls(
+            Isometry3d(
+                pos,
+                _safe_quaternion(quat[3], quat[0], quat[1], quat[2]),
+            )
         )
 
     @classmethod
@@ -149,97 +136,101 @@ class Pose:
         pitch: float,
         yaw: float,
     ) -> Pose:
-        """
-        Create pose from position and roll-pitch-yaw angles.
-
-        Args:
-            x: X position.
-            y: Y position.
-            z: Z position.
-            roll: Roll angle in radians.
-            pitch: Pitch angle in radians.
-            yaw: Yaw angle in radians (XYZ convention).
-        """
-        mat = np.eye(4)
-        mat[:3, 3] = [x, y, z]
-        mat[:3, :3] = _rpy_to_rotation_matrix(roll, pitch, yaw)
-        return cls(mat)
+        """Pose from position and XYZ Tait-Bryan angles; R = Rz(yaw)·Ry(pitch)·Rx(roll)."""
+        q = (
+            Quaterniond(AngleAxisd(yaw, Z_AXIS))
+            * Quaterniond(AngleAxisd(pitch, Y_AXIS))
+            * Quaterniond(AngleAxisd(roll, X_AXIS))
+        )
+        return cls(Isometry3d(np.array([x, y, z], dtype=np.float64), q))
 
     @classmethod
     def from_matrix(cls, matrix: ArrayLike) -> Pose:
-        """Create pose from 4x4 homogeneous matrix."""
-        return cls(np.asarray(matrix))
+        """Pose from a 4x4 homogeneous matrix (validated by `__init__`)."""
+        return cls(matrix)
 
     @classmethod
     def from_matrix_position(cls, rotation: ArrayLike, position: ArrayLike) -> Pose:
-        """
-        Create pose from 3x3 rotation matrix and position.
+        """Pose from a 3x3 rotation matrix and a 3-element position.
 
-        Args:
-            rotation: 3x3 rotation matrix
-            position: [x, y, z] position
-
-        Example:
-            R = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
-            p = Pose.from_matrix_position(R, [0.5, 0, 0.3])
+        The rotation must be orthonormal. `Quaterniond(Matrix3d)` validates
+        this at the binding boundary and raises `ValueError` for non-rotation
+        input (scaling, shear, or accumulated FP drift beyond ~1e-12).
         """
-        mat = np.eye(4)
-        mat[:3, :3] = rotation
-        mat[:3, 3] = position
-        return cls(mat)
+        R = np.asarray(rotation, dtype=np.float64)
+        pos = np.asarray(position, dtype=np.float64).ravel()
+        if R.shape != (3, 3):
+            raise ValueError(f"Rotation must be 3x3, got {R.shape}")
+        if pos.shape != (3,):
+            raise ValueError(f"Position must have 3 elements, got {pos.shape}")
+        return cls(Isometry3d(pos, Quaterniond(R)))
 
     @classmethod
     def from_isometry(cls, isometry: Isometry3d) -> Pose:
-        """Create pose from Tesseract Isometry3d."""
-        return cls(isometry.matrix())
+        """Pose from an existing Isometry3d (defensively copied)."""
+        return cls(isometry)
+
+    # ----- Accessors ----------------------------------------------------
+
+    @property
+    def matrix(self) -> np.ndarray:
+        """4x4 homogeneous matrix as a fresh numpy array. Safe to mutate."""
+        return self._iso.matrix()
 
     @property
     def position(self) -> np.ndarray:
-        """Get translation component as [x, y, z]."""
-        return self.matrix[:3, 3].copy()
+        """Translation as a fresh `[x, y, z]` numpy array. Safe to mutate."""
+        return self._iso.translation()
 
     @property
     def x(self) -> float:
-        """Get x position."""
-        return float(self.matrix[0, 3])
+        """X translation component."""
+        return float(self._iso.translation()[0])
 
     @property
     def y(self) -> float:
-        """Get y position."""
-        return float(self.matrix[1, 3])
+        """Y translation component."""
+        return float(self._iso.translation()[1])
 
     @property
     def z(self) -> float:
-        """Get z position."""
-        return float(self.matrix[2, 3])
+        """Z translation component."""
+        return float(self._iso.translation()[2])
 
     @property
     def rotation_matrix(self) -> np.ndarray:
-        """Get 3x3 rotation matrix."""
-        return self.matrix[:3, :3].copy()
+        """3x3 rotation matrix as a fresh numpy array. Safe to mutate."""
+        return self._iso.rotation()
 
     @property
     def quaternion(self) -> np.ndarray:
-        """Get quaternion as [qx, qy, qz, qw] (scalar-last)."""
-        return _rotation_matrix_to_quaternion(self.matrix[:3, :3])
+        """Quaternion as `[qx, qy, qz, qw]` (scalar-last) — Eigen's coeffs() layout."""
+        return Quaterniond(self._iso.linear()).coeffs()
 
     @property
     def rpy(self) -> tuple[float, float, float]:
-        """Get roll-pitch-yaw angles in radians."""
-        return _rotation_matrix_to_rpy(self.matrix[:3, :3])
+        """Roll-pitch-yaw angles in radians, extracted such that R = Rz(yaw)·Ry(pitch)·Rx(roll)."""
+        yaw, pitch, roll = Quaterniond(self._iso.linear()).eulerAngles("ZYX")
+        return (float(roll), float(pitch), float(yaw))
+
+    # ----- Conversions / ops --------------------------------------------
 
     def to_isometry(self) -> Isometry3d:
-        """Convert to Tesseract Isometry3d."""
-        return Isometry3d(self.matrix)
+        """Return an `Isometry3d` copy — safe to mutate without affecting this Pose."""
+        return Isometry3d(self._iso)
 
     def inverse(self) -> Pose:
-        """Return the inverse pose."""
-        return Pose(np.linalg.inv(self.matrix))
+        """Inverse pose. Uses Eigen's isometry-aware inverse (Rᵀ, −Rᵀ·t), not general 4x4 inversion."""
+        return Pose(self._iso.inverse())
+
+    def isApprox(self, other: Pose, prec: float = 1e-12) -> bool:
+        """Component-wise approximate equality. Delegates to `Isometry3d.isApprox`."""
+        return self._iso.isApprox(other._iso, prec)
 
     def __matmul__(self, other: Pose) -> Pose:
-        """Chain poses: result = self @ other."""
+        """Compose poses: `self @ other` is the transform that applies `other` then `self`."""
         if isinstance(other, Pose):
-            return Pose(self.matrix @ other.matrix)
+            return Pose(self._iso * other._iso)
         raise TypeError(f"Cannot multiply Pose with {type(other)}")
 
     def __repr__(self) -> str:
@@ -255,171 +246,56 @@ class Pose:
 
 
 def translation(x: float, y: float, z: float) -> Pose:
-    """Create pure translation pose."""
+    """Pure translation pose."""
     return Pose.from_xyz(x, y, z)
 
 
 def rotation_x(angle: float) -> Pose:
-    """Create rotation around X axis (radians)."""
-    c, s = math.cos(angle), math.sin(angle)
-    mat = np.eye(4)
-    mat[1, 1] = c
-    mat[1, 2] = -s
-    mat[2, 1] = s
-    mat[2, 2] = c
-    return Pose(mat)
+    """Pure rotation about the X axis (radians)."""
+    return Pose(Isometry3d(AngleAxisd(angle, X_AXIS)))
 
 
 def rotation_y(angle: float) -> Pose:
-    """Create rotation around Y axis (radians)."""
-    c, s = math.cos(angle), math.sin(angle)
-    mat = np.eye(4)
-    mat[0, 0] = c
-    mat[0, 2] = s
-    mat[2, 0] = -s
-    mat[2, 2] = c
-    return Pose(mat)
+    """Pure rotation about the Y axis (radians)."""
+    return Pose(Isometry3d(AngleAxisd(angle, Y_AXIS)))
 
 
 def rotation_z(angle: float) -> Pose:
-    """Create rotation around Z axis (radians)."""
-    c, s = math.cos(angle), math.sin(angle)
-    mat = np.eye(4)
-    mat[0, 0] = c
-    mat[0, 1] = -s
-    mat[1, 0] = s
-    mat[1, 1] = c
-    return Pose(mat)
+    """Pure rotation about the Z axis (radians)."""
+    return Pose(Isometry3d(AngleAxisd(angle, Z_AXIS)))
 
 
 def rotation_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Pose:
-    """Create pure rotation from quaternion (scalar-last: qx, qy, qz, qw)."""
-    mat = np.eye(4)
-    mat[:3, :3] = _quaternion_to_rotation_matrix(qx, qy, qz, qw)
-    return Pose(mat)
+    """Pure rotation from scalar-last quaternion (qx, qy, qz, qw)."""
+    return Pose(Isometry3d(_safe_quaternion(qw, qx, qy, qz)))
 
 
 def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
-    """
-    Create pure rotation from axis-angle representation.
-
-    Args:
-        axis: [ax, ay, az] unit axis of rotation
-        angle: rotation angle in radians
-    """
-    axis = np.asarray(axis, dtype=np.float64)
-    axis = axis / np.linalg.norm(axis)  # Normalize
-
-    c, s = math.cos(angle), math.sin(angle)
-    t = 1 - c
-    x, y, z = axis
-
-    mat = np.eye(4)
-    mat[0, 0] = t * x * x + c
-    mat[0, 1] = t * x * y - s * z
-    mat[0, 2] = t * x * z + s * y
-    mat[1, 0] = t * x * y + s * z
-    mat[1, 1] = t * y * y + c
-    mat[1, 2] = t * y * z - s * x
-    mat[2, 0] = t * x * z - s * y
-    mat[2, 1] = t * y * z + s * x
-    mat[2, 2] = t * z * z + c
-
-    return Pose(mat)
+    """Pure rotation from axis-angle. Axis need not be unit length (normalised here)."""
+    axis_arr = np.asarray(axis, dtype=np.float64).ravel()
+    if axis_arr.shape != (3,):
+        raise ValueError(f"Axis must have 3 elements, got {axis_arr.shape}")
+    norm = np.linalg.norm(axis_arr)
+    if norm < _QUAT_MIN_NORM:
+        raise ValueError(f"Axis magnitude too small for normalisation: {norm}")
+    return Pose(Isometry3d(AngleAxisd(angle, axis_arr / norm)))
 
 
 # Backwards compatibility alias
 Transform = Pose
 
 
-# Internal helper functions
+def _safe_quaternion(qw: float, qx: float, qy: float, qz: float) -> Quaterniond:
+    """Build a normalised quaternion, rejecting zero-magnitude input.
 
-
-def _quaternion_to_rotation_matrix(qx: float, qy: float, qz: float, qw: float) -> np.ndarray:
-    """Convert quaternion to 3x3 rotation matrix."""
-    # Normalize quaternion
-    n = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
-    qx, qy, qz, qw = qx / n, qy / n, qz / n, qw / n
-
-    return np.array(
-        [
-            [
-                1 - 2 * (qy * qy + qz * qz),
-                2 * (qx * qy - qz * qw),
-                2 * (qx * qz + qy * qw),
-            ],
-            [
-                2 * (qx * qy + qz * qw),
-                1 - 2 * (qx * qx + qz * qz),
-                2 * (qy * qz - qx * qw),
-            ],
-            [
-                2 * (qx * qz - qy * qw),
-                2 * (qy * qz + qx * qw),
-                1 - 2 * (qx * qx + qy * qy),
-            ],
-        ]
-    )
-
-
-def _rotation_matrix_to_quaternion(R: np.ndarray) -> np.ndarray:
-    """Convert 3x3 rotation matrix to quaternion [qx, qy, qz, qw]."""
-    trace = R[0, 0] + R[1, 1] + R[2, 2]
-
-    if trace > 0:
-        s = 0.5 / math.sqrt(trace + 1.0)
-        qw = 0.25 / s
-        qx = (R[2, 1] - R[1, 2]) * s
-        qy = (R[0, 2] - R[2, 0]) * s
-        qz = (R[1, 0] - R[0, 1]) * s
-    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-        s = 2.0 * math.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
-        qw = (R[2, 1] - R[1, 2]) / s
-        qx = 0.25 * s
-        qy = (R[0, 1] + R[1, 0]) / s
-        qz = (R[0, 2] + R[2, 0]) / s
-    elif R[1, 1] > R[2, 2]:
-        s = 2.0 * math.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
-        qw = (R[0, 2] - R[2, 0]) / s
-        qx = (R[0, 1] + R[1, 0]) / s
-        qy = 0.25 * s
-        qz = (R[1, 2] + R[2, 1]) / s
-    else:
-        s = 2.0 * math.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
-        qw = (R[1, 0] - R[0, 1]) / s
-        qx = (R[0, 2] + R[2, 0]) / s
-        qy = (R[1, 2] + R[2, 1]) / s
-        qz = 0.25 * s
-
-    return np.array([qx, qy, qz, qw])
-
-
-def _rpy_to_rotation_matrix(roll: float, pitch: float, yaw: float) -> np.ndarray:
-    """Convert roll-pitch-yaw (XYZ) to rotation matrix."""
-    cr, sr = math.cos(roll), math.sin(roll)
-    cp, sp = math.cos(pitch), math.sin(pitch)
-    cy, sy = math.cos(yaw), math.sin(yaw)
-
-    return np.array(
-        [
-            [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
-            [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
-            [-sp, cp * sr, cp * cr],
-        ]
-    )
-
-
-def _rotation_matrix_to_rpy(R: np.ndarray) -> tuple[float, float, float]:
-    """Convert rotation matrix to roll-pitch-yaw (XYZ)."""
-    sy = math.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
-
-    if sy > 1e-6:
-        roll = math.atan2(R[2, 1], R[2, 2])
-        pitch = math.atan2(-R[2, 0], sy)
-        yaw = math.atan2(R[1, 0], R[0, 0])
-    else:
-        roll = math.atan2(-R[1, 2], R[1, 1])
-        pitch = math.atan2(-R[2, 0], sy)
-        yaw = 0
-
-    return (roll, pitch, yaw)
+    Eigen's `.normalized()` divides by `.norm()` unconditionally — for a
+    zero quaternion that yields NaN, which then propagates silently into
+    every subsequent computation. Guard at the source.
+    """
+    norm = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+    if norm < _QUAT_MIN_NORM:
+        raise ValueError(
+            f"Quaternion magnitude too small for normalisation: "
+            f"|(w={qw}, x={qx}, y={qy}, z={qz})| = {norm}"
+        )
+    return Quaterniond(qw, qx, qy, qz).normalized()

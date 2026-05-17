@@ -1,11 +1,22 @@
 """tesseract_common Python bindings (nanobind)"""
 
+import numpy as np
+
 from tesseract_robotics.tesseract_common._tesseract_common import *
 
 # FilesystemPath - for SWIG compatibility, we keep it as a str subclass
 # This allows it to be passed directly to functions expecting strings
 # The C++ binding is available as _FilesystemPath for cases that need it
 from tesseract_robotics.tesseract_common._tesseract_common import FilesystemPath as _FilesystemPath
+
+# Standard unit axes — Vector3d-compatible, frozen to guard against accidental
+# in-place mutation when the same constant is reused across call sites.
+X_AXIS: np.ndarray = np.array([1.0, 0.0, 0.0])
+Y_AXIS: np.ndarray = np.array([0.0, 1.0, 0.0])
+Z_AXIS: np.ndarray = np.array([0.0, 0.0, 1.0])
+X_AXIS.flags.writeable = False
+Y_AXIS.flags.writeable = False
+Z_AXIS.flags.writeable = False
 
 
 class FilesystemPath(str):
@@ -69,6 +80,12 @@ __all__ = [
     "Translation3d",
     "Quaterniond",
     "AngleAxisd",
+    "Hyperplane3d",
+    "ParametrizedLine3d",
+    # Unit axes (Vector3d-compatible numpy arrays)
+    "X_AXIS",
+    "Y_AXIS",
+    "Z_AXIS",
     # Console bridge log function
     "log",
     # Plugin
