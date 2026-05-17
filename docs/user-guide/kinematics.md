@@ -48,8 +48,7 @@ Compute a link's pose from joint values.
     ```
 
     !!! info "Quaternion convention"
-        `Pose.quaternion` returns `[qx, qy, qz, qw]` (scalar-last) — the same
-        convention used by `scipy.spatial.transform.Rotation.as_quat()`. This
+        `Pose.quaternion` returns `[qx, qy, qz, qw]` (scalar-last). This
         differs from C++ Eigen, which uses scalar-first `[qw, qx, qy, qz]`.
 
 === "Low-Level API"

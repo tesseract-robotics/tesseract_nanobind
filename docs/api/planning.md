@@ -66,8 +66,7 @@ result = composer.plan(robot, program, pipeline="TrajOptPipeline")
 
 ### Pose
 
-Scalar-last (`qx, qy, qz, qw`) quaternion convention — matches scipy's
-`Rotation.as_quat()`.
+Scalar-last (`qx, qy, qz, qw`) quaternion convention.
 
 ```python
 from tesseract_robotics.planning import Pose
