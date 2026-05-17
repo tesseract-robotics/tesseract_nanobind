@@ -17,6 +17,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract_common/kinematic_limits.h>
 #include <tesseract_common/plugin_info.h>
 #include <filesystem>
+#include <sstream>
 
 // console_bridge
 #include <console_bridge/console.h>
@@ -50,7 +51,18 @@ NB_MODULE(_tesseract_common, m) {
 
     // Isometry3d class binding for SWIG API compatibility
     nb::class_<Eigen::Isometry3d>(m, "Isometry3d")
-        .def(nb::init<>())  // Identity transform
+        // Default ctor — explicit Identity. Eigen's `Transform()` initialises
+        // only the bottom row of the augmented matrix; the linear and
+        // translation blocks are uninitialised. Without this override the
+        // bare `Isometry3d()` from Python would expose uninit memory.
+        .def("__init__", [](Eigen::Isometry3d* self) {
+            new (self) Eigen::Isometry3d(Eigen::Isometry3d::Identity());
+        })
+        // Defensive copy ctor — lets value-type wrappers (e.g. `Pose`) take
+        // an `Isometry3d` argument without aliasing the caller's instance.
+        .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Isometry3d& other) {
+            new (self) Eigen::Isometry3d(other);
+        }, "other"_a)
         .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Matrix4d& mat) {
             new (self) Eigen::Isometry3d();
             self->matrix() = mat;
@@ -66,6 +78,24 @@ NB_MODULE(_tesseract_common, m) {
         .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Translation3d& t) {
             new (self) Eigen::Isometry3d(t);
         }, "translation"_a)
+        // Canonical robotics ctor: position + orientation in one call instead
+        // of `Identity() * Translation3d(...) * Quaterniond(...)` chain.
+        .def("__init__", [](Eigen::Isometry3d* self,
+                            const Eigen::Vector3d& t,
+                            const Eigen::Quaterniond& q) {
+            new (self) Eigen::Isometry3d();
+            self->setIdentity();
+            self->linear() = q.toRotationMatrix();
+            self->translation() = t;
+        }, "translation"_a, "rotation"_a)
+        .def("__init__", [](Eigen::Isometry3d* self,
+                            const Eigen::Translation3d& t,
+                            const Eigen::Quaterniond& q) {
+            new (self) Eigen::Isometry3d();
+            self->setIdentity();
+            self->linear() = q.toRotationMatrix();
+            self->translation() = t.vector();
+        }, "translation"_a, "rotation"_a)
         .def_static("Identity", []() { return Eigen::Isometry3d::Identity(); })
         .def("setIdentity", [](Eigen::Isometry3d& self) { self.setIdentity(); })
         .def("matrix", [](const Eigen::Isometry3d& self) -> Eigen::Matrix4d {
@@ -90,17 +120,67 @@ NB_MODULE(_tesseract_common, m) {
             return Eigen::Isometry3d(self * t);
         })
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::Quaterniond& q) {
-            Eigen::Isometry3d result = self;
-            result.rotate(q);
-            return result;
+            return Eigen::Isometry3d(self * q);
         })
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::AngleAxisd& aa) {
-            Eigen::Isometry3d result = self;
-            result.rotate(aa);
-            return result;
+            return Eigen::Isometry3d(self * aa);
         })
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::Vector3d& v) {
             return self * v;
+        })
+        // In-place composition mutators. Return self so callers can chain
+        // (`iso.translate(v).rotate(q)`), matching Eigen's fluent C++ API.
+        //
+        // IMPORTANT — Python aliasing: chaining returns the SAME object,
+        // so `iso2 = iso.translate(v)` gives `iso2 is iso == True` and any
+        // later mutation on `iso2` mutates `iso`. Use `Isometry3d(iso)` to
+        // defensively copy first if independence is required.
+        .def("translate", [](Eigen::Isometry3d& self, const Eigen::Vector3d& v) -> Eigen::Isometry3d& {
+            self.translate(v);
+            return self;
+        }, "vec"_a, nb::rv_policy::reference_internal)
+        .def("pretranslate", [](Eigen::Isometry3d& self, const Eigen::Vector3d& v) -> Eigen::Isometry3d& {
+            self.pretranslate(v);
+            return self;
+        }, "vec"_a, nb::rv_policy::reference_internal)
+        .def("rotate", [](Eigen::Isometry3d& self, const Eigen::Quaterniond& q) -> Eigen::Isometry3d& {
+            self.rotate(q);
+            return self;
+        }, "rotation"_a, nb::rv_policy::reference_internal)
+        .def("rotate", [](Eigen::Isometry3d& self, const Eigen::AngleAxisd& aa) -> Eigen::Isometry3d& {
+            self.rotate(aa);
+            return self;
+        }, "rotation"_a, nb::rv_policy::reference_internal)
+        .def("rotate", [](Eigen::Isometry3d& self, const Eigen::Matrix3d& R) -> Eigen::Isometry3d& {
+            self.rotate(R);
+            return self;
+        }, "rotation"_a, nb::rv_policy::reference_internal)
+        .def("prerotate", [](Eigen::Isometry3d& self, const Eigen::Quaterniond& q) -> Eigen::Isometry3d& {
+            self.prerotate(q);
+            return self;
+        }, "rotation"_a, nb::rv_policy::reference_internal)
+        .def("prerotate", [](Eigen::Isometry3d& self, const Eigen::AngleAxisd& aa) -> Eigen::Isometry3d& {
+            self.prerotate(aa);
+            return self;
+        }, "rotation"_a, nb::rv_policy::reference_internal)
+        .def("prerotate", [](Eigen::Isometry3d& self, const Eigen::Matrix3d& R) -> Eigen::Isometry3d& {
+            self.prerotate(R);
+            return self;
+        }, "rotation"_a, nb::rv_policy::reference_internal)
+        // Float-safe equality. Eigen default precision for double is ~1e-12.
+        .def("isApprox", [](const Eigen::Isometry3d& self,
+                            const Eigen::Isometry3d& other,
+                            double prec) {
+            return self.isApprox(other, prec);
+        }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        .def("__repr__", [](const Eigen::Isometry3d& self) {
+            Eigen::Quaterniond q(self.linear());
+            const auto& t = self.translation();
+            std::ostringstream ss;
+            ss << "Isometry3d(translation=[" << t.x() << ", " << t.y() << ", " << t.z()
+               << "], quaternion=[w=" << q.w() << ", x=" << q.x()
+               << ", y=" << q.y() << ", z=" << q.z() << "])";
+            return ss.str();
         });
 
     nb::class_<Eigen::Translation3d>(m, "Translation3d")
@@ -124,23 +204,48 @@ NB_MODULE(_tesseract_common, m) {
             return Eigen::Isometry3d(self * other);
         })
         .def("__mul__", [](const Eigen::Translation3d& self, const Eigen::Translation3d& other) {
-            return Eigen::Translation3d(self.x() + other.x(), self.y() + other.y(), self.z() + other.z());
+            return Eigen::Translation3d(self.vector() + other.vector());
         })
         // Translate a point: T * v = v + translation.
         .def("__mul__", [](const Eigen::Translation3d& self, const Eigen::Vector3d& v) -> Eigen::Vector3d {
             return self * v;
+        })
+        .def("isApprox", [](const Eigen::Translation3d& self,
+                            const Eigen::Translation3d& other,
+                            double prec) {
+            return self.isApprox(other, prec);
+        }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        .def("__repr__", [](const Eigen::Translation3d& self) {
+            std::ostringstream ss;
+            ss << "Translation3d(" << self.x() << ", " << self.y() << ", " << self.z() << ")";
+            return ss.str();
         });
 
     nb::class_<Eigen::Quaterniond>(m, "Quaterniond")
         .def(nb::init<double, double, double, double>())  // w, x, y, z
-        // Constructor from rotation matrix
+        // Constructor from rotation matrix — validates orthonormality so
+        // callers cannot smuggle scaling or shear into a "rotation."
         .def("__init__", [](Eigen::Quaterniond* self, const Eigen::Matrix3d& rot) {
+            if (!rot.isUnitary()) {
+                const double dev = (rot.transpose() * rot
+                                    - Eigen::Matrix3d::Identity()).cwiseAbs().maxCoeff();
+                std::ostringstream ss;
+                ss << "Quaterniond(rotation_matrix): input is not orthonormal "
+                   << "(max |Rᵀ·R − I| = " << dev << ")";
+                throw std::invalid_argument(ss.str());
+            }
             new (self) Eigen::Quaterniond(rot);
         }, "rotation_matrix"_a)
         // Construct from AngleAxisd
         .def("__init__", [](Eigen::Quaterniond* self, const Eigen::AngleAxisd& aa) {
             new (self) Eigen::Quaterniond(aa);
         }, "angle_axis"_a)
+        // Construct from 4-vector in Eigen-internal (x, y, z, w) coeff order;
+        // round-trips with `coeffs()` and any external array of that layout.
+        // Uses Eigen's pointer ctor so there is no uninitialised intermediate.
+        .def("__init__", [](Eigen::Quaterniond* self, const Eigen::Vector4d& coeffs) {
+            new (self) Eigen::Quaterniond(coeffs.data());
+        }, "coeffs"_a)
         .def_static("Identity", []() { return Eigen::Quaterniond::Identity(); })
         // Minimal-rotation quaternion taking `a` to `b` (Eigen handles the
         // antipodal case and gives an orthogonal-axis 180-deg rotation).
@@ -155,6 +260,10 @@ NB_MODULE(_tesseract_common, m) {
         // numpy interop without per-component getter calls.
         .def("coeffs", [](const Eigen::Quaterniond& q) -> Eigen::Vector4d {
             return q.coeffs();
+        })
+        // The vector (imaginary / xyz) part of the quaternion.
+        .def("vec", [](const Eigen::Quaterniond& q) -> Eigen::Vector3d {
+            return q.vec();
         })
         .def("toRotationMatrix", [](const Eigen::Quaterniond& q) -> Eigen::Matrix3d {
             return q.toRotationMatrix();
@@ -189,11 +298,64 @@ NB_MODULE(_tesseract_common, m) {
             return self.angularDistance(other);
         })
         .def("norm", [](const Eigen::Quaterniond& self) { return self.norm(); })
+        .def("squaredNorm", [](const Eigen::Quaterniond& self) { return self.squaredNorm(); })
         .def("normalize", [](Eigen::Quaterniond& self) { self.normalize(); })
         .def("normalized", [](const Eigen::Quaterniond& self) {
             return Eigen::Quaterniond(self.normalized());
         })
-        .def("setIdentity", [](Eigen::Quaterniond& self) { self.setIdentity(); });
+        .def("setIdentity", [](Eigen::Quaterniond& self) { self.setIdentity(); })
+        // Component-wise approx-equality on (w, x, y, z). NOTE: q and -q
+        // represent the same rotation but isApprox returns false for them;
+        // use angularDistance() to test rotational equality instead.
+        .def("isApprox", [](const Eigen::Quaterniond& self,
+                            const Eigen::Quaterniond& other,
+                            double prec) {
+            return self.isApprox(other, prec);
+        }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        // Decompose into intrinsic Euler angles given a 3-character axis
+        // order (case-insensitive), e.g. "ZYX" — first axis rotated about
+        // is Z, then Y, then X. The returned triple matches that order:
+        // `q.eulerAngles("ZYX")` gives `(yaw, pitch, roll)` for
+        // `R = Rz(yaw) · Ry(pitch) · Rx(roll)`.
+        //
+        // Tait-Bryan orders (3 distinct axes): ranges ([-π,π], [-π/2,π/2], [-π,π]).
+        // Proper Euler (repeating first axis): ranges ([0,π], [-π,π], [-π,π]).
+        .def("eulerAngles", [](const Eigen::Quaterniond& self,
+                               const std::string& order) -> Eigen::Vector3d {
+            if (order.size() != 3) {
+                throw std::invalid_argument(
+                    "eulerAngles order must be 3 characters from {X, Y, Z}, e.g. 'ZYX'; got \""
+                    + order + "\"");
+            }
+            auto axis_index = [&order](char c) -> int {
+                switch (c) {
+                    case 'X': case 'x': return 0;
+                    case 'Y': case 'y': return 1;
+                    case 'Z': case 'z': return 2;
+                    default:
+                        throw std::invalid_argument(
+                            "eulerAngles order: invalid axis '" + std::string(1, c)
+                            + "' in \"" + order + "\"; expected X, Y, or Z");
+                }
+            };
+            const int a0 = axis_index(order[0]);
+            const int a1 = axis_index(order[1]);
+            const int a2 = axis_index(order[2]);
+            // Adjacent axes must differ: Tait-Bryan (i,j,k all distinct) and
+            // proper Euler (i==k, i!=j) are the only well-defined orderings.
+            if (a0 == a1 || a1 == a2) {
+                throw std::invalid_argument(
+                    "eulerAngles order requires adjacent axes to differ; got \""
+                    + order + "\"");
+            }
+            return self.toRotationMatrix().eulerAngles(a0, a1, a2);
+        }, "order"_a)
+        .def("__repr__", [](const Eigen::Quaterniond& self) {
+            std::ostringstream ss;
+            ss << "Quaterniond(w=" << self.w() << ", x=" << self.x()
+               << ", y=" << self.y() << ", z=" << self.z() << ")";
+            return ss.str();
+        });
 
     nb::class_<Eigen::AngleAxisd>(m, "AngleAxisd")
         .def(nb::init<double, const Eigen::Vector3d&>())
@@ -201,6 +363,10 @@ NB_MODULE(_tesseract_common, m) {
         .def("__init__", [](Eigen::AngleAxisd* self, const Eigen::Quaterniond& q) {
             new (self) Eigen::AngleAxisd(q);
         }, "quaternion"_a)
+        // Construct from a 3x3 rotation matrix.
+        .def("__init__", [](Eigen::AngleAxisd* self, const Eigen::Matrix3d& R) {
+            new (self) Eigen::AngleAxisd(R);
+        }, "rotation_matrix"_a)
         .def("angle", [](const Eigen::AngleAxisd& self) { return self.angle(); })
         .def("axis", [](const Eigen::AngleAxisd& self) -> Eigen::Vector3d { return self.axis(); })
         .def("inverse", [](const Eigen::AngleAxisd& self) {
@@ -208,6 +374,217 @@ NB_MODULE(_tesseract_common, m) {
         })
         .def("toRotationMatrix", [](const Eigen::AngleAxisd& self) -> Eigen::Matrix3d {
             return self.toRotationMatrix();
+        })
+        .def("isApprox", [](const Eigen::AngleAxisd& self,
+                            const Eigen::AngleAxisd& other,
+                            double prec) {
+            return self.isApprox(other, prec);
+        }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        .def("__repr__", [](const Eigen::AngleAxisd& self) {
+            const auto& ax = self.axis();
+            std::ostringstream ss;
+            ss << "AngleAxisd(angle=" << self.angle()
+               << ", axis=[" << ax.x() << ", " << ax.y() << ", " << ax.z() << "])";
+            return ss.str();
+        });
+
+    // ========== Hyperplane3d ==========
+    // Plane in 3D as {x : normal · x + offset = 0}. Bound before
+    // ParametrizedLine3d because the latter's intersection methods take a
+    // Hyperplane3d argument; nanobind needs the type registered first.
+    //
+    // IMPORTANT: `signedDistance`, `absDistance`, and `projection` compute
+    // `normal · p + offset` directly — they return Euclidean distance ONLY
+    // when the normal is unit. Call `.normalize()` first (it rescales BOTH
+    // normal and offset, preserving the plane geometry) if you constructed
+    // with an un-normalised normal.
+    using Hyperplane3d = Eigen::Hyperplane<double, 3>;
+    // Shared threshold for rejecting degenerate geometric inputs — matches
+    // the `_QUAT_MIN_NORM` constant in `planning/transforms.py` so the whole
+    // module fails-fast at the same precision. Below this magnitude the
+    // implied normal / direction is indistinguishable from FP noise.
+    constexpr double kDegenerateGeometryEps = 1e-12;
+    nb::class_<Hyperplane3d>(m, "Hyperplane3d")
+        // Normal + signed offset: plane is {x : normal · x + offset = 0}.
+        .def("__init__", [](Hyperplane3d* self,
+                            const Eigen::Vector3d& normal,
+                            double offset) {
+            const double n_norm = normal.norm();
+            if (n_norm < kDegenerateGeometryEps) {
+                std::ostringstream ss;
+                ss << "Hyperplane3d(normal, offset): normal is zero-magnitude (|normal|="
+                   << n_norm << ")";
+                throw std::invalid_argument(ss.str());
+            }
+            new (self) Hyperplane3d(normal, offset);
+        }, "normal"_a, "offset"_a)
+        // Normal + point-on-plane: computes offset = -normal · point.
+        .def("__init__", [](Hyperplane3d* self,
+                            const Eigen::Vector3d& normal,
+                            const Eigen::Vector3d& point) {
+            const double n_norm = normal.norm();
+            if (n_norm < kDegenerateGeometryEps) {
+                std::ostringstream ss;
+                ss << "Hyperplane3d(normal, point): normal is zero-magnitude (|normal|="
+                   << n_norm << ")";
+                throw std::invalid_argument(ss.str());
+            }
+            new (self) Hyperplane3d(normal, point);
+        }, "normal"_a, "point"_a)
+        // Plane through three non-collinear points, normal direction by the
+        // right-hand rule: `normal = (p1 − p0) × (p2 − p0)`, normalised.
+        // (Upstream Eigen's `Through` computes the cross with the operands
+        //  swapped, giving the wrong sign for the natural reading. We pass
+        //  `(p0, p2, p1)` to undo the swap so the Python API stays intuitive.)
+        // Collinear inputs are rejected — Eigen silently falls back to an
+        // SVD-derived perpendicular, but that plane is mathematically arbitrary
+        // and almost never what the caller meant.
+        .def_static("Through", [](const Eigen::Vector3d& p0,
+                                  const Eigen::Vector3d& p1,
+                                  const Eigen::Vector3d& p2) {
+            const Eigen::Vector3d v1 = p1 - p0;
+            const Eigen::Vector3d v2 = p2 - p0;
+            const double cross_norm = v1.cross(v2).norm();
+            // Relative criterion: matches Eigen's own SVD-fallback trigger
+            // (norm <= ||v1|| · ||v2|| · eps), tightened to our shared epsilon.
+            const double scale = v1.norm() * v2.norm();
+            if (scale < kDegenerateGeometryEps
+                || cross_norm < scale * kDegenerateGeometryEps) {
+                std::ostringstream ss;
+                ss << "Hyperplane3d.Through: points are collinear "
+                   << "(|cross| = " << cross_norm
+                   << ", ||p1-p0|| · ||p2-p0|| = " << scale << ")";
+                throw std::invalid_argument(ss.str());
+            }
+            return Hyperplane3d(Hyperplane3d::Through(p0, p2, p1));
+        }, "p0"_a, "p1"_a, "p2"_a)
+        .def("normal", [](const Hyperplane3d& self) -> Eigen::Vector3d {
+            return self.normal();
+        })
+        .def("offset", [](const Hyperplane3d& self) { return self.offset(); })
+        // Plane coefficients (n.x, n.y, n.z, offset) — `coeffs · [x,y,z,1] = 0`.
+        .def("coeffs", [](const Hyperplane3d& self) -> Eigen::Vector4d {
+            return self.coeffs();
+        })
+        // Signed distance: positive on the half-space the normal points into.
+        .def("signedDistance", [](const Hyperplane3d& self, const Eigen::Vector3d& p) {
+            return self.signedDistance(p);
+        }, "point"_a)
+        .def("absDistance", [](const Hyperplane3d& self, const Eigen::Vector3d& p) {
+            return self.absDistance(p);
+        }, "point"_a)
+        // Closest point on the plane (perpendicular foot).
+        .def("projection", [](const Hyperplane3d& self, const Eigen::Vector3d& p) -> Eigen::Vector3d {
+            return self.projection(p);
+        }, "point"_a)
+        // In-place normalisation of the normal vector (and corresponding
+        // rescaling of the offset). Returns self for chaining.
+        .def("normalize", [](Hyperplane3d& self) -> Hyperplane3d& {
+            self.normalize();
+            return self;
+        }, nb::rv_policy::reference_internal)
+        // Apply a rigid-body transform to the plane in-place. Returns self
+        // for chaining. Replicates Eigen's `Hyperplane::transform(Transform&)`
+        // math manually because that overload is templated on `Affine`-mode
+        // Transforms and won't bind to our `Isometry3d` (`Transform<…, Isometry>`).
+        .def("transform", [](Hyperplane3d& self, const Eigen::Isometry3d& tf) -> Hyperplane3d& {
+            self.transform(tf.linear(), Eigen::Isometry);
+            self.offset() -= self.normal().dot(tf.translation());
+            return self;
+        }, "transform"_a, nb::rv_policy::reference_internal)
+        .def("isApprox", [](const Hyperplane3d& self, const Hyperplane3d& other, double prec) {
+            return self.isApprox(other, prec);
+        }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        .def("__repr__", [](const Hyperplane3d& self) {
+            const auto& n = self.normal();
+            std::ostringstream ss;
+            ss << "Hyperplane3d(normal=[" << n.x() << ", " << n.y() << ", " << n.z()
+               << "], offset=" << self.offset() << ")";
+            return ss.str();
+        });
+
+    // ========== ParametrizedLine3d ==========
+    // Line as `origin + t · direction`. The direct ctor does NOT normalise the
+    // direction; `Through(p0, p1)` DOES (it stores `(p1 − p0).normalized()`).
+    // Methods like `distance()`, `projection()`, and `intersectionParameter()`
+    // only return Euclidean / signed-length values when the direction is unit.
+    using ParametrizedLine3d = Eigen::ParametrizedLine<double, 3>;
+    nb::class_<ParametrizedLine3d>(m, "ParametrizedLine3d")
+        // Direct ctor — direction must be non-zero (it parameterises the line;
+        // a zero direction collapses every method to NaN).
+        .def("__init__", [](ParametrizedLine3d* self,
+                            const Eigen::Vector3d& origin,
+                            const Eigen::Vector3d& direction) {
+            const double d_norm = direction.norm();
+            if (d_norm < kDegenerateGeometryEps) {
+                std::ostringstream ss;
+                ss << "ParametrizedLine3d(origin, direction): direction is zero-magnitude "
+                   << "(|direction| = " << d_norm << ")";
+                throw std::invalid_argument(ss.str());
+            }
+            new (self) ParametrizedLine3d(origin, direction);
+        }, "origin"_a, "direction"_a)
+        // Line through two distinct points: origin = p0, direction = (p1 − p0).normalized().
+        .def_static("Through", [](const Eigen::Vector3d& p0, const Eigen::Vector3d& p1) {
+            const double sep = (p1 - p0).norm();
+            if (sep < kDegenerateGeometryEps) {
+                std::ostringstream ss;
+                ss << "ParametrizedLine3d.Through: p0 and p1 are coincident "
+                   << "(||p1 - p0|| = " << sep << ")";
+                throw std::invalid_argument(ss.str());
+            }
+            return ParametrizedLine3d(ParametrizedLine3d::Through(p0, p1));
+        }, "p0"_a, "p1"_a)
+        .def("origin", [](const ParametrizedLine3d& self) -> Eigen::Vector3d {
+            return self.origin();
+        })
+        .def("direction", [](const ParametrizedLine3d& self) -> Eigen::Vector3d {
+            return self.direction();
+        })
+        // Euclidean distance from `point` to the line (assumes unit direction).
+        .def("distance", [](const ParametrizedLine3d& self, const Eigen::Vector3d& p) {
+            return self.distance(p);
+        }, "point"_a)
+        .def("squaredDistance", [](const ParametrizedLine3d& self, const Eigen::Vector3d& p) {
+            return self.squaredDistance(p);
+        }, "point"_a)
+        // Closest point on the line to `point` (assumes unit direction).
+        .def("projection", [](const ParametrizedLine3d& self, const Eigen::Vector3d& p) -> Eigen::Vector3d {
+            return self.projection(p);
+        }, "point"_a)
+        // Point at parameter t: origin + t · direction.
+        .def("pointAt", [](const ParametrizedLine3d& self, double t) -> Eigen::Vector3d {
+            return self.pointAt(t);
+        }, "t"_a)
+        // Intersection with a plane. `intersectionParameter` returns the line
+        // parameter t (in direction-vector units); `intersectionPoint` returns
+        // the 3D point. Both return ±inf or NaN when the line is parallel to
+        // the plane — Eigen does not check; the caller must.
+        .def("intersectionParameter", [](const ParametrizedLine3d& self, const Hyperplane3d& plane) {
+            return self.intersectionParameter(plane);
+        }, "plane"_a)
+        .def("intersectionPoint", [](const ParametrizedLine3d& self, const Hyperplane3d& plane) -> Eigen::Vector3d {
+            return self.intersectionPoint(plane);
+        }, "plane"_a)
+        // Apply a rigid-body transform to the line in-place. Returns self for
+        // chaining. Same `Affine`-vs-`Isometry` template-mismatch as the
+        // Hyperplane3d.transform binding above; we call the Matrix overload
+        // on `tf.linear()` then add `tf.translation()` to the origin.
+        .def("transform", [](ParametrizedLine3d& self, const Eigen::Isometry3d& tf) -> ParametrizedLine3d& {
+            self.transform(tf.linear(), Eigen::Isometry);
+            self.origin() += tf.translation();
+            return self;
+        }, "transform"_a, nb::rv_policy::reference_internal)
+        .def("isApprox", [](const ParametrizedLine3d& self, const ParametrizedLine3d& other, double prec) {
+            return self.isApprox(other, prec);
+        }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        .def("__repr__", [](const ParametrizedLine3d& self) {
+            const auto& o = self.origin();
+            const auto& d = self.direction();
+            std::ostringstream ss;
+            ss << "ParametrizedLine3d(origin=[" << o.x() << ", " << o.y() << ", " << o.z()
+               << "], direction=[" << d.x() << ", " << d.y() << ", " << d.z() << "])";
+            return ss.str();
         });
 
     // ========== FilesystemPath ==========
