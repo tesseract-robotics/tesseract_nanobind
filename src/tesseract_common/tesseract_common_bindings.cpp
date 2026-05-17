@@ -55,7 +55,19 @@ NB_MODULE(_tesseract_common, m) {
             new (self) Eigen::Isometry3d();
             self->matrix() = mat;
         }, "matrix"_a)
+        // Construct directly from rotation primitives so callers don't have
+        // to assemble a 4x4 matrix by hand.
+        .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Quaterniond& q) {
+            new (self) Eigen::Isometry3d(q);
+        }, "rotation_quaternion"_a)
+        .def("__init__", [](Eigen::Isometry3d* self, const Eigen::AngleAxisd& aa) {
+            new (self) Eigen::Isometry3d(aa);
+        }, "rotation_angle_axis"_a)
+        .def("__init__", [](Eigen::Isometry3d* self, const Eigen::Translation3d& t) {
+            new (self) Eigen::Isometry3d(t);
+        }, "translation"_a)
         .def_static("Identity", []() { return Eigen::Isometry3d::Identity(); })
+        .def("setIdentity", [](Eigen::Isometry3d& self) { self.setIdentity(); })
         .def("matrix", [](const Eigen::Isometry3d& self) -> Eigen::Matrix4d {
             return self.matrix();
         })
@@ -93,11 +105,30 @@ NB_MODULE(_tesseract_common, m) {
 
     nb::class_<Eigen::Translation3d>(m, "Translation3d")
         .def(nb::init<double, double, double>())
+        // Construct from a numpy Vector3d.
+        .def("__init__", [](Eigen::Translation3d* self, const Eigen::Vector3d& v) {
+            new (self) Eigen::Translation3d(v);
+        }, "vector"_a)
+        // Component accessors — without these the class is effectively
+        // write-only (you can construct one but not read components back).
+        .def("x", [](const Eigen::Translation3d& self) { return self.x(); })
+        .def("y", [](const Eigen::Translation3d& self) { return self.y(); })
+        .def("z", [](const Eigen::Translation3d& self) { return self.z(); })
+        .def("translation", [](const Eigen::Translation3d& self) -> Eigen::Vector3d {
+            return self.translation();
+        })
+        .def("inverse", [](const Eigen::Translation3d& self) {
+            return Eigen::Translation3d(self.inverse());
+        })
         .def("__mul__", [](const Eigen::Translation3d& self, const Eigen::Isometry3d& other) {
             return Eigen::Isometry3d(self * other);
         })
         .def("__mul__", [](const Eigen::Translation3d& self, const Eigen::Translation3d& other) {
             return Eigen::Translation3d(self.x() + other.x(), self.y() + other.y(), self.z() + other.z());
+        })
+        // Translate a point: T * v = v + translation.
+        .def("__mul__", [](const Eigen::Translation3d& self, const Eigen::Vector3d& v) -> Eigen::Vector3d {
+            return self * v;
         });
 
     nb::class_<Eigen::Quaterniond>(m, "Quaterniond")
@@ -106,16 +137,75 @@ NB_MODULE(_tesseract_common, m) {
         .def("__init__", [](Eigen::Quaterniond* self, const Eigen::Matrix3d& rot) {
             new (self) Eigen::Quaterniond(rot);
         }, "rotation_matrix"_a)
+        // Construct from AngleAxisd
+        .def("__init__", [](Eigen::Quaterniond* self, const Eigen::AngleAxisd& aa) {
+            new (self) Eigen::Quaterniond(aa);
+        }, "angle_axis"_a)
+        .def_static("Identity", []() { return Eigen::Quaterniond::Identity(); })
+        // Minimal-rotation quaternion taking `a` to `b` (Eigen handles the
+        // antipodal case and gives an orthogonal-axis 180-deg rotation).
+        .def_static("FromTwoVectors", [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) {
+            return Eigen::Quaterniond().setFromTwoVectors(a, b);
+        }, "a"_a, "b"_a)
         .def("w", [](const Eigen::Quaterniond& q) { return q.w(); })
         .def("x", [](const Eigen::Quaterniond& q) { return q.x(); })
         .def("y", [](const Eigen::Quaterniond& q) { return q.y(); })
         .def("z", [](const Eigen::Quaterniond& q) { return q.z(); })
+        // Eigen stores coeffs internally as (x, y, z, w); expose for direct
+        // numpy interop without per-component getter calls.
+        .def("coeffs", [](const Eigen::Quaterniond& q) -> Eigen::Vector4d {
+            return q.coeffs();
+        })
         .def("toRotationMatrix", [](const Eigen::Quaterniond& q) -> Eigen::Matrix3d {
             return q.toRotationMatrix();
-        });
+        })
+        // Spherical linear interpolation: q1.slerp(t, q2) -> Quaterniond.
+        // Eigen handles the short-arc sign flip and the near-parallel
+        // numerically-stable lerp fallback internally.
+        .def("slerp", [](const Eigen::Quaterniond& self, double t, const Eigen::Quaterniond& other) {
+            return Eigen::Quaterniond(self.slerp(t, other));
+        }, "t"_a, "other"_a)
+        // Hamilton product as Python __mul__ so q1 * q2 composes rotations.
+        .def("__mul__", [](const Eigen::Quaterniond& self, const Eigen::Quaterniond& other) {
+            return Eigen::Quaterniond(self * other);
+        })
+        // q * v rotates a 3-vector by the quaternion (== R(q) @ v).
+        .def("__mul__", [](const Eigen::Quaterniond& self, const Eigen::Vector3d& v) -> Eigen::Vector3d {
+            return self * v;
+        })
+        // Conjugate / inverse for unit quaternions.
+        .def("conjugate", [](const Eigen::Quaterniond& self) {
+            return Eigen::Quaterniond(self.conjugate());
+        })
+        .def("inverse", [](const Eigen::Quaterniond& self) {
+            return Eigen::Quaterniond(self.inverse());
+        })
+        // Dot product on the 4-vector representation.
+        .def("dot", [](const Eigen::Quaterniond& self, const Eigen::Quaterniond& other) {
+            return self.dot(other);
+        })
+        // Geodesic angle between two unit quaternions (== acos(2 dot^2 - 1)).
+        .def("angularDistance", [](const Eigen::Quaterniond& self, const Eigen::Quaterniond& other) {
+            return self.angularDistance(other);
+        })
+        .def("norm", [](const Eigen::Quaterniond& self) { return self.norm(); })
+        .def("normalize", [](Eigen::Quaterniond& self) { self.normalize(); })
+        .def("normalized", [](const Eigen::Quaterniond& self) {
+            return Eigen::Quaterniond(self.normalized());
+        })
+        .def("setIdentity", [](Eigen::Quaterniond& self) { self.setIdentity(); });
 
     nb::class_<Eigen::AngleAxisd>(m, "AngleAxisd")
         .def(nb::init<double, const Eigen::Vector3d&>())
+        // Construct from a Quaterniond.
+        .def("__init__", [](Eigen::AngleAxisd* self, const Eigen::Quaterniond& q) {
+            new (self) Eigen::AngleAxisd(q);
+        }, "quaternion"_a)
+        .def("angle", [](const Eigen::AngleAxisd& self) { return self.angle(); })
+        .def("axis", [](const Eigen::AngleAxisd& self) -> Eigen::Vector3d { return self.axis(); })
+        .def("inverse", [](const Eigen::AngleAxisd& self) {
+            return Eigen::AngleAxisd(self.inverse());
+        })
         .def("toRotationMatrix", [](const Eigen::AngleAxisd& self) -> Eigen::Matrix3d {
             return self.toRotationMatrix();
         });
