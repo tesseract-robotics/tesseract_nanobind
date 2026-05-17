@@ -156,8 +156,8 @@ def main():
     # - .position/.quaternion properties returning numpy arrays
     print("\n4. Pose helpers...")
 
-    # WHY from_xyz_quat: Quaternion order is (x,y,z,w) to match scipy/ROS
-    # convention. Internally converts to Quaterniond(w,x,y,z) for Eigen.
+    # WHY from_xyz_quat: Quaternion order is scalar-last (x,y,z,w).
+    # Internally converts to Quaterniond(w,x,y,z) for Eigen.
     t1 = Pose.from_xyz_quat(0.5, 0, 0.8, 0, 0, 0.707, 0.707)
     print(f"   From xyz_quat: {t1}")
 
@@ -166,7 +166,7 @@ def main():
     t2 = translation(0.5, 0, 0.8) @ rotation_z(1.57)
     print(f"   From factories: {t2}")
 
-    # WHY numpy properties: Direct interop with numpy/scipy without manual extraction
+    # WHY numpy properties: direct interop with numpy without manual extraction
     print(f"   Position array: {t1.position}")
     print(f"   Quaternion: {t1.quaternion}")
 

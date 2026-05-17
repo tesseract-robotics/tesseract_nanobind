@@ -28,9 +28,8 @@ tesseract_kinematics_example
 ```
 
 !!! tip "Quaternion convention"
-    The Python API uses **scalar-last** quaternions `[x, y, z, w]` to match
-    scipy. C++ Eigen uses scalar-first `[w, x, y, z]` — reorder when porting
-    C++ examples.
+    The Python API uses **scalar-last** quaternions `[x, y, z, w]`. C++ Eigen
+    uses scalar-first `[w, x, y, z]` — reorder when porting C++ examples.
 
 ## Collision Detection Example
 

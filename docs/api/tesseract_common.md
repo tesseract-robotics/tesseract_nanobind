@@ -32,9 +32,8 @@ combined = pose1 * pose2
 !!! tip "Prefer `planning.Pose` for authoring"
     For building/serializing transforms in Python, use
     `tesseract_robotics.planning.Pose` — it accepts scalar-last quaternions
-    (`qx, qy, qz, qw`, matching scipy's `Rotation.as_quat()`) and offers
-    `from_xyz_quat`, `from_rpy`, etc. Convert to an `Isometry3d` when calling
-    the raw C++ API.
+    (`qx, qy, qz, qw`) and offers `from_xyz_quat`, `from_rpy`, etc. Convert
+    to an `Isometry3d` when calling the raw C++ API.
 
     ```python
     from tesseract_robotics.planning import Pose
@@ -59,8 +58,7 @@ rotation_matrix = q.toRotationMatrix()
 
 !!! warning "Quaternion conventions differ"
     - `Quaterniond` (raw Eigen) is **scalar-first** (`w, x, y, z`).
-    - `planning.Pose.quaternion` is **scalar-last** (`qx, qy, qz, qw`),
-      matching scipy.
+    - `planning.Pose.quaternion` is **scalar-last** (`qx, qy, qz, qw`).
 
     Reorder components when crossing the boundary.
 

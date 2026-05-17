@@ -29,7 +29,7 @@ joints = np.zeros(6)
 # group_name is the first positional argument; tip_link defaults to the chain's tip.
 tcp_pose = robot.fk("manipulator", joints)
 print(f"Position: {tcp_pose.position}")
-print(f"Quaternion (scalar-last, matches scipy): {tcp_pose.quaternion}")
+print(f"Quaternion (scalar-last [x, y, z, w]): {tcp_pose.quaternion}")
 ```
 
 ## Inverse Kinematics
@@ -37,7 +37,7 @@ print(f"Quaternion (scalar-last, matches scipy): {tcp_pose.quaternion}")
 ```python
 from tesseract_robotics.planning import Pose
 
-# Scalar-last quaternion convention (matches scipy.spatial.transform.Rotation)
+# Scalar-last quaternion convention [qx, qy, qz, qw]
 target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, 0.0, 0.0)
 ik_solution = robot.ik("manipulator", target, seed=joints)
 
