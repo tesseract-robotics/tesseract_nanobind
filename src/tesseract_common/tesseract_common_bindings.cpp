@@ -403,7 +403,9 @@ NB_MODULE(_tesseract_common, m) {
     // the `_QUAT_MIN_NORM` constant in `planning/transforms.py` so the whole
     // module fails-fast at the same precision. Below this magnitude the
     // implied normal / direction is indistinguishable from FP noise.
-    constexpr double kDegenerateGeometryEps = 1e-12;
+    // `static` so the lambdas below can capture it implicitly under MSVC
+    // (clang/gcc tolerate constexpr capture without it; MSVC does not).
+    static constexpr double kDegenerateGeometryEps = 1e-12;
     nb::class_<Hyperplane3d>(m, "Hyperplane3d")
         // Normal + signed offset: plane is {x : normal · x + offset = 0}.
         .def("__init__", [](Hyperplane3d* self,
