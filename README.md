@@ -28,7 +28,7 @@ Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract)
 pip install tesseract-robotics-nanobind
 ```
 
-**Platform support:** Linux x86_64. macOS arm64 coming soon.
+**Platform support:** Linux and windows x86_64, macOS arm64
 
 ## Quick Start
 
