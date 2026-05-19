@@ -16,6 +16,8 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract_common/allowed_collision_matrix.h>
 #include <tesseract_common/kinematic_limits.h>
 #include <tesseract_common/plugin_info.h>
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <sstream>
 
@@ -374,11 +376,60 @@ NB_MODULE(_tesseract_common, m) {
                             double prec) {
             return self.isApprox(other, prec);
         }, "other"_a, "prec"_a = Eigen::NumTraits<double>::dummy_precision())
+        // Decompose into (roll, pitch, yaw) — the inverse of `from_rpy`.
+        // Same intrinsic ZYX Tait-Bryan convention as ROS / `tf2`.
+        //
+        // Canonical ranges (matching `tf2::Matrix3x3::getRPY`):
+        //   roll  ∈ [-π, π]
+        //   pitch ∈ [-π/2, π/2]
+        //   yaw   ∈ [-π, π]
+        //
+        // Implementation note: deliberately NOT `eulerAngles("ZYX")[::-1]`.
+        // Eigen's `eulerAngles` is internally consistent for *rotation*
+        // preservation but its wrap conditions can return a (roll, pitch,
+        // yaw) representation outside the canonical ranges above — fine
+        // for math, wrong for ROS interop where users expect tf2-style
+        // values. The textbook extraction below picks the *canonical*
+        // branch every time, so `from_rpy(*q.to_rpy())` returns exactly
+        // the (r, p, y) values the user would expect.
+        //
+        // Gimbal lock at cos(pitch) ≈ 0: yaw becomes free and the (roll,
+        // yaw) split is arbitrary. Convention here matches tf2: yaw = 0,
+        // roll absorbs the residual. The rotation roundtrips; the
+        // individual values stop being meaningful — for near-vertical
+        // tool axes use the quaternion / rotation-matrix surface.
+        .def("to_rpy", [](const Eigen::Quaterniond& self) -> Eigen::Vector3d {
+            // Threshold on cos(pitch) below which (roll, yaw) cannot be
+            // separated stably. 1e-9 in cos(pitch) corresponds to pitch
+            // within ~4.5e-5 rad (≈ 2.5 millidegrees) of ±π/2 — well
+            // below typical joint-angle precision and below Eigen's own
+            // `NumTraits<double>::dummy_precision()` floor.
+            constexpr double kGimbalLockCosPitchThreshold = 1e-9;
+
+            const Eigen::Matrix3d R = self.toRotationMatrix();
+            // Clamp before asin to guard against |sin(pitch)| > 1 from
+            // accumulated FP error on the input quaternion.
+            const double sin_pitch = std::clamp(-R(2, 0), -1.0, 1.0);
+            const double pitch = std::asin(sin_pitch);
+            const double cos_pitch = std::cos(pitch);
+
+            double roll, yaw;
+            if (std::abs(cos_pitch) > kGimbalLockCosPitchThreshold) {
+                roll = std::atan2(R(2, 1), R(2, 2));
+                yaw  = std::atan2(R(1, 0), R(0, 0));
+            } else {
+                // Gimbal lock: pitch ≈ ±π/2. Match tf2 convention.
+                roll = std::atan2(-R(1, 2), R(1, 1));
+                yaw  = 0.0;
+            }
+            return Eigen::Vector3d(roll, pitch, yaw);
+        })
         // Decompose into intrinsic Euler angles given a 3-character axis
         // order (case-insensitive), e.g. "ZYX" — first axis rotated about
         // is Z, then Y, then X. The returned triple matches that order:
         // `q.eulerAngles("ZYX")` gives `(yaw, pitch, roll)` for
-        // `R = Rz(yaw) · Ry(pitch) · Rx(roll)`.
+        // `R = Rz(yaw) · Ry(pitch) · Rx(roll)`. For the RPY-natural
+        // (roll, pitch, yaw) order, use `to_rpy()` instead.
         //
         // Tait-Bryan orders (3 distinct axes): ranges ([-π,π], [-π/2,π/2], [-π,π]).
         // Proper Euler (repeating first axis): ranges ([0,π], [-π,π], [-π,π]).

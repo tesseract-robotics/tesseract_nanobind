@@ -329,18 +329,17 @@ class Pose(Isometry3d):
     @property
     def roll(self) -> float:
         """Roll angle (X rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
-        # eulerAngles("ZYX") returns (yaw, pitch, roll); roll is index 2.
-        return float(Quaterniond(self.linear).eulerAngles("ZYX")[2])
+        return float(Quaterniond(self.linear).to_rpy()[0])
 
     @property
     def pitch(self) -> float:
         """Pitch angle (Y rotation) from ZYX Tait-Bryan decomposition. Singular at ±π/2 (see section comment)."""
-        return float(Quaterniond(self.linear).eulerAngles("ZYX")[1])
+        return float(Quaterniond(self.linear).to_rpy()[1])
 
     @property
     def yaw(self) -> float:
         """Yaw angle (Z rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
-        return float(Quaterniond(self.linear).eulerAngles("ZYX")[0])
+        return float(Quaterniond(self.linear).to_rpy()[2])
 
     @property
     def rotation_matrix(self) -> np.ndarray:
