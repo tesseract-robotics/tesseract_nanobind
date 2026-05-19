@@ -92,12 +92,12 @@ def main():
     wp1 = CartesianWaypoint(
         Isometry3d.Identity()
         * Translation3d(0.8, -0.3, 1.455)
-        * Quaterniond(0.70710678, 0, 0.70710678, 0)
+        * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
     )
     wp2 = CartesianWaypoint(
         Isometry3d.Identity()
         * Translation3d(0.8, 0.3, 1.455)
-        * Quaterniond(0.70710678, 0, 0.70710678, 0)
+        * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
     )
 
     # Create move instructions

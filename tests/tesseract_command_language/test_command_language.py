@@ -95,7 +95,9 @@ class TestCartesianWaypoint:
     def test_constructor_with_quaternion(self):
         # Create transform with rotation
         transform = (
-            Isometry3d.Identity() * Translation3d(0.8, 0.3, 1.5) * Quaterniond(0.707, 0, 0.707, 0)
+            Isometry3d.Identity()
+            * Translation3d(0.8, 0.3, 1.5)
+            * Quaterniond.from_xyzw(0, 0.707, 0, 0.707)
         )
         wp = CartesianWaypoint(transform)
         assert wp is not None
@@ -364,17 +366,17 @@ class TestABBExampleWorkflow:
         wp1 = CartesianWaypoint(
             Isometry3d.Identity()
             * Translation3d(0.8, -0.3, 1.455)
-            * Quaterniond(0.70710678, 0, 0.70710678, 0)
+            * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
         )
         wp2 = CartesianWaypoint(
             Isometry3d.Identity()
             * Translation3d(0.8, 0.3, 1.455)
-            * Quaterniond(0.70710678, 0, 0.70710678, 0)
+            * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
         )
         wp3 = CartesianWaypoint(
             Isometry3d.Identity()
             * Translation3d(0.8, 0.5, 1.455)
-            * Quaterniond(0.70710678, 0, 0.70710678, 0)
+            * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
         )
 
         # Create instructions (as in example - 3-arg form with profile)
@@ -591,7 +593,10 @@ class TestWaitInstruction:
                 assert child.isMoveInstruction()
             else:
                 assert child.isWaitInstruction()
-                assert child.asWaitInstruction().getWaitType() == WaitInstructionType.DIGITAL_INPUT_HIGH
+                assert (
+                    child.asWaitInstruction().getWaitType()
+                    == WaitInstructionType.DIGITAL_INPUT_HIGH
+                )
 
 
 class TestTimerInstruction:
