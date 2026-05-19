@@ -352,10 +352,6 @@ def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
     return Pose(Isometry3d(AngleAxisd(angle, axis_arr / norm)))
 
 
-# Backwards compatibility alias
-Transform = Pose
-
-
 def _safe_quaternion(qx: float, qy: float, qz: float, qw: float) -> Quaterniond:
     """Build a normalised quaternion from scalar-last (qx, qy, qz, qw).
 

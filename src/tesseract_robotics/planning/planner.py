@@ -11,7 +11,7 @@ Example:
 
     program = (MotionProgram("manipulator")
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
-        .move_to(CartesianTarget(Transform.from_xyz(0.5, 0, 0.5)))
+        .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
     )
 
     result = plan_freespace(robot, program)
@@ -155,15 +155,15 @@ def plan_cartesian(
 
     Example:
         from tesseract_robotics.planning import (
-            Robot, MotionProgram, CartesianTarget, Transform, plan_cartesian
+            Robot, MotionProgram, CartesianTarget, Pose, plan_cartesian
         )
 
         robot = Robot.from_tesseract_support("abb_irb2400")
 
         # Create linear path
         program = (MotionProgram("manipulator")
-            .move_to(CartesianTarget(Transform.from_xyz(0.5, -0.2, 0.5)))
-            .linear_to(CartesianTarget(Transform.from_xyz(0.5, 0.2, 0.5)))
+            .move_to(CartesianTarget(Pose.from_xyz(0.5, -0.2, 0.5)))
+            .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
         )
 
         result = plan_cartesian(robot, program)
