@@ -281,6 +281,35 @@ NB_MODULE(_tesseract_common, m) {
                         return Eigen::Quaterniond(qw, qx, qy, qz);
                     },
                     "qx"_a, "qy"_a, "qz"_a, "qw"_a)
+        // Intrinsic ZYX Tait-Bryan factory — `R = Rz(yaw)·Ry(pitch)·Rx(roll)`.
+        // This is the ROS / `tf2::Quaternion::setRPY` convention, matching
+        // `tf.transformations.quaternion_from_euler(r, p, y, axes='sxyz')`.
+        // Eigen has no single `fromRPY` — the idiom is to compose three
+        // AngleAxis rotations; centralising it here avoids the duplication
+        // that previously lived in `Pose.from_xyz_rpy`. Round-trips with
+        // `eulerAngles("ZYX")` (which returns `(yaw, pitch, roll)`).
+        //
+        // Two overloads: scalar-positional for `geometry_msgs/Vector3 rpy`
+        // (`from_rpy(rpy.x, rpy.y, rpy.z)`) and arraylike for the numpy /
+        // tf_transformations shape (`from_rpy(np.asarray([r, p, y]))`).
+        // Both shapes show up at real ROS-interop call sites; pick one and
+        // half the callers grow ugly `*` / `.x .y .z` plumbing.
+        .def_static("from_rpy",
+                    [](double roll, double pitch, double yaw) {
+                        return Eigen::Quaterniond(
+                            Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ())
+                            * Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY())
+                            * Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()));
+                    },
+                    "roll"_a, "pitch"_a, "yaw"_a)
+        .def_static("from_rpy",
+                    [](const Eigen::Vector3d& rpy) {
+                        return Eigen::Quaterniond(
+                            Eigen::AngleAxisd(rpy.z(), Eigen::Vector3d::UnitZ())
+                            * Eigen::AngleAxisd(rpy.y(), Eigen::Vector3d::UnitY())
+                            * Eigen::AngleAxisd(rpy.x(), Eigen::Vector3d::UnitX()));
+                    },
+                    "rpy"_a)
         // Scalar component accessors — properties, not methods. Matches the
         // Pose scalar accessors (x/y/z/qx/qy/qz/qw) and keeps the read-side
         // free of trailing-parens noise. Eigen's C++ API exposes these as

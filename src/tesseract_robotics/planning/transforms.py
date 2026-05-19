@@ -235,13 +235,10 @@ class Pose(Isometry3d):
             raise ValueError(f"Position must have 3 elements, got {pos.shape}")
         if angles.shape != (3,):
             raise ValueError(f"RPY must have 3 elements, got {angles.shape}")
-        roll, pitch, yaw = float(angles[0]), float(angles[1]), float(angles[2])
-        q = (
-            Quaterniond(AngleAxisd(yaw, Z_AXIS))
-            * Quaterniond(AngleAxisd(pitch, Y_AXIS))
-            * Quaterniond(AngleAxisd(roll, X_AXIS))
+        return cls(
+            Translation3d(float(pos[0]), float(pos[1]), float(pos[2])),
+            Quaterniond.from_rpy(angles),
         )
-        return cls(Translation3d(float(pos[0]), float(pos[1]), float(pos[2])), q)
 
     @classmethod
     def from_matrix_position(cls, rotation: ArrayLike, position: ArrayLike) -> Pose:

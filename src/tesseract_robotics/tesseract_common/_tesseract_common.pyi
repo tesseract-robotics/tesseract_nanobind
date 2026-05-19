@@ -150,6 +150,14 @@ class Quaterniond:
     @staticmethod
     def from_xyzw(qx: float, qy: float, qz: float, qw: float) -> Quaterniond: ...
 
+    @overload
+    @staticmethod
+    def from_rpy(roll: float, pitch: float, yaw: float) -> Quaterniond: ...
+
+    @overload
+    @staticmethod
+    def from_rpy(rpy: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> Quaterniond: ...
+
     @property
     def w(self) -> float: ...
 

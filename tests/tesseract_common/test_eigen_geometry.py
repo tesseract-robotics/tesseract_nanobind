@@ -179,13 +179,60 @@ def test_axis_constants_are_readonly(axis):
 def test_quaterniond_euler_angles_zyx_roundtrip():
     """Build R = Rz(yaw)·Ry(pitch)·Rx(roll), extract via Eigen's eulerAngles('ZYX')."""
     roll, pitch, yaw = 0.5, -0.4, 0.3  # negative pitch — non-trivial range
-    q = (
+    q = Quaterniond.from_rpy(roll, pitch, yaw)
+    extracted = q.eulerAngles("ZYX")
+    nptest.assert_allclose(extracted, [yaw, pitch, roll], atol=DEFAULT_PREC)
+
+
+def test_quaterniond_from_rpy_identity():
+    """from_rpy(0, 0, 0) is Identity — the ROS-zero-orientation case."""
+    q = Quaterniond.from_rpy(0.0, 0.0, 0.0)
+    assert q.isApprox(Quaterniond.Identity())
+
+
+@pytest.mark.parametrize(
+    "axis_name, angle, axis_vec",
+    [("roll", 0.7, X_AXIS), ("pitch", 0.7, Y_AXIS), ("yaw", 0.7, Z_AXIS)],
+)
+def test_quaterniond_from_rpy_pure_axis_rotation(axis_name, angle, axis_vec):
+    """Each scalar drives a rotation about its named axis only."""
+    rpy = {"roll": [angle, 0, 0], "pitch": [0, angle, 0], "yaw": [0, 0, angle]}[axis_name]
+    q = Quaterniond.from_rpy(*rpy)
+    expected = Quaterniond(AngleAxisd(angle, axis_vec))
+    assert q.angularDistance(expected) < ANGULAR_PREC
+
+
+def test_quaterniond_from_rpy_matches_manual_zyx_composition():
+    """from_rpy(r, p, y) == Rz(y) · Ry(p) · Rx(r) — the ROS / tf2 convention."""
+    roll, pitch, yaw = 0.3, -0.6, 1.2
+    q = Quaterniond.from_rpy(roll, pitch, yaw)
+    manual = (
         Quaterniond(AngleAxisd(yaw, Z_AXIS))
         * Quaterniond(AngleAxisd(pitch, Y_AXIS))
         * Quaterniond(AngleAxisd(roll, X_AXIS))
     )
-    extracted = q.eulerAngles("ZYX")
-    nptest.assert_allclose(extracted, [yaw, pitch, roll], atol=DEFAULT_PREC)
+    assert q.angularDistance(manual) < ANGULAR_PREC
+
+
+def test_quaterniond_from_rpy_array_overload():
+    """Array overload `from_rpy(np.ndarray)` matches scalar `from_rpy(r, p, y)`.
+
+    Binding accepts a `numpy.ndarray[float64, shape=(3,)]` — same Vector3d
+    caster used everywhere else in the bindings (`FromTwoVectors`,
+    `Translation3d(Vector3d)`, etc.). For list/tuple inputs, wrap with
+    `np.asarray(...)` or splat into the scalar overload — both one keystroke.
+    """
+    scalar_q = Quaterniond.from_rpy(0.3, -0.6, 1.2)
+    array_q = Quaterniond.from_rpy(np.array([0.3, -0.6, 1.2]))
+    assert array_q.angularDistance(scalar_q) < ANGULAR_PREC
+
+
+def test_quaterniond_from_rpy_array_overload_rejects_wrong_length():
+    """Array overload validates shape — 2 or 4 elements must raise."""
+    with pytest.raises((TypeError, ValueError)):
+        Quaterniond.from_rpy(np.array([0.3, -0.6]))
+    with pytest.raises((TypeError, ValueError)):
+        Quaterniond.from_rpy(np.array([0.3, -0.6, 1.2, 0.0]))
 
 
 def test_quaterniond_euler_angles_case_insensitive():
