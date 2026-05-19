@@ -8,8 +8,8 @@ Markers:
 """
 
 import pytest
-import tesseract_robotics.examples
 
+import tesseract_robotics.examples
 
 # === Viewer Examples ===
 

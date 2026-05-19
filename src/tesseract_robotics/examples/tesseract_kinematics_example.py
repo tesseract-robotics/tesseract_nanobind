@@ -91,9 +91,9 @@ def main():
     # STEP 3: Inverse Kinematics
     # =========================================================================
     # Define target pose for end effector
-    # Pose.from_xyz_quat(x, y, z, qx, qy, qz, qw) - note scalar-last quaternion
+    # Pose.from_xyz_quat([x, y, z], [qx, qy, qz, qw]) - note scalar-last quaternion
     # This quaternion represents a rotation about the z-axis
-    target_pose = Pose.from_xyz_quat(0.7, -0.1, 1.0, 0.7071, 0, 0.7071, 0)
+    target_pose = Pose.from_xyz_quat([0.7, -0.1, 1.0], [0.7071, 0, 0.7071, 0])
 
     # robot.ik() solves for joint angles that achieve target pose
     # seed: initial guess for iterative solver (affects which solution is found)

@@ -12,8 +12,8 @@ from tesseract_robotics.tesseract_task_composer_planning import (
     UpsampleTrajectoryProfile,
 )
 
-
 # ---- MinLengthProfile ------------------------------------------------------
+
 
 class TestMinLengthProfile:
     def test_default(self):
@@ -32,6 +32,7 @@ class TestMinLengthProfile:
 
 # ---- UpsampleTrajectoryProfile --------------------------------------------
 
+
 class TestUpsampleTrajectoryProfile:
     def test_default(self):
         p = UpsampleTrajectoryProfile()
@@ -49,6 +50,7 @@ class TestUpsampleTrajectoryProfile:
 
 # ---- ProfileSwitchProfile --------------------------------------------------
 
+
 class TestProfileSwitchProfile:
     def test_default(self):
         p = ProfileSwitchProfile()
@@ -65,6 +67,7 @@ class TestProfileSwitchProfile:
 
 
 # ---- KinematicLimitsCheckProfile ------------------------------------------
+
 
 class TestKinematicLimitsCheckProfile:
     def test_default(self):
@@ -88,6 +91,7 @@ class TestKinematicLimitsCheckProfile:
 
 
 # ---- FixStateBoundsProfile -------------------------------------------------
+
 
 class TestFixStateBoundsProfile:
     def test_default(self):
@@ -116,6 +120,7 @@ class TestFixStateBoundsProfile:
 
 
 # ---- FixStateCollisionProfile ---------------------------------------------
+
 
 class TestFixStateCollisionProfile:
     def test_default(self):
@@ -170,6 +175,7 @@ class TestFixStateCollisionProfile:
 
 
 # ---- ContactCheckProfile ---------------------------------------------------
+
 
 class TestContactCheckProfile:
     def test_default(self):

@@ -70,7 +70,7 @@ GOLDEN: Final[Path] = Path(__file__).parent / "golden" / "abb_irb2400_zigzag_squ
 
 def _pose_at(x: float, y: float) -> Pose:
     """Pose at ``(x, y, Z_HEIGHT_M)`` with the tool pointing down."""
-    return Pose.from_xyz_quat(x, y, Z_HEIGHT_M, *TOOL_DOWN_QUAT_XYZW)
+    return Pose.from_xyz_quat([x, y, Z_HEIGHT_M], TOOL_DOWN_QUAT_XYZW)
 
 
 # ---------------------------------------------------------------------------

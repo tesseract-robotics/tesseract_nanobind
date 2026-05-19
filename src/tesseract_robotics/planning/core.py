@@ -351,7 +351,7 @@ class Robot:
             # Use first tip link
             tip_link = list(group.getActiveLinkNames())[-1]
 
-        return Pose.from_isometry(poses[tip_link])
+        return Pose(poses[tip_link])
 
     def ik(
         self,

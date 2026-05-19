@@ -266,7 +266,7 @@ def create_obstacle(
         )
     """
     if transform is None:
-        transform = Transform.identity()
+        transform = Transform()
 
     # Create link with geometry at origin of link frame
     link = Link(name)

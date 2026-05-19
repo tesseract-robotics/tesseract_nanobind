@@ -53,7 +53,7 @@ def _clear_singleton():
 
 def test_full_dsl_golden() -> None:
     """Full DSL coverage — output byte-for-byte against checked-in golden."""
-    fr = Pose.from_xyz_quat(0.6, -0.1, 0.8, 0.0, 0.707170, 0.0, 0.707170)
+    fr = Pose.from_xyz_quat([0.6, -0.1, 0.8], [0.0, 0.707170, 0.0, 0.707170])
     ext_axe = [1.57, 1.57]
 
     target_default = RapidTarget(fr, config=Config(0, 0, 0, 0))

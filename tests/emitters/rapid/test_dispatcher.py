@@ -89,7 +89,7 @@ def _proc_lines(rapid_text: str) -> list[str]:
 
 
 def test_linear_cartesian_lowers_to_movel():
-    pose = Pose.from_xyz_quat(0.5, -0.2, 0.62, 0, 0, 0, 1)
+    pose = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 0, 1])
     composite = _composite_with(_move(_cart_waypoint_poly(pose)))
     out = emit_rapid(composite, _PROFILES)
 
@@ -99,7 +99,7 @@ def test_linear_cartesian_lowers_to_movel():
 
 
 def test_freespace_cartesian_lowers_to_movej():
-    pose = Pose.from_xyz_quat(0.5, 0.0, 0.62, 0, 0, 0, 1)
+    pose = Pose.from_xyz_quat([0.5, 0.0, 0.62], [0, 0, 0, 1])
     composite = _composite_with(
         _move(_cart_waypoint_poly(pose), move_type=MoveInstructionType_FREESPACE)
     )
@@ -168,7 +168,7 @@ def test_settool_emits_comment_with_int_id():
 
 
 def test_nested_composite_walks_recursively():
-    pose = Pose.from_xyz_quat(0.5, 0.0, 0.5, 0, 0, 0, 1)
+    pose = Pose.from_xyz_quat([0.5, 0.0, 0.5], [0, 0, 0, 1])
     inner = _composite_with(_move(_cart_waypoint_poly(pose)))
     outer = _composite_with(inner, _move(_cart_waypoint_poly(pose)))
     out = emit_rapid(outer, _PROFILES)
@@ -180,7 +180,7 @@ def test_nested_composite_walks_recursively():
 
 
 def test_circular_move_raises_unsupported():
-    pose = Pose.from_xyz_quat(0.5, 0.0, 0.5, 0, 0, 0, 1)
+    pose = Pose.from_xyz_quat([0.5, 0.0, 0.5], [0, 0, 0, 1])
     composite = _composite_with(
         _move(_cart_waypoint_poly(pose), move_type=MoveInstructionType_CIRCULAR)
     )
@@ -189,7 +189,7 @@ def test_circular_move_raises_unsupported():
 
 
 def test_missing_profile_raises():
-    pose = Pose.from_xyz_quat(0.5, 0.0, 0.5, 0, 0, 0, 1)
+    pose = Pose.from_xyz_quat([0.5, 0.0, 0.5], [0, 0, 0, 1])
     composite = _composite_with(_move(_cart_waypoint_poly(pose), profile="UNKNOWN"))
     with pytest.raises(MissingProfileError, match="'UNKNOWN'"):
         emit_rapid(composite, _PROFILES)

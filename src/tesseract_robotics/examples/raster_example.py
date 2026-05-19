@@ -139,7 +139,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     y_values = [-0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3]
 
     # Create Cartesian waypoints with constant orientation
-    waypoints = [Pose.from_xyz_quat(x_const, y, z_const, *tool_quat) for y in y_values]
+    waypoints = [Pose.from_xyz_quat([x_const, y, z_const], tool_quat) for y in y_values]
     print(f"Created {len(waypoints)} waypoints")
 
     # --8<-- [start:build_program]
