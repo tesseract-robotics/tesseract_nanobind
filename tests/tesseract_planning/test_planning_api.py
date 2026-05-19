@@ -126,6 +126,60 @@ class TestPose:
         rotated = t.rotation() @ x_vec
         np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=2)
 
+    def test_scalar_translation_accessors(self):
+        # Per Joelkang's review: pose.translation()[0] is clunky; pose.x is
+        # the ergonomic accessor. These return Python float (not numpy
+        # scalar) and don't introduce any numpy facade — they're a 1-line
+        # adapter over the inherited Isometry3d.translation() method.
+        p = Pose.from_xyz(1.25, -2.5, 3.75)
+        assert p.x == 1.25 and isinstance(p.x, float)
+        assert p.y == -2.5 and isinstance(p.y, float)
+        assert p.z == 3.75 and isinstance(p.z, float)
+
+    def test_scalar_quaternion_accessors(self):
+        # Scalar-last [qx, qy, qz, qw] is the project canonical order.
+        p = Pose.from_xyz_quat(0, 0, 0, 0.0, 0.0, 0.7071067811865475, 0.7071067811865476)
+        np.testing.assert_almost_equal(p.qx, 0.0)
+        np.testing.assert_almost_equal(p.qy, 0.0)
+        np.testing.assert_almost_equal(p.qz, 0.7071067811865475)
+        np.testing.assert_almost_equal(p.qw, 0.7071067811865476)
+        for v in (p.qx, p.qy, p.qz, p.qw):
+            assert isinstance(v, float)
+
+    def test_scalar_rpy_accessors(self):
+        # Tait-Bryan ZYX decomposition (yaw·pitch·roll); roll/pitch/yaw
+        # individually accessible as Python floats.
+        p = Pose.from_xyz_rpy(0, 0, 0, 0.1, 0.2, 0.3)
+        np.testing.assert_almost_equal(p.roll, 0.1)
+        np.testing.assert_almost_equal(p.pitch, 0.2)
+        np.testing.assert_almost_equal(p.yaw, 0.3)
+        for v in (p.roll, p.pitch, p.yaw):
+            assert isinstance(v, float)
+
+    def test_rotation_matrix_accessor(self):
+        # Returns an independent np.ndarray copy — mutating it must not
+        # affect the pose's linear() state.
+        p = Pose.from_xyz_rpy(0, 0, 0, 0, 0, np.pi / 2)
+        R = p.rotation_matrix
+        assert R.shape == (3, 3)
+        np.testing.assert_array_almost_equal(R @ np.array([1, 0, 0]), [0, 1, 0])
+
+        # Mutate the returned copy — original pose must be unaffected.
+        R[0, 0] = 999.0
+        assert p.rotation_matrix[0, 0] != 999.0
+
+    def test_quaternion_accessor_returns_typed_quaterniond(self):
+        # Per Joelkang's review: pose.quaternion should return Quaterniond
+        # (typed), not a numpy array — so the Eigen API (.x(), .coeffs(),
+        # slerp, etc.) is available without an extra wrapping step.
+        p = Pose.from_xyz_quat(0, 0, 0, 0.0, 0.0, 0.7071067811865475, 0.7071067811865476)
+        q = p.quaternion
+        assert isinstance(q, Quaterniond)
+        np.testing.assert_almost_equal(q.x, 0.0)
+        np.testing.assert_almost_equal(q.y, 0.0)
+        np.testing.assert_almost_equal(q.z, 0.7071067811865475)
+        np.testing.assert_almost_equal(q.w, 0.7071067811865476)
+
     def test_rotation_from_axis_angle(self):
         """Test rotation_from_axis_angle factory function."""
         from tesseract_robotics.planning import rotation_from_axis_angle
