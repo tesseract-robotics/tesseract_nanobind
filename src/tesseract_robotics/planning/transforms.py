@@ -37,6 +37,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from tesseract_robotics.tesseract_common import (
+    EIGEN_DEFAULT_PREC,
     X_AXIS,
     Y_AXIS,
     Z_AXIS,
@@ -54,10 +55,11 @@ from tesseract_robotics.tesseract_common import (
 #
 # This is a NUMERICAL FLOOR, not a tolerance (per CLAUDE.md): it does not
 # assert anything about input accuracy, only that the input can be safely
-# divided into. The value is a property of float64 (~4 orders of magnitude
-# above eps = 2.2e-16), independent of vector dimension — applies equally
-# to unit quaternions (4 components) and rotation axes (3 components).
-_NORMALISE_DENOM_FLOOR = 1e-12
+# divided into. Sourced from Eigen's `NumTraits<double>::dummy_precision()`
+# (re-exported as `EIGEN_DEFAULT_PREC` from the binding) so the whole
+# stack — this constant, the C++ `kDegenerateGeometryEps`, the test
+# constants — share one anchor.
+_NORMALISE_DENOM_FLOOR = EIGEN_DEFAULT_PREC
 
 
 class Pose(Isometry3d):

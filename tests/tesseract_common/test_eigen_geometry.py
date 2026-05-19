@@ -7,6 +7,7 @@ import numpy.testing as nptest
 import pytest
 
 from tesseract_robotics.tesseract_common import (
+    EIGEN_DEFAULT_PREC,
     X_AXIS,
     Y_AXIS,
     Z_AXIS,
@@ -19,8 +20,10 @@ from tesseract_robotics.tesseract_common import (
 )
 
 # Tolerance constants — all expressed relative to Eigen's default
-# `isApprox` precision (`NumTraits<double>::dummy_precision()` = 1e-12 for
-# float64). The triple covers the three regimes the tests exercise:
+# `isApprox` precision (`EIGEN_DEFAULT_PREC` re-exported from
+# tesseract_common, sourced from `NumTraits<double>::dummy_precision()` =
+# 1e-12 for float64). The triple covers the three regimes the tests
+# exercise:
 #   DEFAULT_PREC — Eigen's own default; used as atol on assert_allclose
 #                  when the spec is "approximately equal at Eigen's default".
 #   SUB_PREC     — perturbations smaller than DEFAULT_PREC; values that
@@ -28,9 +31,9 @@ from tesseract_robotics.tesseract_common import (
 #   TIGHTER_PREC — tolerance tighter than the perturbations above; used
 #                  to assert that explicit `prec=` overrides the default
 #                  and makes the comparison fail.
-DEFAULT_PREC = 1e-12  # Eigen NumTraits<double>::dummy_precision
-SUB_PREC = 1e-15  # 3 orders below default — still passes isApprox at default
-TIGHTER_PREC = 1e-20  # 8 orders below default — defeats default isApprox
+DEFAULT_PREC = EIGEN_DEFAULT_PREC
+SUB_PREC = 1e-3 * DEFAULT_PREC  # 3 orders below default — still passes isApprox
+TIGHTER_PREC = 1e-8 * DEFAULT_PREC  # 8 orders below default — defeats default isApprox
 
 # Looser tolerance for angularDistance-style trig-based assertions: the
 # `acos(2·dot² - 1)` form has poor conditioning near acos(1), so component-

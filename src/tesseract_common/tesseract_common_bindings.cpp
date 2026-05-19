@@ -45,6 +45,16 @@ public:
 NB_MODULE(_tesseract_common, m) {
     m.doc() = "tesseract_common Python bindings (nanobind)";
 
+    // Single source of truth for the float64 default precision used across
+    // the project. Eigen exposes this as `NumTraits<double>::dummy_precision()`
+    // (constexpr, returns 1e-12); we re-export so Python tests + helpers
+    // can reference one value instead of duplicating `1e-12` literals.
+    // Used by: planning/transforms.py (_NORMALISE_DENOM_FLOOR),
+    // tests/tesseract_common/test_eigen_geometry.py (DEFAULT_PREC),
+    // tests/tesseract_planning/test_planning_api.py (EIGEN_DEFAULT_PREC),
+    // and the C++ `kDegenerateGeometryEps` constexpr further down.
+    m.attr("EIGEN_DEFAULT_PREC") = Eigen::NumTraits<double>::dummy_precision();
+
     // ========== Eigen Type Aliases ==========
     // Note: Vector3d, VectorXd, MatrixXd are handled automatically by nanobind/eigen/dense.h
     // Isometry3d needs explicit binding for SWIG compatibility (tests expect .matrix() method)
@@ -424,14 +434,18 @@ NB_MODULE(_tesseract_common, m) {
     // normal and offset, preserving the plane geometry) if you constructed
     // with an un-normalised normal.
     using Hyperplane3d = Eigen::Hyperplane<double, 3>;
-    // Shared threshold for rejecting degenerate geometric inputs — matches
-    // the `_NORMALISE_DENOM_FLOOR` constant in `planning/transforms.py` so
-    // the whole module fails-fast at the same precision. Below this
+    // Shared threshold for rejecting degenerate geometric inputs. Sourced
+    // from Eigen's float64 default precision so the entire stack (the
+    // Python `_NORMALISE_DENOM_FLOOR`, Python test `DEFAULT_PREC`, the
+    // re-exported `EIGEN_DEFAULT_PREC` attribute above, and this constant)
+    // all share one anchor — tightening the float64 precision regime
+    // changes only Eigen's value, never our duplicates. Below this
     // magnitude the implied normal / direction is indistinguishable from
     // FP noise. `static` so the lambdas below can capture it implicitly
     // under MSVC (clang/gcc tolerate constexpr capture without it; MSVC
     // does not).
-    static constexpr double kDegenerateGeometryEps = 1e-12;
+    static constexpr double kDegenerateGeometryEps =
+        Eigen::NumTraits<double>::dummy_precision();
     nb::class_<Hyperplane3d>(m, "Hyperplane3d")
         // Normal + signed offset: plane is {x : normal · x + offset = 0}.
         .def("__init__", [](Hyperplane3d* self,
