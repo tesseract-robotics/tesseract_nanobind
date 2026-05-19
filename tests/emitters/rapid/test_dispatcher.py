@@ -39,14 +39,14 @@ from tesseract_robotics.tesseract_command_language import (
     TimerInstructionType,
     WaitInstruction,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
 
 _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")
 _PROFILES = {"P": _PROFILE}
 
 
 def _cart_waypoint_poly(pose: Pose):
-    return CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(Isometry3d(pose.matrix)))
+    # Pose IS-A Isometry3d (subclass) — passed directly, no wrapping needed.
+    return CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
 
 
 def _joint_waypoint_poly(joints_rad, names):
