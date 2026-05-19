@@ -127,7 +127,7 @@ jobs:
         run: |
           source test_env/bin/activate
           python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
-          python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+          python -c "from tesseract import tesseract_common, tesseract_geometry, tesseract_scene_graph"
       - name: run full tests
         # Serial (no xdist): planning tests (OMPL/TrajOpt) segfault under xdist
         # on macOS — fork+OpenMP threads don't mix. Linux handles it fine.

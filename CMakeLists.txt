@@ -69,9 +69,12 @@ find_package(console_bridge REQUIRED)
 # non-Windows platforms.
 set(_NBE_STUB_DLL_DIRS "")
 if(WIN32)
+  # Use comma separator (paths can't contain commas on Windows; semicolons
+  # collide with CMake's list separator and get mangled when passed via
+  # `cmake -E env`).
   set(_NBE_STUB_DLL_DIRS "${TESSERACT_INSTALL_DIR}/bin")
   if(DEFINED ENV{CONDA_PREFIX})
-    string(APPEND _NBE_STUB_DLL_DIRS "$ENV{CONDA_PREFIX}/Library/bin")
+    set(_NBE_STUB_DLL_DIRS "${_NBE_STUB_DLL_DIRS},$ENV{CONDA_PREFIX}/Library/bin")
   endif()
 endif()
 

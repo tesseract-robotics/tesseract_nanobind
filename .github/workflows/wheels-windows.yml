@@ -414,8 +414,8 @@ jobs:
       run: |
         source test_env/Scripts/activate
         python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
-        python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
-        python -c "from tesseract_robotics import trajopt_ifopt; print('trajopt_ifopt OK')"
+        python -c "from tesseract import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+        python -c "from tesseract import trajopt_ifopt; print('trajopt_ifopt OK')"
 
     - name: run tests
       run: |

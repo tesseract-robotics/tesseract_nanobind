@@ -26,8 +26,10 @@ import sys
 def _add_dll_search_dirs() -> None:
     if sys.platform != "win32":
         return
+    # Comma separator (not os.pathsep / `;`) because `;` collides with CMake's
+    # list separator when the env var is passed via `cmake -E env`.
     dirs = os.environ.get("NB_STUB_DLL_DIRS", "")
-    for directory in dirs.split(os.pathsep):
+    for directory in dirs.split(","):
         directory = directory.strip()
         if directory and os.path.isdir(directory):
             os.add_dll_directory(directory)  # type: ignore[attr-defined]
