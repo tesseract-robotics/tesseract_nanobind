@@ -131,7 +131,9 @@ function(add_tesseract_nanobind_extension module_name source_file)
 
   # Generate Python stub file (.pyi) via the DLL-search-aware wrapper.
   add_tesseract_nanobind_stub(${module_name} ${_NBE_STUB_DEPENDS})
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi DESTINATION tesseract)
+  if(NOT WIN32)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi DESTINATION tesseract)
+  endif()
 endfunction()
 
 # Generate .pyi stub for an already-defined nanobind module target.
@@ -139,12 +141,29 @@ endfunction()
 # Windows DLL search dirs (NB_STUB_DLL_DIRS) are honored. Additional ARGN
 # values become extra DEPENDS on the custom command (sibling modules whose
 # .pyd must exist before stubgen imports this one).
+#
+# Windows: stub generation is skipped entirely. The .pyd's transitive DLL
+# deps (conda libs, tesseract C++ libs in ws/install/bin) require
+# os.add_dll_directory() registration plus delvewheel-style RPATH that
+# only exists post-wheel-build. Generating stubs at CMake time requires
+# loading the .pyd in-place, which doesn't have a working DLL search yet.
+# Stubs are a developer ergonomic feature, not a runtime requirement, so
+# Windows wheels ship without .pyi files. Linux/macOS still get them; a
+# future improvement is to either run delvewheel-then-stubgen as a wheel
+# post-processing step, or get nanobind upstream to support DLL search
+# config in nanobind_add_stub.
 function(add_tesseract_nanobind_stub module_name)
+  if(WIN32)
+    # Create a no-op alias target so anything depending on ${module_name}_stub
+    # still resolves cleanly.
+    add_custom_target(${module_name}_stub ALL DEPENDS ${module_name})
+    return()
+  endif()
+
   set(_pyi ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi)
   add_custom_command(
     OUTPUT ${_pyi}
-    COMMAND ${CMAKE_COMMAND} -E env "NB_STUB_DLL_DIRS=${_NBE_STUB_DLL_DIRS}"
-            "${Python_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/nb_stubgen_wrapper.py"
+    COMMAND "${Python_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/nb_stubgen_wrapper.py"
             -q
             -i "$<TARGET_FILE_DIR:${module_name}>"
             -m ${module_name}
@@ -334,7 +353,9 @@ install(TARGETS base LIBRARY DESTINATION ompl)
 # Generate Python stub file (.pyi) via the DLL-search-aware wrapper.
 # `base` has no `import_module_in_context` calls so no extra STUB_DEPENDS.
 add_tesseract_nanobind_stub(base)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/base.pyi DESTINATION ompl)
+if(NOT WIN32)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/base.pyi DESTINATION ompl)
+endif()
 
 # Add tesseract_motion_planners_descartes module (optional - only if descartes component was built)
 find_package(tesseract_motion_planners QUIET COMPONENTS descartes)
