@@ -192,9 +192,11 @@ NB_MODULE(_tesseract_common, m) {
         }, "vector"_a)
         // Component accessors — without these the class is effectively
         // write-only (you can construct one but not read components back).
-        .def("x", [](const Eigen::Translation3d& self) { return self.x(); })
-        .def("y", [](const Eigen::Translation3d& self) { return self.y(); })
-        .def("z", [](const Eigen::Translation3d& self) { return self.z(); })
+        // Properties (def_prop_ro) match the Quaterniond.x/y/z/w convention:
+        // stored-data scalar reads have no trailing parens in Python.
+        .def_prop_ro("x", [](const Eigen::Translation3d& self) { return self.x(); })
+        .def_prop_ro("y", [](const Eigen::Translation3d& self) { return self.y(); })
+        .def_prop_ro("z", [](const Eigen::Translation3d& self) { return self.z(); })
         .def("translation", [](const Eigen::Translation3d& self) -> Eigen::Vector3d {
             return self.translation();
         })
@@ -381,8 +383,9 @@ NB_MODULE(_tesseract_common, m) {
         .def("__init__", [](Eigen::AngleAxisd* self, const Eigen::Matrix3d& R) {
             new (self) Eigen::AngleAxisd(R);
         }, "rotation_matrix"_a)
-        .def("angle", [](const Eigen::AngleAxisd& self) { return self.angle(); })
-        .def("axis", [](const Eigen::AngleAxisd& self) -> Eigen::Vector3d { return self.axis(); })
+        // Stored-data accessors as properties (matches Quaterniond / Translation3d).
+        .def_prop_ro("angle", [](const Eigen::AngleAxisd& self) { return self.angle(); })
+        .def_prop_ro("axis", [](const Eigen::AngleAxisd& self) -> Eigen::Vector3d { return self.axis(); })
         .def("inverse", [](const Eigen::AngleAxisd& self) {
             return Eigen::AngleAxisd(self.inverse());
         })
@@ -475,10 +478,12 @@ NB_MODULE(_tesseract_common, m) {
             }
             return Hyperplane3d(Hyperplane3d::Through(p0, p2, p1));
         }, "p0"_a, "p1"_a, "p2"_a)
-        .def("normal", [](const Hyperplane3d& self) -> Eigen::Vector3d {
+        // Stored-data accessors as properties (matches the project convention
+        // for getter-style methods that return stored values).
+        .def_prop_ro("normal", [](const Hyperplane3d& self) -> Eigen::Vector3d {
             return self.normal();
         })
-        .def("offset", [](const Hyperplane3d& self) { return self.offset(); })
+        .def_prop_ro("offset", [](const Hyperplane3d& self) { return self.offset(); })
         // Plane coefficients (n.x, n.y, n.z, offset) — `coeffs · [x,y,z,1] = 0`.
         .def("coeffs", [](const Hyperplane3d& self) -> Eigen::Vector4d {
             return self.coeffs();
@@ -552,10 +557,11 @@ NB_MODULE(_tesseract_common, m) {
             }
             return ParametrizedLine3d(ParametrizedLine3d::Through(p0, p1));
         }, "p0"_a, "p1"_a)
-        .def("origin", [](const ParametrizedLine3d& self) -> Eigen::Vector3d {
+        // Stored-data accessors as properties (project convention).
+        .def_prop_ro("origin", [](const ParametrizedLine3d& self) -> Eigen::Vector3d {
             return self.origin();
         })
-        .def("direction", [](const ParametrizedLine3d& self) -> Eigen::Vector3d {
+        .def_prop_ro("direction", [](const ParametrizedLine3d& self) -> Eigen::Vector3d {
             return self.direction();
         })
         // Euclidean distance from `point` to the line (assumes unit direction).

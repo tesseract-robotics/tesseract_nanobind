@@ -143,8 +143,8 @@ def test_quaterniond_vec_and_squarednorm():
 def test_angleaxisd_from_matrix3d():
     aa_original = AngleAxisd(math.pi / 3, Z_AXIS)
     aa_recovered = AngleAxisd(aa_original.toRotationMatrix())
-    assert aa_recovered.angle() == pytest.approx(math.pi / 3)
-    nptest.assert_allclose(aa_recovered.axis(), Z_AXIS, atol=1e-12)
+    assert aa_recovered.angle == pytest.approx(math.pi / 3)
+    nptest.assert_allclose(aa_recovered.axis, Z_AXIS, atol=1e-12)
 
 
 @pytest.mark.parametrize("axis", [X_AXIS, Y_AXIS, Z_AXIS])
@@ -239,8 +239,8 @@ def test_quaterniond_from_valid_rotation_matrix_accepted():
 
 def test_hyperplane_normal_offset_ctor():
     plane = Hyperplane3d(Z_AXIS, -5.0)  # z = 5
-    nptest.assert_allclose(plane.normal(), Z_AXIS)
-    assert plane.offset() == -5.0
+    nptest.assert_allclose(plane.normal, Z_AXIS)
+    assert plane.offset == -5.0
     # Signed distance of origin to z = 5: −5 (origin is below the plane along +Z).
     assert plane.signedDistance(np.zeros(3)) == pytest.approx(-5.0)
 
@@ -261,17 +261,17 @@ def test_hyperplane_through_three_points_right_hand_rule():
     """
     # XY plane traversed counter-clockwise from origin → normal = +Z.
     plane = Hyperplane3d.Through(np.zeros(3), X_AXIS, Y_AXIS)
-    nptest.assert_allclose(plane.normal(), Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(plane.normal, Z_AXIS, atol=1e-12)
     # Reversing the last two points flips the normal.
     plane_flipped = Hyperplane3d.Through(np.zeros(3), Y_AXIS, X_AXIS)
-    nptest.assert_allclose(plane_flipped.normal(), -Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(plane_flipped.normal, -Z_AXIS, atol=1e-12)
     # General case: normal direction matches (p1 − p0) × (p2 − p0).
     p0 = np.array([1.0, 1.0, 1.0])
     p1 = np.array([2.0, 1.0, 1.0])
     p2 = np.array([1.0, 2.0, 1.0])
     expected_normal = np.cross(p1 - p0, p2 - p0)
     expected_normal /= np.linalg.norm(expected_normal)
-    nptest.assert_allclose(Hyperplane3d.Through(p0, p1, p2).normal(), expected_normal, atol=1e-12)
+    nptest.assert_allclose(Hyperplane3d.Through(p0, p1, p2).normal, expected_normal, atol=1e-12)
 
 
 def test_hyperplane_signed_vs_abs_distance():
@@ -305,7 +305,7 @@ def test_hyperplane_normalize_makes_distance_methods_euclidean():
     assert plane_raw.signedDistance(point) == pytest.approx(4.0)
 
     plane_raw.normalize()
-    nptest.assert_allclose(np.linalg.norm(plane_raw.normal()), 1.0, atol=1e-12)
+    nptest.assert_allclose(np.linalg.norm(plane_raw.normal), 1.0, atol=1e-12)
     # Post-normalisation: signedDistance is the actual Euclidean distance.
     assert plane_raw.signedDistance(point) == pytest.approx(2.0)
     # And the same plane is unchanged from one built normalised in the first place.
@@ -337,8 +337,8 @@ def test_hyperplane_repr():
 
 def test_parametrized_line_origin_direction_ctor():
     line = ParametrizedLine3d(np.array([1.0, 2.0, 3.0]), Z_AXIS)
-    nptest.assert_allclose(line.origin(), [1.0, 2.0, 3.0])
-    nptest.assert_allclose(line.direction(), Z_AXIS)
+    nptest.assert_allclose(line.origin, [1.0, 2.0, 3.0])
+    nptest.assert_allclose(line.direction, Z_AXIS)
 
 
 def test_parametrized_line_through_normalises_direction():
@@ -349,11 +349,11 @@ def test_parametrized_line_through_normalises_direction():
     the convention can't drift silently.
     """
     line = ParametrizedLine3d.Through(np.zeros(3), np.array([3.0, 0.0, 0.0]))
-    nptest.assert_allclose(line.origin(), np.zeros(3))
-    nptest.assert_allclose(line.direction(), X_AXIS)  # magnitude 1, not 3
+    nptest.assert_allclose(line.origin, np.zeros(3))
+    nptest.assert_allclose(line.direction, X_AXIS)  # magnitude 1, not 3
     # Direct ctor with the same direction does NOT normalise:
     raw = ParametrizedLine3d(np.zeros(3), np.array([3.0, 0.0, 0.0]))
-    nptest.assert_allclose(raw.direction(), [3.0, 0.0, 0.0])
+    nptest.assert_allclose(raw.direction, [3.0, 0.0, 0.0])
 
 
 def test_parametrized_line_pointAt():
@@ -469,7 +469,7 @@ def test_hyperplane_transform_translates_and_rotates():
     plane = Hyperplane3d(Z_AXIS, 0.0)  # z = 0
     tf = Isometry3d(np.array([0.0, 0.0, 5.0]), Quaterniond.Identity())  # translate +5Z
     plane.transform(tf)
-    nptest.assert_allclose(plane.normal(), Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(plane.normal, Z_AXIS, atol=1e-12)
     assert plane.signedDistance(np.zeros(3)) == pytest.approx(-5.0)
     assert plane.signedDistance(np.array([0.0, 0.0, 5.0])) == pytest.approx(0.0, abs=1e-12)
 
@@ -492,8 +492,8 @@ def test_hyperplane_transform_preserves_membership():
 def test_parametrized_line_transform_round_trip():
     """Applying a transform then its inverse returns the line to its starting state."""
     line = ParametrizedLine3d(np.array([1.0, 2.0, 3.0]), Z_AXIS)
-    origin_before = line.origin().copy()
-    direction_before = line.direction().copy()
+    origin_before = line.origin.copy()
+    direction_before = line.direction.copy()
 
     tf = Isometry3d(
         np.array([5.0, -1.0, 2.0]),
@@ -502,8 +502,8 @@ def test_parametrized_line_transform_round_trip():
     line.transform(tf)
     line.transform(tf.inverse())
 
-    nptest.assert_allclose(line.origin(), origin_before, atol=1e-12)
-    nptest.assert_allclose(line.direction(), direction_before, atol=1e-12)
+    nptest.assert_allclose(line.origin, origin_before, atol=1e-12)
+    nptest.assert_allclose(line.direction, direction_before, atol=1e-12)
 
 
 def test_parametrized_line_transform_translates_origin_only():
@@ -511,5 +511,5 @@ def test_parametrized_line_transform_translates_origin_only():
     line = ParametrizedLine3d(np.zeros(3), Z_AXIS)
     tf = Isometry3d(np.array([1.0, 2.0, 3.0]), Quaterniond.Identity())
     line.transform(tf)
-    nptest.assert_allclose(line.origin(), [1.0, 2.0, 3.0], atol=1e-12)
-    nptest.assert_allclose(line.direction(), Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(line.origin, [1.0, 2.0, 3.0], atol=1e-12)
+    nptest.assert_allclose(line.direction, Z_AXIS, atol=1e-12)
