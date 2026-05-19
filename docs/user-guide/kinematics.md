@@ -72,7 +72,7 @@ Compute a link's pose from joint values.
 
 ```python
 from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract.tesseract_common import Isometry3d
 import numpy as np
 
 pose = Pose.from_xyz_rpy(0.5, 0.0, 0.3, 0, 0, np.pi / 4)
@@ -121,7 +121,7 @@ Find joint values that achieve a target pose.
 === "Low-Level API"
 
     ```python
-    from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+    from tesseract.tesseract_kinematics import KinGroupIKInput
 
     # Pose subclasses Isometry3d, so KinGroupIKInput accepts it directly.
     working_frame = manip.getBaseLinkName()

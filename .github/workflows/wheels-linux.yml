@@ -232,6 +232,18 @@ jobs:
           echo "  Patched: $(basename $ext)"
         done
 
+        # Bindings now live in sibling namespace packages (src/tesseract/, src/ompl/)
+        # since the structural refactor. Deps are bundled into tesseract_robotics/,
+        # so cross-dir RPATH points to the sibling.
+        for sibling in tesseract ompl; do
+          if [[ -d "$WHEEL_DIR/$sibling" ]]; then
+            find "$WHEEL_DIR/$sibling" -maxdepth 1 -name "*.so" -type f | while read ext; do
+              patchelf --set-rpath '$ORIGIN/../tesseract_robotics' "$ext" 2>/dev/null || true
+              echo "  Patched ($sibling): $(basename $ext)"
+            done
+          fi
+        done
+
         echo "Checking for missing deps..."
         for so in "$PKG_DIR"/*.so*; do
           if [[ -f "$so" && ! -L "$so" ]]; then
@@ -313,7 +325,7 @@ jobs:
         run: |
           source test_env/bin/activate
           python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
-          python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+          python -c "from tesseract import tesseract_common, tesseract_geometry, tesseract_scene_graph"
       - name: run full tests
         run: |
           source test_env/bin/activate

@@ -25,9 +25,9 @@ from typing import ClassVar
 
 import numpy as np
 from numpy.typing import ArrayLike
+from tesseract.tesseract_common import Quaterniond
 
 from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_common import Quaterniond
 
 from .utils import MotionType, RapidType, format_ext_axis, get_quat, get_rapid_bool
 

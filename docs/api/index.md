@@ -14,31 +14,31 @@ Auto-generated API documentation from docstrings.
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.tesseract_common`](tesseract_common.md) | Common types (Isometry3d, etc.) |
-| [`tesseract_robotics.tesseract_geometry`](tesseract_geometry.md) | Geometric primitives |
-| [`tesseract_robotics.tesseract_scene_graph`](tesseract_scene_graph.md) | Links, joints, scene graph |
-| [`tesseract_robotics.tesseract_environment`](tesseract_environment.md) | Environment, commands |
-| [`tesseract_robotics.tesseract_collision`](tesseract_collision.md) | Collision managers, contacts |
-| [`tesseract_robotics.tesseract_kinematics`](tesseract_kinematics.md) | Kinematic groups, solvers |
+| [`tesseract.tesseract_common`](tesseract_common.md) | Common types (Isometry3d, etc.) |
+| [`tesseract.tesseract_geometry`](tesseract_geometry.md) | Geometric primitives |
+| [`tesseract.tesseract_scene_graph`](tesseract_scene_graph.md) | Links, joints, scene graph |
+| [`tesseract.tesseract_environment`](tesseract_environment.md) | Environment, commands |
+| [`tesseract.tesseract_collision`](tesseract_collision.md) | Collision managers, contacts |
+| [`tesseract.tesseract_kinematics`](tesseract_kinematics.md) | Kinematic groups, solvers |
 
 ### Planning Modules
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.tesseract_command_language`](tesseract_command_language.md) | Waypoints, instructions |
-| [`tesseract_robotics.tesseract_motion_planners`](tesseract_motion_planners.md) | Base planner types |
-| [`tesseract_robotics.tesseract_motion_planners_ompl`](tesseract_motion_planners_ompl.md) | OMPL planner |
-| [`tesseract_robotics.tesseract_motion_planners_trajopt`](tesseract_motion_planners_trajopt.md) | TrajOpt planner |
-| [`tesseract_robotics.tesseract_motion_planners_descartes`](tesseract_motion_planners_descartes.md) | Descartes planner |
-| [`tesseract_robotics.tesseract_motion_planners_simple`](tesseract_motion_planners_simple.md) | Simple interpolation |
-| [`tesseract_robotics.tesseract_task_composer`](tesseract_task_composer.md) | Task composition |
+| [`tesseract.tesseract_command_language`](tesseract_command_language.md) | Waypoints, instructions |
+| [`tesseract.tesseract_motion_planners`](tesseract_motion_planners.md) | Base planner types |
+| [`tesseract.tesseract_motion_planners_ompl`](tesseract_motion_planners_ompl.md) | OMPL planner |
+| [`tesseract.tesseract_motion_planners_trajopt`](tesseract_motion_planners_trajopt.md) | TrajOpt planner |
+| [`tesseract.tesseract_motion_planners_descartes`](tesseract_motion_planners_descartes.md) | Descartes planner |
+| [`tesseract.tesseract_motion_planners_simple`](tesseract_motion_planners_simple.md) | Simple interpolation |
+| [`tesseract.tesseract_task_composer`](tesseract_task_composer.md) | Task composition |
 
 ### Low-Level SQP Modules
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.trajopt_ifopt`](trajopt_ifopt.md) | Variables, constraints, costs (Var, Node, collision, Cartesian) |
-| [`tesseract_robotics.trajopt_sqp`](trajopt_sqp.md) | SQP solver (TrustRegionSQPSolver, OSQP) |
+| [`tesseract.trajopt_ifopt`](trajopt_ifopt.md) | Variables, constraints, costs (Var, Node, collision, Cartesian) |
+| [`tesseract.trajopt_sqp`](trajopt_sqp.md) | SQP solver (TrustRegionSQPSolver, OSQP) |
 
 ## Import Patterns
 
@@ -69,16 +69,16 @@ result = composer.plan(robot, program, pipeline="TrajOptPipeline")
 ### Direct Module Access
 
 ```python
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_scene_graph import Link, Joint
-from tesseract_robotics.tesseract_geometry import Box, Sphere
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_scene_graph import Link, Joint
+from tesseract.tesseract_geometry import Box, Sphere
 ```
 
 ### SQP API
 
 ```python
-from tesseract_robotics.trajopt_ifopt import Bounds, CartPosConstraint, createNodesVariables
-from tesseract_robotics.trajopt_sqp import TrustRegionSQPSolver, OSQPEigenSolver
+from tesseract.trajopt_ifopt import Bounds, CartPosConstraint, createNodesVariables
+from tesseract.trajopt_sqp import TrustRegionSQPSolver, OSQPEigenSolver
 ```
 
 ## Type Conventions

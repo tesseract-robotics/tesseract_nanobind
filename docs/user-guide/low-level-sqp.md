@@ -17,11 +17,11 @@ Measured step rates for a reference 8-DOF gantry problem are printed at runtime 
 
 | Module | Purpose |
 |---|---|
-| `tesseract_robotics.trajopt_ifopt` | Variables (`Var`, `Node`, `NodesVariables`), constraints (joint, Cartesian, collision), factory helpers |
-| `tesseract_robotics.trajopt_sqp` | `IfoptProblem` (NLP), `IfoptQPProblem` (QP wrapper), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
+| `tesseract.trajopt_ifopt` | Variables (`Var`, `Node`, `NodesVariables`), constraints (joint, Cartesian, collision), factory helpers |
+| `tesseract.trajopt_sqp` | `IfoptProblem` (NLP), `IfoptQPProblem` (QP wrapper), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
 
 The standalone `tesseract_robotics.ifopt` module was **removed in 0.34**.
-All types merged into `tesseract_robotics.trajopt_ifopt`. See the
+All types merged into `tesseract.trajopt_ifopt`. See the
 [0.33 → 0.34 migration guide](../changes.md) for details.
 
 ## Variable Hierarchy (0.34+)
@@ -35,7 +35,7 @@ The `JointPosition` class is gone. Variables now use a three-level hierarchy:
 Build the full hierarchy with `createNodesVariables`:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
+from tesseract.trajopt_ifopt import Bounds, createNodesVariables
 
 bounds = Bounds(-3.14, 3.14)
 nodes_variables = createNodesVariables(
@@ -65,7 +65,7 @@ wrapping for collision constraints, followed by `problem.setup()`:
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
 ```
 
-Available constraint types in `tesseract_robotics.trajopt_ifopt`:
+Available constraint types in `tesseract.trajopt_ifopt`:
 
 | Constraint | Purpose |
 |---|---|

@@ -1,4 +1,4 @@
-# tesseract_robotics.trajopt_sqp
+# tesseract.trajopt_sqp
 
 Sequential Quadratic Programming (SQP) solver for trajectory optimization.
 See the [Low-Level SQP guide](../user-guide/low-level-sqp.md) for the user-guide walkthrough.
@@ -72,7 +72,7 @@ on the QP problem (no arguments) — the 0.33
 ## Enums
 
 ```python
-from tesseract_robotics.trajopt_sqp import (
+from tesseract.trajopt_sqp import (
     SQPStatus, QPSolverStatus, CostPenaltyType,
 )
 
@@ -100,7 +100,7 @@ solver.registerCallback(MyCallback())
 
 ## Module API
 
-::: tesseract_robotics.trajopt_sqp
+::: tesseract.trajopt_sqp
     options:
       show_root_heading: true
       show_source: false

@@ -5,12 +5,8 @@ import math
 import numpy as np
 import numpy.testing as nptest
 import pytest
-
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     EIGEN_DEFAULT_PREC,
-    X_AXIS,
-    Y_AXIS,
-    Z_AXIS,
     AngleAxisd,
     Hyperplane3d,
     Isometry3d,
@@ -18,6 +14,8 @@ from tesseract_robotics.tesseract_common import (
     Quaterniond,
     Translation3d,
 )
+
+from tesseract_robotics.planning.transforms import X_AXIS, Y_AXIS, Z_AXIS
 
 # Tolerance constants — all expressed relative to Eigen's default
 # `isApprox` precision (`EIGEN_DEFAULT_PREC` re-exported from

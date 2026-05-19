@@ -34,18 +34,17 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
     from tesseract_robotics.planning.program import MotionProgram
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CompositeInstruction,
     InstructionPoly_as_MoveInstructionPoly,
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
 )
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_motion_planners import assignCurrentStateAsSeed
+from tesseract.tesseract_task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
@@ -264,7 +263,7 @@ class TaskComposer:
             composer = TaskComposer.from_config(num_threads=4)
 
             # Use custom executor
-            from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+            from tesseract.tesseract_task_composer import TaskflowTaskComposerExecutor
             executor = TaskflowTaskComposerExecutor("MyExecutor", 8)
             composer = TaskComposer.from_config(executor=executor)
         """
@@ -313,7 +312,7 @@ class TaskComposer:
             )
 
         factory = TaskComposerPluginFactory(
-            FilesystemPath(str(config_path)),
+            str(config_path),
             locator,
         )
 
@@ -511,15 +510,17 @@ class TaskComposer:
                 try:
                     task_infos = future.context.task_infos
                     if task_infos:
-                        # Try aborting node first — most useful diagnostic
+                        # Try aborting node first — most useful diagnostic.
+                        # pyright ignores: auto-generated stubs type these as `object`;
+                        # the actual runtime type is a dict-like with str keys.
                         aborting = task_infos.getAbortingNodeInfo()
                         if aborting and aborting.get("status_message"):
-                            msg = f"{aborting['name']}: {aborting['status_message']}"
+                            msg = f"{aborting['name']}: {aborting['status_message']}"  # pyright: ignore[reportIndexIssue]
                         else:
                             # Scan all node infos for first non-empty status_message
                             for info in task_infos.getAllInfos():
                                 if info.get("status_message"):
-                                    msg = f"{info['name']}: {info['status_message']}"
+                                    msg = f"{info['name']}: {info['status_message']}"  # pyright: ignore[reportIndexIssue]
                                     break
                 except (AttributeError, TypeError):
                     pass

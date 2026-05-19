@@ -2,7 +2,7 @@ from inspect import currentframe, getframeinfo
 
 import numpy.testing as nptest
 
-from tesseract_robotics import tesseract_common
+from tesseract import tesseract_common
 
 
 def test_bytes_resource():

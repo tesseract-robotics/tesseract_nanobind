@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_geometry
+# tesseract.tesseract_geometry
 
 Geometric primitives for collision and visualization.
 
@@ -7,7 +7,7 @@ Geometric primitives for collision and visualization.
 ### Box
 
 ```python
-from tesseract_robotics.tesseract_geometry import Box
+from tesseract.tesseract_geometry import Box
 
 box = Box(1.0, 0.5, 0.25)  # x, y, z dimensions
 print(f"Dimensions: {box.getX()} x {box.getY()} x {box.getZ()}")
@@ -16,7 +16,7 @@ print(f"Dimensions: {box.getX()} x {box.getY()} x {box.getZ()}")
 ### Sphere
 
 ```python
-from tesseract_robotics.tesseract_geometry import Sphere
+from tesseract.tesseract_geometry import Sphere
 
 sphere = Sphere(0.1)  # radius
 print(f"Radius: {sphere.getRadius()}")
@@ -25,7 +25,7 @@ print(f"Radius: {sphere.getRadius()}")
 ### Cylinder
 
 ```python
-from tesseract_robotics.tesseract_geometry import Cylinder
+from tesseract.tesseract_geometry import Cylinder
 
 cylinder = Cylinder(0.05, 0.2)  # radius, length
 print(f"Radius: {cylinder.getRadius()}, Length: {cylinder.getLength()}")
@@ -34,7 +34,7 @@ print(f"Radius: {cylinder.getRadius()}, Length: {cylinder.getLength()}")
 ### Capsule
 
 ```python
-from tesseract_robotics.tesseract_geometry import Capsule
+from tesseract.tesseract_geometry import Capsule
 
 capsule = Capsule(0.05, 0.2)  # radius, length
 ```
@@ -42,7 +42,7 @@ capsule = Capsule(0.05, 0.2)  # radius, length
 ### Cone
 
 ```python
-from tesseract_robotics.tesseract_geometry import Cone
+from tesseract.tesseract_geometry import Cone
 
 cone = Cone(0.1, 0.3)  # radius, length
 ```
@@ -50,7 +50,7 @@ cone = Cone(0.1, 0.3)  # radius, length
 ### Plane
 
 ```python
-from tesseract_robotics.tesseract_geometry import Plane
+from tesseract.tesseract_geometry import Plane
 
 # ax + by + cz + d = 0
 plane = Plane(0, 0, 1, 0)  # XY plane (z = 0)
@@ -63,7 +63,7 @@ plane = Plane(0, 0, 1, 0)  # XY plane (z = 0)
 Triangle mesh from file.
 
 ```python
-from tesseract_robotics.tesseract_geometry import Mesh, createMeshFromPath
+from tesseract.tesseract_geometry import Mesh, createMeshFromPath
 import numpy as np
 
 # Load from file
@@ -83,7 +83,7 @@ meshes = createMeshFromPath("model.stl", scale=np.array([0.001, 0.001, 0.001]))
 Convex hull for efficient collision.
 
 ```python
-from tesseract_robotics.tesseract_geometry import ConvexMesh, createConvexMeshFromPath
+from tesseract.tesseract_geometry import ConvexMesh, createConvexMeshFromPath
 
 meshes = createConvexMeshFromPath("model.stl")
 convex = meshes[0]
@@ -94,7 +94,7 @@ convex = meshes[0]
 Signed distance field mesh.
 
 ```python
-from tesseract_robotics.tesseract_geometry import SDFMesh, createSDFMeshFromPath
+from tesseract.tesseract_geometry import SDFMesh, createSDFMeshFromPath
 
 meshes = createSDFMeshFromPath("model.stl")
 sdf = meshes[0]
@@ -105,7 +105,7 @@ sdf = meshes[0]
 Multiple mesh parts as single geometry.
 
 ```python
-from tesseract_robotics.tesseract_geometry import CompoundMesh
+from tesseract.tesseract_geometry import CompoundMesh
 
 # Combine multiple meshes
 compound = CompoundMesh(meshes)
@@ -118,7 +118,7 @@ compound = CompoundMesh(meshes)
 Surface material properties.
 
 ```python
-from tesseract_robotics.tesseract_geometry import MeshMaterial
+from tesseract.tesseract_geometry import MeshMaterial
 import numpy as np
 
 material = MeshMaterial()
@@ -132,7 +132,7 @@ material.roughness = 0.5
 Texture for mesh surfaces.
 
 ```python
-from tesseract_robotics.tesseract_geometry import MeshTexture
+from tesseract.tesseract_geometry import MeshTexture
 
 texture = MeshTexture()
 texture.image = resource  # Resource pointing to image file
@@ -146,7 +146,7 @@ texture.uvs = uv_coords   # UV coordinates per vertex
 Base class for all geometry types.
 
 ```python
-from tesseract_robotics.tesseract_geometry import Geometry, GeometryType
+from tesseract.tesseract_geometry import Geometry, GeometryType
 
 geom = box  # any geometry
 
@@ -185,7 +185,7 @@ copy = geom.clone()
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_geometry._tesseract_geometry
+::: tesseract.tesseract_geometry
     options:
       show_root_heading: false
       show_source: false

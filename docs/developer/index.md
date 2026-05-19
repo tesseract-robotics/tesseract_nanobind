@@ -205,7 +205,7 @@ nanobind maintains separate type registries per module. When a function returns 
 ```cpp
 NB_MODULE(_my_module, m) {
     // Import module that defines the type BEFORE using it
-    nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
+    nb::module_::import_("tesseract.tesseract_collision._tesseract_collision");
 
     // Now can return DiscreteContactManager from functions
     .def("getContactManager", [...] { return self.getDiscreteContactManager(); })

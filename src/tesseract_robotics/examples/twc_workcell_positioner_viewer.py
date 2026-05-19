@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """TWC Workcell viewer example.
 
 Loads workcell URDFs from tesseract_ros_workcell and visualizes them.
@@ -19,9 +20,9 @@ import time
 from pathlib import Path
 
 import numpy as np
+from tesseract.tesseract_common import ResourceLocator, SimpleLocatedResource
+from tesseract.tesseract_environment import Environment
 
-from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
-from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 

@@ -125,10 +125,11 @@ def _configure_environment():
     """Set env vars using bundled data paths or dev workspace (if not already set)."""
     pkg_dir = Path(__file__).parent.resolve()
 
-    # Try bundled data first (installed package)
-    data_dir = pkg_dir / "data"
-    support_dir = data_dir / "tesseract_support"
-    config_dir = data_dir / "task_composer_config"
+    # Bundled data lives under the sibling `tesseract` namespace package
+    # (installed to <site-packages>/tesseract/tesseract_support/ per CMake install rules).
+    bundled_tesseract_dir = pkg_dir.parent / "tesseract"
+    support_dir = bundled_tesseract_dir / "tesseract_support"
+    config_dir = support_dir / "task_composer_config"
 
     # Fallback: dev workspace layout (editable install)
     # pkg_dir = src/tesseract_robotics -> project root is 2 levels up

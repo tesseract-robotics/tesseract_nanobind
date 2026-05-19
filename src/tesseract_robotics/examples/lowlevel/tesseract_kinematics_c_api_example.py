@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Low-Level Kinematics Example (C-API Style)
 ===========================================
@@ -105,16 +106,14 @@ Related Examples
 """
 
 import numpy as np
-
-from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
+from tesseract.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
+from tesseract.tesseract_environment import Environment
+from tesseract.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
 
 # Initialize Environment with a robot from URDF file
 # The URDF and SRDF file must be configured. The kinematics solver also requires plugin configuration,
@@ -157,9 +156,8 @@ def main():
         "package://tesseract_support/urdf/abb_irb2400.srdf"
     ).getFilePath()
 
-    # FilesystemPath wraps std::filesystem::path for cross-platform compatibility
-    urdf_path = FilesystemPath(urdf_path_str)
-    srdf_path = FilesystemPath(srdf_path_str)
+    urdf_path = urdf_path_str
+    srdf_path = srdf_path_str
 
     # init() parses URDF/SRDF and loads configured kinematic plugins
     assert env.init(urdf_path, srdf_path, locator)

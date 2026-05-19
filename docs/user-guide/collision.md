@@ -8,7 +8,7 @@ The collision API is driven by the environment's contact manager — there is no
 
 ```python
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
@@ -73,7 +73,7 @@ graph LR
 ## Discrete Collision Checking
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType_ALL,
@@ -97,7 +97,7 @@ contacts = ContactResultMap()
 manager.contactTest(contacts, request)
 
 # Iterate pairs via flattened vector (simplest idiom)
-from tesseract_robotics.tesseract_collision import ContactResultVector
+from tesseract.tesseract_collision import ContactResultVector
 results = ContactResultVector()
 contacts.flattenMoveResults(results)
 for i in range(len(results)):
@@ -110,7 +110,7 @@ for i in range(len(results)):
 Check for collisions along a motion segment. Each active link needs a start and end transform via `setCollisionObjectsTransformCast`:
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType_ALL,
@@ -154,8 +154,8 @@ graph LR
 Used in TrajOpt for efficient continuous collision approximation:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # TrajOptCollisionConfig(margin, coeff)
 config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
@@ -171,7 +171,7 @@ config.collision_check_config.longest_valid_segment_length = 0.05  # 5cm interpo
 Contact margins define the safety buffer around objects. Use `CollisionMarginData` from `tesseract_common`:
 
 ```python
-from tesseract_robotics.tesseract_common import CollisionMarginData
+from tesseract.tesseract_common import CollisionMarginData
 
 # Default margin for all pairs (applied to the contact manager)
 manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2cm
@@ -215,8 +215,8 @@ if acm.isCollisionAllowed("link_1", "link_2"):
 To add entries, issue a scene graph command through the environment (see `car_seat_example.py` for the canonical pattern):
 
 ```python
-from tesseract_robotics.tesseract_common import AllowedCollisionMatrix
-from tesseract_robotics.tesseract_environment import (
+from tesseract.tesseract_common import AllowedCollisionMatrix
+from tesseract.tesseract_environment import (
     ModifyAllowedCollisionsCommand, ModifyAllowedCollisionsType,
 )
 
@@ -249,7 +249,7 @@ Adjacent links already defined in the SRDF are added automatically when the envi
 
 !!! tip "Choose the Right Test Type"
     ```python
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract.tesseract_collision import (
         ContactTestType_FIRST,
         ContactTestType_ALL,
     )
@@ -301,7 +301,7 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
     For complex meshes, use `makeConvexMesh` to build a convex hull:
 
     ```python
-    from tesseract_robotics.tesseract_collision import makeConvexMesh
+    from tesseract.tesseract_collision import makeConvexMesh
 
     convex = makeConvexMesh(mesh)
     ```
@@ -317,7 +317,7 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
 ## Debugging Collisions
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,

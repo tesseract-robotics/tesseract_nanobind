@@ -3,7 +3,7 @@ import os
 import numpy as np
 import numpy.testing as nptest
 
-from tesseract_robotics import tesseract_common, tesseract_geometry
+from tesseract import tesseract_common, tesseract_geometry
 
 
 def test_geometry_instantiation():

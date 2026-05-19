@@ -61,42 +61,126 @@ find_package(tesseract_environment REQUIRED)
 find_package(tesseract_command_language REQUIRED)
 find_package(console_bridge REQUIRED)
 
-# Define reusable function for nanobind extensions
+# Windows DLL search dirs for nanobind stub generation. The .pyd imported by
+# stubgen has transitive DLL deps (tesseract C++ libs, conda libs) that Python
+# 3.8+ doesn't pick up via PATH — they have to be registered via
+# `os.add_dll_directory()`. scripts/nb_stubgen_wrapper.py reads this env var
+# and registers each entry before dispatching to `nanobind.stubgen`. No-op on
+# non-Windows platforms.
+set(_NBE_STUB_DLL_DIRS "")
+if(WIN32)
+  # Use comma separator (paths can't contain commas on Windows; semicolons
+  # collide with CMake's list separator and get mangled when passed via
+  # `cmake -E env`).
+  set(_NBE_STUB_DLL_DIRS "${TESSERACT_INSTALL_DIR}/bin")
+  if(DEFINED ENV{CONDA_PREFIX})
+    set(_NBE_STUB_DLL_DIRS "${_NBE_STUB_DLL_DIRS},$ENV{CONDA_PREFIX}/Library/bin")
+  endif()
+endif()
+
+# Reusable function for nanobind extension modules.
+#
+# Usage:
+#   add_tesseract_nanobind_extension(<module_name> <source_file>
+#                                    [STUB_DEPENDS <mod> ...]
+#                                    <link_lib> ...)
+#
+# STUB_DEPENDS lists sibling binding modules that must be built before this
+# module's .pyi can be generated. Required when the source file does
+# `tesseract_nb::import_module_in_context(m, "<sibling>")` at NB_MODULE
+# top-level — stub generation runs the binding to introspect types, which
+# executes those imports. Without the dep, CI's clean builds may schedule
+# stub generation before the sibling's .so is linked → ModuleNotFoundError.
+#
+# Stub generation routes through scripts/nb_stubgen_wrapper.py (instead of
+# nanobind_add_stub directly) so Windows can register `os.add_dll_directory()`
+# entries for the imported .pyd's transitive C++ deps before dispatching to
+# nanobind.stubgen. On non-Windows platforms the wrapper is a no-op pass-through.
 function(add_tesseract_nanobind_extension module_name source_file)
+  cmake_parse_arguments(_NBE "" "" "STUB_DEPENDS" ${ARGN})
+
   nanobind_add_module(
-    _${module_name}
+    ${module_name}
     STABLE_ABI
     NB_STATIC
     ${source_file}
   )
 
   # Apply precompiled headers
-  target_precompile_headers(_${module_name} PRIVATE
+  target_precompile_headers(${module_name} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tesseract_nb.h)
 
   # Include directories
-  target_include_directories(_${module_name} PRIVATE
+  target_include_directories(${module_name} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
 
-  # Link tesseract libraries (passed as remaining arguments)
-  target_link_libraries(_${module_name} PRIVATE ${ARGN})
+  # Link tesseract libraries (positional args after source_file, excluding
+  # the STUB_DEPENDS keyword and its values)
+  target_link_libraries(${module_name} PRIVATE ${_NBE_UNPARSED_ARGUMENTS})
 
   # RTTI visibility fix: Export typeinfo symbols so typeid() comparison works
   # across library boundaries (needed for TaskComposer plugin compatibility)
-  set_target_properties(_${module_name} PROPERTIES
+  set_target_properties(${module_name} PROPERTIES
     CXX_VISIBILITY_PRESET default
     VISIBILITY_INLINES_HIDDEN OFF)
 
   # Install the module
-  install(TARGETS _${module_name}
-          LIBRARY DESTINATION tesseract_robotics/${module_name})
+  install(TARGETS ${module_name}
+          LIBRARY DESTINATION tesseract)
+
+  # Generate Python stub file (.pyi) via the DLL-search-aware wrapper.
+  add_tesseract_nanobind_stub(${module_name} ${_NBE_STUB_DEPENDS})
+  if(NOT WIN32)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi DESTINATION tesseract)
+  endif()
+endfunction()
+
+# Generate .pyi stub for an already-defined nanobind module target.
+# Equivalent to nanobind_add_stub but routes through nb_stubgen_wrapper.py so
+# Windows DLL search dirs (NB_STUB_DLL_DIRS) are honored. Additional ARGN
+# values become extra DEPENDS on the custom command (sibling modules whose
+# .pyd must exist before stubgen imports this one).
+#
+# Windows: stub generation is skipped entirely. The .pyd's transitive DLL
+# deps (conda libs, tesseract C++ libs in ws/install/bin) require
+# os.add_dll_directory() registration plus delvewheel-style RPATH that
+# only exists post-wheel-build. Generating stubs at CMake time requires
+# loading the .pyd in-place, which doesn't have a working DLL search yet.
+# Stubs are a developer ergonomic feature, not a runtime requirement, so
+# Windows wheels ship without .pyi files. Linux/macOS still get them; a
+# future improvement is to either run delvewheel-then-stubgen as a wheel
+# post-processing step, or get nanobind upstream to support DLL search
+# config in nanobind_add_stub.
+function(add_tesseract_nanobind_stub module_name)
+  if(WIN32)
+    # Create a no-op alias target so anything depending on ${module_name}_stub
+    # still resolves cleanly.
+    add_custom_target(${module_name}_stub ALL DEPENDS ${module_name})
+    return()
+  endif()
+
+  set(_pyi ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi)
+  add_custom_command(
+    OUTPUT ${_pyi}
+    COMMAND "${Python_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/nb_stubgen_wrapper.py"
+            -q
+            -i "$<TARGET_FILE_DIR:${module_name}>"
+            -m ${module_name}
+            -o ${_pyi}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS ${module_name} ${ARGN}
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/nb_stubgen_wrapper.py"
+    COMMENT "Generating ${module_name}.pyi"
+    VERBATIM
+  )
+  add_custom_target(${module_name}_stub ALL DEPENDS ${_pyi})
 endfunction()
 
 # Add tesseract_common module
 add_tesseract_nanobind_extension(
   tesseract_common
-  src/tesseract_common/tesseract_common_bindings.cpp
+  src/tesseract/tesseract_common.cpp
   tesseract::tesseract_common
   console_bridge::console_bridge
 )
@@ -104,7 +188,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_geometry module
 add_tesseract_nanobind_extension(
   tesseract_geometry
-  src/tesseract_geometry/tesseract_geometry_bindings.cpp
+  src/tesseract/tesseract_geometry.cpp
   tesseract::tesseract_geometry
   tesseract::tesseract_common
 )
@@ -112,7 +196,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_scene_graph module
 add_tesseract_nanobind_extension(
   tesseract_scene_graph
-  src/tesseract_scene_graph/tesseract_scene_graph_bindings.cpp
+  src/tesseract/tesseract_scene_graph.cpp
   tesseract::tesseract_scene_graph
   tesseract::tesseract_geometry
   tesseract::tesseract_common
@@ -121,7 +205,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_srdf module
 add_tesseract_nanobind_extension(
   tesseract_srdf
-  src/tesseract_srdf/tesseract_srdf_bindings.cpp
+  src/tesseract/tesseract_srdf.cpp
   tesseract::tesseract_srdf
   tesseract::tesseract_scene_graph
   tesseract::tesseract_common
@@ -130,7 +214,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_urdf module
 add_tesseract_nanobind_extension(
   tesseract_urdf
-  src/tesseract_urdf/tesseract_urdf_bindings.cpp
+  src/tesseract/tesseract_urdf.cpp
   tesseract::tesseract_urdf
   tesseract::tesseract_scene_graph
   tesseract::tesseract_common
@@ -139,7 +223,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_collision module
 add_tesseract_nanobind_extension(
   tesseract_collision
-  src/tesseract_collision/tesseract_collision_bindings.cpp
+  src/tesseract/tesseract_collision.cpp
   tesseract::tesseract_collision_core
   tesseract::tesseract_collision_bullet
   tesseract::tesseract_geometry
@@ -149,7 +233,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_state_solver module
 add_tesseract_nanobind_extension(
   tesseract_state_solver
-  src/tesseract_state_solver/tesseract_state_solver_bindings.cpp
+  src/tesseract/tesseract_state_solver.cpp
   tesseract::tesseract_state_solver_kdl
   tesseract::tesseract_state_solver_ofkt
   tesseract::tesseract_scene_graph
@@ -159,7 +243,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_kinematics module
 add_tesseract_nanobind_extension(
   tesseract_kinematics
-  src/tesseract_kinematics/tesseract_kinematics_bindings.cpp
+  src/tesseract/tesseract_kinematics.cpp
   tesseract::tesseract_kinematics_core
   tesseract::tesseract_scene_graph
   tesseract::tesseract_state_solver_kdl
@@ -169,19 +253,27 @@ add_tesseract_nanobind_extension(
 # Add tesseract_environment module
 add_tesseract_nanobind_extension(
   tesseract_environment
-  src/tesseract_environment/tesseract_environment_bindings.cpp
+  src/tesseract/tesseract_environment.cpp
   tesseract::tesseract_environment
   tesseract::tesseract_kinematics_core
   tesseract::tesseract_collision_core
   tesseract::tesseract_srdf
   tesseract::tesseract_scene_graph
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_collision
+    tesseract_common
+    tesseract_geometry
+    tesseract_kinematics
+    tesseract_scene_graph
+    tesseract_srdf
+    tesseract_state_solver
 )
 
 # Add tesseract_command_language module
 add_tesseract_nanobind_extension(
   tesseract_command_language
-  src/tesseract_command_language/tesseract_command_language_bindings.cpp
+  src/tesseract/tesseract_command_language.cpp
   tesseract::tesseract_command_language
   tesseract::tesseract_common
 )
@@ -189,7 +281,7 @@ add_tesseract_nanobind_extension(
 # Add tesseract_serialization module (XML/binary serialization for root types)
 add_tesseract_nanobind_extension(
   tesseract_serialization
-  src/tesseract_serialization/tesseract_serialization_bindings.cpp
+  src/tesseract/tesseract_serialization.cpp
   tesseract::tesseract_command_language
   tesseract::tesseract_environment
   tesseract::tesseract_scene_graph
@@ -202,7 +294,7 @@ find_package(tesseract_motion_planners REQUIRED COMPONENTS core simple ompl)
 # Add tesseract_motion_planners module
 add_tesseract_nanobind_extension(
   tesseract_motion_planners
-  src/tesseract_motion_planners/tesseract_motion_planners_bindings.cpp
+  src/tesseract/tesseract_motion_planners.cpp
   tesseract::tesseract_motion_planners_core
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
@@ -212,44 +304,58 @@ add_tesseract_nanobind_extension(
 # Add tesseract_motion_planners_simple module
 add_tesseract_nanobind_extension(
   tesseract_motion_planners_simple
-  src/tesseract_motion_planners_simple/tesseract_motion_planners_simple_bindings.cpp
+  src/tesseract/tesseract_motion_planners_simple.cpp
   tesseract::tesseract_motion_planners_simple
   tesseract::tesseract_motion_planners_core
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_command_language
+    tesseract_motion_planners
 )
 
 # Add tesseract_motion_planners_ompl module
 add_tesseract_nanobind_extension(
   tesseract_motion_planners_ompl
-  src/tesseract_motion_planners_ompl/tesseract_motion_planners_ompl_bindings.cpp
+  src/tesseract/tesseract_motion_planners_ompl.cpp
   tesseract::tesseract_motion_planners_ompl
   tesseract::tesseract_motion_planners_core
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_collision
+    tesseract_command_language
+    tesseract_motion_planners
 )
 
 # Add ompl_base module (SE2, Reeds-Shepp, Dubins state spaces)
 # Note: OMPL uses old-style CMake variables, not modern targets
 find_package(ompl REQUIRED)
 nanobind_add_module(
-  _ompl_base
+  base
   STABLE_ABI
   NB_STATIC
-  src/ompl_base/ompl_base_bindings.cpp
+  src/ompl/base.cpp
 )
-target_precompile_headers(_ompl_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/tesseract_nb.h)
-target_include_directories(_ompl_base PRIVATE
+target_precompile_headers(base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/tesseract_nb.h)
+target_include_directories(base PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${OMPL_INCLUDE_DIRS}
 )
-target_link_libraries(_ompl_base PRIVATE ${OMPL_LIBRARIES})
-set_target_properties(_ompl_base PROPERTIES
+target_link_libraries(base PRIVATE ${OMPL_LIBRARIES})
+set_target_properties(base PROPERTIES
   CXX_VISIBILITY_PRESET default
   VISIBILITY_INLINES_HIDDEN OFF)
-install(TARGETS _ompl_base LIBRARY DESTINATION tesseract_robotics/ompl_base)
+install(TARGETS base LIBRARY DESTINATION ompl)
+
+# Generate Python stub file (.pyi) via the DLL-search-aware wrapper.
+# `base` has no `import_module_in_context` calls so no extra STUB_DEPENDS.
+add_tesseract_nanobind_stub(base)
+if(NOT WIN32)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/base.pyi DESTINATION ompl)
+endif()
 
 # Add tesseract_motion_planners_descartes module (optional - only if descartes component was built)
 find_package(tesseract_motion_planners QUIET COMPONENTS descartes)
@@ -258,13 +364,17 @@ if(tesseract_motion_planners_descartes_FOUND AND descartes_light_FOUND)
   message(STATUS "tesseract_motion_planners descartes component found - building bindings")
   add_tesseract_nanobind_extension(
     tesseract_motion_planners_descartes
-    src/tesseract_motion_planners_descartes/tesseract_motion_planners_descartes_bindings.cpp
+    src/tesseract/tesseract_motion_planners_descartes.cpp
     tesseract::tesseract_motion_planners_descartes
     tesseract::tesseract_motion_planners_core
     tesseract::tesseract_environment
     tesseract::tesseract_command_language
     tesseract::tesseract_collision_core
     tesseract::tesseract_common
+    STUB_DEPENDS
+      tesseract_collision
+      tesseract_command_language
+      tesseract_motion_planners
   )
 else()
   message(STATUS "tesseract_motion_planners descartes component not found - skipping bindings")
@@ -277,13 +387,18 @@ if(tesseract_motion_planners_trajopt_FOUND AND trajopt_FOUND)
   message(STATUS "tesseract_motion_planners trajopt component found - building bindings")
   add_tesseract_nanobind_extension(
     tesseract_motion_planners_trajopt
-    src/tesseract_motion_planners_trajopt/tesseract_motion_planners_trajopt_bindings.cpp
+    src/tesseract/tesseract_motion_planners_trajopt.cpp
     tesseract::tesseract_motion_planners_trajopt
     tesseract::tesseract_motion_planners_core
     tesseract::tesseract_environment
     tesseract::tesseract_command_language
     tesseract::tesseract_common
     trajopt::trajopt
+    STUB_DEPENDS
+      tesseract_collision
+      tesseract_command_language
+      tesseract_motion_planners
+      trajopt_ifopt
   )
 else()
   message(STATUS "tesseract_motion_planners trajopt component not found - skipping bindings")
@@ -298,7 +413,7 @@ if(tesseract_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND tra
   message(STATUS "tesseract_motion_planners trajopt_ifopt component found - building bindings")
   add_tesseract_nanobind_extension(
     tesseract_motion_planners_trajopt_ifopt
-    src/tesseract_motion_planners_trajopt_ifopt/tesseract_motion_planners_trajopt_ifopt_bindings.cpp
+    src/tesseract/tesseract_motion_planners_trajopt_ifopt.cpp
     tesseract::tesseract_motion_planners_trajopt_ifopt
     tesseract::tesseract_motion_planners_core
     tesseract::tesseract_environment
@@ -306,6 +421,9 @@ if(tesseract_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND tra
     tesseract::tesseract_common
     trajopt::trajopt_ifopt
     trajopt::trajopt_sqp
+    STUB_DEPENDS
+      tesseract_command_language
+      tesseract_motion_planners
   )
 else()
   message(STATUS "tesseract_motion_planners trajopt_ifopt component not found - skipping bindings")
@@ -317,13 +435,15 @@ if(trajopt_ifopt_FOUND AND trajopt_common_FOUND)
   message(STATUS "trajopt_ifopt found - building bindings for variables/constraints/costs")
   add_tesseract_nanobind_extension(
     trajopt_ifopt
-    src/trajopt_ifopt/trajopt_ifopt_bindings.cpp
+    src/tesseract/trajopt_ifopt.cpp
     trajopt::trajopt_ifopt
     trajopt::trajopt_common
     tesseract::tesseract_kinematics_core
     tesseract::tesseract_environment
     tesseract::tesseract_collision_core
     tesseract::tesseract_common
+    STUB_DEPENDS
+      tesseract_collision
   )
 else()
   message(STATUS "trajopt_ifopt/trajopt_common not found - skipping bindings")
@@ -334,10 +454,12 @@ if(trajopt_sqp_FOUND)
   message(STATUS "trajopt_sqp found - building SQP solver bindings")
   add_tesseract_nanobind_extension(
     trajopt_sqp
-    src/trajopt_sqp/trajopt_sqp_bindings.cpp
+    src/tesseract/trajopt_sqp.cpp
     trajopt::trajopt_sqp
     trajopt::trajopt_ifopt
     tesseract::tesseract_common
+    STUB_DEPENDS
+      trajopt_ifopt
   )
 else()
   message(STATUS "trajopt_sqp not found - skipping bindings")
@@ -348,13 +470,15 @@ find_package(tesseract_time_parameterization REQUIRED)
 
 add_tesseract_nanobind_extension(
   tesseract_time_parameterization
-  src/tesseract_time_parameterization/tesseract_time_parameterization_bindings.cpp
+  src/tesseract/tesseract_time_parameterization.cpp
   tesseract::tesseract_time_parameterization_isp
   tesseract::tesseract_time_parameterization_totg
   tesseract::tesseract_time_parameterization_kdl
   tesseract::tesseract_time_parameterization_core
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_command_language
 )
 
 # Find and add tesseract_task_composer
@@ -362,25 +486,56 @@ find_package(tesseract_task_composer REQUIRED COMPONENTS core taskflow planning)
 
 add_tesseract_nanobind_extension(
   tesseract_task_composer
-  src/tesseract_task_composer/tesseract_task_composer_bindings.cpp
+  src/tesseract/tesseract_task_composer.cpp
   tesseract::tesseract_task_composer
   tesseract::tesseract_task_composer_taskflow
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
   tesseract::tesseract_collision_core
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_common
 )
 
 add_tesseract_nanobind_extension(
   tesseract_task_composer_planning
-  src/tesseract_task_composer_planning/tesseract_task_composer_planning_bindings.cpp
+  src/tesseract/tesseract_task_composer_planning.cpp
   tesseract::tesseract_task_composer_planning_nodes
   tesseract::tesseract_task_composer
   tesseract::tesseract_motion_planners_trajopt
   tesseract::tesseract_collision_core
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_collision
+    tesseract_command_language
 )
+
+# Windows-only: install a minimal __init__.py into tesseract/ and ompl/ that
+# imports tesseract_robotics. That triggers tesseract_robotics/__init__.py's
+# os.add_dll_directory() registration before any sibling .pyd is loaded —
+# Python 3.8+ on Windows ignores PATH for .pyd transitive deps, so without
+# this the .pyd's dependent DLLs (tesseract C++ libs in
+# tesseract_robotics_nanobind.libs/, conda libs) don't resolve.
+#
+# On Linux/macOS we leave tesseract/ and ompl/ as PEP-420 namespace packages
+# (no __init__.py). That preserves mkdocstrings's namespace-package merge
+# logic — adding __init__.py here would make mkdocstrings look only in
+# `src/tesseract/` for tesseract.<X> symbols, where there's nothing but
+# .cpp source.
+if(WIN32)
+  set(_NBE_INIT_PY "${CMAKE_CURRENT_BINARY_DIR}/_init_for_windows.py")
+  file(WRITE "${_NBE_INIT_PY}"
+"\"\"\"Bootstraps tesseract_robotics's DLL-search setup on Windows.
+
+Auto-generated by CMakeLists.txt for Windows wheels only. On Linux/macOS
+this package is a namespace package with no __init__.py.
+\"\"\"
+import tesseract_robotics  # noqa: F401
+")
+  install(FILES "${_NBE_INIT_PY}" DESTINATION tesseract RENAME __init__.py)
+  install(FILES "${_NBE_INIT_PY}" DESTINATION ompl RENAME __init__.py)
+endif()
 
 message(STATUS "============= Build Configuration =============")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
@@ -410,7 +565,7 @@ endif()
 if(EXISTS "${TESSERACT_SUPPORT_SRC}")
   message(STATUS "Installing tesseract_support from: ${TESSERACT_SUPPORT_SRC}")
   install(DIRECTORY "${TESSERACT_SUPPORT_SRC}/"
-    DESTINATION tesseract_robotics/data/tesseract_support
+    DESTINATION tesseract/tesseract_support
     FILES_MATCHING
     PATTERN "*.urdf" PATTERN "*.srdf" PATTERN "*.yaml" PATTERN "*.xacro"
     PATTERN "*.stl" PATTERN "*.STL" PATTERN "*.dae" PATTERN "*.ply" PATTERN "*.obj" PATTERN "*.csv"
@@ -423,7 +578,7 @@ endif()
 if(EXISTS "${TASK_COMPOSER_CFG_SRC}")
   message(STATUS "Installing task_composer config from: ${TASK_COMPOSER_CFG_SRC}")
   install(DIRECTORY "${TASK_COMPOSER_CFG_SRC}/"
-    DESTINATION tesseract_robotics/data/task_composer_config
+    DESTINATION tesseract/tesseract_support/task_composer_config
     FILES_MATCHING PATTERN "*.yaml" PATTERN "*.schema")
 else()
   message(WARNING "task_composer config not found at ${TASK_COMPOSER_CFG_SRC}")

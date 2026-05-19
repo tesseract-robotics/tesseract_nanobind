@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_collision
+# tesseract.tesseract_collision
 
 Collision detection managers and contact queries.
 
@@ -9,7 +9,7 @@ Collision detection managers and contact queries.
 Checks collision at a single configuration.
 
 ```python
-from tesseract_robotics.tesseract_collision import DiscreteContactManager
+from tesseract.tesseract_collision import DiscreteContactManager
 
 # Get from environment
 manager = env.getDiscreteContactManager()
@@ -30,7 +30,7 @@ my_manager.contactTest(result_map, request)
 Checks collision along swept motion.
 
 ```python
-from tesseract_robotics.tesseract_collision import ContinuousContactManager
+from tesseract.tesseract_collision import ContinuousContactManager
 
 # Get from environment
 manager = env.getContinuousContactManager()
@@ -54,7 +54,7 @@ my_manager.contactTest(result_map, request)
 Configure what contacts to find.
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest, ContactTestType
 )
 
@@ -81,7 +81,7 @@ request.type = ContactTestType.LIMITED  # up to max contacts
 Single contact between two objects.
 
 ```python
-from tesseract_robotics.tesseract_collision import ContactResult, ContactResultVector
+from tesseract.tesseract_collision import ContactResult, ContactResultVector
 
 # ContactResultMap is a nested map (link_a → link_b → list[ContactResult]).
 # Flatten it to iterate individual contacts.
@@ -111,7 +111,7 @@ Nested map: `link_a → link_b → list[ContactResult]`. Exposes `size()`,
 `flattenCopyResults()` / `flattenMoveResults()` for iteration.
 
 ```python
-from tesseract_robotics.tesseract_collision import ContactResultMap
+from tesseract.tesseract_collision import ContactResultMap
 
 result_map = ContactResultMap()
 manager.contactTest(result_map, request)
@@ -125,7 +125,7 @@ print(result_map.getSummary())
 Flat list of `ContactResult`. Use this for iteration.
 
 ```python
-from tesseract_robotics.tesseract_collision import ContactResultVector
+from tesseract.tesseract_collision import ContactResultVector
 
 all_contacts = ContactResultVector()
 result_map.flattenMoveResults(all_contacts)   # or flattenCopyResults to keep map data
@@ -141,7 +141,7 @@ for contact in all_contacts:
 Configure collision checking behavior.
 
 ```python
-from tesseract_robotics.tesseract_collision import CollisionCheckConfig
+from tesseract.tesseract_collision import CollisionCheckConfig
 
 config = CollisionCheckConfig()
 config.contact_request = request
@@ -153,7 +153,7 @@ config.longest_valid_segment_length = 0.01  # for continuous
 Configure contact manager settings.
 
 ```python
-from tesseract_robotics.tesseract_collision import ContactManagerConfig
+from tesseract.tesseract_collision import ContactManagerConfig
 
 config = ContactManagerConfig()
 config.margin_data.setDefaultCollisionMargin(0.025)
@@ -165,7 +165,7 @@ config.margin_data.setPairCollisionMargin("link_a", "link_b", 0.05)
 Generate convex hulls for collision.
 
 ```python
-from tesseract_robotics.tesseract_collision import makeConvexMesh
+from tesseract.tesseract_collision import makeConvexMesh
 
 # From vertices
 vertices = [np.array([x, y, z]) for ...]
@@ -177,7 +177,7 @@ convex = makeConvexMesh(vertices)
 Used with trajectory optimization.
 
 ```python
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 CollisionEvaluatorType.DISCRETE           # single config
 CollisionEvaluatorType.LVS_DISCRETE       # interpolated discrete
@@ -188,7 +188,7 @@ CollisionEvaluatorType.CONTINUOUS         # continuous
 ## Usage Example
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest, ContactTestType, ContactResultMap, ContactResultVector
 )
 
@@ -217,7 +217,7 @@ if not results.empty():
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_collision._tesseract_collision
+::: tesseract.tesseract_collision
     options:
       show_root_heading: false
       show_source: false

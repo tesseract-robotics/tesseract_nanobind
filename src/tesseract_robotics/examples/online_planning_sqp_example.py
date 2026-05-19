@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Online Planning with Low-Level SQP API
 ======================================
@@ -44,12 +45,12 @@ import sys
 import time
 
 import numpy as np
+from tesseract.tesseract_common import Isometry3d
 
 # Low-level SQP imports
-from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics import trajopt_sqp as tsqp
+from tesseract import trajopt_ifopt as ti
+from tesseract import trajopt_sqp as tsqp
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_common import Isometry3d
 
 TesseractViewer = None
 if "pytest" not in sys.modules:

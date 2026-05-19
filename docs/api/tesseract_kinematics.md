@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_kinematics
+# tesseract.tesseract_kinematics
 
 Forward and inverse kinematics solvers.
 
@@ -9,7 +9,7 @@ Forward and inverse kinematics solvers.
 Full kinematics with FK and IK.
 
 ```python
-from tesseract_robotics.tesseract_kinematics import KinematicGroup
+from tesseract.tesseract_kinematics import KinematicGroup
 
 # Get from environment (defined in SRDF)
 manip = env.getKinematicGroup("manipulator")
@@ -30,7 +30,7 @@ vel_limits = limits.velocity_limits
 Forward kinematics only (no IK solver).
 
 ```python
-from tesseract_robotics.tesseract_kinematics import JointGroup
+from tesseract.tesseract_kinematics import JointGroup
 
 group = env.getJointGroup("manipulator")
 
@@ -63,8 +63,8 @@ Compute joint values for a target pose. `calcInvKin` takes a `KinGroupIKInput`
 working frame.
 
 ```python
-from tesseract_robotics.tesseract_common import Isometry3d
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+from tesseract.tesseract_common import Isometry3d
+from tesseract.tesseract_kinematics import KinGroupIKInput
 import numpy as np
 
 manip = env.getKinematicGroup("manipulator")
@@ -89,7 +89,7 @@ else:
 ### Batch IK — KinGroupIKInputs
 
 ```python
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInputs
+from tesseract.tesseract_kinematics import KinGroupIKInputs
 
 inputs = KinGroupIKInputs()
 inputs.append(ik_input)
@@ -103,7 +103,7 @@ solutions = manip.calcInvKin(inputs, seed)
 Get all IK solutions including joint wraparound.
 
 ```python
-from tesseract_robotics.tesseract_kinematics import getRedundantSolutions
+from tesseract.tesseract_kinematics import getRedundantSolutions
 
 # Initial solution
 solution = solutions[0]
@@ -122,7 +122,7 @@ redundant = getRedundantSolutions(
 Analytical IK parameters for Universal Robots.
 
 ```python
-from tesseract_robotics.tesseract_kinematics import (
+from tesseract.tesseract_kinematics import (
     URParameters, UR10Parameters, UR10eParameters,
     UR5Parameters, UR5eParameters, UR3Parameters, UR3eParameters
 )
@@ -142,7 +142,7 @@ print(f"d6: {params.d6}")
 Load kinematics solvers from plugins.
 
 ```python
-from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
+from tesseract.tesseract_kinematics import KinematicsPluginFactory
 
 # Usually handled by Environment initialization
 # Plugins: KDLFwdKin, OPWInvKin, etc.
@@ -152,8 +152,8 @@ from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
 
 ```python
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_common import Isometry3d
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+from tesseract.tesseract_common import Isometry3d
+from tesseract.tesseract_kinematics import KinGroupIKInput
 import numpy as np
 
 # Load robot
@@ -193,7 +193,7 @@ if solutions:
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_kinematics._tesseract_kinematics
+::: tesseract.tesseract_kinematics
     options:
       show_root_heading: false
       show_source: false

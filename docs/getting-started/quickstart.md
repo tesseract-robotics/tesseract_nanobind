@@ -52,7 +52,7 @@ else:
 Use the environment's discrete contact manager directly:
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType_ALL,

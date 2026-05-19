@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_scene_graph
+# tesseract.tesseract_scene_graph
 
 Scene graph elements: links, joints, and kinematic tree.
 
@@ -7,7 +7,7 @@ Scene graph elements: links, joints, and kinematic tree.
 The kinematic tree structure.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import SceneGraph
+from tesseract.tesseract_scene_graph import SceneGraph
 
 graph = SceneGraph()
 graph.setName("my_robot")
@@ -37,9 +37,9 @@ root = graph.getRoot()
 A rigid body in the kinematic tree.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import Link, Visual, Collision
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract.tesseract_scene_graph import Link, Visual, Collision
+from tesseract.tesseract_geometry import Box
+from tesseract.tesseract_common import Isometry3d
 
 # Create link
 link = Link("my_link")
@@ -70,7 +70,7 @@ link.clearCollision()
 Visual representation of a link.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import Visual, Material
+from tesseract.tesseract_scene_graph import Visual, Material
 
 visual = Visual()
 visual.name = "visual_0"
@@ -89,7 +89,7 @@ visual.material = material
 Collision geometry of a link.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import Collision
+from tesseract.tesseract_scene_graph import Collision
 
 collision = Collision()
 collision.name = "collision_0"
@@ -102,7 +102,7 @@ collision.origin = transform
 Connection between two links.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+from tesseract.tesseract_scene_graph import Joint, JointType
 
 joint = Joint("joint_1")
 joint.type = JointType.REVOLUTE
@@ -126,7 +126,7 @@ joint.axis = np.array([0, 0, 1])  # rotation axis
 ### JointLimits
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import JointLimits
+from tesseract.tesseract_scene_graph import JointLimits
 
 limits = JointLimits()
 limits.lower = -3.14
@@ -141,7 +141,7 @@ joint.limits = limits
 ### JointDynamics
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import JointDynamics
+from tesseract.tesseract_scene_graph import JointDynamics
 
 dynamics = JointDynamics()
 dynamics.damping = 0.1
@@ -153,7 +153,7 @@ joint.dynamics = dynamics
 ### JointMimic
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import JointMimic
+from tesseract.tesseract_scene_graph import JointMimic
 
 mimic = JointMimic()
 mimic.joint_name = "joint_1"  # joint to mimic
@@ -168,7 +168,7 @@ joint.mimic = mimic
 Mass and inertia properties.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import Inertial
+from tesseract.tesseract_scene_graph import Inertial
 
 inertial = Inertial()
 inertial.origin = Isometry3d.Identity()
@@ -188,7 +188,7 @@ link.inertial = inertial
 Current state of the scene graph.
 
 ```python
-from tesseract_robotics.tesseract_scene_graph import SceneState
+from tesseract.tesseract_scene_graph import SceneState
 
 state = env.getState()
 
@@ -202,7 +202,7 @@ tcp_pose = transforms["tool0"]
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph
+::: tesseract.tesseract_scene_graph
     options:
       show_root_heading: false
       show_source: false

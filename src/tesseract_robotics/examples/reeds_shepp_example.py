@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Reeds-Shepp Path Planning Example
 
@@ -29,7 +30,7 @@ Reference:
 
 import math
 
-from tesseract_robotics.ompl_base import (
+from ompl.base import (
     DubinsStateSpace,
     RealVectorBounds,
     ReedsSheppPathSegmentType,
@@ -123,7 +124,7 @@ def run(pipeline=None, num_planners=None):
     # Interpolate and show waypoints
     print("\nWaypoints along path:")
     for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
-        rs.interpolate(start, goal, t, interp)
+        rs.interpolate(start, goal, t, interp)  # pyright: ignore[reportCallIssue]
         st = rs.getStateAs(interp)
         yaw_deg = math.degrees(st.getYaw())
         print(f"  t={t:.2f}: ({st.getX():6.2f}, {st.getY():6.2f}) yaw={yaw_deg:6.1f}°")

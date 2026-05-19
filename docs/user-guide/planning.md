@@ -157,11 +157,11 @@ graph TD
 ### TrajOpt Costs and Constraints
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile (per-waypoint settings)
 plan_profile = TrajOptDefaultPlanProfile()
@@ -181,8 +181,8 @@ composite_profile.smooth_accelerations = True
 ### Collision Configuration
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # TrajOptCollisionConfig constructor: (margin, coeff) or default
 collision_config = TrajOptCollisionConfig(0.025, 20.0)  # margin=2.5cm, coeff=20
@@ -222,10 +222,10 @@ TrajOpt distinguishes between **costs** (soft constraints) and **constraints** (
 ### Example: Collision as Cost vs Constraint
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 profile = TrajOptDefaultCompositeProfile()
 
@@ -254,7 +254,7 @@ profile.collision_constraint_config.collision_check_config.type = CollisionEvalu
 ### Example: Cartesian Pose as Cost vs Constraint
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
+from tesseract.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
 
 plan_profile = TrajOptDefaultPlanProfile()
 
@@ -367,7 +367,7 @@ Use the `MotionProgram` builder — it handles all the poly-type wrapping
 automatically. For reference, the equivalent low-level call would be:
 
 ```python
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction, MoveInstruction, MoveInstructionType_LINEAR,
     MoveInstructionPoly_wrap_MoveInstruction,
@@ -426,7 +426,7 @@ if not result.successful:
     # Debug strategies:
 
     # 1. Check if start/goal are collision-free
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract.tesseract_collision import (
         ContactRequest, ContactResultMap, ContactTestType_ALL,
     )
     manager = robot.env.getDiscreteContactManager()

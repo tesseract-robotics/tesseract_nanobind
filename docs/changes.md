@@ -14,7 +14,7 @@
 
 ### `ifopt` module removed
 
-The standalone `tesseract_robotics.ifopt` module no longer exists. All types moved into `tesseract_robotics.trajopt_ifopt`.
+The standalone `tesseract_robotics.ifopt` module no longer exists. All types moved into `tesseract.trajopt_ifopt`.
 
 ```python
 # 0.33

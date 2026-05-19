@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_task_composer
+# tesseract.tesseract_task_composer
 
 Task composition and planning pipelines.
 
@@ -8,7 +8,7 @@ TaskComposer orchestrates complex planning tasks by chaining planners,
 post-processors, and validators into pipelines.
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_task_composer import (
     TaskComposerPluginFactory, TaskflowTaskComposerExecutor,
     TaskComposerDataStorage, TaskComposerContext,
     createTaskComposerPluginFactory, createTaskComposerDataStorage,
@@ -18,11 +18,11 @@ from tesseract_robotics.tesseract_task_composer import (
 ## Quick Start
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_task_composer import (
     createTaskComposerPluginFactory, createTaskComposerDataStorage,
     TaskflowTaskComposerExecutor,
 )
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_ProfileDictionary,
     AnyPoly_as_CompositeInstruction,
 )
@@ -57,7 +57,7 @@ result = AnyPoly_as_CompositeInstruction(context.data_storage.getData(output_key
 Loads pipeline definitions from YAML config.
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_task_composer import (
     TaskComposerPluginFactory, createTaskComposerPluginFactory
 )
 
@@ -77,7 +77,7 @@ task = factory.createTaskComposerNode("TrajOptPipeline")
 Executes tasks with parallel support.
 
 ```python
-from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+from tesseract.tesseract_task_composer import TaskflowTaskComposerExecutor
 
 executor = TaskflowTaskComposerExecutor(factory, num_threads=4)
 
@@ -94,8 +94,8 @@ if future.context.isSuccessful():
 Key-value storage for pipeline data.
 
 ```python
-from tesseract_robotics.tesseract_task_composer import createTaskComposerDataStorage
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_task_composer import createTaskComposerDataStorage
+from tesseract.tesseract_command_language import (
     AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_ProfileDictionary,
 )
 
@@ -204,7 +204,7 @@ elif input_keys.has("program"):
 TaskComposer uses type-erased `AnyPoly` for data storage:
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_task_composer import (
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
     AnyPoly_wrap_ProfileDictionary,
@@ -223,11 +223,11 @@ program = AnyPoly_as_CompositeInstruction(any_poly)
 ## Complete Example
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract.tesseract_task_composer import (
     createTaskComposerPluginFactory, createTaskComposerDataStorage,
     TaskflowTaskComposerExecutor, AnyPoly_wrap_EnvironmentConst,
 )
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_ProfileDictionary,
     AnyPoly_as_CompositeInstruction,
 )
@@ -285,7 +285,7 @@ if result.successful:
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_task_composer._tesseract_task_composer
+::: tesseract.tesseract_task_composer
     options:
       show_root_heading: false
       show_source: false
