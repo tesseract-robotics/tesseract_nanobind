@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_motion_planners_trajopt
+# tesseract.tesseract_motion_planners_trajopt
 
 TrajOpt trajectory optimization planner.
 
@@ -8,7 +8,7 @@ TrajOpt optimizes trajectories for smoothness while avoiding collisions.
 Best for Cartesian paths and trajectory refinement.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
     TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
     TrajOptPlanProfile, TrajOptCompositeProfile,
@@ -16,19 +16,19 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 ```
 
 !!! note "`TrajOptCollisionConfig` lives in `trajopt_ifopt`"
-    It's defined in `tesseract_robotics.trajopt_ifopt` (trajopt_common) and
+    It's defined in `tesseract.trajopt_ifopt` (trajopt_common) and
     re-exported from `tesseract_motion_planners_trajopt` for convenience. Import
     from either location.
 
 ## TrajOptMotionPlanner
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptMotionPlanner
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_trajopt import TrajOptMotionPlanner
+from tesseract.tesseract_motion_planners import PlannerRequest
 
 planner = TrajOptMotionPlanner()
 
@@ -47,7 +47,7 @@ response = planner.solve(request)
 Per-waypoint configuration.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
+from tesseract.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
 
 profile = TrajOptDefaultPlanProfile()
 
@@ -69,8 +69,8 @@ profile.joint_constraint_config.coeff = np.ones(6)  # weight per joint
 Trajectory-wide configuration.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultCompositeProfile
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_motion_planners_trajopt import TrajOptDefaultCompositeProfile
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 profile = TrajOptDefaultCompositeProfile()
 
@@ -99,8 +99,8 @@ Replaces the 0.33 `CollisionCostConfig` / `CollisionConstraintConfig`.
 See [changes](../changes.md) for the full migration notes.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # Constructor: TrajOptCollisionConfig(margin, coeff) or default
 config = TrajOptCollisionConfig(0.025, 20.0)  # margin=2.5cm, coeff=20
@@ -114,7 +114,7 @@ config.collision_check_config.longest_valid_segment_length = 0.05  # for LVS mod
 
 !!! note "Module Location"
     `CollisionEvaluatorType` lives in
-    `tesseract_robotics.tesseract_collision` (re-exported from the TrajOpt
+    `tesseract.tesseract_collision` (re-exported from the TrajOpt
     module for convenience).
 
 | Type | Description | Speed |
@@ -129,7 +129,7 @@ config.collision_check_config.longest_valid_segment_length = 0.05  # for LVS mod
 ### TrajOptCartesianWaypointConfig
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCartesianWaypointConfig
+from tesseract.tesseract_motion_planners_trajopt import TrajOptCartesianWaypointConfig
 
 config = TrajOptCartesianWaypointConfig()
 config.enabled = True
@@ -141,7 +141,7 @@ config.upper_tolerance = np.zeros(6)
 ### TrajOptJointWaypointConfig
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptJointWaypointConfig
+from tesseract.tesseract_motion_planners_trajopt import TrajOptJointWaypointConfig
 
 config = TrajOptJointWaypointConfig()
 config.enabled = True
@@ -153,13 +153,13 @@ config.upper_tolerance = np.zeros(6)
 ## Adding Profiles
 
 ```python
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile (per waypoint)
 plan_profile = TrajOptDefaultPlanProfile()
@@ -183,13 +183,13 @@ ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask
 ## Complete Example
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner, TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile, ProfileDictionary_addTrajOptCompositeProfile,
 )
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_collision import CollisionEvaluatorType
 import numpy as np
 
 # Configure profiles
@@ -243,7 +243,7 @@ export TRAJOPT_LOG_THRESH=ERROR  # FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt
+::: tesseract.tesseract_motion_planners_trajopt
     options:
       show_root_heading: false
       show_source: false

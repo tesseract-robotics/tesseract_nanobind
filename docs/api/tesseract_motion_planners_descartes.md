@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_motion_planners_descartes
+# tesseract.tesseract_motion_planners_descartes
 
 Descartes graph-based Cartesian planner.
 
@@ -9,7 +9,7 @@ and finding the optimal path through it. Best for industrial toolpaths
 (welding, milling) where every waypoint must be reached.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_descartes import (
+from tesseract.tesseract_motion_planners_descartes import (
     DescartesMotionPlannerD,
     DescartesDefaultPlanProfileD,
     DescartesLadderGraphSolverProfileD,
@@ -19,8 +19,8 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
 ## DescartesMotionPlannerD
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_descartes import DescartesMotionPlannerD
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_descartes import DescartesMotionPlannerD
+from tesseract.tesseract_motion_planners import PlannerRequest
 
 planner = DescartesMotionPlannerD()
 
@@ -39,7 +39,7 @@ response = planner.solve(request)
 Per-waypoint configuration.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultPlanProfileD
+from tesseract.tesseract_motion_planners_descartes import DescartesDefaultPlanProfileD
 
 profile = DescartesDefaultPlanProfileD()
 
@@ -52,7 +52,7 @@ profile = DescartesDefaultPlanProfileD()
 Solver configuration for the ladder graph.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_descartes import DescartesLadderGraphSolverProfileD
+from tesseract.tesseract_motion_planners_descartes import DescartesLadderGraphSolverProfileD
 
 profile = DescartesLadderGraphSolverProfileD()
 
@@ -98,7 +98,7 @@ Waypoint 1      Waypoint 2      Waypoint 3
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_motion_planners_descartes._tesseract_motion_planners_descartes
+::: tesseract.tesseract_motion_planners_descartes
     options:
       show_root_heading: false
       show_source: false

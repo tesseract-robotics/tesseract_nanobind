@@ -70,7 +70,7 @@ See the source at
 
 ??? tip "Loading Mesh Files"
     ```python
-    from tesseract_robotics.tesseract_geometry import Mesh
+    from tesseract.tesseract_geometry import Mesh
 
     # From file (STL, OBJ, DAE)
     mesh = Mesh.fromFile("/path/to/model.stl")

@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_motion_planners_simple
+# tesseract.tesseract_motion_planners_simple
 
 Simple joint-space interpolation planner.
 
@@ -8,7 +8,7 @@ The Simple planner performs linear interpolation in joint space.
 No collision checking - use only when path is known to be safe.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract.tesseract_motion_planners_simple import (
     SimpleMotionPlanner,
     generateInterpolatedProgram,
 )
@@ -17,8 +17,8 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
 ## SimpleMotionPlanner
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_simple import SimpleMotionPlanner
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_motion_planners_simple import SimpleMotionPlanner
+from tesseract.tesseract_motion_planners import PlannerRequest
 
 planner = SimpleMotionPlanner()
 
@@ -37,7 +37,7 @@ response = planner.solve(request)
 Interpolate a program to add intermediate waypoints.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+from tesseract.tesseract_motion_planners_simple import generateInterpolatedProgram
 
 # Add waypoints between existing ones
 interpolated = generateInterpolatedProgram(
@@ -58,9 +58,9 @@ interpolated = generateInterpolatedProgram(
 ## Example
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_simple import SimpleMotionPlanner
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_motion_planners_simple import SimpleMotionPlanner
+from tesseract.tesseract_motion_planners import PlannerRequest
+from tesseract.tesseract_command_language import ProfileDictionary
 
 # Simple planner needs minimal setup
 profiles = ProfileDictionary()
@@ -92,7 +92,7 @@ if response.successful:
 
 ## Auto-generated API Reference
 
-::: tesseract_robotics.tesseract_motion_planners_simple._tesseract_motion_planners_simple
+::: tesseract.tesseract_motion_planners_simple
     options:
       show_root_heading: false
       show_source: false

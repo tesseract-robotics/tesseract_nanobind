@@ -9,7 +9,7 @@ The cross-module inheritance for Profile types now works. We use `nb::class_<Der
 **Solution:** Use helper functions like `ProfileDictionary_addOMPLProfile()` from the OMPL module:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import ProfileDictionary_addOMPLProfile
+from tesseract.tesseract_motion_planners_ompl import ProfileDictionary_addOMPLProfile
 
 plan_profile = OMPLRealVectorPlanProfile()
 profiles = ProfileDictionary()
@@ -114,14 +114,14 @@ Use `nb::handle` to accept any Python object, manually verify the type using `nb
 ```cpp
 // In tesseract_task_composer_bindings.cpp
 // Import the module at module init
-nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+nb::module_::import_("tesseract.tesseract_common._tesseract_common");
 
 // Use nb::handle + isinstance for cross-module type resolution
 m.def("createTaskComposerPluginFactory", [](const std::string& config_str, nb::handle locator_handle) {
     tc::fs::path config(config_str);
 
     // Get the type from the imported module
-    auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    auto common_module = nb::module_::import_("tesseract.tesseract_common._tesseract_common");
     auto grl_type = common_module.attr("GeneralResourceLocator");
 
     // Verify type
@@ -137,8 +137,8 @@ m.def("createTaskComposerPluginFactory", [](const std::string& config_str, nb::h
 
 **Python Usage:**
 ```python
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import createTaskComposerPluginFactory
+from tesseract.tesseract_common import GeneralResourceLocator
+from tesseract.tesseract_task_composer import createTaskComposerPluginFactory
 
 locator = GeneralResourceLocator()
 factory = createTaskComposerPluginFactory(task_composer_config_file, locator)
@@ -167,14 +167,14 @@ TrajOpt bindings are optional and auto-detected at build time.
 ### Usage (0.33 API)
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # Create profiles
 plan_profile = TrajOptDefaultPlanProfile()
@@ -277,13 +277,13 @@ input_key = task.getInputKeys().get("program")
 Configure waypoint-level TrajOpt behavior via config objects:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptDefaultCompositeProfile,
     ProfileDictionary_addTrajOptPlanProfile,
     ProfileDictionary_addTrajOptCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile - waypoint constraints
 trajopt_plan_profile = TrajOptDefaultPlanProfile()
@@ -325,11 +325,11 @@ ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask
 
 **TimeParameterization** (0.33 API):
 ```python
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_command_language import ProfileDictionary
 
 # Create TOTG with profile-based configuration
 totg = TimeOptimalTrajectoryGeneration()
@@ -354,7 +354,7 @@ Available config classes:
 When planning Cartesian paths (CartesianWaypoint), TrajOpt needs seed joint states. Use `assignCurrentStateAsSeed()`:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
+from tesseract.tesseract_motion_planners import assignCurrentStateAsSeed
 
 program = CompositeInstruction("DEFAULT")
 # ... add CartesianWaypoint instructions ...

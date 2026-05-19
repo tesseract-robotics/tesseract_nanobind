@@ -19,7 +19,7 @@ Boost.Serialization handles nested types recursively - only root types need expl
 Save and load planned trajectories:
 
 ```python
-from tesseract_robotics.tesseract_serialization import (
+from tesseract.tesseract_serialization import (
     composite_instruction_to_xml,
     composite_instruction_from_xml,
     composite_instruction_to_file,
@@ -50,7 +50,7 @@ program = composite_instruction_from_binary(binary)
 Save and restore complete scene state including all applied commands:
 
 ```python
-from tesseract_robotics.tesseract_serialization import (
+from tesseract.tesseract_serialization import (
     environment_to_xml,
     environment_from_xml,
     environment_to_file,
@@ -76,7 +76,7 @@ env = environment_from_file("scene.xml")
 Checkpoint joint positions and link transforms:
 
 ```python
-from tesseract_robotics.tesseract_serialization import (
+from tesseract.tesseract_serialization import (
     scene_state_to_xml,
     scene_state_from_xml,
     scene_state_to_file,

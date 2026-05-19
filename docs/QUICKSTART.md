@@ -12,7 +12,7 @@ pip install tesseract-robotics-nanobind
 
 ```python
 import tesseract_robotics
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract.tesseract_environment import Environment
 
 env = Environment()
 print("Success!")

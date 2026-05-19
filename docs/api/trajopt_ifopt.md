@@ -1,4 +1,4 @@
-# tesseract_robotics.trajopt_ifopt
+# tesseract.trajopt_ifopt
 
 Constraints, costs, and variables for the low-level SQP solver.
 See the [Low-Level SQP guide](../user-guide/low-level-sqp.md) for the user-guide walkthrough.
@@ -24,7 +24,7 @@ Container of `Node`s. Passed to `IfoptProblem`.
 Factory helper. Builds the full hierarchy from a list of initial states.
 
 ```python
-from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
+from tesseract.trajopt_ifopt import Bounds, createNodesVariables
 
 bounds = Bounds(-3.14, 3.14)
 nodes_variables = createNodesVariables(
@@ -90,7 +90,7 @@ directly (see [changes](../changes.md)).
 
 ## Module API
 
-::: tesseract_robotics.trajopt_ifopt
+::: tesseract.trajopt_ifopt
     options:
       show_root_heading: true
       show_source: false

@@ -1,4 +1,4 @@
-# tesseract_robotics.tesseract_serialization
+# tesseract.tesseract_serialization
 
 XML and binary serialization for root types. The backend switched from
 Boost.Serialization (0.33) to Cereal (0.34); the Python API is unchanged.
@@ -19,7 +19,7 @@ archive formats:
 The `*_to_file` / `*_from_file` helpers auto-detect the format from the path
 suffix (`.xml` vs `.bin`).
 
-::: tesseract_robotics.tesseract_serialization
+::: tesseract.tesseract_serialization
     options:
       show_root_heading: true
       show_source: false

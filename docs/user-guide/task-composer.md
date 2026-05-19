@@ -49,8 +49,8 @@ graph TD
 === "Low-Level API"
 
     ```python
-    from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
-    from tesseract_robotics.tesseract_task_composer import (
+    from tesseract.tesseract_common import FilesystemPath, GeneralResourceLocator
+    from tesseract.tesseract_task_composer import (
         AnyPoly_wrap_CompositeInstruction,
         AnyPoly_wrap_EnvironmentConst,
         AnyPoly_wrap_ProfileDictionary,
@@ -200,9 +200,9 @@ result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=prof
 For a manual `ProfileDictionary`:
 
 ```python
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLDefaultPlanProfile
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_motion_planners_ompl import OMPLDefaultPlanProfile
+from tesseract.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
 )
 
@@ -235,7 +235,7 @@ if not result.successful:
 The Task Composer uses Taskflow for parallel execution. Override the thread count via `TaskComposer.from_config(num_threads=...)` or pass a pre-built executor:
 
 ```python
-from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+from tesseract.tesseract_task_composer import TaskflowTaskComposerExecutor
 
 # Override YAML-configured thread count
 composer = TaskComposer.from_config(num_threads=8)

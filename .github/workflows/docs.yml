@@ -7,7 +7,8 @@ on:
       - 'mkdocs.yml'
       - 'CHANGELOG.md'
       - '.github/workflows/docs.yml'
-      - 'src/tesseract_robotics/**/*.pyi'
+      - 'src/**/*.py'
+      - 'src/**/*.cpp'  # binding source — public API surfaces in docstrings
   push:
     branches: [main]
     paths:
@@ -15,7 +16,8 @@ on:
       - 'mkdocs.yml'
       - 'CHANGELOG.md'
       - '.github/workflows/docs.yml'
-      - 'src/tesseract_robotics/**/*.pyi'
+      - 'src/**/*.py'
+      - 'src/**/*.cpp'
   workflow_dispatch:
 
 permissions:
@@ -29,20 +31,56 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
     - uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        path: ws/src/tesseract_nanobind
+        fetch-depth: 0  # setuptools-scm needs tag history for version derivation
 
-    - name: Install dependencies
-      run: pip install -r docs/requirements.txt
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
+      with:
+        manifest-path: ws/src/tesseract_nanobind/pyproject.toml
+        cache: true
+        environments: py312
+        activate-environment: py312
 
-    - name: Build docs (strict)
-      run: PYTHONPATH=src mkdocs build --strict
+    - name: cache vcs repos
+      uses: actions/cache@v4
+      with:
+        path: |
+          ws/src/tesseract
+          ws/src/tesseract_planning
+        key: docs-vcs-${{ runner.os }}-${{ hashFiles('ws/src/tesseract_nanobind/scripts/build_tesseract_cpp.sh') }}
+
+    - name: cache C++ install
+      uses: actions/cache@v4
+      with:
+        path: ws/install
+        key: docs-cppinstall-${{ runner.os }}-${{ hashFiles('ws/src/tesseract_nanobind/scripts/build_tesseract_cpp.sh', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+
+    - name: build + install (provides bindings for mkdocstrings)
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run install
+
+    - name: Install docs deps
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run pip install -r docs/requirements.txt
+
+    # NOTE: --strict dropped temporarily — nanobind macro-generated stubs leave
+    # function signatures as `(*args, **kwargs)` at the Python-introspection
+    # layer (the typed signature lives in the docstring's first line), which
+    # trips griffe's "param does not appear in function signature" warning for
+    # docstrings that have an `Args:` section. The .pyi files do have full
+    # signatures; downstream fix is to teach mkdocstrings to prefer .pyi over
+    # runtime inspection, or to add `nb::sig("...")` to the bindings.
+    - name: Build docs
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run mkdocs build
 
     - name: Upload artifact
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'

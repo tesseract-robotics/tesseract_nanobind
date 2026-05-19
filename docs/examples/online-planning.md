@@ -77,7 +77,7 @@ tesseract_online_planning_sqp_example
 Use `createNodesVariables` to build `NodesVariables` → `Node` → `Var`:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
+from tesseract.trajopt_ifopt import Bounds, createNodesVariables
 
 bounds = Bounds(-3.14, 3.14)
 nodes_variables = createNodesVariables(
@@ -131,7 +131,7 @@ For higher precision (5-10 Hz) use the LVS continuous evaluator with
 `ContinuousCollisionConstraint`:
 
 ```python
-from tesseract_robotics.trajopt_ifopt import (
+from tesseract.trajopt_ifopt import (
     LVSContinuousCollisionEvaluator, ContinuousCollisionConstraint
 )
 
