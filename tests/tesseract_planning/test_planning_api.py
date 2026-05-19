@@ -124,8 +124,19 @@ class TestPose:
         b = Pose.from_xyz(1.0, 2.0, 3.0)
         assert a is not b
         assert a != b
-        assert hash(a) != hash(b)
-        assert len({a, b}) == 2
+
+    def test_pose_is_unhashable(self):
+        # __hash__ = None — Pose deliberately rejects set / dict membership.
+        # Identity-hashing would let `pose in {p1, p2}` mislead by hashing on
+        # `id()` rather than value; value-hashing would break under FP drift.
+        # The honest answer is "not hashable; use isApprox for comparison."
+        p = Pose.from_xyz(1.0, 2.0, 3.0)
+        with pytest.raises(TypeError, match="unhashable"):
+            hash(p)
+        with pytest.raises(TypeError, match="unhashable"):
+            {p}  # noqa: B018 — intentionally trying set construction
+        with pytest.raises(TypeError, match="unhashable"):
+            {p: "value"}  # noqa: B018 — intentionally trying dict key
 
     def test_pose_isapprox_for_tolerance_equality(self):
         # `isApprox` is the supported tolerance-based comparison. Default
