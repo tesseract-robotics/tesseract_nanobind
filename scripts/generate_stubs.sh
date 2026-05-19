@@ -56,7 +56,11 @@ for entry in "${MODULES[@]}"; do
 
     echo "  $MODULE -> $SUBDIR/"
 
-    TRAJOPT_LOG_THRESH=ERROR python -m nanobind.stubgen \
+    # Use pixi-managed python so stubgen sees the editable-install module
+    # objects (not whatever python happens to be first on PATH). A stale
+    # conda env on PATH during PR #76 produced stubs missing the new
+    # Eigen-geometry types, which silently broke CI pyright on Linux 3.9.
+    TRAJOPT_LOG_THRESH=ERROR pixi run -e default python -m nanobind.stubgen \
         -m "$MODULE" \
         $PATTERN_ARG \
         -o "$OUTPUT_FILE" \
