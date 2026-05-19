@@ -510,15 +510,17 @@ class TaskComposer:
                 try:
                     task_infos = future.context.task_infos
                     if task_infos:
-                        # Try aborting node first — most useful diagnostic
+                        # Try aborting node first — most useful diagnostic.
+                        # pyright ignores: auto-generated stubs type these as `object`;
+                        # the actual runtime type is a dict-like with str keys.
                         aborting = task_infos.getAbortingNodeInfo()
                         if aborting and aborting.get("status_message"):
-                            msg = f"{aborting['name']}: {aborting['status_message']}"
+                            msg = f"{aborting['name']}: {aborting['status_message']}"  # pyright: ignore[reportIndexIssue]
                         else:
                             # Scan all node infos for first non-empty status_message
                             for info in task_infos.getAllInfos():
                                 if info.get("status_message"):
-                                    msg = f"{info['name']}: {info['status_message']}"
+                                    msg = f"{info['name']}: {info['status_message']}"  # pyright: ignore[reportIndexIssue]
                                     break
                 except (AttributeError, TypeError):
                     pass
