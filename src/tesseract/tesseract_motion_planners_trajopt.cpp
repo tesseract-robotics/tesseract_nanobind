@@ -44,16 +44,13 @@ namespace tj = trajopt_common;
 NB_MODULE(tesseract_motion_planners_trajopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt Python bindings";
 
-    // Import Profile type from tesseract_command_language for cross-module inheritance
-    auto cl_module = tesseract_nb::import_module_in_context(m, "tesseract_command_language");
-
-    // Import tesseract_collision for CollisionEvaluatorType (moved there in 0.33)
-    tesseract_nb::import_module_in_context(m, "tesseract_collision");
-
-    // Import MotionPlanner base type for clone() return type
-    tesseract_nb::import_module_in_context(m, "tesseract_motion_planners");
-
-    // Note: CollisionEvaluatorType is in tesseract_collision module - import from there
+    // Register sibling types for cross-module inheritance / return types
+    // (side-effect imports; return values discarded).
+    tesseract_nb::import_modules_in_context(m, {
+        "tesseract_command_language",  // for Profile base class
+        "tesseract_collision",         // for CollisionEvaluatorType (moved here in 0.33)
+        "tesseract_motion_planners",   // for MotionPlanner base type (clone() return)
+    });
 
     // ========== TrajOptCartesianWaypointConfig ==========
     nb::class_<tp::TrajOptCartesianWaypointConfig>(m, "TrajOptCartesianWaypointConfig")

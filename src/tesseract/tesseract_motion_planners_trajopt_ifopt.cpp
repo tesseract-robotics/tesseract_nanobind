@@ -34,11 +34,12 @@ namespace tc = tesseract_common;
 NB_MODULE(tesseract_motion_planners_trajopt_ifopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt_ifopt Python bindings";
 
-    // Import Profile type from tesseract_command_language for cross-module inheritance
-    auto cl_module = tesseract_nb::import_module_in_context(m, "tesseract_command_language");
-
-    // Import MotionPlanner base type for clone() return type
-    tesseract_nb::import_module_in_context(m, "tesseract_motion_planners");
+    // Register sibling types for cross-module inheritance / return types
+    // (side-effect imports; return values discarded).
+    tesseract_nb::import_modules_in_context(m, {
+        "tesseract_command_language",  // for Profile base class
+        "tesseract_motion_planners",   // for MotionPlanner base type (clone() return)
+    });
 
     // ========== TrajOptIfoptCartesianWaypointConfig ==========
     nb::class_<tp::TrajOptIfoptCartesianWaypointConfig>(m, "TrajOptIfoptCartesianWaypointConfig")

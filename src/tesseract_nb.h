@@ -49,8 +49,28 @@ namespace tesseract_nb {
 // Import a sibling extension module by its short name, resolving it against the
 // importer's package (e.g. inside `tesseract.tesseract_environment`, calling
 // `import_module_in_context(m, "tesseract_collision")` imports
-// `tesseract.tesseract_collision`). Falls back to a top-level import when the
-// importer has no package qualifier.
+// `tesseract.tesseract_collision`).
+//
+// Why the two branches exist:
+//   - Runtime: the binding is imported as `tesseract.tesseract_<X>`. The
+//     `__name__` attribute contains a dot, so we resolve siblings via the
+//     package prefix. Missing siblings here are a real bug — propagate the
+//     ImportError.
+//   - Stub generation: `nanobind_add_stub` runs the binding in isolation via
+//     `python -m nanobind.stubgen -m <X>`. The PYTHON_PATH is just the build
+//     directory, the importer's `__name__` is the bare module name (no dot),
+//     and sibling .so files may not be built yet (CMake doesn't know about
+//     the implicit cross-module deps that `import_module_in_context` creates).
+//     Tolerate ImportError here: the stub only needs the *importer's own*
+//     symbols, and missing sibling references in type signatures degrade to
+//     string-form names — acceptable until upstream `nanobind_add_stub` learns
+//     about cross-module deps. The presence-of-dot heuristic distinguishes
+//     these two regimes without a separate flag.
+//
+// Callers that use the return value (`.attr(...)`) at NB_MODULE top-level
+// would crash on the empty module returned during stub generation. By
+// convention, such usage is only valid inside lambdas (runtime), where the
+// dot-prefixed branch always runs.
 inline nb::module_ import_module_in_context(const nb::module_& current_module, const char* module_name)
 {
     std::string importer_name = nb::cast<std::string>(current_module.attr("__name__"));
@@ -61,7 +81,16 @@ inline nb::module_ import_module_in_context(const nb::module_& current_module, c
         auto fq_name = package_name + "." + module_name;
         return nb::module_::import_(fq_name.c_str());
     }
-    return nb::module_::import_(module_name);
+    // Stub-gen path: dependent sibling may not exist yet; swallow ImportError.
+    try
+    {
+        return nb::module_::import_(module_name);
+    }
+    catch (const nb::python_error&)
+    {
+        PyErr_Clear();
+        return nb::module_();
+    }
 }
 
 inline void import_modules_in_context(const nb::module_& current_module,

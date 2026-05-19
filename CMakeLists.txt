@@ -61,8 +61,22 @@ find_package(tesseract_environment REQUIRED)
 find_package(tesseract_command_language REQUIRED)
 find_package(console_bridge REQUIRED)
 
-# Define reusable function for nanobind extensions
+# Reusable function for nanobind extension modules.
+#
+# Usage:
+#   add_tesseract_nanobind_extension(<module_name> <source_file>
+#                                    [STUB_DEPENDS <mod> ...]
+#                                    <link_lib> ...)
+#
+# STUB_DEPENDS lists sibling binding modules that must be built before this
+# module's .pyi can be generated. Required when the source file does
+# `tesseract_nb::import_module_in_context(m, "<sibling>")` at NB_MODULE
+# top-level — nanobind_add_stub runs the binding to introspect types, which
+# executes those imports. Without the dep, CI's clean builds may schedule
+# stub generation before the sibling's .so is linked → ModuleNotFoundError.
 function(add_tesseract_nanobind_extension module_name source_file)
+  cmake_parse_arguments(_NBE "" "" "STUB_DEPENDS" ${ARGN})
+
   nanobind_add_module(
     ${module_name}
     STABLE_ABI
@@ -79,8 +93,9 @@ function(add_tesseract_nanobind_extension module_name source_file)
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
 
-  # Link tesseract libraries (passed as remaining arguments)
-  target_link_libraries(${module_name} PRIVATE ${ARGN})
+  # Link tesseract libraries (positional args after source_file, excluding
+  # the STUB_DEPENDS keyword and its values)
+  target_link_libraries(${module_name} PRIVATE ${_NBE_UNPARSED_ARGUMENTS})
 
   # RTTI visibility fix: Export typeinfo symbols so typeid() comparison works
   # across library boundaries (needed for TaskComposer plugin compatibility)
@@ -93,12 +108,14 @@ function(add_tesseract_nanobind_extension module_name source_file)
           LIBRARY DESTINATION tesseract)
 
   # Generate Python stub file (.pyi)
+  # DEPENDS includes STUB_DEPENDS so all sibling .so files exist before stubgen
+  # imports this binding (which transitively imports those siblings).
   nanobind_add_stub(
     ${module_name}_stub
     MODULE ${module_name}
     OUTPUT ${module_name}.pyi
     PYTHON_PATH $<TARGET_FILE_DIR:${module_name}>
-    DEPENDS ${module_name}
+    DEPENDS ${module_name} ${_NBE_STUB_DEPENDS}
   )
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi DESTINATION tesseract)
 endfunction()
@@ -186,6 +203,14 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_srdf
   tesseract::tesseract_scene_graph
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_collision
+    tesseract_common
+    tesseract_geometry
+    tesseract_kinematics
+    tesseract_scene_graph
+    tesseract_srdf
+    tesseract_state_solver
 )
 
 # Add tesseract_command_language module
@@ -228,6 +253,9 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_command_language
+    tesseract_motion_planners
 )
 
 # Add tesseract_motion_planners_ompl module
@@ -239,6 +267,10 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_environment
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_collision
+    tesseract_command_language
+    tesseract_motion_planners
 )
 
 # Add ompl_base module (SE2, Reeds-Shepp, Dubins state spaces)
@@ -285,6 +317,10 @@ if(tesseract_motion_planners_descartes_FOUND AND descartes_light_FOUND)
     tesseract::tesseract_command_language
     tesseract::tesseract_collision_core
     tesseract::tesseract_common
+    STUB_DEPENDS
+      tesseract_collision
+      tesseract_command_language
+      tesseract_motion_planners
   )
 else()
   message(STATUS "tesseract_motion_planners descartes component not found - skipping bindings")
@@ -304,6 +340,11 @@ if(tesseract_motion_planners_trajopt_FOUND AND trajopt_FOUND)
     tesseract::tesseract_command_language
     tesseract::tesseract_common
     trajopt::trajopt
+    STUB_DEPENDS
+      tesseract_collision
+      tesseract_command_language
+      tesseract_motion_planners
+      trajopt_ifopt
   )
 else()
   message(STATUS "tesseract_motion_planners trajopt component not found - skipping bindings")
@@ -326,6 +367,9 @@ if(tesseract_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND tra
     tesseract::tesseract_common
     trajopt::trajopt_ifopt
     trajopt::trajopt_sqp
+    STUB_DEPENDS
+      tesseract_command_language
+      tesseract_motion_planners
   )
 else()
   message(STATUS "tesseract_motion_planners trajopt_ifopt component not found - skipping bindings")
@@ -344,6 +388,8 @@ if(trajopt_ifopt_FOUND AND trajopt_common_FOUND)
     tesseract::tesseract_environment
     tesseract::tesseract_collision_core
     tesseract::tesseract_common
+    STUB_DEPENDS
+      tesseract_collision
   )
 else()
   message(STATUS "trajopt_ifopt/trajopt_common not found - skipping bindings")
@@ -358,6 +404,8 @@ if(trajopt_sqp_FOUND)
     trajopt::trajopt_sqp
     trajopt::trajopt_ifopt
     tesseract::tesseract_common
+    STUB_DEPENDS
+      trajopt_ifopt
   )
 else()
   message(STATUS "trajopt_sqp not found - skipping bindings")
@@ -375,6 +423,8 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_time_parameterization_core
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_command_language
 )
 
 # Find and add tesseract_task_composer
@@ -389,6 +439,8 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_command_language
   tesseract::tesseract_collision_core
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_common
 )
 
 add_tesseract_nanobind_extension(
@@ -400,68 +452,10 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_collision_core
   tesseract::tesseract_command_language
   tesseract::tesseract_common
+  STUB_DEPENDS
+    tesseract_collision
+    tesseract_command_language
 )
-
-# Cross-module stub-generation dependencies.
-#
-# nanobind_add_stub runs the binding extension in isolation to introspect
-# types. Each binding's NB_MODULE body uses tesseract_nb::import_module_in_context()
-# to load sibling extension modules so their type casters are registered before
-# stubgen walks the type graph (otherwise it crashes with std::bad_cast).
-# That means every stub target must depend on every other binding module's
-# .so being built first — otherwise ninja may schedule stub generation
-# before the dependent .so exists (as happens in CI's clean builds).
-#
-# This single foreach replaces the alternative of per-call STUB_DEPS args
-# in the helper function, at the cost of an over-broad dependency graph
-# (a stub doesn't truly need every other module — but the cross-deps are
-# rerun deps, not link deps, so the cost is negligible).
-set(_tesseract_nb_modules
-  tesseract_common
-  tesseract_geometry
-  tesseract_scene_graph
-  tesseract_srdf
-  tesseract_urdf
-  tesseract_collision
-  tesseract_state_solver
-  tesseract_kinematics
-  tesseract_environment
-  tesseract_command_language
-  tesseract_serialization
-  tesseract_motion_planners
-  tesseract_motion_planners_simple
-  tesseract_motion_planners_ompl
-  tesseract_time_parameterization
-  tesseract_task_composer
-  tesseract_task_composer_planning
-)
-# Conditional modules
-foreach(_opt_mod IN ITEMS
-    tesseract_motion_planners_descartes
-    tesseract_motion_planners_trajopt
-    tesseract_motion_planners_trajopt_ifopt
-    trajopt_ifopt
-    trajopt_sqp)
-  if(TARGET ${_opt_mod})
-    list(APPEND _tesseract_nb_modules ${_opt_mod})
-  endif()
-endforeach()
-# ompl/base.cpp produces a target named `base` installed under ompl/
-if(TARGET base)
-  list(APPEND _tesseract_nb_modules base)
-endif()
-
-# Each stub target depends on every binding module being built.
-foreach(_mod IN LISTS _tesseract_nb_modules)
-  if(NOT TARGET ${_mod}_stub)
-    continue()
-  endif()
-  foreach(_dep IN LISTS _tesseract_nb_modules)
-    if(TARGET ${_dep} AND NOT _mod STREQUAL _dep)
-      add_dependencies(${_mod}_stub ${_dep})
-    endif()
-  endforeach()
-endforeach()
 
 message(STATUS "============= Build Configuration =============")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")

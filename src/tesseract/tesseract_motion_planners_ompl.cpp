@@ -32,15 +32,15 @@ namespace tc = tesseract_common;
 NB_MODULE(tesseract_motion_planners_ompl, m) {
     m.doc() = "tesseract_motion_planners_ompl Python bindings";
 
-    // Import Profile type from tesseract_command_language for cross-module inheritance
-    auto cl_module = tesseract_nb::import_module_in_context(m, "tesseract_command_language");
-    auto profile_type = cl_module.attr("Profile");
-
-    // Import tesseract_collision for CollisionCheckConfig
-    tesseract_nb::import_module_in_context(m, "tesseract_collision");
-
-    // Import MotionPlanner base type for clone() return type
-    tesseract_nb::import_module_in_context(m, "tesseract_motion_planners");
+    // Register sibling types for cross-module inheritance / return types.
+    // (Side-effect imports; return values discarded. The `nb::class_<X, tc::Profile>`
+    // declarations below rely on Profile already being registered in the
+    // tesseract_command_language module.)
+    tesseract_nb::import_modules_in_context(m, {
+        "tesseract_command_language",  // for Profile base class
+        "tesseract_collision",         // for CollisionCheckConfig
+        "tesseract_motion_planners",   // for MotionPlanner base type (clone() return)
+    });
 
     // ========== OMPLSolverConfig ==========
     nb::class_<tp::OMPLSolverConfig>(m, "OMPLSolverConfig")
