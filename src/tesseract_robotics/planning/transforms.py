@@ -1,16 +1,18 @@
 """
 Pose helpers for creating poses and transformations.
 
-Thin Pythonic wrapper around `tesseract_common.Isometry3d`. All transform
-math delegates to Eigen — this module owns the construction API, not the
-linear algebra.
+`Pose` inherits from `tesseract_common.Isometry3d` — every Pose IS an
+Isometry3d, accepted directly by every C++ binding that expects one and
+composable with all `Isometry3d` operators. The factory classmethods on
+this class are the Python ergonomic layer over Eigen's ctors; nothing
+about `Pose` adds an indirection.
 
 Example:
     from tesseract_robotics.planning import Pose, translation, rotation_z
 
     pose = Pose.from_xyz_rpy(0.5, 0.0, 0.3, 0, 0, 1.57)
     pose = translation(0.5, 0.0, 0.3) @ rotation_z(1.57)
-    isometry = pose.to_isometry()
+    iso = pose  # no conversion needed — Pose is an Isometry3d
 """
 
 from __future__ import annotations
@@ -35,48 +37,39 @@ from tesseract_robotics.tesseract_common import (
 _QUAT_MIN_NORM = 1e-12
 
 
-class Pose:
-    """A 3D pose backed by `Isometry3d`.
+class Pose(Isometry3d):
+    """A 3D pose: `Isometry3d` plus convenient factory methods.
 
-    Value-type semantics: constructing from an existing `Isometry3d`
-    defensively copies, and every accessor (`matrix`, `position`,
-    `rotation_matrix`, `quaternion`) returns a fresh numpy array.
-    A `Pose` cannot be mutated from outside through any of its members.
+    `Pose` is a Python subclass of `Isometry3d`, not a wrapper — every
+    `Pose` is also an `Isometry3d` (and `isinstance(p, Isometry3d)` is True).
+    C++ bindings that accept `Isometry3d` accept `Pose` directly, and every
+    `Isometry3d` method (`matrix()`, `translation()`, `rotation()`,
+    `linear()`, `inverse()`, `isApprox()`, the in-place mutators, the `*`
+    operator) is inherited.
+
+    The classmethods below (`from_xyz_rpy`, `from_xyz_quat`, …) wrap Eigen's
+    ctors with human-readable parameter conventions; the numpy-returning
+    properties (`position`, `quaternion`, `rpy`, …) are legacy accessors
+    preserved for backwards compatibility. New code should call the
+    inherited `Isometry3d` methods directly.
 
     Example:
         p = Pose.from_xyz_quat(0.5, 0, 0.3, 0, 0, 0.707, 0.707)
-        p = Pose(np.eye(4))               # from 4x4 matrix
-        p = Pose(Isometry3d.Identity())   # from Eigen directly (copied)
-        result = p1 @ p2                  # compose
+        p = Pose(np.eye(4))               # via Isometry3d's matrix4d ctor
+        p2 = p * Pose.from_xyz(1, 0, 0)   # Isometry3d composition (returns Isometry3d)
     """
-
-    __slots__ = ("_iso",)
-
-    def __init__(self, matrix: ArrayLike | Isometry3d):
-        """Build from a 4x4 homogeneous matrix or an Isometry3d.
-
-        Passing an `Isometry3d` makes a defensive copy — subsequent
-        mutation of the caller's instance does not affect this `Pose`.
-        """
-        if isinstance(matrix, Isometry3d):
-            self._iso = Isometry3d(matrix)  # copy ctor — no aliasing
-            return
-        mat = np.asarray(matrix, dtype=np.float64)
-        if mat.shape != (4, 4):
-            raise ValueError(f"Pose matrix must be 4x4, got {mat.shape}")
-        self._iso = Isometry3d(mat)
 
     # ----- Factories ----------------------------------------------------
 
     @classmethod
     def identity(cls) -> Pose:
         """Identity pose (no rotation, no translation)."""
-        return cls(Isometry3d.Identity())
+        return cls()
 
     @classmethod
     def from_xyz(cls, x: float, y: float, z: float) -> Pose:
         """Pure translation pose."""
-        return cls(Isometry3d(np.array([x, y, z], dtype=np.float64), Quaterniond.Identity()))
+        return cls(np.array([x, y, z], dtype=np.float64), Quaterniond.Identity())
 
     @classmethod
     def from_position(cls, position: ArrayLike) -> Pose:
@@ -84,7 +77,7 @@ class Pose:
         pos = np.asarray(position, dtype=np.float64).ravel()
         if pos.shape != (3,):
             raise ValueError(f"Position must have 3 elements, got {pos.shape}")
-        return cls(Isometry3d(pos, Quaterniond.Identity()))
+        return cls(pos, Quaterniond.Identity())
 
     @classmethod
     def from_xyz_quat(
@@ -99,15 +92,12 @@ class Pose:
     ) -> Pose:
         """Pose from position and scalar-last quaternion (qx, qy, qz, qw).
 
-        The quaternion is normalised so callers can pass un-normalised
-        values. Zero-magnitude quaternions are rejected (would otherwise
-        yield NaN under normalisation).
+        Quaternion is normalised so callers can pass un-normalised values;
+        zero-magnitude quaternions are rejected with `ValueError`.
         """
         return cls(
-            Isometry3d(
-                np.array([x, y, z], dtype=np.float64),
-                _safe_quaternion(qw, qx, qy, qz),
-            )
+            np.array([x, y, z], dtype=np.float64),
+            _safe_quaternion(qw, qx, qy, qz),
         )
 
     @classmethod
@@ -119,12 +109,7 @@ class Pose:
             raise ValueError(f"Position must have 3 elements, got {pos.shape}")
         if quat.shape != (4,):
             raise ValueError(f"Quaternion must have 4 elements, got {quat.shape}")
-        return cls(
-            Isometry3d(
-                pos,
-                _safe_quaternion(quat[3], quat[0], quat[1], quat[2]),
-            )
-        )
+        return cls(pos, _safe_quaternion(quat[3], quat[0], quat[1], quat[2]))
 
     @classmethod
     def from_xyz_rpy(
@@ -142,18 +127,18 @@ class Pose:
             * Quaterniond(AngleAxisd(pitch, Y_AXIS))
             * Quaterniond(AngleAxisd(roll, X_AXIS))
         )
-        return cls(Isometry3d(np.array([x, y, z], dtype=np.float64), q))
+        return cls(np.array([x, y, z], dtype=np.float64), q)
 
     @classmethod
     def from_matrix(cls, matrix: ArrayLike) -> Pose:
-        """Pose from a 4x4 homogeneous matrix (validated by `__init__`)."""
+        """Pose from a 4x4 homogeneous matrix (validated by Isometry3d's ctor)."""
         return cls(matrix)
 
     @classmethod
     def from_matrix_position(cls, rotation: ArrayLike, position: ArrayLike) -> Pose:
         """Pose from a 3x3 rotation matrix and a 3-element position.
 
-        The rotation must be orthonormal. `Quaterniond(Matrix3d)` validates
+        The rotation must be orthonormal — `Quaterniond(Matrix3d)` validates
         this at the binding boundary and raises `ValueError` for non-rotation
         input (scaling, shear, or accumulated FP drift beyond ~1e-12).
         """
@@ -163,79 +148,74 @@ class Pose:
             raise ValueError(f"Rotation must be 3x3, got {R.shape}")
         if pos.shape != (3,):
             raise ValueError(f"Position must have 3 elements, got {pos.shape}")
-        return cls(Isometry3d(pos, Quaterniond(R)))
+        return cls(pos, Quaterniond(R))
 
     @classmethod
     def from_isometry(cls, isometry: Isometry3d) -> Pose:
-        """Pose from an existing Isometry3d (defensively copied)."""
+        """Pose from an existing Isometry3d (defensively copied via Isometry3d's copy ctor)."""
         return cls(isometry)
 
-    # ----- Accessors ----------------------------------------------------
-
-    @property
-    def matrix(self) -> np.ndarray:
-        """4x4 homogeneous matrix as a fresh numpy array. Safe to mutate."""
-        return self._iso.matrix()
+    # ----- Legacy numpy-style property accessors ------------------------
+    # Prefer the inherited `Isometry3d` methods (`matrix()`, `translation()`,
+    # `rotation()`, `linear()`) in new code. These properties are kept so
+    # existing callers continue to work; planned for removal in a follow-up.
 
     @property
     def position(self) -> np.ndarray:
-        """Translation as a fresh `[x, y, z]` numpy array. Safe to mutate."""
-        return self._iso.translation()
+        """Translation as `[x, y, z]` numpy array. Alias for `translation()`."""
+        return self.translation()
 
     @property
     def x(self) -> float:
         """X translation component."""
-        return float(self._iso.translation()[0])
+        return float(self.translation()[0])
 
     @property
     def y(self) -> float:
         """Y translation component."""
-        return float(self._iso.translation()[1])
+        return float(self.translation()[1])
 
     @property
     def z(self) -> float:
         """Z translation component."""
-        return float(self._iso.translation()[2])
+        return float(self.translation()[2])
 
     @property
     def rotation_matrix(self) -> np.ndarray:
-        """3x3 rotation matrix as a fresh numpy array. Safe to mutate."""
-        return self._iso.rotation()
+        """3x3 rotation matrix. Alias for `rotation()`."""
+        return self.rotation()
 
     @property
     def quaternion(self) -> np.ndarray:
         """Quaternion as `[qx, qy, qz, qw]` (scalar-last) — Eigen's coeffs() layout."""
-        return Quaterniond(self._iso.linear()).coeffs()
+        return Quaterniond(self.linear()).coeffs()
 
     @property
     def rpy(self) -> tuple[float, float, float]:
-        """Roll-pitch-yaw angles in radians, extracted such that R = Rz(yaw)·Ry(pitch)·Rx(roll)."""
-        yaw, pitch, roll = Quaterniond(self._iso.linear()).eulerAngles("ZYX")
+        """Roll-pitch-yaw angles in radians, R = Rz(yaw)·Ry(pitch)·Rx(roll)."""
+        yaw, pitch, roll = Quaterniond(self.linear()).eulerAngles("ZYX")
         return (float(roll), float(pitch), float(yaw))
 
     # ----- Conversions / ops --------------------------------------------
 
     def to_isometry(self) -> Isometry3d:
-        """Return an `Isometry3d` copy — safe to mutate without affecting this Pose."""
-        return Isometry3d(self._iso)
+        """Return a plain `Isometry3d` copy (strips the `Pose` subclass).
 
-    def inverse(self) -> Pose:
-        """Inverse pose. Uses Eigen's isometry-aware inverse (Rᵀ, −Rᵀ·t), not general 4x4 inversion."""
-        return Pose(self._iso.inverse())
+        Legacy — `Pose` IS-A `Isometry3d`, so C++ bindings no longer need this
+        conversion. Use only when you specifically want an `Isometry3d` and
+        not a `Pose` subclass.
+        """
+        return Isometry3d(self)
 
-    def isApprox(self, other: Pose, prec: float = 1e-12) -> bool:
-        """Component-wise approximate equality. Delegates to `Isometry3d.isApprox`."""
-        return self._iso.isApprox(other._iso, prec)
-
-    def __matmul__(self, other: Pose) -> Pose:
-        """Compose poses: `self @ other` is the transform that applies `other` then `self`."""
-        if isinstance(other, Pose):
-            return Pose(self._iso * other._iso)
+    def __matmul__(self, other: Isometry3d) -> Pose:
+        """Compose: `self @ other` applies `other` then `self`."""
+        if isinstance(other, Isometry3d):
+            return Pose(self * other)
         raise TypeError(f"Cannot multiply Pose with {type(other)}")
 
     def __repr__(self) -> str:
-        pos = self.position
-        quat = self.quaternion
+        pos = self.translation()
+        quat = Quaterniond(self.linear()).coeffs()
         return (
             f"Pose(position=[{pos[0]:.4f}, {pos[1]:.4f}, {pos[2]:.4f}], "
             f"quaternion=[{quat[0]:.4f}, {quat[1]:.4f}, {quat[2]:.4f}, {quat[3]:.4f}])"
