@@ -77,9 +77,11 @@ class Pose(Isometry3d):
     `Pose(Translation3d, Quaterniond)` ctors cover identity, raw-matrix,
     copy, and typed construction respectively.
 
-    For reading: use the inherited Eigen API directly. `pose.translation()`,
-    `pose.rotation()` / `pose.linear()`, `pose.matrix()`, and for quaternion
-    or rpy: `Quaterniond(pose.linear()).coeffs()` / `.eulerAngles("ZYX")`.
+    For reading: scalar accessors (`pose.x/y/z`, `pose.qx/qy/qz/qw`,
+    `pose.roll/pitch/yaw`) and typed accessors (`pose.quaternion` →
+    `Quaterniond`, `pose.rotation_matrix` → `np.ndarray` copy) cover the
+    common cases. The inherited `pose.translation()`, `pose.rotation()`,
+    `pose.linear()`, `pose.matrix()` and `pose.inverse()` are also available.
 
     Example:
         p = Pose.from_xyz(0.5, 0, 0.3)
@@ -145,7 +147,7 @@ class Pose(Isometry3d):
             raise ValueError(f"Quaternion must have 4 elements, got {quat.shape}")
         return cls(
             Translation3d(float(pos[0]), float(pos[1]), float(pos[2])),
-            _safe_quaternion(float(quat[3]), float(quat[0]), float(quat[1]), float(quat[2])),
+            _safe_quaternion(float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])),
         )
 
     @overload
@@ -215,6 +217,85 @@ class Pose(Isometry3d):
             Quaterniond(R),
         )
 
+    # ----- Scalar accessors ---------------------------------------------
+    #
+    # Ergonomic float-returning shortcuts over the inherited Isometry3d API.
+    # Per Joelkang's PR #76 review: `pose.translation()[0]` is clunky; `pose.x`
+    # is the ergonomic spelling. These do NOT reintroduce the numpy facade
+    # @johnwason objected to — they're 1-line scalar extractors, no parallel
+    # state, no numpy roundtrip.
+
+    @property
+    def x(self) -> float:
+        """X translation component."""
+        return float(self.translation()[0])
+
+    @property
+    def y(self) -> float:
+        """Y translation component."""
+        return float(self.translation()[1])
+
+    @property
+    def z(self) -> float:
+        """Z translation component."""
+        return float(self.translation()[2])
+
+    @property
+    def qx(self) -> float:
+        """Quaternion x component (scalar-last [qx, qy, qz, qw] convention)."""
+        return float(Quaterniond(self.linear()).x)
+
+    @property
+    def qy(self) -> float:
+        """Quaternion y component."""
+        return float(Quaterniond(self.linear()).y)
+
+    @property
+    def qz(self) -> float:
+        """Quaternion z component."""
+        return float(Quaterniond(self.linear()).z)
+
+    @property
+    def qw(self) -> float:
+        """Quaternion w (scalar) component — last in the canonical order."""
+        return float(Quaterniond(self.linear()).w)
+
+    @property
+    def roll(self) -> float:
+        """Roll angle (X-axis rotation) from the ZYX Tait-Bryan decomposition."""
+        # eulerAngles("ZYX") returns (yaw, pitch, roll); roll is index 2.
+        return float(Quaterniond(self.linear()).eulerAngles("ZYX")[2])
+
+    @property
+    def pitch(self) -> float:
+        """Pitch angle (Y-axis rotation) from the ZYX Tait-Bryan decomposition."""
+        return float(Quaterniond(self.linear()).eulerAngles("ZYX")[1])
+
+    @property
+    def yaw(self) -> float:
+        """Yaw angle (Z-axis rotation) from the ZYX Tait-Bryan decomposition."""
+        return float(Quaterniond(self.linear()).eulerAngles("ZYX")[0])
+
+    @property
+    def rotation_matrix(self) -> np.ndarray:
+        """3x3 rotation matrix as an independent numpy copy.
+
+        Convenience over the inherited `linear()` for callers that want a
+        guaranteed-owned numpy array (e.g. to mutate locally without
+        aliasing the pose's state).
+        """
+        return np.asarray(self.linear()).copy()
+
+    @property
+    def quaternion(self) -> Quaterniond:
+        """Quaternion of the rotation component as a typed `Quaterniond`.
+
+        Returns the Eigen-bound type, not a numpy array — so `.x()`, `.y()`,
+        `.z()`, `.w()`, `.coeffs()`, `.toRotationMatrix()`, slerp, etc. are
+        all available without an extra wrapping step.
+        """
+        return Quaterniond(self.linear())
+
     # ----- Conversions / ops --------------------------------------------
 
     def __matmul__(self, other: Isometry3d) -> Pose:
@@ -257,7 +338,7 @@ def rotation_z(angle: float) -> Pose:
 
 def rotation_from_quaternion(qx: float, qy: float, qz: float, qw: float) -> Pose:
     """Pure rotation from scalar-last quaternion (qx, qy, qz, qw)."""
-    return Pose(Isometry3d(_safe_quaternion(qw, qx, qy, qz)))
+    return Pose(Isometry3d(_safe_quaternion(qx, qy, qz, qw)))
 
 
 def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
@@ -275,17 +356,20 @@ def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
 Transform = Pose
 
 
-def _safe_quaternion(qw: float, qx: float, qy: float, qz: float) -> Quaterniond:
-    """Build a normalised quaternion, rejecting zero-magnitude input.
+def _safe_quaternion(qx: float, qy: float, qz: float, qw: float) -> Quaterniond:
+    """Build a normalised quaternion from scalar-last (qx, qy, qz, qw).
 
     Eigen's `.normalized()` divides by `.norm()` unconditionally — for a
     zero quaternion that yields NaN, which then propagates silently into
     every subsequent computation. Guard at the source.
+
+    Project convention is scalar-last [qx, qy, qz, qw] (see CLAUDE.md).
+    Internally bridges to Eigen's scalar-first ctor via `from_xyzw`.
     """
-    norm = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+    norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
     if norm < _QUAT_MIN_NORM:
         raise ValueError(
             f"Quaternion magnitude too small for normalisation: "
-            f"|(w={qw}, x={qx}, y={qy}, z={qz})| = {norm}"
+            f"|(qx={qx}, qy={qy}, qz={qz}, qw={qw})| = {norm}"
         )
-    return Quaterniond(qw, qx, qy, qz).normalized()
+    return Quaterniond.from_xyzw(qx, qy, qz, qw).normalized()
