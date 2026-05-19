@@ -287,20 +287,27 @@ class Pose(Isometry3d):
         """Quaternion w (scalar) component — last in the canonical order."""
         return float(Quaterniond(self.linear()).w)
 
+    # ZYX Tait-Bryan decomposition has a singularity (gimbal lock) at
+    # |pitch| = π/2 — at that pose only (yaw ± roll) is well-defined; the
+    # individual angles become numerically unstable and depend on Eigen's
+    # tie-breaking. The pose itself is unaffected; this is purely a property
+    # of the (yaw, pitch, roll) decomposition. Avoid these properties on
+    # poses with near-vertical tool axes; use `pose.quaternion` instead.
+
     @property
     def roll(self) -> float:
-        """Roll angle (X-axis rotation) from the ZYX Tait-Bryan decomposition."""
+        """Roll angle (X rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
         # eulerAngles("ZYX") returns (yaw, pitch, roll); roll is index 2.
         return float(Quaterniond(self.linear()).eulerAngles("ZYX")[2])
 
     @property
     def pitch(self) -> float:
-        """Pitch angle (Y-axis rotation) from the ZYX Tait-Bryan decomposition."""
+        """Pitch angle (Y rotation) from ZYX Tait-Bryan decomposition. Singular at ±π/2 (see section comment)."""
         return float(Quaterniond(self.linear()).eulerAngles("ZYX")[1])
 
     @property
     def yaw(self) -> float:
-        """Yaw angle (Z-axis rotation) from the ZYX Tait-Bryan decomposition."""
+        """Yaw angle (Z rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
         return float(Quaterniond(self.linear()).eulerAngles("ZYX")[0])
 
     @property
@@ -325,11 +332,19 @@ class Pose(Isometry3d):
 
     # ----- Conversions / ops --------------------------------------------
 
-    def __matmul__(self, other: Isometry3d) -> Pose:
-        """Compose: `self @ other` applies `other` then `self`."""
+    def __matmul__(self, other: object) -> Pose:
+        """Compose: `self @ other` applies `other` then `self`.
+
+        Returns `NotImplemented` (not raises) for non-Isometry3d operands so
+        Python's binary-op protocol can try `other.__rmatmul__(self)` before
+        giving up with `TypeError`. Parameter is annotated `object` because
+        the dunder must accept anything at the language level — narrowing to
+        `Isometry3d` would mislead static analysis into treating the
+        `isinstance` check as dead code.
+        """
         if isinstance(other, Isometry3d):
             return Pose(self * other)
-        raise TypeError(f"Cannot multiply Pose with {type(other)}")
+        return NotImplemented
 
     def __repr__(self) -> str:
         t = self.translation()
