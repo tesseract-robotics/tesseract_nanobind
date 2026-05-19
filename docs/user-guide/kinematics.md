@@ -43,13 +43,17 @@ Compute a link's pose from joint values.
     # tip_link defaults to the last active link in the chain.
     tcp_pose = robot.fk("manipulator", joints)
 
-    print(f"Position:   {tcp_pose.position}")      # np.ndarray([x, y, z])
-    print(f"Quaternion: {tcp_pose.quaternion}")    # [qx, qy, qz, qw] scalar-last
+    print(f"Position:   ({tcp_pose.x}, {tcp_pose.y}, {tcp_pose.z})")
+    print(f"Quaternion: ({tcp_pose.qx}, {tcp_pose.qy}, {tcp_pose.qz}, {tcp_pose.qw})")
     ```
 
-    !!! info "Quaternion convention"
-        `Pose.quaternion` returns `[qx, qy, qz, qw]` (scalar-last). This
-        differs from C++ Eigen, which uses scalar-first `[qw, qx, qy, qz]`.
+    !!! info "Quaternion convention — scalar-last project-wide"
+        Project canonical quaternion order is `[qx, qy, qz, qw]` (scalar-last).
+        `Pose.qx/qy/qz/qw`, `Pose.quaternion`, `Quaterniond.from_xyzw`,
+        `q.coeffs()`, and every factory in `tesseract_common` follow this.
+
+        The Eigen-native `Quaterniond(w, x, y, z)` 4-double ctor exists for
+        interop but is the one exception — prefer `Quaterniond.from_xyzw`.
 
 === "Low-Level API"
 

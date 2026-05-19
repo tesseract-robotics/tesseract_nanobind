@@ -74,12 +74,11 @@ def run():
     joint_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     robot.set_joints(joint_pos, joint_names=joint_names)
 
-    # Create Cartesian waypoints (6D tool poses in world frame)
-    # Quaternion (x, y, z, w) = (0, 0, 1.0, 0) represents 180° rotation around Z-axis
-    # This points the tool down toward the work surface
-    # Note: Python uses (x,y,z,w) format; C++ Eigen uses (w,x,y,z)
-    wp1_pose = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 1.0, 0])  # First waypoint
-    wp2_pose = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 0, 1.0, 0])  # Second waypoint (Y+0.5m)
+    # Create Cartesian waypoints (6D tool poses in world frame). Project
+    # canonical quaternion order is scalar-last `[qx, qy, qz, qw]`.
+    # (0, 0, 1.0, 0) = 180° about Z (tool pointing down at the work surface).
+    wp1_pose = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 1.0, 0])
+    wp2_pose = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 0, 1.0, 0])
 
     # Build 4-phase motion program using fluent API:
     # Phase 1: Start from known joint state (defines initial configuration)

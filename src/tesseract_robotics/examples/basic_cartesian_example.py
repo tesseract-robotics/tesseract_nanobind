@@ -27,8 +27,9 @@ Motion Types:
     - move_to(StateTarget): Return to known joint configuration
 
 Quaternion Note:
-    Python uses (x, y, z, w) format; C++ Eigen::Quaterniond uses (w, x, y, z).
-    This example uses (0, 0, 1.0, 0) = 180 deg rotation around Z-axis (tool pointing down).
+    Project canonical: scalar-last `[qx, qy, qz, qw]`. This example uses
+    `(0, 0, 1.0, 0)` — a 180° rotation about Z (tool pointing down). When
+    porting the C++ example, reorder from Eigen's scalar-first ctor literal.
 
 C++ Source: tesseract_planning/tesseract_examples/src/basic_cartesian_example.cpp
 
@@ -103,11 +104,11 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     joint_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     robot.set_joints(joint_pos, joint_names=joint_names)
 
-    # Create Cartesian waypoints (6D poses)
-    # Quaternion (x=0, y=0, z=1.0, w=0) = 180 deg around Z = tool pointing down
-    # C++ uses Eigen::Quaterniond(w, x, y, z) = (0, 0, 1.0, 0)
-    wp1 = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 1.0, 0])  # First Cartesian waypoint
-    wp2 = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 0, 1.0, 0])  # Second waypoint (+0.5m in Y)
+    # Create Cartesian waypoints (6D poses). Project canonical quaternion
+    # order is scalar-last `[qx, qy, qz, qw]`. (0, 0, 1.0, 0) = 180° about
+    # Z = tool pointing down.
+    wp1 = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 1.0, 0])
+    wp2 = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 0, 1.0, 0])
 
     # Build 4-phase motion program:
     # 1. StateTarget: Start from known joint configuration

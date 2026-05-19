@@ -38,10 +38,11 @@ MotionProgram: Fluent builder that produces CompositeInstruction:
   - Automatically wraps all types in their Poly containers
   - set_joint_names() binds joint ordering for JointTarget
 
-Pose: Pythonic wrapper around Isometry3d:
-  - from_xyz()/from_xyz_quat() factory methods
+Pose: subclass of Isometry3d:
+  - from_xyz() / from_xyz_quat() / from_xyz_rpy() factory methods
   - @ operator for chaining transforms (rotation_z(1.57) @ translation(0.5, 0, 0))
-  - .translation() / Quaterniond(pose.linear()).coeffs() for numpy access
+  - Scalar accessors: pose.x / y / z / qx / qy / qz / qw / roll / pitch / yaw
+  - Typed accessors: pose.quaternion (Quaterniond), pose.rotation_matrix (ndarray)
 
 plan_freespace(): Convenience function that:
   - Creates TaskComposer from default config
@@ -158,8 +159,8 @@ def main():
     # - Inherited Isometry3d API: .translation() / .linear() for numpy access
     print("\n4. Pose helpers...")
 
-    # WHY from_xyz_quat: Quaternion order is scalar-last (x,y,z,w).
-    # Internally converts to Quaterniond(w,x,y,z) for Eigen.
+    # WHY from_xyz_quat: project canonical quaternion order is scalar-last
+    # `[qx, qy, qz, qw]`. The factory bridges to Eigen's internal layout.
     t1 = Pose.from_xyz_quat([0.5, 0, 0.8], [0, 0, 0.707, 0.707])
     print(f"   From position_quaternion: {t1}")
 

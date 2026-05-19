@@ -56,8 +56,10 @@ C++ Parameters (verified):
     - OFFSET = 0.005m (5mm clearance)
 
 Quaternion Note:
-    - C++ Eigen::Quaterniond(w, x, y, z) = (0, 0, 0.7071, 0.7071) for shelf
-    - Equivalent rotation matrix: [[-1,0,0], [0,0,1], [0,1,0]]
+    - Project canonical scalar-last: `[qx, qy, qz, qw] = (0, 0.7071, 0.7071, 0)`
+      for the shelf approach (equivalent to Eigen's `(w, x, y, z) = (0, 0,
+      0.7071, 0.7071)` literal in the C++ source).
+    - Equivalent rotation matrix: [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]
 
 Related Examples:
     - basic_cartesian_example.py - Simpler FREESPACE/LINEAR mixing

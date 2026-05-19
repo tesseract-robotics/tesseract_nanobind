@@ -43,24 +43,31 @@ combined = pose1 * pose2
 
 ### Quaterniond
 
-Eigen quaternion, **scalar-first** (`w, x, y, z`) — matches Eigen's C++
-convention.
+Eigen quaternion. **Project canonical order is scalar-last
+`[qx, qy, qz, qw]`** — use `Quaterniond.from_xyzw(qx, qy, qz, qw)` to build
+and access components via the `q.x`, `q.y`, `q.z`, `q.w` properties.
 
 ```python
 from tesseract_robotics.tesseract_common import Quaterniond
 
-q = Quaterniond(1.0, 0.0, 0.0, 0.0)  # identity: w, x, y, z
+q = Quaterniond.from_xyzw(0.0, 0.0, 0.0, 1.0)  # identity: scalar-last
 
-# Access
-print(f"w={q.w()}, x={q.x()}, y={q.y()}, z={q.z()}")
+# Component access — properties, not method calls.
+print(f"x={q.x}, y={q.y}, z={q.z}, w={q.w}")
+
+# Flat coefficient vector is also scalar-last (Eigen storage order).
+qx, qy, qz, qw = q.coeffs()
+
 rotation_matrix = q.toRotationMatrix()
 ```
 
-!!! warning "Quaternion conventions differ"
-    - `Quaterniond` (raw Eigen) is **scalar-first** (`w, x, y, z`).
-    - `planning.Pose.quaternion` is **scalar-last** (`qx, qy, qz, qw`).
+!!! warning "Eigen's 4-double ctor is scalar-first — avoid in Python"
+    `Quaterniond(w, x, y, z)` exists for direct Eigen interop but is the
+    one signature in the binding that breaks the project convention. Use
+    `Quaterniond.from_xyzw(qx, qy, qz, qw)` everywhere else.
 
-    Reorder components when crossing the boundary.
+    `q.coeffs()`, `q.vec()`, the `Quaterniond(Vector4d)` ctor, and `Pose`'s
+    quaternion-returning factories all use scalar-last `[qx, qy, qz, qw]`.
 
 ### AngleAxisd
 
