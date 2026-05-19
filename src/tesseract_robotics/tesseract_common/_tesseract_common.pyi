@@ -8,6 +8,8 @@ import numpy
 from numpy.typing import NDArray
 
 
+EIGEN_DEFAULT_PREC: float = 1e-12
+
 class Isometry3d:
     @overload
     def __init__(self) -> None: ...

@@ -21,14 +21,13 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
+from tesseract_robotics.tesseract_common import EIGEN_DEFAULT_PREC, Isometry3d, Quaterniond
 
-# Tolerance constants for the equality / isApprox tests below. Eigen's
-# default `isApprox` precision is `NumTraits<double>::dummy_precision()` =
-# 1e-12 for float64. The drift values are calibrated relative to that so
-# the assertions document a meaningful relationship rather than ad-hoc
-# numerology.
-EIGEN_DEFAULT_PREC = 1e-12  # Eigen's NumTraits<double>::dummy_precision
+# Tolerance constants for the equality / isApprox tests below. EIGEN_DEFAULT_PREC
+# is the project-wide anchor: Eigen's NumTraits<double>::dummy_precision()
+# = 1e-12, re-exported from the tesseract_common binding. Drift values are
+# calibrated relative to that so the assertions document a meaningful
+# relationship rather than ad-hoc numerology.
 DRIFT_ABOVE_DEFAULT_PREC = 100 * EIGEN_DEFAULT_PREC  # 1e-10 — defeats default isApprox
 LOOSE_TEST_PREC = 100 * DRIFT_ABOVE_DEFAULT_PREC  # 1e-8 — comfortably admits the drift
 
