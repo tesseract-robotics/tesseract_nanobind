@@ -140,7 +140,7 @@ def create_geometry_link(
     joint.parent_link_name = "base_link"
     joint.child_link_name = name
     joint.type = JointType.FIXED
-    joint.parent_to_joint_origin_transform = transform.to_isometry()
+    joint.parent_to_joint_origin_transform = transform
 
     return link, joint
 

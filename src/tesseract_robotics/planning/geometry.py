@@ -277,7 +277,7 @@ def create_obstacle(
     joint.parent_link_name = parent_link
     joint.child_link_name = name
     joint.type = JointType.FIXED
-    joint.parent_to_joint_origin_transform = transform.to_isometry()
+    joint.parent_to_joint_origin_transform = transform
 
     return robot.add_link(link, joint)
 
@@ -303,7 +303,7 @@ def create_link_with_geometry(
     Returns:
         Configured Link object
     """
-    isometry = origin.to_isometry() if origin else Isometry3d.Identity()
+    isometry = origin if origin else Isometry3d.Identity()
 
     link = Link(name)
     _add_visual_and_collision(link, geometry, isometry, name, color)
@@ -334,6 +334,6 @@ def create_fixed_joint(
     joint.type = JointType.FIXED
 
     if origin is not None:
-        joint.parent_to_joint_origin_transform = origin.to_isometry()
+        joint.parent_to_joint_origin_transform = origin
 
     return joint

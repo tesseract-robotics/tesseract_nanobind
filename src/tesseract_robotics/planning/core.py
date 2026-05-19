@@ -377,9 +377,6 @@ class Robot:
         """
         group = self.env.getKinematicGroup(group_name)
 
-        if isinstance(target_pose, Pose):
-            target_pose = target_pose.to_isometry()
-
         if seed is None:
             seed = self.get_state(list(group.getJointNames())).joint_positions
         else:
