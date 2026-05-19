@@ -402,6 +402,67 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_common
 )
 
+# Cross-module stub-generation dependencies.
+#
+# nanobind_add_stub runs the binding extension in isolation to introspect
+# types. Each binding's NB_MODULE body uses tesseract_nb::import_module_in_context()
+# to load sibling extension modules so their type casters are registered before
+# stubgen walks the type graph (otherwise it crashes with std::bad_cast).
+# That means every stub target must depend on every other binding module's
+# .so being built first — otherwise ninja may schedule stub generation
+# before the dependent .so exists (as happens in CI's clean builds).
+#
+# This single foreach replaces the alternative of per-call STUB_DEPS args
+# in the helper function, at the cost of an over-broad dependency graph
+# (a stub doesn't truly need every other module — but the cross-deps are
+# rerun deps, not link deps, so the cost is negligible).
+set(_tesseract_nb_modules
+  tesseract_common
+  tesseract_geometry
+  tesseract_scene_graph
+  tesseract_srdf
+  tesseract_urdf
+  tesseract_collision
+  tesseract_state_solver
+  tesseract_kinematics
+  tesseract_environment
+  tesseract_command_language
+  tesseract_serialization
+  tesseract_motion_planners
+  tesseract_motion_planners_simple
+  tesseract_motion_planners_ompl
+  tesseract_time_parameterization
+  tesseract_task_composer
+  tesseract_task_composer_planning
+)
+# Conditional modules
+foreach(_opt_mod IN ITEMS
+    tesseract_motion_planners_descartes
+    tesseract_motion_planners_trajopt
+    tesseract_motion_planners_trajopt_ifopt
+    trajopt_ifopt
+    trajopt_sqp)
+  if(TARGET ${_opt_mod})
+    list(APPEND _tesseract_nb_modules ${_opt_mod})
+  endif()
+endforeach()
+# ompl/base.cpp produces a target named `base` installed under ompl/
+if(TARGET base)
+  list(APPEND _tesseract_nb_modules base)
+endif()
+
+# Each stub target depends on every binding module being built.
+foreach(_mod IN LISTS _tesseract_nb_modules)
+  if(NOT TARGET ${_mod}_stub)
+    continue()
+  endif()
+  foreach(_dep IN LISTS _tesseract_nb_modules)
+    if(TARGET ${_dep} AND NOT _mod STREQUAL _dep)
+      add_dependencies(${_mod}_stub ${_dep})
+    endif()
+  endforeach()
+endforeach()
+
 message(STATUS "============= Build Configuration =============")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ Standard: C++${CMAKE_CXX_STANDARD}")
