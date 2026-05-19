@@ -188,8 +188,8 @@ def test_kinematic_group_single_ik_input():
 
     # Poses should be close (IK solution should reach target)
     np.testing.assert_allclose(
-        sol_pose.matrix()[:3, 3],
-        target_pose.matrix()[:3, 3],
+        sol_pose.matrix[:3, 3],
+        target_pose.matrix[:3, 3],
         atol=1e-3,
         err_msg="IK solution should reach target position",
     )

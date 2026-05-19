@@ -240,8 +240,8 @@ def main():
         manager.setCollisionObjectsTransform(scene_state.link_transforms)
 
         # Debug output: verify link poses are updating correctly
-        print(f"Link 6 Pose: {scene_state.link_transforms['link_6'].matrix()}")
-        print(f"Sphere Link Pose: {scene_state.link_transforms[sphere_link.getName()].matrix()}")
+        print(f"Link 6 Pose: {scene_state.link_transforms['link_6'].matrix}")
+        print(f"Sphere Link Pose: {scene_state.link_transforms[sphere_link.getName()].matrix}")
 
         # Execute collision query
         # ContactTestType_ALL: find all collision pairs (vs FIRST for early-out)

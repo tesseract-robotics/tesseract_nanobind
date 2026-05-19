@@ -187,8 +187,8 @@ def _emit_move(move: MoveInstructionPoly, profiles: dict[str, RapidProfile]) -> 
 
     if waypoint.isCartesianWaypoint():
         cart = WaypointPoly_as_CartesianWaypointPoly(waypoint)
-        # Isometry3d.matrix() is a method (not a property) — must call it.
-        target = RapidTarget(pose=Pose(cart.getTransform().matrix()))
+        # Isometry3d.matrix is a method (not a property) — must call it.
+        target = RapidTarget(pose=Pose(cart.getTransform().matrix))
         if move_type == MoveInstructionType.LINEAR:
             MoveL(target, profile)
         elif move_type == MoveInstructionType.FREESPACE:

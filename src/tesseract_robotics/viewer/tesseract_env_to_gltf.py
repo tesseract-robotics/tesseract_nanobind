@@ -117,9 +117,9 @@ def _find_child_joints(joint_map, parent_link_name):
 
 
 def _env_frame_to_node(eigen_tf, name=None):
-    p = eigen_tf.translation().flatten().tolist()
-    q0 = Quaterniond(eigen_tf.rotation())
-    q = [q0.x(), q0.y(), q0.z(), q0.w()]
+    p = eigen_tf.translation.flatten().tolist()
+    q0 = Quaterniond(eigen_tf.rotation)
+    q = [q0.x, q0.y, q0.z, q0.w]
     ret = {"rotation": q, "translation": p}
     if name is not None:
         ret["name"] = name
@@ -543,7 +543,7 @@ def _append_trajectory_animation(gltf_dict, gltf_buf_io, tesseract_trajectory):
             for j in range(len(trajectory2_i)):
                 a_ax = AngleAxisd(float(trajectory2_i[j]), joint_axisd)
                 qd = Quaterniond(a_ax)
-                sampler_np[j, :] = [qd.x(), qd.y(), qd.z(), qd.w()]
+                sampler_np[j, :] = [qd.x, qd.y, qd.z, qd.w]
             _, s_ind = _append_accessor(gltf_dict, gltf_buf_io, sampler_np)
 
             animation["samplers"].append(

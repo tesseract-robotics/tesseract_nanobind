@@ -17,7 +17,7 @@ single source of truth is the inherited Isometry3d state.
 
 On-demand getters returning numpy *are* allowed and desirable:
 `pose.rotation_matrix` (3×3 ndarray copy) and the inherited
-`pose.translation()` / `pose.linear()` / `pose.matrix()` all return
+`pose.translation` / `pose.linear` / `pose.matrix` all return
 numpy. They are reads from the canonical state, not a parallel store.
 
 Example:
@@ -65,10 +65,11 @@ class Pose(Isometry3d):
 
     `Pose` is a Python subclass of `Isometry3d`, not a wrapper — every
     `Pose` is also an `Isometry3d` (and `isinstance(p, Isometry3d)` is True).
-    C++ bindings that accept `Isometry3d` accept `Pose` directly, and every
-    `Isometry3d` method (`matrix()`, `translation()`, `rotation()`,
-    `linear()`, `inverse()`, `isApprox()`, the in-place mutators, the `*`
-    operator) is inherited.
+    C++ bindings that accept `Isometry3d` accept `Pose` directly. The
+    inherited surface: `matrix` / `translation` / `rotation` / `linear` are
+    **properties** (stored-data getters); `inverse()`, `isApprox()`, the
+    in-place mutators (`translate`, `rotate`, `pretranslate`, `prerotate`),
+    and the `*` operator are **methods**.
 
     Factory convention: **one name per logical operation; both arraylike-
     pair and by-component signatures accepted via `@overload` *only when
@@ -96,8 +97,8 @@ class Pose(Isometry3d):
     For reading: scalar accessors (`pose.x/y/z`, `pose.qx/qy/qz/qw`,
     `pose.roll/pitch/yaw`) and typed accessors (`pose.quaternion` →
     `Quaterniond`, `pose.rotation_matrix` → `np.ndarray` copy) cover the
-    common cases. The inherited `pose.translation()`, `pose.rotation()`,
-    `pose.linear()`, `pose.matrix()` and `pose.inverse()` are also available.
+    common cases. The inherited `pose.translation`, `pose.rotation`,
+    `pose.linear`, `pose.matrix` and `pose.inverse()` are also available.
 
     Equality and hashability:
 
@@ -262,13 +263,13 @@ class Pose(Isometry3d):
     # ----- Scalar accessors ---------------------------------------------
     #
     # Ergonomic float-returning shortcuts over the inherited Isometry3d API.
-    # Per Joelkang's PR #76 review: `pose.translation()[0]` is clunky; `pose.x`
+    # Per Joelkang's PR #76 review: `pose.translation[0]` is clunky; `pose.x`
     # is the ergonomic spelling. These do NOT reintroduce the numpy facade
     # @johnwason objected to — they're 1-line scalar extractors, no parallel
     # state, no numpy roundtrip.
     #
     # Perf note: each `qx/qy/qz/qw` access allocates a fresh `Quaterniond`
-    # from `self.linear()`; each `roll/pitch/yaw` access additionally runs
+    # from `self.linear`; each `roll/pitch/yaw` access additionally runs
     # an `eulerAngles("ZYX")` decomposition. Negligible in typical use
     # (logging, formatting, one-off reads). For multi-component reads in
     # a hot loop, do it once:
@@ -287,37 +288,37 @@ class Pose(Isometry3d):
     @property
     def x(self) -> float:
         """X translation component."""
-        return float(self.translation()[0])
+        return float(self.translation[0])
 
     @property
     def y(self) -> float:
         """Y translation component."""
-        return float(self.translation()[1])
+        return float(self.translation[1])
 
     @property
     def z(self) -> float:
         """Z translation component."""
-        return float(self.translation()[2])
+        return float(self.translation[2])
 
     @property
     def qx(self) -> float:
         """Quaternion x component (scalar-last [qx, qy, qz, qw] convention)."""
-        return float(Quaterniond(self.linear()).x)
+        return float(Quaterniond(self.linear).x)
 
     @property
     def qy(self) -> float:
         """Quaternion y component."""
-        return float(Quaterniond(self.linear()).y)
+        return float(Quaterniond(self.linear).y)
 
     @property
     def qz(self) -> float:
         """Quaternion z component."""
-        return float(Quaterniond(self.linear()).z)
+        return float(Quaterniond(self.linear).z)
 
     @property
     def qw(self) -> float:
         """Quaternion w (scalar) component — last in the canonical order."""
-        return float(Quaterniond(self.linear()).w)
+        return float(Quaterniond(self.linear).w)
 
     # ZYX Tait-Bryan decomposition has a singularity (gimbal lock) at
     # |pitch| = π/2 — at that pose only (yaw ± roll) is well-defined; the
@@ -330,17 +331,17 @@ class Pose(Isometry3d):
     def roll(self) -> float:
         """Roll angle (X rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
         # eulerAngles("ZYX") returns (yaw, pitch, roll); roll is index 2.
-        return float(Quaterniond(self.linear()).eulerAngles("ZYX")[2])
+        return float(Quaterniond(self.linear).eulerAngles("ZYX")[2])
 
     @property
     def pitch(self) -> float:
         """Pitch angle (Y rotation) from ZYX Tait-Bryan decomposition. Singular at ±π/2 (see section comment)."""
-        return float(Quaterniond(self.linear()).eulerAngles("ZYX")[1])
+        return float(Quaterniond(self.linear).eulerAngles("ZYX")[1])
 
     @property
     def yaw(self) -> float:
         """Yaw angle (Z rotation) from ZYX Tait-Bryan decomposition. Unstable near |pitch|=π/2 (see section comment)."""
-        return float(Quaterniond(self.linear()).eulerAngles("ZYX")[0])
+        return float(Quaterniond(self.linear).eulerAngles("ZYX")[0])
 
     @property
     def rotation_matrix(self) -> np.ndarray:
@@ -350,17 +351,17 @@ class Pose(Isometry3d):
         guaranteed-owned numpy array (e.g. to mutate locally without
         aliasing the pose's state).
         """
-        return np.asarray(self.linear()).copy()
+        return np.asarray(self.linear).copy()
 
     @property
     def quaternion(self) -> Quaterniond:
         """Quaternion of the rotation component as a typed `Quaterniond`.
 
-        Returns the Eigen-bound type, not a numpy array — so `.x()`, `.y()`,
-        `.z()`, `.w()`, `.coeffs()`, `.toRotationMatrix()`, slerp, etc. are
-        all available without an extra wrapping step.
+        Returns the Eigen-bound type, not a numpy array — so `.x`, `.y`,
+        `.z`, `.w` (properties), `.coeffs()`, `.toRotationMatrix()`, slerp,
+        etc. are all available without an extra wrapping step.
         """
-        return Quaterniond(self.linear())
+        return Quaterniond(self.linear)
 
     # ----- Conversions / ops --------------------------------------------
 
@@ -383,8 +384,8 @@ class Pose(Isometry3d):
         # precision used in Quaterniond / Isometry3d __repr__, so reprs are
         # consistent across the surface. Identity values render as `0` / `1`
         # rather than `0.000000` / `1.000000`, keeping common poses readable.
-        t = self.translation()
-        q = Quaterniond(self.linear()).coeffs()
+        t = self.translation
+        q = Quaterniond(self.linear).coeffs()
         return (
             f"Pose(position=[{t[0]:.6g}, {t[1]:.6g}, {t[2]:.6g}], "
             f"quaternion=[{q[0]:.6g}, {q[1]:.6g}, {q[2]:.6g}, {q[3]:.6g}])"

@@ -102,32 +102,32 @@ def test_isapprox_angleaxisd_translation3d():
 
 def test_isometry3d_canonical_ctor_vector_quat():
     iso = Isometry3d(np.array([1.0, 2.0, 3.0]), Quaterniond.Identity())
-    nptest.assert_allclose(iso.translation(), [1.0, 2.0, 3.0])
-    nptest.assert_allclose(iso.rotation(), np.eye(3))
+    nptest.assert_allclose(iso.translation, [1.0, 2.0, 3.0])
+    nptest.assert_allclose(iso.rotation, np.eye(3))
 
 
 def test_isometry3d_canonical_ctor_translation_quat():
     iso = Isometry3d(Translation3d(4.0, 5.0, 6.0), _ROT_90_X)
-    nptest.assert_allclose(iso.translation(), [4.0, 5.0, 6.0])
+    nptest.assert_allclose(iso.translation, [4.0, 5.0, 6.0])
     # 90° around X sends +Y to +Z.
-    nptest.assert_allclose(iso.linear() @ Y_AXIS, Z_AXIS, atol=DEFAULT_PREC)
+    nptest.assert_allclose(iso.linear @ Y_AXIS, Z_AXIS, atol=DEFAULT_PREC)
 
 
 def test_isometry3d_fluent_mutators():
     iso = Isometry3d.Identity().translate(X_AXIS).rotate(_ROT_90_Z)
     # `translate` runs before `rotate`, and rotation happens about the
     # already-translated origin, leaving the translation vector unchanged.
-    nptest.assert_allclose(iso.translation(), X_AXIS, atol=DEFAULT_PREC)
+    nptest.assert_allclose(iso.translation, X_AXIS, atol=DEFAULT_PREC)
 
 
 def test_isometry3d_pretranslate_vs_translate():
     """`translate` post-multiplies (local frame); `pretranslate` pre-multiplies (global)."""
     a = Isometry3d.Identity().rotate(_ROT_90_Z).translate(X_AXIS)
     # +X in the rotated local frame is +Y in the global frame.
-    nptest.assert_allclose(a.translation(), Y_AXIS, atol=DEFAULT_PREC)
+    nptest.assert_allclose(a.translation, Y_AXIS, atol=DEFAULT_PREC)
 
     b = Isometry3d.Identity().rotate(_ROT_90_Z).pretranslate(X_AXIS)
-    nptest.assert_allclose(b.translation(), X_AXIS, atol=DEFAULT_PREC)
+    nptest.assert_allclose(b.translation, X_AXIS, atol=DEFAULT_PREC)
 
 
 def test_isometry3d_rotate_overloads():
@@ -233,8 +233,8 @@ def test_isometry3d_copy_ctor_does_not_alias():
     original.translate(np.array([1.0, 0.0, 0.0]))
     copy = Isometry3d(original)
     original.translate(np.array([10.0, 0.0, 0.0]))
-    nptest.assert_allclose(copy.translation(), [1.0, 0.0, 0.0], atol=DEFAULT_PREC)
-    nptest.assert_allclose(original.translation(), [11.0, 0.0, 0.0], atol=DEFAULT_PREC)
+    nptest.assert_allclose(copy.translation, [1.0, 0.0, 0.0], atol=DEFAULT_PREC)
+    nptest.assert_allclose(original.translation, [11.0, 0.0, 0.0], atol=DEFAULT_PREC)
 
 
 def test_quaterniond_from_non_orthonormal_matrix_rejected():
@@ -507,7 +507,7 @@ def test_hyperplane_transform_preserves_membership():
         np.array([1.0, 2.0, 3.0]),
         Quaterniond(AngleAxisd(math.pi / 5, X_AXIS)),
     )
-    transformed_point = tf.matrix()[:3, :3] @ point_on + tf.translation()
+    transformed_point = tf.matrix[:3, :3] @ point_on + tf.translation
     plane.transform(tf)
     assert plane.signedDistance(transformed_point) == pytest.approx(0.0, abs=DEFAULT_PREC)
 

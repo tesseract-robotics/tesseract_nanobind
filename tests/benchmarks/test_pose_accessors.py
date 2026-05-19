@@ -18,7 +18,7 @@ Run with:
 Reference run (Apple M-series, Python 3.12, debug build), median ns:
 
     Path                                           Median   Relative
-    pose.translation() + [0]/[1]/[2]                 ~960   1.0× (baseline)
+    pose.translation + [0]/[1]/[2]                 ~960   1.0× (baseline)
     q = pose.quaternion; q.x/y/z/w                 ~1,334   1.4×
     pose.quaternion.eulerAngles("ZYX")             ~2,458   2.6×
     pose.x / pose.y / pose.z (3 property reads)    ~2,500   2.6×
@@ -64,11 +64,11 @@ def test_translation_via_x_y_z_properties(benchmark, sample_pose):
     benchmark(read)
 
 
-def test_translation_via_translation_method(benchmark, sample_pose):
-    """`pose.translation()[i]` — 1 binding call + 3 numpy indexes."""
+def test_translation_via_translation_property_with_index(benchmark, sample_pose):
+    """`pose.translation[i]` — 1 property read returning ndarray + 3 numpy indexes."""
 
     def read():
-        t = sample_pose.translation()
+        t = sample_pose.translation
         return t[0], t[1], t[2]
 
     benchmark(read)

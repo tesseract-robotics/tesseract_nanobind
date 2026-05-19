@@ -11,8 +11,8 @@ RAPID conventions used throughout:
     Joint angle: degrees, 2-decimal precision (`:.2f`) inside a jointtarget.
 
 Tesseract conventions assumed (per project CLAUDE.md):
-    `Pose.translation()` is in metres.
-    `Quaterniond(Pose.linear()).coeffs()` is scalar-last `[qx, qy, qz, qw]`.
+    `Pose.translation` is in metres.
+    `Quaterniond(Pose.linear).coeffs()` is scalar-last `[qx, qy, qz, qw]`.
 """
 
 from __future__ import annotations

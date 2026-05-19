@@ -78,7 +78,7 @@ def addCollisionObjects(checker):
         tfs = checker.getCollisionObjectGeometriesTransforms(co)
         for i in range(len(tfs)):
             cgt = tfs[i]
-            nptest.assert_almost_equal(cgt.matrix(), np.eye(4))
+            nptest.assert_almost_equal(cgt.matrix, np.eye(4))
 
 
 def run_test(checker):

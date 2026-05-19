@@ -316,15 +316,15 @@ def main():
 
         target_joints = np.array([5.5, 3.0, 0, 0, 0, 0, 0, 0])
         target_tf = manip.calcFwdKin(target_joints)["tool0"]
-        target_pos = target_tf.translation()
+        target_pos = target_tf.translation
 
         traj0 = results["trajectories"][0][: steps * n_joints].reshape(steps, n_joints)
         initial_tf = manip.calcFwdKin(traj0[-1])["tool0"]
-        initial_pos = initial_tf.translation()
+        initial_pos = initial_tf.translation
 
         traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
         final_tf = manip.calcFwdKin(traj_final[-1])["tool0"]
-        final_pos = final_tf.translation()
+        final_pos = final_tf.translation
 
         print(f"Target TCP:  {target_pos}")
         print(

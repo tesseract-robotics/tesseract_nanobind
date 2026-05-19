@@ -59,4 +59,4 @@ def test_manipulator_info():
     transform = tesseract_common.Isometry3d() * tesseract_common.Translation3d(1, 2, 3)
     info.tcp_offset = transform
     transform2 = info.tcp_offset
-    nptest.assert_allclose(transform2.matrix(), transform.matrix())
+    nptest.assert_allclose(transform2.matrix, transform.matrix)

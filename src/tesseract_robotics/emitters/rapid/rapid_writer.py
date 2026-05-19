@@ -176,8 +176,8 @@ class RapidTarget:
     @property
     def robtarget(self) -> str:
         """Serialize to a RAPID robtarget literal `[[mm xyz], [wxyz quat], [config], [ext]]`."""
-        t = self.pose.translation()
-        qx, qy, qz, qw = Quaterniond(self.pose.linear()).coeffs()
+        t = self.pose.translation
+        qx, qy, qz, qw = Quaterniond(self.pose.linear).coeffs()
         x_mm, y_mm, z_mm = t[0] * 1000.0, t[1] * 1000.0, t[2] * 1000.0
         pos = f"[{x_mm:.4f}, {y_mm:.4f}, {z_mm:.4f}]"
         rot = f"[{qw:.8f}, {qx:.8f}, {qy:.8f}, {qz:.8f}]"
@@ -430,8 +430,8 @@ class Robtarget(RapidCommand):
         target: RapidTarget,
         rapid_type: RapidType = RapidType.PERS,
     ) -> str:
-        t = target.pose.translation()
-        qx, qy, qz, qw = Quaterniond(target.pose.linear()).coeffs()
+        t = target.pose.translation
+        qx, qy, qz, qw = Quaterniond(target.pose.linear).coeffs()
         x_mm, y_mm, z_mm = t[0] * 1000.0, t[1] * 1000.0, t[2] * 1000.0
         decl = (
             f"{rapid_type} {varname} := "
