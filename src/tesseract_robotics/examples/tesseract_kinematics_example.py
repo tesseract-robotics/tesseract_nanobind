@@ -55,6 +55,7 @@ Related Examples
 import numpy as np
 
 from tesseract_robotics.planning import Pose, Robot
+from tesseract_robotics.tesseract_common import Quaterniond
 
 
 def main():
@@ -81,8 +82,10 @@ def main():
     tool0_pose = robot.fk("manipulator", joint_pos, tip_link="tool0")
 
     print(f"Tool0 transform at joint position {joint_pos}:")
-    print(f"Translation: {tool0_pose.position}")  # [x, y, z] in meters
-    print(f"Rotation (quat): {tool0_pose.quaternion}")  # [x, y, z, w] scalar-last
+    print(f"Translation: {tool0_pose.translation()}")  # [x, y, z] in meters
+    print(
+        f"Rotation (quat): {Quaterniond(tool0_pose.linear()).coeffs()}"
+    )  # [x, y, z, w] scalar-last
 
     # =========================================================================
     # STEP 3: Inverse Kinematics

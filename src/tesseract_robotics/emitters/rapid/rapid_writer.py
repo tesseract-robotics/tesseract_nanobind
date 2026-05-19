@@ -27,6 +27,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from tesseract_robotics.planning import Pose
+from tesseract_robotics.tesseract_common import Quaterniond
 
 from .utils import MotionType, RapidType, format_ext_axis, get_quat, get_rapid_bool
 
@@ -175,10 +176,10 @@ class RapidTarget:
     @property
     def robtarget(self) -> str:
         """Serialize to a RAPID robtarget literal `[[mm xyz], [wxyz quat], [config], [ext]]`."""
-        qx, qy, qz, qw = self.pose.quaternion
-        pos = (
-            f"[{self.pose.x * 1000.0:.4f}, {self.pose.y * 1000.0:.4f}, {self.pose.z * 1000.0:.4f}]"
-        )
+        t = self.pose.translation()
+        qx, qy, qz, qw = Quaterniond(self.pose.linear()).coeffs()
+        x_mm, y_mm, z_mm = t[0] * 1000.0, t[1] * 1000.0, t[2] * 1000.0
+        pos = f"[{x_mm:.4f}, {y_mm:.4f}, {z_mm:.4f}]"
         rot = f"[{qw:.8f}, {qx:.8f}, {qy:.8f}, {qz:.8f}]"
         return "[" + ",".join([pos, rot, str(self.config), str(self.external_axis)]) + "]"
 
@@ -429,10 +430,9 @@ class Robtarget(RapidCommand):
         target: RapidTarget,
         rapid_type: RapidType = RapidType.PERS,
     ) -> str:
-        qx, qy, qz, qw = target.pose.quaternion
-        x_mm = target.pose.x * 1000.0
-        y_mm = target.pose.y * 1000.0
-        z_mm = target.pose.z * 1000.0
+        t = target.pose.translation()
+        qx, qy, qz, qw = Quaterniond(target.pose.linear()).coeffs()
+        x_mm, y_mm, z_mm = t[0] * 1000.0, t[1] * 1000.0, t[2] * 1000.0
         decl = (
             f"{rapid_type} {varname} := "
             f"[ [{x_mm:.3f}, {y_mm:.3f}, {z_mm:.3f}],"
