@@ -114,6 +114,33 @@ class TestPose:
         assert "Pose" in repr_str
         assert "1.5" in repr_str or "1.50" in repr_str
 
+    def test_pose_equality_is_identity_based(self):
+        # Floating-point types should NOT have value-based __eq__ — drift
+        # would silently break it. The binding deliberately does not override
+        # __eq__, so structurally-identical poses constructed independently
+        # are `!=`. Class docstring documents this contract; this test pins
+        # it so future binding additions can't quietly change it.
+        a = Pose.from_xyz(1.0, 2.0, 3.0)
+        b = Pose.from_xyz(1.0, 2.0, 3.0)
+        assert a is not b
+        assert a != b
+        assert hash(a) != hash(b)
+        assert len({a, b}) == 2
+
+    def test_pose_isapprox_for_tolerance_equality(self):
+        # `isApprox` is the supported tolerance-based comparison. Default
+        # precision is tight (~1e-12); callers can loosen via `prec=`.
+        a = Pose.from_xyz(1.0, 2.0, 3.0)
+        b = Pose.from_xyz(1.0, 2.0, 3.0)
+        assert a.isApprox(b)
+
+        # 1e-10 drift defeats the default 1e-12 precision but matches a
+        # looser tolerance — both branches verified to lock the threshold
+        # semantics.
+        c = Pose.from_xyz(1.0 + 1e-10, 2.0, 3.0)
+        assert not a.isApprox(c)
+        assert a.isApprox(c, prec=1e-8)
+
     def test_rotation_from_quaternion(self):
         """Test rotation_from_quaternion factory function."""
         from tesseract_robotics.planning import rotation_from_quaternion

@@ -99,6 +99,16 @@ class Pose(Isometry3d):
     common cases. The inherited `pose.translation()`, `pose.rotation()`,
     `pose.linear()`, `pose.matrix()` and `pose.inverse()` are also available.
 
+    Equality: `==` and `hash` are **identity-based** (Python's default;
+    the binding deliberately does not override). Two structurally-identical
+    poses constructed independently are `!=`, hash to different values, and
+    occupy two slots in a `set`. This is the right design for floating-point
+    transforms — value-equality would silently collapse poses that differ
+    by sub-epsilon drift and would *fail* for poses that *should* be equal
+    but accumulated FP error. Use `pose.isApprox(other, prec=…)` for
+    tolerance-based comparison (default `prec ≈ 1e-12`, tighten or loosen
+    as the calling context requires).
+
     Example:
         p = Pose.from_xyz(0.5, 0, 0.3)
         p = Pose.from_xyz_quat([0.5, 0, 0.3], [0, 0, 0.707, 0.707])
