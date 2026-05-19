@@ -43,6 +43,7 @@ from tesseract_robotics.tesseract_command_language import (
 )
 from tesseract_robotics.tesseract_common import (
     Isometry3d,
+    JointState,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
@@ -102,6 +103,16 @@ class TestCartesianWaypoint:
         wp = CartesianWaypoint(transform)
         assert wp is not None
 
+    def test_set_get_seed(self):
+        wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.5, 0.0, 0.5))
+        names = ["j1", "j2", "j3"]
+        position = np.array([0.1, 0.2, 0.3])
+        wp.setSeed(JointState(names, position))
+
+        seed = wp.getSeed()
+        assert seed.joint_names == names
+        np.testing.assert_array_almost_equal(seed.position, position)
+
 
 class TestStateWaypoint:
     """Test StateWaypoint creation and methods."""
@@ -127,6 +138,22 @@ class TestWaypointPoly:
         poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
         assert poly is not None
         assert not poly.isNull()
+
+    def test_cartesian_waypoint_poly_seed(self):
+        names = ["j1", "j2", "j3"]
+        position = np.array([0.4, -0.2, 0.1])
+        wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(1.0, 0.0, 0.0))
+        wp.setSeed(JointState(names, position))
+
+        poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
+        assert poly.hasSeed()
+
+        seed = poly.getSeed()
+        assert seed.joint_names == names
+        np.testing.assert_array_almost_equal(seed.position, position)
+
+        poly.clearSeed()
+        assert not poly.hasSeed()
 
     def test_joint_waypoint_poly_wrap(self):
         names = ["j1", "j2"]

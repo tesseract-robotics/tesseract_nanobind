@@ -144,6 +144,7 @@ NB_MODULE(_tesseract_command_language, m) {
         })
         .def("setTransform", &tp::CartesianWaypointPoly::setTransform, "transform"_a)
         .def("hasSeed", &tp::CartesianWaypointPoly::hasSeed)
+        .def("getSeed", [](const tp::CartesianWaypointPoly& self) { return self.getSeed(); })
         .def("clearSeed", &tp::CartesianWaypointPoly::clearSeed)
         // Re-expose WaypointPoly methods
         .def("setName", &tp::CartesianWaypointPoly::setName, "name"_a)
