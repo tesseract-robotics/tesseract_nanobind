@@ -41,7 +41,7 @@ MotionProgram: Fluent builder that produces CompositeInstruction:
 Pose: Pythonic wrapper around Isometry3d:
   - from_xyz()/from_xyz_quat() factory methods
   - @ operator for chaining transforms (rotation_z(1.57) @ translation(0.5, 0, 0))
-  - .position/.quaternion properties for numpy access
+  - .translation() / Quaterniond(pose.linear()).coeffs() for numpy access
 
 plan_freespace(): Convenience function that:
   - Creates TaskComposer from default config
@@ -87,6 +87,7 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
+from tesseract_robotics.tesseract_common import Quaterniond
 
 
 def main():
@@ -144,7 +145,8 @@ def main():
 
     pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
     print(f"   FK at zeros: {pose}")
-    print(f"   Position: x={pose.x:.3f}, y={pose.y:.3f}, z={pose.z:.3f}")
+    pos = pose.translation()
+    print(f"   Position: x={float(pos[0]):.3f}, y={float(pos[1]):.3f}, z={float(pos[2]):.3f}")
 
     # =========================================================================
     # 4. Poses - Clean API
@@ -153,7 +155,7 @@ def main():
     # Quaterniond, and matrix multiplication. The Pose class provides:
     # - Factory methods that accept separate x,y,z,qx,qy,qz,qw args
     # - @ operator for composing transforms (maps to matrix multiplication)
-    # - .position/.quaternion properties returning numpy arrays
+    # - Inherited Isometry3d API: .translation() / .linear() for numpy access
     print("\n4. Pose helpers...")
 
     # WHY from_xyz_quat: Quaternion order is scalar-last (x,y,z,w).
@@ -167,8 +169,8 @@ def main():
     print(f"   From factories: {t2}")
 
     # WHY numpy properties: direct interop with numpy without manual extraction
-    print(f"   Position array: {t1.position}")
-    print(f"   Quaternion: {t1.quaternion}")
+    print(f"   Position array: {t1.translation()}")
+    print(f"   Quaternion: {Quaterniond(t1.linear()).coeffs()}")
 
     # =========================================================================
     # 5. Add Obstacles

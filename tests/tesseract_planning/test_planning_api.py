@@ -21,6 +21,7 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
+from tesseract_robotics.tesseract_common import Quaterniond
 
 
 class TestPose:
@@ -28,36 +29,38 @@ class TestPose:
 
     def test_identity(self):
         t = Pose.identity()
-        np.testing.assert_array_almost_equal(t.position, [0, 0, 0])
-        np.testing.assert_array_almost_equal(t.quaternion, [0, 0, 0, 1])
+        np.testing.assert_array_almost_equal(t.translation(), [0, 0, 0])
+        np.testing.assert_array_almost_equal(Quaterniond(t.linear()).coeffs(), [0, 0, 0, 1])
 
     def test_from_xyz(self):
         t = Pose.from_xyz(1, 2, 3)
-        assert t.x == 1
-        assert t.y == 2
-        assert t.z == 3
-        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
+        assert t.translation()[0] == 1
+        assert t.translation()[1] == 2
+        assert t.translation()[2] == 3
+        np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
 
     def test_from_position(self):
         t = Pose.from_position([1.5, 2.5, 3.5])
-        np.testing.assert_array_almost_equal(t.position, [1.5, 2.5, 3.5])
+        np.testing.assert_array_almost_equal(t.translation(), [1.5, 2.5, 3.5])
 
     def test_from_xyz_quat(self):
         # 90 degree rotation around Z
         t = Pose.from_xyz_quat(1, 2, 3, 0, 0, 0.707, 0.707)
-        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
-        np.testing.assert_array_almost_equal(t.quaternion, [0, 0, 0.707, 0.707], decimal=3)
+        np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
+        np.testing.assert_array_almost_equal(
+            Quaterniond(t.linear()).coeffs(), [0, 0, 0.707, 0.707], decimal=3
+        )
 
     def test_from_xyz_rpy(self):
         # 90 degrees around Z
         t = Pose.from_xyz_rpy(1, 2, 3, 0, 0, np.pi / 2)
-        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
-        roll, pitch, yaw = t.rpy
-        np.testing.assert_almost_equal(yaw, np.pi / 2, decimal=5)
+        np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
+        _yaw, _pitch, _roll = Quaterniond(t.linear()).eulerAngles("ZYX")
+        np.testing.assert_almost_equal(float(_yaw), np.pi / 2, decimal=5)
 
     def test_translation_helper(self):
         t = translation(1, 2, 3)
-        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
+        np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
 
     @pytest.mark.parametrize(
         "rotation_func,input_vec,expected",
@@ -71,20 +74,20 @@ class TestPose:
     def test_rotation_90deg(self, rotation_func, input_vec, expected):
         """Test 90-degree rotation around each axis."""
         t = rotation_func(np.pi / 2)
-        rotated = t.rotation_matrix @ np.array(input_vec)
+        rotated = t.rotation() @ np.array(input_vec)
         np.testing.assert_array_almost_equal(rotated, expected, decimal=5)
 
     def test_pose_chaining(self):
         t1 = translation(1, 0, 0)
         t2 = translation(0, 2, 0)
         combined = t1 @ t2
-        np.testing.assert_array_almost_equal(combined.position, [1, 2, 0])
+        np.testing.assert_array_almost_equal(combined.translation(), [1, 2, 0])
 
     def test_pose_inverse(self):
         t = Pose.from_xyz(1, 2, 3)
         inv = t.inverse()
         combined = t @ inv
-        np.testing.assert_array_almost_equal(combined.position, [0, 0, 0], decimal=5)
+        np.testing.assert_array_almost_equal(combined.translation(), [0, 0, 0], decimal=5)
 
     def test_to_isometry(self):
         t = Pose.from_xyz(1, 2, 3)
@@ -92,7 +95,7 @@ class TestPose:
         assert iso is not None
         # Round-trip
         t2 = Pose.from_isometry(iso)
-        np.testing.assert_array_almost_equal(t.position, t2.position)
+        np.testing.assert_array_almost_equal(t.translation(), t2.translation())
 
     def test_pose_repr(self):
         """Test Pose string representation."""
@@ -110,7 +113,7 @@ class TestPose:
         assert t is not None
         # Should rotate X to Y
         x_vec = np.array([1, 0, 0])
-        rotated = t.rotation_matrix @ x_vec
+        rotated = t.rotation() @ x_vec
         np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=2)
 
     def test_rotation_from_axis_angle(self):
@@ -122,7 +125,7 @@ class TestPose:
         assert t is not None
         # Should rotate X to Y
         x_vec = np.array([1, 0, 0])
-        rotated = t.rotation_matrix @ x_vec
+        rotated = t.rotation() @ x_vec
         np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=5)
 
     def test_from_position_quaternion(self):
@@ -130,8 +133,8 @@ class TestPose:
         pos = [1, 2, 3]
         quat = [0, 0, 0.707, 0.707]  # 90 deg around Z
         t = Pose.from_position_quaternion(pos, quat)
-        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
-        np.testing.assert_array_almost_equal(t.quaternion, quat, decimal=2)
+        np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
+        np.testing.assert_array_almost_equal(Quaterniond(t.linear()).coeffs(), quat, decimal=2)
 
     def test_from_matrix(self):
         """Test Pose.from_matrix factory method for 4x4 matrix."""
@@ -141,7 +144,7 @@ class TestPose:
         mat[1, 3] = 2.5  # Translation y
         mat[2, 3] = 3.5  # Translation z
         t = Pose.from_matrix(mat)
-        np.testing.assert_array_almost_equal(t.position, [1.5, 2.5, 3.5])
+        np.testing.assert_array_almost_equal(t.translation(), [1.5, 2.5, 3.5])
 
     def test_from_matrix_position(self):
         """Test Pose.from_matrix_position factory method."""
@@ -149,9 +152,9 @@ class TestPose:
         rot_mat = np.eye(3)
         pos = [1, 2, 3]
         t = Pose.from_matrix_position(rot_mat, pos)
-        np.testing.assert_array_almost_equal(t.position, [1, 2, 3])
+        np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
         # Check rotation is identity
-        np.testing.assert_array_almost_equal(t.rotation_matrix, np.eye(3))
+        np.testing.assert_array_almost_equal(t.rotation(), np.eye(3))
 
 
 class TestRobot:
@@ -227,8 +230,8 @@ class TestRobot:
         pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
         assert isinstance(pose, Pose)
         # ABB IRB2400 tool0 at zeros should be around x=0.94, z=1.455
-        assert pose.x > 0.9
-        assert pose.z > 1.4
+        assert pose.translation()[0] > 0.9
+        assert pose.translation()[2] > 1.4
 
     def test_get_manipulator_info(self, robot):
         info = robot.get_manipulator_info("manipulator")
@@ -287,7 +290,9 @@ class TestRobot:
 
         # Verify FK of result matches target
         result_pose = robot.fk("manipulator", result)
-        np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
+        np.testing.assert_array_almost_equal(
+            result_pose.translation(), target_pose.translation(), decimal=4
+        )
 
     def test_ik_with_seed(self, robot):
         """Test IK with different seed configurations."""
@@ -302,7 +307,9 @@ class TestRobot:
 
         # Result should produce same end-effector pose
         result_pose = robot.fk("manipulator", result)
-        np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
+        np.testing.assert_array_almost_equal(
+            result_pose.translation(), target_pose.translation(), decimal=4
+        )
 
     def test_ik_unreachable_pose(self, robot):
         """Test IK returns None for unreachable poses."""
@@ -331,7 +338,9 @@ class TestRobot:
 
         # Verify solution is valid
         result_pose = robot.fk("manipulator", result)
-        np.testing.assert_array_almost_equal(result_pose.position, target_pose.position, decimal=4)
+        np.testing.assert_array_almost_equal(
+            result_pose.translation(), target_pose.translation(), decimal=4
+        )
 
     def test_ik_all_solutions(self, robot):
         """Test IK returns multiple solutions for OPW solver (ABB IRB2400)."""
@@ -351,7 +360,7 @@ class TestRobot:
         for sol in solutions:
             result_pose = robot.fk("manipulator", sol)
             np.testing.assert_array_almost_equal(
-                result_pose.position, target_pose.position, decimal=3
+                result_pose.translation(), target_pose.translation(), decimal=3
             )
 
 
@@ -434,22 +443,22 @@ class TestTargets:
     def test_cartesian_target_from_pose(self):
         pose = Pose.from_xyz(1, 2, 3)
         target = CartesianTarget(pose)
-        assert target.pose.x == 1
-        assert target.pose.y == 2
-        assert target.pose.z == 3
+        assert target.pose.translation()[0] == 1
+        assert target.pose.translation()[1] == 2
+        assert target.pose.translation()[2] == 3
 
     def test_cartesian_target_from_position(self):
         target = CartesianTarget(position=[1, 2, 3])
-        assert target.pose.x == 1
-        assert target.pose.y == 2
-        assert target.pose.z == 3
+        assert target.pose.translation()[0] == 1
+        assert target.pose.translation()[1] == 2
+        assert target.pose.translation()[2] == 3
 
     def test_cartesian_target_from_position_quaternion(self):
         target = CartesianTarget(
             position=[1, 2, 3],
             quaternion=[0, 0, 0.707, 0.707],
         )
-        np.testing.assert_array_almost_equal(target.pose.position, [1, 2, 3])
+        np.testing.assert_array_almost_equal(target.pose.translation(), [1, 2, 3])
 
     def test_state_target(self):
         target = StateTarget(
@@ -995,7 +1004,10 @@ class TestTaskComposer:
         start_pose = robot.fk("manipulator", start_joints)
 
         # Create Cartesian motion (freespace to Cartesian target)
-        end_pose = Pose.from_xyz(start_pose.x, start_pose.y + 0.1, start_pose.z)
+        start_pos = start_pose.translation()
+        end_pose = Pose.from_xyz(
+            float(start_pos[0]), float(start_pos[1]) + 0.1, float(start_pos[2])
+        )
 
         program = (
             MotionProgram("manipulator", tcp_frame="tool0")
