@@ -23,6 +23,15 @@ from tesseract_robotics.planning import (
 )
 from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
 
+# Tolerance constants for the equality / isApprox tests below. Eigen's
+# default `isApprox` precision is `NumTraits<double>::dummy_precision()` =
+# 1e-12 for float64. The drift values are calibrated relative to that so
+# the assertions document a meaningful relationship rather than ad-hoc
+# numerology.
+EIGEN_DEFAULT_PREC = 1e-12  # Eigen's NumTraits<double>::dummy_precision
+DRIFT_ABOVE_DEFAULT_PREC = 100 * EIGEN_DEFAULT_PREC  # 1e-10 — defeats default isApprox
+LOOSE_TEST_PREC = 100 * DRIFT_ABOVE_DEFAULT_PREC  # 1e-8 — comfortably admits the drift
+
 
 class TestPose:
     """Test Pose class and helpers."""
@@ -145,12 +154,12 @@ class TestPose:
         b = Pose.from_xyz(1.0, 2.0, 3.0)
         assert a.isApprox(b)
 
-        # 1e-10 drift defeats the default 1e-12 precision but matches a
-        # looser tolerance — both branches verified to lock the threshold
-        # semantics.
-        c = Pose.from_xyz(1.0 + 1e-10, 2.0, 3.0)
+        # Drift larger than the default isApprox precision defeats it but
+        # is admitted by a looser explicit `prec=`. Both branches verify
+        # the threshold semantics.
+        c = Pose.from_xyz(1.0 + DRIFT_ABOVE_DEFAULT_PREC, 2.0, 3.0)
         assert not a.isApprox(c)
-        assert a.isApprox(c, prec=1e-8)
+        assert a.isApprox(c, prec=LOOSE_TEST_PREC)
 
     def test_rotation_from_quaternion(self):
         """Test rotation_from_quaternion factory function."""
