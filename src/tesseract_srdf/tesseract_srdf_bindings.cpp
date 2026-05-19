@@ -27,7 +27,37 @@ NB_MODULE(_tesseract_srdf, m) {
         .def_rw("joint_groups", &ts::KinematicsInformation::joint_groups)
         .def_rw("link_groups", &ts::KinematicsInformation::link_groups)
         .def_rw("group_states", &ts::KinematicsInformation::group_states)
-        .def_rw("group_tcps", &ts::KinematicsInformation::group_tcps)
+        // group_tcps: the C++ field is nested unordered_map keyed on string with
+        // Eigen::aligned_allocator on the inner map (Isometry3d alignment). nanobind's
+        // default stl/unordered_map caster does not pattern-match against that allocator
+        // template arg, so a raw def_rw exposes a Python attribute whose getter raises
+        // TypeError on access. The fix is a def_prop_rw that copies through to a
+        // default-allocator nested map at the binding boundary; values (Isometry3d) round-trip
+        // via their existing nanobind class binding.
+        .def_prop_rw(
+            "group_tcps",
+            [](const ts::KinematicsInformation& self) {
+                std::unordered_map<std::string,
+                                   std::unordered_map<std::string, Eigen::Isometry3d>> out;
+                for (const auto& [group_name, tcps] : self.group_tcps) {
+                    std::unordered_map<std::string, Eigen::Isometry3d> inner;
+                    for (const auto& [tcp_name, tcp] : tcps) {
+                        inner.emplace(tcp_name, tcp);
+                    }
+                    out.emplace(group_name, std::move(inner));
+                }
+                return out;
+            },
+            [](ts::KinematicsInformation& self,
+               const std::unordered_map<std::string,
+                                        std::unordered_map<std::string, Eigen::Isometry3d>>& value) {
+                self.group_tcps.clear();
+                for (const auto& [group_name, tcps] : value) {
+                    for (const auto& [tcp_name, tcp] : tcps) {
+                        self.group_tcps[group_name][tcp_name] = tcp;
+                    }
+                }
+            })
         .def("insert", &ts::KinematicsInformation::insert, "other"_a)
         .def("clear", &ts::KinematicsInformation::clear)
         .def("hasGroup", &ts::KinematicsInformation::hasGroup, "group_name"_a)
