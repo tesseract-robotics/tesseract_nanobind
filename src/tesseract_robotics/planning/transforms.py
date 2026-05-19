@@ -148,8 +148,17 @@ class Pose(Isometry3d):
     # pyright wants the impl signature to enumerate named params from every
     # overload (would be 7 params with 5 defaults, narrowed on len(args)
     # anyway). The dispatch in the body is correct; the wart is purely
-    # structural. Tried `*args: Any` — pyright still complains; the check is
-    # structural not type-based.
+    # structural. Two paths tried and rejected:
+    #   1. `*args: Any` — pyright still complains; the check is structural,
+    #      not type-based.
+    #   2. Verbose impl signature `(position_or_x: ArrayLike | float, ...)`
+    #      with 5 optional params, dispatching on `if z is None`, plus two
+    #      private `_from_xyz_quat_pair` / `_from_xyz_quat_scalars` helpers.
+    #      DOES drop the ignore cleanly (verified) but the impl signature
+    #      becomes a misleading union obscuring both overload shapes — a
+    #      reader scrolls past 30 lines of plumbing to find the dispatch.
+    #      Readability cost > diagnostic-noise cost. Kept the one-line
+    #      ignore as the principled trade-off.
     @classmethod
     def from_xyz_quat(cls, *args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
         """Pose from position `[x, y, z]` and scalar-last quaternion `[qx, qy, qz, qw]`.
