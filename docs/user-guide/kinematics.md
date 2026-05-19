@@ -64,19 +64,22 @@ Compute a link's pose from joint values.
 
 ### Pose vs Isometry3d
 
-`Pose` is the Python-side wrapper around a 4x4 matrix (see `planning/transforms.py`). `Isometry3d` is the low-level C++/Eigen type.
+`Pose` is a subclass of `Isometry3d` (see `planning/transforms.py`). Every `Pose` IS an `Isometry3d`, so any C++ binding that accepts `Isometry3d` accepts `Pose` directly — no conversion step.
 
 ```python
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.tesseract_common import Isometry3d
 import numpy as np
 
-# Pose -> Isometry3d
 pose = Pose.from_xyz_rpy(0.5, 0.0, 0.3, 0, 0, np.pi / 4)
-iso = pose.to_isometry()
+assert isinstance(pose, Isometry3d)   # subclass relationship
 
-# Isometry3d -> Pose
-pose2 = Pose.from_isometry(iso)
+# Need a plain Isometry3d? Pass the Pose through the Isometry3d ctor.
+iso = Isometry3d(pose)
+
+# Wrap an existing Isometry3d as a Pose (gains the ergonomic factories +
+# @-operator composition).
+pose2 = Pose(iso)
 
 # Composition (Pose uses Python's @ operator)
 combined = pose @ pose2
@@ -116,11 +119,11 @@ Find joint values that achieve a target pose.
     ```python
     from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
 
-    target_iso = target.to_isometry()
+    # Pose subclasses Isometry3d, so KinGroupIKInput accepts it directly.
     working_frame = manip.getBaseLinkName()
     tip_link = list(manip.getActiveLinkNames())[-1]
 
-    ik_input = KinGroupIKInput(target_iso, working_frame, tip_link)
+    ik_input = KinGroupIKInput(target, working_frame, tip_link)
     seed = np.zeros(6)
     solutions = manip.calcInvKin(ik_input, seed)  # list[np.ndarray]
     ```

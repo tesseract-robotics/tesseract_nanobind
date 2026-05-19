@@ -198,15 +198,6 @@ class Pose(Isometry3d):
 
     # ----- Conversions / ops --------------------------------------------
 
-    def to_isometry(self) -> Isometry3d:
-        """Return a plain `Isometry3d` copy (strips the `Pose` subclass).
-
-        Legacy — `Pose` IS-A `Isometry3d`, so C++ bindings no longer need this
-        conversion. Use only when you specifically want an `Isometry3d` and
-        not a `Pose` subclass.
-        """
-        return Isometry3d(self)
-
     def __matmul__(self, other: Isometry3d) -> Pose:
         """Compose: `self @ other` applies `other` then `self`."""
         if isinstance(other, Isometry3d):

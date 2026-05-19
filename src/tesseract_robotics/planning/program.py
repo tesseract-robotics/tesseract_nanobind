@@ -113,7 +113,7 @@ class CartesianTarget:
 
     def to_waypoint(self) -> CartesianWaypoint:
         """Convert to low-level CartesianWaypoint."""
-        return CartesianWaypoint(self.pose.to_isometry())
+        return CartesianWaypoint(self.pose)
 
     def _get_move_type(self) -> MoveInstructionType:
         """Get low-level move instruction type."""

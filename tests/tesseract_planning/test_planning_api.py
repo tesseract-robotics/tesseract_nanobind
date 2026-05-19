@@ -21,11 +21,29 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
-from tesseract_robotics.tesseract_common import Quaterniond
+from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
 
 
 class TestPose:
     """Test Pose class and helpers."""
+
+    def test_pose_accepted_where_isometry_required(self):
+        # Regression guard for the to_isometry() removal: every C++ binding
+        # that takes Isometry3d must accept Pose directly via subclass
+        # inheritance. If this ever fails, the binding has started doing
+        # strict type checks and we silently corrupt geometry downstream.
+        from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+
+        pose = Pose.from_xyz_rpy(0.1, 0.2, 0.3, 0.0, 0.0, 1.0)
+        assert isinstance(pose, Isometry3d)
+
+        j = Joint("test_joint")
+        j.type = JointType.FIXED
+        j.parent_to_joint_origin_transform = pose
+
+        out = j.parent_to_joint_origin_transform
+        np.testing.assert_array_almost_equal(out.translation(), pose.translation())
+        np.testing.assert_array_almost_equal(out.linear(), pose.linear())
 
     def test_default_ctor(self):
         t = Pose()
@@ -88,14 +106,6 @@ class TestPose:
         inv = t.inverse()
         combined = t @ inv
         np.testing.assert_array_almost_equal(combined.translation(), [0, 0, 0], decimal=5)
-
-    def test_to_isometry(self):
-        t = Pose.from_xyz(1, 2, 3)
-        iso = t.to_isometry()
-        assert iso is not None
-        # Round-trip via inherited Isometry3d ctor
-        t2 = Pose(iso)
-        np.testing.assert_array_almost_equal(t.translation(), t2.translation())
 
     def test_pose_repr(self):
         """Test Pose string representation."""
