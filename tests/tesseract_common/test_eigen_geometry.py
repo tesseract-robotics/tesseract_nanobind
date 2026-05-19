@@ -235,6 +235,123 @@ def test_quaterniond_from_rpy_array_overload_rejects_wrong_length():
         Quaterniond.from_rpy(np.array([0.3, -0.6, 1.2, 0.0]))
 
 
+def test_quaterniond_to_rpy_identity():
+    """Identity quaternion → all zero RPY."""
+    rpy = Quaterniond.Identity().to_rpy()
+    nptest.assert_allclose(rpy, [0.0, 0.0, 0.0], atol=DEFAULT_PREC)
+
+
+def test_quaterniond_to_rpy_returns_roll_pitch_yaw_order():
+    """to_rpy returns axis order R, P, Y — NOT eulerAngles('ZYX') which is Y, P, R.
+
+    Distinguishing test: roll, pitch, yaw must all be different magnitudes so
+    a swap would be detected.
+    """
+    roll, pitch, yaw = 0.3, -0.4, 0.7
+    q = Quaterniond.from_rpy(roll, pitch, yaw)
+    rpy = q.to_rpy()
+    assert rpy[0] == pytest.approx(roll, abs=DEFAULT_PREC)
+    assert rpy[1] == pytest.approx(pitch, abs=DEFAULT_PREC)
+    assert rpy[2] == pytest.approx(yaw, abs=DEFAULT_PREC)
+
+
+def test_quaterniond_to_rpy_canonical_ranges():
+    """to_rpy returns canonical ROS/tf2 ranges: pitch ∈ [-π/2, π/2], roll/yaw ∈ [-π, π]."""
+    rng = np.random.default_rng(seed=0x7042)
+    for _ in range(50):
+        u1, u2, u3 = rng.uniform(0.0, 1.0, size=3)
+        w = math.sqrt(u1) * math.cos(2 * math.pi * u3)
+        x = math.sqrt(1 - u1) * math.sin(2 * math.pi * u2)
+        y = math.sqrt(1 - u1) * math.cos(2 * math.pi * u2)
+        z = math.sqrt(u1) * math.sin(2 * math.pi * u3)
+        roll, pitch, yaw = Quaterniond.from_xyzw(x, y, z, w).to_rpy()
+        assert -math.pi <= roll <= math.pi, f"roll={roll} outside [-π, π]"
+        assert -math.pi / 2 <= pitch <= math.pi / 2, f"pitch={pitch} outside [-π/2, π/2]"
+        assert -math.pi <= yaw <= math.pi, f"yaw={yaw} outside [-π, π]"
+
+
+def test_quaterniond_to_rpy_gimbal_lock_yaw_zero_convention():
+    """At pitch = ±π/2 (gimbal lock), tf2 convention assigns yaw = 0.
+
+    Tolerance is `ANGULAR_PREC` (1e-6), not `DEFAULT_PREC` (1e-12), because
+    `asin` near ±1 is ill-conditioned: input rounding of ε ~ 1e-16 amplifies
+    to output error ~ √(2ε) ~ 1.4e-8. This is a fundamental property of the
+    parametrization, not a bug — the rotation itself is bit-exact.
+    """
+    q_up = Quaterniond.from_rpy(0.3, math.pi / 2, 0.0)
+    rpy_up = q_up.to_rpy()
+    assert rpy_up[1] == pytest.approx(math.pi / 2, abs=ANGULAR_PREC)
+    assert rpy_up[2] == pytest.approx(0.0, abs=ANGULAR_PREC)
+
+    q_down = Quaterniond.from_rpy(0.3, -math.pi / 2, 0.0)
+    rpy_down = q_down.to_rpy()
+    assert rpy_down[1] == pytest.approx(-math.pi / 2, abs=ANGULAR_PREC)
+    assert rpy_down[2] == pytest.approx(0.0, abs=ANGULAR_PREC)
+
+
+# RPY-roundtrip cases that stay clear of gimbal lock (|pitch| ≈ π/2): in
+# this regime, the (roll, pitch, yaw) decomposition is unique, so we can
+# assert both that the *values* survive the trip AND that the *rotation*
+# survives. Gimbal-lock cases are tested separately with the weaker (but
+# still required) angular-distance check.
+_RPY_ROUNDTRIP_CASES = [
+    pytest.param(0.0, 0.0, 0.0, id="identity"),
+    pytest.param(0.5, -0.3, 1.1, id="mid_range_mixed_signs"),
+    pytest.param(math.pi / 6, math.pi / 4, math.pi / 3, id="small_positive"),
+    pytest.param(-math.pi / 4, -math.pi / 6, -math.pi / 3, id="small_negative"),
+    pytest.param(2.5, 0.4, -1.8, id="large_roll_negative_yaw"),
+    pytest.param(math.pi - 0.1, 0.0, 0.0, id="near_pi_roll"),
+    pytest.param(0.1, 0.5, math.pi - 0.05, id="near_pi_yaw"),
+    pytest.param(-2.8, -0.2, 2.7, id="large_negative_roll_positive_yaw"),
+]
+
+
+@pytest.mark.parametrize("roll, pitch, yaw", _RPY_ROUNDTRIP_CASES)
+def test_quaterniond_rpy_roundtrip_values(roll, pitch, yaw):
+    """from_rpy(r,p,y).to_rpy() returns (r,p,y) exactly (outside gimbal lock)."""
+    rpy = Quaterniond.from_rpy(roll, pitch, yaw).to_rpy()
+    assert rpy[0] == pytest.approx(roll, abs=DEFAULT_PREC)
+    assert rpy[1] == pytest.approx(pitch, abs=DEFAULT_PREC)
+    assert rpy[2] == pytest.approx(yaw, abs=DEFAULT_PREC)
+
+
+@pytest.mark.parametrize("roll, pitch, yaw", _RPY_ROUNDTRIP_CASES)
+def test_quaterniond_rpy_roundtrip_rotation_preserved(roll, pitch, yaw):
+    """from_rpy(*q.to_rpy()) reproduces q's rotation (angular distance)."""
+    original = Quaterniond.from_rpy(roll, pitch, yaw)
+    roundtrip = Quaterniond.from_rpy(*original.to_rpy())
+    assert original.angularDistance(roundtrip) < ANGULAR_PREC
+
+
+def test_quaterniond_rpy_roundtrip_random_unit_quaternions():
+    """100 random unit quaternions: to_rpy → from_rpy preserves the rotation.
+
+    Covers the *entire* rotation space, including gimbal-lock-adjacent regions.
+    Even where the (roll, pitch, yaw) *values* become unstable (gimbal lock),
+    recomposing them must reproduce the original *rotation* — that is the
+    minimum semantic guarantee Eigen's `eulerAngles` provides, and it is
+    what every downstream user of `to_rpy` relies on.
+
+    Uses Shoemake's uniform-on-SO(3) sampling (1992) for fair coverage —
+    sampling Euler angles uniformly would over-sample the poles.
+    """
+    rng = np.random.default_rng(seed=0x5031)
+    for _ in range(100):
+        u1, u2, u3 = rng.uniform(0.0, 1.0, size=3)
+        # Shoemake (1992): uniform random unit quaternion in (w, x, y, z).
+        w = math.sqrt(u1) * math.cos(2 * math.pi * u3)
+        x = math.sqrt(1 - u1) * math.sin(2 * math.pi * u2)
+        y = math.sqrt(1 - u1) * math.cos(2 * math.pi * u2)
+        z = math.sqrt(u1) * math.sin(2 * math.pi * u3)
+        original = Quaterniond.from_xyzw(x, y, z, w)
+        roundtrip = Quaterniond.from_rpy(*original.to_rpy())
+        assert original.angularDistance(roundtrip) < ANGULAR_PREC, (
+            f"roundtrip failed for q=({x:.4f}, {y:.4f}, {z:.4f}, {w:.4f}), "
+            f"rpy={tuple(original.to_rpy())}, "
+            f"angularDistance={original.angularDistance(roundtrip):.3e}"
+        )
+
+
 def test_quaterniond_euler_angles_case_insensitive():
     q = Quaterniond(AngleAxisd(math.pi / 4, Z_AXIS))
     nptest.assert_allclose(q.eulerAngles("zyx"), q.eulerAngles("ZYX"))
