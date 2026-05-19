@@ -177,9 +177,10 @@ NB_MODULE(_tesseract_common, m) {
             Eigen::Quaterniond q(self.linear());
             const auto& t = self.translation();
             std::ostringstream ss;
+            // Project canonical: scalar-last [qx, qy, qz, qw].
             ss << "Isometry3d(translation=[" << t.x() << ", " << t.y() << ", " << t.z()
-               << "], quaternion=[w=" << q.w() << ", x=" << q.x()
-               << ", y=" << q.y() << ", z=" << q.z() << "])";
+               << "], quaternion=[x=" << q.x() << ", y=" << q.y()
+               << ", z=" << q.z() << ", w=" << q.w() << "])";
             return ss.str();
         });
 
@@ -252,10 +253,22 @@ NB_MODULE(_tesseract_common, m) {
         .def_static("FromTwoVectors", [](const Eigen::Vector3d& a, const Eigen::Vector3d& b) {
             return Eigen::Quaterniond().setFromTwoVectors(a, b);
         }, "a"_a, "b"_a)
-        .def("w", [](const Eigen::Quaterniond& q) { return q.w(); })
-        .def("x", [](const Eigen::Quaterniond& q) { return q.x(); })
-        .def("y", [](const Eigen::Quaterniond& q) { return q.y(); })
-        .def("z", [](const Eigen::Quaterniond& q) { return q.z(); })
+        // Project-canonical scalar-last factory. The 4-double ctor above is
+        // Eigen's scalar-first (w, x, y, z) signature; prefer this in Python
+        // code so the convention is uniform.
+        .def_static("from_xyzw",
+                    [](double qx, double qy, double qz, double qw) {
+                        return Eigen::Quaterniond(qw, qx, qy, qz);
+                    },
+                    "qx"_a, "qy"_a, "qz"_a, "qw"_a)
+        // Scalar component accessors — properties, not methods. Matches the
+        // Pose scalar accessors (x/y/z/qx/qy/qz/qw) and keeps the read-side
+        // free of trailing-parens noise. Eigen's C++ API exposes these as
+        // methods; we deliberately don't mirror that in Python.
+        .def_prop_ro("w", [](const Eigen::Quaterniond& q) { return q.w(); })
+        .def_prop_ro("x", [](const Eigen::Quaterniond& q) { return q.x(); })
+        .def_prop_ro("y", [](const Eigen::Quaterniond& q) { return q.y(); })
+        .def_prop_ro("z", [](const Eigen::Quaterniond& q) { return q.z(); })
         // Eigen stores coeffs internally as (x, y, z, w); expose for direct
         // numpy interop without per-component getter calls.
         .def("coeffs", [](const Eigen::Quaterniond& q) -> Eigen::Vector4d {
@@ -350,10 +363,11 @@ NB_MODULE(_tesseract_common, m) {
             }
             return self.toRotationMatrix().eulerAngles(a0, a1, a2);
         }, "order"_a)
+        // Project canonical: scalar-last [qx, qy, qz, qw] in repr.
         .def("__repr__", [](const Eigen::Quaterniond& self) {
             std::ostringstream ss;
-            ss << "Quaterniond(w=" << self.w() << ", x=" << self.x()
-               << ", y=" << self.y() << ", z=" << self.z() << ")";
+            ss << "Quaterniond(x=" << self.x() << ", y=" << self.y()
+               << ", z=" << self.z() << ", w=" << self.w() << ")";
             return ss.str();
         });
 

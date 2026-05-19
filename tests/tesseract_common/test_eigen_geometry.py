@@ -30,7 +30,8 @@ def test_repr_isometry3d():
     r = repr(iso)
     assert r.startswith("Isometry3d(")
     assert "translation=[0, 0, 0]" in r
-    assert "quaternion=[w=1, x=0, y=0, z=0]" in r
+    # Project canonical: scalar-last [qx, qy, qz, qw] in repr.
+    assert "quaternion=[x=0, y=0, z=0, w=1]" in r
 
 
 def test_repr_translation3d():
@@ -38,7 +39,8 @@ def test_repr_translation3d():
 
 
 def test_repr_quaterniond():
-    assert repr(Quaterniond(1.0, 0.0, 0.0, 0.0)) == "Quaterniond(w=1, x=0, y=0, z=0)"
+    # Project canonical: scalar-last [qx, qy, qz, qw] order.
+    assert repr(Quaterniond.from_xyzw(0.0, 0.0, 0.0, 1.0)) == "Quaterniond(x=0, y=0, z=0, w=1)"
 
 
 def test_repr_angleaxisd():
@@ -63,7 +65,7 @@ def test_isapprox_isometry3d():
 def test_isapprox_quaterniond_component_wise():
     """isApprox is component-wise; q and -q (same rotation) are NOT approx."""
     q = _ROT_90_Z
-    q_neg = Quaterniond(-q.w(), -q.x(), -q.y(), -q.z())
+    q_neg = Quaterniond.from_xyzw(-q.x, -q.y, -q.z, -q.w)
     assert not q.isApprox(q_neg)
     # ...but they describe the same rotation, so geodesic distance is zero.
     assert q.angularDistance(q_neg) == pytest.approx(0.0, abs=1e-6)
@@ -131,9 +133,10 @@ def test_quaterniond_from_coeffs_vector4d():
 
 
 def test_quaterniond_vec_and_squarednorm():
-    q = Quaterniond(0.5, 0.1, 0.2, 0.3)
+    # Project canonical scalar-last [qx, qy, qz, qw].
+    q = Quaterniond.from_xyzw(0.1, 0.2, 0.3, 0.5)
     nptest.assert_allclose(q.vec(), [0.1, 0.2, 0.3])
-    expected_sq = 0.5**2 + 0.1**2 + 0.2**2 + 0.3**2
+    expected_sq = 0.1**2 + 0.2**2 + 0.3**2 + 0.5**2
     assert q.squaredNorm() == pytest.approx(expected_sq)
 
 
