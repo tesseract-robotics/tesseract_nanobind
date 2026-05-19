@@ -18,6 +18,25 @@ from tesseract_robotics.tesseract_common import (
     Translation3d,
 )
 
+# Tolerance constants — all expressed relative to Eigen's default
+# `isApprox` precision (`NumTraits<double>::dummy_precision()` = 1e-12 for
+# float64). The triple covers the three regimes the tests exercise:
+#   DEFAULT_PREC — Eigen's own default; used as atol on assert_allclose
+#                  when the spec is "approximately equal at Eigen's default".
+#   SUB_PREC     — perturbations smaller than DEFAULT_PREC; values that
+#                  differ by SUB_PREC are still isApprox-equal by default.
+#   TIGHTER_PREC — tolerance tighter than the perturbations above; used
+#                  to assert that explicit `prec=` overrides the default
+#                  and makes the comparison fail.
+DEFAULT_PREC = 1e-12  # Eigen NumTraits<double>::dummy_precision
+SUB_PREC = 1e-15  # 3 orders below default — still passes isApprox at default
+TIGHTER_PREC = 1e-20  # 8 orders below default — defeats default isApprox
+
+# Looser tolerance for angularDistance-style trig-based assertions: the
+# `acos(2·dot² - 1)` form has poor conditioning near acos(1), so component-
+# wise DEFAULT_PREC is too tight. 1e-6 rad ≈ 1 µrad ≈ 6 × 10⁻⁵ degrees.
+ANGULAR_PREC = 1e-6
+
 # Canonical 90° rotations used across several tests — built from
 # `AngleAxisd` so the test is self-documenting and never grows
 # half-precision quaternion literals like `0.70710678`.
@@ -56,10 +75,10 @@ def test_isapprox_isometry3d():
     assert a.isApprox(b)
 
     # Perturbation below default precision is "approx"; above is not.
-    sub_precision = np.array([1e-15, 0.0, 0.0])
+    sub_precision = np.array([SUB_PREC, 0.0, 0.0])
     a.translate(sub_precision)
     assert a.isApprox(b)
-    assert not a.isApprox(b, prec=1e-20)
+    assert not a.isApprox(b, prec=TIGHTER_PREC)
 
 
 def test_isapprox_quaterniond_component_wise():
@@ -68,16 +87,16 @@ def test_isapprox_quaterniond_component_wise():
     q_neg = Quaterniond.from_xyzw(-q.x, -q.y, -q.z, -q.w)
     assert not q.isApprox(q_neg)
     # ...but they describe the same rotation, so geodesic distance is zero.
-    assert q.angularDistance(q_neg) == pytest.approx(0.0, abs=1e-6)
+    assert q.angularDistance(q_neg) == pytest.approx(0.0, abs=ANGULAR_PREC)
 
 
 def test_isapprox_angleaxisd_translation3d():
     aa1 = AngleAxisd(1.0, Z_AXIS)
-    aa2 = AngleAxisd(1.0 + 1e-15, Z_AXIS)
+    aa2 = AngleAxisd(1.0 + SUB_PREC, Z_AXIS)
     assert aa1.isApprox(aa2)
 
     t1 = Translation3d(1.0, 2.0, 3.0)
-    t2 = Translation3d(1.0, 2.0, 3.0 + 1e-15)
+    t2 = Translation3d(1.0, 2.0, 3.0 + SUB_PREC)
     assert t1.isApprox(t2)
 
 
@@ -91,24 +110,24 @@ def test_isometry3d_canonical_ctor_translation_quat():
     iso = Isometry3d(Translation3d(4.0, 5.0, 6.0), _ROT_90_X)
     nptest.assert_allclose(iso.translation(), [4.0, 5.0, 6.0])
     # 90° around X sends +Y to +Z.
-    nptest.assert_allclose(iso.linear() @ Y_AXIS, Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(iso.linear() @ Y_AXIS, Z_AXIS, atol=DEFAULT_PREC)
 
 
 def test_isometry3d_fluent_mutators():
     iso = Isometry3d.Identity().translate(X_AXIS).rotate(_ROT_90_Z)
     # `translate` runs before `rotate`, and rotation happens about the
     # already-translated origin, leaving the translation vector unchanged.
-    nptest.assert_allclose(iso.translation(), X_AXIS, atol=1e-12)
+    nptest.assert_allclose(iso.translation(), X_AXIS, atol=DEFAULT_PREC)
 
 
 def test_isometry3d_pretranslate_vs_translate():
     """`translate` post-multiplies (local frame); `pretranslate` pre-multiplies (global)."""
     a = Isometry3d.Identity().rotate(_ROT_90_Z).translate(X_AXIS)
     # +X in the rotated local frame is +Y in the global frame.
-    nptest.assert_allclose(a.translation(), Y_AXIS, atol=1e-12)
+    nptest.assert_allclose(a.translation(), Y_AXIS, atol=DEFAULT_PREC)
 
     b = Isometry3d.Identity().rotate(_ROT_90_Z).pretranslate(X_AXIS)
-    nptest.assert_allclose(b.translation(), X_AXIS, atol=1e-12)
+    nptest.assert_allclose(b.translation(), X_AXIS, atol=DEFAULT_PREC)
 
 
 def test_isometry3d_rotate_overloads():
@@ -144,7 +163,7 @@ def test_angleaxisd_from_matrix3d():
     aa_original = AngleAxisd(math.pi / 3, Z_AXIS)
     aa_recovered = AngleAxisd(aa_original.toRotationMatrix())
     assert aa_recovered.angle == pytest.approx(math.pi / 3)
-    nptest.assert_allclose(aa_recovered.axis, Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(aa_recovered.axis, Z_AXIS, atol=DEFAULT_PREC)
 
 
 @pytest.mark.parametrize("axis", [X_AXIS, Y_AXIS, Z_AXIS])
@@ -163,7 +182,7 @@ def test_quaterniond_euler_angles_zyx_roundtrip():
         * Quaterniond(AngleAxisd(roll, X_AXIS))
     )
     extracted = q.eulerAngles("ZYX")
-    nptest.assert_allclose(extracted, [yaw, pitch, roll], atol=1e-12)
+    nptest.assert_allclose(extracted, [yaw, pitch, roll], atol=DEFAULT_PREC)
 
 
 def test_quaterniond_euler_angles_case_insensitive():
@@ -214,8 +233,8 @@ def test_isometry3d_copy_ctor_does_not_alias():
     original.translate(np.array([1.0, 0.0, 0.0]))
     copy = Isometry3d(original)
     original.translate(np.array([10.0, 0.0, 0.0]))
-    nptest.assert_allclose(copy.translation(), [1.0, 0.0, 0.0], atol=1e-12)
-    nptest.assert_allclose(original.translation(), [11.0, 0.0, 0.0], atol=1e-12)
+    nptest.assert_allclose(copy.translation(), [1.0, 0.0, 0.0], atol=DEFAULT_PREC)
+    nptest.assert_allclose(original.translation(), [11.0, 0.0, 0.0], atol=DEFAULT_PREC)
 
 
 def test_quaterniond_from_non_orthonormal_matrix_rejected():
@@ -231,7 +250,7 @@ def test_quaterniond_from_valid_rotation_matrix_accepted():
     q_in = Quaterniond(AngleAxisd(math.pi / 3, X_AXIS))
     R = q_in.toRotationMatrix()
     q_out = Quaterniond(R)
-    assert q_out.angularDistance(q_in) == pytest.approx(0.0, abs=1e-12)
+    assert q_out.angularDistance(q_in) == pytest.approx(0.0, abs=DEFAULT_PREC)
 
 
 # ---------- Hyperplane3d ----------
@@ -248,7 +267,7 @@ def test_hyperplane_normal_offset_ctor():
 def test_hyperplane_normal_point_ctor():
     """Hyperplane(normal, point) places the plane *through* the point."""
     plane = Hyperplane3d(Z_AXIS, np.array([0.0, 0.0, 5.0]))
-    assert plane.signedDistance(np.array([0.0, 0.0, 5.0])) == pytest.approx(0.0, abs=1e-12)
+    assert plane.signedDistance(np.array([0.0, 0.0, 5.0])) == pytest.approx(0.0, abs=DEFAULT_PREC)
     assert plane.signedDistance(np.array([0.0, 0.0, 5.0]) + Z_AXIS) == pytest.approx(1.0)
 
 
@@ -261,17 +280,19 @@ def test_hyperplane_through_three_points_right_hand_rule():
     """
     # XY plane traversed counter-clockwise from origin → normal = +Z.
     plane = Hyperplane3d.Through(np.zeros(3), X_AXIS, Y_AXIS)
-    nptest.assert_allclose(plane.normal, Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(plane.normal, Z_AXIS, atol=DEFAULT_PREC)
     # Reversing the last two points flips the normal.
     plane_flipped = Hyperplane3d.Through(np.zeros(3), Y_AXIS, X_AXIS)
-    nptest.assert_allclose(plane_flipped.normal, -Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(plane_flipped.normal, -Z_AXIS, atol=DEFAULT_PREC)
     # General case: normal direction matches (p1 − p0) × (p2 − p0).
     p0 = np.array([1.0, 1.0, 1.0])
     p1 = np.array([2.0, 1.0, 1.0])
     p2 = np.array([1.0, 2.0, 1.0])
     expected_normal = np.cross(p1 - p0, p2 - p0)
     expected_normal /= np.linalg.norm(expected_normal)
-    nptest.assert_allclose(Hyperplane3d.Through(p0, p1, p2).normal, expected_normal, atol=1e-12)
+    nptest.assert_allclose(
+        Hyperplane3d.Through(p0, p1, p2).normal, expected_normal, atol=DEFAULT_PREC
+    )
 
 
 def test_hyperplane_signed_vs_abs_distance():
@@ -288,7 +309,7 @@ def test_hyperplane_projection_drops_normal_component():
     nptest.assert_allclose(
         plane.projection(np.array([1.0, 2.0, 5.0])),
         [1.0, 2.0, 0.0],
-        atol=1e-12,
+        atol=DEFAULT_PREC,
     )
 
 
@@ -305,7 +326,7 @@ def test_hyperplane_normalize_makes_distance_methods_euclidean():
     assert plane_raw.signedDistance(point) == pytest.approx(4.0)
 
     plane_raw.normalize()
-    nptest.assert_allclose(np.linalg.norm(plane_raw.normal), 1.0, atol=1e-12)
+    nptest.assert_allclose(np.linalg.norm(plane_raw.normal), 1.0, atol=DEFAULT_PREC)
     # Post-normalisation: signedDistance is the actual Euclidean distance.
     assert plane_raw.signedDistance(point) == pytest.approx(2.0)
     # And the same plane is unchanged from one built normalised in the first place.
@@ -320,9 +341,9 @@ def test_hyperplane_coeffs_layout():
 
 def test_hyperplane_isapprox():
     a = Hyperplane3d(Z_AXIS, 0.0)
-    b = Hyperplane3d(Z_AXIS, 1e-15)
+    b = Hyperplane3d(Z_AXIS, SUB_PREC)
     assert a.isApprox(b)
-    assert not a.isApprox(b, prec=1e-20)
+    assert not a.isApprox(b, prec=TIGHTER_PREC)
 
 
 def test_hyperplane_repr():
@@ -380,20 +401,22 @@ def test_parametrized_line_distance_requires_unit_direction():
     line_unit = ParametrizedLine3d(np.zeros(3), Z_AXIS)
     line_2x = ParametrizedLine3d(np.zeros(3), 2.0 * Z_AXIS)
     p = np.array([1.0, 0.0, 5.0])  # true Euclidean distance to Z-axis is 1.0
-    assert line_unit.distance(p) == pytest.approx(1.0, abs=1e-12)
-    assert line_2x.distance(p) == pytest.approx(math.sqrt(226.0), abs=1e-12)
+    assert line_unit.distance(p) == pytest.approx(1.0, abs=DEFAULT_PREC)
+    assert line_2x.distance(p) == pytest.approx(math.sqrt(226.0), abs=DEFAULT_PREC)
 
 
 def test_parametrized_line_projection_on_unit_line():
     line = ParametrizedLine3d(np.zeros(3), Z_AXIS)
-    nptest.assert_allclose(line.projection(np.array([1.0, 2.0, 5.0])), [0.0, 0.0, 5.0], atol=1e-12)
+    nptest.assert_allclose(
+        line.projection(np.array([1.0, 2.0, 5.0])), [0.0, 0.0, 5.0], atol=DEFAULT_PREC
+    )
 
 
 def test_parametrized_line_intersects_plane():
     line = ParametrizedLine3d(np.array([1.0, 2.0, -3.0]), Z_AXIS)
     plane_xy = Hyperplane3d(Z_AXIS, 0.0)
     assert line.intersectionParameter(plane_xy) == pytest.approx(3.0)
-    nptest.assert_allclose(line.intersectionPoint(plane_xy), [1.0, 2.0, 0.0], atol=1e-12)
+    nptest.assert_allclose(line.intersectionPoint(plane_xy), [1.0, 2.0, 0.0], atol=DEFAULT_PREC)
 
 
 def test_parametrized_line_parallel_to_plane_returns_non_finite():
@@ -411,9 +434,9 @@ def test_parametrized_line_isapprox():
     """
     base = np.array([1.0, 2.0, 3.0])
     a = ParametrizedLine3d(base, Z_AXIS)
-    b = ParametrizedLine3d(base + np.array([1e-15, 0.0, 0.0]), Z_AXIS)
+    b = ParametrizedLine3d(base + np.array([SUB_PREC, 0.0, 0.0]), Z_AXIS)
     assert a.isApprox(b)
-    assert not a.isApprox(b, prec=1e-20)
+    assert not a.isApprox(b, prec=TIGHTER_PREC)
 
 
 def test_parametrized_line_repr():
@@ -469,16 +492,16 @@ def test_hyperplane_transform_translates_and_rotates():
     plane = Hyperplane3d(Z_AXIS, 0.0)  # z = 0
     tf = Isometry3d(np.array([0.0, 0.0, 5.0]), Quaterniond.Identity())  # translate +5Z
     plane.transform(tf)
-    nptest.assert_allclose(plane.normal, Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(plane.normal, Z_AXIS, atol=DEFAULT_PREC)
     assert plane.signedDistance(np.zeros(3)) == pytest.approx(-5.0)
-    assert plane.signedDistance(np.array([0.0, 0.0, 5.0])) == pytest.approx(0.0, abs=1e-12)
+    assert plane.signedDistance(np.array([0.0, 0.0, 5.0])) == pytest.approx(0.0, abs=DEFAULT_PREC)
 
 
 def test_hyperplane_transform_preserves_membership():
     """A point on the plane stays on the plane after any rigid transform applied to both."""
     plane = Hyperplane3d.Through(np.zeros(3), X_AXIS, Y_AXIS)  # z = 0
     point_on = np.array([3.0, 4.0, 0.0])
-    assert plane.signedDistance(point_on) == pytest.approx(0.0, abs=1e-12)
+    assert plane.signedDistance(point_on) == pytest.approx(0.0, abs=DEFAULT_PREC)
 
     tf = Isometry3d(
         np.array([1.0, 2.0, 3.0]),
@@ -486,7 +509,7 @@ def test_hyperplane_transform_preserves_membership():
     )
     transformed_point = tf.matrix()[:3, :3] @ point_on + tf.translation()
     plane.transform(tf)
-    assert plane.signedDistance(transformed_point) == pytest.approx(0.0, abs=1e-12)
+    assert plane.signedDistance(transformed_point) == pytest.approx(0.0, abs=DEFAULT_PREC)
 
 
 def test_parametrized_line_transform_round_trip():
@@ -502,8 +525,8 @@ def test_parametrized_line_transform_round_trip():
     line.transform(tf)
     line.transform(tf.inverse())
 
-    nptest.assert_allclose(line.origin, origin_before, atol=1e-12)
-    nptest.assert_allclose(line.direction, direction_before, atol=1e-12)
+    nptest.assert_allclose(line.origin, origin_before, atol=DEFAULT_PREC)
+    nptest.assert_allclose(line.direction, direction_before, atol=DEFAULT_PREC)
 
 
 def test_parametrized_line_transform_translates_origin_only():
@@ -511,5 +534,5 @@ def test_parametrized_line_transform_translates_origin_only():
     line = ParametrizedLine3d(np.zeros(3), Z_AXIS)
     tf = Isometry3d(np.array([1.0, 2.0, 3.0]), Quaterniond.Identity())
     line.transform(tf)
-    nptest.assert_allclose(line.origin, [1.0, 2.0, 3.0], atol=1e-12)
-    nptest.assert_allclose(line.direction, Z_AXIS, atol=1e-12)
+    nptest.assert_allclose(line.origin, [1.0, 2.0, 3.0], atol=DEFAULT_PREC)
+    nptest.assert_allclose(line.direction, Z_AXIS, atol=DEFAULT_PREC)
