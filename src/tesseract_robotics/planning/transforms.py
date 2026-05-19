@@ -7,10 +7,18 @@ composable with all `Isometry3d` operators. The factory classmethods on
 this class are the Python ergonomic layer over Eigen's ctors; nothing
 about `Pose` adds an indirection.
 
-Per @johnwason's PR #76 review: no numpy facade on `Pose`. Construction
-goes through `Translation3d(x, y, z)` + `Quaterniond(...)` directly — no
-intermediate `np.array([x, y, z])` that the Eigen caster has to convert
-back. Read accessors are the inherited `Isometry3d` methods.
+Design rule (per PR #76 reviews): **no parallel numpy state on Pose**.
+The old design kept a `_matrix: np.ndarray` alongside an Isometry3d
+that was kept in sync — that was the anti-pattern. The current design
+is "Pose IS-A Isometry3d, full stop": construction goes through
+`Translation3d(x, y, z)` + `Quaterniond(...)` directly (no intermediate
+`np.array([x, y, z])` for the Eigen caster to convert back), and the
+single source of truth is the inherited Isometry3d state.
+
+On-demand getters returning numpy *are* allowed and desirable:
+`pose.rotation_matrix` (3×3 ndarray copy) and the inherited
+`pose.translation()` / `pose.linear()` / `pose.matrix()` all return
+numpy. They are reads from the canonical state, not a parallel store.
 
 Example:
     from tesseract_robotics.planning import Pose, translation, rotation_z
@@ -38,10 +46,18 @@ from tesseract_robotics.tesseract_common import (
     Translation3d,
 )
 
-# Minimum quaternion magnitude before normalisation is considered ill-posed.
-# Below this the implied rotation is undefined and `.normalized()` would
-# produce NaN. We refuse rather than silently corrupt the resulting pose.
-_QUAT_MIN_NORM = 1e-12
+# Denominator floor for `.normalized()`-style operations. Below this
+# magnitude, float64 division by `.norm()` (Eigen's `.normalized()` or the
+# manual `axis / norm`) is ill-conditioned — it produces NaN for zero input
+# and unstably-amplified roundoff for sub-epsilon input. We refuse rather
+# than silently corrupt the result.
+#
+# This is a NUMERICAL FLOOR, not a tolerance (per CLAUDE.md): it does not
+# assert anything about input accuracy, only that the input can be safely
+# divided into. The value is a property of float64 (~4 orders of magnitude
+# above eps = 2.2e-16), independent of vector dimension — applies equally
+# to unit quaternions (4 components) and rotation axes (3 components).
+_NORMALISE_DENOM_FLOOR = 1e-12
 
 
 class Pose(Isometry3d):
@@ -358,7 +374,7 @@ def rotation_from_axis_angle(axis: ArrayLike, angle: float) -> Pose:
     if axis_arr.shape != (3,):
         raise ValueError(f"Axis must have 3 elements, got {axis_arr.shape}")
     norm = np.linalg.norm(axis_arr)
-    if norm < _QUAT_MIN_NORM:
+    if norm < _NORMALISE_DENOM_FLOOR:
         raise ValueError(f"Axis magnitude too small for normalisation: {norm}")
     return Pose(Isometry3d(AngleAxisd(angle, axis_arr / norm)))
 
@@ -374,7 +390,7 @@ def _safe_quaternion(qx: float, qy: float, qz: float, qw: float) -> Quaterniond:
     Internally bridges to Eigen's scalar-first ctor via `from_xyzw`.
     """
     norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
-    if norm < _QUAT_MIN_NORM:
+    if norm < _NORMALISE_DENOM_FLOOR:
         raise ValueError(
             f"Quaternion magnitude too small for normalisation: "
             f"|(qx={qx}, qy={qy}, qz={qz}, qw={qw})| = {norm}"
