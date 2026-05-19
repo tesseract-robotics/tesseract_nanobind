@@ -27,9 +27,12 @@ Run it:
 tesseract_kinematics_example
 ```
 
-!!! tip "Quaternion convention"
-    The Python API uses **scalar-last** quaternions `[x, y, z, w]`. C++ Eigen
-    uses scalar-first `[w, x, y, z]` — reorder when porting C++ examples.
+!!! tip "Quaternion convention — scalar-last everywhere"
+    Project canonical order is **scalar-last** `[qx, qy, qz, qw]`. Build
+    with `Quaterniond.from_xyzw(qx, qy, qz, qw)`; access components via
+    `q.x`, `q.y`, `q.z`, `q.w` properties. The Eigen-style
+    `Quaterniond(w, x, y, z)` ctor exists for direct interop but is not the
+    preferred call shape.
 
 ## Collision Detection Example
 

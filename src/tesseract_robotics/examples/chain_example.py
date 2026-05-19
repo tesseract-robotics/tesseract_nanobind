@@ -68,11 +68,10 @@ def run(pipeline="CartesianPipeline", num_planners=None):
     joint_start = np.zeros(6)
     robot.set_joints(joint_start, joint_names=joint_names)
 
-    # Define raster waypoints (from C++ example)
-    # C++ Quaterniond(0, 0, -1.0, 0) in (w,x,y,z) format = 180° rotation around Y-axis
-    # Python from_xyz_quat uses (x, y, z, w) format → (0, -1.0, 0, 0)
-    # This orientation points the tool straight down (Z-axis inverted)
-    quat_down = (0.0, -1.0, 0.0, 0.0)  # Tool pointing down
+    # Define raster waypoints (from C++ example). Project canonical
+    # quaternion is scalar-last [qx, qy, qz, qw]. (0, -1, 0, 0) is a 180°
+    # rotation about Y — tool pointing straight down (Z-axis inverted).
+    quat_down = (0.0, -1.0, 0.0, 0.0)
 
     # Raster pattern: 3 parallel passes at different X positions
     # Each pass sweeps Y from -0.2m to +0.2m at constant Z=0.8m

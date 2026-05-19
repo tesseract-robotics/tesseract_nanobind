@@ -42,8 +42,10 @@ Key Concepts
     tend to find nearby solutions.
 
 **Quaternion Convention**:
-    Python/Tesseract uses scalar-last quaternions: [x, y, z, w]
-    This differs from C++ Eigen which uses scalar-first: [w, x, y, z]
+    Project canonical order is scalar-last `[qx, qy, qz, qw]` — used by
+    every public Python API (`Pose.from_xyz_quat`, `Quaterniond.from_xyzw`,
+    `q.coeffs()`, etc.). The `Quaterniond(w, x, y, z)` 4-double ctor is
+    Eigen's exception, for direct interop only.
 
 Related Examples
 ----------------
