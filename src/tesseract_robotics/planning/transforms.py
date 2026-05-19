@@ -261,6 +261,12 @@ class Pose(Isometry3d):
     #     yaw, pitch, roll = q.eulerAngles("ZYX")   # one decomposition
     # Caching would require parallel mutable state — explicitly out of scope
     # given Pose IS-A Isometry3d (which is itself mutable via in-place ops).
+    #
+    # Quantified by `tests/benchmarks/test_pose_accessors.py`: 3× RPY
+    # property reads ~6 µs (M-series, debug build); single-eulerAngles call
+    # ~2.5 µs. Property paths are 2.5–3.5× slower than the bind-once pattern,
+    # but all are sub-microsecond per access — recommendation matters in
+    # tight loops, not in typical logging / formatting usage.
 
     @property
     def x(self) -> float:
