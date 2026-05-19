@@ -12,6 +12,7 @@
 #include <functional>
 #include <variant>
 #include <optional>
+#include <initializer_list>
 #include <stdexcept>
 
 // Eigen
@@ -35,6 +36,7 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/bind_vector.h>
+#include <nanobind/stl/filesystem.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 
@@ -42,6 +44,35 @@
 namespace nb = nanobind;
 using namespace nb::literals;
 
-// Note: Eigen::Isometry3d is bound as an explicit class in tesseract_common_bindings.cpp
+namespace tesseract_nb {
+
+// Import a sibling extension module by its short name, resolving it against the
+// importer's package (e.g. inside `tesseract.tesseract_environment`, calling
+// `import_module_in_context(m, "tesseract_collision")` imports
+// `tesseract.tesseract_collision`). Falls back to a top-level import when the
+// importer has no package qualifier.
+inline nb::module_ import_module_in_context(const nb::module_& current_module, const char* module_name)
+{
+    std::string importer_name = nb::cast<std::string>(current_module.attr("__name__"));
+    auto dot = importer_name.rfind('.');
+    if (dot != std::string::npos)
+    {
+        auto package_name = importer_name.substr(0, dot);
+        auto fq_name = package_name + "." + module_name;
+        return nb::module_::import_(fq_name.c_str());
+    }
+    return nb::module_::import_(module_name);
+}
+
+inline void import_modules_in_context(const nb::module_& current_module,
+                                      std::initializer_list<const char*> module_names)
+{
+    for (const char* module_name : module_names)
+        import_module_in_context(current_module, module_name);
+}
+
+}  // namespace tesseract_nb
+
+// Note: Eigen::Isometry3d is bound as an explicit class in src/tesseract/tesseract_common.cpp
 // for SWIG API compatibility (tests expect .matrix() method etc.)
 // No type caster is needed since we have explicit bindings.
