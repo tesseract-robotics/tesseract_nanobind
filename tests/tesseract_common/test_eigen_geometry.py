@@ -539,3 +539,125 @@ def test_parametrized_line_transform_translates_origin_only():
     line.transform(tf)
     nptest.assert_allclose(line.origin, [1.0, 2.0, 3.0], atol=DEFAULT_PREC)
     nptest.assert_allclose(line.direction, Z_AXIS, atol=DEFAULT_PREC)
+
+
+# ---------- Cross-type multiplication coverage ----------
+#
+# The binding registers 10 `__mul__` overloads across the rigid-transform
+# types. Each test below exercises ONE overload, asserts the return type,
+# and verifies a known-result rotation/translation. Per @johnwason's PR
+# review question on coverage — addressed comprehensively here.
+
+# --- Isometry3d.__mul__ (5 overloads) ---
+
+
+def test_mul_isometry3d_by_isometry3d():
+    """Isometry3d × Isometry3d → Isometry3d (composition)."""
+    a = Isometry3d(np.array([1.0, 0.0, 0.0]), _ROT_90_Z)  # rotate, then translate +X
+    b = Isometry3d(np.array([0.0, 2.0, 0.0]), Quaterniond.Identity())
+    result = a * b
+    assert isinstance(result, Isometry3d)
+    # a applies first: identity translation through b (+Y=2), then a's
+    # rotation (90°Z sends +Y → -X), then a's translation (+X=1).
+    # b moves to (0, 2, 0); a then rotates to (-2, 0, 0); a adds (1, 0, 0)
+    # → (-1, 0, 0).
+    nptest.assert_allclose(result.translation, [-1.0, 0.0, 0.0], atol=DEFAULT_PREC)
+
+
+def test_mul_isometry3d_by_translation3d():
+    """Isometry3d × Translation3d → Isometry3d."""
+    iso = Isometry3d(np.array([1.0, 1.0, 1.0]), _ROT_90_Z)
+    t = Translation3d(2.0, 0.0, 0.0)
+    result = iso * t
+    assert isinstance(result, Isometry3d)
+    # iso rotates Translation3d's vector (90°Z: +X → +Y) and adds iso's translation.
+    nptest.assert_allclose(result.translation, [1.0, 3.0, 1.0], atol=DEFAULT_PREC)
+
+
+def test_mul_isometry3d_by_quaterniond():
+    """Isometry3d × Quaterniond → Isometry3d (rotation composition, translation preserved)."""
+    iso = Isometry3d(np.array([1.0, 2.0, 3.0]), Quaterniond.Identity())
+    result = iso * _ROT_90_X
+    assert isinstance(result, Isometry3d)
+    nptest.assert_allclose(result.translation, [1.0, 2.0, 3.0], atol=DEFAULT_PREC)
+    # Linear block now matches the rotation (90°X sends +Y → +Z).
+    nptest.assert_allclose(result.linear @ Y_AXIS, Z_AXIS, atol=DEFAULT_PREC)
+
+
+def test_mul_isometry3d_by_angleaxisd():
+    """Isometry3d × AngleAxisd → Isometry3d."""
+    iso = Isometry3d(np.array([0.0, 0.0, 0.0]), Quaterniond.Identity())
+    aa = AngleAxisd(math.pi / 2, Y_AXIS)
+    result = iso * aa
+    assert isinstance(result, Isometry3d)
+    # 90°Y sends +Z → +X.
+    nptest.assert_allclose(result.linear @ Z_AXIS, X_AXIS, atol=DEFAULT_PREC)
+
+
+def test_mul_isometry3d_by_vector3d():
+    """Isometry3d × Vector3d → Vector3d (point transformation)."""
+    iso = Isometry3d(np.array([1.0, 0.0, 0.0]), _ROT_90_Z)
+    v = np.array([1.0, 0.0, 0.0])
+    result = iso * v
+    # Rotate first (90°Z sends +X → +Y), then translate (+X=1) → (1, 1, 0).
+    nptest.assert_allclose(result, [1.0, 1.0, 0.0], atol=DEFAULT_PREC)
+
+
+# --- Translation3d.__mul__ (3 overloads) ---
+
+
+def test_mul_translation3d_by_isometry3d():
+    """Translation3d × Isometry3d → Isometry3d."""
+    t = Translation3d(1.0, 0.0, 0.0)
+    iso = Isometry3d(np.array([0.0, 2.0, 0.0]), _ROT_90_Z)
+    result = t * iso
+    assert isinstance(result, Isometry3d)
+    # t pretranslates iso's translation: (0+1, 2+0, 0+0) = (1, 2, 0).
+    nptest.assert_allclose(result.translation, [1.0, 2.0, 0.0], atol=DEFAULT_PREC)
+
+
+def test_mul_translation3d_by_translation3d():
+    """Translation3d × Translation3d → Translation3d (additive)."""
+    a = Translation3d(1.0, 2.0, 3.0)
+    b = Translation3d(4.0, 5.0, 6.0)
+    result = a * b
+    assert isinstance(result, Translation3d)
+    nptest.assert_allclose(result.translation(), [5.0, 7.0, 9.0], atol=DEFAULT_PREC)
+
+
+def test_mul_translation3d_by_vector3d():
+    """Translation3d × Vector3d → Vector3d (T·v = v + translation)."""
+    t = Translation3d(1.0, 2.0, 3.0)
+    v = np.array([10.0, 20.0, 30.0])
+    result = t * v
+    nptest.assert_allclose(result, [11.0, 22.0, 33.0], atol=DEFAULT_PREC)
+
+
+# --- Quaterniond.__mul__ (2 overloads) ---
+
+
+def test_mul_quaterniond_by_quaterniond():
+    """Quaterniond × Quaterniond → Quaterniond (Hamilton product = rotation composition)."""
+    result = _ROT_90_Z * _ROT_90_X
+    assert isinstance(result, Quaterniond)
+    # Z90 ∘ X90 sends +X → +Y → still +Y (Y is X90's fixed axis); +Y → +Z (X90) → -X (Z90).
+    # Apply to +Y: X90 sends Y→Z, then Z90 sends Z→Z, result is Z.
+    nptest.assert_allclose(result * Y_AXIS, Z_AXIS, atol=DEFAULT_PREC)
+
+
+def test_mul_quaterniond_by_vector3d():
+    """Quaterniond × Vector3d → Vector3d (point rotation)."""
+    result = _ROT_90_Z * X_AXIS  # 90°Z sends +X → +Y
+    nptest.assert_allclose(result, Y_AXIS, atol=DEFAULT_PREC)
+
+
+# --- Chained composition (multiple types in one expression) ---
+
+
+def test_mul_chained_iso_translation_quaternion():
+    """The canonical robotics construction: `Isometry3d.Identity() * Translation3d * Quaterniond`."""
+    iso = Isometry3d.Identity() * Translation3d(1.0, 2.0, 3.0) * _ROT_90_Z
+    assert isinstance(iso, Isometry3d)
+    nptest.assert_allclose(iso.translation, [1.0, 2.0, 3.0], atol=DEFAULT_PREC)
+    # Rotation: 90°Z sends +X → +Y.
+    nptest.assert_allclose(iso.linear @ X_AXIS, Y_AXIS, atol=DEFAULT_PREC)
