@@ -23,15 +23,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-# Re-export PlanningResult from composer
-from tesseract_robotics.planning.composer import PlanningResult, TaskComposer
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CompositeInstruction,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_motion_planners import (
+from tesseract.tesseract_motion_planners import (
     assignCurrentStateAsSeed as _assignCurrentStateAsSeed,
 )
+
+# Re-export PlanningResult from composer
+from tesseract_robotics.planning.composer import PlanningResult, TaskComposer
 
 if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot

@@ -55,9 +55,9 @@ Related Examples
 """
 
 import numpy as np
+from tesseract.tesseract_common import Quaterniond
 
 from tesseract_robotics.planning import Pose, Robot
-from tesseract_robotics.tesseract_common import Quaterniond
 
 
 def main():

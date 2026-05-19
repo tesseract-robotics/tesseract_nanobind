@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from tesseract.tesseract_common import EIGEN_DEFAULT_PREC, Isometry3d, Quaterniond
 
 from tesseract_robotics.planning import (
     CartesianTarget,
@@ -21,7 +22,6 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
-from tesseract_robotics.tesseract_common import EIGEN_DEFAULT_PREC, Isometry3d, Quaterniond
 
 # Tolerance constants for the equality / isApprox tests below. EIGEN_DEFAULT_PREC
 # is the project-wide anchor: Eigen's NumTraits<double>::dummy_precision()
@@ -40,7 +40,7 @@ class TestPose:
         # that takes Isometry3d must accept Pose directly via subclass
         # inheritance. If this ever fails, the binding has started doing
         # strict type checks and we silently corrupt geometry downstream.
-        from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+        from tesseract.tesseract_scene_graph import Joint, JointType
 
         pose = Pose.from_xyz_rpy(0.1, 0.2, 0.3, 0.0, 0.0, 1.0)
         assert isinstance(pose, Isometry3d)
@@ -684,8 +684,8 @@ class TestRobotLinkManagement:
 
     def test_add_link_with_geometry(self, robot):
         """Test adding a link with visual/collision geometry."""
-        from tesseract_robotics.tesseract_geometry import Box
-        from tesseract_robotics.tesseract_scene_graph import (
+        from tesseract.tesseract_geometry import Box
+        from tesseract.tesseract_scene_graph import (
             Collision,
             Joint,
             JointType,
@@ -719,9 +719,10 @@ class TestRobotLinkManagement:
 
     def test_add_link_using_create_fixed_joint(self, robot):
         """Test adding link using create_fixed_joint helper."""
+        from tesseract.tesseract_geometry import Sphere
+        from tesseract.tesseract_scene_graph import Collision, Link, Visual
+
         from tesseract_robotics.planning import create_fixed_joint
-        from tesseract_robotics.tesseract_geometry import Sphere
-        from tesseract_robotics.tesseract_scene_graph import Collision, Link, Visual
 
         # Create sphere link
         link = Link("sphere_obstacle")
@@ -823,8 +824,8 @@ class TestRobotLinkManagement:
 
     def test_move_link(self, robot):
         """Test relocating a link to different parent."""
-        from tesseract_robotics.tesseract_geometry import Box
-        from tesseract_robotics.tesseract_scene_graph import (
+        from tesseract.tesseract_geometry import Box
+        from tesseract.tesseract_scene_graph import (
             Collision,
             Joint,
             JointType,
@@ -1138,8 +1139,9 @@ class TestProfileCreation:
 
     def test_create_trajopt_default_profiles(self):
         """Test TrajOpt profile creation with defaults."""
+        from tesseract.tesseract_command_language import ProfileDictionary
+
         from tesseract_robotics.planning import create_trajopt_default_profiles
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
         profiles = create_trajopt_default_profiles()
 
@@ -1155,8 +1157,9 @@ class TestProfileCreation:
 
     def test_create_trajopt_ifopt_default_profiles(self):
         """Test TrajOptIfopt profile creation with defaults."""
+        from tesseract.tesseract_command_language import ProfileDictionary
+
         from tesseract_robotics.planning import create_trajopt_ifopt_default_profiles
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
         profiles = create_trajopt_ifopt_default_profiles()
 
@@ -1164,8 +1167,9 @@ class TestProfileCreation:
 
     def test_create_ompl_default_profiles(self):
         """Test OMPL profile creation with defaults."""
+        from tesseract.tesseract_command_language import ProfileDictionary
+
         from tesseract_robotics.planning import create_ompl_default_profiles
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
         profiles = create_ompl_default_profiles()
 
@@ -1186,8 +1190,9 @@ class TestProfileCreation:
 
     def test_create_descartes_default_profiles(self):
         """Test Descartes profile creation with defaults."""
+        from tesseract.tesseract_command_language import ProfileDictionary
+
         from tesseract_robotics.planning import create_descartes_default_profiles
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
         profiles = create_descartes_default_profiles()
 
@@ -1206,8 +1211,9 @@ class TestProfileCreation:
 
     def test_create_freespace_pipeline_profiles(self):
         """Test freespace pipeline profile creation (OMPL + TrajOpt)."""
+        from tesseract.tesseract_command_language import ProfileDictionary
+
         from tesseract_robotics.planning import create_freespace_pipeline_profiles
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
         profiles = create_freespace_pipeline_profiles()
 
@@ -1215,8 +1221,9 @@ class TestProfileCreation:
 
     def test_create_cartesian_pipeline_profiles(self):
         """Test cartesian pipeline profile creation (Descartes + TrajOpt)."""
+        from tesseract.tesseract_command_language import ProfileDictionary
+
         from tesseract_robotics.planning import create_cartesian_pipeline_profiles
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
         profiles = create_cartesian_pipeline_profiles()
 

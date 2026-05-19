@@ -12,16 +12,7 @@ import math
 
 import numpy as np
 import pytest
-
-from tesseract_robotics.emitters.rapid import (
-    EmptyProgramError,
-    MissingProfileError,
-    RapidProfile,
-    UnsupportedInstructionError,
-    emit_rapid,
-)
-from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
@@ -39,6 +30,15 @@ from tesseract_robotics.tesseract_command_language import (
     TimerInstructionType,
     WaitInstruction,
 )
+
+from tesseract_robotics.emitters.rapid import (
+    EmptyProgramError,
+    MissingProfileError,
+    RapidProfile,
+    UnsupportedInstructionError,
+    emit_rapid,
+)
+from tesseract_robotics.planning import Pose
 
 _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")
 _PROFILES = {"P": _PROFILE}

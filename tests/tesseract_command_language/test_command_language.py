@@ -5,8 +5,7 @@ including waypoints, instructions, and composite instructions.
 """
 
 import numpy as np
-
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CartesianWaypoint,
     # Poly wrappers
     CartesianWaypointPoly_wrap_CartesianWaypoint,
@@ -41,7 +40,7 @@ from tesseract_robotics.tesseract_command_language import (
     WaitInstruction,
     WaitInstructionType,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
@@ -444,7 +443,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_composite_instruction(self):
         """Test wrapping CompositeInstruction in AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract.tesseract_task_composer import (
             AnyPoly_wrap_CompositeInstruction,
         )
 
@@ -465,7 +464,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_profile_dictionary(self):
         """Test wrapping ProfileDictionary in AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract.tesseract_task_composer import (
             AnyPoly_wrap_ProfileDictionary,
         )
 
@@ -476,7 +475,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_roundtrip_composite_instruction(self):
         """Test wrapping and unwrapping CompositeInstruction via AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract.tesseract_task_composer import (
             AnyPoly_as_CompositeInstruction,
             AnyPoly_wrap_CompositeInstruction,
         )
@@ -573,7 +572,7 @@ class TestWaitInstruction:
     def test_scan_program_interleaves_moves_and_waits(self):
         """Concrete usage: a scan program where each move is followed by a
         wait for the camera-done IO line."""
-        from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+        from tesseract.tesseract_common import Isometry3d, Translation3d
 
         program = CompositeInstruction("DEFAULT")
         for x in (0.0, 0.1, 0.2):

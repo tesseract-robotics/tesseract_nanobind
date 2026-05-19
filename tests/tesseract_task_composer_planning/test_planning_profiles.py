@@ -1,8 +1,7 @@
 """Tests for tesseract_task_composer planning-node profile bindings."""
 
 import pytest
-
-from tesseract_robotics.tesseract_task_composer_planning import (
+from tesseract.tesseract_task_composer_planning import (
     ContactCheckProfile,
     FixStateBoundsProfile,
     FixStateCollisionProfile,

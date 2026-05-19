@@ -7,9 +7,8 @@ ProfileDictionary registration helpers.
 import math
 
 import pytest
-
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_motion_planners_simple import (
     SimplePlannerCompositeProfile,
     SimplePlannerFixedSizeAssignMoveProfile,
     SimplePlannerFixedSizeAssignNoIKMoveProfile,

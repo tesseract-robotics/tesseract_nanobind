@@ -26,6 +26,16 @@ import csv
 import sys
 
 import numpy as np
+from tesseract.tesseract_collision import CollisionEvaluatorType
+from tesseract.tesseract_command_language import ProfileDictionary
+from tesseract.tesseract_motion_planners_trajopt import (
+    ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptPlanProfile,
+    ProfileDictionary_addTrajOptSolverProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
+    TrajOptOSQPSolverProfile,
+)
 
 from tesseract_robotics.planning import (
     CartesianTarget,
@@ -33,16 +43,6 @@ from tesseract_robotics.planning import (
     Pose,
     Robot,
     TaskComposer,
-)
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptSolverProfile,
-    TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
-    TrajOptOSQPSolverProfile,
 )
 
 TesseractViewer = None

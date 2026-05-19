@@ -35,17 +35,22 @@ from typing import overload
 
 import numpy as np
 from numpy.typing import ArrayLike
-
-from tesseract_robotics.tesseract_common import (
+from tesseract.tesseract_common import (
     EIGEN_DEFAULT_PREC,
-    X_AXIS,
-    Y_AXIS,
-    Z_AXIS,
     AngleAxisd,
     Isometry3d,
     Quaterniond,
     Translation3d,
 )
+
+# Standard unit axes — Vector3d-compatible, frozen to guard against accidental
+# in-place mutation when the same constant is reused across call sites.
+X_AXIS: np.ndarray = np.array([1.0, 0.0, 0.0])
+Y_AXIS: np.ndarray = np.array([0.0, 1.0, 0.0])
+Z_AXIS: np.ndarray = np.array([0.0, 0.0, 1.0])
+X_AXIS.flags.writeable = False
+Y_AXIS.flags.writeable = False
+Z_AXIS.flags.writeable = False
 
 # Denominator floor for `.normalized()`-style operations. Below this
 # magnitude, float64 division by `.norm()` (Eigen's `.normalized()` or the

@@ -29,7 +29,7 @@ Reference:
 
 import math
 
-from tesseract_robotics.ompl_base import (
+from ompl.base import (
     DubinsStateSpace,
     RealVectorBounds,
     ReedsSheppPathSegmentType,

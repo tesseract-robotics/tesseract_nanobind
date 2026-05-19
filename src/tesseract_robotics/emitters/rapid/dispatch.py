@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_command_language import (
+from tesseract.tesseract_command_language import (
     CompositeInstruction,
     InstructionPoly,
     MoveInstructionPoly,
@@ -19,6 +18,8 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_CartesianWaypointPoly,
     WaypointPoly_as_JointWaypointPoly,
 )
+
+from tesseract_robotics.planning import Pose
 
 from .rapid_writer import (
     Comment,

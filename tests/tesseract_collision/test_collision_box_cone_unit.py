@@ -4,7 +4,7 @@ import os
 import numpy as np
 import numpy.testing as nptest
 
-from tesseract_robotics import tesseract_collision, tesseract_common, tesseract_geometry
+from tesseract import tesseract_collision, tesseract_common, tesseract_geometry
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -91,7 +91,7 @@ def run_test(checker):
     nptest.assert_almost_equal(checker.getCollisionMarginData().getMaxCollisionMargin(), 0.1)
 
     # Set the collision object transforms
-    location = tesseract_common.TransformMap()
+    location = dict()
     location["box_link"] = tesseract_common.Isometry3d(np.eye(4))
     cone_link_transform = np.eye(4)
     cone_link_transform[0][3] = 0.2
@@ -129,11 +129,9 @@ def run_test(checker):
 
 
 def get_plugin_factory():
-    # Use _FilesystemPath (C++ binding) for ContactManagersPluginFactory which needs fs::path
-    from tesseract_robotics.tesseract_common import _FilesystemPath
-
+    # Use C++ binding for ContactManagersPluginFactory which needs fs::path
     support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
-    collision_config = _FilesystemPath(support_dir + "/urdf/" + "contact_manager_plugins.yaml")
+    collision_config = support_dir + "/urdf/" + "contact_manager_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_collision.ContactManagersPluginFactory(collision_config, locator), locator
 
