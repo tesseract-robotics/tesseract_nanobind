@@ -61,6 +61,20 @@ find_package(tesseract_environment REQUIRED)
 find_package(tesseract_command_language REQUIRED)
 find_package(console_bridge REQUIRED)
 
+# Windows DLL search dirs for nanobind stub generation. The .pyd imported by
+# stubgen has transitive DLL deps (tesseract C++ libs, conda libs) that Python
+# 3.8+ doesn't pick up via PATH — they have to be registered via
+# `os.add_dll_directory()`. scripts/nb_stubgen_wrapper.py reads this env var
+# and registers each entry before dispatching to `nanobind.stubgen`. No-op on
+# non-Windows platforms.
+set(_NBE_STUB_DLL_DIRS "")
+if(WIN32)
+  set(_NBE_STUB_DLL_DIRS "${TESSERACT_INSTALL_DIR}/bin")
+  if(DEFINED ENV{CONDA_PREFIX})
+    string(APPEND _NBE_STUB_DLL_DIRS "$ENV{CONDA_PREFIX}/Library/bin")
+  endif()
+endif()
+
 # Reusable function for nanobind extension modules.
 #
 # Usage:
@@ -71,9 +85,14 @@ find_package(console_bridge REQUIRED)
 # STUB_DEPENDS lists sibling binding modules that must be built before this
 # module's .pyi can be generated. Required when the source file does
 # `tesseract_nb::import_module_in_context(m, "<sibling>")` at NB_MODULE
-# top-level — nanobind_add_stub runs the binding to introspect types, which
+# top-level — stub generation runs the binding to introspect types, which
 # executes those imports. Without the dep, CI's clean builds may schedule
 # stub generation before the sibling's .so is linked → ModuleNotFoundError.
+#
+# Stub generation routes through scripts/nb_stubgen_wrapper.py (instead of
+# nanobind_add_stub directly) so Windows can register `os.add_dll_directory()`
+# entries for the imported .pyd's transitive C++ deps before dispatching to
+# nanobind.stubgen. On non-Windows platforms the wrapper is a no-op pass-through.
 function(add_tesseract_nanobind_extension module_name source_file)
   cmake_parse_arguments(_NBE "" "" "STUB_DEPENDS" ${ARGN})
 
@@ -107,17 +126,33 @@ function(add_tesseract_nanobind_extension module_name source_file)
   install(TARGETS ${module_name}
           LIBRARY DESTINATION tesseract)
 
-  # Generate Python stub file (.pyi)
-  # DEPENDS includes STUB_DEPENDS so all sibling .so files exist before stubgen
-  # imports this binding (which transitively imports those siblings).
-  nanobind_add_stub(
-    ${module_name}_stub
-    MODULE ${module_name}
-    OUTPUT ${module_name}.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:${module_name}>
-    DEPENDS ${module_name} ${_NBE_STUB_DEPENDS}
-  )
+  # Generate Python stub file (.pyi) via the DLL-search-aware wrapper.
+  add_tesseract_nanobind_stub(${module_name} ${_NBE_STUB_DEPENDS})
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi DESTINATION tesseract)
+endfunction()
+
+# Generate .pyi stub for an already-defined nanobind module target.
+# Equivalent to nanobind_add_stub but routes through nb_stubgen_wrapper.py so
+# Windows DLL search dirs (NB_STUB_DLL_DIRS) are honored. Additional ARGN
+# values become extra DEPENDS on the custom command (sibling modules whose
+# .pyd must exist before stubgen imports this one).
+function(add_tesseract_nanobind_stub module_name)
+  set(_pyi ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.pyi)
+  add_custom_command(
+    OUTPUT ${_pyi}
+    COMMAND ${CMAKE_COMMAND} -E env "NB_STUB_DLL_DIRS=${_NBE_STUB_DLL_DIRS}"
+            "${Python_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/nb_stubgen_wrapper.py"
+            -q
+            -i "$<TARGET_FILE_DIR:${module_name}>"
+            -m ${module_name}
+            -o ${_pyi}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS ${module_name} ${ARGN}
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/nb_stubgen_wrapper.py"
+    COMMENT "Generating ${module_name}.pyi"
+    VERBATIM
+  )
+  add_custom_target(${module_name}_stub ALL DEPENDS ${_pyi})
 endfunction()
 
 # Add tesseract_common module
@@ -293,14 +328,9 @@ set_target_properties(base PROPERTIES
   VISIBILITY_INLINES_HIDDEN OFF)
 install(TARGETS base LIBRARY DESTINATION ompl)
 
-# Generate Python stub file (.pyi)
-nanobind_add_stub(
-  base_stub
-  MODULE base
-  OUTPUT base.pyi
-  PYTHON_PATH $<TARGET_FILE_DIR:base>
-  DEPENDS base
-)
+# Generate Python stub file (.pyi) via the DLL-search-aware wrapper.
+# `base` has no `import_module_in_context` calls so no extra STUB_DEPENDS.
+add_tesseract_nanobind_stub(base)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/base.pyi DESTINATION ompl)
 
 # Add tesseract_motion_planners_descartes module (optional - only if descartes component was built)
