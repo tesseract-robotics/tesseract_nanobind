@@ -134,10 +134,14 @@ class TestDescartesPlanning:
 
         # Two cartesian waypoints
         wp1 = CartesianWaypoint(
-            Isometry3d.Identity() * Translation3d(0.8, -0.2, 0.8) * Quaterniond(0, 0, -1.0, 0)
+            Isometry3d.Identity()
+            * Translation3d(0.8, -0.2, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
         )
         wp2 = CartesianWaypoint(
-            Isometry3d.Identity() * Translation3d(0.8, 0.2, 0.8) * Quaterniond(0, 0, -1.0, 0)
+            Isometry3d.Identity()
+            * Translation3d(0.8, 0.2, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
         )
 
         start_instruction = MoveInstruction(

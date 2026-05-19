@@ -197,7 +197,9 @@ class TestTrajOptPlanning:
         wp1 = JointWaypoint(joint_names, np.array([0, 0, 0, -1.57, 0, 0, 0], dtype=np.float64))
         # End at cartesian position
         wp2 = CartesianWaypoint(
-            Isometry3d.Identity() * Translation3d(-0.2, 0.4, 0.2) * Quaterniond(0, 0, 1.0, 0)
+            Isometry3d.Identity()
+            * Translation3d(-0.2, 0.4, 0.2)
+            * Quaterniond.from_xyzw(0, 1.0, 0, 0)
         )
 
         start_instruction = MoveInstruction(

@@ -66,9 +66,11 @@ Key Concepts
     Used by KUKA IIWA, UR robots, custom mechanisms.
 
 **Quaternion Convention**:
-    Eigen::Quaterniond uses (w, x, y, z) order in constructor but Tesseract's
-    Quaterniond follows Eigen. When printing: q.w(), q.x(), q.y(), q.z().
-    Be careful with conversions to/from scipy, transforms3d, etc.
+    Project canonical order is scalar-last `[qx, qy, qz, qw]`. Use
+    `Quaterniond.from_xyzw(qx, qy, qz, qw)` to build; component access via
+    properties (`q.x`, `q.y`, `q.z`, `q.w`). The 4-double `Quaterniond(w, x, y, z)`
+    ctor is Eigen's scalar-first signature — present for direct interop but
+    not preferred in Python code.
 
 **Isometry3d**:
     Rigid transformation (rotation + translation, no scaling/shearing).
@@ -191,17 +193,19 @@ def main():
     print(f"Tool0 transform at joint position {robot_joint_pos} is: ")
     q = Quaterniond(tool0_transform.rotation())
     print(f"Translation: {tool0_transform.translation().flatten()}")
-    # Quaternion printed as (w, x, y, z) - Eigen convention
-    print(f"Rotation: {q.w()} {q.x()} {q.y()} {q.z()}")
+    # Project convention: scalar-last [qx, qy, qz, qw]
+    print(f"Rotation: {q.x} {q.y} {q.z} {q.w}")
 
     # =========================================================================
     # STEP 4: Inverse Kinematics
     # =========================================================================
     # Define target pose for end effector
-    # Compose transform: Identity * Translation * Rotation
-    # Note: Quaterniond constructor order is (w, x, y, z) - Eigen convention
+    # Compose transform: Identity * Translation * Rotation.
+    # Quaternion in project canonical scalar-last [qx, qy, qz, qw].
     tool0_transform2 = (
-        Isometry3d.Identity() * Translation3d(0.7, -0.1, 1) * Quaterniond(0.70711, 0, 0.7171, 0)
+        Isometry3d.Identity()
+        * Translation3d(0.7, -0.1, 1)
+        * Quaterniond.from_xyzw(0, 0.7171, 0, 0.70711)
     )
 
     # KinGroupIKInput specifies a single IK request
