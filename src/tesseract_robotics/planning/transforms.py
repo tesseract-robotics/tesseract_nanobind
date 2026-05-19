@@ -224,6 +224,17 @@ class Pose(Isometry3d):
     # is the ergonomic spelling. These do NOT reintroduce the numpy facade
     # @johnwason objected to — they're 1-line scalar extractors, no parallel
     # state, no numpy roundtrip.
+    #
+    # Perf note: each `qx/qy/qz/qw` access allocates a fresh `Quaterniond`
+    # from `self.linear()`; each `roll/pitch/yaw` access additionally runs
+    # an `eulerAngles("ZYX")` decomposition. Negligible in typical use
+    # (logging, formatting, one-off reads). For multi-component reads in
+    # a hot loop, do it once:
+    #     q = pose.quaternion                       # one allocation
+    #     qx, qy, qz, qw = q.x, q.y, q.z, q.w
+    #     yaw, pitch, roll = q.eulerAngles("ZYX")   # one decomposition
+    # Caching would require parallel mutable state — explicitly out of scope
+    # given Pose IS-A Isometry3d (which is itself mutable via in-place ops).
 
     @property
     def x(self) -> float:
