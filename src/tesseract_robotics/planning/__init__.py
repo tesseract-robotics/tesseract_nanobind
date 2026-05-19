@@ -10,7 +10,7 @@ Key Features:
 - Simple robot/environment loading from URDF/SRDF
 - Builder pattern for motion programs
 - Simplified task composer workflow
-- Transform/pose helpers
+- Pose helpers
 
 Example Usage:
     from tesseract_robotics.planning import (
@@ -85,7 +85,6 @@ from tesseract_robotics.planning.program import (
 )
 from tesseract_robotics.planning.transforms import (
     Pose,
-    Transform,  # Backwards compatibility alias
     rotation_from_axis_angle,
     rotation_from_quaternion,
     rotation_x,
@@ -106,7 +105,6 @@ __all__ = [
     "MoveType",
     # Transforms
     "Pose",
-    "Transform",  # Backwards compatibility alias
     "translation",
     "rotation_x",
     "rotation_y",

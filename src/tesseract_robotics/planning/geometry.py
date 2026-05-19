@@ -5,7 +5,7 @@ Provides factory functions for common geometry types and a high-level
 interface for adding obstacles to the environment.
 
 Example:
-    from tesseract_robotics.planning import Robot, box, sphere, create_obstacle, Transform
+    from tesseract_robotics.planning import Robot, box, sphere, create_obstacle, Pose
 
     robot = Robot.from_tesseract_support("abb_irb2400")
 
@@ -14,7 +14,7 @@ Example:
         robot,
         name="table",
         geometry=box(1.0, 0.5, 0.05),
-        transform=Transform.from_xyz(0.5, 0, 0.4),
+        transform=Pose.from_xyz(0.5, 0, 0.4),
     )
 
     # Add a sphere obstacle
@@ -22,7 +22,7 @@ Example:
         robot,
         name="ball",
         geometry=sphere(0.1),
-        transform=Transform.from_xyz(0.3, 0.2, 0.6),
+        transform=Pose.from_xyz(0.3, 0.2, 0.6),
     )
 """
 
@@ -36,7 +36,7 @@ import numpy as np
 if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
 
-from tesseract_robotics.planning.transforms import Transform
+from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_common import Isometry3d
 from tesseract_robotics.tesseract_geometry import (
     Box,
@@ -235,7 +235,7 @@ def create_obstacle(
     robot: Robot,
     name: str,
     geometry: Geometry,
-    transform: Transform | None = None,
+    transform: Pose | None = None,
     parent_link: str = "base_link",
     color: tuple | None = None,
 ) -> bool:
@@ -261,12 +261,12 @@ def create_obstacle(
             robot,
             name="box_obstacle",
             geometry=box(0.5, 0.5, 0.5),
-            transform=Transform.from_xyz(0.5, 0, 0.3),
+            transform=Pose.from_xyz(0.5, 0, 0.3),
             color=(0.8, 0.2, 0.2, 1.0),
         )
     """
     if transform is None:
-        transform = Transform()
+        transform = Pose()
 
     # Create link with geometry at origin of link frame
     link = Link(name)
@@ -285,7 +285,7 @@ def create_obstacle(
 def create_link_with_geometry(
     name: str,
     geometry: Geometry,
-    origin: Transform | None = None,
+    origin: Pose | None = None,
     color: tuple | None = None,
 ) -> Link:
     """
@@ -297,7 +297,7 @@ def create_link_with_geometry(
     Args:
         name: Link name
         geometry: Geometry object
-        origin: Transform from link frame to geometry (identity if None)
+        origin: Pose from link frame to geometry (identity if None)
         color: Optional RGBA color
 
     Returns:
@@ -314,7 +314,7 @@ def create_fixed_joint(
     name: str,
     parent_link: str,
     child_link: str,
-    origin: Transform | None = None,
+    origin: Pose | None = None,
 ) -> Joint:
     """
     Create a fixed joint between two links.
@@ -323,7 +323,7 @@ def create_fixed_joint(
         name: Joint name
         parent_link: Parent link name
         child_link: Child link name
-        origin: Transform from parent to child (identity if None)
+        origin: Pose from parent to child (identity if None)
 
     Returns:
         Configured Joint object
