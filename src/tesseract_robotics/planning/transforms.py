@@ -55,14 +55,27 @@ class Pose(Isometry3d):
     operator) is inherited.
 
     Factory convention: **one name per logical operation; both arraylike-
-    pair and by-component signatures accepted via `@overload`**. So
-    `from_xyz_quat(pos, quat)` and
-    `from_xyz_quat(x, y, z, qx, qy, qz, qw)` are both valid
-    spellings of the same factory — pick whichever reads better at the
-    call site (literals favour scalars; existing arrays favour the pair).
-    Same pattern on `from_xyz_rpy`. The inherited `Pose()` /
-    `Pose(matrix)` / `Pose(iso)` / `Pose(Translation3d, Quaterniond)` ctors
-    cover identity, raw-matrix, copy, and typed construction respectively.
+    pair and by-component signatures accepted via `@overload` *only when
+    both styles read naturally* at the call site**.
+
+    Where `@overload` is provided:
+    - `from_xyz_quat(pos, quat)` / `from_xyz_quat(x, y, z, qx, qy, qz, qw)`
+    - `from_xyz_rpy(pos, rpy)` / `from_xyz_rpy(x, y, z, roll, pitch, yaw)`
+
+    Where it is NOT (asymmetry by design):
+    - `from_xyz(x, y, z)` — 3 scalars only. `from_xyz([x, y, z])` saves no
+      keystrokes and a literal `[0.5, 0, 0.3]` rarely already exists as a
+      variable; the @overload would be ceremony.
+    - `from_matrix_position(R, pos)` — `R` is always arraylike (9 scalars
+      is absurd). `pos` could grow a scalar overload but the asymmetric
+      `(R, x, y, z)` shape reads worse than the current uniform-arraylike.
+
+    Rule of thumb: add `@overload` when both call shapes show up unprompted
+    at real call sites. Don't add overloads for hypothetical symmetry.
+
+    The inherited `Pose()` / `Pose(matrix)` / `Pose(iso)` /
+    `Pose(Translation3d, Quaterniond)` ctors cover identity, raw-matrix,
+    copy, and typed construction respectively.
 
     For reading: use the inherited Eigen API directly. `pose.translation()`,
     `pose.rotation()` / `pose.linear()`, `pose.matrix()`, and for quaternion
@@ -97,6 +110,11 @@ class Pose(Isometry3d):
         qz: float,
         qw: float,
     ) -> Pose: ...
+    # pyright wants the impl signature to enumerate named params from every
+    # overload (would be 7 params with 5 defaults, narrowed on len(args)
+    # anyway). The dispatch in the body is correct; the wart is purely
+    # structural. Tried `*args: Any` — pyright still complains; the check is
+    # structural not type-based.
     @classmethod
     def from_xyz_quat(cls, *args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
         """Pose from position `[x, y, z]` and scalar-last quaternion `[qx, qy, qz, qw]`.
@@ -144,6 +162,7 @@ class Pose(Isometry3d):
         pitch: float,
         yaw: float,
     ) -> Pose: ...
+    # Same structural pyright limitation as from_xyz_quat — see comment there.
     @classmethod
     def from_xyz_rpy(cls, *args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
         """Pose from position `[x, y, z]` and XYZ Tait-Bryan angles `[roll, pitch, yaw]`.
