@@ -29,10 +29,21 @@ def _add_dll_search_dirs() -> None:
     # Comma separator (not os.pathsep / `;`) because `;` collides with CMake's
     # list separator when the env var is passed via `cmake -E env`.
     dirs = os.environ.get("NB_STUB_DLL_DIRS", "")
+    print(f"[nb_stubgen_wrapper] NB_STUB_DLL_DIRS={dirs!r}", file=sys.stderr)
+    added = []
+    skipped = []
     for directory in dirs.split(","):
         directory = directory.strip()
-        if directory and os.path.isdir(directory):
+        if not directory:
+            continue
+        if os.path.isdir(directory):
             os.add_dll_directory(directory)  # type: ignore[attr-defined]
+            added.append(directory)
+        else:
+            skipped.append(directory)
+    print(
+        f"[nb_stubgen_wrapper] add_dll_directory: added={added} skipped={skipped}", file=sys.stderr
+    )
 
 
 def main() -> None:
