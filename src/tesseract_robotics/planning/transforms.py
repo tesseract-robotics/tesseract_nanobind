@@ -347,11 +347,15 @@ class Pose(Isometry3d):
         return NotImplemented
 
     def __repr__(self) -> str:
+        # 6 sig figs (`:.6g`) matches the C++ binding's default ostream
+        # precision used in Quaterniond / Isometry3d __repr__, so reprs are
+        # consistent across the surface. Identity values render as `0` / `1`
+        # rather than `0.000000` / `1.000000`, keeping common poses readable.
         t = self.translation()
         q = Quaterniond(self.linear()).coeffs()
         return (
-            f"Pose(position=[{t[0]:.4f}, {t[1]:.4f}, {t[2]:.4f}], "
-            f"quaternion=[{q[0]:.4f}, {q[1]:.4f}, {q[2]:.4f}, {q[3]:.4f}])"
+            f"Pose(position=[{t[0]:.6g}, {t[1]:.6g}, {t[2]:.6g}], "
+            f"quaternion=[{q[0]:.6g}, {q[1]:.6g}, {q[2]:.6g}, {q[3]:.6g}])"
         )
 
 
