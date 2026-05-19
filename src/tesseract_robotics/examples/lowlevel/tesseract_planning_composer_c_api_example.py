@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Task Composer Planning Example - High-Level Pipeline Orchestration
 

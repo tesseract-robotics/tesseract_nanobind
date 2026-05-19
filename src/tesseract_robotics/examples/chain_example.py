@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Chain Example - Descartes + TrajOpt Chained Planning
 

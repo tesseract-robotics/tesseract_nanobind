@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Pick and Place Example - Low-Level C API Implementation
 

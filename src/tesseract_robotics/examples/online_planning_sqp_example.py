@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Online Planning with Low-Level SQP API
 ======================================

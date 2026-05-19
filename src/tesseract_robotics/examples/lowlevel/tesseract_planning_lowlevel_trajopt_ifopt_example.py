@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Low-Level Planning with TrajOptIfopt (OSQP-based SQP)
 

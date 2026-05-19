@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Puzzle Piece Auxiliary Axes Example
 

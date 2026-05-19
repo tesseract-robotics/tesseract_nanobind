@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Car Seat Example - Complex Multi-Step Pick & Place with Dynamic Mesh Objects
 

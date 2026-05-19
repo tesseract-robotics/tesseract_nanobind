@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Freespace Hybrid Example - OMPL + TrajOpt Hybrid Planning
 

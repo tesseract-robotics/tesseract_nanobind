@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Puzzle Piece Auxiliary Axes Example - 9-DOF Cartesian Path with Positioner
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """TWC Workcell viewer example.
 
 Loads workcell URDFs from tesseract_ros_workcell and visualizes them.

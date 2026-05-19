@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 SSL shapes viewer for WebXR VR headset support.
 
