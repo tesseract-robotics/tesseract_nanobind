@@ -335,7 +335,7 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
 
     # Compute relative transform: T_ee_seat = T_world_ee^-1 * T_world_seat
     # This preserves the seat's world position when reparenting
-    relative_tf = np.linalg.inv(end_effector_tf.matrix()) @ seat_tf.matrix()
+    relative_tf = np.linalg.inv(end_effector_tf.matrix) @ seat_tf.matrix
     joint_seat_robot.parent_to_joint_origin_transform = Isometry3d(relative_tf)
 
     # MoveLinkCommand: changes parent of existing link in scene graph

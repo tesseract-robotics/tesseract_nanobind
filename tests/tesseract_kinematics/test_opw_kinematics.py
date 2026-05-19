@@ -42,7 +42,7 @@ def run_inv_kin_test(inv_kin, fwd_kin):
 
     result = fwd_kin.calcFwdKin(solutions[0])
 
-    nptest.assert_almost_equal(pose, result["tool0"].matrix(), decimal=3)
+    nptest.assert_almost_equal(pose, result["tool0"].matrix, decimal=3)
 
 
 def test_opw_inverse_kinematic():

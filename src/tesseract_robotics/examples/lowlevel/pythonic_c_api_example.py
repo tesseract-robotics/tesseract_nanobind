@@ -146,7 +146,7 @@ def main():
 
     pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
     print(f"   FK at zeros: {pose}")
-    pos = pose.translation()
+    pos = pose.translation
     print(f"   Position: x={float(pos[0]):.3f}, y={float(pos[1]):.3f}, z={float(pos[2]):.3f}")
 
     # =========================================================================
@@ -156,7 +156,7 @@ def main():
     # Quaterniond, and matrix multiplication. The Pose class provides:
     # - Factory methods that accept separate x,y,z,qx,qy,qz,qw args
     # - @ operator for composing transforms (maps to matrix multiplication)
-    # - Inherited Isometry3d API: .translation() / .linear() for numpy access
+    # - Inherited Isometry3d API: .translation / .linear for numpy access
     print("\n4. Pose helpers...")
 
     # WHY from_xyz_quat: project canonical quaternion order is scalar-last
@@ -170,8 +170,8 @@ def main():
     print(f"   From factories: {t2}")
 
     # WHY numpy properties: direct interop with numpy without manual extraction
-    print(f"   Position array: {t1.translation()}")
-    print(f"   Quaternion: {Quaterniond(t1.linear()).coeffs()}")
+    print(f"   Position array: {t1.translation}")
+    print(f"   Quaternion: {Quaterniond(t1.linear).coeffs()}")
 
     # =========================================================================
     # 5. Add Obstacles

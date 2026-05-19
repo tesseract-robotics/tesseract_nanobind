@@ -80,7 +80,7 @@ def run(pipeline=None, num_planners=None):
     state = robot.env.getState()
     for link_name in link_names[:3]:
         transform = state.link_transforms[link_name]
-        pos = transform.translation()
+        pos = transform.translation
         print(f"  {link_name}: position = ({pos[0]:.3f}, {pos[1]:.3f}, {pos[2]:.3f})")
 
     # === QUERY ACTIVE JOINTS ===

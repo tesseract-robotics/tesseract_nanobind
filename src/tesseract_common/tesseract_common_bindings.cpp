@@ -98,16 +98,24 @@ NB_MODULE(_tesseract_common, m) {
         }, "translation"_a, "rotation"_a)
         .def_static("Identity", []() { return Eigen::Isometry3d::Identity(); })
         .def("setIdentity", [](Eigen::Isometry3d& self) { self.setIdentity(); })
-        .def("matrix", [](const Eigen::Isometry3d& self) -> Eigen::Matrix4d {
+        // Stored-data accessors as properties (matches the project
+        // convention: scalar component accessors on Quaterniond /
+        // Translation3d / AngleAxisd are properties; this completes the
+        // pattern for the rigid-transform getters). `matrix` returns the
+        // full 4x4 homogeneous matrix; `translation` the 3-vector;
+        // `linear` and `rotation` the upper-left 3x3 block (identical for
+        // Isometry3d since it guarantees no scale/shear, but both names
+        // are kept for API familiarity).
+        .def_prop_ro("matrix", [](const Eigen::Isometry3d& self) -> Eigen::Matrix4d {
             return self.matrix();
         })
-        .def("translation", [](const Eigen::Isometry3d& self) -> Eigen::Vector3d {
+        .def_prop_ro("translation", [](const Eigen::Isometry3d& self) -> Eigen::Vector3d {
             return self.translation();
         })
-        .def("rotation", [](const Eigen::Isometry3d& self) -> Eigen::Matrix3d {
+        .def_prop_ro("rotation", [](const Eigen::Isometry3d& self) -> Eigen::Matrix3d {
             return self.rotation();
         })
-        .def("linear", [](const Eigen::Isometry3d& self) -> Eigen::Matrix3d {
+        .def_prop_ro("linear", [](const Eigen::Isometry3d& self) -> Eigen::Matrix3d {
             return self.linear();
         })
         .def("inverse", [](const Eigen::Isometry3d& self) {

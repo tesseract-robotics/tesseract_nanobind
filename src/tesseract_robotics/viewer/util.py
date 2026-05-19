@@ -90,9 +90,9 @@ def trajectory_list_to_frames(tesseract_env, manipulator_info, joint_names, traj
     for i in range(len(trajectory_list)):
         frames = kin.calcFwdKin(np.asarray(trajectory_list[i], dtype=np.float64))
         frame = frames[manipulator_info.tcp_frame]
-        p = frame.translation().flatten()
-        q1 = Quaterniond(frame.linear())
-        q = np.array([q1.w(), q1.x(), q1.y(), q1.z()])
+        p = frame.translation.flatten()
+        q1 = Quaterniond(frame.linear)
+        q = np.array([q1.w, q1.x, q1.y, q1.z])
 
         ret.append([p, q])
     return ret

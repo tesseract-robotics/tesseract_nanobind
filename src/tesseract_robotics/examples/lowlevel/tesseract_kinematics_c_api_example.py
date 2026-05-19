@@ -191,8 +191,8 @@ def main():
     # Extract position and orientation from Isometry3d
     # rotation() returns 3x3 rotation matrix, Quaterniond converts to quaternion
     print(f"Tool0 transform at joint position {robot_joint_pos} is: ")
-    q = Quaterniond(tool0_transform.rotation())
-    print(f"Translation: {tool0_transform.translation().flatten()}")
+    q = Quaterniond(tool0_transform.rotation)
+    print(f"Translation: {tool0_transform.translation.flatten()}")
     # Project convention: scalar-last [qx, qy, qz, qw]
     print(f"Rotation: {q.x} {q.y} {q.z} {q.w}")
 

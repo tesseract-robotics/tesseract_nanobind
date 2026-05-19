@@ -90,7 +90,7 @@ class TestCartesianWaypoint:
         transform = Isometry3d.Identity() * Translation3d(1.0, 2.0, 3.0)
         wp = CartesianWaypoint(transform)
         result = wp.getTransform()
-        np.testing.assert_array_almost_equal(result.translation(), np.array([1.0, 2.0, 3.0]))
+        np.testing.assert_array_almost_equal(result.translation, np.array([1.0, 2.0, 3.0]))
 
     def test_constructor_with_quaternion(self):
         # Create transform with rotation

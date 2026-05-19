@@ -286,7 +286,7 @@ def attach_seat(robot, seat_name="seat_1"):
     joint.parent_link_name = "end_effector"
     joint.child_link_name = seat_name
     joint.type = JointType.FIXED
-    relative_tf = np.linalg.inv(ee_tf.matrix()) @ seat_tf.matrix()
+    relative_tf = np.linalg.inv(ee_tf.matrix) @ seat_tf.matrix
     joint.parent_to_joint_origin_transform = Isometry3d(relative_tf)
 
     # MoveLinkCommand: changes parent of existing link in scene graph
