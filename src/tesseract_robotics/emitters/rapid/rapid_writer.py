@@ -409,7 +409,7 @@ class Robtarget(RapidCommand):
     Usage:
 
     ```python
-    target = RapidTarget(Pose.from_xyz_quat(0.6, -0.1, 0.8, 0, 0.707, 0, 0.707))
+    target = RapidTarget(Pose.from_xyz_quat([0.6, -0.1, 0.8], [0, 0.707, 0, 0.707]))
     p1 = Robtarget("p1", target)   # emits the declaration, returns "p1"
     MoveL(p1, profile)             # references by varname
     ```

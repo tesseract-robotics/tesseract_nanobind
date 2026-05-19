@@ -5,7 +5,6 @@ import sys
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
-    
 
 shapes_urdf = """
 <robot name="mesh_viewer">

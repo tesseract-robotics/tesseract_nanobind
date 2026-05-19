@@ -7,21 +7,22 @@ Save JSON: pytest tests/benchmarks/ --benchmark-only --benchmark-json=results.js
 """
 
 import os
+
 import pytest
 
 # Skip if benchmark not installed
 pytest.importorskip("pytest_benchmark")
 
 from tesseract_robotics.examples import (
-    freespace_ompl_example,
-    pick_and_place_example,
-    glass_upright_example,
     basic_cartesian_example,
-    raster_example,
-    online_planning_example,
     chain_example,
     freespace_hybrid_example,
+    freespace_ompl_example,
+    glass_upright_example,
+    online_planning_example,
+    pick_and_place_example,
     puzzle_piece_auxillary_axes_example,
+    raster_example,
     scene_graph_example,
 )
 
@@ -50,7 +51,7 @@ class TestExampleBenchmarks:
         """Time each example's run() function with default pipeline."""
         result = benchmark(example)
         assert result, f"{example} failed"
-        benchmark.extra_info["example"] = f'{example}'
+        benchmark.extra_info["example"] = f"{example}"
         benchmark.extra_info["cpus"] = os.cpu_count()
 
 
@@ -70,6 +71,6 @@ class TestOMPLScaling:
             assert result, f"{example} failed"
         except (AssertionError, RuntimeError) as e:
             pytest.skip(f"{example} requires TrajOpt: {e}")
-        benchmark.extra_info["example"] = f'{example}'
+        benchmark.extra_info["example"] = f"{example}"
         benchmark.extra_info["num_planners"] = num_planners
         benchmark.extra_info["cpus"] = os.cpu_count()

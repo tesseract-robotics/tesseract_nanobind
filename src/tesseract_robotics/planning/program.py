@@ -102,9 +102,9 @@ class CartesianTarget:
                 pos = np.asarray(self.position)
                 if self.quaternion is not None:
                     quat = np.asarray(self.quaternion)
-                    self.pose = Pose.from_position_quaternion(pos, quat)
+                    self.pose = Pose.from_xyz_quat(pos, quat)
                 else:
-                    self.pose = Pose.from_position(pos)
+                    self.pose = Pose.from_xyz(*pos)
             else:
                 raise ValueError(
                     f"CartesianTarget requires 'pose' or 'position'. "

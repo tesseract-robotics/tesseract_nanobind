@@ -77,16 +77,16 @@ def run(pipeline="CartesianPipeline", num_planners=None):
     # Raster pattern: 3 parallel passes at different X positions
     # Each pass sweeps Y from -0.2m to +0.2m at constant Z=0.8m
     # Raster 1: x=0.8m
-    wp1 = Pose.from_xyz_quat(0.8, -0.2, 0.8, *quat_down)  # Start of pass 1
-    wp2 = Pose.from_xyz_quat(0.8, 0.2, 0.8, *quat_down)  # End of pass 1
+    wp1 = Pose.from_xyz_quat([0.8, -0.2, 0.8], quat_down)  # Start of pass 1
+    wp2 = Pose.from_xyz_quat([0.8, 0.2, 0.8], quat_down)  # End of pass 1
 
     # Raster 2: x=0.9m (10cm step in X)
-    wp3 = Pose.from_xyz_quat(0.9, -0.2, 0.8, *quat_down)
-    wp4 = Pose.from_xyz_quat(0.9, 0.2, 0.8, *quat_down)
+    wp3 = Pose.from_xyz_quat([0.9, -0.2, 0.8], quat_down)
+    wp4 = Pose.from_xyz_quat([0.9, 0.2, 0.8], quat_down)
 
     # Raster 3: x=1.0m
-    wp5 = Pose.from_xyz_quat(1.0, -0.2, 0.8, *quat_down)
-    wp6 = Pose.from_xyz_quat(1.0, 0.2, 0.8, *quat_down)
+    wp5 = Pose.from_xyz_quat([1.0, -0.2, 0.8], quat_down)
+    wp6 = Pose.from_xyz_quat([1.0, 0.2, 0.8], quat_down)
 
     # --8<-- [start:descartes_then_trajopt]
     # Build motion program with FREESPACE and CARTESIAN segments

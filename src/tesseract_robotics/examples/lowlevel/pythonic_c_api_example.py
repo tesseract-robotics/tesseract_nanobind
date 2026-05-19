@@ -160,8 +160,8 @@ def main():
 
     # WHY from_xyz_quat: Quaternion order is scalar-last (x,y,z,w).
     # Internally converts to Quaterniond(w,x,y,z) for Eigen.
-    t1 = Pose.from_xyz_quat(0.5, 0, 0.8, 0, 0, 0.707, 0.707)
-    print(f"   From xyz_quat: {t1}")
+    t1 = Pose.from_xyz_quat([0.5, 0, 0.8], [0, 0, 0.707, 0.707])
+    print(f"   From position_quaternion: {t1}")
 
     # WHY @ chaining: Reads left-to-right as "translate then rotate"
     # Equivalent to t2 = Isometry3d.Identity() * Translation3d(...) * Quaterniond(...)
@@ -223,7 +223,7 @@ def main():
         # Start at current position (joints)
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         # Move to Cartesian target
-        .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.707, 0, 0.707, 0)))
+        .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, -0.2, 0.8], [0.707, 0, 0.707, 0])))
         # Another Cartesian target
         .move_to(
             CartesianTarget(

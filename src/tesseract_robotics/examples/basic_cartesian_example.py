@@ -106,8 +106,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Create Cartesian waypoints (6D poses)
     # Quaternion (x=0, y=0, z=1.0, w=0) = 180 deg around Z = tool pointing down
     # C++ uses Eigen::Quaterniond(w, x, y, z) = (0, 0, 1.0, 0)
-    wp1 = Pose.from_xyz_quat(0.5, -0.2, 0.62, 0, 0, 1.0, 0)  # First Cartesian waypoint
-    wp2 = Pose.from_xyz_quat(0.5, 0.3, 0.62, 0, 0, 1.0, 0)  # Second waypoint (+0.5m in Y)
+    wp1 = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 1.0, 0])  # First Cartesian waypoint
+    wp2 = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 0, 1.0, 0])  # Second waypoint (+0.5m in Y)
 
     # Build 4-phase motion program:
     # 1. StateTarget: Start from known joint configuration

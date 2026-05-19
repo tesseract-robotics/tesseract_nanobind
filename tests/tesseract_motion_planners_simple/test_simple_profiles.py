@@ -21,7 +21,6 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
     SimplePlannerMoveProfile,
 )
 
-
 # ---- Fixed-size profiles ---------------------------------------------------
 
 FIXED_SIZE_CLASSES = [
@@ -111,6 +110,7 @@ class TestLVSProfiles:
 
 # ---- Composite base --------------------------------------------------------
 
+
 class TestSimplePlannerCompositeProfile:
     def test_default_construction(self):
         p = SimplePlannerCompositeProfile()
@@ -118,6 +118,7 @@ class TestSimplePlannerCompositeProfile:
 
 
 # ---- ProfileDictionary helpers ---------------------------------------------
+
 
 class TestProfileDictionaryHelpers:
     def test_add_move_profile(self):

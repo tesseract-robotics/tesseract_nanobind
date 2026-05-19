@@ -129,8 +129,8 @@ def main():
     # for end-effector tasks. The planner handles IK internally.
     # Quaternion (0.707, 0, 0.707, 0) = 90 deg rotation around Y axis,
     # pointing tool downward (common for pick/place operations).
-    wp1 = Pose.from_xyz_quat(0.8, -0.3, 1.455, 0.707, 0, 0.707, 0)
-    wp2 = Pose.from_xyz_quat(0.8, 0.3, 1.455, 0.707, 0, 0.707, 0)
+    wp1 = Pose.from_xyz_quat([0.8, -0.3, 1.455], [0.707, 0, 0.707, 0])
+    wp2 = Pose.from_xyz_quat([0.8, 0.3, 1.455], [0.707, 0, 0.707, 0])
 
     # WHY MotionProgram builder: Abstracts the low-level CompositeInstruction
     # construction. Internally creates CartesianWaypoint, wraps in poly types,

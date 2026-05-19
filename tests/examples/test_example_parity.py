@@ -7,6 +7,7 @@ closely match the C++ tesseract_examples).
 
 import numpy as np
 import pytest
+
 import tesseract_robotics.examples as examples
 
 

@@ -20,15 +20,15 @@ from tesseract_robotics.tesseract_command_language import (
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
+    ConstantTCPSpeedCompositeProfile,
+    ConstantTCPSpeedParameterization,
     InstructionsTrajectory,
     ISPCompositeProfile,
     ISPMoveProfile,
     IterativeSplineParameterization,
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
-    ConstantTCPSpeedCompositeProfile,
-    ConstantTCPSpeedParameterization,
     TimeParameterization,
+    TOTGCompositeProfile,
 )
 
 
@@ -157,7 +157,6 @@ class TestInstructionsTrajectory:
         assert trajectory.size() == 3
         assert trajectory.dof() == 6
         assert not trajectory.empty()
-
 
 
 class TestConstantTCPSpeedParameterization:

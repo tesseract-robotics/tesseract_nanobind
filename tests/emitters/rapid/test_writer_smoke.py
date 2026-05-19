@@ -55,7 +55,7 @@ def test_module_proc_moveabsj_emits_expected_lines():
 def test_movej_takes_target_bundle():
     """MoveJ takes a `RapidTarget` bundle (m → mm, scalar-last → scalar-first
     conversion inside `robtarget_from_pose`)."""
-    target = RapidTarget(Pose.from_xyz_quat(0.6, -0.1, 0.8, 0.0, 0.0, 0.0, 1.0))
+    target = RapidTarget(Pose.from_xyz_quat([0.6, -0.1, 0.8], [0.0, 0.0, 0.0, 1.0]))
 
     rapid = rpdw.RapidWriter()
     with rpdw.Module("M"):
@@ -72,8 +72,8 @@ def test_movej_takes_target_bundle():
 
 def test_movec_takes_via_end_target_bundles():
     """`MoveC` takes (via_target, end_target) — two independent `RapidTarget` bundles."""
-    via = RapidTarget(Pose.from_xyz_quat(0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
-    end = RapidTarget(Pose.from_xyz_quat(0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+    via = RapidTarget(Pose.from_xyz_quat([0.1, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]))
+    end = RapidTarget(Pose.from_xyz_quat([0.2, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]))
 
     rapid = rpdw.RapidWriter()
     with rpdw.Module("M"):
@@ -88,7 +88,7 @@ def test_movec_takes_via_end_target_bundles():
 
 def test_movel_uses_profile_bundle():
     """`MoveL(target, profile)` substitutes profile vars in the emitted line."""
-    target = RapidTarget(Pose.from_xyz_quat(0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0))
+    target = RapidTarget(Pose.from_xyz_quat([0.5, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]))
 
     rapid = rpdw.RapidWriter()
     with rpdw.Module("M"):
@@ -110,7 +110,7 @@ def test_movel_accepts_robtarget_varname_string():
     """
     from tesseract_robotics.emitters.rapid.rapid_writer import Robtarget
 
-    target = RapidTarget(Pose.from_xyz_quat(0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0))
+    target = RapidTarget(Pose.from_xyz_quat([0.5, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]))
 
     rapid = rpdw.RapidWriter()
     with rpdw.Module("M"):
@@ -132,8 +132,8 @@ def test_movec_accepts_mixed_inline_and_varname_targets():
     """`MoveC` accepts each of via/end independently as RapidTarget or str."""
     from tesseract_robotics.emitters.rapid.rapid_writer import Robtarget
 
-    via_target = RapidTarget(Pose.from_xyz_quat(0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
-    end_target = RapidTarget(Pose.from_xyz_quat(0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+    via_target = RapidTarget(Pose.from_xyz_quat([0.1, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]))
+    end_target = RapidTarget(Pose.from_xyz_quat([0.2, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]))
 
     rapid = rpdw.RapidWriter()
     with rpdw.Module("M"):
@@ -153,7 +153,7 @@ def test_target_carries_config_and_external_axis():
     from tesseract_robotics.emitters.rapid.rapid_writer import Config, ExternalAxis
 
     target = RapidTarget(
-        Pose.from_xyz_quat(0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0),
+        Pose.from_xyz_quat([0.5, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]),
         config=Config(2, 0, 1, 0),
         external_axis=ExternalAxis([1.57, 1.57]),
     )

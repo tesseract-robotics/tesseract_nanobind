@@ -27,8 +27,8 @@ from tesseract_robotics.tesseract_common import Quaterniond
 class TestPose:
     """Test Pose class and helpers."""
 
-    def test_identity(self):
-        t = Pose.identity()
+    def test_default_ctor(self):
+        t = Pose()
         np.testing.assert_array_almost_equal(t.translation(), [0, 0, 0])
         np.testing.assert_array_almost_equal(Quaterniond(t.linear()).coeffs(), [0, 0, 0, 1])
 
@@ -39,13 +39,13 @@ class TestPose:
         assert t.translation()[2] == 3
         np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
 
-    def test_from_position(self):
-        t = Pose.from_position([1.5, 2.5, 3.5])
+    def test_from_xyz_unpacked(self):
+        t = Pose.from_xyz(*[1.5, 2.5, 3.5])
         np.testing.assert_array_almost_equal(t.translation(), [1.5, 2.5, 3.5])
 
-    def test_from_xyz_quat(self):
+    def test_from_xyz_quat_literal(self):
         # 90 degree rotation around Z
-        t = Pose.from_xyz_quat(1, 2, 3, 0, 0, 0.707, 0.707)
+        t = Pose.from_xyz_quat([1, 2, 3], [0, 0, 0.707, 0.707])
         np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
         np.testing.assert_array_almost_equal(
             Quaterniond(t.linear()).coeffs(), [0, 0, 0.707, 0.707], decimal=3
@@ -53,7 +53,7 @@ class TestPose:
 
     def test_from_xyz_rpy(self):
         # 90 degrees around Z
-        t = Pose.from_xyz_rpy(1, 2, 3, 0, 0, np.pi / 2)
+        t = Pose.from_xyz_rpy([1, 2, 3], [0, 0, np.pi / 2])
         np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
         _yaw, _pitch, _roll = Quaterniond(t.linear()).eulerAngles("ZYX")
         np.testing.assert_almost_equal(float(_yaw), np.pi / 2, decimal=5)
@@ -93,8 +93,8 @@ class TestPose:
         t = Pose.from_xyz(1, 2, 3)
         iso = t.to_isometry()
         assert iso is not None
-        # Round-trip
-        t2 = Pose.from_isometry(iso)
+        # Round-trip via inherited Isometry3d ctor
+        t2 = Pose(iso)
         np.testing.assert_array_almost_equal(t.translation(), t2.translation())
 
     def test_pose_repr(self):
@@ -128,22 +128,22 @@ class TestPose:
         rotated = t.rotation() @ x_vec
         np.testing.assert_array_almost_equal(rotated, [0, 1, 0], decimal=5)
 
-    def test_from_position_quaternion(self):
-        """Test Pose.from_position_quaternion factory method."""
+    def test_from_xyz_quat(self):
+        """Test Pose.from_xyz_quat factory method."""
         pos = [1, 2, 3]
         quat = [0, 0, 0.707, 0.707]  # 90 deg around Z
-        t = Pose.from_position_quaternion(pos, quat)
+        t = Pose.from_xyz_quat(pos, quat)
         np.testing.assert_array_almost_equal(t.translation(), [1, 2, 3])
         np.testing.assert_array_almost_equal(Quaterniond(t.linear()).coeffs(), quat, decimal=2)
 
-    def test_from_matrix(self):
-        """Test Pose.from_matrix factory method for 4x4 matrix."""
+    def test_from_matrix_ctor(self):
+        """Test Pose(matrix) inherited 4x4 matrix ctor."""
         # Identity matrix
         mat = np.eye(4)
         mat[0, 3] = 1.5  # Translation x
         mat[1, 3] = 2.5  # Translation y
         mat[2, 3] = 3.5  # Translation z
-        t = Pose.from_matrix(mat)
+        t = Pose(mat)
         np.testing.assert_array_almost_equal(t.translation(), [1.5, 2.5, 3.5])
 
     def test_from_matrix_position(self):
@@ -453,7 +453,7 @@ class TestTargets:
         assert target.pose.translation()[1] == 2
         assert target.pose.translation()[2] == 3
 
-    def test_cartesian_target_from_position_quaternion(self):
+    def test_cartesian_target_from_xyz_quat(self):
         target = CartesianTarget(
             position=[1, 2, 3],
             quaternion=[0, 0, 0.707, 0.707],
@@ -946,8 +946,8 @@ class TestTaskComposer:
         program = (
             MotionProgram("manipulator", tcp_frame="tool0")
             .set_joint_names(joint_names)
-            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.0, 1.2, 0.707, 0.0, 0.707, 0.0)))
-            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.2, 1.2, 0.707, 0.0, 0.707, 0.0)))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 1.2], [0.707, 0.0, 0.707, 0.0])))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 1.2], [0.707, 0.0, 0.707, 0.0])))
         )
 
         composer = TaskComposer.from_config()
@@ -975,8 +975,8 @@ class TestTaskComposer:
         program = (
             MotionProgram("manipulator", tcp_frame="tool0")
             .set_joint_names(joint_names)
-            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.0, 1.2, 0.707, 0.0, 0.707, 0.0)))
-            .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, 0.2, 1.2, 0.707, 0.0, 0.707, 0.0)))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 1.2], [0.707, 0.0, 0.707, 0.0])))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 1.2], [0.707, 0.0, 0.707, 0.0])))
         )
 
         composer = TaskComposer.from_config()
