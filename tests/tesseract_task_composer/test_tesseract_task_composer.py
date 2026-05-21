@@ -9,6 +9,7 @@ import pytest
 import tesseract_robotics
 from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import (
+    TaskComposerNodeInfo,
     TaskComposerNodeInfoContainer,
     TaskComposerPluginFactory,
 )
@@ -490,16 +491,6 @@ class TestPipelineDataStorageExposure:
         del composer
         gc.collect()
 
-    def test_node_info_dict_exposes_data_storage(self, pipeline_run):
-        """Every node info dict from getAllInfos should carry a 'data_storage'
-        entry — the binding that 994bee3 added."""
-        infos = pipeline_run
-        assert len(infos) > 0, "Pipeline produced no node infos"
-        for info in infos:
-            assert "data_storage" in info, (
-                f"Node {info.get('name')!r} info dict missing 'data_storage' key"
-            )
-
     def test_discrete_contact_check_data_storage_yields_contact_results(
         self, pipeline_run
     ):
@@ -510,13 +501,11 @@ class TestPipelineDataStorageExposure:
             AnyPoly_as_ContactResultMapVector,
         )
 
-        infos = pipeline_run
-        contact_check_infos = [
-            i for i in infos if "DiscreteContactCheck" in (i.get("name") or "")
-        ]
+        infos: list[TaskComposerNodeInfo] = pipeline_run
+        contact_check_infos = [i for i in infos if "DiscreteContactCheck" in (i.name or "")]
         assert contact_check_infos, "DiscreteContactCheckTask did not run"
 
-        ds = contact_check_infos[0]["data_storage"]
+        ds = contact_check_infos[0].data_storage
         assert ds is not None
         all_data = ds.getAllData()
         assert "contact_results" in all_data, (
