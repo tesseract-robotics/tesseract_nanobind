@@ -9,6 +9,8 @@
 #include <nanobind/stl/chrono.h>
 #include <nanobind/stl/optional.h>
 
+#include <boost/uuid/uuid_io.hpp>
+
 #include <fstream>
 #include <sstream>
 
@@ -152,47 +154,31 @@ NB_MODULE(_tesseract_task_composer, m) {
 
     // ========== TaskComposerNodeInfo ==========
     nb::class_<tp::TaskComposerNodeInfo>(m, "TaskComposerNodeInfo")
+        .def_prop_ro("uuid", [](const tp::TaskComposerNodeInfo& self) { return boost::uuids::to_string(self.uuid); })
+        .def_prop_ro("parent_uuid", [](const tp::TaskComposerNodeInfo& self) { return boost::uuids::to_string(self.parent_uuid); })
         .def_prop_ro("name", [](const tp::TaskComposerNodeInfo& self) { return self.name; })
         .def_prop_ro("return_value", [](const tp::TaskComposerNodeInfo& self) { return self.return_value; })
         .def_prop_ro("status_code", [](const tp::TaskComposerNodeInfo& self) { return self.status_code; })
         .def_prop_ro("status_message", [](const tp::TaskComposerNodeInfo& self) { return self.status_message; })
         .def_prop_ro("elapsed_time", [](const tp::TaskComposerNodeInfo& self) { return self.elapsed_time; })
+        .def_prop_ro("data_storage", [](const tp::TaskComposerNodeInfo& self) { return self.data_storage; })
         .def_prop_ro("dotgraph", [](const tp::TaskComposerNodeInfo& self) { return self.dotgraph; });
 
     // ========== TaskComposerNodeInfoContainer ==========
     nb::class_<tp::TaskComposerNodeInfoContainer>(m, "TaskComposerNodeInfoContainer")
         .def(nb::init<>())
-        .def("getAbortingNodeInfo", [](const tp::TaskComposerNodeInfoContainer& self) -> nb::object {
+        .def("getAbortingNodeInfo", [](const tp::TaskComposerNodeInfoContainer& self) -> std::optional<tp::TaskComposerNodeInfo> {
             auto uuid = self.getAbortingNode();
             if (uuid.is_nil())
-                return nb::none();
-            auto info = self.getInfo(uuid);
-            if (!info.has_value())
-                return nb::none();
-            // Return a dict with the info (0.33: getInfo returns optional<value> not pointer)
-            nb::dict result;
-            result["name"] = info->name;
-            result["return_value"] = info->return_value;
-            result["status_code"] = info->status_code;
-            result["status_message"] = info->status_message;
-            result["elapsed_time"] = info->elapsed_time;
-            result["data_storage"] = info->data_storage;
-            return result;
+                return std::nullopt;
+            return self.getInfo(uuid);
         })
-        .def("getAllInfos", [](const tp::TaskComposerNodeInfoContainer& self) -> nb::list {
-            nb::list result;
+        .def("getAllInfos", [](const tp::TaskComposerNodeInfoContainer& self) -> std::vector<tp::TaskComposerNodeInfo> {
             auto info_map = self.getInfoMap();
-            // 0.33: getInfoMap returns map of values, not pointers
-            for (const auto& [uuid, info] : info_map) {
-                nb::dict d;
-                d["name"] = info.name;
-                d["return_value"] = info.return_value;
-                d["status_code"] = info.status_code;
-                d["status_message"] = info.status_message;
-                d["elapsed_time"] = info.elapsed_time;
-                d["data_storage"] = info.data_storage;
-                result.append(d);
-            }
+            std::vector<tp::TaskComposerNodeInfo> result;
+            result.reserve(info_map.size());
+            for (auto& [uuid, info] : info_map)
+                result.push_back(std::move(info));
             return result;
         });
 

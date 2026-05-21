@@ -513,13 +513,13 @@ class TaskComposer:
                     if task_infos:
                         # Try aborting node first — most useful diagnostic
                         aborting = task_infos.getAbortingNodeInfo()
-                        if aborting and aborting.get("status_message"):
-                            msg = f"{aborting['name']}: {aborting['status_message']}"
+                        if aborting and aborting.status_message:
+                            msg = f"{aborting.name}: {aborting.status_message}"
                         else:
                             # Scan all node infos for first non-empty status_message
                             for info in task_infos.getAllInfos():
-                                if info.get("status_message"):
-                                    msg = f"{info['name']}: {info['status_message']}"
+                                if info.status_message:
+                                    msg = f"{info.name}: {info.status_message}"
                                     break
                 except (AttributeError, TypeError):
                     pass

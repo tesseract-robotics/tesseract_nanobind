@@ -44,6 +44,12 @@ def createTaskComposerDataStorage() -> TaskComposerDataStorage:
 
 class TaskComposerNodeInfo:
     @property
+    def uuid(self) -> str: ...
+
+    @property
+    def parent_uuid(self) -> str: ...
+
+    @property
     def name(self) -> str: ...
 
     @property
@@ -59,14 +65,17 @@ class TaskComposerNodeInfo:
     def elapsed_time(self) -> float: ...
 
     @property
+    def data_storage(self) -> TaskComposerDataStorage: ...
+
+    @property
     def dotgraph(self) -> str: ...
 
 class TaskComposerNodeInfoContainer:
     def __init__(self) -> None: ...
 
-    def getAbortingNodeInfo(self) -> dict[str, object] | None: ...
+    def getAbortingNodeInfo(self) -> TaskComposerNodeInfo | None: ...
 
-    def getAllInfos(self) -> list[dict[str, object]]: ...
+    def getAllInfos(self) -> list[TaskComposerNodeInfo]: ...
 
 class TaskComposerContext:
     @property
@@ -224,11 +233,7 @@ def AnyPoly_as_CompositeInstruction(any_poly: AnyPoly) -> "tesseract_planning::C
 def AnyPoly_as_TaskComposerDataStorage(any_poly: AnyPoly) -> TaskComposerDataStorage:
     """Extract a TaskComposerDataStorage from an AnyPoly"""
 
-def AnyPoly_as_ContactResultMapVector(
-    any_poly: AnyPoly,
-) -> list["tesseract_collision::ContactResultMap"]:
-    """Extract a std::vector<ContactResultMap> from an AnyPoly.
-
-    DiscreteContactCheckTask saves its per-step contact results under the
-    'contact_results' key on its node info's data_storage in this form.
+def AnyPoly_as_ContactResultMapVector(any_poly: AnyPoly) -> list["tesseract_collision::ContactResultMap"]:
+    """
+    Extract a std::vector<ContactResultMap> from an AnyPoly. DiscreteContactCheckTask saves its per-step contact results under the 'contact_results' key on its node info's data_storage in this form.
     """
