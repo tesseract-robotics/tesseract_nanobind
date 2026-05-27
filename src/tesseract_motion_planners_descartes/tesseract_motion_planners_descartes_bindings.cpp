@@ -23,11 +23,159 @@
 #include <tesseract_motion_planners/descartes/profile/descartes_default_move_profile.h>
 #include <tesseract_motion_planners/descartes/profile/descartes_ladder_graph_solver_profile.h>
 
+// descartes_light core types (needed for Python-side subclassing)
+#include <descartes_light/types.h>
+#include <descartes_light/core/edge_evaluator.h>
+#include <descartes_light/core/waypoint_sampler.h>
+#include <descartes_light/core/state_evaluator.h>
+
+// tesseract dependencies referenced by profile method signatures
+#include <tesseract_command_language/poly/move_instruction_poly.h>
+#include <tesseract_common/manipulator_info.h>
+#include <tesseract_environment/environment.h>
+
 // tesseract_collision for CollisionCheckConfig
 #include <tesseract_collision/core/types.h>
 
 namespace tp = tesseract_planning;
 namespace tc = tesseract_common;
+namespace dl = descartes_light;
+
+// ------------------------------------------------------------------
+// Trampolines so Python can subclass the descartes_light interfaces.
+// ------------------------------------------------------------------
+
+class PyEdgeEvaluatorD : public dl::EdgeEvaluator<double> {
+public:
+    NB_TRAMPOLINE(dl::EdgeEvaluator<double>, 1);
+
+    std::pair<bool, double>
+    evaluate(const dl::State<double>& start, const dl::State<double>& end) const override {
+        NB_OVERRIDE_PURE(evaluate, start, end);
+    }
+};
+
+class PyWaypointSamplerD : public dl::WaypointSampler<double> {
+public:
+    NB_TRAMPOLINE(dl::WaypointSampler<double>, 1);
+
+    std::vector<dl::StateSample<double>> sample() const override {
+        NB_OVERRIDE_PURE(sample);
+    }
+};
+
+class PyStateEvaluatorD : public dl::StateEvaluator<double> {
+public:
+    NB_TRAMPOLINE(dl::StateEvaluator<double>, 1);
+
+    std::pair<bool, double> evaluate(const dl::State<double>& solution) const override {
+        NB_OVERRIDE(evaluate, solution);
+    }
+};
+
+// Shim C++ EdgeEvaluator/WaypointSampler/StateEvaluator that hold a Python
+// reference and forward calls. These exist so that when a Python-side
+// DescartesMoveProfileD subclass returns a Python object from createXxx,
+// we can hand back a `std::unique_ptr<...>` to C++ without trying to
+// transfer ownership of a Python-allocated instance (which nanobind cannot
+// do with the default deleter).
+class PyHeldEdgeEvaluatorD : public dl::EdgeEvaluator<double> {
+public:
+    explicit PyHeldEdgeEvaluatorD(nb::object obj) : obj_(std::move(obj)) {}
+    ~PyHeldEdgeEvaluatorD() override {
+        nb::gil_scoped_acquire gil;
+        obj_.reset();
+    }
+
+    std::pair<bool, double>
+    evaluate(const dl::State<double>& start, const dl::State<double>& end) const override {
+        nb::gil_scoped_acquire gil;
+        return nb::cast<std::pair<bool, double>>(
+            obj_.attr("evaluate")(nb::cast(&start, nb::rv_policy::reference),
+                                  nb::cast(&end, nb::rv_policy::reference)));
+    }
+
+private:
+    nb::object obj_;
+};
+
+class PyHeldWaypointSamplerD : public dl::WaypointSampler<double> {
+public:
+    explicit PyHeldWaypointSamplerD(nb::object obj) : obj_(std::move(obj)) {}
+    ~PyHeldWaypointSamplerD() override {
+        nb::gil_scoped_acquire gil;
+        obj_.reset();
+    }
+
+    std::vector<dl::StateSample<double>> sample() const override {
+        nb::gil_scoped_acquire gil;
+        return nb::cast<std::vector<dl::StateSample<double>>>(obj_.attr("sample")());
+    }
+
+private:
+    nb::object obj_;
+};
+
+class PyHeldStateEvaluatorD : public dl::StateEvaluator<double> {
+public:
+    explicit PyHeldStateEvaluatorD(nb::object obj) : obj_(std::move(obj)) {}
+    ~PyHeldStateEvaluatorD() override {
+        nb::gil_scoped_acquire gil;
+        obj_.reset();
+    }
+
+    std::pair<bool, double> evaluate(const dl::State<double>& solution) const override {
+        nb::gil_scoped_acquire gil;
+        return nb::cast<std::pair<bool, double>>(
+            obj_.attr("evaluate")(nb::cast(&solution, nb::rv_policy::reference)));
+    }
+
+private:
+    nb::object obj_;
+};
+
+// Trampoline for the move profile itself - lets Python supply custom
+// waypoint samplers / edge evaluators / state evaluators via subclassing.
+// All three create* overrides wrap the Python return value in a C++ shim.
+// This handles both cases uniformly:
+//   - Python returns a Python subclass instance (Python owns the C++ obj)
+//   - Python returns a C++-origin wrapper (e.g. delegated to a default profile)
+// In the second case the shim's dispatch goes Python -> nanobind -> C++ as
+// a normal virtual call, which is a one-time extra hop per shim call.
+class PyDescartesMoveProfileD : public tp::DescartesMoveProfile<double> {
+public:
+    NB_TRAMPOLINE(tp::DescartesMoveProfile<double>, 3);
+
+    std::unique_ptr<dl::WaypointSampler<double>>
+    createWaypointSampler(const tp::MoveInstructionPoly& move_instruction,
+                          const tc::ManipulatorInfo& composite_manip_info,
+                          const std::shared_ptr<const tesseract_environment::Environment>& env) const override {
+        nb::detail::ticket t(nb_trampoline, "createWaypointSampler", true);
+        nb::object py_result = nb::borrow<nb::object>(
+            nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
+        return std::make_unique<PyHeldWaypointSamplerD>(std::move(py_result));
+    }
+
+    std::unique_ptr<dl::EdgeEvaluator<double>>
+    createEdgeEvaluator(const tp::MoveInstructionPoly& move_instruction,
+                        const tc::ManipulatorInfo& composite_manip_info,
+                        const std::shared_ptr<const tesseract_environment::Environment>& env) const override {
+        nb::detail::ticket t(nb_trampoline, "createEdgeEvaluator", true);
+        nb::object py_result = nb::borrow<nb::object>(
+            nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
+        return std::make_unique<PyHeldEdgeEvaluatorD>(std::move(py_result));
+    }
+
+    std::unique_ptr<dl::StateEvaluator<double>>
+    createStateEvaluator(const tp::MoveInstructionPoly& move_instruction,
+                         const tc::ManipulatorInfo& composite_manip_info,
+                         const std::shared_ptr<const tesseract_environment::Environment>& env) const override {
+        nb::detail::ticket t(nb_trampoline, "createStateEvaluator", true);
+        nb::object py_result = nb::borrow<nb::object>(
+            nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
+        return std::make_unique<PyHeldStateEvaluatorD>(std::move(py_result));
+    }
+};
 
 NB_MODULE(_tesseract_motion_planners_descartes, m) {
     m.doc() = "tesseract_motion_planners_descartes Python bindings";
@@ -40,6 +188,42 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
 
     // Import MotionPlanner base type for clone() return type
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
+    // ========== descartes_light::State<double> ==========
+    // Python-readable view of a Descartes state. Constructable from a numpy
+    // vector so Python-side StateEvaluator/WaypointSampler subclasses can
+    // produce one.
+    nb::class_<dl::State<double>>(m, "DescartesStateD")
+        .def(nb::init<>())
+        .def("__init__", [](dl::State<double>* self, const Eigen::Ref<const Eigen::VectorXd>& v) {
+            new (self) dl::State<double>(v);
+        }, "values"_a)
+        .def_rw("values", &dl::State<double>::values);
+
+    // ========== descartes_light::StateSample<double> ==========
+    nb::class_<dl::StateSample<double>>(m, "DescartesStateSampleD")
+        .def(nb::init<>())
+        .def(nb::init<std::shared_ptr<const dl::State<double>>, double>(), "state"_a, "cost"_a)
+        .def_rw("state", &dl::StateSample<double>::state)
+        .def_rw("cost", &dl::StateSample<double>::cost);
+
+    // ========== descartes_light::EdgeEvaluator<double> ==========
+    nb::class_<dl::EdgeEvaluator<double>, PyEdgeEvaluatorD>(m, "DescartesEdgeEvaluatorD")
+        .def(nb::init<>())
+        .def("evaluate", &dl::EdgeEvaluator<double>::evaluate, "start"_a, "end"_a,
+             "Returns (is_valid, cost) for the edge between two states");
+
+    // ========== descartes_light::WaypointSampler<double> ==========
+    nb::class_<dl::WaypointSampler<double>, PyWaypointSamplerD>(m, "DescartesWaypointSamplerD")
+        .def(nb::init<>())
+        .def("sample", &dl::WaypointSampler<double>::sample,
+             "Return the list of valid state samples for this waypoint");
+
+    // ========== descartes_light::StateEvaluator<double> ==========
+    nb::class_<dl::StateEvaluator<double>, PyStateEvaluatorD>(m, "DescartesStateEvaluatorD")
+        .def(nb::init<>())
+        .def("evaluate", &dl::StateEvaluator<double>::evaluate, "solution"_a,
+             "Returns (is_valid, cost) for a state");
 
     // ========== DescartesSolverProfile<double> (base for solver profiles) ==========
     nb::class_<tp::DescartesSolverProfile<double>, tc::Profile>(m, "DescartesSolverProfileD")
@@ -58,8 +242,24 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     "Cast DescartesLadderGraphSolverProfileD to Profile for use with ProfileDictionary");
 
     // ========== DescartesMoveProfile<double> (base, was DescartesPlanProfile) ==========
-    nb::class_<tp::DescartesMoveProfile<double>, tc::Profile>(m, "DescartesMoveProfileD")
-        .def("getKey", &tp::DescartesMoveProfile<double>::getKey);
+    // Python users may subclass this and override createWaypointSampler/
+    // createEdgeEvaluator/createStateEvaluator to plug in custom logic.
+    nb::class_<tp::DescartesMoveProfile<double>, tc::Profile, PyDescartesMoveProfileD>(m, "DescartesMoveProfileD")
+        .def(nb::init<>())
+        .def("getKey", &tp::DescartesMoveProfile<double>::getKey)
+        .def("createWaypointSampler", &tp::DescartesMoveProfile<double>::createWaypointSampler,
+             "move_instruction"_a, "composite_manip_info"_a, "env"_a)
+        .def("createEdgeEvaluator", &tp::DescartesMoveProfile<double>::createEdgeEvaluator,
+             "move_instruction"_a, "composite_manip_info"_a, "env"_a)
+        .def("createStateEvaluator", &tp::DescartesMoveProfile<double>::createStateEvaluator,
+             "move_instruction"_a, "composite_manip_info"_a, "env"_a);
+
+    // Helper to cast a Python (or C++) DescartesMoveProfileD subclass to Profile
+    // for ProfileDictionary insertion.
+    m.def("cast_DescartesMoveProfileD", [](std::shared_ptr<tp::DescartesMoveProfile<double>> profile) {
+        return std::static_pointer_cast<tc::Profile>(profile);
+    }, "profile"_a,
+    "Cast a DescartesMoveProfileD (including Python subclasses) to Profile for use with ProfileDictionary");
 
     // SWIG-compatible alias
     m.attr("DescartesPlanProfileD") = m.attr("DescartesMoveProfileD");
@@ -84,17 +284,11 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     // SWIG-compatible alias
     m.attr("DescartesDefaultPlanProfileD") = m.attr("DescartesDefaultMoveProfileD");
 
-    // Helper to cast DescartesDefaultMoveProfileD to Profile
-    m.def("cast_DescartesMoveProfileD", [](std::shared_ptr<tp::DescartesDefaultMoveProfile<double>> profile) {
+    // Legacy alias for cast_DescartesMoveProfileD
+    m.def("cast_DescartesPlanProfileD", [](std::shared_ptr<tp::DescartesMoveProfile<double>> profile) {
         return std::static_pointer_cast<tc::Profile>(profile);
     }, "profile"_a,
-    "Cast DescartesDefaultMoveProfileD to Profile for use with ProfileDictionary");
-
-    // Legacy alias
-    m.def("cast_DescartesPlanProfileD", [](std::shared_ptr<tp::DescartesDefaultMoveProfile<double>> profile) {
-        return std::static_pointer_cast<tc::Profile>(profile);
-    }, "profile"_a,
-    "Cast DescartesDefaultPlanProfileD to Profile (legacy alias)");
+    "Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)");
 
     // ========== DescartesMotionPlanner<double> ==========
     nb::class_<tp::DescartesMotionPlanner<double>>(m, "DescartesMotionPlannerD")

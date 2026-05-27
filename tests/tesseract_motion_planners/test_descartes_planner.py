@@ -29,8 +29,12 @@ from tesseract_robotics.tesseract_motion_planners_simple import generateInterpol
 # Descartes imports - skip tests if not available
 try:
     from tesseract_robotics.tesseract_motion_planners_descartes import (
+        DescartesDefaultMoveProfileD,
         DescartesDefaultPlanProfileD,
+        DescartesEdgeEvaluatorD,
         DescartesMotionPlannerD,
+        DescartesMoveProfileD,
+        cast_DescartesMoveProfileD,
         cast_DescartesPlanProfileD,
     )
 
@@ -200,3 +204,95 @@ class TestDescartesPlanning:
                     assert len(state_wp.getPosition()) == 6
                 count += 1
         assert count > 0, "Expected at least one move instruction in results"
+
+
+class TestPythonEdgeEvaluator:
+    """End-to-end test of a Python-side custom EdgeEvaluator plugged into a
+    Python-side DescartesMoveProfileD subclass."""
+
+    def test_custom_python_edge_evaluator_is_called(self, abb_irb2400_environment):
+        env, manip_info, _ = abb_irb2400_environment
+
+        # Counter visible across all instances; cheap way to prove the C++
+        # planner called back into our Python evaluate() during the solve.
+        call_counter = {"n": 0}
+
+        class JointDistanceEdgeEvaluator(DescartesEdgeEvaluatorD):
+            """Cost = L2 norm of joint-space delta; always valid."""
+
+            def evaluate(self, start, end):
+                call_counter["n"] += 1
+                delta = end.values - start.values
+                cost = float(np.linalg.norm(delta))
+                return (True, cost)
+
+        class PythonMoveProfile(DescartesMoveProfileD):
+            """Delegates sampling/state-evaluation to the default profile,
+            but supplies a Python EdgeEvaluator."""
+
+            def __init__(self):
+                super().__init__()
+                self._inner = DescartesDefaultMoveProfileD()
+                # Keep evaluators alive on the profile so the planner sees
+                # the same Python instance for every edge it evaluates.
+                self._edge_evaluator = JointDistanceEdgeEvaluator()
+
+            def createWaypointSampler(self, move_instruction, composite_manip_info, env):
+                return self._inner.createWaypointSampler(move_instruction, composite_manip_info, env)
+
+            def createEdgeEvaluator(self, move_instruction, composite_manip_info, env):
+                return self._edge_evaluator
+
+            def createStateEvaluator(self, move_instruction, composite_manip_info, env):
+                return self._inner.createStateEvaluator(move_instruction, composite_manip_info, env)
+
+        # Build the same fixed-pose program as the default-profile test.
+        wp1 = CartesianWaypoint(
+            Isometry3d.Identity()
+            * Translation3d(0.8, -0.2, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+        )
+        wp2 = CartesianWaypoint(
+            Isometry3d.Identity()
+            * Translation3d(0.8, 0.2, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+        )
+
+        start_instruction = MoveInstruction(
+            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+            MoveInstructionType_LINEAR,
+            "PY_EDGE_PROFILE",
+        )
+        start_instruction.setManipulatorInfo(manip_info)
+
+        plan_f1 = MoveInstruction(
+            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+            MoveInstructionType_LINEAR,
+            "PY_EDGE_PROFILE",
+        )
+        plan_f1.setManipulatorInfo(manip_info)
+
+        program = CompositeInstruction()
+        program.setManipulatorInfo(manip_info)
+        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
+        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+
+        interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
+
+        py_profile = PythonMoveProfile()
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            DESCARTES_DEFAULT_NAMESPACE,
+            "PY_EDGE_PROFILE",
+            cast_DescartesMoveProfileD(py_profile),
+        )
+
+        planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
+        request = PlannerRequest()
+        request.instructions = interpolated_program
+        request.env = env
+        request.profiles = profiles
+
+        response = planner.solve(request)
+        assert response.successful, f"Descartes planning failed: {response.message}"
+        assert call_counter["n"] > 0, "Python EdgeEvaluator.evaluate() was never called by the planner"

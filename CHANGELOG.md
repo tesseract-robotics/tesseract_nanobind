@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - contributed by [@Joelkang]
 
   - `Octree` geometry bindings (plus `octomap::OcTree`, `OctreeSubType`, `PointCloud`, `createOctree`) and the remaining `tesseract_geometry` utilities (`isIdentical`, `extractVertices`, `toTriangleMesh`).
+  - **Python-subclassable Descartes evaluators/sampler/profile** for `tesseract_motion_planners_descartes`. New bindings for `DescartesStateD`, `DescartesStateSampleD`, `DescartesEdgeEvaluatorD`, `DescartesWaypointSamplerD`, `DescartesStateEvaluatorD`, and a now-subclassable `DescartesMoveProfileD` let users override `createWaypointSampler` / `createEdgeEvaluator` / `createStateEvaluator` from Python.
 
 ## [0.34.1.7] - 2026-05-09 — command_language I/O instructions + TaskComposer introspection
 
