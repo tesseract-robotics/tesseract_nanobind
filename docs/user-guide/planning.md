@@ -325,6 +325,99 @@ profiles = create_descartes_default_profiles(
 result = plan_cartesian(robot, program, profiles=profiles)
 ```
 
+### Custom Edge / State Evaluators in Python
+
+When the default cost function (joint-space distance) does not fully satisfy your
+requirements, you can subclass the evaluator interfaces directly in Python to
+tweak how Descartes picks the right IK branch. Examples include penalizing wrist
+flips, weighting specific joints, or scoring edges using an external signal.
+
+The three extension points are:
+
+| Class | Override | When it runs |
+|-------|----------|--------------|
+| `DescartesWaypointSamplerD` | `sample() -> list[DescartesStateSampleD]` | Generating IK candidates for a waypoint |
+| `DescartesEdgeEvaluatorD` | `evaluate(start, end) -> (valid, cost)` | Edge between two graph states |
+| `DescartesStateEvaluatorD` | `evaluate(state) -> (valid, cost)` | Per-state cost |
+
+To inject them into the planner, subclass `DescartesMoveProfileD` and
+return your custom objects from the three factory methods. Delegate the
+ones you don't want to customize to an inner `DescartesDefaultMoveProfileD`:
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_motion_planners_descartes import (
+    DescartesDefaultMoveProfileD,
+    DescartesEdgeEvaluatorD,
+    DescartesMoveProfileD,
+    cast_DescartesMoveProfileD,
+)
+
+class WristFlipPenaltyEvaluator(DescartesEdgeEvaluatorD):
+    """Cost = L2 joint delta + large penalty for >90 deg wrist swing."""
+
+    def evaluate(self, start, end):
+        delta = end.values - start.values
+        cost = float(np.linalg.norm(delta))
+        if abs(delta[-1]) > np.pi / 2:   # wrist joint flip
+            return (False, cost)         # reject this edge
+        return (True, cost)
+
+
+class MyMoveProfile(DescartesMoveProfileD):
+    def __init__(self):
+        super().__init__()
+        self._inner = DescartesDefaultMoveProfileD()
+        # Hold evaluators on self so the planner sees the same instance
+        # across all edge evaluations.
+        self._edge_evaluator = WristFlipPenaltyEvaluator()
+
+    def createWaypointSampler(self, move_instruction, composite_manip_info, env):
+        return self._inner.createWaypointSampler(move_instruction, composite_manip_info, env)
+
+    def createEdgeEvaluator(self, move_instruction, composite_manip_info, env):
+        return self._edge_evaluator
+
+    def createStateEvaluator(self, move_instruction, composite_manip_info, env):
+        return self._inner.createStateEvaluator(move_instruction, composite_manip_info, env)
+```
+
+The `start` and `end` arguments to `evaluate` are `DescartesStateD`
+objects with a `.values` attribute that is a 1-D numpy array of joint
+positions in the manipulator's joint order.
+
+Then, register the profile in the `ProfileDictionary` the same way you would a
+C++ profile, using `cast_DescartesMoveProfileD` to coerce it to the
+base `Profile` type:
+
+```python
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+profiles = ProfileDictionary()
+profiles.addProfile(
+    "DescartesMotionPlannerTask",          # namespace
+    "MY_PROFILE",                          # profile name (referenced by MoveInstruction)
+    cast_DescartesMoveProfileD(MyMoveProfile()),
+)
+```
+
+
+
+!!! warning "Threading and the GIL"
+    Each call back into Python acquires the GIL, so OpenMP-parallel
+    edge evaluation inside Descartes is serialized through your Python
+    evaluator. If you set `num_threads > 1`, the cost computation
+    itself runs single-threaded — only IK sampling parallelizes. Keep
+    the Python evaluate body tight (numpy ops, no allocations) for best
+    throughput.
+
+!!! tip "Use for joint-continuity across rasters"
+    A custom edge evaluator is the cleanest way to globally enforce
+    IK-branch consistency across an entire raster program — the raster
+    pipeline itself does **not** backtrack on a downstream transition
+    failure, so picking compatible IK solutions during Descartes is the
+    only reliable solution.
+
 ## Motion Types
 
 Motion type is set via the `MotionProgram` builder methods:

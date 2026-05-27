@@ -1,12 +1,65 @@
-from typing import Annotated, TypeAlias
+"""tesseract_motion_planners_descartes Python bindings"""
+
+from typing import Annotated, TypeAlias, overload
 
 import numpy
 from numpy.typing import NDArray
 
 import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
+import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 
+
+class DescartesStateD:
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> None: ...
+
+    @property
+    def values(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    @values.setter
+    def values(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+
+class DescartesStateSampleD:
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, state: DescartesStateD, cost: float) -> None: ...
+
+    @property
+    def state(self) -> DescartesStateD: ...
+
+    @state.setter
+    def state(self, arg: DescartesStateD, /) -> None: ...
+
+    @property
+    def cost(self) -> float: ...
+
+    @cost.setter
+    def cost(self, arg: float, /) -> None: ...
+
+class DescartesEdgeEvaluatorD:
+    def __init__(self) -> None: ...
+
+    def evaluate(self, start: DescartesStateD, end: DescartesStateD) -> tuple[bool, float]:
+        """Returns (is_valid, cost) for the edge between two states"""
+
+class DescartesWaypointSamplerD:
+    def __init__(self) -> None: ...
+
+    def sample(self) -> list[DescartesStateSampleD]:
+        """Return the list of valid state samples for this waypoint"""
+
+class DescartesStateEvaluatorD:
+    def __init__(self) -> None: ...
+
+    def evaluate(self, solution: DescartesStateD) -> tuple[bool, float]:
+        """Returns (is_valid, cost) for a state"""
 
 class DescartesSolverProfileD(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
@@ -27,7 +80,20 @@ def cast_DescartesSolverProfileD(profile: DescartesLadderGraphSolverProfileD) ->
     """
 
 class DescartesMoveProfileD(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
+    def __init__(self) -> None: ...
+
     def getKey(self) -> int: ...
+
+    def createWaypointSampler(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: "tesseract_environment::Environment") -> DescartesWaypointSamplerD: ...
+
+    def createEdgeEvaluator(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: "tesseract_environment::Environment") -> DescartesEdgeEvaluatorD: ...
+
+    def createStateEvaluator(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: "tesseract_environment::Environment") -> DescartesStateEvaluatorD: ...
+
+def cast_DescartesMoveProfileD(profile: DescartesMoveProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
+    """
+    Cast a DescartesMoveProfileD (including Python subclasses) to Profile for use with ProfileDictionary
+    """
 
 DescartesPlanProfileD: TypeAlias = DescartesMoveProfileD
 
@@ -114,13 +180,10 @@ class DescartesDefaultMoveProfileD(DescartesMoveProfileD):
 
 DescartesDefaultPlanProfileD: TypeAlias = DescartesDefaultMoveProfileD
 
-def cast_DescartesMoveProfileD(profile: DescartesDefaultMoveProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
+def cast_DescartesPlanProfileD(profile: DescartesMoveProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
     """
-    Cast DescartesDefaultMoveProfileD to Profile for use with ProfileDictionary
+    Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)
     """
-
-def cast_DescartesPlanProfileD(profile: DescartesDefaultMoveProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
-    """Cast DescartesDefaultPlanProfileD to Profile (legacy alias)"""
 
 class DescartesMotionPlannerD:
     def __init__(self, name: str) -> None: ...
