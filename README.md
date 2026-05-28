@@ -22,6 +22,10 @@ Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract)
 - Task composition and pipelines
 - Pythonic high-level API
 
+## Examples
+
+[examples](https://github.com/tesseract-robotics/tesseract_nanobind/tree/main/src/tesseract_robotics/examples) are located at `src/tesseract_robotics/examples`.
+
 ## Installation
 
 ```bash
