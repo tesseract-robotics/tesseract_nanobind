@@ -22,10 +22,6 @@ Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract)
 - Task composition and pipelines
 - Pythonic high-level API
 
-## Examples
-
-[examples](https://github.com/tesseract-robotics/tesseract_nanobind/tree/main/src/tesseract_robotics/examples) are located at `src/tesseract_robotics/examples`.
-
 ## Installation
 
 ```bash
@@ -85,7 +81,8 @@ print(f"Links: {env.getLinkNames()}")
 
 ## Examples
 
-See the `examples/` directory for:
+[examples](https://github.com/tesseract-robotics/tesseract_nanobind/tree/main/src/tesseract_robotics/examples) are located at `src/tesseract_robotics/examples`.
+
 - `basic_cartesian_example.py` - Simple Cartesian planning
 - `freespace_ompl_example.py` - OMPL freespace planning
 - `pick_and_place_example.py` - Pick and place with TrajOpt
