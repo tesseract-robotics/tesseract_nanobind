@@ -630,7 +630,7 @@ class TestGeometry:
 
         # Use mesh from tesseract_support package
         mesh = mesh_from_file(
-            "package://tesseract_support/meshes/car_seat/visual/end_effector_open.stl"
+            "package://tesseract/support/meshes/car_seat/visual/end_effector_open.stl"
         )
         assert mesh is not None
 
@@ -640,7 +640,7 @@ class TestGeometry:
 
         # Use mesh from tesseract_support package
         mesh = convex_mesh_from_file(
-            "package://tesseract_support/meshes/car_seat/visual/end_effector_open.stl"
+            "package://tesseract/support/meshes/car_seat/visual/end_effector_open.stl"
         )
         assert mesh is not None
 

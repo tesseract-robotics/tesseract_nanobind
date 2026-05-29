@@ -22,10 +22,10 @@ def test_kdl_kinematics_plugin_loads():
     locator = GeneralResourceLocator()
     env = Environment()
     urdf = locator.locateResource(
-        "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
+        "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
     ).getFilePath()
     srdf = locator.locateResource(
-        "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
+        "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
     ).getFilePath()
     assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
 
@@ -42,8 +42,8 @@ def test_opw_kinematics_plugin_loads():
     """Test OPW kinematics plugin loads for ABB robot."""
     locator = GeneralResourceLocator()
     env = Environment()
-    urdf = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
-    srdf = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
+    urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
+    srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
 
     # This should not raise RuntimeError if plugins load correctly

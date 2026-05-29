@@ -15,10 +15,10 @@ def abb_environment():
     """Load ABB IRB2400 environment."""
     locator = GeneralResourceLocator()
     urdf_path = FilesystemPath(
-        locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf").getFilePath()
+        locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
     srdf_path = FilesystemPath(
-        locator.locateResource("package://tesseract_support/urdf/abb_irb2400.srdf").getFilePath()
+        locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     )
     env = Environment()
     assert env.init(urdf_path, srdf_path, locator)

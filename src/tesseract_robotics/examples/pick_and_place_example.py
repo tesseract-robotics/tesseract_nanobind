@@ -166,8 +166,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Load KUKA IIWA workcell from tesseract_support
     # Includes: robot, table (z=0.772m), shelf structure
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/pick_and_place_plan.urdf",
-        "package://tesseract_support/urdf/pick_and_place_plan.srdf",
+        "package://tesseract/support/urdf/pick_and_place_plan.urdf",
+        "package://tesseract/support/urdf/pick_and_place_plan.srdf",
     )
     # Set default collision margin (distance for contact reporting)
     robot.set_collision_margin(0.005)  # 5mm

@@ -146,10 +146,10 @@ def main():
 
     # Locate URDF (robot geometry) and SRDF (semantic info: groups, ACM, plugins)
     urdf_path_str = locator.locateResource(
-        "package://tesseract_support/urdf/abb_irb2400.urdf"
+        "package://tesseract/support/urdf/abb_irb2400.urdf"
     ).getFilePath()
     srdf_path_str = locator.locateResource(
-        "package://tesseract_support/urdf/abb_irb2400.srdf"
+        "package://tesseract/support/urdf/abb_irb2400.srdf"
     ).getFilePath()
 
     # FilesystemPath wraps std::filesystem::path for cross-platform compatibility

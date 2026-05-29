@@ -11,7 +11,7 @@ mesh_urdf = """
   <link name="mesh_dae_link">
     <visual>
       <geometry>
-        <mesh filename="package://tesseract_support/meshes/tesseract_material_mesh.dae"/>
+        <mesh filename="package://tesseract/support/meshes/tesseract_material_mesh.dae"/>
       </geometry>
     </visual>
   </link>

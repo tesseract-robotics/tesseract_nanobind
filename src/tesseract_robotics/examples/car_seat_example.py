@@ -214,7 +214,7 @@ def add_seats(robot):
     """
     locator = robot.locator
     visual_resource = locator.locateResource(
-        "package://tesseract_support/meshes/car_seat/visual/seat.dae"
+        "package://tesseract/support/meshes/car_seat/visual/seat.dae"
     )
 
     for i in range(3):
@@ -231,7 +231,7 @@ def add_seats(robot):
 
         # Collision meshes (10 convex hulls)
         for m in range(1, 11):
-            collision_url = f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
+            collision_url = f"package://tesseract/support/meshes/car_seat/collision/seat_{m}.stl"
             collision_resource = locator.locateResource(collision_url)
             for mesh in createMeshFromResource(collision_resource):
                 collision = Collision()
@@ -357,8 +357,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # === PHASE 0: LOAD ROBOT ===
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/car_seat_demo.urdf",
-        "package://tesseract_support/urdf/car_seat_demo.srdf",
+        "package://tesseract/support/urdf/car_seat_demo.urdf",
+        "package://tesseract/support/urdf/car_seat_demo.srdf",
     )
     print(f"Loaded robot: {robot.env.getName()}")
 

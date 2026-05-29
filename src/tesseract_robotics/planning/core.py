@@ -9,8 +9,8 @@ Example:
 
     # Load from package URLs
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/abb_irb2400.urdf",
-        "package://tesseract_support/urdf/abb_irb2400.srdf"
+        "package://tesseract/support/urdf/abb_irb2400.urdf",
+        "package://tesseract/support/urdf/abb_irb2400.srdf"
     )
 
     # Or from file paths
@@ -234,8 +234,8 @@ class Robot:
         Returns:
             Initialized Robot instance
         """
-        urdf_url = f"package://tesseract_support/urdf/{robot_name}.urdf"
-        srdf_url = f"package://tesseract_support/urdf/{robot_name}.srdf"
+        urdf_url = f"package://tesseract/support/urdf/{robot_name}.urdf"
+        srdf_url = f"package://tesseract/support/urdf/{robot_name}.srdf"
         return cls.from_urdf(urdf_url, srdf_url, locator)
 
     def get_state(self, joint_names: list[str] | None = None) -> RobotState:

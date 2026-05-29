@@ -191,8 +191,8 @@ def run():
     #   - workcell_base with table (z=0.772m)
     #   - Shelf structure with placement locations
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/pick_and_place_plan.urdf",
-        "package://tesseract_support/urdf/pick_and_place_plan.srdf",
+        "package://tesseract/support/urdf/pick_and_place_plan.urdf",
+        "package://tesseract/support/urdf/pick_and_place_plan.srdf",
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 

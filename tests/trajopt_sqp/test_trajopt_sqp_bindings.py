@@ -56,12 +56,12 @@ def kuka_setup():
     locator = GeneralResourceLocator()
     urdf_path = FilesystemPath(
         locator.locateResource(
-            "package://tesseract_support/urdf/lbr_iiwa_14_r820.urdf"
+            "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
         ).getFilePath()
     )
     srdf_path = FilesystemPath(
         locator.locateResource(
-            "package://tesseract_support/urdf/lbr_iiwa_14_r820.srdf"
+            "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
         ).getFilePath()
     )
 
