@@ -72,14 +72,22 @@ jobs:
     - name: patch upstream missing includes
       working-directory: ws/src
       run: |
-        # tesseract_planning 0.34.0 uses std::runtime_error without #include <stdexcept>
-        # Works on macOS (transitive include) but fails on Linux GCC
-        find tesseract_planning -name '*.h' -path '*/poly/*' | xargs grep -l 'std::runtime_error' | while read f; do
-          if ! grep -q '#include <stdexcept>' "$f"; then
-            sed -i '/#include <string>/a #include <stdexcept>' "$f"
-            echo "  patched: $f"
-          fi
-        done
+        # 0.35 consolidation moved std::runtime_error usages into many more
+        # files (now in tesseract/common/any_poly.h plus 70+ .cpp files across
+        # tesseract_planning). macOS/MSVC pull <stdexcept> in transitively;
+        # Linux GCC is stricter and fails. The 0.34-era patch anchored on
+        # `#include <string>` which no longer matches — switch to inserting
+        # after the FIRST existing #include <...> line, which every affected
+        # file has.
+        find tesseract tesseract_planning \( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' \) -print0 \
+          | xargs -0 grep -l 'std::runtime_error' \
+          | while read f; do
+              if ! grep -q '#include <stdexcept>' "$f"; then
+                awk 'BEGIN{added=0} /^#include </ && !added {print; print "#include <stdexcept>"; added=1; next} {print}' "$f" > "$f.new"
+                mv "$f.new" "$f"
+                echo "  patched: $f"
+              fi
+            done
     - name: cache colcon build
       uses: actions/cache@v4
       id: colcon-cache
