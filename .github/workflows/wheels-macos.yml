@@ -69,16 +69,16 @@ jobs:
           ws/src/descartes_light
           ws/src/opw_kinematics
           ws/src/ruckig
-        key: vcs-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
+        key: vcs-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos') }}
     - name: vcs import
       working-directory: ws/src
-      run: vcs import --input tesseract_nanobind/dependencies.rosinstall --skip-existing
+      run: vcs import --input tesseract_nanobind/dependencies.repos --skip-existing
     - name: cache colcon build
       uses: actions/cache@v4
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-macos-v1-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-macos-v1-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
     - name: build C++ deps
       if: steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws/src/tesseract_nanobind

@@ -79,7 +79,7 @@ pixi install
 
 ## C++ Dependencies
 
-The build fetches 9 repositories via `vcs import` from `ws/src/dependencies.rosinstall`:
+The build fetches 9 repositories via `vcs import` from `ws/src/dependencies.repos`:
 
 | Repository | Version | What it provides |
 | ---------- | ------- | ---------------- |

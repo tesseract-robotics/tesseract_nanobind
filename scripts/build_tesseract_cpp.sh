@@ -63,13 +63,13 @@ if [ -d "$PROJECT_ROOT/tesseract_python" ]; then
     fi
 fi
 
-# Copy dependencies.rosinstall to workspace
-echo "Copying dependencies.rosinstall..."
-if [ ! -f "$PROJECT_ROOT/dependencies.rosinstall" ]; then
-    echo "❌ dependencies.rosinstall not found at: $PROJECT_ROOT/dependencies.rosinstall"
+# Copy dependencies.repos to workspace
+echo "Copying dependencies.repos..."
+if [ ! -f "$PROJECT_ROOT/dependencies.repos" ]; then
+    echo "❌ dependencies.repos not found at: $PROJECT_ROOT/dependencies.repos"
     exit 1
 fi
-cp "$PROJECT_ROOT/dependencies.rosinstall" "$WORKSPACE_DIR/src/"
+cp "$PROJECT_ROOT/dependencies.repos" "$WORKSPACE_DIR/src/"
 
 # Import dependencies using vcstool
 echo ""
@@ -78,8 +78,8 @@ echo "Importing Dependencies (vcstool)"
 echo "=========================================="
 cd "$WORKSPACE_DIR/src"
 
-echo "Running: vcs import --shallow --input dependencies.rosinstall"
-vcs import --shallow --input dependencies.rosinstall
+echo "Running: vcs import --shallow --input dependencies.repos"
+vcs import --shallow --input dependencies.repos
 
 echo ""
 echo "Workspace contents:"

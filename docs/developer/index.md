@@ -56,7 +56,7 @@ If you modify a C++ binding file (`src/*_bindings.cpp`):
 pixi run install
 ```
 
-If you modify upstream C++ sources or `dependencies.rosinstall`:
+If you modify upstream C++ sources or `dependencies.repos`:
 
 ```bash
 # Full C++ rebuild + reinstall
@@ -175,7 +175,7 @@ tesseract_nanobind/
 ├── pyproject.toml             # pixi workspace + package config
 ├── pixi.lock                  # locked deps (~200 packages)
 ├── CMakeLists.txt             # nanobind module build
-├── dependencies.rosinstall    # C++ source versions (vcstool)
+├── dependencies.repos    # C++ source versions (vcstool)
 ├── src/
 │   ├── tesseract_robotics/    # Python package
 │   │   ├── planning/          # High-level API (pure Python)

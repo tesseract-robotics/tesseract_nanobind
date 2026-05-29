@@ -89,11 +89,11 @@ jobs:
           ws/src/ruckig
           ws/src/boost_plugin_loader
           ws/src/ros_industrial_cmake_boilerplate
-        key: vcs-win-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall') }}
+        key: vcs-win-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos') }}
 
     - name: vcs import
       working-directory: ws/src
-      run: vcs import --input tesseract_nanobind/dependencies.rosinstall --skip-existing
+      run: vcs import --input tesseract_nanobind/dependencies.repos --skip-existing
 
     - name: patch upstream missing includes
       working-directory: ws/src
@@ -149,7 +149,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ws/install
-        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
     - name: colcon build C++ deps
       if: steps.colcon-cache.outputs.cache-hit != 'true'
@@ -189,7 +189,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ws/install
-        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-win-pixi-exported-symbols-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
 
     # Plugin-factory export verification is preserved as a commented recipe.
     # Used during gh-40 iteration to fail fast when MSVC stripped factory
@@ -267,7 +267,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ws/src/tesseract_nanobind/build
-        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
+        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
 
     - name: build nanobind wheel
       working-directory: ws/src/tesseract_nanobind
@@ -296,7 +296,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ws/src/tesseract_nanobind/build
-        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.rosinstall', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
+        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/CMakeLists.txt', 'ws/src/tesseract_nanobind/pyproject.toml', 'ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/src/**/*.cpp', 'ws/src/tesseract_nanobind/src/**/*.h', 'ws/src/tesseract_nanobind/src/**/*.hpp') }}
 
     - name: bundle plugins then delvewheel repair
       working-directory: ws/src/tesseract_nanobind

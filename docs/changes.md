@@ -1,3 +1,87 @@
+# API Changes: 0.34 → 0.35
+
+## C++ Dependency Versions
+
+| Package | 0.34 | 0.35 |
+|---------|------|------|
+| tesseract | 0.34.1 | 0.35.0 |
+| tesseract_planning | 0.34.0 | 0.35.0 |
+| trajopt | 0.34.4 | 0.35.0 |
+| descartes_light | 0.4.9 | 0.4.10 |
+| opw_kinematics | 0.5.2 | 0.5.3 |
+| ruckig | `pantor/ruckig @ v0.15.3` | `Levi-Armstrong/ruckig @ cpack-v0.9.2` |
+
+`ros_industrial_cmake_boilerplate` (0.7.4), `boost_plugin_loader` (0.4.3), and `ifopt` (2.1.4) were already at latest.
+
+## Upstream Structural Changes
+
+Both `tesseract` and `tesseract_planning` consolidated their many small CMake packages into single multi-component packages. The upstream `MIGRATION.md` files (in each repo at tag `0.35.0`) document the full mapping; below are the highlights this binding repo has to absorb.
+
+### Include path remap
+
+| Old | New |
+|-----|-----|
+| `<tesseract_common/X.h>` | `<tesseract/common/X.h>` |
+| `<tesseract_collision/core/X.h>` | `<tesseract/collision/X.h>` (`core/` flattened) |
+| `<tesseract_kinematics/core/X.h>` | `<tesseract/kinematics/X.h>` (`core/` flattened) |
+| `<tesseract_motion_planners/core/X.h>` | `<tesseract/motion_planners/X.h>` (`core/` flattened) |
+| `<tesseract_task_composer/core/X.h>` | `<tesseract/task_composer/X.h>` (`core/` flattened) |
+
+The full set of subpackages (`geometry`, `scene_graph`, `state_solver`, `srdf`, `urdf`, `environment`, `visualization`, `support`, `command_language`, `time_parameterization`, `examples`) all move under `tesseract/`.
+
+### C++ namespace remap
+
+| Old | New |
+|-----|-----|
+| `tesseract_common::Foo` | `tesseract::common::Foo` |
+| `tesseract_collision::Foo` | `tesseract::collision::Foo` |
+| ... (every `tesseract_<name>::` becomes `tesseract::<name>::`) | |
+
+### CMake target rename
+
+`tesseract::tesseract_<name>` → `tesseract::<name>` across the board.
+
+### find_package consolidation
+
+```cmake
+# 0.34
+find_package(tesseract_common REQUIRED)
+find_package(tesseract_collision REQUIRED COMPONENTS core bullet)
+find_package(tesseract_kinematics REQUIRED COMPONENTS core kdl)
+
+# 0.35
+find_package(tesseract REQUIRED
+             COMPONENTS common collision collision_bullet kinematics kinematics_kdl)
+```
+
+Same pattern for `tesseract_planning`: one `find_package(tesseract_planning REQUIRED COMPONENTS ...)` replaces all the per-subpackage calls.
+
+### dependencies file rename
+
+`dependencies.rosinstall` → `dependencies.repos` (matches upstream's ros2 vcs-tool convention). File format unchanged (YAML, `vcs import` reads both extensions).
+
+### ruckig: switch to Levi-Armstrong fork
+
+`tesseract_planning` 0.35.0 pins ruckig at `Levi-Armstrong/ruckig.git @ cpack-v0.9.2` (a fork with a cpack patch). We had been diverging on upstream `pantor/ruckig @ v0.15.3`; this release brings us back in line with what upstream CI builds against.
+
+## Python API Changes
+
+_TBD — populated as bindings are rebuilt and API breaks surface._
+
+## Migration Checklist
+
+- [x] Bump versions in `dependencies.repos`
+- [x] Switch to `Levi-Armstrong/ruckig` fork
+- [x] Rename `dependencies.rosinstall` → `dependencies.repos`
+- [x] Update build script + CI workflows to reference new filename
+- [ ] Apply upstream sed scripts (tesseract + tesseract_planning `MIGRATION.md`) to `src/` and `CMakeLists.txt`
+- [ ] Manual sweep for nanobind-specific cases the sed misses (`nb::module_::import_(...)` paths, cross-module type registration)
+- [ ] Rebuild C++ workspace (`pixi run build-cpp`)
+- [ ] Rebuild bindings
+- [ ] Run test suite; document Python API breaks as they surface
+
+---
+
 # API Changes: 0.33 → 0.34
 
 ## C++ Dependency Versions
