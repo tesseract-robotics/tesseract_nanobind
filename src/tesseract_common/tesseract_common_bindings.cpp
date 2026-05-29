@@ -1,21 +1,21 @@
 #include "tesseract_nb.h"
 
 // tesseract_common headers (need eigen_types.h before opaque declarations)
-#include <tesseract_common/eigen_types.h>
-#include <tesseract_common/types.h>
+#include <tesseract/common/eigen_types.h>
+#include <tesseract/common/types.h>
 
 // Opaque declarations for vector types we want to bind as classes
-using VectorVector3d = tesseract_common::VectorVector3d;  // std::vector<Eigen::Vector3d>
-using VectorIsometry3d = tesseract_common::VectorIsometry3d;  // std::vector<Eigen::Isometry3d>
+using VectorVector3d = tesseract::common::VectorVector3d;  // std::vector<Eigen::Vector3d>
+using VectorIsometry3d = tesseract::common::VectorIsometry3d;  // std::vector<Eigen::Isometry3d>
 NB_MAKE_OPAQUE(VectorVector3d)
 NB_MAKE_OPAQUE(VectorIsometry3d)
-#include <tesseract_common/resource_locator.h>
-#include <tesseract_common/manipulator_info.h>
-#include <tesseract_common/joint_state.h>
-#include <tesseract_common/collision_margin_data.h>
-#include <tesseract_common/allowed_collision_matrix.h>
-#include <tesseract_common/kinematic_limits.h>
-#include <tesseract_common/plugin_info.h>
+#include <tesseract/common/resource_locator.h>
+#include <tesseract/common/manipulator_info.h>
+#include <tesseract/common/joint_state.h>
+#include <tesseract/common/collision_margin_data.h>
+#include <tesseract/common/allowed_collision_matrix.h>
+#include <tesseract/common/kinematic_limits.h>
+#include <tesseract/common/plugin_info.h>
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -25,11 +25,11 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <console_bridge/console.h>
 
 // Trampoline class for ResourceLocator
-class PyResourceLocator : public tesseract_common::ResourceLocator {
+class PyResourceLocator : public tesseract::common::ResourceLocator {
 public:
-    NB_TRAMPOLINE(tesseract_common::ResourceLocator, 1);
+    NB_TRAMPOLINE(tesseract::common::ResourceLocator, 1);
 
-    std::shared_ptr<tesseract_common::Resource> locateResource(const std::string& url) const override {
+    std::shared_ptr<tesseract::common::Resource> locateResource(const std::string& url) const override {
         NB_OVERRIDE_PURE(locateResource, url);
     }
 };
@@ -52,7 +52,7 @@ NB_MODULE(_tesseract_common, m) {
     // (constexpr, returns 1e-12); we re-export so Python tests + helpers
     // can reference one value instead of duplicating `1e-12` literals.
     // Used by: planning/transforms.py (_NORMALISE_DENOM_FLOOR),
-    // tests/tesseract_common/test_eigen_geometry.py (DEFAULT_PREC),
+    // tests/tesseract/common/test_eigen_geometry.py (DEFAULT_PREC),
     // tests/tesseract_planning/test_planning_api.py (EIGEN_DEFAULT_PREC),
     // and the C++ `kDegenerateGeometryEps` constexpr further down.
     m.attr("EIGEN_DEFAULT_PREC") = Eigen::NumTraits<double>::dummy_precision();
@@ -728,133 +728,133 @@ NB_MODULE(_tesseract_common, m) {
 
     // ========== Resource Types ==========
     // Note: In nanobind 2.x, shared_ptr holder is automatic - don't specify it
-    nb::class_<tesseract_common::Resource>(m, "Resource")
-        .def("isFile", &tesseract_common::Resource::isFile)
-        .def("getUrl", &tesseract_common::Resource::getUrl)
-        .def("getFilePath", &tesseract_common::Resource::getFilePath)
-        .def("getResourceContents", [](tesseract_common::Resource& self) {
+    nb::class_<tesseract::common::Resource>(m, "Resource")
+        .def("isFile", &tesseract::common::Resource::isFile)
+        .def("getUrl", &tesseract::common::Resource::getUrl)
+        .def("getFilePath", &tesseract::common::Resource::getFilePath)
+        .def("getResourceContents", [](tesseract::common::Resource& self) {
             std::vector<uint8_t> data = self.getResourceContents();
             return nb::bytes(reinterpret_cast<const char*>(data.data()), data.size());
         })
-        .def("getResourceContentStream", &tesseract_common::Resource::getResourceContentStream);
+        .def("getResourceContentStream", &tesseract::common::Resource::getResourceContentStream);
 
-    nb::class_<tesseract_common::BytesResource, tesseract_common::Resource>(m, "BytesResource")
+    nb::class_<tesseract::common::BytesResource, tesseract::common::Resource>(m, "BytesResource")
         .def(nb::init<const std::string&, const std::vector<uint8_t>&>())
-        .def("__init__", [](tesseract_common::BytesResource* self, const std::string& url, nb::bytes data) {
+        .def("__init__", [](tesseract::common::BytesResource* self, const std::string& url, nb::bytes data) {
             std::vector<uint8_t> vec(data.size());
             std::memcpy(vec.data(), data.c_str(), data.size());
-            new (self) tesseract_common::BytesResource(url, vec);
+            new (self) tesseract::common::BytesResource(url, vec);
         });
 
-    nb::class_<tesseract_common::SimpleLocatedResource, tesseract_common::Resource>(m, "SimpleLocatedResource")
+    nb::class_<tesseract::common::SimpleLocatedResource, tesseract::common::Resource>(m, "SimpleLocatedResource")
         .def(nb::init<const std::string&, const std::string&>(), "url"_a, "filename"_a)
-        .def(nb::init<const std::string&, const std::string&, std::shared_ptr<tesseract_common::ResourceLocator>>(),
+        .def(nb::init<const std::string&, const std::string&, std::shared_ptr<tesseract::common::ResourceLocator>>(),
              "url"_a, "filename"_a, "parent"_a);
 
     // ========== ResourceLocator Hierarchy ==========
-    nb::class_<tesseract_common::ResourceLocator, PyResourceLocator>(m, "ResourceLocator")
+    nb::class_<tesseract::common::ResourceLocator, PyResourceLocator>(m, "ResourceLocator")
         .def(nb::init<>())
-        .def("locateResource", &tesseract_common::ResourceLocator::locateResource);
+        .def("locateResource", &tesseract::common::ResourceLocator::locateResource);
 
-    nb::class_<tesseract_common::GeneralResourceLocator, tesseract_common::ResourceLocator>(m, "GeneralResourceLocator")
+    nb::class_<tesseract::common::GeneralResourceLocator, tesseract::common::ResourceLocator>(m, "GeneralResourceLocator")
         .def(nb::init<>());
 
     // ========== ManipulatorInfo ==========
-    nb::class_<tesseract_common::ManipulatorInfo>(m, "ManipulatorInfo")
+    nb::class_<tesseract::common::ManipulatorInfo>(m, "ManipulatorInfo")
         .def(nb::init<>())
-        .def_rw("manipulator", &tesseract_common::ManipulatorInfo::manipulator)
-        .def_rw("manipulator_ik_solver", &tesseract_common::ManipulatorInfo::manipulator_ik_solver)
-        .def_rw("working_frame", &tesseract_common::ManipulatorInfo::working_frame)
-        .def_rw("tcp_frame", &tesseract_common::ManipulatorInfo::tcp_frame)
+        .def_rw("manipulator", &tesseract::common::ManipulatorInfo::manipulator)
+        .def_rw("manipulator_ik_solver", &tesseract::common::ManipulatorInfo::manipulator_ik_solver)
+        .def_rw("working_frame", &tesseract::common::ManipulatorInfo::working_frame)
+        .def_rw("tcp_frame", &tesseract::common::ManipulatorInfo::tcp_frame)
         .def_prop_rw("tcp_offset",
-            [](const tesseract_common::ManipulatorInfo& self) -> nb::object {
+            [](const tesseract::common::ManipulatorInfo& self) -> nb::object {
                 if (self.tcp_offset.index() == 0) {
                     return nb::cast(std::get<std::string>(self.tcp_offset));
                 } else {
                     return nb::cast(std::get<Eigen::Isometry3d>(self.tcp_offset));
                 }
             },
-            [](tesseract_common::ManipulatorInfo& self, nb::object value) {
+            [](tesseract::common::ManipulatorInfo& self, nb::object value) {
                 if (nb::isinstance<nb::str>(value)) {
                     self.tcp_offset = nb::cast<std::string>(value);
                 } else {
                     self.tcp_offset = nb::cast<Eigen::Isometry3d>(value);
                 }
             })
-        .def("__repr__", [](const tesseract_common::ManipulatorInfo& self) {
+        .def("__repr__", [](const tesseract::common::ManipulatorInfo& self) {
             return "<ManipulatorInfo manipulator='" + self.manipulator + "'>";
         });
 
     // ========== JointState ==========
-    nb::class_<tesseract_common::JointState>(m, "JointState")
+    nb::class_<tesseract::common::JointState>(m, "JointState")
         .def(nb::init<>())
         .def(nb::init<const std::vector<std::string>&, const Eigen::VectorXd&>())
-        .def_rw("joint_names", &tesseract_common::JointState::joint_names)
-        .def_rw("position", &tesseract_common::JointState::position)
-        .def_rw("velocity", &tesseract_common::JointState::velocity)
-        .def_rw("acceleration", &tesseract_common::JointState::acceleration)
-        .def_rw("effort", &tesseract_common::JointState::effort)
-        .def_rw("time", &tesseract_common::JointState::time);
+        .def_rw("joint_names", &tesseract::common::JointState::joint_names)
+        .def_rw("position", &tesseract::common::JointState::position)
+        .def_rw("velocity", &tesseract::common::JointState::velocity)
+        .def_rw("acceleration", &tesseract::common::JointState::acceleration)
+        .def_rw("effort", &tesseract::common::JointState::effort)
+        .def_rw("time", &tesseract::common::JointState::time);
 
     // ========== AllowedCollisionMatrix ==========
-    nb::class_<tesseract_common::AllowedCollisionMatrix>(m, "AllowedCollisionMatrix")
+    nb::class_<tesseract::common::AllowedCollisionMatrix>(m, "AllowedCollisionMatrix")
         .def(nb::init<>())
         .def("addAllowedCollision",
              nb::overload_cast<const std::string&, const std::string&, const std::string&>(
-                 &tesseract_common::AllowedCollisionMatrix::addAllowedCollision))
+                 &tesseract::common::AllowedCollisionMatrix::addAllowedCollision))
         .def("removeAllowedCollision",
              nb::overload_cast<const std::string&, const std::string&>(
-                 &tesseract_common::AllowedCollisionMatrix::removeAllowedCollision))
-        .def("isCollisionAllowed", &tesseract_common::AllowedCollisionMatrix::isCollisionAllowed)
-        .def("clearAllowedCollisions", &tesseract_common::AllowedCollisionMatrix::clearAllowedCollisions)
-        .def("getAllAllowedCollisions", &tesseract_common::AllowedCollisionMatrix::getAllAllowedCollisions)
-        .def("insertAllowedCollisionMatrix", &tesseract_common::AllowedCollisionMatrix::insertAllowedCollisionMatrix);
+                 &tesseract::common::AllowedCollisionMatrix::removeAllowedCollision))
+        .def("isCollisionAllowed", &tesseract::common::AllowedCollisionMatrix::isCollisionAllowed)
+        .def("clearAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::clearAllowedCollisions)
+        .def("getAllAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::getAllAllowedCollisions)
+        .def("insertAllowedCollisionMatrix", &tesseract::common::AllowedCollisionMatrix::insertAllowedCollisionMatrix);
 
     // ========== CollisionMarginData ==========
     // Note: CollisionMarginOverrideType was renamed to CollisionMarginPairOverrideType in 0.33
     // and reduced to 3 values (NONE, REPLACE, MODIFY)
-    nb::enum_<tesseract_common::CollisionMarginPairOverrideType>(m, "CollisionMarginPairOverrideType")
-        .value("NONE", tesseract_common::CollisionMarginPairOverrideType::NONE)
-        .value("REPLACE", tesseract_common::CollisionMarginPairOverrideType::REPLACE)
-        .value("MODIFY", tesseract_common::CollisionMarginPairOverrideType::MODIFY);
+    nb::enum_<tesseract::common::CollisionMarginPairOverrideType>(m, "CollisionMarginPairOverrideType")
+        .value("NONE", tesseract::common::CollisionMarginPairOverrideType::NONE)
+        .value("REPLACE", tesseract::common::CollisionMarginPairOverrideType::REPLACE)
+        .value("MODIFY", tesseract::common::CollisionMarginPairOverrideType::MODIFY);
 
     // Backwards-compatible alias (old name)
     m.attr("CollisionMarginOverrideType") = m.attr("CollisionMarginPairOverrideType");
 
     // CollisionMarginPairData - new in 0.33
-    nb::class_<tesseract_common::CollisionMarginPairData>(m, "CollisionMarginPairData")
+    nb::class_<tesseract::common::CollisionMarginPairData>(m, "CollisionMarginPairData")
         .def(nb::init<>())
-        .def("setCollisionMargin", &tesseract_common::CollisionMarginPairData::setCollisionMargin)
-        .def("getCollisionMargin", &tesseract_common::CollisionMarginPairData::getCollisionMargin)
-        .def("getCollisionMargins", &tesseract_common::CollisionMarginPairData::getCollisionMargins)
-        .def("empty", &tesseract_common::CollisionMarginPairData::empty)
-        .def("clear", &tesseract_common::CollisionMarginPairData::clear);
+        .def("setCollisionMargin", &tesseract::common::CollisionMarginPairData::setCollisionMargin)
+        .def("getCollisionMargin", &tesseract::common::CollisionMarginPairData::getCollisionMargin)
+        .def("getCollisionMargins", &tesseract::common::CollisionMarginPairData::getCollisionMargins)
+        .def("empty", &tesseract::common::CollisionMarginPairData::empty)
+        .def("clear", &tesseract::common::CollisionMarginPairData::clear);
 
-    nb::class_<tesseract_common::CollisionMarginData>(m, "CollisionMarginData")
+    nb::class_<tesseract::common::CollisionMarginData>(m, "CollisionMarginData")
         .def(nb::init<>())
         .def(nb::init<double>())
-        .def("getDefaultCollisionMargin", &tesseract_common::CollisionMarginData::getDefaultCollisionMargin)
-        .def("setDefaultCollisionMargin", &tesseract_common::CollisionMarginData::setDefaultCollisionMargin)
-        .def("getCollisionMargin", &tesseract_common::CollisionMarginData::getCollisionMargin)
-        .def("setCollisionMargin", &tesseract_common::CollisionMarginData::setCollisionMargin)
-        .def("getCollisionMarginPairData", &tesseract_common::CollisionMarginData::getCollisionMarginPairData)
-        .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract_common::CollisionMarginData::getMaxCollisionMargin, nb::const_))
+        .def("getDefaultCollisionMargin", &tesseract::common::CollisionMarginData::getDefaultCollisionMargin)
+        .def("setDefaultCollisionMargin", &tesseract::common::CollisionMarginData::setDefaultCollisionMargin)
+        .def("getCollisionMargin", &tesseract::common::CollisionMarginData::getCollisionMargin)
+        .def("setCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin)
+        .def("getCollisionMarginPairData", &tesseract::common::CollisionMarginData::getCollisionMarginPairData)
+        .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract::common::CollisionMarginData::getMaxCollisionMargin, nb::const_))
         // Backwards compatibility aliases
-        .def("getPairCollisionMargin", &tesseract_common::CollisionMarginData::getCollisionMargin)
-        .def("setPairCollisionMargin", &tesseract_common::CollisionMarginData::setCollisionMargin);
+        .def("getPairCollisionMargin", &tesseract::common::CollisionMarginData::getCollisionMargin)
+        .def("setPairCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin);
 
     // ========== KinematicLimits ==========
-    nb::class_<tesseract_common::KinematicLimits>(m, "KinematicLimits")
+    nb::class_<tesseract::common::KinematicLimits>(m, "KinematicLimits")
         .def(nb::init<>())
-        .def_rw("joint_limits", &tesseract_common::KinematicLimits::joint_limits)
-        .def_rw("velocity_limits", &tesseract_common::KinematicLimits::velocity_limits)
-        .def_rw("acceleration_limits", &tesseract_common::KinematicLimits::acceleration_limits);
+        .def_rw("joint_limits", &tesseract::common::KinematicLimits::joint_limits)
+        .def_rw("velocity_limits", &tesseract::common::KinematicLimits::velocity_limits)
+        .def_rw("acceleration_limits", &tesseract::common::KinematicLimits::acceleration_limits);
 
     // ========== PluginInfo ==========
-    nb::class_<tesseract_common::PluginInfo>(m, "PluginInfo")
+    nb::class_<tesseract::common::PluginInfo>(m, "PluginInfo")
         .def(nb::init<>())
-        .def_rw("class_name", &tesseract_common::PluginInfo::class_name)
-        .def_rw("config", &tesseract_common::PluginInfo::config);
+        .def_rw("class_name", &tesseract::common::PluginInfo::class_name)
+        .def_rw("config", &tesseract::common::PluginInfo::config);
 
     // ========== Console Bridge ==========
     nb::enum_<console_bridge::LogLevel>(m, "LogLevel")

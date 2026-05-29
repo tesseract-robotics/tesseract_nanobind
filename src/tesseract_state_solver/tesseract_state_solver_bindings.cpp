@@ -7,20 +7,20 @@
 #include <nanobind/stl/map.h>
 
 // tesseract_state_solver
-#include <tesseract_state_solver/state_solver.h>
-#include <tesseract_state_solver/mutable_state_solver.h>
-#include <tesseract_state_solver/kdl/kdl_state_solver.h>
-#include <tesseract_state_solver/ofkt/ofkt_state_solver.h>
+#include <tesseract/state_solver/state_solver.h>
+#include <tesseract/state_solver/mutable_state_solver.h>
+#include <tesseract/state_solver/kdl/kdl_state_solver.h>
+#include <tesseract/state_solver/ofkt/ofkt_state_solver.h>
 
 // tesseract_scene_graph for SceneState and SceneGraph
-#include <tesseract_scene_graph/scene_state.h>
-#include <tesseract_scene_graph/graph.h>
-#include <tesseract_scene_graph/link.h>
-#include <tesseract_scene_graph/joint.h>
+#include <tesseract/scene_graph/scene_state.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/link.h>
+#include <tesseract/scene_graph/joint.h>
 
 // tesseract_common
-#include <tesseract_common/kinematic_limits.h>
-#include <tesseract_common/eigen_types.h>
+#include <tesseract/common/kinematic_limits.h>
+#include <tesseract/common/eigen_types.h>
 
 namespace tsg = tesseract_scene_graph;
 namespace tc = tesseract_common;

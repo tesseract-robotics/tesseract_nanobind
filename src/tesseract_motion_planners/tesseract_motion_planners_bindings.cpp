@@ -7,16 +7,16 @@
 #include <nanobind/stl/unordered_map.h>
 
 // tesseract_motion_planners core
-#include <tesseract_motion_planners/core/planner.h>
-#include <tesseract_motion_planners/core/types.h>
-#include <tesseract_motion_planners/core/utils.h>
+#include <tesseract/motion_planners/planner.h>
+#include <tesseract/motion_planners/types.h>
+#include <tesseract/motion_planners/utils.h>
 
 // tesseract_environment
-#include <tesseract_environment/environment.h>
+#include <tesseract/environment/environment.h>
 
 // tesseract_command_language
-#include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/command_language/composite_instruction.h>
+#include <tesseract/common/profile_dictionary.h>
 
 namespace tp = tesseract_planning;
 namespace te = tesseract_environment;

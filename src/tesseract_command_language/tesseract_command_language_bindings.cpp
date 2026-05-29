@@ -10,32 +10,32 @@
 #include <nanobind/stl/function.h>
 
 // tesseract_command_language - concrete types
-#include <tesseract_command_language/joint_waypoint.h>
-#include <tesseract_command_language/cartesian_waypoint.h>
-#include <tesseract_command_language/state_waypoint.h>
-#include <tesseract_command_language/move_instruction.h>
-#include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_command_language/wait_instruction.h>
-#include <tesseract_command_language/timer_instruction.h>
-#include <tesseract_command_language/set_analog_instruction.h>
-#include <tesseract_command_language/set_digital_instruction.h>
-#include <tesseract_command_language/set_tool_instruction.h>
-#include <tesseract_command_language/instruction_type.h>
-#include <tesseract_common/profile.h>
-#include <tesseract_common/profile_dictionary.h>
-#include <tesseract_command_language/constants.h>
+#include <tesseract/command_language/joint_waypoint.h>
+#include <tesseract/command_language/cartesian_waypoint.h>
+#include <tesseract/command_language/state_waypoint.h>
+#include <tesseract/command_language/move_instruction.h>
+#include <tesseract/command_language/composite_instruction.h>
+#include <tesseract/command_language/wait_instruction.h>
+#include <tesseract/command_language/timer_instruction.h>
+#include <tesseract/command_language/set_analog_instruction.h>
+#include <tesseract/command_language/set_digital_instruction.h>
+#include <tesseract/command_language/set_tool_instruction.h>
+#include <tesseract/command_language/instruction_type.h>
+#include <tesseract/common/profile.h>
+#include <tesseract/common/profile_dictionary.h>
+#include <tesseract/command_language/constants.h>
 
 // tesseract_command_language - Poly types
-#include <tesseract_command_language/poly/waypoint_poly.h>
-#include <tesseract_command_language/poly/cartesian_waypoint_poly.h>
-#include <tesseract_command_language/poly/joint_waypoint_poly.h>
-#include <tesseract_command_language/poly/state_waypoint_poly.h>
-#include <tesseract_command_language/poly/move_instruction_poly.h>
-#include <tesseract_command_language/poly/instruction_poly.h>
+#include <tesseract/command_language/poly/waypoint_poly.h>
+#include <tesseract/command_language/poly/cartesian_waypoint_poly.h>
+#include <tesseract/command_language/poly/joint_waypoint_poly.h>
+#include <tesseract/command_language/poly/state_waypoint_poly.h>
+#include <tesseract/command_language/poly/move_instruction_poly.h>
+#include <tesseract/command_language/poly/instruction_poly.h>
 
 // tesseract_common
-#include <tesseract_common/manipulator_info.h>
-#include <tesseract_common/joint_state.h>
+#include <tesseract/common/manipulator_info.h>
+#include <tesseract/common/joint_state.h>
 
 namespace tp = tesseract_planning;
 namespace tc = tesseract_common;

@@ -16,15 +16,15 @@
 #include "tesseract_nb.h"
 #include <nanobind/stl/vector.h>
 
-#include <tesseract_common/profile.h>
+#include <tesseract/common/profile.h>
 
-#include <tesseract_task_composer/planning/profiles/contact_check_profile.h>
-#include <tesseract_task_composer/planning/profiles/fix_state_bounds_profile.h>
-#include <tesseract_task_composer/planning/profiles/fix_state_collision_profile.h>
-#include <tesseract_task_composer/planning/profiles/kinematic_limits_check_profile.h>
-#include <tesseract_task_composer/planning/profiles/min_length_profile.h>
-#include <tesseract_task_composer/planning/profiles/profile_switch_profile.h>
-#include <tesseract_task_composer/planning/profiles/upsample_trajectory_profile.h>
+#include <tesseract/task_composer/planning/profiles/contact_check_profile.h>
+#include <tesseract/task_composer/planning/profiles/fix_state_bounds_profile.h>
+#include <tesseract/task_composer/planning/profiles/fix_state_collision_profile.h>
+#include <tesseract/task_composer/planning/profiles/kinematic_limits_check_profile.h>
+#include <tesseract/task_composer/planning/profiles/min_length_profile.h>
+#include <tesseract/task_composer/planning/profiles/profile_switch_profile.h>
+#include <tesseract/task_composer/planning/profiles/upsample_trajectory_profile.h>
 
 namespace tp = tesseract_planning;
 namespace tc = tesseract_common;

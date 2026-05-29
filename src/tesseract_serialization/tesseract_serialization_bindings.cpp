@@ -9,13 +9,13 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
-#include <tesseract_common/serialization.h>
-#include <tesseract_command_language/composite_instruction.h>
-#include <tesseract_command_language/cereal_serialization.h>
-#include <tesseract_environment/environment.h>
-#include <tesseract_environment/cereal_serialization.h>
-#include <tesseract_scene_graph/scene_state.h>
-#include <tesseract_scene_graph/cereal_serialization.h>
+#include <tesseract/common/serialization.h>
+#include <tesseract/command_language/composite_instruction.h>
+#include <tesseract/command_language/cereal_serialization.h>
+#include <tesseract/environment/environment.h>
+#include <tesseract/environment/cereal_serialization.h>
+#include <tesseract/scene_graph/scene_state.h>
+#include <tesseract/scene_graph/cereal_serialization.h>
 
 // CEREAL_REGISTER_TYPE expansion needs all archive headers visible before the
 // macro fires (so cereal can bind the type to each archive at TU init).
@@ -24,10 +24,10 @@
 #include <cereal/archives/json.hpp>
 
 namespace nb = nanobind;
-using namespace tesseract_common;
+using namespace tesseract::common;
 using namespace tesseract_planning;
-using namespace tesseract_environment;
-using namespace tesseract_scene_graph;
+using namespace tesseract::environment;
+using namespace tesseract::scene_graph;
 
 // Cereal polymorphic-type registry on Windows MSVC is per-DLL — class-template
 // statics (StaticObject<InputBindingMap<Archive>>, OutputBindingMap, ...) are
@@ -80,7 +80,7 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, t
 CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::TimerInstruction)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::WaitInstruction)
 
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_common::AnyInterface, tesseract_planning::CompositeInstructionAnyPoly)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract::common::AnyInterface, tesseract_planning::CompositeInstructionAnyPoly)
 
 // Belt-and-suspenders: also keep the upstream TU anchored. Harmless if the
 // TU is already alive; the consumer-side registrations above are the actual

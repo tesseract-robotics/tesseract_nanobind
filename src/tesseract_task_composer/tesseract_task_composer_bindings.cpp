@@ -15,35 +15,35 @@
 #include <sstream>
 
 // tesseract_task_composer core
-#include <tesseract_task_composer/core/task_composer_context.h>
-#include <tesseract_task_composer/core/task_composer_data_storage.h>
-#include <tesseract_task_composer/core/task_composer_executor.h>
-#include <tesseract_task_composer/core/task_composer_future.h>
-#include <tesseract_task_composer/core/task_composer_node.h>
-#include <tesseract_task_composer/core/task_composer_node_info.h>
-#include <tesseract_task_composer/core/task_composer_keys.h>
-#include <tesseract_task_composer/core/task_composer_plugin_factory.h>
-#include <tesseract_task_composer/core/task_composer_server.h>
+#include <tesseract/task_composer/task_composer_context.h>
+#include <tesseract/task_composer/task_composer_data_storage.h>
+#include <tesseract/task_composer/task_composer_executor.h>
+#include <tesseract/task_composer/task_composer_future.h>
+#include <tesseract/task_composer/task_composer_node.h>
+#include <tesseract/task_composer/task_composer_node_info.h>
+#include <tesseract/task_composer/task_composer_keys.h>
+#include <tesseract/task_composer/task_composer_plugin_factory.h>
+#include <tesseract/task_composer/task_composer_server.h>
 
 // tesseract_task_composer taskflow
-#include <tesseract_task_composer/taskflow/taskflow_task_composer_executor.h>
+#include <tesseract/task_composer/taskflow/taskflow_task_composer_executor.h>
 
 // tesseract_common
-#include <tesseract_common/any_poly.h>
-#include <tesseract_common/resource_locator.h>
+#include <tesseract/common/any_poly.h>
+#include <tesseract/common/resource_locator.h>
 #include <filesystem>
 
 // tesseract_environment for Environment wrapper
-#include <tesseract_environment/environment.h>
+#include <tesseract/environment/environment.h>
 
 // tesseract_command_language for CompositeInstruction
-#include <tesseract_command_language/composite_instruction.h>
+#include <tesseract/command_language/composite_instruction.h>
 // Note: ProfileDictionary moved to tesseract_common in 0.33
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/common/profile_dictionary.h>
 
 // tesseract_collision for ContactResultMap (DiscreteContactCheckTask saves
 // std::vector<ContactResultMap> on its node info's data_storage)
-#include <tesseract_collision/core/types.h>
+#include <tesseract/collision/types.h>
 
 // console_bridge for log output visible alongside the rest of tesseract's logging
 #include <console_bridge/console.h>
@@ -407,8 +407,8 @@ NB_MODULE(_tesseract_task_composer, m) {
     }, "any_poly"_a, "Extract a TaskComposerDataStorage from an AnyPoly");
 
     m.def("AnyPoly_as_ContactResultMapVector",
-          [](const tc::AnyPoly& ap) -> std::vector<tesseract_collision::ContactResultMap> {
-        return ap.as<std::vector<tesseract_collision::ContactResultMap>>();
+          [](const tc::AnyPoly& ap) -> std::vector<tesseract::collision::ContactResultMap> {
+        return ap.as<std::vector<tesseract::collision::ContactResultMap>>();
     }, "any_poly"_a,
        "Extract a std::vector<ContactResultMap> from an AnyPoly. "
        "DiscreteContactCheckTask saves its per-step contact results under "

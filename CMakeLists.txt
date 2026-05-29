@@ -49,16 +49,16 @@ if(DEFINED ENV{CONDA_PREFIX})
 endif()
 
 # Find tesseract C++ libraries
-find_package(tesseract_common REQUIRED)
-find_package(tesseract_geometry REQUIRED)
-find_package(tesseract_scene_graph REQUIRED)
-find_package(tesseract_srdf REQUIRED)
-find_package(tesseract_urdf REQUIRED)
-find_package(tesseract_collision REQUIRED)
-find_package(tesseract_state_solver REQUIRED)
-find_package(tesseract_kinematics REQUIRED)
-find_package(tesseract_environment REQUIRED)
-find_package(tesseract_command_language REQUIRED)
+find_package(tesseract REQUIRED COMPONENTS common)
+find_package(tesseract REQUIRED COMPONENTS geometry)
+find_package(tesseract REQUIRED COMPONENTS scene_graph)
+find_package(tesseract REQUIRED COMPONENTS srdf)
+find_package(tesseract REQUIRED COMPONENTS urdf)
+find_package(tesseract REQUIRED COMPONENTS collision)
+find_package(tesseract REQUIRED COMPONENTS state_solver)
+find_package(tesseract REQUIRED COMPONENTS kinematics)
+find_package(tesseract REQUIRED COMPONENTS environment)
+find_package(tesseract_planning REQUIRED COMPONENTS command_language)
 find_package(console_bridge REQUIRED)
 
 # Define reusable function for nanobind extensions
@@ -97,7 +97,7 @@ endfunction()
 add_tesseract_nanobind_extension(
   tesseract_common
   src/tesseract_common/tesseract_common_bindings.cpp
-  tesseract::tesseract_common
+  tesseract::common
   console_bridge::console_bridge
 )
 
@@ -105,130 +105,130 @@ add_tesseract_nanobind_extension(
 add_tesseract_nanobind_extension(
   tesseract_geometry
   src/tesseract_geometry/tesseract_geometry_bindings.cpp
-  tesseract::tesseract_geometry
-  tesseract::tesseract_common
+  tesseract::geometry
+  tesseract::common
 )
 
 # Add tesseract_scene_graph module
 add_tesseract_nanobind_extension(
   tesseract_scene_graph
   src/tesseract_scene_graph/tesseract_scene_graph_bindings.cpp
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_geometry
-  tesseract::tesseract_common
+  tesseract::scene_graph
+  tesseract::geometry
+  tesseract::common
 )
 
 # Add tesseract_srdf module
 add_tesseract_nanobind_extension(
   tesseract_srdf
   src/tesseract_srdf/tesseract_srdf_bindings.cpp
-  tesseract::tesseract_srdf
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_common
+  tesseract::srdf
+  tesseract::scene_graph
+  tesseract::common
 )
 
 # Add tesseract_urdf module
 add_tesseract_nanobind_extension(
   tesseract_urdf
   src/tesseract_urdf/tesseract_urdf_bindings.cpp
-  tesseract::tesseract_urdf
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_common
+  tesseract::urdf
+  tesseract::scene_graph
+  tesseract::common
 )
 
 # Add tesseract_collision module
 add_tesseract_nanobind_extension(
   tesseract_collision
   src/tesseract_collision/tesseract_collision_bindings.cpp
-  tesseract::tesseract_collision_core
-  tesseract::tesseract_collision_bullet
-  tesseract::tesseract_geometry
-  tesseract::tesseract_common
+  tesseract::collision
+  tesseract::collision_bullet
+  tesseract::geometry
+  tesseract::common
 )
 
 # Add tesseract_state_solver module
 add_tesseract_nanobind_extension(
   tesseract_state_solver
   src/tesseract_state_solver/tesseract_state_solver_bindings.cpp
-  tesseract::tesseract_state_solver_kdl
-  tesseract::tesseract_state_solver_ofkt
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_common
+  tesseract::state_solver_kdl
+  tesseract::state_solver_ofkt
+  tesseract::scene_graph
+  tesseract::common
 )
 
 # Add tesseract_kinematics module
 add_tesseract_nanobind_extension(
   tesseract_kinematics
   src/tesseract_kinematics/tesseract_kinematics_bindings.cpp
-  tesseract::tesseract_kinematics_core
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_state_solver_kdl
-  tesseract::tesseract_common
+  tesseract::kinematics
+  tesseract::scene_graph
+  tesseract::state_solver_kdl
+  tesseract::common
 )
 
 # Add tesseract_environment module
 add_tesseract_nanobind_extension(
   tesseract_environment
   src/tesseract_environment/tesseract_environment_bindings.cpp
-  tesseract::tesseract_environment
-  tesseract::tesseract_kinematics_core
-  tesseract::tesseract_collision_core
-  tesseract::tesseract_srdf
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_common
+  tesseract::environment
+  tesseract::kinematics
+  tesseract::collision
+  tesseract::srdf
+  tesseract::scene_graph
+  tesseract::common
 )
 
 # Add tesseract_command_language module
 add_tesseract_nanobind_extension(
   tesseract_command_language
   src/tesseract_command_language/tesseract_command_language_bindings.cpp
-  tesseract::tesseract_command_language
-  tesseract::tesseract_common
+  tesseract::command_language
+  tesseract::common
 )
 
 # Add tesseract_serialization module (XML/binary serialization for root types)
 add_tesseract_nanobind_extension(
   tesseract_serialization
   src/tesseract_serialization/tesseract_serialization_bindings.cpp
-  tesseract::tesseract_command_language
-  tesseract::tesseract_environment
-  tesseract::tesseract_scene_graph
-  tesseract::tesseract_common
+  tesseract::command_language
+  tesseract::environment
+  tesseract::scene_graph
+  tesseract::common
 )
 
 # Find motion planners
-find_package(tesseract_motion_planners REQUIRED COMPONENTS core simple ompl)
+find_package(tesseract_planning REQUIRED COMPONENTS motion_planners motion_planners_simple motion_planners_ompl)
 
 # Add tesseract_motion_planners module
 add_tesseract_nanobind_extension(
   tesseract_motion_planners
   src/tesseract_motion_planners/tesseract_motion_planners_bindings.cpp
-  tesseract::tesseract_motion_planners_core
-  tesseract::tesseract_environment
-  tesseract::tesseract_command_language
-  tesseract::tesseract_common
+  tesseract::motion_planners
+  tesseract::environment
+  tesseract::command_language
+  tesseract::common
 )
 
 # Add tesseract_motion_planners_simple module
 add_tesseract_nanobind_extension(
   tesseract_motion_planners_simple
   src/tesseract_motion_planners_simple/tesseract_motion_planners_simple_bindings.cpp
-  tesseract::tesseract_motion_planners_simple
-  tesseract::tesseract_motion_planners_core
-  tesseract::tesseract_environment
-  tesseract::tesseract_command_language
-  tesseract::tesseract_common
+  tesseract::motion_planners_simple
+  tesseract::motion_planners
+  tesseract::environment
+  tesseract::command_language
+  tesseract::common
 )
 
 # Add tesseract_motion_planners_ompl module
 add_tesseract_nanobind_extension(
   tesseract_motion_planners_ompl
   src/tesseract_motion_planners_ompl/tesseract_motion_planners_ompl_bindings.cpp
-  tesseract::tesseract_motion_planners_ompl
-  tesseract::tesseract_motion_planners_core
-  tesseract::tesseract_environment
-  tesseract::tesseract_command_language
-  tesseract::tesseract_common
+  tesseract::motion_planners_ompl
+  tesseract::motion_planners
+  tesseract::environment
+  tesseract::command_language
+  tesseract::common
 )
 
 # Add ompl_base module (SE2, Reeds-Shepp, Dubins state spaces)
@@ -252,37 +252,37 @@ set_target_properties(_ompl_base PROPERTIES
 install(TARGETS _ompl_base LIBRARY DESTINATION tesseract_robotics/ompl_base)
 
 # Add tesseract_motion_planners_descartes module (optional - only if descartes component was built)
-find_package(tesseract_motion_planners QUIET COMPONENTS descartes)
+find_package(tesseract_planning QUIET COMPONENTS motion_planners_descartes)
 find_package(descartes_light QUIET)
-if(tesseract_motion_planners_descartes_FOUND AND descartes_light_FOUND)
+if(tesseract_planning_motion_planners_descartes_FOUND AND descartes_light_FOUND)
   message(STATUS "tesseract_motion_planners descartes component found - building bindings")
   add_tesseract_nanobind_extension(
     tesseract_motion_planners_descartes
     src/tesseract_motion_planners_descartes/tesseract_motion_planners_descartes_bindings.cpp
-    tesseract::tesseract_motion_planners_descartes
-    tesseract::tesseract_motion_planners_core
-    tesseract::tesseract_environment
-    tesseract::tesseract_command_language
-    tesseract::tesseract_collision_core
-    tesseract::tesseract_common
+    tesseract::motion_planners_descartes
+    tesseract::motion_planners
+    tesseract::environment
+    tesseract::command_language
+    tesseract::collision
+    tesseract::common
   )
 else()
   message(STATUS "tesseract_motion_planners descartes component not found - skipping bindings")
 endif()
 
 # Add tesseract_motion_planners_trajopt module (optional - only if trajopt component was built)
-find_package(tesseract_motion_planners QUIET COMPONENTS trajopt)
+find_package(tesseract_planning QUIET COMPONENTS motion_planners_trajopt)
 find_package(trajopt QUIET)
-if(tesseract_motion_planners_trajopt_FOUND AND trajopt_FOUND)
+if(tesseract_planning_motion_planners_trajopt_FOUND AND trajopt_FOUND)
   message(STATUS "tesseract_motion_planners trajopt component found - building bindings")
   add_tesseract_nanobind_extension(
     tesseract_motion_planners_trajopt
     src/tesseract_motion_planners_trajopt/tesseract_motion_planners_trajopt_bindings.cpp
-    tesseract::tesseract_motion_planners_trajopt
-    tesseract::tesseract_motion_planners_core
-    tesseract::tesseract_environment
-    tesseract::tesseract_command_language
-    tesseract::tesseract_common
+    tesseract::motion_planners_trajopt
+    tesseract::motion_planners
+    tesseract::environment
+    tesseract::command_language
+    tesseract::common
     trajopt::trajopt
   )
 else()
@@ -290,20 +290,20 @@ else()
 endif()
 
 # Add tesseract_motion_planners_trajopt_ifopt module (optional - only if trajopt_ifopt component was built)
-find_package(tesseract_motion_planners QUIET COMPONENTS trajopt_ifopt)
+find_package(tesseract_planning QUIET COMPONENTS motion_planners_trajopt_ifopt)
 find_package(trajopt_ifopt QUIET)
 find_package(trajopt_sqp QUIET)
 find_package(trajopt_common QUIET)
-if(tesseract_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND trajopt_sqp_FOUND)
+if(tesseract_planning_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND trajopt_sqp_FOUND)
   message(STATUS "tesseract_motion_planners trajopt_ifopt component found - building bindings")
   add_tesseract_nanobind_extension(
     tesseract_motion_planners_trajopt_ifopt
     src/tesseract_motion_planners_trajopt_ifopt/tesseract_motion_planners_trajopt_ifopt_bindings.cpp
-    tesseract::tesseract_motion_planners_trajopt_ifopt
-    tesseract::tesseract_motion_planners_core
-    tesseract::tesseract_environment
-    tesseract::tesseract_command_language
-    tesseract::tesseract_common
+    tesseract::motion_planners_trajopt_ifopt
+    tesseract::motion_planners
+    tesseract::environment
+    tesseract::command_language
+    tesseract::common
     trajopt::trajopt_ifopt
     trajopt::trajopt_sqp
   )
@@ -320,10 +320,10 @@ if(trajopt_ifopt_FOUND AND trajopt_common_FOUND)
     src/trajopt_ifopt/trajopt_ifopt_bindings.cpp
     trajopt::trajopt_ifopt
     trajopt::trajopt_common
-    tesseract::tesseract_kinematics_core
-    tesseract::tesseract_environment
-    tesseract::tesseract_collision_core
-    tesseract::tesseract_common
+    tesseract::kinematics
+    tesseract::environment
+    tesseract::collision
+    tesseract::common
   )
 else()
   message(STATUS "trajopt_ifopt/trajopt_common not found - skipping bindings")
@@ -337,49 +337,49 @@ if(trajopt_sqp_FOUND)
     src/trajopt_sqp/trajopt_sqp_bindings.cpp
     trajopt::trajopt_sqp
     trajopt::trajopt_ifopt
-    tesseract::tesseract_common
+    tesseract::common
   )
 else()
   message(STATUS "trajopt_sqp not found - skipping bindings")
 endif()
 
 # Find and add tesseract_time_parameterization
-find_package(tesseract_time_parameterization REQUIRED)
+find_package(tesseract_planning REQUIRED COMPONENTS time_parameterization time_parameterization_isp time_parameterization_totg time_parameterization_kdl)
 
 add_tesseract_nanobind_extension(
   tesseract_time_parameterization
   src/tesseract_time_parameterization/tesseract_time_parameterization_bindings.cpp
-  tesseract::tesseract_time_parameterization_isp
-  tesseract::tesseract_time_parameterization_totg
-  tesseract::tesseract_time_parameterization_kdl
-  tesseract::tesseract_time_parameterization_core
-  tesseract::tesseract_command_language
-  tesseract::tesseract_common
+  tesseract::time_parameterization_isp
+  tesseract::time_parameterization_totg
+  tesseract::time_parameterization_kdl
+  tesseract::time_parameterization
+  tesseract::command_language
+  tesseract::common
 )
 
 # Find and add tesseract_task_composer
-find_package(tesseract_task_composer REQUIRED COMPONENTS core taskflow planning)
+find_package(tesseract_planning REQUIRED COMPONENTS task_composer task_composer_taskflow task_composer_planning)
 
 add_tesseract_nanobind_extension(
   tesseract_task_composer
   src/tesseract_task_composer/tesseract_task_composer_bindings.cpp
-  tesseract::tesseract_task_composer
-  tesseract::tesseract_task_composer_taskflow
-  tesseract::tesseract_environment
-  tesseract::tesseract_command_language
-  tesseract::tesseract_collision_core
-  tesseract::tesseract_common
+  tesseract::task_composer
+  tesseract::task_composer_taskflow
+  tesseract::environment
+  tesseract::command_language
+  tesseract::collision
+  tesseract::common
 )
 
 add_tesseract_nanobind_extension(
   tesseract_task_composer_planning
   src/tesseract_task_composer_planning/tesseract_task_composer_planning_bindings.cpp
-  tesseract::tesseract_task_composer_planning_nodes
-  tesseract::tesseract_task_composer
-  tesseract::tesseract_motion_planners_trajopt
-  tesseract::tesseract_collision_core
-  tesseract::tesseract_command_language
-  tesseract::tesseract_common
+  tesseract::task_composer_planning_nodes
+  tesseract::task_composer
+  tesseract::motion_planners_trajopt
+  tesseract::collision
+  tesseract::command_language
+  tesseract::common
 )
 
 message(STATUS "============= Build Configuration =============")

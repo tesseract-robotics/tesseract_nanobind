@@ -7,25 +7,25 @@
 #include <nanobind/stl/map.h>
 
 // tesseract_collision core
-#include <tesseract_collision/core/types.h>
-#include <tesseract_collision/core/discrete_contact_manager.h>
-#include <tesseract_collision/core/continuous_contact_manager.h>
-#include <tesseract_collision/core/contact_managers_plugin_factory.h>
+#include <tesseract/collision/types.h>
+#include <tesseract/collision/discrete_contact_manager.h>
+#include <tesseract/collision/continuous_contact_manager.h>
+#include <tesseract/collision/contact_managers_plugin_factory.h>
 
 // tesseract_common for types
-#include <tesseract_common/allowed_collision_matrix.h>
-#include <tesseract_common/collision_margin_data.h>
-#include <tesseract_common/resource_locator.h>
+#include <tesseract/common/allowed_collision_matrix.h>
+#include <tesseract/common/collision_margin_data.h>
+#include <tesseract/common/resource_locator.h>
 #include <filesystem>
-#include <tesseract_common/types.h>
+#include <tesseract/common/types.h>
 
 // tesseract_geometry for collision objects
-#include <tesseract_geometry/geometry.h>
-#include <tesseract_geometry/impl/mesh.h>
-#include <tesseract_geometry/impl/convex_mesh.h>
+#include <tesseract/geometry/geometry.h>
+#include <tesseract/geometry/impl/mesh.h>
+#include <tesseract/geometry/impl/convex_mesh.h>
 
 // bullet convex hull utils
-#include <tesseract_collision/bullet/convex_hull_utils.h>
+#include <tesseract/collision/bullet/convex_hull_utils.h>
 
 namespace tc = tesseract_collision;
 namespace tcommon = tesseract_common;

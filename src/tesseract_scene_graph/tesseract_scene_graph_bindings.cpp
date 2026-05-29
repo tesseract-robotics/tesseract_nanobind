@@ -6,16 +6,16 @@
 #include "tesseract_nb.h"
 
 // tesseract_scene_graph
-#include <tesseract_scene_graph/joint.h>
-#include <tesseract_scene_graph/link.h>
-#include <tesseract_scene_graph/graph.h>
-#include <tesseract_scene_graph/scene_state.h>
+#include <tesseract/scene_graph/joint.h>
+#include <tesseract/scene_graph/link.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/scene_state.h>
 
 // tesseract_geometry for Visual/Collision geometry pointer
-#include <tesseract_geometry/geometry.h>
+#include <tesseract/geometry/geometry.h>
 
 // tesseract_common for AllowedCollisionMatrix
-#include <tesseract_common/allowed_collision_matrix.h>
+#include <tesseract/common/allowed_collision_matrix.h>
 
 namespace tsg = tesseract_scene_graph;
 namespace tg = tesseract_geometry;
