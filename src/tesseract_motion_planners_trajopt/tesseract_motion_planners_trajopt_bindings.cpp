@@ -14,19 +14,19 @@
 #include "tesseract_nb.h"
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
-#include <tesseract_motion_planners/core/types.h>
+#include <tesseract/motion_planners/types.h>
 
 // tesseract_common (Profile and ProfileDictionary moved here in 0.33)
-#include <tesseract_common/profile.h>
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/common/profile.h>
+#include <tesseract/common/profile_dictionary.h>
 
 // tesseract_motion_planners TrajOpt
-#include <tesseract_motion_planners/trajopt/trajopt_motion_planner.h>
-#include <tesseract_motion_planners/trajopt/profile/trajopt_profile.h>
-#include <tesseract_motion_planners/trajopt/profile/trajopt_default_move_profile.h>
-#include <tesseract_motion_planners/trajopt/profile/trajopt_default_composite_profile.h>
-#include <tesseract_motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h>
-#include <tesseract_motion_planners/trajopt/trajopt_waypoint_config.h>
+#include <tesseract/motion_planners/trajopt/trajopt_motion_planner.h>
+#include <tesseract/motion_planners/trajopt/profile/trajopt_profile.h>
+#include <tesseract/motion_planners/trajopt/profile/trajopt_default_move_profile.h>
+#include <tesseract/motion_planners/trajopt/profile/trajopt_default_composite_profile.h>
+#include <tesseract/motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h>
+#include <tesseract/motion_planners/trajopt/trajopt_waypoint_config.h>
 
 // trajopt_sco for optimizer parameters
 #include <trajopt_sco/optimizers.hpp>
@@ -35,7 +35,7 @@
 #include <trajopt_common/collision_types.h>
 
 // tesseract_collision for CollisionEvaluatorType (moved here in 0.33)
-#include <tesseract_collision/core/types.h>
+#include <tesseract/collision/types.h>
 
 namespace tp = tesseract_planning;
 namespace tc = tesseract_common;

@@ -8,22 +8,22 @@
 #include "tesseract_nb.h"
 
 // tesseract_time_parameterization
-#include <tesseract_time_parameterization/core/time_parameterization.h>
-#include <tesseract_time_parameterization/core/instructions_trajectory.h>
-#include <tesseract_time_parameterization/totg/time_optimal_trajectory_generation.h>
-#include <tesseract_time_parameterization/totg/time_optimal_trajectory_generation_profiles.h>
-#include <tesseract_time_parameterization/isp/iterative_spline_parameterization.h>
-#include <tesseract_time_parameterization/isp/iterative_spline_parameterization_profiles.h>
-#include <tesseract_time_parameterization/kdl/constant_tcp_speed_parameterization.h>
-#include <tesseract_time_parameterization/kdl/constant_tcp_speed_parameterization_profiles.h>
+#include <tesseract/time_parameterization/time_parameterization.h>
+#include <tesseract/time_parameterization/instructions_trajectory.h>
+#include <tesseract/time_parameterization/totg/time_optimal_trajectory_generation.h>
+#include <tesseract/time_parameterization/totg/time_optimal_trajectory_generation_profiles.h>
+#include <tesseract/time_parameterization/isp/iterative_spline_parameterization.h>
+#include <tesseract/time_parameterization/isp/iterative_spline_parameterization_profiles.h>
+#include <tesseract/time_parameterization/kdl/constant_tcp_speed_parameterization.h>
+#include <tesseract/time_parameterization/kdl/constant_tcp_speed_parameterization_profiles.h>
 
 // tesseract_command_language
-#include <tesseract_command_language/composite_instruction.h>
+#include <tesseract/command_language/composite_instruction.h>
 // Note: ProfileDictionary moved to tesseract_common in 0.33
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/common/profile_dictionary.h>
 
 // tesseract_environment
-#include <tesseract_environment/environment.h>
+#include <tesseract/environment/environment.h>
 
 namespace tp = tesseract_planning;
 namespace tc = tesseract_common;

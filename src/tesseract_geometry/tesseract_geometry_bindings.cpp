@@ -6,33 +6,33 @@
 #include "tesseract_nb.h"
 
 // tesseract_geometry
-#include <tesseract_geometry/geometry.h>
-#include <tesseract_geometry/geometries.h>
-#include <tesseract_geometry/impl/box.h>
-#include <tesseract_geometry/impl/sphere.h>
-#include <tesseract_geometry/impl/cylinder.h>
-#include <tesseract_geometry/impl/capsule.h>
-#include <tesseract_geometry/impl/cone.h>
-#include <tesseract_geometry/impl/plane.h>
-#include <tesseract_geometry/impl/polygon_mesh.h>
-#include <tesseract_geometry/impl/mesh.h>
-#include <tesseract_geometry/impl/convex_mesh.h>
-#include <tesseract_geometry/impl/sdf_mesh.h>
-#include <tesseract_geometry/impl/compound_mesh.h>
-#include <tesseract_geometry/impl/mesh_material.h>
-#include <tesseract_geometry/impl/octree.h>
-#include <tesseract_geometry/impl/octree_utils.h>
-#include <tesseract_geometry/mesh_parser.h>
-#include <tesseract_geometry/utils.h>
-#include <tesseract_geometry/conversions.h>
+#include <tesseract/geometry/geometry.h>
+#include <tesseract/geometry/geometries.h>
+#include <tesseract/geometry/impl/box.h>
+#include <tesseract/geometry/impl/sphere.h>
+#include <tesseract/geometry/impl/cylinder.h>
+#include <tesseract/geometry/impl/capsule.h>
+#include <tesseract/geometry/impl/cone.h>
+#include <tesseract/geometry/impl/plane.h>
+#include <tesseract/geometry/impl/polygon_mesh.h>
+#include <tesseract/geometry/impl/mesh.h>
+#include <tesseract/geometry/impl/convex_mesh.h>
+#include <tesseract/geometry/impl/sdf_mesh.h>
+#include <tesseract/geometry/impl/compound_mesh.h>
+#include <tesseract/geometry/impl/mesh_material.h>
+#include <tesseract/geometry/impl/octree.h>
+#include <tesseract/geometry/impl/octree_utils.h>
+#include <tesseract/geometry/mesh_parser.h>
+#include <tesseract/geometry/utils.h>
+#include <tesseract/geometry/conversions.h>
 
 // octomap
 #include <octomap/OcTree.h>
 
 // tesseract_common
-#include <tesseract_common/types.h>
-#include <tesseract_common/eigen_types.h>
-#include <tesseract_common/resource_locator.h>
+#include <tesseract/common/types.h>
+#include <tesseract/common/eigen_types.h>
+#include <tesseract/common/resource_locator.h>
 
 namespace tg = tesseract_geometry;
 namespace tc = tesseract_common;
@@ -252,7 +252,7 @@ NB_MODULE(_tesseract_geometry, m) {
         .def("getScale", &tg::CompoundMesh::getScale, "Get the scale applied to the mesh");
 
     // octomap::OcTree - minimal binding so callers can construct/load and
-    // pass it to tesseract_geometry::Octree
+    // pass it to tesseract::geometry::Octree
     nb::class_<octomap::OcTree>(m, "OcTree")
         .def(nb::init<double>(), "resolution"_a,
              "Create an empty octomap OcTree with the given leaf resolution")

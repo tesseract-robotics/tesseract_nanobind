@@ -5,14 +5,14 @@
 
 #include "tesseract_nb.h"
 
-#include <tesseract_srdf/srdf_model.h>
-#include <tesseract_srdf/kinematics_information.h>
-#include <tesseract_srdf/utils.h>
-#include <tesseract_scene_graph/graph.h>
-#include <tesseract_common/resource_locator.h>
-#include <tesseract_common/allowed_collision_matrix.h>
-#include <tesseract_common/calibration_info.h>
-#include <tesseract_common/collision_margin_data.h>
+#include <tesseract/srdf/srdf_model.h>
+#include <tesseract/srdf/kinematics_information.h>
+#include <tesseract/srdf/utils.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/common/resource_locator.h>
+#include <tesseract/common/allowed_collision_matrix.h>
+#include <tesseract/common/calibration_info.h>
+#include <tesseract/common/collision_margin_data.h>
 
 namespace ts = tesseract_srdf;
 

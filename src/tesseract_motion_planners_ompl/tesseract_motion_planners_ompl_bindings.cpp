@@ -11,20 +11,20 @@
 #include "tesseract_nb.h"
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
-#include <tesseract_motion_planners/core/types.h>
+#include <tesseract/motion_planners/types.h>
 
 // tesseract_common (Profile and ProfileDictionary moved here in 0.33)
-#include <tesseract_common/profile.h>
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/common/profile.h>
+#include <tesseract/common/profile_dictionary.h>
 
 // tesseract_motion_planners OMPL
-#include <tesseract_motion_planners/ompl/ompl_motion_planner.h>
-#include <tesseract_motion_planners/ompl/ompl_planner_configurator.h>
-#include <tesseract_motion_planners/ompl/ompl_solver_config.h>
-#include <tesseract_motion_planners/ompl/profile/ompl_real_vector_move_profile.h>
+#include <tesseract/motion_planners/ompl/ompl_motion_planner.h>
+#include <tesseract/motion_planners/ompl/ompl_planner_configurator.h>
+#include <tesseract/motion_planners/ompl/ompl_solver_config.h>
+#include <tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h>
 
 // tesseract_collision for CollisionCheckConfig
-#include <tesseract_collision/core/types.h>
+#include <tesseract/collision/types.h>
 
 namespace tp = tesseract_planning;
 namespace tc = tesseract_common;

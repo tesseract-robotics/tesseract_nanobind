@@ -9,24 +9,24 @@
 #include <nanobind/stl/set.h>
 
 // tesseract_state_solver - need full definition for JointGroup
-#include <tesseract_state_solver/state_solver.h>
+#include <tesseract/state_solver/state_solver.h>
 
 // tesseract_kinematics core
-#include <tesseract_kinematics/core/forward_kinematics.h>
-#include <tesseract_kinematics/core/inverse_kinematics.h>
-#include <tesseract_kinematics/core/joint_group.h>
-#include <tesseract_kinematics/core/kinematic_group.h>
-#include <tesseract_kinematics/core/types.h>
-#include <tesseract_kinematics/core/kinematics_plugin_factory.h>
-#include <tesseract_kinematics/core/utils.h>
+#include <tesseract/kinematics/forward_kinematics.h>
+#include <tesseract/kinematics/inverse_kinematics.h>
+#include <tesseract/kinematics/joint_group.h>
+#include <tesseract/kinematics/kinematic_group.h>
+#include <tesseract/kinematics/types.h>
+#include <tesseract/kinematics/kinematics_plugin_factory.h>
+#include <tesseract/kinematics/utils.h>
 
 // tesseract_scene_graph
-#include <tesseract_scene_graph/graph.h>
-#include <tesseract_scene_graph/scene_state.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/scene_state.h>
 
 // tesseract_common
-#include <tesseract_common/kinematic_limits.h>
-#include <tesseract_common/resource_locator.h>
+#include <tesseract/common/kinematic_limits.h>
+#include <tesseract/common/resource_locator.h>
 #include <filesystem>
 
 namespace tk = tesseract_kinematics;
@@ -110,7 +110,7 @@ NB_MODULE(_tesseract_kinematics, m) {
                               const std::map<std::string, Eigen::Isometry3d>& tip_link_poses,
                               const Eigen::Ref<const Eigen::VectorXd>& seed) {
             // Convert std::map to TransformMap
-            tesseract_common::TransformMap poses;
+            tesseract::common::TransformMap poses;
             for (const auto& p : tip_link_poses) {
                 poses[p.first] = p.second;
             }

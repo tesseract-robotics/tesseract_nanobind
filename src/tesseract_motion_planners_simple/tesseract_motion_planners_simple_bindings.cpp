@@ -6,29 +6,29 @@
 #include "tesseract_nb.h"
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
-#include <tesseract_motion_planners/core/types.h>
+#include <tesseract/motion_planners/types.h>
 
 // tesseract_motion_planners simple
-#include <tesseract_motion_planners/simple/interpolation.h>
-#include <tesseract_motion_planners/simple/simple_motion_planner.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_fixed_size_move_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_fixed_size_assign_move_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_fixed_size_assign_no_ik_move_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_lvs_move_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_lvs_no_ik_move_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_lvs_assign_move_profile.h>
-#include <tesseract_motion_planners/simple/profile/simple_planner_lvs_assign_no_ik_move_profile.h>
+#include <tesseract/motion_planners/simple/interpolation.h>
+#include <tesseract/motion_planners/simple/simple_motion_planner.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_fixed_size_move_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_fixed_size_assign_move_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_fixed_size_assign_no_ik_move_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_lvs_move_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_lvs_no_ik_move_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_lvs_assign_move_profile.h>
+#include <tesseract/motion_planners/simple/profile/simple_planner_lvs_assign_no_ik_move_profile.h>
 
 // tesseract_common (Profile/ProfileDictionary moved here in 0.33)
-#include <tesseract_common/profile.h>
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/common/profile.h>
+#include <tesseract/common/profile_dictionary.h>
 
 // tesseract_environment
-#include <tesseract_environment/environment.h>
+#include <tesseract/environment/environment.h>
 
 // tesseract_command_language
-#include <tesseract_command_language/composite_instruction.h>
+#include <tesseract/command_language/composite_instruction.h>
 
 namespace tp = tesseract_planning;
 namespace te = tesseract_environment;

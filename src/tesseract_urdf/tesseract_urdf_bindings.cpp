@@ -5,9 +5,9 @@
 
 #include "tesseract_nb.h"
 
-#include <tesseract_urdf/urdf_parser.h>
-#include <tesseract_scene_graph/graph.h>
-#include <tesseract_common/resource_locator.h>
+#include <tesseract/urdf/urdf_parser.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/common/resource_locator.h>
 
 namespace tu = tesseract_urdf;
 

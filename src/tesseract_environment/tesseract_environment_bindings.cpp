@@ -10,51 +10,51 @@
 #include <nanobind/stl/set.h>
 
 // tesseract_environment
-#include <tesseract_environment/environment.h>
-#include <tesseract_environment/events.h>
-#include <tesseract_environment/command.h>
-#include <tesseract_environment/commands/add_link_command.h>
-#include <tesseract_environment/commands/add_scene_graph_command.h>
-#include <tesseract_environment/commands/change_collision_margins_command.h>
-#include <tesseract_environment/commands/change_joint_acceleration_limits_command.h>
-#include <tesseract_environment/commands/change_joint_origin_command.h>
-#include <tesseract_environment/commands/change_joint_position_limits_command.h>
-#include <tesseract_environment/commands/change_joint_velocity_limits_command.h>
-#include <tesseract_environment/commands/change_link_collision_enabled_command.h>
-#include <tesseract_environment/commands/change_link_origin_command.h>
-#include <tesseract_environment/commands/change_link_visibility_command.h>
-#include <tesseract_environment/commands/modify_allowed_collisions_command.h>
-#include <tesseract_environment/commands/move_joint_command.h>
-#include <tesseract_environment/commands/move_link_command.h>
-#include <tesseract_environment/commands/remove_allowed_collision_link_command.h>
-#include <tesseract_environment/commands/remove_joint_command.h>
-#include <tesseract_environment/commands/remove_link_command.h>
-#include <tesseract_environment/commands/replace_joint_command.h>
+#include <tesseract/environment/environment.h>
+#include <tesseract/environment/events.h>
+#include <tesseract/environment/command.h>
+#include <tesseract/environment/commands/add_link_command.h>
+#include <tesseract/environment/commands/add_scene_graph_command.h>
+#include <tesseract/environment/commands/change_collision_margins_command.h>
+#include <tesseract/environment/commands/change_joint_acceleration_limits_command.h>
+#include <tesseract/environment/commands/change_joint_origin_command.h>
+#include <tesseract/environment/commands/change_joint_position_limits_command.h>
+#include <tesseract/environment/commands/change_joint_velocity_limits_command.h>
+#include <tesseract/environment/commands/change_link_collision_enabled_command.h>
+#include <tesseract/environment/commands/change_link_origin_command.h>
+#include <tesseract/environment/commands/change_link_visibility_command.h>
+#include <tesseract/environment/commands/modify_allowed_collisions_command.h>
+#include <tesseract/environment/commands/move_joint_command.h>
+#include <tesseract/environment/commands/move_link_command.h>
+#include <tesseract/environment/commands/remove_allowed_collision_link_command.h>
+#include <tesseract/environment/commands/remove_joint_command.h>
+#include <tesseract/environment/commands/remove_link_command.h>
+#include <tesseract/environment/commands/replace_joint_command.h>
 
 // tesseract_scene_graph
-#include <tesseract_scene_graph/graph.h>
-#include <tesseract_scene_graph/scene_state.h>
-#include <tesseract_scene_graph/link.h>
-#include <tesseract_scene_graph/joint.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/scene_graph/scene_state.h>
+#include <tesseract/scene_graph/link.h>
+#include <tesseract/scene_graph/joint.h>
 
 // tesseract_common
-#include <tesseract_common/resource_locator.h>
-#include <tesseract_common/manipulator_info.h>
+#include <tesseract/common/resource_locator.h>
+#include <tesseract/common/manipulator_info.h>
 #include <filesystem>
 
 // tesseract_srdf
-#include <tesseract_srdf/srdf_model.h>
+#include <tesseract/srdf/srdf_model.h>
 
 // tesseract_kinematics
-#include <tesseract_kinematics/core/joint_group.h>
-#include <tesseract_kinematics/core/kinematic_group.h>
+#include <tesseract/kinematics/joint_group.h>
+#include <tesseract/kinematics/kinematic_group.h>
 
 // tesseract_collision
-#include <tesseract_collision/core/discrete_contact_manager.h>
-#include <tesseract_collision/core/continuous_contact_manager.h>
+#include <tesseract/collision/discrete_contact_manager.h>
+#include <tesseract/collision/continuous_contact_manager.h>
 
 // tesseract_state_solver - need full definition for getStateSolver return type
-#include <tesseract_state_solver/state_solver.h>
+#include <tesseract/state_solver/state_solver.h>
 
 namespace te = tesseract_environment;
 namespace tsg = tesseract_scene_graph;
@@ -242,8 +242,8 @@ NB_MODULE(_tesseract_environment, m) {
         }, "scene_graph"_a)
         // Init with scene_graph + srdf (makes a copy of srdf into shared_ptr)
         .def("init", [](te::Environment& self, const tsg::SceneGraph& scene_graph,
-                        const tesseract_srdf::SRDFModel& srdf) {
-            auto srdf_ptr = std::make_shared<const tesseract_srdf::SRDFModel>(srdf);
+                        const tesseract::srdf::SRDFModel& srdf) {
+            auto srdf_ptr = std::make_shared<const tesseract::srdf::SRDFModel>(srdf);
             return self.init(scene_graph, srdf_ptr);
         }, "scene_graph"_a, "srdf"_a)
         .def("initFromUrdf", [](te::Environment& self, const std::string& urdf_string,

@@ -38,12 +38,12 @@
 #include <trajopt_common/collision_types.h>
 
 // tesseract_collision for CollisionCheckConfig (used by TrajOptCollisionConfig)
-#include <tesseract_collision/core/types.h>
+#include <tesseract/collision/types.h>
 
 // tesseract dependencies
-#include <tesseract_kinematics/core/joint_group.h>
-#include <tesseract_kinematics/core/kinematic_group.h>
-#include <tesseract_environment/environment.h>
+#include <tesseract/kinematics/joint_group.h>
+#include <tesseract/kinematics/kinematic_group.h>
+#include <tesseract/environment/environment.h>
 
 namespace ti = trajopt_ifopt;
 namespace tc = trajopt_common;
@@ -260,7 +260,7 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::class_<ti::CartPosConstraint, ti::ConstraintSet>(m, "CartPosConstraint")
         .def("__init__", [](ti::CartPosConstraint* self,
                             std::shared_ptr<const ti::Var> position_var,
-                            std::shared_ptr<const tesseract_kinematics::JointGroup> manip,
+                            std::shared_ptr<const tesseract::kinematics::JointGroup> manip,
                             std::string source_frame,
                             std::string target_frame,
                             const Eigen::Isometry3d& source_frame_offset,
@@ -357,8 +357,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     // ========== SingleTimestepCollisionEvaluator ==========
     // CollisionCache parameter removed in 0.34
     nb::class_<ti::SingleTimestepCollisionEvaluator, ti::DiscreteCollisionEvaluator>(m, "SingleTimestepCollisionEvaluator")
-        .def(nb::init<std::shared_ptr<const tesseract_kinematics::JointGroup>,
-                      std::shared_ptr<const tesseract_environment::Environment>,
+        .def(nb::init<std::shared_ptr<const tesseract::kinematics::JointGroup>,
+                      std::shared_ptr<const tesseract::environment::Environment>,
                       const tc::TrajOptCollisionConfig&,
                       bool>(),
              "manip"_a, "env"_a, "collision_config"_a,
@@ -386,8 +386,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     // ========== LVSDiscreteCollisionEvaluator ==========
     // CollisionCache parameter removed in 0.34
     nb::class_<ti::LVSDiscreteCollisionEvaluator, ti::ContinuousCollisionEvaluator>(m, "LVSDiscreteCollisionEvaluator")
-        .def(nb::init<std::shared_ptr<const tesseract_kinematics::JointGroup>,
-                      std::shared_ptr<const tesseract_environment::Environment>,
+        .def(nb::init<std::shared_ptr<const tesseract::kinematics::JointGroup>,
+                      std::shared_ptr<const tesseract::environment::Environment>,
                       const tc::TrajOptCollisionConfig&,
                       bool>(),
              "manip"_a, "env"_a, "collision_config"_a,
@@ -396,8 +396,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     // ========== LVSContinuousCollisionEvaluator ==========
     // CollisionCache parameter removed in 0.34
     nb::class_<ti::LVSContinuousCollisionEvaluator, ti::ContinuousCollisionEvaluator>(m, "LVSContinuousCollisionEvaluator")
-        .def(nb::init<std::shared_ptr<const tesseract_kinematics::JointGroup>,
-                      std::shared_ptr<const tesseract_environment::Environment>,
+        .def(nb::init<std::shared_ptr<const tesseract::kinematics::JointGroup>,
+                      std::shared_ptr<const tesseract::environment::Environment>,
                       const tc::TrajOptCollisionConfig&,
                       bool>(),
              "manip"_a, "env"_a, "collision_config"_a,

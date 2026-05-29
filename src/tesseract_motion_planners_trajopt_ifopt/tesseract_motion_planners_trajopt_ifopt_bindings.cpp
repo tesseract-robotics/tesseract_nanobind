@@ -11,19 +11,19 @@
 #include "tesseract_nb.h"
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
-#include <tesseract_motion_planners/core/types.h>
+#include <tesseract/motion_planners/types.h>
 
 // tesseract_common (Profile and ProfileDictionary moved here in 0.33)
-#include <tesseract_common/profile.h>
-#include <tesseract_common/profile_dictionary.h>
+#include <tesseract/common/profile.h>
+#include <tesseract/common/profile_dictionary.h>
 
 // tesseract_motion_planners TrajOpt IFOPT
-#include <tesseract_motion_planners/trajopt_ifopt/trajopt_ifopt_motion_planner.h>
-#include <tesseract_motion_planners/trajopt_ifopt/profile/trajopt_ifopt_profile.h>
-#include <tesseract_motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_move_profile.h>
-#include <tesseract_motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_composite_profile.h>
-#include <tesseract_motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h>
-#include <tesseract_motion_planners/trajopt_ifopt/trajopt_ifopt_waypoint_config.h>
+#include <tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_motion_planner.h>
+#include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_profile.h>
+#include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_move_profile.h>
+#include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_composite_profile.h>
+#include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h>
+#include <tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_waypoint_config.h>
 
 // trajopt_common for collision config
 #include <trajopt_common/collision_types.h>
