@@ -38,7 +38,8 @@
 #include <tesseract/collision/types.h>
 
 namespace tp = tesseract::motion_planners;
-namespace tc = tesseract_common;
+namespace tcl = tesseract::command_language;
+namespace tc = tesseract::common;
 namespace dl = descartes_light;
 
 // ------------------------------------------------------------------
@@ -147,7 +148,7 @@ public:
     NB_TRAMPOLINE(tp::DescartesMoveProfile<double>, 3);
 
     std::unique_ptr<dl::WaypointSampler<double>>
-    createWaypointSampler(const tp::MoveInstructionPoly& move_instruction,
+    createWaypointSampler(const tcl::MoveInstructionPoly& move_instruction,
                           const tc::ManipulatorInfo& composite_manip_info,
                           const std::shared_ptr<const tesseract::environment::Environment>& env) const override {
         nb::detail::ticket t(nb_trampoline, "createWaypointSampler", true);
@@ -157,7 +158,7 @@ public:
     }
 
     std::unique_ptr<dl::EdgeEvaluator<double>>
-    createEdgeEvaluator(const tp::MoveInstructionPoly& move_instruction,
+    createEdgeEvaluator(const tcl::MoveInstructionPoly& move_instruction,
                         const tc::ManipulatorInfo& composite_manip_info,
                         const std::shared_ptr<const tesseract::environment::Environment>& env) const override {
         nb::detail::ticket t(nb_trampoline, "createEdgeEvaluator", true);
@@ -167,7 +168,7 @@ public:
     }
 
     std::unique_ptr<dl::StateEvaluator<double>>
-    createStateEvaluator(const tp::MoveInstructionPoly& move_instruction,
+    createStateEvaluator(const tcl::MoveInstructionPoly& move_instruction,
                          const tc::ManipulatorInfo& composite_manip_info,
                          const std::shared_ptr<const tesseract::environment::Environment>& env) const override {
         nb::detail::ticket t(nb_trampoline, "createStateEvaluator", true);
