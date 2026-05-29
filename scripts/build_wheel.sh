@@ -75,7 +75,7 @@ unzip -q "$WHEEL_FILE" -d "$WHEEL_DIR"
 PLUGINS=(
     libtesseract_collision_bullet_factories.dylib
     libtesseract_collision_fcl_factories.dylib
-    libtesseract_kinematics_core_factories.dylib
+    libtesseract_kinematics_factories.dylib
     libtesseract_kinematics_kdl_factories.dylib
     libtesseract_kinematics_opw_factory.dylib
     libtesseract_kinematics_ur_factory.dylib

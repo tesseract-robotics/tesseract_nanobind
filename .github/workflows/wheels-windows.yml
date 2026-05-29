@@ -311,7 +311,7 @@ jobs:
         for plugin in \
           tesseract_collision_bullet_factories \
           tesseract_collision_fcl_factories \
-          tesseract_kinematics_core_factories \
+          tesseract_kinematics_factories \
           tesseract_kinematics_kdl_factories \
           tesseract_kinematics_opw_factory \
           tesseract_kinematics_ur_factory \
