@@ -27,9 +27,9 @@
 // bullet convex hull utils
 #include <tesseract/collision/bullet/convex_hull_utils.h>
 
-namespace tc = tesseract_collision;
-namespace tcommon = tesseract_common;
-namespace tg = tesseract_geometry;
+namespace tc = tesseract::collision;
+namespace tcommon = tesseract::common;
+namespace tg = tesseract::geometry;
 
 // Disable type caster for ContactResultVector so we can bind it as a class
 NB_MAKE_OPAQUE(tc::ContactResultVector);

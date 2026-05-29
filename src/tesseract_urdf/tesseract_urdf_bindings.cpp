@@ -9,7 +9,7 @@
 #include <tesseract/scene_graph/graph.h>
 #include <tesseract/common/resource_locator.h>
 
-namespace tu = tesseract_urdf;
+namespace tu = tesseract::urdf;
 
 NB_MODULE(_tesseract_urdf, m) {
     m.doc() = "tesseract_urdf Python bindings";

@@ -25,8 +25,9 @@
 // tesseract_environment
 #include <tesseract/environment/environment.h>
 
-namespace tp = tesseract_planning;
-namespace tc = tesseract_common;
+namespace tp = tesseract::time_parameterization;
+namespace tcl = tesseract::command_language;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_time_parameterization, m) {
     m.doc() = "tesseract_time_parameterization Python bindings";
@@ -36,7 +37,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
 
     // ========== InstructionsTrajectory ==========
     nb::class_<tp::InstructionsTrajectory>(m, "InstructionsTrajectory")
-        .def(nb::init<tp::CompositeInstruction&>(), "program"_a)
+        .def(nb::init<tcl::CompositeInstruction&>(), "program"_a)
         .def("getPosition", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getPosition, nb::const_), "i"_a)
         .def("getVelocity", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getVelocity, nb::const_), "i"_a)
         .def("getAcceleration", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getAcceleration, nb::const_), "i"_a)

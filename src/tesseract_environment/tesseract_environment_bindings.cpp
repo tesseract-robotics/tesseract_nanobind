@@ -56,10 +56,10 @@
 // tesseract_state_solver - need full definition for getStateSolver return type
 #include <tesseract/state_solver/state_solver.h>
 
-namespace te = tesseract_environment;
-namespace tsg = tesseract_scene_graph;
-namespace tc = tesseract_common;
-namespace tk = tesseract_kinematics;
+namespace te = tesseract::environment;
+namespace tsg = tesseract::scene_graph;
+namespace tc = tesseract::common;
+namespace tk = tesseract::kinematics;
 
 // Wrapper for Python event callbacks
 struct PyEventCallbackFn {

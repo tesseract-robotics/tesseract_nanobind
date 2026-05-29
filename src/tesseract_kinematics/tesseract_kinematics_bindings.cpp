@@ -29,9 +29,9 @@
 #include <tesseract/common/resource_locator.h>
 #include <filesystem>
 
-namespace tk = tesseract_kinematics;
-namespace tcommon = tesseract_common;
-namespace tsg = tesseract_scene_graph;
+namespace tk = tesseract::kinematics;
+namespace tcommon = tesseract::common;
+namespace tsg = tesseract::scene_graph;
 
 // Make KinGroupIKInputs opaque so we can bind it as a class
 NB_MAKE_OPAQUE(tk::KinGroupIKInputs)

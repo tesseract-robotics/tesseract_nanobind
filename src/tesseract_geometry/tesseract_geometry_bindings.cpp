@@ -34,8 +34,8 @@
 #include <tesseract/common/eigen_types.h>
 #include <tesseract/common/resource_locator.h>
 
-namespace tg = tesseract_geometry;
-namespace tc = tesseract_common;
+namespace tg = tesseract::geometry;
+namespace tc = tesseract::common;
 
 // Disable type caster for this specific vector type so we can bind it as a class
 NB_MAKE_OPAQUE(std::vector<std::shared_ptr<const tg::Geometry>>);

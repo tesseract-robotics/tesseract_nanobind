@@ -28,8 +28,8 @@
 // trajopt_common for collision config
 #include <trajopt_common/collision_types.h>
 
-namespace tp = tesseract_planning;
-namespace tc = tesseract_common;
+namespace tp = tesseract::motion_planners;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt_ifopt Python bindings";

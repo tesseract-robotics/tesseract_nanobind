@@ -65,9 +65,10 @@
 #include <unordered_set>
 #endif
 
-namespace tp = tesseract_planning;
-namespace te = tesseract_environment;
-namespace tc = tesseract_common;
+namespace tp = tesseract::task_composer;
+namespace tcl = tesseract::command_language;
+namespace te = tesseract::environment;
+namespace tc = tesseract::common;
 
 #ifdef __APPLE__
 namespace {
@@ -380,7 +381,7 @@ NB_MODULE(_tesseract_task_composer, m) {
     // ========== AnyPoly wrapper functions for common types ==========
     // These wrap specific types into AnyPoly for use with TaskComposerDataStorage.setData()
 
-    m.def("AnyPoly_wrap_CompositeInstruction", [](const tp::CompositeInstruction& ci) {
+    m.def("AnyPoly_wrap_CompositeInstruction", [](const tcl::CompositeInstruction& ci) {
         return tc::AnyPoly(ci);
     }, "instruction"_a, "Wrap a CompositeInstruction into an AnyPoly");
 
@@ -398,8 +399,8 @@ NB_MODULE(_tesseract_task_composer, m) {
     }, "data_storage"_a, "Wrap a TaskComposerDataStorage shared_ptr into an AnyPoly");
 
     // ========== AnyPoly unwrap functions ==========
-    m.def("AnyPoly_as_CompositeInstruction", [](const tc::AnyPoly& ap) -> tp::CompositeInstruction {
-        return ap.as<tp::CompositeInstruction>();
+    m.def("AnyPoly_as_CompositeInstruction", [](const tc::AnyPoly& ap) -> tcl::CompositeInstruction {
+        return ap.as<tcl::CompositeInstruction>();
     }, "any_poly"_a, "Extract a CompositeInstruction from an AnyPoly");
 
     m.def("AnyPoly_as_TaskComposerDataStorage", [](const tc::AnyPoly& ap) {

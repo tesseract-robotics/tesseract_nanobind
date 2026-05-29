@@ -37,8 +37,8 @@
 // tesseract_collision for CollisionEvaluatorType (moved here in 0.33)
 #include <tesseract/collision/types.h>
 
-namespace tp = tesseract_planning;
-namespace tc = tesseract_common;
+namespace tp = tesseract::motion_planners;
+namespace tc = tesseract::common;
 namespace tj = trajopt_common;
 
 NB_MODULE(_tesseract_motion_planners_trajopt, m) {

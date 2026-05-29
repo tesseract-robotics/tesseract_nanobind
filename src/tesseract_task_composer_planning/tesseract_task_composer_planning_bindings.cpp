@@ -26,8 +26,8 @@
 #include <tesseract/task_composer/planning/profiles/profile_switch_profile.h>
 #include <tesseract/task_composer/planning/profiles/upsample_trajectory_profile.h>
 
-namespace tp = tesseract_planning;
-namespace tc = tesseract_common;
+namespace tp = tesseract::task_composer;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_task_composer_planning, m) {
     m.doc() = "tesseract_task_composer planning-node profile Python bindings";
