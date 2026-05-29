@@ -137,7 +137,7 @@ jobs:
         PLUGINS=(
           libtesseract_collision_bullet_factories.so
           libtesseract_collision_fcl_factories.so
-          libtesseract_kinematics_core_factories.so
+          libtesseract_kinematics_factories.so
           libtesseract_kinematics_kdl_factories.so
           libtesseract_kinematics_opw_factory.so
           libtesseract_kinematics_ur_factory.so
