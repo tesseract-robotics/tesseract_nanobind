@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false  # don't kill siblings on transient network failures
       matrix:
-        python: ['3.9', '3.10', '3.11', '3.12']
+        python: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
     defaults:
       run:
         shell: bash -el {0}  # Git Bash is pre-installed on windows-2022
@@ -54,7 +54,7 @@ jobs:
     - name: setup pixi
       uses: prefix-dev/setup-pixi@v0.8.0
       env:
-        PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || '312' }}
+        PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || matrix.python == '3.12' && '312' || matrix.python == '3.13' && '313' || '314' }}
       with:
         manifest-path: ws/src/tesseract_nanobind/pyproject.toml
         cache: true
@@ -385,7 +385,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.12']
+        python: ['3.9', '3.14']
     defaults:
       run:
         shell: bash -el {0}

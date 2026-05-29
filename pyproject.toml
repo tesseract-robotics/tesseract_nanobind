@@ -40,8 +40,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    # "Programming Language :: Python :: 3.13",
-    # "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: C++",
     "Programming Language :: Python :: Implementation :: CPython",
     "License :: OSI Approved :: Apache Software License",
@@ -148,7 +148,7 @@ git = "*"  # needed by setuptools-scm for version derivation; CI pixi envs don't
 
 # C++ dependencies - pinned for C++17 compatibility and API stability
 eigen = ">=3.3,<3.5"
-boost-cpp = ">=1.70,<2"
+libboost-devel = ">=1.86,<2"
 console_bridge = ">=1.0,<2"
 assimp = ">=5.0,<6"
 urdfdom = ">=3.0,<5"
@@ -241,9 +241,17 @@ python = "3.11.*"
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
+[tool.pixi.feature.py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.feature.py314.dependencies]
+python = "3.14.*"
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
 py39 = { features = ["py39"], solve-group = "py39" }
 py310 = { features = ["py310"], solve-group = "py310" }
 py311 = { features = ["py311"], solve-group = "py311" }
 py312 = { features = ["py312"], solve-group = "py312" }
+py313 = { features = ["py313"], solve-group = "py313" }
+py314 = { features = ["py314"], solve-group = "py314" }
