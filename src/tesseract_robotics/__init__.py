@@ -127,7 +127,7 @@ def _configure_environment():
 
     # Try bundled data first (installed package)
     data_dir = pkg_dir / "data"
-    support_dir = data_dir / "tesseract_support"
+    support_dir = data_dir / "tesseract" / "support"
     config_dir = data_dir / "task_composer_config"
 
     # Fallback: dev workspace layout (editable install)
@@ -218,7 +218,7 @@ def get_data_path() -> Path:
 
 def get_tesseract_support_path() -> Path:
     """Get path to bundled tesseract_support directory."""
-    return Path(__file__).parent / "data" / "tesseract_support"
+    return Path(__file__).parent / "data" / "tesseract" / "support"
 
 
 def get_task_composer_config_path() -> Path:

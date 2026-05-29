@@ -342,7 +342,7 @@ jobs:
         done
 
         echo "=== Stripping search_paths from tesseract_support YAMLs ==="
-        find "$PKG_DIR/data/tesseract_support" -name "*.yaml" -type f 2>/dev/null | while read yaml_file; do
+        find "$PKG_DIR/data/tesseract/support" -name "*.yaml" -type f 2>/dev/null | while read yaml_file; do
           if grep -q 'search_paths:' "$yaml_file"; then
             sed -i '/search_paths:/d; /^[[:space:]]*- \/.*$/d' "$yaml_file"
             echo "  Stripped: $(basename "$yaml_file")"
