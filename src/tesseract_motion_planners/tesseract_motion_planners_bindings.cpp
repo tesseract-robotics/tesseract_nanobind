@@ -18,9 +18,9 @@
 #include <tesseract/command_language/composite_instruction.h>
 #include <tesseract/common/profile_dictionary.h>
 
-namespace tp = tesseract_planning;
-namespace te = tesseract_environment;
-namespace tc = tesseract_common;
+namespace tp = tesseract::motion_planners;
+namespace te = tesseract::environment;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_motion_planners, m) {
     m.doc() = "tesseract_motion_planners Python bindings";

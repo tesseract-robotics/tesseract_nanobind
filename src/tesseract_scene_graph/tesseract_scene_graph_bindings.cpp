@@ -17,8 +17,8 @@
 // tesseract_common for AllowedCollisionMatrix
 #include <tesseract/common/allowed_collision_matrix.h>
 
-namespace tsg = tesseract_scene_graph;
-namespace tg = tesseract_geometry;
+namespace tsg = tesseract::scene_graph;
+namespace tg = tesseract::geometry;
 
 NB_MODULE(_tesseract_scene_graph, m) {
     m.doc() = "tesseract_scene_graph Python bindings";

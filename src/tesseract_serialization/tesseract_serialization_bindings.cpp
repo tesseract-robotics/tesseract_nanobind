@@ -25,67 +25,18 @@
 
 namespace nb = nanobind;
 using namespace tesseract::common;
-using namespace tesseract_planning;
+using namespace tesseract::command_language;
 using namespace tesseract::environment;
 using namespace tesseract::scene_graph;
 
-// Cereal polymorphic-type registry on Windows MSVC is per-DLL — class-template
-// statics (StaticObject<InputBindingMap<Archive>>, OutputBindingMap, ...) are
-// instantiated independently in each DLL with no automatic dllexport/dllimport
-// to share them. Upstream tesseract_command_language.dll registers all its
-// polymorphic types into ITS OWN registry; our .pyd's registry stays empty
-// and serialization fails at runtime with "Trying to save an unregistered
-// polymorphic type". Linux and macOS skirt this because their linkers dedupe
-// the template statics across shared libraries.
-//
-// CEREAL_FORCE_DYNAMIC_INIT alone is insufficient — it forces upstream's
-// registration TU to survive in tesseract_command_language.dll, but doesn't
-// bridge the registry gap on the consumer side. To populate our .pyd's
-// registry we have to instantiate the registrar templates in OUR translation
-// unit by re-issuing the registration macros here. These mirror upstream
-// tesseract_command_language/src/cereal_serialization.cpp verbatim.
-//
-// Linux/macOS unaffected: cereal's polymorphic registry tolerates
-// re-registration of the same {type, archive} pair (no-op on duplicates).
-CEREAL_REGISTER_TYPE(tesseract_planning::CartesianWaypointPoly)
-CEREAL_REGISTER_TYPE(tesseract_planning::JointWaypointPoly)
-CEREAL_REGISTER_TYPE(tesseract_planning::StateWaypointPoly)
-CEREAL_REGISTER_TYPE(tesseract_planning::MoveInstructionPoly)
-CEREAL_REGISTER_TYPE(tesseract_planning::CartesianWaypoint)
-CEREAL_REGISTER_TYPE(tesseract_planning::JointWaypoint)
-CEREAL_REGISTER_TYPE(tesseract_planning::StateWaypoint)
-CEREAL_REGISTER_TYPE(tesseract_planning::MoveInstruction)
-CEREAL_REGISTER_TYPE(tesseract_planning::CompositeInstruction)
-CEREAL_REGISTER_TYPE(tesseract_planning::CompositeInstructionAnyPoly)
-CEREAL_REGISTER_TYPE(tesseract_planning::SetAnalogInstruction)
-CEREAL_REGISTER_TYPE(tesseract_planning::SetDigitalInstruction)
-CEREAL_REGISTER_TYPE(tesseract_planning::SetToolInstruction)
-CEREAL_REGISTER_TYPE(tesseract_planning::TimerInstruction)
-CEREAL_REGISTER_TYPE(tesseract_planning::WaitInstruction)
-
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::WaypointInterface, tesseract_planning::CartesianWaypointPoly)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::WaypointInterface, tesseract_planning::JointWaypointPoly)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::WaypointInterface, tesseract_planning::StateWaypointPoly)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::MoveInstructionPoly)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::CartesianWaypointInterface,
-                                     tesseract_planning::CartesianWaypoint)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::JointWaypointInterface, tesseract_planning::JointWaypoint)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::StateWaypointInterface, tesseract_planning::StateWaypoint)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::MoveInstructionInterface, tesseract_planning::MoveInstruction)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::CompositeInstruction)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::SetAnalogInstruction)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface,
-                                     tesseract_planning::SetDigitalInstruction)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::SetToolInstruction)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::TimerInstruction)
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract_planning::InstructionInterface, tesseract_planning::WaitInstruction)
-
-CEREAL_REGISTER_POLYMORPHIC_RELATION(tesseract::common::AnyInterface, tesseract_planning::CompositeInstructionAnyPoly)
-
-// Belt-and-suspenders: also keep the upstream TU anchored. Harmless if the
-// TU is already alive; the consumer-side registrations above are the actual
-// fix.
-CEREAL_FORCE_DYNAMIC_INIT(tesseract_command_language_cereal)
+// In tesseract 0.35, upstream's <tesseract/command_language/cereal_serialization.h>
+// transitively includes cereal_serialization_impl.hpp, which issues all the
+// CEREAL_REGISTER_TYPE / CEREAL_REGISTER_POLYMORPHIC_RELATION macros for the
+// command_language polymorphic types. Every consumer TU that includes the .h
+// (such as this binding) gets the registrations automatically — including
+// Windows .pyd consumers where cereal's registry is per-DLL. The consumer-side
+// hand-rolled mirror that 0.34 needed is now redundant; re-issuing the macros
+// triggers "redefinition of binding_name<...>" compile errors.
 
 NB_MODULE(_tesseract_serialization, m)
 {

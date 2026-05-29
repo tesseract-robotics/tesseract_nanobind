@@ -30,9 +30,10 @@
 // tesseract_command_language
 #include <tesseract/command_language/composite_instruction.h>
 
-namespace tp = tesseract_planning;
-namespace te = tesseract_environment;
-namespace tc = tesseract_common;
+namespace tp = tesseract::motion_planners;
+namespace tcl = tesseract::command_language;
+namespace te = tesseract::environment;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.doc() = "tesseract_motion_planners_simple Python bindings";
@@ -55,7 +56,7 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
 
     // ========== generateInterpolatedProgram ==========
     m.def("generateInterpolatedProgram",
-          [](const tp::CompositeInstruction& instructions,
+          [](const tcl::CompositeInstruction& instructions,
              const std::shared_ptr<const te::Environment>& env,
              double state_lvs,
              double translation_lvs,

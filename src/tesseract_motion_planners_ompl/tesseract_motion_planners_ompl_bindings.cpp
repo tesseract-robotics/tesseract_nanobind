@@ -26,8 +26,8 @@
 // tesseract_collision for CollisionCheckConfig
 #include <tesseract/collision/types.h>
 
-namespace tp = tesseract_planning;
-namespace tc = tesseract_common;
+namespace tp = tesseract::motion_planners;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_motion_planners_ompl, m) {
     m.doc() = "tesseract_motion_planners_ompl Python bindings";

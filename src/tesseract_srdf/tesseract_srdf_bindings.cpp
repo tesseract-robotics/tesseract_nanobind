@@ -14,7 +14,7 @@
 #include <tesseract/common/calibration_info.h>
 #include <tesseract/common/collision_margin_data.h>
 
-namespace ts = tesseract_srdf;
+namespace ts = tesseract::srdf;
 
 NB_MODULE(_tesseract_srdf, m) {
     m.doc() = "tesseract_srdf Python bindings";

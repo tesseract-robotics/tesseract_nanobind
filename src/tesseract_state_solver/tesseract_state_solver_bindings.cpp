@@ -22,8 +22,8 @@
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/eigen_types.h>
 
-namespace tsg = tesseract_scene_graph;
-namespace tc = tesseract_common;
+namespace tsg = tesseract::scene_graph;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_state_solver, m) {
     m.doc() = "tesseract_state_solver Python bindings";

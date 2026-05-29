@@ -30,14 +30,14 @@
 #include <descartes_light/core/state_evaluator.h>
 
 // tesseract dependencies referenced by profile method signatures
-#include <tesseract_command_language/poly/move_instruction_poly.h>
-#include <tesseract_common/manipulator_info.h>
-#include <tesseract_environment/environment.h>
+#include <tesseract/command_language/poly/move_instruction_poly.h>
+#include <tesseract/common/manipulator_info.h>
+#include <tesseract/environment/environment.h>
 
 // tesseract_collision for CollisionCheckConfig
 #include <tesseract/collision/types.h>
 
-namespace tp = tesseract_planning;
+namespace tp = tesseract::motion_planners;
 namespace tc = tesseract_common;
 namespace dl = descartes_light;
 
@@ -149,7 +149,7 @@ public:
     std::unique_ptr<dl::WaypointSampler<double>>
     createWaypointSampler(const tp::MoveInstructionPoly& move_instruction,
                           const tc::ManipulatorInfo& composite_manip_info,
-                          const std::shared_ptr<const tesseract_environment::Environment>& env) const override {
+                          const std::shared_ptr<const tesseract::environment::Environment>& env) const override {
         nb::detail::ticket t(nb_trampoline, "createWaypointSampler", true);
         nb::object py_result = nb::borrow<nb::object>(
             nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
@@ -159,7 +159,7 @@ public:
     std::unique_ptr<dl::EdgeEvaluator<double>>
     createEdgeEvaluator(const tp::MoveInstructionPoly& move_instruction,
                         const tc::ManipulatorInfo& composite_manip_info,
-                        const std::shared_ptr<const tesseract_environment::Environment>& env) const override {
+                        const std::shared_ptr<const tesseract::environment::Environment>& env) const override {
         nb::detail::ticket t(nb_trampoline, "createEdgeEvaluator", true);
         nb::object py_result = nb::borrow<nb::object>(
             nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));
@@ -169,7 +169,7 @@ public:
     std::unique_ptr<dl::StateEvaluator<double>>
     createStateEvaluator(const tp::MoveInstructionPoly& move_instruction,
                          const tc::ManipulatorInfo& composite_manip_info,
-                         const std::shared_ptr<const tesseract_environment::Environment>& env) const override {
+                         const std::shared_ptr<const tesseract::environment::Environment>& env) const override {
         nb::detail::ticket t(nb_trampoline, "createStateEvaluator", true);
         nb::object py_result = nb::borrow<nb::object>(
             nb_trampoline.base().attr(t.key)(move_instruction, composite_manip_info, env));

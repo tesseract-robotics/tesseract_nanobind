@@ -37,8 +37,8 @@
 #include <tesseract/common/manipulator_info.h>
 #include <tesseract/common/joint_state.h>
 
-namespace tp = tesseract_planning;
-namespace tc = tesseract_common;
+namespace tp = tesseract::command_language;
+namespace tc = tesseract::common;
 
 NB_MODULE(_tesseract_command_language, m) {
     m.doc() = "tesseract_command_language Python bindings";
