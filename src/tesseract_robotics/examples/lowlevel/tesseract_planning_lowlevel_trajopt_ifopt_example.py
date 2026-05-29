@@ -70,8 +70,8 @@ TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 def main():
     # Initialize the resource locator and environment
     locator = GeneralResourceLocator()
-    urdf_url = "package://tesseract_support/urdf/abb_irb2400.urdf"
-    srdf_url = "package://tesseract_support/urdf/abb_irb2400.srdf"
+    urdf_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
+    srdf_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
     urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
     srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
 

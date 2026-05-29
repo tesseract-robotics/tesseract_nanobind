@@ -151,10 +151,10 @@ def main():
     # ABB IRB2400 uses OPW (analytical) kinematics solver
     # Solver is configured in abb_irb2400_plugins.yaml referenced by SRDF
     urdf_path_str = locator.locateResource(
-        "package://tesseract_support/urdf/abb_irb2400.urdf"
+        "package://tesseract/support/urdf/abb_irb2400.urdf"
     ).getFilePath()
     srdf_path_str = locator.locateResource(
-        "package://tesseract_support/urdf/abb_irb2400.srdf"
+        "package://tesseract/support/urdf/abb_irb2400.srdf"
     ).getFilePath()
 
     # FilesystemPath wraps std::filesystem::path for cross-platform compatibility

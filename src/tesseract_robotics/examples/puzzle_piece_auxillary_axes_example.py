@@ -141,7 +141,7 @@ def make_puzzle_tool_poses(robot):
     Returns:
         list[Pose]: ~50 Cartesian waypoints for puzzle piece edge
     """
-    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
+    resource = robot.locator.locateResource("package://tesseract/support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
     poses = []
@@ -239,8 +239,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # === LOAD WORKCELL ===
     # puzzle_piece_workcell: KUKA IIWA arm + 2-DOF positioner
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/puzzle_piece_workcell.urdf",
-        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf",
+        "package://tesseract/support/urdf/puzzle_piece_workcell.urdf",
+        "package://tesseract/support/urdf/puzzle_piece_workcell.srdf",
     )
 
     # 9 DOF: KUKA IIWA (7) + auxiliary axes (2)

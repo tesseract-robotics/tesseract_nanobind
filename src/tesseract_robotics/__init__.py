@@ -133,9 +133,9 @@ def _configure_environment():
     # Fallback: dev workspace layout (editable install)
     # pkg_dir = src/tesseract_robotics -> project root is 2 levels up
     project_root = pkg_dir.parent.parent
-    ws_support = project_root / "ws" / "src" / "tesseract" / "tesseract_support"
+    ws_support = project_root / "ws" / "src" / "tesseract" / "support"
     ws_resource = project_root / "ws" / "src" / "tesseract"
-    ws_composer = project_root / "ws" / "src" / "tesseract_planning" / "tesseract_task_composer"
+    ws_composer = project_root / "ws" / "src" / "tesseract_planning" / "task_composer"
     ws_config = ws_composer / "config" / "task_composer_plugins.yaml"
 
     # TESSERACT_SUPPORT_DIR: path to tesseract_support (bundled or dev)

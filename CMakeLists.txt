@@ -395,16 +395,16 @@ message(STATUS "===============================================")
 #   - Local dev: ws/src/tesseract/... (flat repo layout)
 #   - CI layout: ../tesseract/... (repo cloned to ws/src/tesseract_nanobind)
 
-set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract/tesseract_support")
+set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract/support")
 if(NOT EXISTS "${TESSERACT_SUPPORT_SRC}")
   # CI layout: repo at ws/src/tesseract_nanobind, deps at ws/src/tesseract
-  set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../tesseract/tesseract_support")
+  set(TESSERACT_SUPPORT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../tesseract/support")
 endif()
 
-set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract_planning/tesseract_task_composer/config")
+set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/ws/src/tesseract_planning/task_composer/config")
 if(NOT EXISTS "${TASK_COMPOSER_CFG_SRC}")
   # CI layout
-  set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../tesseract_planning/tesseract_task_composer/config")
+  set(TASK_COMPOSER_CFG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../tesseract_planning/task_composer/config")
 endif()
 
 if(EXISTS "${TESSERACT_SUPPORT_SRC}")

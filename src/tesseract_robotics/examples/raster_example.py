@@ -112,8 +112,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # === LOAD ROBOT ===
     # ABB IRB2400: 6-DOF industrial manipulator (same as C++ example)
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/abb_irb2400.urdf",
-        "package://tesseract_support/urdf/abb_irb2400.srdf",
+        "package://tesseract/support/urdf/abb_irb2400.urdf",
+        "package://tesseract/support/urdf/abb_irb2400.srdf",
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 

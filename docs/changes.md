@@ -66,7 +66,45 @@ Same pattern for `tesseract_planning`: one `find_package(tesseract_planning REQU
 
 ## Python API Changes
 
-_TBD — populated as bindings are rebuilt and API breaks surface._
+Surface-level Python API is unchanged. The breaks below are infrastructure/resource-resolution, not user-facing types.
+
+### URDF/SRDF resource URI scheme
+
+`package://tesseract_support/` → `package://tesseract/support/` everywhere.
+
+In 0.34, `tesseract_support` was its own ROS-style package (with its own `package.xml`). In 0.35, the support data is a subdirectory of the unified `tesseract` package, so the URI prefix changed. Affects every URDF/SRDF reference in tests/examples (25 files in this repo). Upstream's own URDFs at `ws/install/share/tesseract/support/urdf/` already use the new URI.
+
+### Dev-workspace directory renames
+
+Resource paths used by `tesseract_robotics/__init__.py` (editable-install fallback) and `scripts/env.sh`:
+
+| 0.34 path | 0.35 path |
+|-----------|-----------|
+| `ws/src/tesseract/tesseract_support/` | `ws/src/tesseract/support/` |
+| `ws/src/tesseract_planning/tesseract_task_composer/` | `ws/src/tesseract_planning/task_composer/` |
+
+The internal wheel-data layout (`tesseract_robotics/data/tesseract_support/`) is unchanged — that's our naming, not upstream's.
+
+### Cereal serialization registry — consumer-side workaround obsoleted
+
+In 0.34, the `tesseract_serialization_bindings.cpp` had a hand-rolled mirror of upstream's `CEREAL_REGISTER_TYPE` / `CEREAL_REGISTER_POLYMORPHIC_RELATION` macros to populate the Windows .pyd's per-DLL cereal registry. In 0.35, `<tesseract/command_language/cereal_serialization.h>` transitively includes a new `cereal_serialization_impl.hpp` registration-only header. Every consumer TU that includes the .h now gets the registrations automatically — including Windows .pyd consumers. The consumer-side mirror is now actively harmful (triggers `redefinition of binding_name<...>` errors); we deleted it.
+
+### namespace aliases — `tesseract_planning` umbrella is gone
+
+`namespace tesseract_planning` (the 0.34 umbrella for command_language + motion_planners + task_composer + time_parameterization types) has no 0.35 equivalent — each subpackage has its own nested `tesseract::<X>` namespace. Binding files that used `namespace tp = tesseract_planning;` have been remapped per-file to whichever sub-namespace dominates:
+
+- `tesseract_command_language_bindings.cpp` → `tesseract::command_language`
+- `tesseract_motion_planners*_bindings.cpp` → `tesseract::motion_planners`
+- `tesseract_task_composer*_bindings.cpp` → `tesseract::task_composer`
+- `tesseract_time_parameterization_bindings.cpp` → `tesseract::time_parameterization`
+
+Three files (simple/task_composer/time_param) reference `CompositeInstruction` (lives in command_language) — they additionally get a `tcl = tesseract::command_language` alias.
+
+### Test suite status (macOS arm64)
+
+Post-upgrade: **560 passed, 7 failed, 14 skipped** (vs pre-upgrade: 352 passed, 95 failed, 92 errors on first build, before any Python-side fixes).
+
+The 7 remaining failures are all `tests/benchmarks/test_parallel_scaling.py` "harder problem" stress cases throwing `Planning failed: ErrorTask: Error (Abort Triggered)`. Likely an algorithmic-tolerance change in 0.35's task composer rather than a binding-layer break. Out of scope for the upgrade milestone.
 
 ## Migration Checklist
 
@@ -74,11 +112,16 @@ _TBD — populated as bindings are rebuilt and API breaks surface._
 - [x] Switch to `Levi-Armstrong/ruckig` fork
 - [x] Rename `dependencies.rosinstall` → `dependencies.repos`
 - [x] Update build script + CI workflows to reference new filename
-- [ ] Apply upstream sed scripts (tesseract + tesseract_planning `MIGRATION.md`) to `src/` and `CMakeLists.txt`
-- [ ] Manual sweep for nanobind-specific cases the sed misses (`nb::module_::import_(...)` paths, cross-module type registration)
-- [ ] Rebuild C++ workspace (`pixi run build-cpp`)
-- [ ] Rebuild bindings
-- [ ] Run test suite; document Python API breaks as they surface
+- [x] Apply upstream sed scripts (tesseract + tesseract_planning `MIGRATION.md`) to `src/` and `CMakeLists.txt`
+- [x] Manual sweep for nanobind-specific cases sed misses (namespace aliases, redundant cereal registrations)
+- [x] Rebuild C++ workspace (`pixi run build-cpp`)
+- [x] Rebuild bindings — all 23 modules import clean
+- [x] Update resource paths (`__init__.py`, `env.sh`, CMakeLists)
+- [x] Rewrite `package://tesseract_support/` URIs across tests/examples
+- [x] Run test suite; document Python-side breaks
+- [ ] Triage 7 `parallel_scaling` benchmark regressions (likely tolerance change, not binding break)
+- [ ] Verify Linux + Windows wheel builds
+- [ ] Update CLAUDE.md re: cereal Windows-DLL workaround (now obsoleted by upstream)
 
 ---
 

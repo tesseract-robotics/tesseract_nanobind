@@ -70,7 +70,7 @@ def make_puzzle_tool_poses(robot):
         - Y-axis: Z x X for right-handed frame
     """
     # Locate CSV via tesseract resource system (resolves package:// URIs)
-    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
+    resource = robot.locator.locateResource("package://tesseract/support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
     poses = []
@@ -126,8 +126,8 @@ def main():
     """
     # Load puzzle piece workcell - contains KUKA IIWA + 2-DOF positioner
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/puzzle_piece_workcell.urdf",
-        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf",
+        "package://tesseract/support/urdf/puzzle_piece_workcell.urdf",
+        "package://tesseract/support/urdf/puzzle_piece_workcell.srdf",
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 

@@ -244,7 +244,7 @@ def add_seats(robot):
     # Resolve package:// URI to filesystem path for visual mesh
     # seat.dae contains full visual detail (curves, materials)
     visual_mesh_path = locator.locateResource(
-        "package://tesseract_support/meshes/car_seat/visual/seat.dae"
+        "package://tesseract/support/meshes/car_seat/visual/seat.dae"
     ).getFilePath()
 
     for i in range(3):
@@ -267,7 +267,7 @@ def add_seats(robot):
         # Each STL is a convex piece of the original seat geometry
         for m in range(1, 11):  # seat_1.stl through seat_10.stl
             collision_mesh_url = (
-                f"package://tesseract_support/meshes/car_seat/collision/seat_{m}.stl"
+                f"package://tesseract/support/meshes/car_seat/collision/seat_{m}.stl"
             )
             collision_mesh_path = locator.locateResource(collision_mesh_url).getFilePath()
 
@@ -385,8 +385,8 @@ def run():
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
     # URDF defines kinematic chain, SRDF defines planning groups and ACM
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/car_seat_demo.urdf",
-        "package://tesseract_support/urdf/car_seat_demo.srdf",
+        "package://tesseract/support/urdf/car_seat_demo.urdf",
+        "package://tesseract/support/urdf/car_seat_demo.srdf",
     )
     print(f"Loaded robot: {robot.env.getName()}")
 

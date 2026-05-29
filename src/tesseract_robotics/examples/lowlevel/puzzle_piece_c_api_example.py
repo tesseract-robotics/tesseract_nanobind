@@ -63,7 +63,7 @@ def make_puzzle_tool_poses(robot):
     4. x-axis = cross(y, z) -> completes right-handed frame
     """
     # Locate CSV via resource locator (respects package:// URIs)
-    resource = robot.locator.locateResource("package://tesseract_support/urdf/puzzle_bent.csv")
+    resource = robot.locator.locateResource("package://tesseract/support/urdf/puzzle_bent.csv")
     csv_path = resource.getFilePath()
 
     poses = []
@@ -115,8 +115,8 @@ def main():
     # Load puzzle_piece_workcell: KUKA IIWA 7-DOF arm with grinder tool
     # URDF defines: part frame (workpiece), grinder_frame (TCP)
     robot = Robot.from_urdf(
-        "package://tesseract_support/urdf/puzzle_piece_workcell.urdf",
-        "package://tesseract_support/urdf/puzzle_piece_workcell.srdf",
+        "package://tesseract/support/urdf/puzzle_piece_workcell.urdf",
+        "package://tesseract/support/urdf/puzzle_piece_workcell.srdf",
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
