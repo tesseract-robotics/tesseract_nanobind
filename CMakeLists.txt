@@ -410,7 +410,7 @@ endif()
 if(EXISTS "${TESSERACT_SUPPORT_SRC}")
   message(STATUS "Installing tesseract_support from: ${TESSERACT_SUPPORT_SRC}")
   install(DIRECTORY "${TESSERACT_SUPPORT_SRC}/"
-    DESTINATION tesseract_robotics/data/tesseract_support
+    DESTINATION tesseract_robotics/data/tesseract/support
     FILES_MATCHING
     PATTERN "*.urdf" PATTERN "*.srdf" PATTERN "*.yaml" PATTERN "*.xacro"
     PATTERN "*.stl" PATTERN "*.STL" PATTERN "*.dae" PATTERN "*.ply" PATTERN "*.obj" PATTERN "*.csv"

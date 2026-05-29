@@ -192,7 +192,7 @@ done
 
 # Remove search_paths from robot YAMLs (forces use of env vars set by __init__.py)
 echo "Removing hardcoded search_paths from robot YAMLs..."
-find "$WHEEL_DIR/tesseract_robotics/data/tesseract_support" -name "*.yaml" -type f | while read yaml_file; do
+find "$WHEEL_DIR/tesseract_robotics/data/tesseract/support" -name "*.yaml" -type f | while read yaml_file; do
     if grep -q 'search_paths:' "$yaml_file"; then
         # Remove search_paths: line and following lines with - /path
         sed -i '' '/search_paths:/d; /^[[:space:]]*- \/.*$/d' "$yaml_file"
