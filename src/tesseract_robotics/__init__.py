@@ -141,8 +141,11 @@ def _configure_environment():
     # TESSERACT_SUPPORT_DIR: path to tesseract_support (bundled or dev)
     _set_env_if_missing("TESSERACT_SUPPORT_DIR", support_dir, ws_support)
 
-    # TESSERACT_RESOURCE_PATH: parent of support_dir for resource resolution
-    _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir, ws_resource, use_parent=True)
+    # TESSERACT_RESOURCE_PATH: directory containing `tesseract` as a subdir
+    # so locator resolves package://tesseract/support/X via `<path>/tesseract/support/X`.
+    # bundled:   data/tesseract/support → use parent's parent (= data)
+    # dev (ws):  ws/src/tesseract       → use parent (= ws/src)
+    _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir.parent, ws_resource, use_parent=True)
 
     # Plugin search paths - env var, bundled plugins, or ws/install/lib
     # Linux:   pkg_dir (all deps bundled in package root with $ORIGIN rpath)
