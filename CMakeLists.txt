@@ -416,6 +416,13 @@ if(EXISTS "${TESSERACT_SUPPORT_SRC}")
     PATTERN "*.stl" PATTERN "*.STL" PATTERN "*.dae" PATTERN "*.ply" PATTERN "*.obj" PATTERN "*.csv"
     PATTERN "*.xml" PATTERN "*.png" PATTERN "*.jpg" PATTERN "*.jpeg"
     PATTERN ".git" EXCLUDE PATTERN "__pycache__" EXCLUDE)
+  # Install package.xml alongside support data so GeneralResourceLocator
+  # registers `tesseract` as a package when scanning TESSERACT_RESOURCE_PATH.
+  # The locator skips directories without package.xml (ROS convention).
+  get_filename_component(TESSERACT_PKG_XML "${TESSERACT_SUPPORT_SRC}/../package.xml" ABSOLUTE)
+  if(EXISTS "${TESSERACT_PKG_XML}")
+    install(FILES "${TESSERACT_PKG_XML}" DESTINATION tesseract_robotics/data/tesseract)
+  endif()
 else()
   message(WARNING "tesseract_support not found at ${TESSERACT_SUPPORT_SRC}")
 endif()
