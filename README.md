@@ -157,7 +157,7 @@ This runs ruff + auto-staging on commit, and pyright + pytest on push (configure
 ├── tests/                    # pytest suite
 ├── examples/                 # usage examples
 ├── ws/                       # C++ workspace (colcon src/ + install/)
-├── scripts/                  # build scripts (build_tesseract_cpp.sh, build_wheel.sh)
+├── scripts/                  # build scripts (build_tesseract_cpp.sh, build_{linux,macos}_wheel.sh)
 └── docs/                     # mkdocs-material documentation
 ```
 
@@ -166,7 +166,7 @@ This runs ruff + auto-staging on commit, and pyright + pytest on push (configure
 Editable installs bake absolute paths — not portable. For distributable wheels:
 
 ```bash
-./scripts/build_wheel.sh              # builds + delocates (bundles dylibs)
+pixi run build-wheel                  # bundles native deps (Linux: patchelf, macOS: delocate)
 pip install wheelhouse/tesseract*.whl
 ```
 

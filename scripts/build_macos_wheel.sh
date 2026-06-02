@@ -1,12 +1,17 @@
 #!/bin/zsh
 # Build wheel (macOS)
+#
+# Invoked by `pixi run build-wheel` on macOS (the osx-arm64 target overrides the
+# base build-wheel task, which runs build_linux_wheel.sh). Also used by
+# .github/workflows/wheels-macos.yml.
+#
 # Usage:
-#   ./build_wheel.sh        # Full portable wheel with delocate (slow, for distribution)
-#   ./build_wheel.sh --dev  # Fast dev build, no delocate (only works in current env)
+#   ./build_macos_wheel.sh        # Full portable wheel with delocate (slow, for distribution)
+#   ./build_macos_wheel.sh --dev  # Fast dev build, no delocate (only works in current env)
 set -e
 
 SCRIPT_DIR="${0:a:h}"
-PROJECT_ROOT="$SCRIPT_DIR/.."
+PROJECT_ROOT="${SCRIPT_DIR:h}"
 
 DEV_MODE=false
 if [[ "$1" == "--dev" ]]; then
@@ -15,9 +20,18 @@ fi
 
 cd "$PROJECT_ROOT"
 
+# Resolve the colcon workspace root the same way build_tesseract_cpp.sh does:
+# top-level <repo>/ws for local dev, or the enclosing <ws> when the repo is
+# checked out inside a colcon workspace (CI, at <ws>/src/tesseract_nanobind).
+if [[ "${PROJECT_ROOT:h:t}" == "src" ]]; then
+    WORKSPACE_DIR="${PROJECT_ROOT:h:h}"
+else
+    WORKSPACE_DIR="$PROJECT_ROOT/ws"
+fi
+
 # Set library paths
-export DYLD_LIBRARY_PATH="$PROJECT_ROOT/ws/install/lib:$CONDA_PREFIX/lib"
-export CMAKE_PREFIX_PATH="$CONDA_PREFIX:$PROJECT_ROOT/ws/install"
+export DYLD_LIBRARY_PATH="$WORKSPACE_DIR/install/lib:$CONDA_PREFIX/lib"
+export CMAKE_PREFIX_PATH="$CONDA_PREFIX:$WORKSPACE_DIR/install"
 
 if $DEV_MODE; then
     echo "Building dev wheel (no delocate)..."
@@ -26,7 +40,7 @@ if $DEV_MODE; then
     # Fix plugin rpaths on macOS (so they work without DYLD_LIBRARY_PATH)
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo "Fixing plugin factory rpaths..."
-        LIB_DIR="$PROJECT_ROOT/ws/install/lib"
+        LIB_DIR="$WORKSPACE_DIR/install/lib"
         for factory in "$LIB_DIR"/*_factor*.dylib; do
             if [[ -f "$factory" ]]; then
                 if ! otool -l "$factory" 2>/dev/null | grep -q LC_RPATH; then
@@ -85,8 +99,8 @@ PLUGINS=(
 )
 
 for plugin in "${PLUGINS[@]}"; do
-    if [[ -f "$PROJECT_ROOT/ws/install/lib/$plugin" ]]; then
-        cp "$PROJECT_ROOT/ws/install/lib/$plugin" "$WHEEL_DIR/tesseract_robotics/.dylibs/"
+    if [[ -f "$WORKSPACE_DIR/install/lib/$plugin" ]]; then
+        cp "$WORKSPACE_DIR/install/lib/$plugin" "$WHEEL_DIR/tesseract_robotics/.dylibs/"
         echo "  Added: $plugin"
     fi
 done
@@ -133,7 +147,7 @@ while (( ${#queue[@]} )); do
         # on first use. Can't ship the symlink — pip's wheel installer
         # dereferences symlinks on extract. See GH #48.
         canonical="$base"
-        for src_dir in "$PROJECT_ROOT/ws/install/lib" "$CONDA_PREFIX/lib"; do
+        for src_dir in "$WORKSPACE_DIR/install/lib" "$CONDA_PREFIX/lib"; do
             if [[ -L "$src_dir/$base" ]]; then
                 canonical=$(readlink "$src_dir/$base")
                 break
@@ -145,7 +159,7 @@ while (( ${#queue[@]} )); do
         modified=1
         # Ensure the canonical target is bundled in .dylibs/
         if [[ ! -e "$DYLIBS_DIR/$canonical" ]]; then
-            for src_dir in "$PROJECT_ROOT/ws/install/lib" "$CONDA_PREFIX/lib"; do
+            for src_dir in "$WORKSPACE_DIR/install/lib" "$CONDA_PREFIX/lib"; do
                 if [[ -f "$src_dir/$canonical" ]]; then
                     cp "$src_dir/$canonical" "$DYLIBS_DIR/$canonical"
                     queue+=("$DYLIBS_DIR/$canonical")

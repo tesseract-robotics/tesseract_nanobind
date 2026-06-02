@@ -78,7 +78,7 @@ jobs:
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-macos-v1-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-macos-v2-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
     - name: build C++ deps
       if: steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws/src/tesseract_nanobind

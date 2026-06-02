@@ -190,7 +190,8 @@ tesseract_nanobind/
 ├── scripts/
 │   ├── build_tesseract_cpp.sh # C++ build (colcon + vcstool)
 │   ├── generate_stubs.sh      # Regenerate .pyi stubs
-│   └── build_wheel.sh         # Portable wheel with delocate
+│   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
+│   └── build_macos_wheel.sh   # Portable macOS wheel (delocate)
 └── ws/                        # C++ workspace
     ├── src/                   # Fetched C++ sources
     └── install/               # Built C++ libraries

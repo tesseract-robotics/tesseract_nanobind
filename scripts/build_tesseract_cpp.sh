@@ -4,8 +4,7 @@
 # This script is the source of truth for the C++ build. It is invoked by:
 #   - pixi run build-cpp (local dev)
 #   - .github/workflows/wheels-macos.yml (CI macOS)
-# .github/workflows/wheels-linux.yml has its own inline colcon invocation —
-# unifying them is out of scope for now.
+#   - .github/workflows/wheels-linux.yml (CI Linux)
 #
 # Usage:
 #   pixi run build-cpp          # recommended
@@ -13,12 +12,22 @@
 
 set -e  # Exit on error
 
-# Get project root (parent of scripts/)
+# Get project root (parent of scripts/), normalized to an absolute path
 SCRIPT_DIR="${0:a:h}"  # zsh way to get script directory
-PROJECT_ROOT="$SCRIPT_DIR/.."
+PROJECT_ROOT="${SCRIPT_DIR:h}"
 cd "$PROJECT_ROOT"
 
-WORKSPACE_DIR="$PROJECT_ROOT/ws"
+# Resolve the colcon workspace root. For local dev the repo sits at the top
+# level, so the workspace is <repo>/ws. In CI the repo is checked out *inside*
+# a colcon workspace (at <ws>/src/tesseract_nanobind); detect that and reuse
+# the existing <ws> so deps and install/ land at the top level. This keeps the
+# CI cache paths (ws/src, ws/install) effective instead of nesting everything
+# under ws/src/tesseract_nanobind/ws.
+if [[ "${PROJECT_ROOT:h:t}" == "src" ]]; then
+    WORKSPACE_DIR="${PROJECT_ROOT:h:h}"
+else
+    WORKSPACE_DIR="$PROJECT_ROOT/ws"
+fi
 
 echo "=========================================="
 echo "Tesseract C++ Build Script"

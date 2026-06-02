@@ -217,7 +217,7 @@ lint = "ruff check ."
 fmt = "ruff format ."
 typecheck = { cmd = "pyright src/tesseract_robotics", description = "Type check with pyright" }
 build-cpp = { cmd = "zsh scripts/build_tesseract_cpp.sh", description = "Build tesseract C++ libs" }
-build-wheel = { cmd = "zsh scripts/build_wheel.sh", description = "Build portable wheel (macOS: delocate + plugins + YAML patch)" }
+build-wheel = { cmd = "zsh scripts/build_linux_wheel.sh", description = "Build portable manylinux wheel (patchelf + plugins + YAML patch). macOS overrides this via the osx-arm64 target." }
 install = { cmd = "pip install -e . --no-build-isolation", depends-on = [
     "build-cpp",
 ], description = "Install package (editable)" }
@@ -226,6 +226,12 @@ build = { depends-on = [
 ], description = "Build C++ libs + install bindings" }
 docs = { cmd = "mkdocs serve --dev-addr=localhost:8000 --open", description = "Live docs server with auto-reload" }
 docs-build = { cmd = "mkdocs build", description = "Build static docs to site/" }
+
+# macOS uses delocate + install_name_tool instead of patchelf, so build-wheel
+# delegates to a platform-specific script. The base task (above) handles Linux;
+# this override handles macOS. See scripts/build_{linux,macos}_wheel.sh.
+[tool.pixi.target.osx-arm64.tasks]
+build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build portable macOS wheel (delocate + plugins + YAML patch)" }
 
 
 # Python version features for CI matrix builds

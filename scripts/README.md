@@ -82,36 +82,40 @@ Tests how examples scale with parallel OMPL planners.
 
 ## Building Wheels
 
-### `build_wheel.sh`
-Builds Python wheels for distribution. Two modes:
+### `build-wheel` (pixi task → `build_linux_wheel.sh` / `build_macos_wheel.sh`)
+Builds Python wheels for distribution. The pixi `build-wheel` task delegates to
+the right platform script: `build_linux_wheel.sh` (patchelf + `$ORIGIN` rpaths +
+manylinux retag) is the base task, and the `osx-arm64` target overrides it to
+`build_macos_wheel.sh` (delocate + `@loader_path`). Both accept the same modes.
 
 #### Dev mode (fast, for local testing)
 ```bash
-./scripts/build_wheel.sh --dev
+pixi run build-wheel --dev
 ```
-- Builds wheel in `dist/` without delocate
+- Builds wheel in `dist/` without bundling
 - Fast (~30s) - just runs pip wheel
 - **Only works in the pixi env where it was built** (bakes in absolute paths)
 - Use for quick iteration when testing in the same env
 
 #### Portable mode (slow, for distribution)
 ```bash
-./scripts/build_wheel.sh
+pixi run build-wheel
 ```
 - Builds fully portable wheel in `wheelhouse/`
-- Slow (~5min) - runs delocate to bundle all dylibs
+- Slow (~5min) - bundles all native deps
 - **Works across any pixi/conda env** - all dependencies bundled
 
 #### What portable mode does:
 1. Builds wheel with `pip wheel`
-2. Runs `delocate-wheel` to bundle linked dylibs and fix rpaths
-3. Manually adds plugin factory dylibs (not caught by delocate since they're dlopen'd at runtime):
-   - `libtesseract_collision_bullet_factories.dylib`
-   - `libtesseract_collision_fcl_factories.dylib`
-   - `libtesseract_kinematics_*_factory.dylib`
-   - `libtesseract_task_composer_*_factories.dylib`
-4. Runs `delocate-path` on plugins to fix their rpaths
-5. Repacks wheel
+2. Bundles linked native deps and fixes rpaths
+   (macOS: `delocate-wheel`; Linux: `ldd` + `patchelf --set-rpath`)
+3. Manually adds plugin factory libs (not caught by the linker since they're dlopen'd at runtime):
+   - `libtesseract_collision_bullet_factories`
+   - `libtesseract_collision_fcl_factories`
+   - `libtesseract_kinematics_*_factory`
+   - `libtesseract_task_composer_*_factories`
+4. Patches runtime config YAMLs (`task_composer_config`, robot `search_paths`)
+5. Repacks wheel (Linux retags `linux_x86_64` → `manylinux_2_35_x86_64`)
 
 #### Why two modes?
 Editable installs (`pip install -e .`) and dev wheels bake absolute env paths into the nanobind modules via `CMAKE_INSTALL_RPATH`. Example:
