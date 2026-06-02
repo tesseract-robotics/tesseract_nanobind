@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # Build tesseract C++ libraries using colcon
 #
 # This script is the source of truth for the C++ build. It is invoked by:
@@ -8,13 +8,13 @@
 #
 # Usage:
 #   pixi run build-cpp          # recommended
-#   zsh scripts/build_tesseract_cpp.sh  # direct (requires pixi env active)
+#   bash scripts/build_tesseract_cpp.sh  # direct (requires pixi env active)
 
 set -e  # Exit on error
 
 # Get project root (parent of scripts/), normalized to an absolute path
-SCRIPT_DIR="${0:a:h}"  # zsh way to get script directory
-PROJECT_ROOT="${SCRIPT_DIR:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 # Resolve the colcon workspace root. For local dev the repo sits at the top
@@ -23,8 +23,8 @@ cd "$PROJECT_ROOT"
 # the existing <ws> so deps and install/ land at the top level. This keeps the
 # CI cache paths (ws/src, ws/install) effective instead of nesting everything
 # under ws/src/tesseract_nanobind/ws.
-if [[ "${PROJECT_ROOT:h:t}" == "src" ]]; then
-    WORKSPACE_DIR="${PROJECT_ROOT:h:h}"
+if [[ "$(basename "$(dirname "$PROJECT_ROOT")")" == "src" ]]; then
+    WORKSPACE_DIR="$(dirname "$(dirname "$PROJECT_ROOT")")"
 else
     WORKSPACE_DIR="$PROJECT_ROOT/ws"
 fi

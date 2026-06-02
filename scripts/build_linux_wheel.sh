@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # Build wheel (Linux)
 #
 # Invoked by `pixi run build-wheel` on Linux (the base build-wheel task; macOS
@@ -10,8 +10,8 @@
 #   ./build_linux_wheel.sh --dev  # Fast dev build, no bundling (only works in current env)
 set -e
 
-SCRIPT_DIR="${0:a:h}"
-PROJECT_ROOT="${SCRIPT_DIR:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 DEV_MODE=false
 if [[ "$1" == "--dev" ]]; then
@@ -23,8 +23,8 @@ cd "$PROJECT_ROOT"
 # Resolve the colcon workspace root the same way build_tesseract_cpp.sh does:
 # top-level <repo>/ws for local dev, or the enclosing <ws> when the repo is
 # checked out inside a colcon workspace (CI, at <ws>/src/tesseract_nanobind).
-if [[ "${PROJECT_ROOT:h:t}" == "src" ]]; then
-    WORKSPACE_DIR="${PROJECT_ROOT:h:h}"
+if [[ "$(basename "$(dirname "$PROJECT_ROOT")")" == "src" ]]; then
+    WORKSPACE_DIR="$(dirname "$(dirname "$PROJECT_ROOT")")"
 else
     WORKSPACE_DIR="$PROJECT_ROOT/ws"
 fi
