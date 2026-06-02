@@ -170,7 +170,7 @@ done
 
 # Repack as a manylinux wheel.
 mkdir -p "$PROJECT_ROOT/wheelhouse"
-WHEEL_NAME=$(basename "$WHEEL_FILE" | sed 's/linux_x86_64/manylinux_2_35_x86_64/')
+WHEEL_NAME=$(basename "$WHEEL_FILE" | sed -E 's/linux_(x86_64|aarch64)/manylinux_2_35_\1/')
 cd "$WHEEL_DIR"
 zip -rq "$PROJECT_ROOT/wheelhouse/$WHEEL_NAME" .
 cd "$PROJECT_ROOT"

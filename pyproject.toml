@@ -189,6 +189,9 @@ pre-commit = ">=3.0"
 [tool.pixi.target.linux-64.dependencies]
 patchelf = "*"
 
+[tool.pixi.target.linux-aarch64.dependencies]
+patchelf = "*"
+
 [tool.pixi.pypi-dependencies]
 # Note: tesseract-robotics-nanobind NOT here - use `pixi run install` (chains build-cpp -> pip install)
 numpy = ">=1.21.0"

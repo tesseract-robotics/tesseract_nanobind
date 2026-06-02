@@ -537,6 +537,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/orocos-kdl-1.5.3-hfae3067_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/p11-kit-0.24.1-h9f2702f_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/patchelf-0.17.2-h884eca8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcl-1.14.1-h7979ff8_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcre2-10.43-hd0f9c67_0.conda
@@ -1739,6 +1740,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/orocos-kdl-1.5.3-hfae3067_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/p11-kit-0.24.1-h9f2702f_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/patchelf-0.17.2-h884eca8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcl-1.14.1-h7979ff8_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcre2-10.43-hd0f9c67_0.conda
@@ -2941,6 +2943,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/orocos-kdl-1.5.3-hfae3067_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/p11-kit-0.24.1-h9f2702f_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/patchelf-0.17.2-h884eca8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcl-1.14.1-h7979ff8_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcre2-10.43-hd0f9c67_0.conda
@@ -4141,6 +4144,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/orocos-kdl-1.5.3-hfae3067_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/p11-kit-0.24.1-h9f2702f_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/patchelf-0.17.2-h884eca8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcl-1.14.1-h7979ff8_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcre2-10.43-hd0f9c67_0.conda
@@ -5342,6 +5346,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/orocos-kdl-1.5.3-hfae3067_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/p11-kit-0.24.1-h9f2702f_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/patchelf-0.17.2-h884eca8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-0.12.1-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcl-1.14.1-h7979ff8_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pcre2-10.43-hd0f9c67_0.conda
@@ -17356,6 +17361,17 @@ packages:
   purls: []
   size: 94048
   timestamp: 1673473024463
+- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/patchelf-0.17.2-h884eca8_0.conda
+  sha256: 8b98158f36a7a92013a1982ab7a60947151350ac5c513c1d1575825d0fa52518
+  md5: bbd8dee69c4ac2e2d07bca100b8fcc31
+  depends:
+  - libgcc-ng >=7.5.0
+  - libstdcxx-ng >=7.5.0
+  license: GPL-3.0-or-later
+  license_family: GPL
+  purls: []
+  size: 101306
+  timestamp: 1673473812166
 - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-0.12.1-pyhd8ed1ab_1.conda
   sha256: 9f64009cdf5b8e529995f18e03665b03f5d07c0b17445b8badef45bde76249ee
   md5: 617f15191456cc6a13db418a275435e5
