@@ -14,6 +14,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract/common/joint_state.h>
 #include <tesseract/common/collision_margin_data.h>
 #include <tesseract/common/allowed_collision_matrix.h>
+#include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/plugin_info.h>
 #include <algorithm>
@@ -809,6 +810,29 @@ NB_MODULE(_tesseract_common, m) {
         .def("clearAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::clearAllowedCollisions)
         .def("getAllAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::getAllAllowedCollisions)
         .def("insertAllowedCollisionMatrix", &tesseract::common::AllowedCollisionMatrix::insertAllowedCollisionMatrix);
+
+    // ========== ContactAllowedValidator ==========
+    // Abstract base. Determines whether two links are allowed to be in collision.
+    nb::class_<tesseract::common::ContactAllowedValidator>(m, "ContactAllowedValidator")
+        .def("__call__", &tesseract::common::ContactAllowedValidator::operator(), "link_name1"_a, "link_name2"_a);
+
+    // Validator backed by an AllowedCollisionMatrix
+    nb::class_<tesseract::common::ACMContactAllowedValidator, tesseract::common::ContactAllowedValidator>(
+        m, "ACMContactAllowedValidator")
+        .def(nb::init<>())
+        .def(nb::init<tesseract::common::AllowedCollisionMatrix>(), "acm"_a);
+
+    nb::enum_<tesseract::common::CombinedContactAllowedValidatorType>(m, "CombinedContactAllowedValidatorType")
+        .value("AND", tesseract::common::CombinedContactAllowedValidatorType::AND)
+        .value("OR", tesseract::common::CombinedContactAllowedValidatorType::OR);
+
+    // Validator combining multiple validators with an AND/OR operator
+    nb::class_<tesseract::common::CombinedContactAllowedValidator, tesseract::common::ContactAllowedValidator>(
+        m, "CombinedContactAllowedValidator")
+        .def(nb::init<>())
+        .def(nb::init<std::vector<std::shared_ptr<const tesseract::common::ContactAllowedValidator>>,
+                      tesseract::common::CombinedContactAllowedValidatorType>(),
+             "validators"_a, "type"_a);
 
     // ========== CollisionMarginData ==========
     // Note: CollisionMarginOverrideType was renamed to CollisionMarginPairOverrideType in 0.33

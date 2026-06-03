@@ -1,5 +1,6 @@
 """tesseract_collision Python bindings (nanobind)"""
-
+# Import dependencies first to register their types for cross-module access
+import tesseract_robotics.tesseract_common  # noqa: F401 - needed for CollisionMarginData, ACM
 from tesseract_robotics.tesseract_collision._tesseract_collision import *
 
 __all__ = [
@@ -8,6 +9,7 @@ __all__ = [
     "ContactTestType",
     "CollisionEvaluatorType",
     "CollisionCheckProgramType",
+    "CollisionCheckExitType",
     "ACMOverrideType",
     # SWIG-compatible enum constants
     "ContactTestType_FIRST",

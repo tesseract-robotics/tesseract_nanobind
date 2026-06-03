@@ -58,7 +58,13 @@ __all__ = [
     "JointState",
     # Collision
     "AllowedCollisionMatrix",
+    "ContactAllowedValidator",
+    "ACMContactAllowedValidator",
+    "CombinedContactAllowedValidator",
+    "CombinedContactAllowedValidatorType",
     "CollisionMarginData",
+    "CollisionMarginPairData",
+    "CollisionMarginPairOverrideType",
     "CollisionMarginOverrideType",
     # Kinematics
     "KinematicLimits",

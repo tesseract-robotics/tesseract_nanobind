@@ -1,9 +1,13 @@
+"""tesseract_collision Python bindings"""
+
 from collections.abc import Mapping, Sequence
 import enum
 from typing import Annotated, overload
 
 import numpy
 from numpy.typing import NDArray
+
+import tesseract_robotics.tesseract_common
 
 
 class ContinuousCollisionType(enum.Enum):
@@ -64,6 +68,13 @@ class ACMOverrideType(enum.Enum):
     AND = 2
 
     OR = 3
+
+class CollisionCheckExitType(enum.Enum):
+    FIRST = 0
+
+    ONE_PER_STEP = 1
+
+    ALL = 2
 
 class ContactResult:
     def __init__(self) -> None: ...
@@ -201,10 +212,34 @@ class ContactManagerConfig:
     def pair_margin_override_type(self, arg: "tesseract_common::CollisionMarginPairOverrideType", /) -> None: ...
 
     @property
+    def pair_margin_data(self) -> "tesseract_common::CollisionMarginPairData": ...
+
+    @pair_margin_data.setter
+    def pair_margin_data(self, arg: "tesseract_common::CollisionMarginPairData", /) -> None: ...
+
+    @property
+    def acm(self) -> "tesseract_common::AllowedCollisionMatrix": ...
+
+    @acm.setter
+    def acm(self, arg: "tesseract_common::AllowedCollisionMatrix", /) -> None: ...
+
+    @property
     def acm_override_type(self) -> ACMOverrideType: ...
 
     @acm_override_type.setter
     def acm_override_type(self, arg: ACMOverrideType, /) -> None: ...
+
+    @property
+    def modify_object_enabled(self) -> dict[str, bool]: ...
+
+    @modify_object_enabled.setter
+    def modify_object_enabled(self, arg: Mapping[str, bool], /) -> None: ...
+
+    def incrementMargins(self, increment: float) -> None: ...
+
+    def scaleMargins(self, scale: float) -> None: ...
+
+    def validate(self) -> None: ...
 
     @property
     def margin_data_override_type(self) -> "tesseract_common::CollisionMarginPairOverrideType": ...
@@ -213,7 +248,11 @@ class ContactManagerConfig:
     def margin_data_override_type(self, arg: "tesseract_common::CollisionMarginPairOverrideType", /) -> None: ...
 
 class CollisionCheckConfig:
+    @overload
     def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, contact_request: ContactRequest = ..., type: CollisionEvaluatorType = CollisionEvaluatorType.DISCRETE, longest_valid_segment_length: float = 0.005, check_program_mode: CollisionCheckProgramType = CollisionCheckProgramType.ALL, exit_condition: CollisionCheckExitType = CollisionCheckExitType.FIRST) -> None: ...
 
     @property
     def contact_request(self) -> ContactRequest: ...
@@ -238,6 +277,12 @@ class CollisionCheckConfig:
 
     @check_program_mode.setter
     def check_program_mode(self, arg: CollisionCheckProgramType, /) -> None: ...
+
+    @property
+    def exit_condition(self) -> CollisionCheckExitType: ...
+
+    @exit_condition.setter
+    def exit_condition(self, arg: CollisionCheckExitType, /) -> None: ...
 
 class DiscreteContactManager:
     def getName(self) -> str: ...
@@ -312,9 +357,23 @@ class ContinuousContactManager:
 
     def getActiveCollisionObjects(self) -> list[str]: ...
 
+    def setCollisionMarginData(self, collision_margin_data: "tesseract_common::CollisionMarginData") -> None: ...
+
+    def getCollisionMarginData(self) -> "tesseract_common::CollisionMarginData": ...
+
     def setDefaultCollisionMargin(self, default_collision_margin: float) -> None: ...
 
     def setCollisionMarginPair(self, name1: str, name2: str, collision_margin: float) -> None: ...
+
+    def setCollisionMarginPairData(self, pair_margin_data: "tesseract_common::CollisionMarginPairData", override_type: "tesseract_common::CollisionMarginPairOverrideType" = "tesseract_common::CollisionMarginPairOverrideType".REPLACE) -> None: ...
+
+    def incrementCollisionMargin(self, increment: float) -> None: ...
+
+    def setContactAllowedValidator(self, validator: "tesseract_common::ContactAllowedValidator") -> None: ...
+
+    def getContactAllowedValidator(self) -> "tesseract_common::ContactAllowedValidator": ...
+
+    def applyContactManagerConfig(self, config: ContactManagerConfig) -> None: ...
 
     def setDefaultCollisionMarginData(self, default_collision_margin: float) -> None: ...
 

@@ -14,6 +14,7 @@
 
 // tesseract_common for types
 #include <tesseract/common/allowed_collision_matrix.h>
+#include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/collision_margin_data.h>
 #include <tesseract/common/resource_locator.h>
 #include <filesystem>
@@ -76,6 +77,11 @@ NB_MODULE(_tesseract_collision, m) {
         .value("ASSIGN", tc::ACMOverrideType::ASSIGN)
         .value("AND", tc::ACMOverrideType::AND)
         .value("OR", tc::ACMOverrideType::OR);
+
+    nb::enum_<tc::CollisionCheckExitType>(m, "CollisionCheckExitType")
+        .value("FIRST", tc::CollisionCheckExitType::FIRST)
+        .value("ONE_PER_STEP", tc::CollisionCheckExitType::ONE_PER_STEP)
+        .value("ALL", tc::CollisionCheckExitType::ALL);
 
     // ========== ContactResult ==========
     nb::class_<tc::ContactResult>(m, "ContactResult")
@@ -177,7 +183,13 @@ NB_MODULE(_tesseract_collision, m) {
             [](const tc::ContactManagerConfig& c) -> std::optional<double> { return c.default_margin; },
             [](tc::ContactManagerConfig& c, double v) { c.default_margin = v; })
         .def_rw("pair_margin_override_type", &tc::ContactManagerConfig::pair_margin_override_type)
+        .def_rw("pair_margin_data", &tc::ContactManagerConfig::pair_margin_data)
+        .def_rw("acm", &tc::ContactManagerConfig::acm)
         .def_rw("acm_override_type", &tc::ContactManagerConfig::acm_override_type)
+        .def_rw("modify_object_enabled", &tc::ContactManagerConfig::modify_object_enabled)
+        .def("incrementMargins", &tc::ContactManagerConfig::incrementMargins, "increment"_a)
+        .def("scaleMargins", &tc::ContactManagerConfig::scaleMargins, "scale"_a)
+        .def("validate", &tc::ContactManagerConfig::validate)
         // Backwards compatibility alias
         .def_prop_rw("margin_data_override_type",
             [](const tc::ContactManagerConfig& c) { return c.pair_margin_override_type; },
@@ -186,10 +198,18 @@ NB_MODULE(_tesseract_collision, m) {
     // ========== CollisionCheckConfig ==========
     nb::class_<tc::CollisionCheckConfig>(m, "CollisionCheckConfig")
         .def(nb::init<>())
+        .def(nb::init<tc::ContactRequest, tc::CollisionEvaluatorType, double, tc::CollisionCheckProgramType,
+                      tc::CollisionCheckExitType>(),
+             "contact_request"_a = tc::ContactRequest(),
+             "type"_a = tc::CollisionEvaluatorType::DISCRETE,
+             "longest_valid_segment_length"_a = 0.005,
+             "check_program_mode"_a = tc::CollisionCheckProgramType::ALL,
+             "exit_condition"_a = tc::CollisionCheckExitType::FIRST)
         .def_rw("contact_request", &tc::CollisionCheckConfig::contact_request)
         .def_rw("type", &tc::CollisionCheckConfig::type)
         .def_rw("longest_valid_segment_length", &tc::CollisionCheckConfig::longest_valid_segment_length)
-        .def_rw("check_program_mode", &tc::CollisionCheckConfig::check_program_mode);
+        .def_rw("check_program_mode", &tc::CollisionCheckConfig::check_program_mode)
+        .def_rw("exit_condition", &tc::CollisionCheckConfig::exit_condition);
 
     // ========== DiscreteContactManager (abstract, expose key methods) ==========
     nb::class_<tc::DiscreteContactManager>(m, "DiscreteContactManager")
@@ -203,6 +223,11 @@ NB_MODULE(_tesseract_collision, m) {
              [](tc::DiscreteContactManager& self, const std::string& name, const Eigen::Isometry3d& pose) {
                  self.setCollisionObjectsTransform(name, pose);
              }, "name"_a, "pose"_a)
+        .def("setCollisionObjectsTransform",
+             [](tc::DiscreteContactManager& self, const std::vector<std::string>& names,
+                const tcommon::VectorIsometry3d& poses) {
+                 self.setCollisionObjectsTransform(names, poses);
+             }, "names"_a, "poses"_a)
         .def("setCollisionObjectsTransform",
              [](tc::DiscreteContactManager& self, const tcommon::TransformMap& transforms) {
                  self.setCollisionObjectsTransform(transforms);
@@ -227,6 +252,13 @@ NB_MODULE(_tesseract_collision, m) {
              "name1"_a, "name2"_a, "collision_margin"_a)
         .def("setCollisionMarginData", &tc::DiscreteContactManager::setCollisionMarginData,
              "collision_margin_data"_a)
+        .def("setCollisionMarginPairData", &tc::DiscreteContactManager::setCollisionMarginPairData,
+             "pair_margin_data"_a,
+             "override_type"_a = tcommon::CollisionMarginPairOverrideType::REPLACE)
+        .def("incrementCollisionMargin", &tc::DiscreteContactManager::incrementCollisionMargin, "increment"_a)
+        .def("setContactAllowedValidator", &tc::DiscreteContactManager::setContactAllowedValidator, "validator"_a)
+        .def("getContactAllowedValidator", &tc::DiscreteContactManager::getContactAllowedValidator)
+        .def("applyContactManagerConfig", &tc::DiscreteContactManager::applyContactManagerConfig, "config"_a)
         // Backwards compatibility aliases
         .def("setDefaultCollisionMarginData", &tc::DiscreteContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
@@ -252,24 +284,69 @@ NB_MODULE(_tesseract_collision, m) {
         .def("enableCollisionObject", &tc::ContinuousContactManager::enableCollisionObject, "name"_a)
         .def("disableCollisionObject", &tc::ContinuousContactManager::disableCollisionObject, "name"_a)
         .def("isCollisionObjectEnabled", &tc::ContinuousContactManager::isCollisionObjectEnabled, "name"_a)
+        .def("addCollisionObject",
+             [](tc::ContinuousContactManager& self, const std::string& name, int mask_id,
+                const std::vector<std::shared_ptr<const tg::Geometry>>& shapes,
+                const tcommon::VectorIsometry3d& shape_poses, bool enabled) {
+                 return self.addCollisionObject(name, mask_id, shapes, shape_poses, enabled);
+             }, "name"_a, "mask_id"_a, "shapes"_a, "shape_poses"_a, "enabled"_a = true)
+        .def("getCollisionObjectGeometries", &tc::ContinuousContactManager::getCollisionObjectGeometries, "name"_a)
+        .def("getCollisionObjectGeometriesTransforms",
+             &tc::ContinuousContactManager::getCollisionObjectGeometriesTransforms, "name"_a)
+        // Static (single-pose) object transforms
         .def("setCollisionObjectsTransform",
              [](tc::ContinuousContactManager& self, const std::string& name, const Eigen::Isometry3d& pose) {
                  self.setCollisionObjectsTransform(name, pose);
              }, "name"_a, "pose"_a)
+        .def("setCollisionObjectsTransform",
+             [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
+                const tcommon::VectorIsometry3d& poses) {
+                 self.setCollisionObjectsTransform(names, poses);
+             }, "names"_a, "poses"_a)
+        .def("setCollisionObjectsTransform",
+             [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& transforms) {
+                 tcommon::TransformMap tm;
+                 for (const auto& p : transforms) { tm[p.first] = p.second; }
+                 self.setCollisionObjectsTransform(tm);
+             }, "transforms"_a)
+        // Cast (moving, start+end pose) object transforms
         .def("setCollisionObjectsTransformCast",
              [](tc::ContinuousContactManager& self, const std::string& name,
                 const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2) {
                  self.setCollisionObjectsTransform(name, pose1, pose2);
              }, "name"_a, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransformCast",
+             [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
+                const tcommon::VectorIsometry3d& pose1, const tcommon::VectorIsometry3d& pose2) {
+                 self.setCollisionObjectsTransform(names, pose1, pose2);
+             }, "names"_a, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransformCast",
+             [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& pose1,
+                const std::map<std::string, Eigen::Isometry3d>& pose2) {
+                 tcommon::TransformMap tm1, tm2;
+                 for (const auto& p : pose1) { tm1[p.first] = p.second; }
+                 for (const auto& p : pose2) { tm2[p.first] = p.second; }
+                 self.setCollisionObjectsTransform(tm1, tm2);
+             }, "pose1"_a, "pose2"_a)
         .def("getCollisionObjects", &tc::ContinuousContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::ContinuousContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::ContinuousContactManager::getActiveCollisionObjects)
+        .def("setCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginData,
+             "collision_margin_data"_a)
+        .def("getCollisionMarginData", &tc::ContinuousContactManager::getCollisionMarginData)
         // Note: 0.33 renamed setDefaultCollisionMarginData → setDefaultCollisionMargin
         .def("setDefaultCollisionMargin", &tc::ContinuousContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
         // Note: 0.33 renamed setPairCollisionMarginData → setCollisionMarginPair
         .def("setCollisionMarginPair", &tc::ContinuousContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
+        .def("setCollisionMarginPairData", &tc::ContinuousContactManager::setCollisionMarginPairData,
+             "pair_margin_data"_a,
+             "override_type"_a = tcommon::CollisionMarginPairOverrideType::REPLACE)
+        .def("incrementCollisionMargin", &tc::ContinuousContactManager::incrementCollisionMargin, "increment"_a)
+        .def("setContactAllowedValidator", &tc::ContinuousContactManager::setContactAllowedValidator, "validator"_a)
+        .def("getContactAllowedValidator", &tc::ContinuousContactManager::getContactAllowedValidator)
+        .def("applyContactManagerConfig", &tc::ContinuousContactManager::applyContactManagerConfig, "config"_a)
         // Backwards compatibility aliases
         .def("setDefaultCollisionMarginData", &tc::ContinuousContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)

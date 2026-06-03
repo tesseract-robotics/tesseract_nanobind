@@ -435,6 +435,28 @@ class AllowedCollisionMatrix:
 
     def insertAllowedCollisionMatrix(self, arg: AllowedCollisionMatrix, /) -> None: ...
 
+class ContactAllowedValidator:
+    def __call__(self, link_name1: str, link_name2: str) -> bool: ...
+
+class ACMContactAllowedValidator(ContactAllowedValidator):
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, acm: AllowedCollisionMatrix) -> None: ...
+
+class CombinedContactAllowedValidatorType(enum.Enum):
+    AND = 0
+
+    OR = 1
+
+class CombinedContactAllowedValidator(ContactAllowedValidator):
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, validators: Sequence[ContactAllowedValidator], type: CombinedContactAllowedValidatorType) -> None: ...
+
 class CollisionMarginPairOverrideType(enum.Enum):
     NONE = 0
 
