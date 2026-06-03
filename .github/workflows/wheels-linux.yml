@@ -30,14 +30,16 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ${{ matrix.arch.runner }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.10', '3.11', '3.12']
-        arch:
-          - { name: x64,   runner: ubuntu-22.04 }
-          - { name: arm64, runner: ubuntu-22.04-arm }
+        include:
+          - { python: '3.9',  arch: x64,     runner: ubuntu-22.04 }
+          - { python: '3.10', arch: x64,     runner: ubuntu-22.04 }
+          - { python: '3.11', arch: x64,     runner: ubuntu-22.04 }
+          - { python: '3.12', arch: x64,     runner: ubuntu-22.04 }
+          - { python: '3.12', arch: aarch64, runner: ubuntu-22.04-arm }
     defaults:
       run:
         shell: bash -el {0}
@@ -77,7 +79,7 @@ jobs:
       id: colcon-cache
       with:
         path: ws/install
-        key: colcon-linux-v12-${{ matrix.arch.name }}-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        key: colcon-linux-v12-${{ matrix.arch }}-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
     - name: build C++ deps
       if: steps.colcon-cache.outputs.cache-hit != 'true'
       working-directory: ws/src/tesseract_nanobind
@@ -88,27 +90,31 @@ jobs:
     - name: archive wheels
       uses: actions/upload-artifact@v4
       with:
-        name: python-${{ matrix.python }}-linux-${{ matrix.arch.name }}
+        name: python-${{ matrix.python }}-linux-${{ matrix.arch }}
         path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: build-logs-linux-${{ matrix.arch.name }}-py${{ matrix.python }}
+        name: build-logs-linux-${{ matrix.arch }}-py${{ matrix.python }}
         path: '**/*.log'
         retention-days: 2
 
   test-wheel:
     needs: build
-    runs-on: ${{ matrix.arch.runner }}
-    continue-on-error: ${{ matrix.python == '3.9' }}
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.continue_on_error }}
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.12']
-        arch:
-          - { name: x64,   runner: ubuntu-24.04 }
-          - { name: arm64, runner: ubuntu-24.04-arm }
+        include:
+          - { python: '3.9',  wheel: '3.9',  arch: x64,   runner: ubuntu-24.04,     continue_on_error: true }
+          - { python: '3.12', wheel: '3.12', arch: x64,   runner: ubuntu-24.04,     continue_on_error: false }
+          - { python: '3.12', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm, continue_on_error: false }
+          - { python: '3.13', wheel: '3.12', arch: x64,   runner: ubuntu-24.04,     continue_on_error: false }
+          - { python: '3.13', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm, continue_on_error: false }
+          - { python: '3.14', wheel: '3.12', arch: x64,   runner: ubuntu-24.04,     continue_on_error: true }
+          - { python: '3.14', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm, continue_on_error: true }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,9 +122,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+          allow-prereleases: true
       - uses: actions/download-artifact@v4
         with:
-          name: python-${{ matrix.python }}-linux-${{ matrix.arch.name }}
+          name: python-${{ matrix.wheel }}-linux-${{ matrix.arch }}
           path: wheelhouse/
       - name: install wheel in virgin env
         run: |
