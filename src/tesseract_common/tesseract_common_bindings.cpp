@@ -400,11 +400,17 @@ NB_MODULE(_tesseract_common, m) {
         // tool axes use the quaternion / rotation-matrix surface.
         .def("to_rpy", [](const Eigen::Quaterniond& self) -> Eigen::Vector3d {
             // Threshold on cos(pitch) below which (roll, yaw) cannot be
-            // separated stably. 1e-9 in cos(pitch) corresponds to pitch
-            // within ~4.5e-5 rad (≈ 2.5 millidegrees) of ±π/2 — well
-            // below typical joint-angle precision and below Eigen's own
-            // `NumTraits<double>::dummy_precision()` floor.
-            constexpr double kGimbalLockCosPitchThreshold = 1e-9;
+            // separated stably. This MUST sit above the FP noise floor:
+            // near gimbal lock `sin(pitch)` rounds to `1 - k·eps`, so
+            // `cos(pitch) = √(1 - sin²) ≈ √(2·k·eps) ≈ 2.1e-8` even when
+            // the true pitch is exactly ±π/2. A threshold below that floor
+            // (e.g. the old 1e-9) fails to detect gimbal lock whenever the
+            // platform's rounding leaves `sin(pitch) < 1` — which is what
+            // breaks on aarch64 but happens to pass on x86_64. 1e-6 clears
+            // the noise floor with ~50x margin while still corresponding to
+            // pitch within ~1e-6 rad of ±π/2 — far tighter than any real
+            // joint-angle precision.
+            constexpr double kGimbalLockCosPitchThreshold = 1e-6;
 
             const Eigen::Matrix3d R = self.toRotationMatrix();
             // Clamp before asin to guard against |sin(pitch)| > 1 from
