@@ -29,7 +29,69 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  # Build the C++ dependencies (tesseract, trajopt, descartes, ...) once per
+  # architecture. These are independent of the Python version, so we key the
+  # colcon cache on arch only and let every build-wheel job restore it.
+  build-cpp:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64,     runner: ubuntu-22.04 }
+          - { arch: aarch64, runner: ubuntu-22.04-arm }
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: ws/src/tesseract_nanobind
+    # The C++ build is Python-version independent; any pixi env provides the
+    # colcon/cmake toolchain, so pin to py312 for the build-cpp job.
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
+      with:
+        manifest-path: ws/src/tesseract_nanobind/pyproject.toml
+        cache: true
+        environments: py312
+        activate-environment: py312
+    - name: cache vcs repos
+      uses: actions/cache@v4
+      with:
+        path: |
+          ws/src/tesseract
+          ws/src/tesseract_planning
+          ws/src/trajopt
+          ws/src/descartes_light
+          ws/src/opw_kinematics
+          ws/src/ruckig
+        key: vcs-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos') }}
+    - name: vcs import
+      working-directory: ws/src
+      run: vcs import --input tesseract_nanobind/dependencies.repos --skip-existing
+    - name: cache colcon build
+      uses: actions/cache@v4
+      id: colcon-cache
+      with:
+        path: ws/install
+        key: colcon-linux-v13-${{ matrix.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+    - name: build C++ deps
+      if: steps.colcon-cache.outputs.cache-hit != 'true'
+      working-directory: ws/src/tesseract_nanobind
+      run: pixi run build-cpp
+    - name: archive logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-cpp-logs-linux-${{ matrix.arch }}
+        path: '**/*.log'
+        retention-days: 2
+
+  # Build one wheel per (arch, python). Restores the arch's prebuilt ws/install
+  # from the build-cpp job's colcon cache instead of rebuilding the C++ deps.
+  build-wheel:
+    needs: build-cpp
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -60,30 +122,14 @@ jobs:
     - name: typecheck
       working-directory: ws/src/tesseract_nanobind
       run: pixi run typecheck
-    - name: cache vcs repos
-      uses: actions/cache@v4
-      with:
-        path: |
-          ws/src/tesseract
-          ws/src/tesseract_planning
-          ws/src/trajopt
-          ws/src/descartes_light
-          ws/src/opw_kinematics
-          ws/src/ruckig
-        key: vcs-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos') }}
-    - name: vcs import
-      working-directory: ws/src
-      run: vcs import --input tesseract_nanobind/dependencies.repos --skip-existing
-    - name: cache colcon build
-      uses: actions/cache@v4
-      id: colcon-cache
+    - name: restore C++ deps
+      uses: actions/cache/restore@v4
       with:
         path: ws/install
-        key: colcon-linux-v12-${{ matrix.arch }}-py${{ matrix.python }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
-    - name: build C++ deps
-      if: steps.colcon-cache.outputs.cache-hit != 'true'
-      working-directory: ws/src/tesseract_nanobind
-      run: pixi run build-cpp
+        key: colcon-linux-v13-${{ matrix.arch }}-${{ hashFiles('ws/src/tesseract_nanobind/dependencies.repos', 'ws/src/tesseract_nanobind/pyproject.toml') }}
+        restore-keys: |
+          colcon-linux-v13-${{ matrix.arch }}-
+        fail-on-cache-miss: true
     - name: build wheel
       working-directory: ws/src/tesseract_nanobind
       run: pixi run build-wheel
@@ -96,12 +142,12 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: build-logs-linux-${{ matrix.arch }}-py${{ matrix.python }}
+        name: build-wheel-logs-linux-${{ matrix.arch }}-py${{ matrix.python }}
         path: '**/*.log'
         retention-days: 2
 
   test-wheel:
-    needs: build
+    needs: build-wheel
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.continue_on_error }}
     strategy:
@@ -164,7 +210,7 @@ jobs:
             -v --tb=short
 
   publish:
-    needs: [build, test-wheel]
+    needs: [build-wheel, test-wheel]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: linux
