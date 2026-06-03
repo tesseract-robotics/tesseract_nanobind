@@ -276,8 +276,10 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def_rw("manipulator_ik_solver", &tp::DescartesDefaultMoveProfile<double>::manipulator_ik_solver)
         .def_rw("allow_collision", &tp::DescartesDefaultMoveProfile<double>::allow_collision)
         .def_rw("enable_collision", &tp::DescartesDefaultMoveProfile<double>::enable_collision)
+        .def_rw("vertex_contact_manager_config", &tp::DescartesDefaultMoveProfile<double>::vertex_contact_manager_config)
         .def_rw("vertex_collision_check_config", &tp::DescartesDefaultMoveProfile<double>::vertex_collision_check_config)
         .def_rw("enable_edge_collision", &tp::DescartesDefaultMoveProfile<double>::enable_edge_collision)
+        .def_rw("edge_contact_manager_config", &tp::DescartesDefaultMoveProfile<double>::edge_contact_manager_config)
         .def_rw("edge_collision_check_config", &tp::DescartesDefaultMoveProfile<double>::edge_collision_check_config)
         .def_rw("use_redundant_joint_solutions", &tp::DescartesDefaultMoveProfile<double>::use_redundant_joint_solutions)
         .def_rw("debug", &tp::DescartesDefaultMoveProfile<double>::debug);

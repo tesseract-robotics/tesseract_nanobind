@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from tesseract_robotics.tesseract_collision import ACMOverrideType, ContactManagerConfig
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
@@ -15,6 +16,7 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
+    AllowedCollisionMatrix,
     FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
@@ -111,6 +113,38 @@ class TestDescartesProfiles:
 
         profile.debug = True
         assert profile.debug is True
+
+    def test_default_plan_profile_contact_manager_config(self):
+        """vertex_contact_manager_config / edge_contact_manager_config round-trip."""
+        profile = DescartesDefaultPlanProfileD()
+
+        # Both fields are exposed and return a ContactManagerConfig.
+        assert isinstance(profile.vertex_contact_manager_config, ContactManagerConfig)
+        assert isinstance(profile.edge_contact_manager_config, ContactManagerConfig)
+
+        # Assign a configured ContactManagerConfig to the vertex slot and read it back.
+        vertex_cfg = ContactManagerConfig()
+        vertex_acm = AllowedCollisionMatrix()
+        vertex_acm.addAllowedCollision("link_1", "link_2", "unit_test")
+        vertex_cfg.acm = vertex_acm
+        vertex_cfg.acm_override_type = ACMOverrideType.OR
+        vertex_cfg.modify_object_enabled = {"link_2": False}
+        profile.vertex_contact_manager_config = vertex_cfg
+
+        assert profile.vertex_contact_manager_config.acm_override_type == ACMOverrideType.OR
+        assert profile.vertex_contact_manager_config.acm.isCollisionAllowed("link_1", "link_2")
+        assert dict(profile.vertex_contact_manager_config.modify_object_enabled) == {
+            "link_2": False
+        }
+
+        # Edge slot is independent of the vertex slot.
+        edge_cfg = ContactManagerConfig(0.05)
+        edge_cfg.acm_override_type = ACMOverrideType.ASSIGN
+        profile.edge_contact_manager_config = edge_cfg
+
+        assert profile.edge_contact_manager_config.acm_override_type == ACMOverrideType.ASSIGN
+        # Vertex slot is unaffected by the edge assignment.
+        assert profile.vertex_contact_manager_config.acm_override_type == ACMOverrideType.OR
 
 
 class TestDescartesMotionPlanner:
@@ -238,7 +272,9 @@ class TestPythonEdgeEvaluator:
                 self._edge_evaluator = JointDistanceEdgeEvaluator()
 
             def createWaypointSampler(self, move_instruction, composite_manip_info, env):
-                return self._inner.createWaypointSampler(move_instruction, composite_manip_info, env)
+                return self._inner.createWaypointSampler(
+                    move_instruction, composite_manip_info, env
+                )
 
             def createEdgeEvaluator(self, move_instruction, composite_manip_info, env):
                 return self._edge_evaluator
@@ -295,4 +331,6 @@ class TestPythonEdgeEvaluator:
 
         response = planner.solve(request)
         assert response.successful, f"Descartes planning failed: {response.message}"
-        assert call_counter["n"] > 0, "Python EdgeEvaluator.evaluate() was never called by the planner"
+        assert call_counter["n"] > 0, (
+            "Python EdgeEvaluator.evaluate() was never called by the planner"
+        )
