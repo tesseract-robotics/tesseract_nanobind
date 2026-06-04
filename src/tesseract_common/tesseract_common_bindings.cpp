@@ -17,7 +17,6 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/plugin_info.h>
-#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <sstream>
@@ -400,32 +399,41 @@ NB_MODULE(_tesseract_common, m) {
         // individual values stop being meaningful — for near-vertical
         // tool axes use the quaternion / rotation-matrix surface.
         .def("to_rpy", [](const Eigen::Quaterniond& self) -> Eigen::Vector3d {
-            // Threshold on cos(pitch) below which (roll, yaw) cannot be
-            // separated stably. This MUST sit above the FP noise floor:
-            // near gimbal lock `sin(pitch)` rounds to `1 - k·eps`, so
-            // `cos(pitch) = √(1 - sin²) ≈ √(2·k·eps) ≈ 2.1e-8` even when
-            // the true pitch is exactly ±π/2. A threshold below that floor
-            // (e.g. the old 1e-9) fails to detect gimbal lock whenever the
-            // platform's rounding leaves `sin(pitch) < 1` — which is what
-            // breaks on aarch64 but happens to pass on x86_64. 1e-6 clears
-            // the noise floor with ~50x margin while still corresponding to
-            // pitch within ~1e-6 rad of ±π/2 — far tighter than any real
-            // joint-angle precision.
+            // Threshold on cos(pitch) below which the (roll, yaw) split is
+            // taken as gimbal-locked and yaw is pinned to the tf2 convention.
+            // Bounded BELOW by the FP residual of "exact" gimbal lock: a unit
+            // quaternion at pitch = ±π/2 reconstructs a rotation matrix whose
+            // -R(2,0) lands within ~1 ulp of ±1, so the rotation's true
+            // cos(pitch) bottoms out around √(2·eps) ≈ 2.1e-8, not 0. The
+            // threshold MUST sit above that floor or the convention never
+            // triggers at the singularity — the bug that surfaced on aarch64,
+            // whose rounding differs from x86. 1e-6 clears it with ~50x margin
+            // while staying within ~1e-6 rad of ±π/2, far tighter than any real
+            // tool-orientation tolerance. (NB: this governs only the gimbal
+            // *branch* decision — pitch itself is resolved exactly below.)
             constexpr double kGimbalLockCosPitchThreshold = 1e-6;
 
             const Eigen::Matrix3d R = self.toRotationMatrix();
-            // Clamp before asin to guard against |sin(pitch)| > 1 from
-            // accumulated FP error on the input quaternion.
-            const double sin_pitch = std::clamp(-R(2, 0), -1.0, 1.0);
-            const double pitch = std::asin(sin_pitch);
-            const double cos_pitch = std::cos(pitch);
+            // Resolve pitch and cos(pitch) from the matrix entries directly, NOT
+            // via `cos(asin(-R(2,0)))`. That composition is `√(1 - sin²)`
+            // evaluated the cancellation-prone way: near ±π/2, sin(pitch) rounds
+            // to within 1 ulp of 1, flooring cos(pitch) at √(2·eps) ≈ 2.1e-8 and
+            // discarding the low bits of pitch. The off-axis entries carry
+            // cos(pitch) without cancellation — R(0,0) = cos(pitch)·cos(yaw),
+            // R(1,0) = cos(pitch)·sin(yaw), so hypot(R00, R10) = |cos(pitch)| —
+            // and atan2 needs no |sin| ≤ 1 clamp (it never overflows). The
+            // result lands in the canonical pitch ∈ [-π/2, π/2] by construction
+            // (hypot ≥ 0).
+            const double cos_pitch = std::hypot(R(0, 0), R(1, 0));
+            const double pitch = std::atan2(-R(2, 0), cos_pitch);
 
             double roll, yaw;
-            if (std::abs(cos_pitch) > kGimbalLockCosPitchThreshold) {
+            if (cos_pitch > kGimbalLockCosPitchThreshold) {
                 roll = std::atan2(R(2, 1), R(2, 2));
                 yaw  = std::atan2(R(1, 0), R(0, 0));
             } else {
-                // Gimbal lock: pitch ≈ ±π/2. Match tf2 convention.
+                // Gimbal lock: pitch ≈ ±π/2, the (roll, yaw) DOF pair is
+                // degenerate. tf2 convention pins yaw = 0; roll absorbs the sum.
                 roll = std::atan2(-R(1, 2), R(1, 1));
                 yaw  = 0.0;
             }

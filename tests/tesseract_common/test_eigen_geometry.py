@@ -289,6 +289,31 @@ def test_quaterniond_to_rpy_gimbal_lock_yaw_zero_convention():
     assert rpy_down[2] == pytest.approx(0.0, abs=ANGULAR_PREC)
 
 
+# Pitch resolution inside the gimbal band. For pitch within δ of ±π/2,
+# `sin(pitch) = cos(δ)`; once δ ≲ 1.5e-8 that value rounds to exactly 1.0 in
+# float64 — an IEEE-754 property, NOT a libm quirk, so it holds on every
+# platform. Computing `cos(pitch)` as `cos(asin(-R20))` then collapses to the
+# √(2·eps) ≈ 2.1e-8 cancellation floor and pitch is reported up to ~2e-8 off.
+# Resolving `cos(pitch) = hypot(R00, R10)` from the off-axis entries (which
+# carry the cos(pitch) magnitude directly, no cancellation) keeps pitch accurate
+# to machine precision. Every δ below sits under the round-to-1 floor, so the
+# cancellation-prone form fails these on every platform — deterministically.
+_GIMBAL_BAND_DELTAS = [1e-9, 5e-9, 1e-8]
+
+
+@pytest.mark.parametrize("delta", _GIMBAL_BAND_DELTAS)
+def test_quaterniond_to_rpy_resolves_pitch_in_gimbal_band(delta):
+    """pitch near ±π/2 is resolved from off-axis entries, not `cos(asin(-R20))`.
+
+    Roll and yaw are deliberately not asserted: inside the band the (roll, yaw)
+    split is gimbal-convention territory (yaw=0). Only pitch — which is fully
+    determined by the rotation everywhere — is pinned here.
+    """
+    true_pitch = math.pi / 2 - delta
+    pitch = Quaterniond.from_rpy(0.3, true_pitch, 0.5).to_rpy()[1]
+    assert pitch == pytest.approx(true_pitch, abs=1e-10)
+
+
 # RPY-roundtrip cases that stay clear of gimbal lock (|pitch| ≈ π/2): in
 # this regime, the (roll, pitch, yaw) decomposition is unique, so we can
 # assert both that the *values* survive the trip AND that the *rotation*
