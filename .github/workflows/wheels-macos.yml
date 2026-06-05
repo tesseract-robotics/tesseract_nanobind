@@ -32,7 +32,7 @@ jobs:
   build:
     runs-on: macos-14
     strategy:
-      fail-fast: true  # one failure aborts the others — save CI minutes during iteration
+      fail-fast: false  # release wheels: never let one flaky job cancel sibling builds — a partial matrix fragments the published set (see 0.35.0.2)
       matrix:
         python: ['3.9', '3.10', '3.11', '3.12']
     defaults:
@@ -158,3 +158,5 @@ jobs:
       run: ls -la dist/
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        skip-existing: true  # idempotent re-runs: skip already-uploaded wheels instead of 400-aborting the batch

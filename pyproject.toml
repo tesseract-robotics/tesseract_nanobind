@@ -102,6 +102,12 @@ provider = "scikit_build_core.metadata.setuptools_scm"
 [tool.setuptools_scm]
 root = "."
 tag_regex = "^(?P<version>\\d+\\.\\d+\\.\\d+\\.\\d+)$"
+# PyPI rejects PEP 440 local-version segments (the "+g<sha>.d<date>" suffix the default
+# node-and-date scheme stamps onto a dirty build tree) with HTTP 400. CI wheel jobs can
+# dirty the tree (generated .pyi stubs / in-place YAML patches), so without this twine
+# aborts mid-batch and fragments the release across platforms (see 0.35.0.2). Force a
+# local-free version so every tag build is uploadable.
+local_scheme = "no-local-version"
 
 [tool.scikit-build.cmake.define]
 CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
