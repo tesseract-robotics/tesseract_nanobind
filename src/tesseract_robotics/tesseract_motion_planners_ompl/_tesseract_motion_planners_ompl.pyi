@@ -174,3 +174,21 @@ class OMPLMotionPlanner:
     def clear(self) -> None: ...
 
     def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...
+
+def RNG_setSeed(seed: int) -> None:
+    """
+    Seed OMPL's global RNG seed generator for reproducible planning.
+
+    Samplers created after this call draw deterministic seeds, so repeated solve()
+    calls produce identical paths. Re-seeding after planning has started logs an
+    OMPL error (harmless: only pre-existing RNG instances stay nondeterministic).
+    A seed of 0 is rejected once generation has started.
+    """
+
+def RNG_getSeed() -> int:
+    """
+    Get the first seed used by OMPL's RNG seed generator.
+
+    Log this value to make a stochastic planning failure reproducible by passing
+    it to RNG_setSeed in a subsequent run.
+    """

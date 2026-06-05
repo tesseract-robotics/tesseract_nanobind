@@ -7,10 +7,12 @@ from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
     CompositeInstruction,
+    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType_FREESPACE,
     ProfileDictionary,
+    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     FilesystemPath,
@@ -26,6 +28,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
     ProfileDictionary_addOMPLProfile,
+    RNG_setSeed,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
@@ -139,6 +142,82 @@ class TestOMPLPlanning:
             response.results, t_env, 3.14, 1.0, 3.14, 10
         )
         assert interpolated_results is not None
+
+
+class TestOMPLSeedDeterminism:
+    """Contract for RNG_setSeed: same seed -> identical planned path (#103).
+
+    Uses the DEFAULT OMPLRealVectorPlanProfile (two parallel RRTConnect
+    threads, optimize=true) - the exact configuration the example tests run -
+    so this fails if parallel-plan racing ever breaks seeded reproducibility,
+    not just single-threaded sampling.
+    """
+
+    @staticmethod
+    def _plan_trajectory(t_env) -> np.ndarray:
+        """Plan the standard two-waypoint freespace problem, return Nx6 joint array."""
+        manip_info = ManipulatorInfo()
+        manip_info.tcp_frame = "tool0"
+        manip_info.manipulator = "manipulator"
+        manip_info.working_frame = "base_link"
+
+        joint_names = [f"joint_{i + 1}" for i in range(6)]
+        t_env.setState(joint_names, np.ones(6) * 0.1)
+
+        wp1 = CartesianWaypoint(
+            Isometry3d.Identity()
+            * Translation3d(0.8, -0.3, 1.455)
+            * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
+        )
+        wp2 = CartesianWaypoint(
+            Isometry3d.Identity()
+            * Translation3d(0.8, 0.3, 1.455)
+            * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
+        )
+
+        program = CompositeInstruction("DEFAULT")
+        program.setManipulatorInfo(manip_info)
+        for wp in (wp1, wp2):
+            program.appendMoveInstruction(
+                MoveInstructionPoly_wrap_MoveInstruction(
+                    MoveInstruction(
+                        CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
+                        MoveInstructionType_FREESPACE,
+                        "DEFAULT",
+                    )
+                )
+            )
+
+        profiles = ProfileDictionary()
+        ProfileDictionary_addOMPLProfile(
+            profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", OMPLRealVectorPlanProfile()
+        )
+
+        request = PlannerRequest()
+        request.instructions = program
+        request.env = t_env
+        request.profiles = profiles
+
+        response = OMPLMotionPlanner(OMPL_DEFAULT_NAMESPACE).solve(request)
+        assert response.successful, f"OMPL planning failed: {response.message}"
+
+        rows = []
+        for instr in response.results.getInstructions():
+            move = InstructionPoly_as_MoveInstructionPoly(instr)
+            wp = WaypointPoly_as_StateWaypointPoly(move.getWaypoint())
+            rows.append(np.asarray(wp.getPosition()).flatten())
+        return np.vstack(rows)
+
+    def test_same_seed_identical_path(self, abb_irb2400_environment):
+        t_env = abb_irb2400_environment
+
+        RNG_setSeed(1234)
+        traj_a = self._plan_trajectory(t_env)
+
+        RNG_setSeed(1234)
+        traj_b = self._plan_trajectory(t_env)
+
+        np.testing.assert_array_equal(traj_a, traj_b)
 
 
 class TestSimplePlanner:

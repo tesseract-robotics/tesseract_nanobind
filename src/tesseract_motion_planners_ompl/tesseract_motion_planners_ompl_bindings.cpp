@@ -26,6 +26,9 @@
 // tesseract_collision for CollisionCheckConfig
 #include <tesseract/collision/types.h>
 
+// OMPL global RNG (seeding for reproducible planning)
+#include <ompl/util/RandomNumbers.h>
+
 namespace tp = tesseract::motion_planners;
 namespace tc = tesseract::common;
 
@@ -157,4 +160,16 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         .def("terminate", &tp::OMPLMotionPlanner::terminate)
         .def("clear", &tp::OMPLMotionPlanner::clear)
         .def("clone", [](const tp::OMPLMotionPlanner& self) { return self.clone(); });
+
+    // ========== Global OMPL RNG seeding ==========
+    m.def("RNG_setSeed", [](std::uint_fast32_t seed) { ompl::RNG::setSeed(seed); }, "seed"_a,
+          "Seed OMPL's global RNG seed generator for reproducible planning.\n\n"
+          "Samplers created after this call draw deterministic seeds, so repeated solve()\n"
+          "calls produce identical paths. Re-seeding after planning has started logs an\n"
+          "OMPL error (harmless: only pre-existing RNG instances stay nondeterministic).\n"
+          "A seed of 0 is rejected once generation has started.");
+    m.def("RNG_getSeed", []() { return ompl::RNG::getSeed(); },
+          "Get the first seed used by OMPL's RNG seed generator.\n\n"
+          "Log this value to make a stochastic planning failure reproducible by passing\n"
+          "it to RNG_setSeed in a subsequent run.");
 }
