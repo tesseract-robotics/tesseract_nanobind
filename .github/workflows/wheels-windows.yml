@@ -381,11 +381,17 @@ jobs:
   test-wheel:
     needs: build
     runs-on: windows-2022
-    continue-on-error: ${{ matrix.python == '3.9' }}
+    continue-on-error: ${{ matrix.continue_on_error }}
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.12']
+        # 3.13/3.14 install the cp312-abi3 wheel (STABLE_ABI) to verify the
+        # published support matrix on Windows, not just Linux. wheel != python.
+        include:
+          - { python: '3.9',  wheel: '3.9',  continue_on_error: true }
+          - { python: '3.12', wheel: '3.12', continue_on_error: false }
+          - { python: '3.13', wheel: '3.12', continue_on_error: false }
+          - { python: '3.14', wheel: '3.12', continue_on_error: true }
     defaults:
       run:
         shell: bash -el {0}
@@ -397,9 +403,10 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
         architecture: x64
+        allow-prereleases: true
     - uses: actions/download-artifact@v4
       with:
-        name: python-${{ matrix.python }}-windows-x64-pixi
+        name: python-${{ matrix.wheel }}-windows-x64-pixi
         path: wheelhouse
 
     - name: install wheel in clean venv
