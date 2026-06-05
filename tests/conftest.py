@@ -5,8 +5,10 @@ which seeds its samplers from entropy per process. Unseeded, every CI run
 plans a different path, and downstream TOTG time parameterization has a hard
 failure region in trajectory-shape space ("Negative path velocity",
 MoveIt-inherited, moveit#1665) — measured ~1-3% stochastic failure rate per
-run. Pinning the seed per test makes the whole pipeline deterministic.
-See https://github.com/tesseract-robotics/tesseract_nanobind/issues/103.
+run. Pinning the seed per test makes the pipeline deterministic on Linux and
+macOS (shared libompl: one RNGSeedGenerator per process). On Windows the
+conda-forge ompl is a STATIC lib, so the planner DLL has its own unreachable
+seed generator and this fixture is inert there — see #103 for the fix routes.
 """
 
 import pytest
