@@ -28,6 +28,9 @@
 // trajopt_common for collision config
 #include <trajopt_common/collision_types.h>
 
+// OsqpEigen settings (forwarded setters on TrajOptIfoptOSQPSolverProfile)
+#include <OsqpEigen/Settings.hpp>
+
 namespace tp = tesseract::motion_planners;
 namespace tc = tesseract::common;
 
@@ -96,10 +99,37 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("jerk_coeff", &tp::TrajOptIfoptDefaultCompositeProfile::jerk_coeff);
 
     // ========== TrajOptIfoptOSQPSolverProfile ==========
-    // Note: This profile has unique_ptr members that can't be easily exposed
-    // Users can rely on default configuration
+    // qp_settings is a unique_ptr<OsqpEigen::Settings>; expose setters that forward into it
+    // (same pattern as trajopt_sqp.OSQPEigenSolver). Defaults via setDefaultOSQPSettings:
+    // polish=true, warmStart=true, adaptiveRho=true, maxIter=8192, absTol=1e-4, relTol=1e-6
     nb::class_<tp::TrajOptIfoptOSQPSolverProfile, tp::TrajOptIfoptSolverProfile>(m, "TrajOptIfoptOSQPSolverProfile")
-        .def(nb::init<>());
+        .def(nb::init<>())
+        .def("setPolish", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
+            self.qp_settings->setPolish(v); }, "polish"_a,
+            "Enable solution polishing (default: true)")
+        .def("setWarmStart", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
+            self.qp_settings->setWarmStart(v); }, "warm_start"_a,
+            "Enable warm-starting (default: true)")
+        .def("setAdaptiveRho", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
+            self.qp_settings->setAdaptiveRho(v); }, "adaptive_rho"_a,
+            "Enable adaptive step size (default: true)")
+        .def("setAdaptiveRhoInterval", [](tp::TrajOptIfoptOSQPSolverProfile& self, int v) {
+            self.qp_settings->setAdaptiveRhoInterval(v); }, "interval"_a,
+            "Adapt rho every N iterations. OSQP's default 0 adapts on wall-clock timing,\n"
+            "making solutions nondeterministic run-to-run; set a fixed interval (e.g. 25)\n"
+            "for reproducible optimization.")
+        .def("setMaxIteration", [](tp::TrajOptIfoptOSQPSolverProfile& self, int v) {
+            self.qp_settings->setMaxIteration(v); }, "max_iter"_a,
+            "Max OSQP iterations per QP solve (default: 8192)")
+        .def("setAbsoluteTolerance", [](tp::TrajOptIfoptOSQPSolverProfile& self, double v) {
+            self.qp_settings->setAbsoluteTolerance(v); }, "abs_tol"_a,
+            "Absolute convergence tolerance (default: 1e-4)")
+        .def("setRelativeTolerance", [](tp::TrajOptIfoptOSQPSolverProfile& self, double v) {
+            self.qp_settings->setRelativeTolerance(v); }, "rel_tol"_a,
+            "Relative convergence tolerance (default: 1e-6)")
+        .def("setVerbosity", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
+            self.qp_settings->setVerbosity(v); }, "verbose"_a,
+            "Enable OSQP console output (default: false)");
 
     // Helper to add TrajOptIfopt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptIfoptMoveProfile", [](tc::ProfileDictionary& dict,

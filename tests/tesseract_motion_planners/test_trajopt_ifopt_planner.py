@@ -81,6 +81,18 @@ class TestTrajOptIfoptProfiles:
         assert profile is not None
         assert profile.getKey() is not None
 
+    def test_osqp_solver_profile_settings(self):
+        """Test OSQP settings setters forward to qp_settings."""
+        profile = TrajOptIfoptOSQPSolverProfile()
+        profile.setPolish(False)
+        profile.setWarmStart(False)
+        profile.setAdaptiveRho(False)
+        profile.setAdaptiveRhoInterval(25)
+        profile.setMaxIteration(4096)
+        profile.setAbsoluteTolerance(1e-5)
+        profile.setRelativeTolerance(1e-7)
+        profile.setVerbosity(False)
+
     def test_add_profiles_to_dictionary(self):
         """Test adding TrajOptIfopt profiles to ProfileDictionary."""
         profiles = ProfileDictionary()

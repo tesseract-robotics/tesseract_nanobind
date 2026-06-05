@@ -155,6 +155,34 @@ class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
 class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def __init__(self) -> None: ...
 
+    def setPolish(self, polish: bool) -> None:
+        """Enable solution polishing (default: true)"""
+
+    def setWarmStart(self, warm_start: bool) -> None:
+        """Enable warm-starting (default: true)"""
+
+    def setAdaptiveRho(self, adaptive_rho: bool) -> None:
+        """Enable adaptive step size (default: true)"""
+
+    def setAdaptiveRhoInterval(self, interval: int) -> None:
+        """
+        Adapt rho every N iterations. OSQP's default 0 adapts on wall-clock timing,
+        making solutions nondeterministic run-to-run; set a fixed interval (e.g. 25)
+        for reproducible optimization.
+        """
+
+    def setMaxIteration(self, max_iter: int) -> None:
+        """Max OSQP iterations per QP solve (default: 8192)"""
+
+    def setAbsoluteTolerance(self, abs_tol: float) -> None:
+        """Absolute convergence tolerance (default: 1e-4)"""
+
+    def setRelativeTolerance(self, rel_tol: float) -> None:
+        """Relative convergence tolerance (default: 1e-6)"""
+
+    def setVerbosity(self, verbose: bool) -> None:
+        """Enable OSQP console output (default: false)"""
+
 def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
     """Add TrajOptIfopt move profile to ProfileDictionary"""
 

@@ -66,6 +66,13 @@ if "pytest" not in sys.modules:
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
+# OSQP's default adaptive_rho_interval=0 adapts rho on wall-clock timing, making
+# the optimized trajectory nondeterministic run-to-run (and downstream TOTG time
+# parameterization a coin flip near its failure region, see #103). A fixed
+# iteration interval keeps the solver deterministic; 25 iterations approximates
+# OSQP's own time-based adaptation cadence.
+OSQP_ADAPTIVE_RHO_INTERVAL = 25
+
 
 def main():
     # Initialize the resource locator and environment
@@ -146,6 +153,7 @@ def main():
     composite_profile.acceleration_coeff = np.ones(6)
     composite_profile.jerk_coeff = np.ones(6)
     solver_profile = TrajOptIfoptOSQPSolverProfile()
+    solver_profile.setAdaptiveRhoInterval(OSQP_ADAPTIVE_RHO_INTERVAL)
 
     trajopt_profiles = ProfileDictionary()
     ProfileDictionary_addTrajOptIfoptPlanProfile(
