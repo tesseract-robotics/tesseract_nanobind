@@ -31,6 +31,11 @@ concurrency:
 jobs:
   build:
     runs-on: macos-14
+    env:
+      # Tag builds must yield EXACTLY the tag version. A dirty CI tree otherwise makes
+      # setuptools_scm guess-next-dev (e.g. 0.35.0.4.dev0) which — local segment stripped —
+      # would publish as a stray dev release (see 0.35.0.3). Pin the version on tag builds.
+      SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
     strategy:
       fail-fast: false  # release wheels: never let one flaky job cancel sibling builds — a partial matrix fragments the published set (see 0.35.0.2)
       matrix:
@@ -188,6 +193,13 @@ jobs:
         path: dist/
     - name: List wheels
       run: ls -la dist/
+    - name: assert wheel version == tag (block stray dev/mismatched release)
+      run: |
+        for whl in dist/*.whl; do
+          v=$(basename "$whl" | cut -d- -f2)
+          [ "$v" = "$GITHUB_REF_NAME" ] || { echo "::error::$whl is version $v, expected tag $GITHUB_REF_NAME — refusing to publish"; exit 1; }
+        done
+        echo "✓ all wheels are version $GITHUB_REF_NAME"
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
