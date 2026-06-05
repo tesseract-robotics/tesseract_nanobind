@@ -7,6 +7,7 @@
 Reissue of [0.35.0.2] with the full wheel set actually published. In 0.35.0.2 a dirty CI build tree made `setuptools_scm` stamp a PEP 440 local segment (`+d<date>`) onto some wheels; PyPI rejects those with HTTP 400, and the non-idempotent publish step aborted mid-upload — so macOS (all) and Linux x86_64 (`cp39`/`cp311`) wheels never landed. 0.35.0.2 is yanked. Identical bindings to 0.35.0.2 — no API changes ([49f1aa9]).
 
 - **Release pipeline hardened** — `setuptools_scm` `local_scheme = "no-local-version"` so a dirty tag build can't produce a PyPI-rejected local version; `skip-existing: true` on all three publish workflows so re-runs fill gaps instead of 400-aborting; macOS `fail-fast: false` so one flaky build can't cancel sibling wheels; plus a 3× retry on the macOS `upload-artifact` step working around GitHub's long-standing arm64-runner `CreateArtifact` timeout (`actions/upload-artifact#569`, still open) that otherwise skips the entire macOS publish ~80% of the time ([49f1aa9], [804d5b8]).
+- **`cp312-abi3` support verified on all platforms** — macOS and Windows `test-wheel` now install the `cp312-abi3` wheel on Python 3.13/3.14 (mirroring Linux; `wheel != python`), so the published 3.9–3.14 support matrix is verified in CI, not just asserted ([14a4cea]).
 
 ## [0.35.0.2] - 2026-06-04 — aarch64 / Jetson Linux wheels + collision manager bindings
 
@@ -178,6 +179,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [c897251]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/c897251
 [49f1aa9]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/49f1aa9
 [804d5b8]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/804d5b8
+[14a4cea]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/14a4cea
 [669f2da]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/669f2da
 [f30014b]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/f30014b
 [7a3b0e3]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/7a3b0e3
