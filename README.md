@@ -1,7 +1,7 @@
 # Tesseract Python (nanobind)
 
 [![PyPI](https://img.shields.io/pypi/v/tesseract-robotics-nanobind.svg)](https://pypi.org/project/tesseract-robotics-nanobind/)
-[![Python](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue.svg)](https://github.com/tesseract-robotics/tesseract_nanobind)
+[![Python](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue.svg)](https://github.com/tesseract-robotics/tesseract_nanobind)
 [![Linux](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-linux.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-linux.yml)
 [![macOS](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-macos.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-macos.yml)
 [![Windows](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-windows.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-windows.yml)
