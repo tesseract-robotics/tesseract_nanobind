@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.35.0.3] - 2026-06-05 — complete wheel matrix for the 0.35.0.2 content
+
+Reissue of [0.35.0.2] with the full wheel set actually published. In 0.35.0.2 a dirty CI build tree made `setuptools_scm` stamp a PEP 440 local segment (`+d<date>`) onto some wheels; PyPI rejects those with HTTP 400, and the non-idempotent publish step aborted mid-upload — so macOS (all) and Linux x86_64 (`cp39`/`cp311`) wheels never landed. 0.35.0.2 is yanked. Identical bindings to 0.35.0.2 — no API changes ([49f1aa9]).
+
+- **Release pipeline hardened** — `setuptools_scm` `local_scheme = "no-local-version"` so a dirty tag build can't produce a PyPI-rejected local version; `skip-existing: true` on all three publish workflows so re-runs fill gaps instead of 400-aborting; macOS `fail-fast: false` so one flaky build can't cancel sibling wheels ([49f1aa9]).
+
 ## [0.35.0.2] - 2026-06-04 — aarch64 / Jetson Linux wheels + collision manager bindings
 
 Extends Linux wheel coverage to `aarch64` (including NVIDIA Jetson), completes the contact-manager binding surface, and hardens the new ROS RPY decomposition against gimbal-lock edge cases ([#97], [669f2da], [f30014b]).
@@ -81,7 +87,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 - Non-benchmark tests fail loud instead of being silently skipped ([a1d7607]).
 - Python 3.9 compatibility for example modules via `from __future__ import annotations` ([87ce68e]).
 
-[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.2...HEAD
+[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.3...HEAD
+[0.35.0.3]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.2...0.35.0.3
 [0.35.0.2]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.1...0.35.0.2
 [0.35.0.1]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.7...0.35.0.1
 [0.34.1.7]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.6...0.34.1.7
@@ -169,6 +176,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [af7bc4e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/af7bc4e
 [ba0510f]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/ba0510f
 [c897251]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/c897251
+[49f1aa9]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/49f1aa9
 [669f2da]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/669f2da
 [f30014b]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/f30014b
 [7a3b0e3]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/7a3b0e3
