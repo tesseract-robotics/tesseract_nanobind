@@ -27,8 +27,10 @@ from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
+    OMPLSolverConfig,
     ProfileDictionary_addOMPLProfile,
     RNG_setSeed,
+    RRTConnectConfigurator,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
@@ -145,12 +147,14 @@ class TestOMPLPlanning:
 
 
 class TestOMPLSeedDeterminism:
-    """Contract for RNG_setSeed: same seed -> identical planned path (#103).
+    """Contract for the reproducible-planning recipe (#103).
 
-    Uses the DEFAULT OMPLRealVectorPlanProfile (two parallel RRTConnect
-    threads, optimize=true) - the exact configuration the example tests run -
-    so this fails if parallel-plan racing ever breaks seeded reproducibility,
-    not just single-threaded sampling.
+    RNG_setSeed alone is NOT sufficient: the default profile runs two
+    RRTConnect threads under ParallelPlan with optimize=true (best-of-N
+    within a wall-clock budget), so solution SELECTION races even with
+    seeded samplers - CI proved 15/18 joint elements mismatched. The
+    guaranteeable contract is seed + single planner + optimize=False
+    (terminate at first solution): bit-identical paths.
     """
 
     @staticmethod
@@ -188,10 +192,19 @@ class TestOMPLSeedDeterminism:
                 )
             )
 
+        # Reproducibility recipe: single planner (no thread race in solution
+        # selection) + optimize=False (terminate at first solution instead of
+        # best-of-N within a wall-clock budget). With RNG_setSeed this makes
+        # the planned path bit-identical across runs.
+        solver_config = OMPLSolverConfig()
+        solver_config.optimize = False
+        solver_config.addPlanner(RRTConnectConfigurator())
+
+        plan_profile = OMPLRealVectorPlanProfile()
+        plan_profile.solver_config = solver_config
+
         profiles = ProfileDictionary()
-        ProfileDictionary_addOMPLProfile(
-            profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", OMPLRealVectorPlanProfile()
-        )
+        ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
 
         request = PlannerRequest()
         request.instructions = program

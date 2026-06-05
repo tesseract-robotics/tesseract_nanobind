@@ -40,6 +40,8 @@ from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
+    OMPLSolverConfig,
+    RRTConnectConfigurator,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
@@ -127,8 +129,22 @@ def main():
 
     # === OMPL Planning ===
     print("Running OMPL planner...")
+
+    # OMPL here only seeds TrajOptIfopt with a feasible path - the optimizer
+    # reworks it entirely. The default profile (two RRTConnect threads,
+    # optimize=True) burns the full 5s budget polishing that throwaway path
+    # AND makes the result nondeterministic (best-of-N selection races on
+    # wall-clock). Single planner + first-solution termination is faster and,
+    # combined with RNG_setSeed, reproducible (#103).
+    ompl_solver_config = OMPLSolverConfig()
+    ompl_solver_config.optimize = False
+    ompl_solver_config.addPlanner(RRTConnectConfigurator())
+
+    ompl_profile = OMPLRealVectorPlanProfile()
+    ompl_profile.solver_config = ompl_solver_config
+
     ompl_profiles = ProfileDictionary()
-    ompl_profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", OMPLRealVectorPlanProfile())
+    ompl_profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", ompl_profile)
 
     ompl_request = PlannerRequest()
     ompl_request.instructions = program
