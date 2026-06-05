@@ -86,11 +86,36 @@ jobs:
     - name: build wheel
       working-directory: ws/src/tesseract_nanobind
       run: pixi run build-wheel
+    # actions/upload-artifact@v4 intermittently fails on macOS arm64 runners with
+    # "Failed to CreateArtifact: Request timeout" (~1/3 of uploads) — a long-standing
+    # open GitHub bug (actions/upload-artifact#569, #527) inherent to arm64 mac runners'
+    # network to the artifact service. The action's 5 internal retries exhaust within the
+    # same bad window; a fresh outer re-invocation usually succeeds. Retry up to 3×; the
+    # final attempt has no continue-on-error, so a real outage still fails loud (no silent
+    # wheel loss). overwrite:true on retries clears any half-created artifact.
     - name: archive wheel
+      id: up1
+      continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
         name: python-${{ matrix.python }}-macos-arm64
         path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
+    - name: archive wheel (retry 1)
+      if: steps.up1.outcome == 'failure'
+      id: up2
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-${{ matrix.python }}-macos-arm64
+        path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
+        overwrite: true
+    - name: archive wheel (retry 2 — fail loud if still down)
+      if: steps.up1.outcome == 'failure' && steps.up2.outcome == 'failure'
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-${{ matrix.python }}-macos-arm64
+        path: ws/src/tesseract_nanobind/wheelhouse/tesseract*.whl
+        overwrite: true
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v4
