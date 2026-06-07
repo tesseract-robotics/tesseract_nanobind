@@ -173,6 +173,7 @@ nav:
     - "0.33 → 0.34": changes.md
   - Developer:
     - developer/index.md
+    - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md
     - Windows Wheel Gotchas: developer/windows-wheels.md
