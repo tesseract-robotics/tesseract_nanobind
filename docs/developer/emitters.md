@@ -5,18 +5,47 @@
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    CI[CompositeInstruction] -->|lower| IR[ProgramIR<br/>typed events]
+    IR -->|drive| BE{{ProgramBackend}}
+    BE --> RB[RapidBackend]
+    BE --> KB[KrlBackend]
+    RB --> RW[rapid_writer DSL]
+    KB --> KW[krl_writer DSL]
+    RW --> OUT[EmittedProgram]
+    KW --> OUT
 ```
-CompositeInstruction ──lower()──▶ ProgramIR (typed events) ──drive()──▶ Backend ──▶ EmittedProgram
-```
+
+One walk produces the brand-neutral `ProgramIR`; `drive()` dispatches its
+events to a `ProgramBackend`, and each backend renders through its brand's
+hand-authoring DSL (`rapid_writer`, `krl_writer`, …). The DSL is the same layer
+you would write by hand to author a program directly — the backend just drives
+it from the IR.
 
 - **`core/`** — the brand-independent spine: the single lowering walk
   (`lower`), the typed event IR (`JointMove`, `CartesianMove`, `Dwell`,
   `WaitDigital`, `SetDigital`, `SetAnalog`, `ToolChange`, `Note`),
   `EmitIdentity` (content-addressed reproducibility), the `ProgramBackend`
-  protocol with `drive()`, and `EmittedProgram`.
+  protocol with `drive()`, `EmittedProgram`, and the shared **DSL skeleton**
+  (`core.dsl`: `Writer`, `Command`, `Block`).
 - **`rapid/`, `krl/`** — per-brand backends. Each owns a pure target formatter,
-  a validated `Profile`, and a stateful backend. ABB RAPID is itself a backend
-  over this core — its golden tests prove the extraction is behaviour-preserving.
+  a validated `Profile`, a hand-authoring **DSL** (`rapid_writer`, `krl_writer`)
+  that specializes `core.dsl`, and a backend that drives that DSL from the IR.
+  ABB RAPID is itself a backend over this core — its golden tests prove the
+  extraction is behaviour-preserving.
+
+### The DSL skeleton (`core.dsl`)
+
+Every brand's hand-authoring DSL is the same shape, captured once:
+
+- `Writer` — an indented code buffer, one singleton per subclass; a brand sets
+  the tab width and leading-newline policy (RAPID: 4 spaces + leading newline;
+  KRL: 2 spaces, none).
+- `Command` — the base every statement/scope class inherits; a brand binds its
+  `Writer` so `MoveL(...)` / `Ptp(...)` write themselves on construction.
+- `Block` — a `<opening> … <closing>` indented `with`-scope (RAPID `Module` /
+  `Proc`, KRL `Def`).
 
 One walk, many backends: `lower()` runs once and the resulting `ProgramIR` can
 drive any number of brand backends.
