@@ -1,0 +1,26 @@
+"""Brand-independent emitter core — typed IR, lowering, shared machinery."""
+
+from .backend import ProgramBackend as ProgramBackend
+from .backend import drive as drive
+from .errors import EmitterError as EmitterError
+from .errors import EmptyProgramError as EmptyProgramError
+from .errors import ExternalAxisError as ExternalAxisError
+from .errors import IdentifierError as IdentifierError
+from .errors import MissingConfigurationError as MissingConfigurationError
+from .errors import MissingProfileError as MissingProfileError
+from .errors import UnsupportedInstructionError as UnsupportedInstructionError
+from .events import CartesianMove as CartesianMove
+from .events import Dwell as Dwell
+from .events import Event as Event
+from .events import JointMove as JointMove
+from .events import MoveKind as MoveKind
+from .events import Note as Note
+from .events import ProgramIR as ProgramIR
+from .events import SetAnalog as SetAnalog
+from .events import SetDigital as SetDigital
+from .events import ToolChange as ToolChange
+from .events import WaitDigital as WaitDigital
+from .identity import EmitIdentity as EmitIdentity
+from .lowering import lower as lower
+from .naming import safe_identifier as safe_identifier
+from .program import EmittedProgram as EmittedProgram
