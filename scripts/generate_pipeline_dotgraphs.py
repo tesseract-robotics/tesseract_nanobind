@@ -85,7 +85,7 @@ def clean_dot_labels(dot_source: str) -> str:
     `DROPPED_LABEL_FIELDS`.
     """
 
-    def _clean(match: re.Match) -> str:
+    def _clean(match: re.Match[str]) -> str:
         segments = re.split(r"\\[nl]", match.group(1))
         kept = [
             seg
@@ -149,7 +149,7 @@ def render_annotated_example(out_dir: Path) -> None:
         .move_to(JointTarget(j_start))
         .move_to(JointTarget(j_end))
     )
-    profiles = create_freespace_pipeline_profiles(planning_time=2.0)
+    profiles = create_freespace_pipeline_profiles(planning_time=2.0)  # seconds (OMPL budget)
 
     forcing = ContactCheckProfile()
     forcing.contact_manager_config = ContactManagerConfig(1.5)
