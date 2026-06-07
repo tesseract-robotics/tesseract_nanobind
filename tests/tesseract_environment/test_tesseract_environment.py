@@ -2,6 +2,7 @@ import os
 import traceback
 
 import numpy as np
+import pytest
 
 from tesseract_robotics import tesseract_environment, tesseract_srdf, tesseract_urdf
 
@@ -79,6 +80,53 @@ def get_environment():
     assert command_applied[0]
 
     return env
+
+
+def _fresh_env():
+    scene_graph = get_scene_graph()
+    srdf = get_srdf_model(scene_graph)
+    env = tesseract_environment.Environment()
+    assert env.init(scene_graph, srdf)
+    return env
+
+
+# GH #43: every case below used to SIGSEGV the interpreter (unchecked name
+# lookup in the state solver). The binding owns the boundary: ValueError.
+def test_set_state_dict_unknown_joint_raises():
+    env = _fresh_env()
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.setState({"not_a_joint": 1.0})
+
+
+def test_set_state_dict_mixed_known_unknown_raises():
+    env = _fresh_env()
+    with pytest.raises(ValueError, match="bogus"):
+        env.setState({"joint_a1": 0.5, "bogus": 1.0})
+
+
+def test_set_state_names_values_unknown_joint_raises():
+    env = _fresh_env()
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.setState(["not_a_joint"], np.array([1.0]))
+
+
+def test_set_state_names_values_length_mismatch_raises():
+    env = _fresh_env()
+    with pytest.raises(ValueError, match="length"):
+        env.setState([f"joint_a{i + 1}" for i in range(7)], np.array([1.0, 2.0]))
+
+
+def test_set_state_by_names_and_values_unknown_joint_raises():
+    env = _fresh_env()
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.setStateByNamesAndValues(["not_a_joint"], np.array([1.0]))
+
+
+def test_set_state_valid_dict_still_works():
+    env = _fresh_env()
+    env.setState({f"joint_a{i + 1}": 0.1 * i for i in range(7)})
+    state = env.getState()
+    assert abs(state.joints["joint_a3"] - 0.2) < 1e-12
 
 
 def test_env():

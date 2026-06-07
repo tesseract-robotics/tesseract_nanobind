@@ -9,6 +9,9 @@
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/set.h>
 
+#include <algorithm>  // std::find (setState validation, GH #43)
+#include <stdexcept>  // std::invalid_argument
+
 // tesseract_environment
 #include <tesseract/environment/environment.h>
 #include <tesseract/environment/events.h>
@@ -60,6 +63,37 @@ namespace te = tesseract::environment;
 namespace tsg = tesseract::scene_graph;
 namespace tc = tesseract::common;
 namespace tk = tesseract::kinematics;
+
+namespace {
+// GH #43: Environment::setState forwards joint names straight into the state
+// solver, which dereferences unknown names unchecked -> SIGSEGV with no Python
+// traceback. The binding owns the Python boundary, so validate here and fail
+// loud (std::invalid_argument -> ValueError). Valid targets are the ACTIVE
+// joints: fixed/mimic joints aren't in the solver's map and crash identically.
+void validate_set_state_joint_names(const te::Environment& env, const std::vector<std::string>& names)
+{
+    const std::vector<std::string> active = env.getActiveJointNames();
+    std::string unknown;
+    for (const auto& name : names) {
+        if (std::find(active.begin(), active.end(), name) == active.end()) {
+            if (!unknown.empty()) unknown += ", ";
+            unknown += name;
+        }
+    }
+    if (!unknown.empty())
+        throw std::invalid_argument("setState: unknown or non-active joint names: " + unknown);
+}
+
+void validate_set_state(const te::Environment& env,
+                        const std::vector<std::string>& names,
+                        const Eigen::Ref<const Eigen::VectorXd>& values)
+{
+    if (static_cast<Eigen::Index>(names.size()) != values.size())
+        throw std::invalid_argument("setState: joint_names length (" + std::to_string(names.size()) +
+                                    ") != joint_values length (" + std::to_string(values.size()) + ")");
+    validate_set_state_joint_names(env, names);
+}
+}  // namespace
 
 // Wrapper for Python event callbacks
 struct PyEventCallbackFn {
@@ -297,17 +331,23 @@ NB_MODULE(_tesseract_environment, m) {
         }, "joint_names"_a, "joint_values"_a)
         .def("setState", [](te::Environment& self,
                             const std::unordered_map<std::string, double>& joints) {
+            std::vector<std::string> names;
+            names.reserve(joints.size());
+            for (const auto& kv : joints) names.push_back(kv.first);
+            validate_set_state_joint_names(self, names);  // GH #43
             self.setState(joints);
         }, "joints"_a)
         .def("setStateByNamesAndValues", [](te::Environment& self,
                                              const std::vector<std::string>& joint_names,
                                              const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
+            validate_set_state(self, joint_names, joint_values);  // GH #43
             self.setState(joint_names, joint_values);
         }, "joint_names"_a, "joint_values"_a)
         // setState with (names, values) - SWIG compatibility
         .def("setState", [](te::Environment& self,
                             const std::vector<std::string>& joint_names,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
+            validate_set_state(self, joint_names, joint_values);  // GH #43
             self.setState(joint_names, joint_values);
         }, "joint_names"_a, "joint_values"_a)
         // Event callbacks
