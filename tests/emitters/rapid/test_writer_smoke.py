@@ -150,7 +150,7 @@ def test_movec_accepts_mixed_inline_and_varname_targets():
 
 def test_target_carries_config_and_external_axis():
     """`RapidTarget.config` and `.external_axis` flow into the emitted robtarget."""
-    from tesseract_robotics.emitters.rapid.rapid_writer import Config, ExternalAxis
+    from tesseract_robotics.emitters.rapid.targets import Config, ExternalAxis
 
     target = RapidTarget(
         Pose.from_xyz_quat([0.5, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]),
@@ -171,7 +171,7 @@ def test_target_carries_config_and_external_axis():
 def test_config_neutral_for_known_robot():
     """`Config.neutral_for("abb_irb2400")` returns the registered known-good
     neutral axis-quadrant config for that robot."""
-    from tesseract_robotics.emitters.rapid.rapid_writer import Config
+    from tesseract_robotics.emitters.rapid.targets import Config
 
     cfg = Config.neutral_for("abb_irb2400")
     assert str(cfg) == "[1, 0, 0, 0]"
@@ -179,7 +179,7 @@ def test_config_neutral_for_known_robot():
 
 def test_config_neutral_for_unknown_robot_raises():
     """Unregistered robot names fail loud with the known-robots list."""
-    from tesseract_robotics.emitters.rapid.rapid_writer import Config
+    from tesseract_robotics.emitters.rapid.targets import Config
 
     with pytest.raises(ValueError, match="no neutral Config registered"):
         Config.neutral_for("unregistered_robot")

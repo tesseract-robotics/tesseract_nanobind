@@ -9,7 +9,7 @@ from tesseract_robotics.emitters.core.events import (
     SetDigital,
 )
 from tesseract_robotics.emitters.rapid.backend import RapidBackend
-from tesseract_robotics.emitters.rapid.rapid_writer import RapidProfile
+from tesseract_robotics.emitters.rapid.profile import RapidProfile
 from tesseract_robotics.planning import Pose
 
 _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")

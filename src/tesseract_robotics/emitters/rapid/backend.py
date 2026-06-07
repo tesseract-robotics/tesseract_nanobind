@@ -26,16 +26,14 @@ from ..core.events import (
     ToolChange,
     WaitDigital,
 )
+from .profile import RapidProfile
 from .rapid_writer import (
     Comment,
-    JointTarget,
     Module,
     MoveAbsJ,
     MoveJ,
     MoveL,
     Proc,
-    RapidProfile,
-    RapidTarget,
     RapidWriter,
     SetAO,
     SetDO,
@@ -43,6 +41,7 @@ from .rapid_writer import (
     WaitDO,
     WaitTime,
 )
+from .targets import JointTarget, RapidTarget
 
 
 def _rapid_signal_name(key: str, index: int) -> str:

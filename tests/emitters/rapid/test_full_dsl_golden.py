@@ -17,8 +17,6 @@ from tesseract_robotics.emitters.rapid import JointTarget, RapidTarget
 from tesseract_robotics.emitters.rapid.rapid_writer import (
     AssignVariable,
     Comment,
-    Config,
-    ExternalAxis,
     For,
     Module,
     MoveAbsJ,
@@ -38,6 +36,7 @@ from tesseract_robotics.emitters.rapid.rapid_writer import (
     Workobject,
     Zone,
 )
+from tesseract_robotics.emitters.rapid.targets import Config, ExternalAxis
 from tesseract_robotics.planning import Pose
 
 GOLDEN = Path(__file__).parent / "golden" / "full_dsl.mod"

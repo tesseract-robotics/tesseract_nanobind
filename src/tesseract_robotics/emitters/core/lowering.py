@@ -1,6 +1,6 @@
 """Lower a tesseract ``CompositeInstruction`` to the brand-free event IR.
 
-The single walk every backend shares — mirrors ``emitters.rapid.dispatch`` but
+The single walk every backend shares — mirrors ``emitters.rapid.emit`` but
 emits typed ``Event`` objects so brand formatting lives downstream. This is the
 anti-corruption layer at the nanobind boundary: loosely-typed binding objects in,
 strictly-typed dataclasses out. One instruction may expand to several events

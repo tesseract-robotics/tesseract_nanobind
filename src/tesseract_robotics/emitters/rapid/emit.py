@@ -18,7 +18,7 @@ from ..core.errors import MissingProfileError as MissingProfileError
 from ..core.errors import UnsupportedInstructionError as UnsupportedInstructionError
 from ..core.lowering import lower
 from .backend import RapidBackend
-from .rapid_writer import RapidProfile
+from .profile import RapidProfile
 
 
 class RapidEmitterError(EmitterError):
