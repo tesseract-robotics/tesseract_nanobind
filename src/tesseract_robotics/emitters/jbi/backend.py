@@ -1,29 +1,30 @@
 """``JbiBackend`` — consume the core IR, emit Yaskawa Motoman INFORM (``.jbi``).
 
-The twin of ``emitters.krl.backend.KrlBackend``, but a ``.jbi`` has **two**
-sections — a ``//POS`` position table and a ``//INST`` instruction body — and
-the position table is written *first* yet only discovered while walking the
-instructions. So this backend accumulates two parallel buffers as the IR
-streams in:
+The structural twin of ``emitters.ls.backend.LsBackend``: a ``.jbi`` has two
+flat sections — a ``//POS`` position table and a ``//INST`` instruction body —
+and the table is written *first* yet only discovered while walking the
+instructions. So, exactly like LS:
 
-- ``_positions`` — the ``C#####`` position tuples (one per move), and
-- ``_lines`` — deferred instruction emitters (closures), each capturing the
-  position index it references.
+1. instruction lines are emitted **eagerly** through the ``jbi_writer`` DSL into
+   the ``JbiWriter`` buffer as the IR streams in (``Movj`` / ``Movl`` / …);
+2. each move's ``C#####`` position tuple is accumulated into ``self._positions``.
 
-``prog_finish`` then drives the ``jbi_writer`` DSL once, in file order:
-``/JOB`` → ``//NAME`` → ``//POS`` (header + table) → ``//INST`` (header + ``NOP``
-+ identity comments + the deferred instruction lines + ``END``).
+``prog_finish`` then assembles the file from a template — ``/JOB`` → ``//NAME``
+→ ``//POS`` (header + table) → ``//INST`` (header + ``NOP``) → the buffered
+instruction body → ``END`` — with a FIXED date so identical inputs produce
+identical bytes. No deferred closures: the buffer already holds the instructions
+in order, and ``//POS`` simply prints ahead of it from the accumulated list.
 
 Joint moves and FREESPACE Cartesian → ``MOVJ`` (joint speed percent); LINEAR →
-``MOVL`` (mm/s). Because v1 writes the position table in ``///POSTYPE PULSE`` as
-joint **degrees** (no encoder-pulse conversion — see ``jbi.targets``), a
-Cartesian move's row needs joint values: ``seed_joints`` supplies them, and a
-Cartesian move without a seed raises ``MissingSeedError`` (never guessed).
+``MOVL`` (mm/s). Because v1 writes the table in ``///POSTYPE PULSE`` as joint
+**degrees** (no encoder-pulse conversion — see ``jbi.targets``), a Cartesian
+move's row needs joint values: ``seed_joints`` supplies them, and a Cartesian
+move without a seed raises ``MissingSeedError`` (never guessed).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from ..core.backend import ProgramBackend
 from ..core.errors import EmitterError, MissingProfileError
@@ -40,29 +41,7 @@ from ..core.events import (
 )
 from ..core.identity import EmitIdentity
 from ..core.naming import safe_identifier
-from .jbi_writer import (
-    Attr,
-    Comm,
-    Comment,
-    Date,
-    End,
-    Group,
-    InstHeader,
-    JbiWriter,
-    Job,
-    Movj,
-    Movl,
-    Name,
-    Nop,
-    NPos,
-    PosHeader,
-    PosType,
-    PosVar,
-    SetOut,
-    TimerInst,
-    Tool,
-    WaitIn,
-)
+from .jbi_writer import Comment, JbiWriter, Movj, Movl, SetOut, TimerInst, WaitIn, pos_var_name
 from .profile import JbiProfile
 from .targets import pulse_pos
 
@@ -76,6 +55,8 @@ _COMM = "tesseract emitters"
 _ATTR = "SC,RW"
 #: ``///GROUP1`` control group (single 6-axis robot in v1).
 _GROUP1 = "RB1"
+#: ``///NPOS`` trailing fixed-zero fields (aux-axis position counts, unused in v1).
+_NPOS_TRAILING = "0,0,0,0,0"
 
 
 class MissingSeedError(EmitterError):
@@ -95,7 +76,7 @@ class MissingSeedError(EmitterError):
 
 
 class JbiBackend(ProgramBackend):
-    """Stateful JBI backend; buffers positions + instructions, assembles at finish."""
+    """Stateful JBI backend; eager ``//INST`` DSL buffer + ``//POS`` list, assembled at finish."""
 
     def __init__(
         self,
@@ -110,7 +91,6 @@ class JbiBackend(ProgramBackend):
         self._jbi = JbiWriter()
         self._tool = self._resolve_tool(profiles)
         self._positions: list[str] = []
-        self._lines: list[Callable[[], None]] = []
         self._move_count = 0
 
     @staticmethod
@@ -141,17 +121,15 @@ class JbiBackend(ProgramBackend):
     def prog_start(self) -> None:
         self._jbi.clear()
         self._positions = []
-        self._lines = []
         self._move_count = 0
         if self._identity is not None:
             for line in self._identity.header_lines():
-                self._lines.append(lambda line=line: Comment(line))
+                Comment(line)
 
     def move_joint(self, m: JointMove) -> None:
         self._move_count += 1
         percent = self._profile(m.profile).joint_speed_percent
-        index = self._add_position(pulse_pos(m.joints))
-        self._lines.append(lambda: Movj(index, percent))
+        Movj(self._add_position(pulse_pos(m.joints)), percent)
 
     def move_cartesian(self, m: CartesianMove) -> None:
         self._move_count += 1
@@ -160,49 +138,58 @@ class JbiBackend(ProgramBackend):
             raise MissingSeedError(self._move_count)
         index = self._add_position(pulse_pos(m.seed_joints))
         if m.kind is MoveKind.LINEAR:
-            speed = profile.linear_speed_mms
-            self._lines.append(lambda: Movl(index, speed))
+            Movl(index, profile.linear_speed_mms)
         else:
-            percent = profile.joint_speed_percent
-            self._lines.append(lambda: Movj(index, percent))
+            Movj(index, profile.joint_speed_percent)
 
     def dwell(self, e: Dwell) -> None:
-        self._lines.append(lambda: TimerInst(e.seconds))
+        TimerInst(e.seconds)
 
     def wait_digital(self, e: WaitDigital) -> None:
-        self._lines.append(lambda: WaitIn(e.index, e.value, is_input=e.is_input))
+        WaitIn(e.index, e.value, is_input=e.is_input)
 
     def set_digital(self, e: SetDigital) -> None:
-        self._lines.append(lambda: SetOut(e.index, e.value))
+        SetOut(e.index, e.value)
 
     def set_analog(self, e: SetAnalog) -> None:
-        self._lines.append(lambda: Comment(f"analog out #{e.index} = {e.value:g} (unsupported)"))
+        Comment(f"analog out #{e.index} = {e.value:g} (unsupported)")
 
     def tool_change(self, e: ToolChange) -> None:
-        self._lines.append(lambda: Comment(f"tool change to tool id {e.tool_id}"))
+        Comment(f"tool change to tool id {e.tool_id}")
 
     def note(self, e: Note) -> None:
-        self._lines.append(lambda: Comment(e.text))
+        Comment(e.text)
 
     def prog_finish(self) -> dict[str, str]:
-        Job()
-        Name(self._name)
+        return {f"{self._name}.jbi": "\n".join(self._assemble()) + "\n"}
 
-        PosHeader()
-        NPos(len(self._positions))
-        Tool(self._tool)
-        PosType()
-        for index, tuple_text in enumerate(self._positions):
-            PosVar(index, tuple_text)
-
-        InstHeader()
-        Date(_FIXED_DATE)
-        Comm(_COMM)
-        Attr(_ATTR)
-        Group(_GROUP1)
-        Nop()
-        for emit_line in self._lines:
-            emit_line()
-        End()
-
-        return {f"{self._name}.jbi": self._jbi.getvalue() + "\n"}
+    # File assembly -----------------------------------------------------
+    def _assemble(self) -> list[str]:
+        """Build the full ``.jbi`` line list: ``/JOB`` + ``//POS`` table + ``//INST`` body."""
+        lines = [
+            "/JOB",
+            f"//NAME {self._name}",
+            "//POS",
+            f"///NPOS {len(self._positions)},{_NPOS_TRAILING}",
+            f"///TOOL {self._tool}",
+            "///POSTYPE PULSE",
+            "///PULSE",
+        ]
+        lines.extend(
+            f"{pos_var_name(i)}={tuple_text}" for i, tuple_text in enumerate(self._positions)
+        )
+        lines.extend(
+            [
+                "//INST",
+                f"///DATE {_FIXED_DATE}",
+                f"///COMM {_COMM}",
+                f"///ATTR {_ATTR}",
+                f"///GROUP1 {_GROUP1}",
+                "NOP",
+            ]
+        )
+        inst_body = self._jbi.getvalue()
+        if inst_body:
+            lines.extend(inst_body.split("\n"))
+        lines.append("END")
+        return lines
