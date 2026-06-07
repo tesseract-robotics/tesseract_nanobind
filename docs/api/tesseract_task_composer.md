@@ -144,6 +144,29 @@ completed = future.waitFor(5000)  # 5 seconds
 context = future.context
 ```
 
+### DOT Graph Export
+
+Every `TaskComposerNode` (pipelines included) exports its task graph as Graphviz DOT, mirroring the C++ `dump()`:
+
+```python
+task = factory.createTaskComposerNode("FreespacePipeline")
+
+# Structure only
+dot = task.getDotgraph()             # DOT source as a string
+task.saveDotgraph("pipeline.dot")    # write to file, returns bool
+
+# Annotated with execution results — pass the run's TaskComposerNodeInfoContainer:
+# successful nodes render green with execution time, failed/aborted nodes red
+future = executor.run(task, data)
+future.wait()
+dot = task.getDotgraph(future.context.task_infos)
+task.saveDotgraph("debug.dot", future.context.task_infos)
+```
+
+Render with graphviz: `dot -Tsvg pipeline.dot -o pipeline.svg`.
+
+See [Visualizing Pipelines](../user-guide/task-composer.md#visualizing-pipelines) for rendered graphs of the stock pipelines.
+
 ## Available Pipelines
 
 ### High-Level API (TaskComposer)

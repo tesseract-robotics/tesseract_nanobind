@@ -171,6 +171,76 @@ from tesseract_robotics.planning import plan_freespace, plan_ompl, plan_cartesia
 result = plan_freespace(robot, program)
 ```
 
+## Visualizing Pipelines
+
+Every `TaskComposerNode` exports its task graph as [Graphviz DOT](https://graphviz.org/) — the same `dump()` mechanism the C++ task composer uses:
+
+```python
+from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
+
+locator = GeneralResourceLocator()
+factory = TaskComposerPluginFactory(FilesystemPath(str(config_path)), locator)
+pipeline = factory.createTaskComposerNode("FreespacePipeline")
+
+dot = pipeline.getDotgraph()             # DOT source as a string
+pipeline.saveDotgraph("pipeline.dot")    # or write it straight to disk
+```
+
+Render to an image with graphviz:
+
+```bash
+dot -Tsvg pipeline.dot -o pipeline.svg
+```
+
+The graphs below are generated exactly this way by `scripts/generate_pipeline_dotgraphs.py` (`pixi run docs-dotgraphs`). Each node lists its type, UUID, and input/output keys; subgraph nodes expand into their own clusters. Click any graph to zoom.
+
+=== "Freespace"
+
+    [![FreespacePipeline DOT graph](../assets/dotgraphs/FreespacePipeline.svg)](../assets/dotgraphs/FreespacePipeline.svg)
+
+=== "Cartesian"
+
+    [![CartesianPipeline DOT graph](../assets/dotgraphs/CartesianPipeline.svg)](../assets/dotgraphs/CartesianPipeline.svg)
+
+=== "TrajOpt"
+
+    [![TrajOptPipeline DOT graph](../assets/dotgraphs/TrajOptPipeline.svg)](../assets/dotgraphs/TrajOptPipeline.svg)
+
+=== "OMPL"
+
+    [![OMPLPipeline DOT graph](../assets/dotgraphs/OMPLPipeline.svg)](../assets/dotgraphs/OMPLPipeline.svg)
+
+=== "Descartes"
+
+    [![DescartesFPipeline DOT graph](../assets/dotgraphs/DescartesFPipeline.svg)](../assets/dotgraphs/DescartesFPipeline.svg)
+
+=== "Raster"
+
+    [![RasterFtPipeline DOT graph](../assets/dotgraphs/RasterFtPipeline.svg)](../assets/dotgraphs/RasterFtPipeline.svg)
+
+### Debugging failed plans
+
+Both methods take an optional `TaskComposerNodeInfoContainer` — pass the run's `task_infos` to overlay execution results on the graph: successful nodes render green with their execution time, failed and aborted nodes render red.
+
+```python
+future = composer.executor.run(task, task_data)
+future.wait()
+
+if not future.context.isSuccessful():
+    # Annotated graph: green = succeeded (+ timing), red = failed/aborted
+    task.saveDotgraph("debug.dot", future.context.task_infos)
+```
+
+This run was aborted by `DiscreteContactCheckTask` — the planners upstream succeeded (green), the contact check flagged the trajectory (red), and the enclosing subgraph reports the abort:
+
+[![Annotated FreespacePipeline DOT graph](../assets/dotgraphs/FreespacePipeline_annotated.svg)](../assets/dotgraphs/FreespacePipeline_annotated.svg)
+
+!!! tip "First stop for a failed plan"
+    `result.message` tells you *that* a plan failed; the annotated DOT graph
+    shows you *where* — including nodes that never ran because an earlier
+    stage aborted the pipeline.
+
 ## Task Types
 
 | Task | Purpose |
