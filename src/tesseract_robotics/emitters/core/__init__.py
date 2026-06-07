@@ -2,6 +2,9 @@
 
 from .backend import ProgramBackend as ProgramBackend
 from .backend import drive as drive
+from .dsl import Block as Block
+from .dsl import Command as Command
+from .dsl import Writer as Writer
 from .errors import EmitterError as EmitterError
 from .errors import EmptyProgramError as EmptyProgramError
 from .errors import ExternalAxisError as ExternalAxisError

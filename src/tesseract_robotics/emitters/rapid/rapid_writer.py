@@ -18,9 +18,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Sequence
-from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
-from io import StringIO
 from typing import ClassVar
 
 import numpy as np
@@ -29,6 +27,7 @@ from numpy.typing import ArrayLike
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.tesseract_common import Quaterniond
 
+from ..core.dsl import Block, Command, Writer
 from .utils import MotionType, RapidType, format_ext_axis, get_quat, get_rapid_bool
 
 logger = logging.getLogger(__name__)
@@ -267,32 +266,23 @@ def _robtarget_str(t: RapidTarget | str) -> str:
 # ---------------------------------------------------------------------------
 
 
-class RapidWriter:
-    """Shared output buffer + indent counter for the RAPID DSL.
+class RapidWriter(Writer):
+    """RAPID code buffer: 4-space indent, leading newline (ABB convention).
 
-    Singleton-via-`__new__`: the first `RapidWriter()` call creates the
-    instance; subsequent calls return the same one. Every `RapidCommand`
-    subclass holds a class-level reference to that instance, so nested
-    `with` blocks all manipulate the same indent level and accumulate into
-    the same buffer. Use `.clear()` to wipe the buffer, indent, and declaration
-    cache between independent emit sessions.
+    Specializes the shared `core.dsl.Writer` with RAPID's tab width and
+    leading-newline policy, plus a declared-name set used by `AssignVariable`
+    to reject assignments to undeclared variables. `.clear()` (inherited) resets
+    everything in place via `_setup`.
     """
 
     _tab: ClassVar[str] = "    "
-    _instance: ClassVar[RapidWriter | None] = None
+    _leading_newline: ClassVar[bool] = True
 
-    buffer: StringIO
-    _indent: int
     _declared_names: set[str]
 
-    def __new__(cls) -> RapidWriter:
-        if cls._instance is None:
-            instance = super().__new__(cls)
-            instance.buffer = StringIO()
-            instance._indent = 0
-            instance._declared_names = set()
-            cls._instance = instance
-        return cls._instance
+    def _setup(self) -> None:
+        super()._setup()
+        self._declared_names = set()
 
     def __enter__(self) -> RapidWriter:
         return self
@@ -300,103 +290,48 @@ class RapidWriter:
     def __exit__(self, *_: object) -> None:
         self.dedent()
 
-    def indent(self) -> None:
-        self._indent += 1
-
-    def dedent(self) -> None:
-        self._indent -= 1
-
-    def write(self, cmd: str) -> None:
-        self.buffer.write("\n" + self._tab * self._indent + cmd)
-
     def declare(self, name: str) -> None:
         self._declared_names.add(name)
 
     def is_declared(self, name: str) -> bool:
         return name in self._declared_names
 
-    def getvalue(self) -> str:
-        return self.buffer.getvalue()
 
-    def clear(self) -> None:
-        """Reset buffer, indent, and declarations on the same singleton instance.
-
-        `RapidCommand.rapid` captures this instance at import time, so
-        `.clear()` (mutate in place) is correct; never replace the singleton
-        via assignment, which would orphan the captured reference.
-        """
-        self.buffer = StringIO()
-        self._indent = 0
-        self._declared_names.clear()
-
-
-class RapidCommand:
-    """Base class for every DSL emitter; all subclasses share the same writer."""
+class RapidCommand(Command):
+    """Base class for every RAPID DSL emitter; bound to the `RapidWriter` singleton."""
 
     # TODO: validate variable name length (RAPID limit is 16 chars) and
     # regex-check that the name is a legal RAPID identifier.
-    rapid: RapidWriter = RapidWriter()
+    writer: ClassVar[RapidWriter] = RapidWriter()
 
 
-class While(RapidCommand, AbstractContextManager["While"]):
+class While(RapidCommand, Block):
     """`WHILE <condition> ... ENDWHILE` block."""
 
     def __init__(self, condition: str) -> None:
         self.condition = condition
-        self.rapid.write(f"WHILE {condition}")
-
-    def __enter__(self) -> While:
-        self.rapid.indent()
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.rapid.dedent()
-        self.rapid.write("ENDWHILE")
+        Block.__init__(self, f"WHILE {condition}", "ENDWHILE")
 
 
-class For(RapidCommand, AbstractContextManager["For"]):
+class For(RapidCommand, Block):
     """`FOR <i> FROM <start> TO <end> DO ... ENDFOR` block."""
 
     def __init__(self, loop_counter: str, start: int, end: int) -> None:
-        self.rapid.write(f"FOR {loop_counter} FROM {start} TO {end} DO")
-
-    def __enter__(self) -> For:
-        self.rapid.indent()
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.rapid.dedent()
-        self.rapid.write("ENDFOR")
+        Block.__init__(self, f"FOR {loop_counter} FROM {start} TO {end} DO", "ENDFOR")
 
 
-class Proc(RapidCommand, AbstractContextManager["Proc"]):
+class Proc(RapidCommand, Block):
     """`PROC <name>() ... ENDPROC` block."""
 
     def __init__(self, name: str) -> None:
-        self.rapid.write(f"PROC {name}()")
-
-    def __enter__(self) -> Proc:
-        self.rapid.indent()
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.rapid.dedent()
-        self.rapid.write("ENDPROC")
+        Block.__init__(self, f"PROC {name}()", "ENDPROC")
 
 
-class Module(RapidCommand, AbstractContextManager["Module"]):
+class Module(RapidCommand, Block):
     """`MODULE <name> ... ENDMODULE` block."""
 
     def __init__(self, name: str) -> None:
-        self.rapid.write(f"MODULE {name}")
-
-    def __enter__(self) -> Module:
-        self.rapid.indent()
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.rapid.dedent()
-        self.rapid.write("ENDMODULE\n")
+        Block.__init__(self, f"MODULE {name}", "ENDMODULE\n")
 
 
 class Robtarget(RapidCommand):
@@ -440,8 +375,8 @@ class Robtarget(RapidCommand):
             f"{target.config},"
             f"{target.external_axis} ];"
         )
-        cls.rapid.write(decl)
-        cls.rapid.declare(varname)
+        cls.writer.write(decl)
+        cls.writer.declare(varname)
         return varname
 
 
@@ -474,7 +409,7 @@ class MoveJ(RapidCommand):
         target: RapidTarget | str,
         profile: RapidProfile = _DEFAULT_PROFILE,
     ) -> None:
-        self.rapid.write(_move_line("MoveJ", _robtarget_str(target), profile))
+        self.writer.write(_move_line("MoveJ", _robtarget_str(target), profile))
 
 
 class MoveL(RapidCommand):
@@ -504,7 +439,7 @@ class MoveL(RapidCommand):
         target: RapidTarget | str,
         profile: RapidProfile = _DEFAULT_PROFILE,
     ) -> None:
-        self.rapid.write(_move_line("MoveL", _robtarget_str(target), profile))
+        self.writer.write(_move_line("MoveL", _robtarget_str(target), profile))
 
 
 class MoveC(RapidCommand):
@@ -526,7 +461,7 @@ class MoveC(RapidCommand):
         end: RapidTarget | str,
         profile: RapidProfile = _DEFAULT_PROFILE,
     ) -> None:
-        self.rapid.write(_movec_line(_robtarget_str(via), _robtarget_str(end), profile))
+        self.writer.write(_movec_line(_robtarget_str(via), _robtarget_str(end), profile))
 
 
 class MoveAbsJ(RapidCommand):
@@ -550,28 +485,28 @@ class MoveAbsJ(RapidCommand):
         target: JointTarget,
         profile: RapidProfile = _DEFAULT_PROFILE,
     ) -> None:
-        self.rapid.write(f"MoveAbsJ {target}, {profile.speed}, {profile.zone}, {profile.tool};")
+        self.writer.write(f"MoveAbsJ {target}, {profile.speed}, {profile.zone}, {profile.tool};")
 
 
 class Comment(RapidCommand):
     """`! <text>` — RAPID line comment."""
 
     def __init__(self, comment: str) -> None:
-        self.rapid.write(f"! {comment}")
+        self.writer.write(f"! {comment}")
 
 
 class TPWrite(RapidCommand):
     """`TPWrite "<text>";` — write a string to the FlexPendant teach pendant."""
 
     def __init__(self, comment: str) -> None:
-        self.rapid.write(f'TPWrite "{comment}";')
+        self.writer.write(f'TPWrite "{comment}";')
 
 
 class Stop(RapidCommand):
     """`Stop;` — halt program execution; resumeable from FlexPendant."""
 
     def __init__(self) -> None:
-        self.rapid.write("Stop;")
+        self.writer.write("Stop;")
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +525,7 @@ class WaitTime(RapidCommand):
     """
 
     def __init__(self, seconds: float) -> None:
-        self.rapid.write(f"WaitTime {seconds};")
+        self.writer.write(f"WaitTime {seconds};")
 
 
 class WaitDI(RapidCommand):
@@ -604,7 +539,7 @@ class WaitDI(RapidCommand):
     """
 
     def __init__(self, signal: str, value: bool = True) -> None:
-        self.rapid.write(f"WaitDI {signal}, {1 if value else 0};")
+        self.writer.write(f"WaitDI {signal}, {1 if value else 0};")
 
 
 class WaitDO(RapidCommand):
@@ -618,7 +553,7 @@ class WaitDO(RapidCommand):
     """
 
     def __init__(self, signal: str, value: bool = True) -> None:
-        self.rapid.write(f"WaitDO {signal}, {1 if value else 0};")
+        self.writer.write(f"WaitDO {signal}, {1 if value else 0};")
 
 
 class SetDO(RapidCommand):
@@ -632,7 +567,7 @@ class SetDO(RapidCommand):
     """
 
     def __init__(self, signal: str, value: bool) -> None:
-        self.rapid.write(f"SetDO {signal}, {1 if value else 0};")
+        self.writer.write(f"SetDO {signal}, {1 if value else 0};")
 
 
 class SetAO(RapidCommand):
@@ -646,7 +581,7 @@ class SetAO(RapidCommand):
     """
 
     def __init__(self, signal: str, value: float) -> None:
-        self.rapid.write(f"SetAO {signal}, {value};")
+        self.writer.write(f"SetAO {signal}, {value};")
 
 
 class Conf(RapidCommand):
@@ -669,7 +604,7 @@ class Conf(RapidCommand):
             )
         keyword = "L" if motion == MotionType.LINEAR else "J"
         switch = r"\On" if on else r"\Off"
-        self.rapid.write(f"Conf{keyword} {switch};")
+        self.writer.write(f"Conf{keyword} {switch};")
 
 
 class Tooldata(RapidCommand):
@@ -701,8 +636,8 @@ class Tooldata(RapidCommand):
             f"[ {_xyz_mm(x, y, z)}, {_quat_wxyz(q_seq)} ], "
             f"[ {_cog_kg(cog, kg)}, [ 1, 0, 0, 0 ], 0, 0, 0 ]"
         )
-        cls.rapid.write(f"PERS tooldata {varname} := [ {stationary}, {body} ];")
-        cls.rapid.declare(varname)
+        cls.writer.write(f"PERS tooldata {varname} := [ {stationary}, {body} ];")
+        cls.writer.declare(varname)
         return ToolName(varname)
 
 
@@ -732,12 +667,12 @@ class Workobject(RapidCommand):
         fixed_str = get_rapid_bool(fixed_coord_sys)
         user_coord = f"[ {_xyz_mm(x, y, z)}, {_quat_wxyz(q)} ]"
         object_coord = "[ [0, 0, 0], [1, 0, 0 ,0] ]"
-        cls.rapid.write(
+        cls.writer.write(
             f"PERS wobjdata {varname} := "
             f'[ {hold_str}, {fixed_str}, "", '
             f"{user_coord}, {object_coord} ];"
         )
-        cls.rapid.declare(varname)
+        cls.writer.declare(varname)
         return WobjName(varname)
 
 
@@ -773,12 +708,12 @@ class Zone(RapidCommand):
         zone_reax: int = 1,
     ) -> ZoneName:
         finepoint_str = get_rapid_bool(finepoint)
-        cls.rapid.write(
+        cls.writer.write(
             f"PERS zonedata {name} := "
             f"[{finepoint_str}, {pzone_tcp}, {pzone_ori}, {pzone_eax}, "
             f"{zone_ori}, {zone_eax}, {zone_reax}];"
         )
-        cls.rapid.declare(name)
+        cls.writer.declare(name)
         return ZoneName(name)
 
 
@@ -800,8 +735,8 @@ class Speed(RapidCommand):
         v_leax: float = 1000.0,
         v_reax: float = 1000.0,
     ) -> SpeedName:
-        cls.rapid.write(f"PERS speeddata {name} := [ {v_tcp}, {v_ori}, {v_leax}, {v_reax} ];")
-        cls.rapid.declare(name)
+        cls.writer.write(f"PERS speeddata {name} := [ {v_tcp}, {v_ori}, {v_leax}, {v_reax} ];")
+        cls.writer.declare(name)
         return SpeedName(name)
 
 
@@ -816,8 +751,8 @@ class Pos(RapidCommand):
     """
 
     def __new__(cls, name: str, x: float, y: float, z: float) -> str:
-        cls.rapid.write(f"PERS pos {name} := [ {x}, {y}, {z} ];")
-        cls.rapid.declare(name)
+        cls.writer.write(f"PERS pos {name} := [ {x}, {y}, {z} ];")
+        cls.writer.declare(name)
         return name
 
 
@@ -832,8 +767,8 @@ class RapidBool(RapidCommand):
     """
 
     def __new__(cls, name: str, value: bool) -> str:
-        cls.rapid.write(f"PERS bool {name} := {get_rapid_bool(value)};")
-        cls.rapid.declare(name)
+        cls.writer.write(f"PERS bool {name} := {get_rapid_bool(value)};")
+        cls.writer.declare(name)
         return name
 
 
@@ -852,7 +787,7 @@ class AssignVariable(RapidCommand):
     """
 
     def __new__(cls, name: str, value: object) -> str:
-        if not cls.rapid.is_declared(name):
+        if not cls.writer.is_declared(name):
             raise NameError(f"cannot assign undeclared RAPID variable {name!r}")
-        cls.rapid.write(f"{name} := {value};")
+        cls.writer.write(f"{name} := {value};")
         return name

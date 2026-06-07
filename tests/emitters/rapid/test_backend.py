@@ -17,7 +17,7 @@ _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")
 
 def _run(events, profiles) -> str:
     backend = RapidBackend(profiles=profiles, module_name="M", proc_name="main")
-    backend.prog_start("M")
+    backend.prog_start()
     for e in events:
         _dispatch(e, backend)
     return next(iter(backend.prog_finish().values()))

@@ -13,6 +13,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ..core.backend import ProgramBackend
 from ..core.errors import MissingProfileError
 from ..core.events import (
     CartesianMove,
@@ -49,7 +50,7 @@ def _rapid_signal_name(key: str, index: int) -> str:
     return key if index == 0 else f"{key}{{{index}}}"
 
 
-class RapidBackend:
+class RapidBackend(ProgramBackend):
     """Stateful RAPID backend; drives the RapidWriter singleton (clears on start)."""
 
     def __init__(
@@ -69,7 +70,7 @@ class RapidBackend:
             raise MissingProfileError(name, list(self._profiles.keys())) from None
 
     # ProgramBackend protocol -------------------------------------------
-    def prog_start(self, name: str) -> None:
+    def prog_start(self) -> None:
         self._rapid.clear()
         self._module = Module(self._module_name)
         self._module.__enter__()

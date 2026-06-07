@@ -14,12 +14,12 @@ from tesseract_robotics.emitters.core.events import (
 )
 
 
-class _RecordingBackend:
+class _RecordingBackend(ProgramBackend):
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def prog_start(self, name: str) -> None:
-        self.calls.append(f"start:{name}")
+    def prog_start(self) -> None:
+        self.calls.append("start")
 
     def move_joint(self, m: JointMove) -> None:
         self.calls.append("joint")
@@ -62,7 +62,7 @@ def test_drive_dispatches_in_order_and_returns_files() -> None:
     )
     backend = _RecordingBackend()
     files = drive(ir, backend)
-    assert backend.calls == ["start:P", "note:hi", "joint", "dwell:2.0", "do:do3=True", "finish"]
+    assert backend.calls == ["start", "note:hi", "joint", "dwell:2.0", "do:do3=True", "finish"]
     assert "OUT.src" in files
 
 

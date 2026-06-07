@@ -22,7 +22,7 @@ from tesseract_robotics.planning import Pose
 
 def _run(events, profiles) -> str:
     backend = KrlBackend(profiles=profiles, program_name="SPIKE")
-    backend.prog_start("SPIKE")
+    backend.prog_start()
     for e in events:
         _dispatch(e, backend)
     return backend.prog_finish()["SPIKE.src"]

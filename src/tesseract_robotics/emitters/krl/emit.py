@@ -29,21 +29,14 @@ def emit_krl(
         program_name: KRL ``DEF`` name; defaults to the composite description.
 
     Returns:
-        An ``EmittedProgram`` with one ``<name>.src`` file; identity lines are
-        inserted as KRL comments right after the ``DEF`` line.
+        An ``EmittedProgram`` with one ``<name>.src`` file; the content-addressed
+        identity is emitted as KRL comment lines at the top of the ``DEF`` body.
 
     Raises:
         EmptyProgramError, MissingProfileError, UnsupportedInstructionError.
     """
     ir = lower(composite)
     name = program_name or ir.name
-    backend = KrlBackend(profiles=profiles, program_name=name)
-    files = drive(ir, backend)
-
     identity = EmitIdentity.build(ir, profiles_repr=repr(sorted(profiles.items())))
-    header = "\n".join(f"; {ln}" for ln in identity.header_lines())
-    out: dict[str, str] = {}
-    for filename, body in files.items():
-        def_line, _, rest = body.partition("\n")
-        out[filename] = f"{def_line}\n{header}\n{rest}"
-    return EmittedProgram(files=out)
+    backend = KrlBackend(profiles=profiles, program_name=name, identity=identity)
+    return EmittedProgram(files=drive(ir, backend))
