@@ -15,6 +15,7 @@ Requires graphviz (`dot`) on PATH and the built tesseract_robotics package.
 """
 
 import argparse
+import re
 import shutil
 import subprocess
 from os import environ
@@ -55,9 +56,60 @@ DOCUMENTED_PIPELINES = (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT_DIR = REPO_ROOT / "docs" / "assets" / "dotgraphs"
 
+# dump() emits debug-grade labels; these fields are noise in documentation
+# graphs. The I/O key maps are near-identical on every node (profiles/
+# environment identity mappings), so they go too. Kept: task name, and on
+# annotated graphs Time + Status Msg.
+DROPPED_LABEL_FIELDS = (
+    "Type:",
+    "UUID:",
+    "Namespace:",
+    "Abort Terminal:",
+    "Conditional:",
+    "Status Code:",
+    "Inputs:",
+    "Outputs:",
+)
+
+# DOT label value: quoted string with backslash escapes (handles \" inside).
+# dump() emits node labels as `label="..."` but cluster labels as `label = "..."`.
+_LABEL_RE = re.compile(r'label\s*=\s*"((?:[^"\\]|\\.)*)"')
+
+
+def clean_dot_labels(dot_source: str) -> str:
+    """Strip debug-only fields from `dump()` node labels for docs rendering.
+
+    Graph structure (nodes, edges, shapes, colors) is untouched — only the
+    label text shrinks. Segments are separated by DOT's ``\\n`` / ``\\l``
+    escapes; a segment is dropped when it starts with one of
+    `DROPPED_LABEL_FIELDS`.
+    """
+
+    def _clean(match: re.Match) -> str:
+        segments = re.split(r"\\[nl]", match.group(1))
+        kept = [
+            seg
+            for seg in segments
+            if seg.strip()
+            and not seg.startswith("\t")  # I/O key lines are tab-indented
+            and not seg.lstrip().startswith(DROPPED_LABEL_FIELDS)
+        ]
+        if not kept:
+            return 'label=""'
+        title, *rest = kept
+        if not rest:
+            return f'label="{title}"'
+        body = "".join(f"{seg}\\l" for seg in rest)
+        return f'label="{title}\\n{body}"'
+
+    return _LABEL_RE.sub(_clean, dot_source)
+
 
 def render_svg(dot_source: str, out_svg: Path) -> None:
     """Render DOT source to an SVG file via graphviz `dot`.
+
+    Labels are passed through `clean_dot_labels` first — this script renders
+    documentation graphs, not debug dumps.
 
     Args:
         dot_source: DOT graph text as returned by `TaskComposerNode.getDotgraph()`.
@@ -71,7 +123,7 @@ def render_svg(dot_source: str, out_svg: Path) -> None:
     # graphviz's black-on-transparent text unreadably.
     subprocess.run(
         ["dot", "-Tsvg", "-Gbgcolor=white", "-o", str(out_svg)],
-        input=dot_source.encode(),
+        input=clean_dot_labels(dot_source).encode(),
         check=True,
     )
 
