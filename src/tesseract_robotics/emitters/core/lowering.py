@@ -12,9 +12,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.tesseract_command_language import (
+    CartesianWaypointPoly,
     CompositeInstruction,
     InstructionPoly,
     MoveInstructionPoly,
@@ -39,6 +41,19 @@ from .events import (
     WaitDigital,
 )
 
+#: ``ProgramIR`` name used when the ``CompositeInstruction`` has no description.
+_DEFAULT_PROGRAM_NAME = "program"
+#: Wait-instruction members that block on an *input* (vs an output) signal.
+#: Compared explicitly rather than substring-sniffing ``kind.name`` — an upstream
+#: enum rename would silently invert a name-sniff, but breaks this loudly.
+_WAIT_INPUT_TYPES = frozenset(
+    {WaitInstructionType.DIGITAL_INPUT_HIGH, WaitInstructionType.DIGITAL_INPUT_LOW}
+)
+#: Wait-instruction members that block until the signal is *HIGH* (vs LOW).
+_WAIT_HIGH_TYPES = frozenset(
+    {WaitInstructionType.DIGITAL_INPUT_HIGH, WaitInstructionType.DIGITAL_OUTPUT_HIGH}
+)
+
 
 def lower(composite: CompositeInstruction) -> ProgramIR:
     """Walk ``composite`` → ``ProgramIR``. Raises ``EmptyProgramError`` if no leaves."""
@@ -48,7 +63,7 @@ def lower(composite: CompositeInstruction) -> ProgramIR:
     events: list[Event] = []
     for instr in leaves:
         events.extend(_lower_instruction(instr))
-    return ProgramIR(name=composite.getDescription() or "program", events=tuple(events))
+    return ProgramIR(name=composite.getDescription() or _DEFAULT_PROGRAM_NAME, events=tuple(events))
 
 
 def _walk(composite: CompositeInstruction) -> Iterator[InstructionPoly]:
@@ -66,14 +81,14 @@ def _lower_instruction(instr: InstructionPoly) -> list[Event]:
 
     if instr.isWaitInstruction():
         wait = instr.asWaitInstruction()
-        if wait.getWaitType() == WaitInstructionType.TIME:
-            return [Dwell(seconds=float(wait.getWaitTime()))]
         kind = wait.getWaitType()
+        if kind == WaitInstructionType.TIME:
+            return [Dwell(seconds=float(wait.getWaitTime()))]
         return [
             WaitDigital(
-                is_input="INPUT" in kind.name,
+                is_input=kind in _WAIT_INPUT_TYPES,
                 index=int(wait.getWaitIO()),
-                value="HIGH" in kind.name,
+                value=kind in _WAIT_HIGH_TYPES,
                 timeout=None,
             )
         ]
@@ -135,10 +150,12 @@ def _lower_move(move: MoveInstructionPoly) -> Event:
     )
 
 
-def _seed_joints(cart) -> tuple[float, ...] | None:
+def _seed_joints(cart: CartesianWaypointPoly) -> tuple[float, ...] | None:
+    """The waypoint's IK seed as a radians tuple, or ``None`` if it carries none."""
     pos = np.asarray(cart.getSeed().position, dtype=np.float64).ravel()
     return tuple(float(v) for v in pos) if pos.size else None
 
 
-def _to_tuple(values) -> tuple[float, ...]:
+def _to_tuple(values: ArrayLike) -> tuple[float, ...]:
+    """Flatten an array-like of joint values to a plain float tuple (radians)."""
     return tuple(float(v) for v in np.asarray(values, dtype=np.float64).ravel())
