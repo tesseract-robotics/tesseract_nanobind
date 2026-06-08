@@ -97,7 +97,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Development
 
-This project uses [pixi](https://pixi.sh) exclusively for dependency management and task running — no pip, conda, or venv needed. Pixi manages the build toolchain (cmake, ninja, nanobind), the prebuilt tesseract C++ libraries (from the `tesseract-robotics` conda channel), and Python deps in a single lockfile.
+This project uses [pixi](https://pixi.sh) exclusively for dependency management and task running — no pip, conda, or venv needed. Pixi manages the build toolchain (cmake, ninja, nanobind), the prebuilt tesseract C++ libraries (from the [`tesseract-robotics` conda channel](https://github.com/tesseract-robotics-packaging)), and Python deps in a single lockfile.
 
 ### Prerequisites
 

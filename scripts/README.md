@@ -5,7 +5,7 @@ Development scripts for tesseract_python_nanobind.
 ## Setup
 
 The tesseract C++ libraries are no longer built from source — they come prebuilt
-from the `tesseract-robotics` conda channel (declared in `pyproject.toml`). Just
+from the [`tesseract-robotics` conda channel](https://github.com/tesseract-robotics-packaging) (declared in `pyproject.toml`). Just
 `pixi run install` (editable) or `pixi run build-wheel` (portable wheel); pixi
 installs the C++ libs into the env automatically.
 
