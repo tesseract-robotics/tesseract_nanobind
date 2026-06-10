@@ -59,10 +59,16 @@ reintroduce it.
 The conda-forge-built tesseract libs need a gcc-13+ era libstdc++
 (`GLIBCXX_3.4.32`-ish): ubuntu 24.04+, debian 13+, fedora 38+, or any
 conda/pixi env. On older distros the wheel imports fail loudly with a
-missing-`GLIBCXX` error — by design; that is strictly better than the silent
-corruption it replaces. The `manylinux_2_35` platform tag encodes only the
-glibc floor, not libstdc++, so pip will install on e.g. ubuntu 22.04 and fail
-at import.
+missing-`GLIBCXX`/`CXXABI` error — by design; that is strictly better than the
+silent corruption it replaces. The `manylinux_2_35` platform tag encodes only
+the glibc floor, not libstdc++, so pip will install on e.g. ubuntu 22.04 and
+fail at import.
+
+**Wheel inside a conda/pixi env on an old distro:** the env carries a suitable
+libstdc++ at `$CONDA_PREFIX/lib`, but env activation does not put it on the
+loader path for foreign (pip-installed) wheels — export
+`LD_LIBRARY_PATH="$CONDA_PREFIX/lib"` (the ABI canary in `wheels-linux.yml`
+does exactly this on its 22.04 build host).
 
 ## Plugin bundling
 

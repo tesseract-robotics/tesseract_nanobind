@@ -81,9 +81,14 @@ jobs:
     # ~30s instead of surfacing as scattered segfaults in test-wheel 15 min later.
     - name: wheel ABI canary (kinematics)
       working-directory: tesseract_nanobind
+      # gh-119: wheels no longer bundle libstdc++, and this build host (old-glibc
+      # 22.04 for the manylinux tag) ships one too old for the gcc-14-built libs.
+      # The pixi env provides the right copy, but its activation doesn't expose
+      # $CONDA_PREFIX/lib to foreign wheels — put it on the loader path, which is
+      # the documented contract for conda envs on pre-gcc-13 distros.
       run: |
         pixi run pip install --force-reinstall --no-deps wheelhouse/tesseract*.whl
-        pixi run python -m pytest tests/tesseract_kinematics -x -q
+        pixi run bash -c 'LD_LIBRARY_PATH="$CONDA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" python -m pytest tests/tesseract_kinematics -x -q'
     - name: archive wheels
       uses: actions/upload-artifact@v4
       with:
