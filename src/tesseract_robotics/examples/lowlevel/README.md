@@ -22,6 +22,7 @@ These examples demonstrate the raw nanobind API - a 1:1 mapping of the C++ Tesse
 | `tesseract_kinematics_c_api_example.py` | Kinematics groups |
 | `tesseract_planning_lowlevel_c_api_example.py` | Planning without TaskComposer |
 | `tesseract_planning_composer_c_api_example.py` | TaskComposer usage |
+| `descartes_raster_c_api_example.py` | Descartes raster + TrajOpt refinement (port of C++ raster_example.cpp) |
 
 ## When to Use Low-Level API
 

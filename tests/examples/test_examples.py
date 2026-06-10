@@ -198,5 +198,11 @@ def test_lowlevel_planning_lowlevel_example():
 
 @pytest.mark.lowlevel
 @pytest.mark.planning
+def test_lowlevel_descartes_raster_example():
+    tesseract_robotics.examples.descartes_raster_c_api_example()
+
+
+@pytest.mark.lowlevel
+@pytest.mark.planning
 def test_lowlevel_trajopt_ifopt_example():
     tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()
