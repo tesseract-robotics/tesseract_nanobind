@@ -16,7 +16,6 @@ Priority: Bundled data (installed) > Dev workspace (editable) > User env vars
 
 from __future__ import annotations
 
-import ctypes
 import hashlib
 import json
 import os
@@ -27,28 +26,15 @@ from pathlib import Path
 
 from loguru import logger
 
-# Linux: preload the bundled libstdc++ BEFORE anything can pull in the system one.
-# (Everything imported above this point is stdlib or pure python — no libstdc++.)
-#
-# The wheels bundle libstdc++.so.6 (the prebuilt tesseract conda libs are built with
-# gcc 13/14 and need GLIBCXX > what e.g. ubuntu 22.04 ships), but numpy/scipy link
-# the SYSTEM libstdc++ (manylinux-whitelisted, never vendored). ld.so dedupes by
-# SONAME: whichever copy enters the link map first serves every later request. If
-# numpy loads first on an old distro, our libs bind to the too-old system copy and
-# die with "GLIBCXX_3.4.31 not found" (GH #35). Loading our newer copy RTLD_GLOBAL
-# here wins the race for any process that imports tesseract_robotics before numpy —
-# libstdc++ is forward-compatible, so numpy/scipy are happy binding to it. No-op for
-# editable installs (no bundled copy) and for processes where numpy already won
-# (unchanged from today's behavior).
-#
-# Conda envs are excluded: there the env's own libstdc++ is canonical and already
-# new enough (the C++ stack comes from the same solve), and force-loading a second
-# copy RTLD_GLOBAL alongside it segfaulted the wheel-in-pixi-env ABI canary on
-# aarch64. The rescue is only for non-conda hosts (bare venvs, system python, Rhino).
-if sys.platform == "linux" and "CONDA_PREFIX" not in os.environ:
-    _bundled_libstdcxx = Path(__file__).parent / "libstdc++.so.6"
-    if _bundled_libstdcxx.is_file():
-        ctypes.CDLL(str(_bundled_libstdcxx), mode=ctypes.RTLD_GLOBAL)
+# Linux: libstdc++ is intentionally NOT bundled in the wheels, and never
+# preloaded. Two libstdc++ copies in one process (bundled via $ORIGIN rpath +
+# system via numpy/scipy) unify their STB_GNU_UNIQUE locale statics across
+# copies, and std::regex corrupts the heap during Environment.init — see
+# docs/developer/linux-wheels.md (gh-119; supersedes the GH #35 preload, whose
+# "two copies coexist safely" premise was falsified). The host or conda/pixi
+# env must provide a gcc-13+ era libstdc++ (ubuntu 24.04+, debian 13+); older
+# distros fail at import with a clear missing-GLIBCXX error instead of
+# corrupting silently.
 
 # Windows: extend the DLL search path before any C extension import.
 #

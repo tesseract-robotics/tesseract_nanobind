@@ -108,6 +108,12 @@ sort -u "$deps_file" | while read -r dep; do
     base=$(basename "$dep")
     case "$base" in
         libpython*) continue ;;
+        # gcc runtime is manylinux-whitelisted: it MUST come from the host/env,
+        # never the wheel. Bundling libstdc++ put two copies in every
+        # numpy-importing process; their STB_GNU_UNIQUE locale statics unify
+        # across copies and std::regex corrupts the heap during env.init.
+        # See docs/developer/linux-wheels.md (gh-119).
+        libstdc++*|libgcc_s*) continue ;;
     esac
     if [[ ! -f "$PKG_DIR/$base" ]]; then
         # pip dereferences symlinks on extract, so ship the real file (cp -L) under
