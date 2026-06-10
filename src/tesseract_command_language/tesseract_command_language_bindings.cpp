@@ -43,6 +43,10 @@ namespace tc = tesseract::common;
 NB_MODULE(_tesseract_command_language, m) {
     m.doc() = "tesseract_command_language Python bindings";
 
+    // ManipulatorInfo is used as a default argument value below — its type
+    // must be registered before this module's defs are created.
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // ========== JointWaypoint ==========
     nb::class_<tp::JointWaypoint>(m, "JointWaypoint")
         .def(nb::init<>())
@@ -504,6 +508,10 @@ NB_MODULE(_tesseract_command_language, m) {
     nb::class_<tp::CompositeInstruction>(m, "CompositeInstruction")
         .def(nb::init<>())
         .def(nb::init<std::string>(), "profile"_a)  // SWIG-compatible constructor
+        // Full C++ ctor — e.g. raster transition composites need order=UNORDERED
+        .def(nb::init<std::string, tesseract::common::ManipulatorInfo, tp::CompositeInstructionOrder>(),
+             "profile"_a, "manipulator_info"_a = tesseract::common::ManipulatorInfo(),
+             "order"_a = tp::CompositeInstructionOrder::ORDERED)
         .def("getOrder", &tp::CompositeInstruction::getOrder)
         .def("getDescription", &tp::CompositeInstruction::getDescription)
         .def("setDescription", &tp::CompositeInstruction::setDescription, "description"_a)
