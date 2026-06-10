@@ -125,12 +125,15 @@ line-length = 100
 extend-exclude = ["*.pyi"] # auto-generated stubs have C++ type strings
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"] # errors, pyflakes, isort, pyupgrade
-ignore = ["E501"]              # line too long (handled by formatter)
+# FA102: PEP 604 unions need `from __future__ import annotations` on the py39 floor (gh-92)
+select = ["E", "F", "I", "UP", "FA102"] # errors, pyflakes, isort, pyupgrade, py39 unions
+ignore = ["E501"]                       # line too long (handled by formatter)
 
 [tool.ruff.lint.per-file-ignores]
 # nanobind extension modules use star imports - ruff can't see into .so files
 "src/tesseract_robotics/tesseract_*/__init__.py" = ["F403", "F405"]
+# examples __init__.py re-export run()/main() entry points for REPL/`python -m` use
+"src/tesseract_robotics/examples/**/__init__.py" = ["F401", "F403", "I001"]
 
 [tool.ruff.format]
 quote-style = "double"

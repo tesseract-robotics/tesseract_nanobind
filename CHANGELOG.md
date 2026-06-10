@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - **`get_task_composer_config_path()` resolves like the runtime** — returns the `@PLUGIN_PATH@`-patched config that `_configure_environment()` publishes via `TESSERACT_TASK_COMPOSER_CONFIG_FILE` (env var → bundled data → conda share) instead of unconditionally returning the bundled-only path, which doesn't exist in dev envs and was unpatched in wheels; raises the new `TaskComposerConfigNotFoundError` when nothing resolves; the hand-rolled fallback chains in the task composer tests, `TaskComposer.from_config`, and `scripts/generate_pipeline_dotgraphs.py` now delegate to it ([#110]).
+- **ruff enforces the py39 floor** — `FA102` added to lint select so PEP 604 unions without `from __future__ import annotations` fail the hooks; with `target-version = "py39"` (rejects 3.10+ syntax) this turns 3.9 compatibility from convention into a gate ([#92]).
 
 ## [0.35.0.4] - 2026-06-08 — conda-forge C++ deps + OSQP tunability + Linux libstdc++ preload + CI hardening
 
