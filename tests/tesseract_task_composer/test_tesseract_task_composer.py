@@ -1,8 +1,6 @@
 """Tests for tesseract_task_composer bindings."""
 
 import gc
-import os
-from pathlib import Path
 
 import pytest
 
@@ -16,25 +14,8 @@ from tesseract_robotics.tesseract_task_composer import (
 
 
 def _resolve_task_composer_config():
-    """Resolve task composer plugin config via env var, package data, or workspace."""
-    env_cfg = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
-    if env_cfg and Path(env_cfg).is_file():
-        return env_cfg
-
-    pkg_config = tesseract_robotics.get_task_composer_config_path()
-    if pkg_config.is_file():
-        return str(pkg_config)
-
-    conda_prefix = os.environ.get("CONDA_PREFIX")
-    if conda_prefix:
-        ws_config = (
-            Path(conda_prefix)
-            / "share/tesseract_planning/task_composer/config/task_composer_plugins.yaml"
-        )
-        if ws_config.is_file():
-            return str(ws_config)
-
-    return None
+    """Resolved task composer plugin config via the package helper (gh-110)."""
+    return str(tesseract_robotics.get_task_composer_config_path())
 
 
 class TestTaskComposerPluginFactory:
@@ -42,36 +23,7 @@ class TestTaskComposerPluginFactory:
 
     def test_create_factory_and_nodes(self):
         """Test factory creation and pipeline node creation."""
-        from pathlib import Path
-
-        # Try multiple fallbacks to find config
-        config_file = None
-
-        # 1. Try env var first (may be set by test runner)
-        env_cfg = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
-        if env_cfg and Path(env_cfg).is_file():
-            config_file = env_cfg
-
-        # 2. Try package bundled config (installed wheels)
-        if not config_file:
-            pkg_config = tesseract_robotics.get_task_composer_config_path()
-            if pkg_config.is_file():
-                config_file = str(pkg_config)
-
-        # 3. Editable install: config ships with the tesseract-robotics conda pkg
-        if not config_file:
-            conda_prefix = os.environ.get("CONDA_PREFIX")
-            if conda_prefix:
-                ws_config = (
-                    Path(conda_prefix)
-                    / "share/tesseract_planning/task_composer/config/task_composer_plugins.yaml"
-                )
-                if ws_config.is_file():
-                    config_file = str(ws_config)
-
-        assert config_file and Path(config_file).is_file(), (
-            "No task composer config found. Tried env var, package config, and workspace"
-        )
+        config_file = _resolve_task_composer_config()
         config_path = FilesystemPath(config_file)
         locator = GeneralResourceLocator()
         factory = TaskComposerPluginFactory(config_path, locator)
@@ -99,8 +51,6 @@ class TestTaskComposerPluginFactory:
 
     def test_all_pipelines_loadable(self):
         """Test all 36 expected pipelines are loadable via the factory."""
-        from pathlib import Path
-
         # Explicit list of all 36 pipelines that must be loadable
         EXPECTED_PIPELINES = [
             # Core pipelines
@@ -144,25 +94,7 @@ class TestTaskComposerPluginFactory:
             "RasterFtTask",
         ]
 
-        # Get config file (same fallback logic as test_create_factory_and_nodes)
-        config_file = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
-        if not config_file or not Path(config_file).is_file():
-            pkg_config = tesseract_robotics.get_task_composer_config_path()
-            if pkg_config.is_file():
-                config_file = str(pkg_config)
-
-        if not config_file:
-            conda_prefix = os.environ.get("CONDA_PREFIX")
-            if conda_prefix:
-                ws_config = (
-                    Path(conda_prefix)
-                    / "share/tesseract_planning/task_composer/config/task_composer_plugins.yaml"
-                )
-                if ws_config.is_file():
-                    config_file = str(ws_config)
-
-        assert config_file and Path(config_file).is_file(), "No task composer config found"
-
+        config_file = _resolve_task_composer_config()
         locator = GeneralResourceLocator()
         factory = TaskComposerPluginFactory(FilesystemPath(config_file), locator)
 
@@ -410,8 +342,6 @@ class TestPipelineDataStorageExposure:
         pytest.importorskip("tesseract_robotics.planning")
 
         config_file = _resolve_task_composer_config()
-        if not config_file:
-            pytest.skip("No task composer config found")
 
         from tesseract_robotics.planning import (
             JointTarget,

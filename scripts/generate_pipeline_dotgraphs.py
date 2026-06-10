@@ -18,14 +18,14 @@ import argparse
 import re
 import shutil
 import subprocess
-from os import environ
 from pathlib import Path
 
 import numpy as np
 from loguru import logger
 
-# Importing the package resolves TESSERACT_TASK_COMPOSER_CONFIG_FILE for both
-# installed wheels (bundled data) and dev envs (conda share/).
+# get_task_composer_config_path resolves the config for both installed wheels
+# (bundled data) and dev envs (conda share/), raising if neither exists (gh-110).
+from tesseract_robotics import get_task_composer_config_path
 from tesseract_robotics.planning import JointTarget, MotionProgram, Robot, TaskComposer
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
 from tesseract_robotics.tesseract_collision import (
@@ -199,15 +199,7 @@ def main() -> None:
             "(e.g. `brew install graphviz` / `apt install graphviz`)"
         )
 
-    config_file = environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
-    if not config_file:
-        raise FileNotFoundError(
-            "TESSERACT_TASK_COMPOSER_CONFIG_FILE not set — importing "
-            "tesseract_robotics should have resolved it (broken install?)"
-        )
-    config = Path(config_file)
-    if not config.is_file():
-        raise FileNotFoundError(f"task composer config not found: {config}")
+    config = get_task_composer_config_path()
 
     factory = TaskComposerPluginFactory(FilesystemPath(str(config)), GeneralResourceLocator())
 

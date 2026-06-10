@@ -267,9 +267,29 @@ def get_tesseract_support_path() -> Path:
     return Path(__file__).parent / "data" / "tesseract" / "support"
 
 
+class TaskComposerConfigNotFoundError(FileNotFoundError):
+    """No task composer config found via env var, bundled data, or conda share."""
+
+
 def get_task_composer_config_path() -> Path:
-    """Get path to bundled task composer config file."""
-    return Path(__file__).parent / "data" / "task_composer_config" / "task_composer_plugins.yaml"
+    """Get the resolved task composer plugin config file.
+
+    Resolution is owned by `_configure_environment()` (env var → bundled data →
+    conda share, with plugin-path placeholders patched) and published via
+    TESSERACT_TASK_COMPOSER_CONFIG_FILE; this returns that single source of
+    truth as a `Path`.
+
+    Raises:
+        TaskComposerConfigNotFoundError: nothing resolves to an existing file.
+    """
+    ensure_configured()
+    env_cfg = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
+    if env_cfg and Path(env_cfg).is_file():
+        return Path(env_cfg)
+    raise TaskComposerConfigNotFoundError(
+        f"no task composer config found (TESSERACT_TASK_COMPOSER_CONFIG_FILE={env_cfg!r}); "
+        "checked env var, bundled data/task_composer_config/, and $CONDA_PREFIX share"
+    )
 
 
 # Run at import of tesseract_robotics itself so env vars are set before any

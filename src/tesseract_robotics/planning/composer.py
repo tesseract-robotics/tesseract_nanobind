@@ -295,14 +295,16 @@ class TaskComposer:
                         config_path = str(nested)
 
         if config_path is None:
-            # Last resort: use bundled config
-            from tesseract_robotics import get_task_composer_config_path
+            # Last resort: package helper (env var → bundled data → conda share)
+            from tesseract_robotics import (
+                TaskComposerConfigNotFoundError,
+                get_task_composer_config_path,
+            )
 
-            bundled = get_task_composer_config_path()
-            if bundled:
-                tried_paths.append(f"bundled config: {bundled}")
-                if bundled.is_file():
-                    config_path = str(bundled)
+            try:
+                config_path = str(get_task_composer_config_path())
+            except TaskComposerConfigNotFoundError as e:
+                tried_paths.append(str(e))
 
         if config_path is None:
             paths_tried = "\n  - ".join(tried_paths) if tried_paths else "(none)"

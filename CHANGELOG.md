@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **`get_task_composer_config_path()` resolves like the runtime** — returns the `@PLUGIN_PATH@`-patched config that `_configure_environment()` publishes via `TESSERACT_TASK_COMPOSER_CONFIG_FILE` (env var → bundled data → conda share) instead of unconditionally returning the bundled-only path, which doesn't exist in dev envs and was unpatched in wheels; raises the new `TaskComposerConfigNotFoundError` when nothing resolves; the hand-rolled fallback chains in the task composer tests, `TaskComposer.from_config`, and `scripts/generate_pipeline_dotgraphs.py` now delegate to it ([#110]).
+
 ## [0.35.0.4] - 2026-06-08 — conda-forge C++ deps + OSQP tunability + Linux libstdc++ preload + CI hardening
 
 - **OSQP solver settings exposed** — `OSQPEigenSolver` gains seven tunable setters (`setPolish`, `setWarmStart`, `setAdaptiveRho`, `setMaxIteration`, `setAbsoluteTolerance`, `setRelativeTolerance`, `setVerbosity`) and `TrajOptIfoptOSQPSolverProfile` gains `setAdaptiveRhoInterval`, enabling iteration-based (deterministic) rho adaptation for reproducible SQP solves; fixes dangling-pointer segfault in `getJacobian()` via `rv_policy::reference_internal` on `getVar`/`getNode`/`getNodes` ([0f40048], [c984044], [c083f5e], [#103]).
