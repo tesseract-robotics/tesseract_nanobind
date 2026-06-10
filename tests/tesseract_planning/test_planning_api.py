@@ -1133,6 +1133,83 @@ class TestTaskComposer:
         assert len(result) > 0
 
 
+class TestDescartesPipeline:
+    """High-level Descartes pipeline support (gh-85)."""
+
+    @pytest.fixture
+    def robot(self):
+        return Robot.from_tesseract_support("abb_irb2400")
+
+    @staticmethod
+    def _raster_program(robot):
+        """Two-waypoint tool-down raster pass, proven reachable for abb_irb2400
+        (same poses as tests/tesseract_motion_planners/test_descartes_planner.py)."""
+        joint_names = robot.get_joint_names("manipulator")
+        robot.set_joints(np.zeros(6), joint_names=joint_names)
+        tool_down = [0.0, -1.0, 0.0, 0.0]  # scalar-last [qx, qy, qz, qw]
+        return (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, -0.2, 0.8], tool_down)))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 0.8], tool_down)))
+        )
+
+    def test_descartes_pipeline_plan(self, robot):
+        """DescartesFPipeline solves a Cartesian program through the high-level API."""
+        from tesseract_robotics.planning import TaskComposer, create_descartes_pipeline_profiles
+
+        profiles = create_descartes_pipeline_profiles()
+        composer = TaskComposer.from_config()
+        result = composer.plan(
+            robot, self._raster_program(robot), pipeline="DescartesFPipeline", profiles=profiles
+        )
+        assert result.successful, f"DescartesFPipeline failed: {result.message}"
+        assert len(result) > 0
+
+    def test_descartes_pipeline_axis_sampling(self, robot):
+        """Rotation sampling about the tool axis (axis-symmetric process) plans."""
+        from tesseract_robotics.planning import TaskComposer, create_descartes_pipeline_profiles
+
+        profiles = create_descartes_pipeline_profiles(
+            sample_axis=(0, 0, 1),
+            sample_resolution=np.radians(30),
+        )
+        composer = TaskComposer.from_config()
+        result = composer.plan(
+            robot, self._raster_program(robot), pipeline="DescartesFPipeline", profiles=profiles
+        )
+        assert result.successful, f"axis-sampled DescartesFPipeline failed: {result.message}"
+
+    def test_descartes_custom_move_profile(self, robot):
+        """A user-supplied DescartesMoveProfileD flows through the high-level API (gh-83)."""
+        from tesseract_robotics.planning import TaskComposer, create_descartes_pipeline_profiles
+        from tesseract_robotics.tesseract_motion_planners_descartes import (
+            DescartesDefaultMoveProfileD,
+        )
+
+        custom = DescartesDefaultMoveProfileD()
+        custom.use_redundant_joint_solutions = True
+
+        profiles = create_descartes_pipeline_profiles(move_profile=custom)
+        composer = TaskComposer.from_config()
+        result = composer.plan(
+            robot, self._raster_program(robot), pipeline="DescartesFPipeline", profiles=profiles
+        )
+        assert result.successful, f"custom-profile DescartesFPipeline failed: {result.message}"
+
+    def test_move_profile_conflicts_with_knobs(self):
+        """move_profile is a full override — combining it with knobs fails loud."""
+        from tesseract_robotics.planning import create_descartes_pipeline_profiles
+        from tesseract_robotics.tesseract_motion_planners_descartes import (
+            DescartesDefaultMoveProfileD,
+        )
+
+        with pytest.raises(ValueError, match="move_profile"):
+            create_descartes_pipeline_profiles(
+                move_profile=DescartesDefaultMoveProfileD(), ik_solver="OPWInvKin"
+            )
+
+
 class TestProfileCreation:
     """Tests for profile factory functions."""
 

@@ -537,9 +537,16 @@ DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 
 def create_descartes_default_profiles(
     profile_names: list[str] | None = None,
-    enable_collision: bool = True,
-    enable_edge_collision: bool = False,
+    enable_collision: bool | None = None,
+    enable_edge_collision: bool | None = None,
     num_threads: int | None = None,
+    sample_axis: Any | None = None,
+    sample_resolution: float | None = None,
+    sample_min: float | None = None,
+    sample_max: float | None = None,
+    ik_solver: str | None = None,
+    use_redundant_joint_solutions: bool | None = None,
+    move_profile: Any | None = None,
 ) -> ProfileDictionary:
     """Create Descartes profiles with sensible defaults.
 
@@ -551,9 +558,9 @@ def create_descartes_default_profiles(
     (ladder graph solver configuration).
 
     Profile Configuration:
-        Plan Profile:
-        - enable_collision: Check vertex (waypoint) collisions
-        - enable_edge_collision: Check edge (transition) collisions
+        Plan Profile (library defaults unless overridden):
+        - enable_collision: vertex (waypoint) collision checking — default on
+        - enable_edge_collision: edge (transition) collision checking — default off
 
         Solver Profile:
         - num_threads: Parallel graph solver threads (default: all CPUs)
@@ -562,16 +569,32 @@ def create_descartes_default_profiles(
         profile_names: Profile names to register (default: DESCARTES_PROFILE_NAMES)
             Relevant names: ["DEFAULT", "CARTESIAN", "RASTER"]
             (Descartes doesn't apply to freespace tasks)
-        enable_collision: Enable vertex collision checking (default: True)
-            Checks each waypoint configuration for collisions
-        enable_edge_collision: Enable edge collision checking (default: False)
-            Checks transitions between waypoints for collisions
+        enable_collision: Vertex collision checking (default: library default, on)
+        enable_edge_collision: Edge collision checking (default: library default, off)
             Warning: Significantly slower, use only if needed
         num_threads: Number of threads for solver (default: CPU count)
             More threads = faster graph search
+        sample_axis: Tool axis (3-vector, tool frame) to sample target rotation
+            about, for axis-symmetric processes (milling, welding, drilling).
+            Setting any `sample_*` argument switches the target pose from fixed
+            to sampled (`target_pose_fixed = False`).
+        sample_resolution: Rotation sampling step in radians (e.g. `radians(30)`)
+        sample_min: Rotation sampling range start in radians (library default: -pi)
+        sample_max: Rotation sampling range end in radians (library default: +pi)
+        ik_solver: Override the kinematic group's IK solver for sampling
+            (e.g. "OPWInvKin" — analytic solvers make the ladder graph fast)
+        use_redundant_joint_solutions: Also sample joint-redundant IK solutions
+            (e.g. wrist flips), enlarging the ladder graph
+        move_profile: Full custom `DescartesMoveProfileD` override — e.g. a Python
+            subclass with custom `createWaypointSampler` / `createEdgeEvaluator` /
+            `createStateEvaluator`. Mutually exclusive with the move-profile
+            arguments above; configure those on the custom profile instead.
 
     Returns:
         ProfileDictionary with configured Descartes profiles
+
+    Raises:
+        ValueError: `move_profile` combined with move-profile arguments.
 
     Usage:
         from tesseract_robotics.planning.profiles import (
@@ -581,15 +604,15 @@ def create_descartes_default_profiles(
         # Standard configuration
         profiles = create_descartes_default_profiles()
 
-        # With edge collision checking (slower but safer)
+        # Axis-symmetric tool: sample rotation about tool Z every 30 degrees
+        import math
         profiles = create_descartes_default_profiles(
-            enable_edge_collision=True
+            sample_axis=(0, 0, 1),
+            sample_resolution=math.radians(30),
         )
 
-        # Custom thread count
-        profiles = create_descartes_default_profiles(
-            num_threads=4
-        )
+        # Custom Python move profile (see gh-83 subclassing surface)
+        profiles = create_descartes_default_profiles(move_profile=my_profile)
     """
     from tesseract_robotics.tesseract_motion_planners_descartes import (
         DescartesDefaultPlanProfileD,
@@ -604,10 +627,47 @@ def create_descartes_default_profiles(
     if num_threads is None:
         num_threads = _get_cpu_count()
 
-    # Create ONE set of profiles
-    plan_profile = DescartesDefaultPlanProfileD()
-    plan_profile.enable_collision = enable_collision
-    plan_profile.enable_edge_collision = enable_edge_collision
+    if move_profile is not None:
+        passed = {
+            "enable_collision": enable_collision,
+            "enable_edge_collision": enable_edge_collision,
+            "sample_axis": sample_axis,
+            "sample_resolution": sample_resolution,
+            "sample_min": sample_min,
+            "sample_max": sample_max,
+            "ik_solver": ik_solver,
+            "use_redundant_joint_solutions": use_redundant_joint_solutions,
+        }
+        conflicting = [name for name, value in passed.items() if value is not None]
+        if conflicting:
+            raise ValueError(
+                f"move_profile is a full profile override — {conflicting} would be "
+                f"silently ignored; configure them on the custom profile instead"
+            )
+        plan_profile = move_profile
+    else:
+        plan_profile = DescartesDefaultPlanProfileD()
+        if enable_collision is not None:
+            plan_profile.enable_collision = enable_collision
+        if enable_edge_collision is not None:
+            plan_profile.enable_edge_collision = enable_edge_collision
+        if any(v is not None for v in (sample_axis, sample_resolution, sample_min, sample_max)):
+            import numpy as np
+
+            plan_profile.target_pose_fixed = False
+            if sample_axis is not None:
+                plan_profile.target_pose_sample_axis = np.asarray(sample_axis, dtype=float)
+            if sample_resolution is not None:
+                plan_profile.target_pose_sample_resolution = sample_resolution
+            if sample_min is not None:
+                plan_profile.target_pose_sample_min = sample_min
+            if sample_max is not None:
+                plan_profile.target_pose_sample_max = sample_max
+        if ik_solver is not None:
+            plan_profile.manipulator_ik_solver = ik_solver
+        if use_redundant_joint_solutions is not None:
+            plan_profile.use_redundant_joint_solutions = use_redundant_joint_solutions
+
     base_plan = cast_DescartesPlanProfileD(plan_profile)
 
     solver_profile = DescartesLadderGraphSolverProfileD()
@@ -866,6 +926,81 @@ def create_cartesian_pipeline_profiles(
     _add_trajopt_to_profiles(profiles, profile_names)
 
     return profiles
+
+
+def create_descartes_pipeline_profiles(
+    profile_names: list[str] | None = None,
+    enable_collision: bool | None = None,
+    enable_edge_collision: bool | None = None,
+    num_threads: int | None = None,
+    sample_axis: Any | None = None,
+    sample_resolution: float | None = None,
+    sample_min: float | None = None,
+    sample_max: float | None = None,
+    ik_solver: str | None = None,
+    use_redundant_joint_solutions: bool | None = None,
+    move_profile: Any | None = None,
+) -> ProfileDictionary:
+    """Create profiles for the standalone Descartes pipelines.
+
+    Covers DescartesFPipeline / DescartesDPipeline and the NPC (no post check)
+    variants. Use these pipelines when the Descartes ladder-graph joint path is
+    the deliverable; for Descartes + TrajOpt refinement use CartesianPipeline
+    with `create_cartesian_pipeline_profiles`.
+
+    Pipeline Flow (F = forward search, D = backward search):
+        Input: Cartesian waypoints (tool poses)
+        -> MinLengthTask: densify the program to a minimum waypoint count
+        -> Descartes: sample IK per waypoint, search the ladder graph
+        -> DiscreteContactCheckTask: validate result (skipped in *NPC* variants)
+        -> IterativeSplineParameterizationTask: time parameterization
+        -> Output: timed joint trajectory following the Cartesian path
+
+    All arguments are forwarded to `create_descartes_default_profiles`; the
+    auxiliary tasks (min length, contact check, time parameterization) run on
+    their library default profiles.
+
+    Args:
+        profile_names: Profile names to register (default: DESCARTES_PROFILE_NAMES)
+        enable_collision: Vertex collision checking (default: library default, on)
+        enable_edge_collision: Edge collision checking (default: library default, off)
+        num_threads: Ladder graph solver threads (default: CPU count)
+        sample_axis: Tool axis to sample target rotation about (axis-symmetric tools)
+        sample_resolution: Rotation sampling step in radians
+        sample_min: Rotation sampling range start in radians
+        sample_max: Rotation sampling range end in radians
+        ik_solver: Override the kinematic group's IK solver for sampling
+        use_redundant_joint_solutions: Also sample joint-redundant IK solutions
+        move_profile: Full custom `DescartesMoveProfileD` override (mutually
+            exclusive with the move-profile arguments above)
+
+    Returns:
+        ProfileDictionary with configured Descartes profiles
+
+    Usage:
+        from tesseract_robotics.planning import TaskComposer
+        from tesseract_robotics.planning.profiles import (
+            create_descartes_pipeline_profiles
+        )
+
+        profiles = create_descartes_pipeline_profiles()
+        result = composer.plan(robot, program,
+                               pipeline="DescartesFPipeline",
+                               profiles=profiles)
+    """
+    return create_descartes_default_profiles(
+        profile_names=profile_names,
+        enable_collision=enable_collision,
+        enable_edge_collision=enable_edge_collision,
+        num_threads=num_threads,
+        sample_axis=sample_axis,
+        sample_resolution=sample_resolution,
+        sample_min=sample_min,
+        sample_max=sample_max,
+        ik_solver=ik_solver,
+        use_redundant_joint_solutions=use_redundant_joint_solutions,
+        move_profile=move_profile,
+    )
 
 
 # =============================================================================
