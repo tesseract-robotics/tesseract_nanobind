@@ -150,6 +150,37 @@ jobs:
           source test_env/bin/activate
           python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
           python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+      - name: dual-libstdc++ regression guard
+        # gh-119: bundling libstdc++ put two copies in every numpy-importing
+        # process (numpy -> system copy, our libs -> bundled copy); their
+        # STB_GNU_UNIQUE locale statics unified across copies and std::regex
+        # corrupted the heap in env.init. Guards: (1) the wheel ships no
+        # libstdc++, (2) exactly one copy is mapped at runtime, (3) the
+        # minimal numpy-first env.init + jacobian path runs clean. Explicit
+        # ordered del until the gh-72 keep_alive teardown fix (#118) lands.
+        run: |
+          source test_env/bin/activate
+          PKG_DIR=$(python -c "import tesseract_robotics; from pathlib import Path; print(Path(tesseract_robotics.__file__).parent)")
+          if ls "$PKG_DIR"/libstdc++.so* 2>/dev/null; then
+            echo "::error::wheel bundles libstdc++ — gh-119 regression"; exit 1
+          fi
+          python -u - <<'EOF'
+          import numpy as np  # numpy first: pulls the system libstdc++ — the gh-119 trigger
+          from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+          from tesseract_robotics.tesseract_environment import Environment
+          maps = sorted({ln.split()[-1] for ln in open("/proc/self/maps") if "libstdc++" in ln and "r-xp" in ln})
+          print("libstdc++ copies:", maps)
+          assert len(maps) == 1, f"dual libstdc++ in process: {maps}"
+          locator = GeneralResourceLocator()
+          urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
+          srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
+          env = Environment()
+          assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+          kg = env.getKinematicGroup("manipulator")
+          J = kg.calcJacobian(np.array([0.0, 0.0, 0.5, 0.0, 0.5, 0.0]), "tool0")
+          print("OK:", J.shape)
+          del J, kg, env
+          EOF
       - name: run full tests
         run: |
           source test_env/bin/activate
