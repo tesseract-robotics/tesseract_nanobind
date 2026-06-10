@@ -504,26 +504,32 @@ NB_MODULE(_tesseract_environment, m) {
         // Return unique_ptr directly - nanobind transfers ownership to Python
         // Previously returned a reference which became dangling when the unique_ptr
         // was destroyed at the end of the lambda, causing segfaults after setState()
+        //
+        // keep_alive<0, 1>: groups/contact managers are built from plugin
+        // instances (OPW/KDL/UR kinematics, bullet/fcl collision) whose vtables
+        // live in dylibs owned by the Environment's plugin loader. If Python
+        // destroys the Environment first, the loader dlcloses those dylibs and
+        // the survivors' destructors virtual-call into unmapped pages (gh-72).
         .def("getJointGroup", [](const te::Environment& self, const std::string& group_name) {
             auto ptr = self.getJointGroup(group_name);
             if (!ptr) throw std::runtime_error("Failed to get joint group: " + group_name);
             return ptr;
-        }, "group_name"_a)
+        }, "group_name"_a, nb::keep_alive<0, 1>())
         .def("getKinematicGroup", [](const te::Environment& self, const std::string& group_name,
                                       const std::string& ik_solver_name) {
             auto ptr = self.getKinematicGroup(group_name, ik_solver_name);
             if (!ptr) throw std::runtime_error("Failed to get kinematic group: " + group_name);
             return ptr;
-        }, "group_name"_a, "ik_solver_name"_a = "")
+        }, "group_name"_a, "ik_solver_name"_a = "", nb::keep_alive<0, 1>())
         // TCP
         .def("findTCPOffset", &te::Environment::findTCPOffset, "manip_info"_a)
         // Contact managers
         .def("getDiscreteContactManager", [](const te::Environment& self) {
             return self.getDiscreteContactManager();
-        })
+        }, nb::keep_alive<0, 1>())
         .def("getContinuousContactManager", [](const te::Environment& self) {
             return self.getContinuousContactManager();
-        })
+        }, nb::keep_alive<0, 1>())
         .def("setActiveDiscreteContactManager", &te::Environment::setActiveDiscreteContactManager, "name"_a)
         .def("setActiveContinuousContactManager", &te::Environment::setActiveContinuousContactManager, "name"_a)
         .def("clearCachedDiscreteContactManager", &te::Environment::clearCachedDiscreteContactManager)
