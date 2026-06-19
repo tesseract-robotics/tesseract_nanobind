@@ -93,9 +93,20 @@ NB_MODULE(_tesseract_serialization, m)
     // Environment - Full Scene State
     // ============================================================
 
+    // NOTE: the Environment writers serialize a shared_ptr<Environment>, NOT a concrete
+    // Environment. is_polymorphic<Environment> is true, so cereal's shared_ptr format
+    // (with a polymorphic type header) differs from the concrete format. The readers below
+    // deserialize shared_ptr<Environment>, so the writers MUST match or the reader misparses
+    // the stream and throws "unregistered polymorphic cast" (tesseract's own C++ test
+    // round-trips Environment::Ptr on both sides). The no-op deleter wraps the borrowed ref
+    // without taking ownership.
+    auto as_shared = [](const Environment& env) {
+        return std::shared_ptr<Environment>(const_cast<Environment*>(&env), [](Environment*) {});
+    };
+
     m.def("environment_to_xml",
-        [](const Environment& env) {
-            return Serialization::toArchiveStringXML(env);
+        [as_shared](const Environment& env) {
+            return Serialization::toArchiveStringXML(as_shared(env));
         },
         nb::arg("environment"),
         "Serialize Environment to XML string. Includes command history - "
@@ -109,8 +120,8 @@ NB_MODULE(_tesseract_serialization, m)
         "Deserialize Environment from XML string. Returns shared_ptr.");
 
     m.def("environment_to_file",
-        [](const Environment& env, const std::string& path) {
-            return Serialization::toArchiveFileXML(env, path);
+        [as_shared](const Environment& env, const std::string& path) {
+            return Serialization::toArchiveFileXML(as_shared(env), path);
         },
         nb::arg("environment"), nb::arg("path"),
         "Save Environment to XML file.");
@@ -123,8 +134,8 @@ NB_MODULE(_tesseract_serialization, m)
         "Load Environment from XML file. Returns shared_ptr.");
 
     m.def("environment_to_binary",
-        [](const Environment& env) {
-            return Serialization::toArchiveBinaryData(env);
+        [as_shared](const Environment& env) {
+            return Serialization::toArchiveBinaryData(as_shared(env));
         },
         nb::arg("environment"),
         "Serialize Environment to binary data.");
