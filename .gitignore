@@ -39,3 +39,7 @@ site/
 .pixi/
 pixi.lock
 .testmondata
+
+# Local-only design docs and plans; never commit
+docs/superpowers/
+docs/plans/
