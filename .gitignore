@@ -43,3 +43,4 @@ pixi.lock
 # Local-only design docs and plans; never commit
 docs/superpowers/
 docs/plans/
+AGENTS.md
