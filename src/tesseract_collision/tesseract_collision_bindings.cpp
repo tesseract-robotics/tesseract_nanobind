@@ -273,7 +273,10 @@ NB_MODULE(_tesseract_collision, m) {
              }, "name"_a, "mask_id"_a, "shapes"_a, "shape_poses"_a, "enabled"_a = true)
         .def("getCollisionObjectGeometries", &tc::DiscreteContactManager::getCollisionObjectGeometries, "name"_a)
         .def("getCollisionObjectGeometriesTransforms", &tc::DiscreteContactManager::getCollisionObjectGeometriesTransforms, "name"_a)
-        .def("contactTest", &tc::DiscreteContactManager::contactTest, "collisions"_a, "request"_a)
+        // Release the GIL during the (broad+narrowphase) collision query so a
+        // background worker thread can sweep a whole trajectory without blocking
+        // the Python UI thread — mirrors the motion planners' solve() guards.
+        .def("contactTest", &tc::DiscreteContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("clone", [](const tc::DiscreteContactManager& self) { return self.clone(); });
 
     // ========== ContinuousContactManager (abstract, expose key methods) ==========
@@ -352,7 +355,7 @@ NB_MODULE(_tesseract_collision, m) {
              "default_collision_margin"_a)
         .def("setPairCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
-        .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a)
+        .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())  // GIL released (see discrete contactTest above)
         .def("clone", [](const tc::ContinuousContactManager& self) { return self.clone(); });
 
     // ========== ContactManagersPluginFactory ==========
