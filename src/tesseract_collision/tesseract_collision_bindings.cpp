@@ -240,7 +240,7 @@ NB_MODULE(_tesseract_collision, m) {
                      tm[p.first] = p.second;
                  }
                  self.setCollisionObjectsTransform(tm);
-             }, "transforms"_a)
+             }, "transforms"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("getCollisionObjects", &tc::DiscreteContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::DiscreteContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::DiscreteContactManager::getActiveCollisionObjects)

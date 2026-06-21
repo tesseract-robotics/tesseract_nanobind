@@ -302,7 +302,7 @@ NB_MODULE(_trajopt_sqp, m) {
         .def("init", &tsqp::TrustRegionSQPSolver::init, "qp_prob"_a,
              "Initialize the solver with a QP problem for incremental solving")
         .def("solve", &tsqp::TrustRegionSQPSolver::solve, "qp_prob"_a,
-             "Run complete SQP optimization")
+             "Run complete SQP optimization", nb::call_guard<nb::gil_scoped_release>())
         .def("stepSQPSolver", &tsqp::TrustRegionSQPSolver::stepSQPSolver,
              "Run a SINGLE SQP convexification step.\n\n"
              "This is the key method for real-time/online planning.\n"

@@ -328,7 +328,7 @@ NB_MODULE(_tesseract_environment, m) {
                                              const std::vector<std::string>& joint_names,
                                              const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
             return self.getState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
+        }, "joint_names"_a, "joint_values"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("setState", [](te::Environment& self,
                             const std::unordered_map<std::string, double>& joints) {
             std::vector<std::string> names;
