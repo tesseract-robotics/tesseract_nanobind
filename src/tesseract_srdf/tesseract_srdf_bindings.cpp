@@ -26,6 +26,10 @@ NB_MODULE(_tesseract_srdf, m) {
         .def_rw("chain_groups", &ts::KinematicsInformation::chain_groups)
         .def_rw("joint_groups", &ts::KinematicsInformation::joint_groups)
         .def_rw("link_groups", &ts::KinematicsInformation::link_groups)
+        // kinematics_plugin_info: tesseract::common::KinematicsPluginInfo, registered by the
+        // tesseract_common module. Carries the fwd/inv IK-solver plugin config per group so a
+        // group added via AddKinematicsInformationCommand resolves through getKinematicGroup().
+        .def_rw("kinematics_plugin_info", &ts::KinematicsInformation::kinematics_plugin_info)
         .def_rw("group_states", &ts::KinematicsInformation::group_states)
         // group_tcps: the C++ field is nested unordered_map keyed on string with
         // Eigen::aligned_allocator on the inner map (Isometry3d alignment). nanobind's

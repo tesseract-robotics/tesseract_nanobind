@@ -22,6 +22,7 @@ __all__ = [
     "AddLinkCommand",
     "RemoveLinkCommand",
     "AddSceneGraphCommand",
+    "AddKinematicsInformationCommand",
     "RemoveJointCommand",
     "ReplaceJointCommand",
     "MoveJointCommand",

@@ -17,6 +17,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/plugin_info.h>
+#include <yaml-cpp/yaml.h>  // YAML::Load / YAML::Node for PluginInfo.config <-> str
 #include <cmath>
 #include <filesystem>
 #include <sstream>
@@ -889,10 +890,42 @@ NB_MODULE(_tesseract_common, m) {
         .def_rw("acceleration_limits", &tesseract::common::KinematicLimits::acceleration_limits);
 
     // ========== PluginInfo ==========
+    // `config` is a YAML::Node in C++, which nanobind has no caster for. Expose it as a
+    // Python `str`: the getter serialises via getConfigString(); the setter parses the
+    // string with YAML::Load. Callers pass a YAML document string (e.g.
+    // "base_link: base_link\ntip_link: tool0").
     nb::class_<tesseract::common::PluginInfo>(m, "PluginInfo")
         .def(nb::init<>())
         .def_rw("class_name", &tesseract::common::PluginInfo::class_name)
-        .def_rw("config", &tesseract::common::PluginInfo::config);
+        .def_prop_rw(
+            "config",
+            [](const tesseract::common::PluginInfo& self) { return self.getConfigString(); },
+            [](tesseract::common::PluginInfo& self, const std::string& value) {
+                self.config = YAML::Load(value);
+            })
+        .def("getConfigString", &tesseract::common::PluginInfo::getConfigString);
+
+    // ========== PluginInfoContainer ==========
+    // plugins is PluginInfoMap = std::map<std::string, PluginInfo> -> dict[str, PluginInfo].
+    nb::class_<tesseract::common::PluginInfoContainer>(m, "PluginInfoContainer")
+        .def(nb::init<>())
+        .def_rw("default_plugin", &tesseract::common::PluginInfoContainer::default_plugin)
+        .def_rw("plugins", &tesseract::common::PluginInfoContainer::plugins)
+        .def("clear", &tesseract::common::PluginInfoContainer::clear);
+
+    // ========== KinematicsPluginInfo ==========
+    // fwd/inv_plugin_infos are std::map<std::string, PluginInfoContainer> keyed on group
+    // name -> dict[str, PluginInfoContainer]. search_paths / search_libraries are
+    // std::vector<std::string> -> list[str].
+    nb::class_<tesseract::common::KinematicsPluginInfo>(m, "KinematicsPluginInfo")
+        .def(nb::init<>())
+        .def_rw("search_paths", &tesseract::common::KinematicsPluginInfo::search_paths)
+        .def_rw("search_libraries", &tesseract::common::KinematicsPluginInfo::search_libraries)
+        .def_rw("fwd_plugin_infos", &tesseract::common::KinematicsPluginInfo::fwd_plugin_infos)
+        .def_rw("inv_plugin_infos", &tesseract::common::KinematicsPluginInfo::inv_plugin_infos)
+        .def("insert", &tesseract::common::KinematicsPluginInfo::insert, "other"_a)
+        .def("clear", &tesseract::common::KinematicsPluginInfo::clear)
+        .def("empty", &tesseract::common::KinematicsPluginInfo::empty);
 
     // ========== Console Bridge ==========
     nb::enum_<console_bridge::LogLevel>(m, "LogLevel")

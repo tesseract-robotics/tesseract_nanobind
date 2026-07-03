@@ -96,6 +96,8 @@ __all__ = [
     "log",
     # Plugin
     "PluginInfo",
+    "PluginInfoContainer",
+    "KinematicsPluginInfo",
     # Container types (SWIG compatibility)
     "VectorVector3d",
     "VectorIsometry3d",

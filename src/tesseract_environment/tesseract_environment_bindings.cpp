@@ -17,6 +17,7 @@
 #include <tesseract/environment/events.h>
 #include <tesseract/environment/command.h>
 #include <tesseract/environment/commands/add_link_command.h>
+#include <tesseract/environment/commands/add_kinematics_information_command.h>
 #include <tesseract/environment/commands/add_scene_graph_command.h>
 #include <tesseract/environment/commands/change_collision_margins_command.h>
 #include <tesseract/environment/commands/change_joint_acceleration_limits_command.h>
@@ -175,6 +176,14 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getSceneGraph", &te::AddSceneGraphCommand::getSceneGraph)
         .def("getJoint", &te::AddSceneGraphCommand::getJoint)
         .def("getPrefix", &te::AddSceneGraphCommand::getPrefix);
+
+    // ========== AddKinematicsInformationCommand ==========
+    // Registers a KinematicsInformation (group defs + IK plugin config) into a live env.
+    // insert-merges with existing kinematics info, so pre-existing groups keep resolving.
+    nb::class_<te::AddKinematicsInformationCommand, te::Command>(m, "AddKinematicsInformationCommand")
+        .def(nb::init<>())
+        .def(nb::init<tesseract::srdf::KinematicsInformation>(), "kinematics_information"_a)
+        .def("getKinematicsInformation", &te::AddKinematicsInformationCommand::getKinematicsInformation);
 
     // ========== ModifyAllowedCollisionsType enum ==========
     nb::enum_<te::ModifyAllowedCollisionsType>(m, "ModifyAllowedCollisionsType")
@@ -384,6 +393,11 @@ NB_MODULE(_tesseract_environment, m) {
             } else {
                 cmd_ptr = std::make_shared<te::AddSceneGraphCommand>(*cmd.getSceneGraph(), cmd.getPrefix());
             }
+            return self.applyCommand(cmd_ptr);
+        }, "command"_a)
+        // Commands - AddKinematicsInformationCommand
+        .def("applyCommand", [](te::Environment& self, const te::AddKinematicsInformationCommand& cmd) {
+            auto cmd_ptr = std::make_shared<te::AddKinematicsInformationCommand>(cmd.getKinematicsInformation());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ModifyAllowedCollisionsCommand

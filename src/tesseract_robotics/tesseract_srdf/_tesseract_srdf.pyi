@@ -1,5 +1,7 @@
 from collections.abc import Mapping, Sequence, Set
 
+from tesseract_robotics.tesseract_common import KinematicsPluginInfo
+
 
 class KinematicsInformation:
     def __init__(self) -> None: ...
@@ -27,6 +29,12 @@ class KinematicsInformation:
 
     @link_groups.setter
     def link_groups(self, arg: Mapping[str, Sequence[str]], /) -> None: ...
+
+    @property
+    def kinematics_plugin_info(self) -> KinematicsPluginInfo: ...
+
+    @kinematics_plugin_info.setter
+    def kinematics_plugin_info(self, arg: KinematicsPluginInfo, /) -> None: ...
 
     @property
     def group_states(self) -> dict[str, dict[str, dict[str, float]]]: ...

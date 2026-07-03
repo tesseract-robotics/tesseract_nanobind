@@ -82,6 +82,15 @@ class AddSceneGraphCommand(Command):
 
     def getPrefix(self) -> str: ...
 
+class AddKinematicsInformationCommand(Command):
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, kinematics_information: tesseract_robotics.tesseract_srdf._tesseract_srdf.KinematicsInformation) -> None: ...
+
+    def getKinematicsInformation(self) -> tesseract_robotics.tesseract_srdf._tesseract_srdf.KinematicsInformation: ...
+
 class ModifyAllowedCollisionsType(enum.Enum):
     ADD = 0
 
@@ -256,6 +265,9 @@ class Environment:
 
     @overload
     def applyCommand(self, command: AddSceneGraphCommand) -> bool: ...
+
+    @overload
+    def applyCommand(self, command: AddKinematicsInformationCommand) -> bool: ...
 
     @overload
     def applyCommand(self, command: ModifyAllowedCollisionsCommand) -> bool: ...
