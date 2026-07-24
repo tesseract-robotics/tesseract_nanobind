@@ -38,6 +38,8 @@ class EmittedProgram:
         written: list[Path] = []
         for name, text in self.files.items():
             path = out / name
-            path.write_text(text)
+            # Explicit UTF-8: Windows defaults write_text to the locale codec
+            # (cp1252), which mangles emitted programs. Robot code stays UTF-8.
+            path.write_text(text, encoding="utf-8")
             written.append(path)
         return written
