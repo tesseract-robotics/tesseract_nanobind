@@ -14,6 +14,8 @@ from typing import Union
 
 from tesseract_robotics.planning import Pose
 
+from .external_axes import ExternalAxisValue
+
 
 class MoveKind(Enum):
     """Interpolation kind (mirrors tesseract MoveInstructionType, minus CIRCULAR)."""
@@ -24,22 +26,31 @@ class MoveKind(Enum):
 
 @dataclass(frozen=True)
 class JointMove:
-    """Absolute joint-space move. ``joints`` radians, 6 + optional external."""
+    """Absolute joint-space move.
+
+    ``joints`` are the six arm axes in radians. ``external_axes`` are the SI
+    external-axis values split off the coordinated joint vector by ``lower()``
+    when a layout is supplied — empty for a plain (uncoupled) 6-DOF move, in
+    which case ``joints`` is the full waypoint vector unchanged.
+    """
 
     joints: tuple[float, ...]
     profile: str
+    external_axes: tuple[ExternalAxisValue, ...] = ()
 
 
 @dataclass(frozen=True)
 class CartesianMove:
     """Cartesian move to ``pose`` (metres). ``seed_joints`` (radians) is the
     waypoint IK seed when present (used by backends that derive configuration
-    from joints), else ``None``."""
+    from joints), else ``None``. ``external_axes`` are the SI external-axis
+    values for the robtarget's ``eax`` field (empty when uncoupled)."""
 
     pose: Pose
     kind: MoveKind
     profile: str
     seed_joints: tuple[float, ...] | None
+    external_axes: tuple[ExternalAxisValue, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -104,13 +115,22 @@ Event = Union[JointMove, CartesianMove, Dwell, WaitDigital, SetDigital, SetAnalo
 
 
 def _event_repr(event: Event) -> str:
-    """Stable value-based repr for canonical serialization (poses via matrix)."""
+    """Stable value-based repr for canonical serialization (poses via matrix).
+
+    ``external_axes`` contributes only when non-empty, so an uncoupled program's
+    canonical form (and thus its content digest) is byte-identical to before the
+    external-axis field existed.
+    """
     if isinstance(event, CartesianMove):
         rows = event.pose.matrix.round(9).tolist()
+        ext = f",ext={event.external_axes}" if event.external_axes else ""
         return (
             f"CartesianMove(kind={event.kind.value},profile={event.profile!r},"
-            f"seed={event.seed_joints},pose={rows})"
+            f"seed={event.seed_joints}{ext},pose={rows})"
         )
+    if isinstance(event, JointMove) and not event.external_axes:
+        # Match the pre-external-axes dataclass repr exactly (default `, ` spacing).
+        return f"JointMove(joints={event.joints}, profile={event.profile!r})"
     return repr(event)
 
 

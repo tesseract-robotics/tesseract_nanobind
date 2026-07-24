@@ -8,9 +8,12 @@ from .dsl import Writer as Writer
 from .errors import EmitterError as EmitterError
 from .errors import EmptyProgramError as EmptyProgramError
 from .errors import ExternalAxisError as ExternalAxisError
+from .errors import ExternalAxisUnitError as ExternalAxisUnitError
 from .errors import IdentifierError as IdentifierError
 from .errors import MissingConfigurationError as MissingConfigurationError
 from .errors import MissingProfileError as MissingProfileError
+from .errors import UncoordinatedTargetError as UncoordinatedTargetError
+from .errors import UnknownKinematicTopologyError as UnknownKinematicTopologyError
 from .errors import UnsupportedInstructionError as UnsupportedInstructionError
 from .events import CartesianMove as CartesianMove
 from .events import Dwell as Dwell
@@ -23,6 +26,10 @@ from .events import SetAnalog as SetAnalog
 from .events import SetDigital as SetDigital
 from .events import ToolChange as ToolChange
 from .events import WaitDigital as WaitDigital
+from .external_axes import ExternalAxisKind as ExternalAxisKind
+from .external_axes import ExternalAxisLayout as ExternalAxisLayout
+from .external_axes import ExternalAxisSpec as ExternalAxisSpec
+from .external_axes import ExternalAxisValue as ExternalAxisValue
 from .identity import EmitIdentity as EmitIdentity
 from .lowering import lower as lower
 from .naming import safe_identifier as safe_identifier

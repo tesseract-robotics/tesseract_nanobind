@@ -79,15 +79,22 @@ class Config:
 @dataclass
 class ExternalAxis:
     """RAPID external-axis values — up to six slots; unset slots serialize to the
-    ``9E+09`` sentinel ABB uses for "no value"."""
+    ``9E+09`` sentinel ABB uses for "no value".
 
-    values: Sequence[float] = ()
+    Each entry is either a raw ``float`` (formatted by ``str()`` — the DSL
+    hand-authoring convention) or an already-formatted display token ``str``
+    (what ``RapidBackend`` emits: unit- and precision-correct mm/deg from the
+    ``core.units`` chokepoint). ``str`` is idempotent under ``format_ext_axis``,
+    so both render identically and float callers stay byte-for-byte unchanged.
+    """
+
+    values: Sequence[float | str] = ()
 
     def __str__(self) -> str:
         return format_ext_axis(self.values)
 
     @classmethod
-    def from_list(cls, values: Sequence[float]) -> ExternalAxis:
+    def from_list(cls, values: Sequence[float | str]) -> ExternalAxis:
         return cls(values=values)
 
 
