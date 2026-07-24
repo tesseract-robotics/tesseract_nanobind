@@ -26,6 +26,8 @@ from ..core.events import (
     ToolChange,
     WaitDigital,
 )
+from ..core.external_axes import ExternalAxisKind, ExternalAxisValue
+from ..core.units import Metres, Radians, to_degrees, to_millimetres
 from .profile import RapidProfile
 from .rapid_writer import (
     Comment,
@@ -41,12 +43,36 @@ from .rapid_writer import (
     WaitDO,
     WaitTime,
 )
-from .targets import JointTarget, RapidTarget
+from .targets import ExternalAxis, JointTarget, RapidTarget
+
+#: RAPID linear external-axis precision (mm) — mirrors the robtarget position `.4f`.
+_EAX_MM_PRECISION = 4
+#: RAPID rotary external-axis precision (deg) — mirrors the jointtarget joint `.2f`.
+_EAX_DEG_PRECISION = 2
 
 
 def _rapid_signal_name(key: str, index: int) -> str:
     """Named-signal RAPID rendering: bare ``key`` at index 0, else ``key{index}``."""
     return key if index == 0 else f"{key}{{{index}}}"
+
+
+def _rapid_eax(values: tuple[ExternalAxisValue, ...]) -> ExternalAxis:
+    """Convert SI external-axis values to RAPID eax display tokens.
+
+    LINEAR → millimetres (``.4f``), ROTARY → degrees (``.2f``), through the single
+    ``core.units`` conversion chokepoint. The pre-formatted strings flow through
+    ``format_ext_axis`` unchanged (``str`` is idempotent on ``str``), so unused
+    slots still pad to ``9E+09`` and an empty tuple renders the all-sentinel field.
+    """
+    tokens: list[str] = []
+    for value in values:
+        if value.kind is ExternalAxisKind.LINEAR:
+            tokens.append(f"{to_millimetres(Metres(value.value_si)):.{_EAX_MM_PRECISION}f}")
+        elif value.kind is ExternalAxisKind.ROTARY:
+            tokens.append(f"{to_degrees(Radians(value.value_si)):.{_EAX_DEG_PRECISION}f}")
+        else:  # pragma: no cover - exhaustive over ExternalAxisKind
+            raise AssertionError(f"unhandled ExternalAxisKind: {value.kind!r}")
+    return ExternalAxis(tokens)
 
 
 class RapidBackend(ProgramBackend):
@@ -77,10 +103,13 @@ class RapidBackend(ProgramBackend):
         self._proc.__enter__()
 
     def move_joint(self, m: JointMove) -> None:
-        MoveAbsJ(JointTarget(np.asarray(m.joints, dtype=np.float64)), self._profile(m.profile))
+        target = JointTarget(
+            np.asarray(m.joints, dtype=np.float64), external_axis=_rapid_eax(m.external_axes)
+        )
+        MoveAbsJ(target, self._profile(m.profile))
 
     def move_cartesian(self, m: CartesianMove) -> None:
-        target = RapidTarget(pose=m.pose)
+        target = RapidTarget(pose=m.pose, external_axis=_rapid_eax(m.external_axes))
         profile = self._profile(m.profile)
         if m.kind is MoveKind.LINEAR:
             MoveL(target, profile)

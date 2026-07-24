@@ -84,11 +84,14 @@ class MotionType(IntEnum):
     ABSOLUTE_JOINTS = 4
 
 
-def format_ext_axis(external_axis: Sequence[float] | None = None) -> str:
+def format_ext_axis(external_axis: Sequence[float | str] | None = None) -> str:
     """Format the external-axis field of a RAPID robtarget/jointtarget.
 
     RAPID expects exactly six external-axis slots; unused slots get `9E+09`
-    (ABB's sentinel for "no value").
+    (ABB's sentinel for "no value"). Entries may be raw floats (formatted by
+    `str()`) or already-formatted display tokens (strings, unit- and
+    precision-correct — what `RapidBackend` emits); `str()` is idempotent on
+    strings, so both render identically.
     """
     if not external_axis:
         return "[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]"

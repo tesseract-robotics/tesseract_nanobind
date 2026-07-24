@@ -83,3 +83,56 @@ class ExternalAxisError(EmitterError):
             f"{brand}: move carries {got} joint values but the profile supports "
             f"{supported} (6 robot + declared external axes); declare external axes"
         )
+
+
+class UnknownKinematicTopologyError(EmitterError):
+    """A group has no ROP/REP-classifiable external-axis structure.
+
+    Raised by the classification layer (which owns the URDF/SRDF) when it cannot
+    decide which joints are the arm vs. the external axes. Never guessed.
+    """
+
+    def __init__(self, group: str, reason: str) -> None:
+        self.group = group
+        self.reason = reason
+        super().__init__(f"group {group!r} has no classifiable external-axis topology: {reason}")
+
+
+class ExternalAxisUnitError(EmitterError):
+    """An external axis's declared kind/unit contradicts its actual joint type.
+
+    E.g. a joint declared ``ROTARY`` (degrees) whose URDF type is ``prismatic``
+    (metres → millimetres). Emitting either unit would be silently wrong.
+    """
+
+    def __init__(self, joint_name: str, declared: str, expected: str) -> None:
+        self.joint_name = joint_name
+        self.declared = declared
+        self.expected = expected
+        super().__init__(
+            f"external axis {joint_name!r} declared {declared} but its joint type implies {expected}"
+        )
+
+
+class UncoordinatedTargetError(EmitterError):
+    """A coordinated move's waypoint joints do not match the external-axis layout.
+
+    The split is by joint name, so a mismatched joint set cannot be resolved —
+    the layout naming a joint the waypoint lacks (an omitted external DOF), or the
+    waypoint carrying a joint the layout does not classify, both raise here rather
+    than guess a slot assignment.
+    """
+
+    def __init__(
+        self,
+        missing: Sequence[str],
+        extra: Sequence[str],
+        waypoint_names: Sequence[str],
+    ) -> None:
+        self.missing = list(missing)
+        self.extra = list(extra)
+        self.waypoint_names = list(waypoint_names)
+        super().__init__(
+            f"coordinated waypoint joints {self.waypoint_names} do not match the "
+            f"external-axis layout; missing {self.missing}, unexpected {self.extra}"
+        )
