@@ -16,6 +16,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import tesseract_kinematics
 from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
@@ -93,3 +94,97 @@ def test_contact_manager_usable_after_env_release():
     del env
     gc.collect()
     assert len(manager.getActiveCollisionObjects()) > 0
+
+
+# --- KinematicsPluginFactory.createInvKin: same dylib-unload hazard, but the
+# plugin loader is owned by the *factory*, and the solver additionally holds the
+# scene graph/state it was built against. keep_alive<0,1/4/5> ties the returned
+# solver to the factory (dylib owner) and the two scene arguments. A ROP solver
+# on abb_irb2400_on_positioner exercises all three (a plugin-backed coupled solver
+# built from a scene). Deterministic SIGSEGV (exit 139) before the fix.
+_ROP_PLUGIN_YAML = """\
+kinematic_plugins:
+  search_libraries: [tesseract_kinematics_kdl_factories, tesseract_kinematics_opw_factories]
+  inv_kin_plugins:
+    full_manipulator:
+      default: ROPInvKin
+      plugins:
+        ROPInvKin:
+          class: ROPInvKinFactory
+          config:
+            manipulator_reach: 2.55
+            positioner_sample_resolution:
+              - {name: positioner_joint_1, value: 0.1}
+            positioner: {class: KDLFwdKinChainFactory, config: {base_link: positioner_base_link, tip_link: base_link}}
+            manipulator:
+              class: OPWInvKinFactory
+              config:
+                base_link: base_link
+                tip_link: tool0
+                params: {a1: 0.1, a2: -0.135, b: 0.0, c1: 0.615, c2: 0.705, c3: 0.755, c4: 0.086, offsets: [0, 0, -1.57079632679, 0, 0, 0], sign_corrections: [1, 1, 1, 1, 1, 1]}
+"""
+
+_ROP_EXPECTED_JOINTS = [
+    "positioner_joint_1",
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+]
+
+_ROP_TEARDOWN_SCRIPT = """\
+from tesseract_robotics import tesseract_kinematics as tk
+from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_environment import Environment
+locator = GeneralResourceLocator()
+urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.urdf").getFilePath()
+srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.srdf").getFilePath()
+env = Environment()
+assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+factory = tk.KinematicsPluginFactory(__YAML__, locator)
+# Inline scene temporaries + no ordered release: the harshest teardown case.
+solver = factory.createInvKin("full_manipulator", "ROPInvKin", env.getSceneGraph(), env.getState())
+print("OK:", solver.numJoints())
+""".replace("__YAML__", repr(_ROP_PLUGIN_YAML))
+
+
+def _make_rop_solver():
+    locator = GeneralResourceLocator()
+    urdf = locator.locateResource(
+        "package://tesseract/support/urdf/abb_irb2400_on_positioner.urdf"
+    ).getFilePath()
+    srdf = locator.locateResource(
+        "package://tesseract/support/urdf/abb_irb2400_on_positioner.srdf"
+    ).getFilePath()
+    env = Environment()
+    assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+    factory = tesseract_kinematics.KinematicsPluginFactory(_ROP_PLUGIN_YAML, locator)
+    solver = factory.createInvKin(
+        "full_manipulator", "ROPInvKin", env.getSceneGraph(), env.getState()
+    )
+    return locator, env, factory, solver
+
+
+def test_interpreter_teardown_survives_rop_solver():
+    """The createInvKin analogue of gh-72: clean exit with solver+factory+env globals."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _ROP_TEARDOWN_SCRIPT],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        f"interpreter teardown died (rc={proc.returncode}, SIGSEGV is -11/139): {proc.stderr[-500:]}"
+    )
+    assert "OK: 7" in proc.stdout
+
+
+def test_rop_solver_usable_after_factory_and_env_release():
+    """keep_alive contract: the solver keeps its factory, env, and scene alive."""
+    locator, env, factory, solver = _make_rop_solver()
+    del factory, env, locator
+    gc.collect()
+    assert solver.numJoints() == 7
+    assert list(solver.getJointNames()) == _ROP_EXPECTED_JOINTS

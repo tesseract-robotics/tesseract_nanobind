@@ -212,21 +212,31 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("getSearchLibraries", &tk::KinematicsPluginFactory::getSearchLibraries)
         .def("getDefaultFwdKinPlugin", &tk::KinematicsPluginFactory::getDefaultFwdKinPlugin, "group_name"_a)
         .def("getDefaultInvKinPlugin", &tk::KinematicsPluginFactory::getDefaultInvKinPlugin, "group_name"_a)
-        // Create kinematics solvers
+        // Create kinematics solvers.
+        // keep_alive: the returned solver is instantiated from a plugin whose code
+        // lives in a dylib owned by this factory (self), and it retains references
+        // into the scene graph/state arguments. If Python frees the factory (the
+        // loader dlcloses the plugin dylib) or a scene argument before the solver,
+        // the solver's destructor virtual-calls into unmapped pages / dereferences
+        // freed memory -> SIGSEGV at teardown (same failure mode as gh-72 for
+        // Environment groups). Nurse 0 = returned solver; patients 1 = self/factory
+        // (the plugin dylib owner), 4 = scene_graph, 5 = scene_state.
         .def("createFwdKin", [](const tk::KinematicsPluginFactory& self,
                                 const std::string& group_name,
                                 const std::string& solver_name,
                                 const tsg::SceneGraph& scene_graph,
                                 const tsg::SceneState& scene_state) {
             return self.createFwdKin(group_name, solver_name, scene_graph, scene_state);
-        }, "group_name"_a, "solver_name"_a, "scene_graph"_a, "scene_state"_a)
+        }, "group_name"_a, "solver_name"_a, "scene_graph"_a, "scene_state"_a,
+           nb::keep_alive<0, 1>(), nb::keep_alive<0, 4>(), nb::keep_alive<0, 5>())
         .def("createInvKin", [](const tk::KinematicsPluginFactory& self,
                                 const std::string& group_name,
                                 const std::string& solver_name,
                                 const tsg::SceneGraph& scene_graph,
                                 const tsg::SceneState& scene_state) {
             return self.createInvKin(group_name, solver_name, scene_graph, scene_state);
-        }, "group_name"_a, "solver_name"_a, "scene_graph"_a, "scene_state"_a);
+        }, "group_name"_a, "solver_name"_a, "scene_graph"_a, "scene_state"_a,
+           nb::keep_alive<0, 1>(), nb::keep_alive<0, 4>(), nb::keep_alive<0, 5>());
 
     // ========== Utility functions ==========
     m.def("getRedundantSolutions", [](const Eigen::Ref<const Eigen::VectorXd>& sol,
