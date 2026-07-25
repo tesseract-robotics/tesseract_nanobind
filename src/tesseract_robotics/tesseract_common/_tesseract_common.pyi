@@ -650,3 +650,8 @@ class VectorIsometry3d:
     def append(self, arg: Isometry3d, /) -> None: ...
 
     def clear(self) -> None: ...
+
+def satisfiesLimits(values: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')], max_diff: float = 1e-06, max_rel_diff: float = 2.220446049250313e-16) -> bool:
+    """
+    True if every value is within [limits.col(0), limits.col(1)] (abs/rel tolerance).
+    """

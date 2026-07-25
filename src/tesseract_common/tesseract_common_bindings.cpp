@@ -982,5 +982,19 @@ NB_MODULE(_tesseract_common, m) {
         .def("append", [](VectorIsometry3d& self, const Eigen::Isometry3d& v) { self.push_back(v); })
         .def("clear", [](VectorIsometry3d& self) { self.clear(); });
 
+    // ========== Kinematic limits (kinematic_limits.h) ==========
+    // Position-limit check used by Descartes vertex evaluators (twc
+    // DescartesStateValidator). Pass a JointGroup's getLimits().joint_limits as
+    // `limits` (an (N, 2) [lower, upper] matrix). Renamed from satisfiesPositionLimits.
+    m.def("satisfiesLimits",
+          [](const Eigen::VectorXd& values, const Eigen::MatrixX2d& limits,
+             double max_diff, double max_rel_diff) {
+              return tesseract::common::satisfiesLimits<double>(values, limits, max_diff, max_rel_diff);
+          },
+          "values"_a, "limits"_a,
+          "max_diff"_a = 1e-6,
+          "max_rel_diff"_a = std::numeric_limits<double>::epsilon(),
+          "True if every value is within [limits.col(0), limits.col(1)] (abs/rel tolerance).");
+
     // Note: VectorLong and Eigen::VectorXi use numpy arrays (automatic conversion)
 }

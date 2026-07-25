@@ -22,6 +22,7 @@
 #include <tesseract/motion_planners/descartes/profile/descartes_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_default_move_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_ladder_graph_solver_profile.h>
+#include <tesseract/motion_planners/descartes/descartes_utils.h>  // sampleToolZAxis / sampleToolXAxis
 
 // descartes_light core types (needed for Python-side subclassing)
 #include <descartes_light/types.h>
@@ -303,4 +304,16 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def("terminate", &tp::DescartesMotionPlanner<double>::terminate)
         .def("clear", &tp::DescartesMotionPlanner<double>::clear)
         .def("clone", [](const tp::DescartesMotionPlanner<double>& self) { return self.clone(); });
+
+    // ========== Tool-axis pose samplers (descartes_utils.h) ==========
+    // Sample the free rotation about the tool axis (the redundant DOF of a
+    // process tool). Equivalent to the C++ profile's target_pose_sampler; here the
+    // DescartesDefaultMoveProfile exposes it via target_pose_sample_axis/min/max/
+    // resolution, but the raw samplers are useful for custom waypoint sampling.
+    m.def("sampleToolZAxis", &tp::sampleToolZAxis,
+          "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Sample poses rotated about the tool Z axis from minimum to maximum at resolution (radians).");
+    m.def("sampleToolXAxis", &tp::sampleToolXAxis,
+          "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Sample poses rotated about the tool X axis from minimum to maximum at resolution (radians).");
 }

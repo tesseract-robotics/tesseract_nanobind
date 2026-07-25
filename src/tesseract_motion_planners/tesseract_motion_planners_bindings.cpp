@@ -10,6 +10,7 @@
 #include <tesseract/motion_planners/planner.h>
 #include <tesseract/motion_planners/types.h>
 #include <tesseract/motion_planners/utils.h>
+#include <tesseract/motion_planners/robot_config.h>  // getRobotConfig / getJointTurns / RobotConfig
 
 // tesseract_environment
 #include <tesseract/environment/environment.h>
@@ -62,4 +63,39 @@ NB_MODULE(_tesseract_motion_planners, m) {
     m.def("assignCurrentStateAsSeed", &tp::assignCurrentStateAsSeed,
           "composite_instructions"_a, "env"_a,
           "Assign the current environment state as seed to all CartesianWaypoints in the program");
+
+    // ========== Robot configuration (robot_config.h) ==========
+    // Kinematic-family classification + redundant-turn detection used to build
+    // Descartes vertex/edge evaluators that coordinate an external-axis (ROP/REP)
+    // group without configuration flips. Header-only in tesseract_motion_planners;
+    // the double specialisation matches the double-precision Descartes states.
+    nb::enum_<tp::RobotConfig>(m, "RobotConfig")
+        .value("NUT", tp::RobotConfig::NUT)
+        .value("FUT", tp::RobotConfig::FUT)
+        .value("NDT", tp::RobotConfig::NDT)
+        .value("FDT", tp::RobotConfig::FDT)
+        .value("NDB", tp::RobotConfig::NDB)
+        .value("FDB", tp::RobotConfig::FDB)
+        .value("NUB", tp::RobotConfig::NUB)
+        .value("FUB", tp::RobotConfig::FUB);
+
+    m.def("getRobotConfig",
+          [](const tesseract::kinematics::JointGroup& joint_group,
+             const std::string& base_link,
+             const std::string& tcp_frame,
+             const Eigen::VectorXd& joint_values,
+             const Eigen::Vector2i& sign_correction) {
+              return tp::getRobotConfig<double>(joint_group, base_link, tcp_frame, joint_values, sign_correction);
+          },
+          "joint_group"_a, "base_link"_a, "tcp_frame"_a, "joint_values"_a,
+          "sign_correction"_a = Eigen::Vector2i(1, 1),
+          "Classify the robot kinematic configuration (NUT/FUT/NDT/...) at a joint state. "
+          "sign_correction fixes the sign of joints 3 and 5 per manufacturer (ABB IRB2400: [-1, 1]).");
+
+    m.def("getJointTurns",
+          [](const Eigen::VectorXd& joint_values) {
+              return tp::getJointTurns<double>(joint_values);
+          },
+          "joint_values"_a,
+          "Per-joint turn count (joint_value / pi, truncated); non-zero flags a redundant solution.");
 }
