@@ -25,8 +25,15 @@ __all__ = [
     # Mesh types
     "Mesh",
     "ConvexMesh",
-    "SDFMesh",
     "CompoundMesh",
+    # Signed distance field
+    "SignedDistanceField",
+    "createDiscreteSignedDistanceField",
+    "createSignedDistanceField",
+    "readSignedDistanceFieldNVDB",
+    "readSignedDistanceFieldVDB",
+    "writeSignedDistanceFieldNVDB",
+    "writeSignedDistanceFieldVDB",
     # Octree
     "OcTree",
     "OctreeSubType",
@@ -36,13 +43,10 @@ __all__ = [
     # Mesh loading functions
     "createMeshFromPath",
     "createConvexMeshFromPath",
-    "createSDFMeshFromPath",
     "createMeshFromResource",
     "createConvexMeshFromResource",
-    "createSDFMeshFromResource",
     "createMeshFromBytes",
     "createConvexMeshFromBytes",
-    "createSDFMeshFromBytes",
     # Utilities / conversions
     "isIdentical",
     "extractVertices",
