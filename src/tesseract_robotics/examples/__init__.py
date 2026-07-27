@@ -14,6 +14,7 @@ from .pick_and_place_example import run as pick_and_place_example
 from .puzzle_piece_auxillary_axes_example import run as puzzle_piece_auxillary_axes_example
 from .raster_example import run as raster_example
 from .scene_graph_example import run as scene_graph_example
+from .sdf_collision_example import run as sdf_collision_example
 from .shapes_viewer import main as shapes_viewer
 from .tesseract_collision_example import main as tesseract_collision_example
 from .tesseract_kinematics_example import main as tesseract_kinematics_example
