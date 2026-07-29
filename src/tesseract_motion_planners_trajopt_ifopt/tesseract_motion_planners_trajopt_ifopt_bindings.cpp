@@ -28,6 +28,9 @@
 // trajopt_common for collision config
 #include <trajopt_common/collision_types.h>
 
+// trajopt_sqp for SQPParameters (TrajOptIfoptSolverProfile::opt_params)
+#include <trajopt_sqp/types.h>
+
 // OsqpEigen settings (forwarded setters on TrajOptIfoptOSQPSolverProfile)
 #include <OsqpEigen/Settings.hpp>
 
@@ -42,6 +45,17 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
 
     // Import MotionPlanner base type for clone() return type
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
+    // ========== trajopt_common::TrajOptCollisionConfig ==========
+    // Owned by the trajopt_ifopt module; import so the composite profile's
+    // collision_cost_config / collision_constraint_config members resolve
+    // (same pattern as tesseract_motion_planners_trajopt).
+    nb::module_::import_("tesseract_robotics.trajopt_ifopt._trajopt_ifopt");
+
+    // ========== trajopt_sqp::SQPParameters ==========
+    // Owned by the trajopt_sqp module; import so TrajOptIfoptSolverProfile's
+    // opt_params member resolves.
+    nb::module_::import_("tesseract_robotics.trajopt_sqp._trajopt_sqp");
 
     // ========== TrajOptIfoptCartesianWaypointConfig ==========
     nb::class_<tp::TrajOptIfoptCartesianWaypointConfig>(m, "TrajOptIfoptCartesianWaypointConfig")
@@ -73,7 +87,14 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey);
 
     // ========== TrajOptIfoptSolverProfile (base) ==========
+    // opt_params is the SQP loop itself (max_iterations, max_qp_solver_failures,
+    // trust-region ratios, merit-coeff inflation) -- create() assigns it straight
+    // onto the TrustRegionSQPSolver, so it is the only route to those knobs. The
+    // sco back-end exposes them via TrajOptOSQPSolverProfile; unbound here, an
+    // IFOPT migration silently loses them and runs on C++ defaults (max_iterations
+    // 50, max_qp_solver_failures 3).
     nb::class_<tp::TrajOptIfoptSolverProfile, tc::Profile>(m, "TrajOptIfoptSolverProfile")
+        .def_rw("opt_params", &tp::TrajOptIfoptSolverProfile::opt_params)
         .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey);
 
     // ========== TrajOptIfoptDefaultMoveProfile (was TrajOptIfoptDefaultPlanProfile) ==========
@@ -88,9 +109,17 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     m.attr("TrajOptIfoptDefaultPlanProfile") = m.attr("TrajOptIfoptDefaultMoveProfile");
 
     // ========== TrajOptIfoptDefaultCompositeProfile ==========
-    // Note: longest_valid_segment_fraction/length removed in 0.33, collision config via TrajOptCollisionConfig
+    // Note: longest_valid_segment_fraction/length removed in 0.33, collision config via TrajOptCollisionConfig.
+    // The two collision configs carry max_num_cnt, which ONLY trajopt_ifopt honours
+    // (trajopt_common/collision_types.h: "only used by trajopt_ifopt because the
+    // constraints size must be fixed") -- it caps the collision constraint at that
+    // many rows per timestep, one per worst link pair, so QP size stops tracking
+    // contact count. Unbound they are unreachable and the planner silently runs on
+    // C++ defaults: no margins, no buffers, no modify_collision_objects scoping.
     nb::class_<tp::TrajOptIfoptDefaultCompositeProfile, tp::TrajOptIfoptCompositeProfile>(m, "TrajOptIfoptDefaultCompositeProfile")
         .def(nb::init<>())
+        .def_rw("collision_cost_config", &tp::TrajOptIfoptDefaultCompositeProfile::collision_cost_config)
+        .def_rw("collision_constraint_config", &tp::TrajOptIfoptDefaultCompositeProfile::collision_constraint_config)
         .def_rw("smooth_velocities", &tp::TrajOptIfoptDefaultCompositeProfile::smooth_velocities)
         .def_rw("velocity_coeff", &tp::TrajOptIfoptDefaultCompositeProfile::velocity_coeff)
         .def_rw("smooth_accelerations", &tp::TrajOptIfoptDefaultCompositeProfile::smooth_accelerations)

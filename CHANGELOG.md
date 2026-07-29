@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] — TrajOptIfopt collision configs + SQP tunability
+
+- **TrajOptIfopt collision configs and SQP parameters bound** — `TrajOptIfoptDefaultCompositeProfile` exposed only smoothing and `TrajOptIfoptSolverProfile` only OSQP settings, so from Python the IFOPT planner ran on C++ collision and SQP-loop defaults with no way to reach them. `collision_cost_config` / `collision_constraint_config` (`trajopt_common::TrajOptCollisionConfig`) and `opt_params` (`trajopt_sqp::SQPParameters`) are now bound. `opt_params` sits on the base solver profile — `create()` assigns it straight onto the `TrustRegionSQPSolver`, making it the only route to `max_iterations` (50), `max_qp_solver_failures` (3), the trust-region ratios, and merit-coeff inflation; the sco back-end has always exposed these via `TrajOptOSQPSolverProfile`, so an IFOPT migration silently lost them. The collision configs carry `max_num_cnt`, which **only** trajopt_ifopt honours (the constraint size must be fixed): it caps the collision constraint at that many rows per timestep, one per worst link pair, so QP size stops tracking contact count ([eb92e15]).
+- **`tesseract_motion_planners_trajopt_ifopt` re-exports the types its profiles need** — `TrajOptCollisionConfig`, `SQPParameters`, and `CollisionEvaluatorType` are re-exported from the planner module, matching `tesseract_motion_planners_trajopt`, so configuring a composite or solver profile no longer means importing from `trajopt_ifopt` / `trajopt_sqp` / `tesseract_collision` alongside it. The module's `__all__` also regains `TrajOptIfoptMoveProfile`, `TrajOptIfoptDefaultMoveProfile`, and `ProfileDictionary_addTrajOptIfoptMoveProfile`, which the stub declared but the package never re-exported.
+
 ## [0.35.0.7] — multi-brand emitter subsystem + coordinated external axes
 
 - **Brand-independent multi-dialect emitter** — the ABB-only RAPID emitter (shipped in [0.35.0.1]) is generalised into a typed intermediate representation and lowering pass feeding per-dialect backends over a shared `ProgramBackend` ABC, so a new controller language is a backend, not a fork. Five dialects emit from one tesseract `CompositeInstruction` — ABB **RAPID**, KUKA **KRL**, Fanuc **LS** (TP ASCII), Yaskawa Motoman **JBI** (INFORM), and Universal Robots **URScript** — all exported from `tesseract_robotics.emitters` with a mermaid architecture page. RAPID is reseated onto the core IR and decomposed into `profile` / `targets` / `emit` / `backend` modules; its public surface (`emit_rapid`, `RapidProfile`, `rapid_writer`) is preserved through re-exports, so existing callers are unaffected ([#128]).
@@ -120,7 +125,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 - Non-benchmark tests fail loud instead of being silently skipped ([a1d7607]).
 - Python 3.9 compatibility for example modules via `from __future__ import annotations` ([87ce68e]).
 
-[0.35.0.7]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.6...HEAD
+[0.35.0.8]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.7...HEAD
+[0.35.0.7]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.6...0.35.0.7
 [0.35.0.6]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.5...0.35.0.6
 [0.35.0.5]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.4...0.35.0.5
 [0.35.0.4]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.3...0.35.0.4
@@ -259,6 +265,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [e51946f]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/e51946f
 [0f12535]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/0f12535
 [bcac229]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/bcac229
+[eb92e15]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/eb92e15
 [@Joelkang]: https://github.com/Joelkang
 [@johnwason]: https://github.com/johnwason
 [@marip8]: https://github.com/marip8

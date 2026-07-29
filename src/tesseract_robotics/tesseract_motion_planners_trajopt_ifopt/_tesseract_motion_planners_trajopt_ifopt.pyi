@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
+import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
 
 class TrajOptIfoptCartesianWaypointConfig:
@@ -115,6 +116,18 @@ TrajOptIfoptDefaultPlanProfile: TypeAlias = TrajOptIfoptDefaultMoveProfile
 
 class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
     def __init__(self) -> None: ...
+
+    @property
+    def collision_cost_config(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig: ...
+
+    @collision_cost_config.setter
+    def collision_cost_config(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
+
+    @property
+    def collision_constraint_config(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig: ...
+
+    @collision_constraint_config.setter
+    def collision_constraint_config(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
 
     @property
     def smooth_velocities(self) -> bool: ...

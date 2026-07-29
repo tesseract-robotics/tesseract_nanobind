@@ -154,6 +154,10 @@ def create_trajopt_ifopt_default_profiles(
         - smooth_velocities: False (disabled; requires velocity_coeff sized to DOF)
         - smooth_accelerations: False
         - smooth_jerks: False
+        - collision_cost_config / collision_constraint_config: left at the C++
+          defaults (both enabled, no margins set). Unlike the sco TrajOpt
+          profiles, these are not pre-configured here because the useful margin
+          depends on the robot and scene — see Tuning below.
 
         Plan Profile (applies per waypoint):
         - cartesian_constraint: enabled (enforce Cartesian targets exactly)
@@ -161,6 +165,8 @@ def create_trajopt_ifopt_default_profiles(
 
         Solver Profile (OSQP configuration):
         - Uses default OSQP settings for QP solving
+        - opt_params (the SQP loop) left at the C++ defaults: max_iterations=50,
+          max_qp_solver_failures=3
 
     Args:
         profile_names: Profile names to register (default: TRAJOPT_PROFILE_NAMES)
@@ -181,6 +187,40 @@ def create_trajopt_ifopt_default_profiles(
         result = composer.plan(robot, program,
                               pipeline='TrajOptIfoptPipeline',
                               profiles=profiles)
+
+    Tuning:
+        Both knob sets are reachable from the planner module, which re-exports
+        CollisionEvaluatorType and TrajOptCollisionConfig for this purpose:
+
+        from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+            CollisionEvaluatorType,
+            TrajOptIfoptDefaultCompositeProfile,
+            TrajOptIfoptOSQPSolverProfile,
+        )
+
+        composite = TrajOptIfoptDefaultCompositeProfile()
+        composite.collision_constraint_config.contact_manager_config.default_margin = 0.01
+        composite.collision_constraint_config.collision_check_config.type = (
+            CollisionEvaluatorType.LVS_DISCRETE
+        )
+        # max_num_cnt is honoured by trajopt_ifopt only — it fixes the number of
+        # collision constraint rows per timestep so QP size stops tracking contact count
+        composite.collision_constraint_config.max_num_cnt = 3
+
+        solver = TrajOptIfoptOSQPSolverProfile()
+        solver.opt_params.max_iterations = 100
+
+        The profiles this helper builds can also be retrieved and edited in
+        place — getProfile returns the concrete profile type, not the Profile
+        base. Note that one composite/plan/solver instance is shared by all
+        profile_names, so an edit applies to every registered name:
+
+        composite = profiles.getProfile(
+            TrajOptIfoptDefaultCompositeProfile().getKey(),
+            TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
+            "DEFAULT",
+        )
+        composite.collision_constraint_config.max_num_cnt = 3
     """
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
         ProfileDictionary_addTrajOptIfoptCompositeProfile,
