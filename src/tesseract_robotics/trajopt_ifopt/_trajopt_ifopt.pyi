@@ -189,8 +189,13 @@ def toBounds(lower_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,),
     """Convert lower/upper limit vectors to vector of Bounds"""
 
 class CartPosConstraint(ConstraintSet):
+    @overload
     def __init__(self, position_var: Var, manip: "tesseract_kinematics::JointGroup", source_frame: str, target_frame: str, source_frame_offset: "Eigen::Transform<double, 3, 1, 0>", target_frame_offset: "Eigen::Transform<double, 3, 1, 0>", name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """Create Cartesian position constraint"""
+
+    @overload
+    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], bounds: Sequence[Bounds], manip: "tesseract_kinematics::JointGroup", source_frame: str, target_frame: str, source_frame_offset: "Eigen::Transform<double, 3, 1, 0>", target_frame_offset: "Eigen::Transform<double, 3, 1, 0>", name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+        """Create Cartesian position constraint with per-axis coefficients and bounds. coeffs and bounds are both length 6, ordered [x, y, z, rx, ry, rz]; a zero coefficient frees that axis."""
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""

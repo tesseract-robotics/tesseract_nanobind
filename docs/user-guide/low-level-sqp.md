@@ -88,6 +88,62 @@ Available collision evaluators:
 | `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete) |
 | `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous) |
 
+
+### Per-axis Cartesian constraints
+
+`CartPosConstraint` has two constructors. The short one is an **equality on all six
+axes at unit weight** — the TCP is pinned to the target pose. That form cannot express
+a process constraint, which usually needs one or both of:
+
+* a **free axis** — a rotation the task is indifferent to (about an axis-symmetric
+  tool, say), which must not be pulled back to the target;
+* an **asymmetric bound** — a standoff that may open but never close.
+
+The second constructor takes `coeffs` (per-axis weights) and `bounds`, both length 6
+in `[x, y, z, rx, ry, rz]` order, ahead of `manip`. Build the band with `toBounds`:
+
+```python
+import numpy as np
+from tesseract_robotics import trajopt_ifopt
+from tesseract_robotics.tesseract_common import Isometry3d
+
+#                   x      y        z       rx      ry      rz
+lower = np.array([-5e-4, -5e-4, -1.5e-3, -0.087, -0.087, -np.pi])
+upper = np.array([ 5e-4,  5e-4,  0.0,     0.087,  0.087,  np.pi])
+
+constraint = trajopt_ifopt.CartPosConstraint(
+    var,
+    np.array([1.0, 1.0, 1.0, 1.0, 1.0, 0.0]),  # rz free
+    trajopt_ifopt.toBounds(lower, upper),
+    manip,
+    "tool0",
+    "base_link",
+    Isometry3d.Identity(),
+    Isometry3d.Identity(),
+    "CartPos",
+    trajopt_ifopt.RangeBoundHandling.KEEP_AS_IS,
+)
+```
+
+Two semantics are worth knowing before you rely on the row count:
+
+| Behaviour | Effect |
+|---|---|
+| **Zero coefficient** | Drops that axis' row entirely — six rows become five. This is how an axis is *freed*, not merely de-weighted. |
+| `RangeBoundHandling.KEEP_AS_IS` | Each range stays one row with `[lower, upper]` — the form that preserves an asymmetric band as written. |
+| `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` (default) | Each *range* row becomes two one-sided rows, `g(x) >= lower` and `g(x) <= upper`, so five constrained axes report ten rows. Equality and already one-sided bounds are unaffected. |
+
+Both are prerequisites for adding the term as a **cost** (`IfoptProblem.addCostSet`)
+rather than a hard constraint: as an equality it only ever pulls straight back to the
+target pose, so a soft Cartesian preference is unexpressible and the free axis has to
+be given up entirely.
+
+!!! note "Eigen arguments are required"
+    `coeffs`, `source_frame_offset`, and `target_frame_offset` have no Python-side
+    defaults. Eigen default arguments raise `std::bad_cast` in this module, so pass
+    them explicitly — `Isometry3d.Identity()` where you want no offset.
+
+
 ## SQP Solver Loop
 
 The solver loop: initial global `solve`, then per-tick `setVariables` + `stepSQPSolver`

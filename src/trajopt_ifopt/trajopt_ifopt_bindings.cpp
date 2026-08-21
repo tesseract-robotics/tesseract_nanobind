@@ -260,6 +260,13 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // ========== CartPosConstraint ==========
     // Constructor takes individual parameters (CartPosInfo struct removed)
+    //
+    // range_bound_handling defaults to kSplitToTwoInequalities, matching the C++ ctor
+    // default: every row whose bounds are a true range [lb, ub] is emitted as two
+    // one-sided rows, g(x) >= lb and g(x) <= ub, so the row count grows accordingly.
+    // kKeepAsIs leaves such a row as a single [lb, ub] row instead - the form to pass
+    // when reading back an asymmetric band. Equality and one-sided bounds are unaffected
+    // either way.
     nb::class_<ti::CartPosConstraint, ti::ConstraintSet>(m, "CartPosConstraint")
         .def("__init__", [](ti::CartPosConstraint* self,
                             std::shared_ptr<const ti::Var> position_var,
@@ -281,6 +288,30 @@ NB_MODULE(_trajopt_ifopt, m) {
              "name"_a = "CartPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create Cartesian position constraint")
+        .def("__init__", [](ti::CartPosConstraint* self,
+                            std::shared_ptr<const ti::Var> position_var,
+                            const Eigen::VectorXd& coeffs,
+                            const std::vector<ti::Bounds>& bounds,
+                            std::shared_ptr<const tesseract::kinematics::JointGroup> manip,
+                            std::string source_frame,
+                            std::string target_frame,
+                            const Eigen::Isometry3d& source_frame_offset,
+                            const Eigen::Isometry3d& target_frame_offset,
+                            const std::string& name,
+                            ti::RangeBoundHandling range_bound_handling) {
+                 new (self) ti::CartPosConstraint(position_var, coeffs, bounds, manip,
+                     std::move(source_frame), std::move(target_frame),
+                     source_frame_offset, target_frame_offset,
+                     name, range_bound_handling);
+             },
+             "position_var"_a, "coeffs"_a, "bounds"_a, "manip"_a,
+             "source_frame"_a, "target_frame"_a,
+             "source_frame_offset"_a, "target_frame_offset"_a,
+             "name"_a = "CartPos",
+             "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
+             "Create Cartesian position constraint with per-axis coefficients and "
+             "bounds. coeffs and bounds are both length 6, ordered "
+             "[x, y, z, rx, ry, rz]; a zero coefficient frees that axis.")
         .def("calcValues", &ti::CartPosConstraint::calcValues, "joint_vals"_a,
              "Calculate error values for given joint values")
         .def("getValues", &ti::CartPosConstraint::getValues,
