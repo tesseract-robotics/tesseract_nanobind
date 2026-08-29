@@ -25,7 +25,10 @@ from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorPlanProfile,
+    OMPLSolverConfig,
     ProfileDictionary_addOMPLProfile,
+    RRTConnectConfigurator,
+    SBLConfigurator,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
@@ -55,6 +58,52 @@ class TestPlannerRequest:
     def test_default_constructor(self):
         request = PlannerRequest()
         assert request is not None
+
+
+class TestOMPLSolverConfig:
+    """Test OMPLSolverConfig bindings."""
+
+    def test_defaults(self):
+        """Default-constructed config matches the C++ struct defaults."""
+        config = OMPLSolverConfig()
+        assert config.planning_time == pytest.approx(5.0)
+        assert config.max_solutions == 10
+        assert config.simplify is False
+        assert config.simplify_time == 0.0
+        assert config.optimize is True
+        assert config.getNumPlanners() == 0
+
+    def test_scalar_fields_read_write(self):
+        """Scalar fields round-trip assigned values."""
+        config = OMPLSolverConfig()
+        config.planning_time = 2.0
+        config.max_solutions = 4
+        config.simplify = True
+        config.optimize = False
+        assert config.planning_time == pytest.approx(2.0)
+        assert config.max_solutions == 4
+        assert config.simplify is True
+        assert config.optimize is False
+
+    def test_simplify_time_default(self):
+        """simplify_time defaults to 0.0 (unbounded simplifyMax behavior)."""
+        config = OMPLSolverConfig()
+        assert config.simplify_time == 0.0
+
+    def test_simplify_time_set(self):
+        """simplify_time is read/write and round-trips a positive bound."""
+        config = OMPLSolverConfig()
+        config.simplify_time = 0.5
+        assert config.simplify_time == pytest.approx(0.5)
+
+    def test_add_and_clear_planners(self):
+        """addPlanner / getNumPlanners / clearPlanners manage the planner list."""
+        config = OMPLSolverConfig()
+        config.addPlanner(RRTConnectConfigurator())
+        config.addPlanner(SBLConfigurator())
+        assert config.getNumPlanners() == 2
+        config.clearPlanners()
+        assert config.getNumPlanners() == 0
 
 
 class TestOMPLMotionPlanner:
