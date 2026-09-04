@@ -89,17 +89,6 @@ meshes = createConvexMeshFromPath("model.stl")
 convex = meshes[0]
 ```
 
-### SDFMesh
-
-Signed distance field mesh.
-
-```python
-from tesseract_robotics.tesseract_geometry import SDFMesh, createSDFMeshFromPath
-
-meshes = createSDFMeshFromPath("model.stl")
-sdf = meshes[0]
-```
-
 ### CompoundMesh
 
 Multiple mesh parts as single geometry.
@@ -110,6 +99,135 @@ from tesseract_robotics.tesseract_geometry import CompoundMesh
 # Combine multiple meshes
 compound = CompoundMesh(meshes)
 ```
+
+## SignedDistanceField
+
+A volumetric geometry: instead of a surface, it stores the signed distance to a surface —
+negative inside, zero on it, positive outside — sampled on a regular axis-aligned grid in the
+geometry's local frame. That yields distance and gradient *everywhere* in the volume, including
+for concave shapes a convex hull cannot represent, which is what trajectory optimization
+consumes. The discrete Bullet and FCL contact managers support it; continuous (cast) managers
+do not, because the field is concave.
+
+!!! note
+    Unrelated to the Gazebo "SDF" Simulation Description Format. This replaces the old
+    `SDFMesh`, which was a *mesh* despite the name.
+
+### From a distance function
+
+The usual entry point. `createDiscreteSignedDistanceField` evaluates your callable once per grid
+point and keeps only the samples, so the returned geometry is pure data — it holds no reference
+to your Python objects and takes no GIL during collision checking.
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_geometry import createDiscreteSignedDistanceField
+
+def sphere(point):            # negative inside, positive outside
+    return float(np.linalg.norm(point) - 0.5)
+
+field = createDiscreteSignedDistanceField(
+    sphere,
+    domain_min=np.array([-1.0, -1.0, -1.0]),
+    domain_max=np.array([1.0, 1.0, 1.0]),
+    dimensions=np.array([33, 33, 33], dtype=np.int32),  # >= 2 per axis
+)
+
+field.getDistance(np.zeros(3))   # -0.5
+```
+
+Pass `batched=True` to receive every sample point as one `(N, 3)` float64 array and return `N`
+distances — the fast path for a vectorised or GPU evaluator, and one Python call instead of
+`dimensions.prod()`:
+
+```python
+field = createDiscreteSignedDistanceField(
+    lambda points: np.linalg.norm(points, axis=1) - 0.5,
+    np.array([-1.0, -1.0, -1.0]),
+    np.array([1.0, 1.0, 1.0]),
+    np.array([33, 33, 33], dtype=np.int32),
+    batched=True,
+)
+```
+
+### From a grid you already have
+
+`distances` is flat and ordered x-fastest (`index = i + nx*(j + ny*k)`), so a numpy grid built
+with `indexing="ij"` transfers with `ravel(order="F")` and comes back with `reshape(..., order="F")`.
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_geometry import SignedDistanceField
+
+dims = np.array([33, 33, 33], dtype=np.int32)
+lo, hi = np.full(3, -1.0), np.full(3, 1.0)
+
+x, y, z = np.meshgrid(*[np.linspace(lo[i], hi[i], dims[i]) for i in range(3)], indexing="ij")
+grid = np.sqrt(x**2 + y**2 + z**2) - 0.5
+
+field = SignedDistanceField(lo, hi, dims, grid.ravel(order="F"))
+assert np.allclose(field.getDistances().reshape(dims, order="F"), grid)
+```
+
+### From a VDB file
+
+Fields round-trip through the standard OpenVDB and NanoVDB grid formats as raw bytes, so a field
+baked offline loads directly. The local `scale` is not stored in the grid and is supplied on read.
+
+```python
+from pathlib import Path
+from tesseract_robotics.tesseract_geometry import (
+    readSignedDistanceFieldVDB, writeSignedDistanceFieldVDB,
+)
+
+field = readSignedDistanceFieldVDB(Path("part.vdb").read_bytes())
+Path("out.vdb").write_bytes(writeSignedDistanceFieldVDB(field))
+```
+
+`readSignedDistanceFieldNVDB` / `writeSignedDistanceFieldNVDB` do the same for NanoVDB. Both
+readers accept exactly one `FloatGrid` with an axis-aligned, uniformly scaled transform.
+
+### Lazy fields
+
+`createSignedDistanceField` keeps your callable as the field's source of truth instead of
+sampling up front, so queries are exact rather than trilinearly interpolated. `dimensions` then
+only sets the resolution used if the grid is ever materialized (on serialization, comparison, or
+an explicit `discretize()`).
+
+Prefer the discrete form unless you need that exactness. A lazy field must be thread-safe, and it
+holds a reference to your callable — so storing one in a module-level global forms a reference
+cycle the garbage collector cannot see through (the callable reaches its `__globals__`, which
+reaches the field, and nanobind instances have no `tp_traverse`).
+
+```python
+from tesseract_robotics.tesseract_geometry import createSignedDistanceField
+
+field = createSignedDistanceField(sphere, lo, hi, dims)
+field.isDiscretized()   # False
+field.getDistance(p)    # exact - calls sphere(p)
+field.discretize()      # materialize the grid up front
+```
+
+!!! warning "Discretize before using a lazy field for collision"
+    The collision backends call `getDistance()` **once per sample point**, and each call
+    re-acquires the GIL. `contactTest` releases the GIL specifically so trajectory sweeps can run
+    in parallel across threads; a lazy field hands that parallelism straight back to the
+    interpreter. Bullet also transcodes the field into its own grid when the geometry is added to
+    a manager, which is one Python call per lattice point.
+
+    `discretize()` up front fixes both — afterwards the sampler is never invoked again and the
+    field behaves like pure data:
+
+    ```python
+    field.discretize()          # pay the sampling cost once, under your control
+    create_obstacle(robot, name="field", geometry=field)
+    ```
+
+    Note `discretize()` holds a *process-wide* static mutex while calling the sampler, so it must
+    never run on a thread that has released the GIL: that thread would hold the mutex and block on
+    the GIL while a Python thread holding the GIL blocks on the mutex. The bindings avoid this (the
+    VDB writers discretize before releasing the GIL); avoid arranging it yourself from a C++
+    callback.
 
 ## Octree
 
@@ -237,7 +355,7 @@ copy = geom.clone()
 | `PLANE` | Infinite plane |
 | `MESH` | Triangle mesh |
 | `CONVEX_MESH` | Convex hull |
-| `SDF_MESH` | Signed distance field |
+| `SIGNED_DISTANCE_FIELD` | Volumetric signed distance field |
 | `OCTREE` | Occupancy octree |
 | `COMPOUND_MESH` | Multiple meshes |
 
@@ -249,9 +367,11 @@ copy = geom.clone()
 | `createMeshFromResource(resource, scale)` | Load mesh from Resource |
 | `createConvexMeshFromPath(path, scale)` | Load as convex hull |
 | `createConvexMeshFromResource(resource, scale)` | Convex from Resource |
-| `createSDFMeshFromPath(path, scale)` | Load as SDF mesh |
-| `createSDFMeshFromResource(resource, scale)` | SDF from Resource |
 | `createOctree(point_cloud, resolution, prune, binary)` | Build an octomap OcTree from a `PointCloud` |
+| `createDiscreteSignedDistanceField(sdf, domain_min, domain_max, dimensions, scale, batched)` | Sample a distance function onto a grid |
+| `createSignedDistanceField(sdf, domain_min, domain_max, dimensions, scale, batched)` | Lazy field backed by a distance function |
+| `readSignedDistanceFieldVDB(data, scale)` / `writeSignedDistanceFieldVDB(sdf)` | OpenVDB `FloatGrid` bytes ↔ field |
+| `readSignedDistanceFieldNVDB(data, scale)` / `writeSignedDistanceFieldNVDB(sdf)` | NanoVDB `FloatGrid` bytes ↔ field |
 
 ## Auto-generated API Reference
 

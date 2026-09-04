@@ -60,6 +60,13 @@ def test_pointcloud_octree_collision_example():
     tesseract_robotics.examples.pointcloud_octree_collision_example(cloud)
 
 
+@pytest.mark.basic
+def test_sdf_collision_example():
+    # Self-contained: the example generates its own URDF/SRDF/contact-manager YAML
+    # into a temp dir, so there is no support-data dependency to thread through.
+    tesseract_robotics.examples.sdf_collision_example()
+
+
 @pytest.mark.planning
 def test_freespace_ompl_example():
     tesseract_robotics.examples.freespace_ompl_example()
