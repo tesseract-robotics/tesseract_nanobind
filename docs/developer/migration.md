@@ -185,7 +185,7 @@ composite_profile.smooth_velocities = True
 # collision_cost_config is TrajOptCollisionConfig, not CollisionCostConfig
 composite_profile.collision_cost_config.enabled = True
 composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.LVS_CONTINUOUS
-composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025
 composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 
 # Register profiles
@@ -297,8 +297,8 @@ trajopt_plan_profile.cartesian_constraint_config.coeff = np.array([10.0, 10.0, 1
 trajopt_composite_profile = TrajOptDefaultCompositeProfile()
 trajopt_composite_profile.collision_constraint_config.enabled = False
 trajopt_composite_profile.collision_cost_config.enabled = True
-# collision_margin_buffer replaces safety_margin
-trajopt_composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+# contact_manager_config.default_margin replaces safety_margin
+trajopt_composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025
 # CollisionEvaluatorType is now in tesseract_collision; DISCRETE replaces SINGLE_TIMESTEP
 trajopt_composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 # collision_coeff_data.setDefaultCollisionCoeff() replaces .coeff
@@ -312,10 +312,24 @@ ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask
 ### 0.33 API Changes Summary
 
 **TrajOptCollisionConfig** (replaces CollisionCostConfig/CollisionConstraintConfig):
-- `collision_margin_buffer` - margin beyond contact (replaces `safety_margin`)
+- `contact_manager_config.default_margin` - the clearance the term drives toward (replaces
+  `safety_margin`); the first argument of `TrajOptCollisionConfig(margin, coeff)`
+- `collision_margin_buffer` - extra distance past the margin within which contacts are
+  collected but add no error (replaces `safety_margin_buffer`)
 - `collision_check_config.type` - collision evaluator type
 - `collision_check_config.longest_valid_segment_length` - interpolation control
 - `collision_coeff_data.setDefaultCollisionCoeff(coeff)` - collision cost coefficient
+
+!!! warning "Porting `safety_margin` onto `collision_margin_buffer` leaves the term with no margin"
+    A default-constructed `TrajOptCollisionConfig` has no margin (`default_margin` is `None`),
+    so the contact manager's own margin applies, which is 0 m unless the environment sets one:
+    the term only engages at contact, and the optimizer pulls the path onto the obstacle's
+    surface. The buffer is documented in trajopt_common as "not used when calculating the
+    error", so moving the old margin there changes nothing about where the path settles. The
+    planning factories carried exactly this port until #103: over OMPL seeds 1-100 the
+    freespace example's trajectory passed a median 0.17 mm from its obstacle, and 3 seeds
+    failed the pipeline's contact check at -0.0000 m. With the cost margin set, the closest
+    pass was 4.98 mm and none failed.
 
 **CollisionEvaluatorType** (moved to `tesseract_collision`):
 - `DISCRETE` - check at each waypoint (was `SINGLE_TIMESTEP`)

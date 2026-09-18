@@ -76,7 +76,7 @@ profile = TrajOptDefaultCompositeProfile()
 
 # Collision avoidance — collision_*_config is a TrajOptCollisionConfig
 profile.collision_cost_config.enabled = True
-profile.collision_cost_config.collision_margin_buffer = 0.025
+profile.collision_cost_config.contact_manager_config.default_margin = 0.025
 profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
@@ -105,10 +105,15 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 # Constructor: TrajOptCollisionConfig(margin, coeff) or default
 config = TrajOptCollisionConfig(0.025, 20.0)  # margin=2.5cm, coeff=20
 config.enabled = True
-config.collision_margin_buffer = 0.005  # additional buffer beyond margin
+config.collision_margin_buffer = 0.005  # collect contacts 5mm past the margin
 config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 config.collision_check_config.longest_valid_segment_length = 0.05  # for LVS modes
 ```
+
+The margin (`contact_manager_config.default_margin`, the constructor's first argument) is
+the clearance the term drives toward. `collision_margin_buffer` only widens contact
+collection and adds no error. A default-constructed config has no margin: the term engages
+only at contact and TrajOpt settles paths on the obstacle's surface.
 
 ### CollisionEvaluatorType
 
@@ -169,7 +174,7 @@ plan_profile.cartesian_constraint_config.coeff = np.array([10.0, 10.0, 10.0, 5.0
 # Composite profile (trajectory-wide)
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.collision_cost_config.enabled = True
-composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025
 composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 composite_profile.smooth_velocities = True
@@ -199,7 +204,7 @@ plan_profile.cartesian_constraint_config.coeff = np.array([10, 10, 10, 5, 5, 5])
 
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.collision_cost_config.enabled = True
-composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025
 composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 composite_profile.smooth_velocities = True
@@ -237,7 +242,7 @@ export TRAJOPT_LOG_THRESH=ERROR  # FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 
 1. **Use as refinement** - TrajOpt works best refining OMPL paths
 2. **Start with collision cost** - easier to tune than hard constraints
-3. **Increase collision_margin_buffer** if collisions occur
+3. **Increase the margin** (`contact_manager_config.default_margin`) if paths pass too close; the buffer only widens contact collection
 4. **Use LVS_DISCRETE** for better collision coverage
 5. **Tune coefficients** - higher = stricter enforcement
 

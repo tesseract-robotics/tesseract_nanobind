@@ -59,8 +59,16 @@ def _create_trajopt_profiles():
     # LVS_CONTINUOUS: Longest Valid Segment continuous collision checking
     # Critical for large attached objects that could pass through obstacles
 
+    # The margin is the clearance each term drives toward. C++ sets it through
+    # TrajOptCollisionConfig(margin, coeff); collision_margin_buffer only widens contact
+    # collection and is "not used when calculating the error" (trajopt_common). Without the
+    # cost's margin the soft term never pushed the path off an obstacle, TrajOpt converged
+    # onto the zero-distance boundary, and the pipeline's own DiscreteContactCheckTask
+    # rejected it whenever the solver's ~1e-5 m residual came out negative (#103).
+
     # Constraint config: margin=0, coeff=10 (hard constraint at zero margin)
     composite.collision_constraint_config.enabled = True
+    composite.collision_constraint_config.contact_manager_config.default_margin = 0.0
     composite.collision_constraint_config.collision_margin_buffer = 0.005
     composite.collision_constraint_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS
@@ -70,6 +78,7 @@ def _create_trajopt_profiles():
 
     # Cost config: margin=0.005, coeff=50 (soft cost pushing away from obstacles)
     composite.collision_cost_config.enabled = True
+    composite.collision_cost_config.contact_manager_config.default_margin = 0.005
     composite.collision_cost_config.collision_margin_buffer = 0.01
     composite.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.LVS_CONTINUOUS

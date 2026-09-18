@@ -56,8 +56,8 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptOSQPSolverProfile,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
-    TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    ISPCompositeProfile,
+    IterativeSplineParameterization,
 )
 
 TesseractViewer = None
@@ -69,8 +69,7 @@ OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
 # OSQP's default adaptive_rho_interval=0 adapts rho on wall-clock timing, making
-# the optimized trajectory nondeterministic run-to-run (and downstream TOTG time
-# parameterization a coin flip near its failure region, see #103). A fixed
+# the optimized trajectory nondeterministic run-to-run (see #103). A fixed
 # iteration interval keeps the solver deterministic; 25 iterations approximates
 # OSQP's own time-based adaptation cadence.
 OSQP_ADAPTIVE_RHO_INTERVAL = 25
@@ -195,20 +194,26 @@ def main():
     trajopt_results_instruction = trajopt_response.results
 
     # === Time Parameterization ===
+    # Iterative spline parameterization, as tesseract's own TrajOptIfoptTask does after
+    # the optimizer. Time-optimal TOTG fails on a share of TrajOptIfopt's trajectories:
+    # its corner blends degenerate on the short segments the optimizer leaves, and it
+    # stops with "Negative path velocity". Across OMPL seeds 1-200, TOTG failed 14 of
+    # this example's trajectories and ISP none (#103). A fixed seed hid that on Linux
+    # and macOS; on Windows OMPL is a static library the seed cannot reach.
     # 0.33 API: TimeParameterization.compute() takes (CompositeInstruction, Environment, ProfileDictionary)
     # instead of (InstructionsTrajectory, velocity, acceleration, jerk) arrays.
     print("Running time parameterization...")
-    time_param = TimeOptimalTrajectoryGeneration()
+    time_param = IterativeSplineParameterization()
 
     # Create profile with velocity/acceleration scaling
-    totg_profile = TOTGCompositeProfile()
-    totg_profile.max_velocity_scaling_factor = 1.0
-    totg_profile.max_acceleration_scaling_factor = 1.0
+    isp_profile = ISPCompositeProfile()
+    isp_profile.max_velocity_scaling_factor = 1.0
+    isp_profile.max_acceleration_scaling_factor = 1.0
 
-    # Create profile dictionary for time parameterization
-    # Note: namespace is "TOTG" (or any string), profile name is "DEFAULT"
+    # The profile namespace must be the algorithm's name ("ISP"): a profile registered
+    # under any other namespace is not found, and compute() silently uses defaults.
     time_profiles = ProfileDictionary()
-    time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
+    time_profiles.addProfile(time_param.getName(), "DEFAULT", isp_profile)
 
     assert time_param.compute(trajopt_results_instruction, t_env, time_profiles)
     print("Time parameterization complete")

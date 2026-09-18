@@ -171,7 +171,7 @@ plan_profile.cartesian_constraint_config.coeff = [5, 5, 5, 5, 5, 5]  # Position/
 # Composite profile (trajectory-wide settings)
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.collision_cost_config.enabled = True
-composite_profile.collision_cost_config.collision_margin_buffer = 0.025  # 2.5cm buffer
+composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025  # 2.5cm margin
 composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 composite_profile.smooth_velocities = True
@@ -186,13 +186,20 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # TrajOptCollisionConfig constructor: (margin, coeff) or default
 collision_config = TrajOptCollisionConfig(0.025, 20.0)  # margin=2.5cm, coeff=20
-collision_config.collision_margin_buffer = 0.005  # Additional buffer
+collision_config.collision_margin_buffer = 0.005  # collect contacts 5mm past the margin
 collision_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 collision_config.collision_check_config.longest_valid_segment_length = 0.05  # For LVS modes
 ```
 
 `TrajOptCollisionConfig` lives in `trajopt_ifopt` (trajopt_common) and is
 re-exported from `tesseract_motion_planners_trajopt`, so either import works.
+
+The margin is the clearance the term drives toward; it lives in
+`contact_manager_config.default_margin`, which the constructor's first argument sets.
+`collision_margin_buffer` only widens the distance within which contacts are collected and
+adds no error, so it cannot stand in for the margin. A default-constructed config has no
+margin (`default_margin` is `None`): the term then engages only at contact, and TrajOpt
+settles paths on the obstacle's surface, where a later contact check can reject them.
 
 ## Costs vs Constraints (Soft vs Hard)
 
@@ -232,14 +239,14 @@ profile = TrajOptDefaultCompositeProfile()
 # SOFT: Collision as cost - allows temporary violations during optimization
 # Good for finding paths through tight spaces
 profile.collision_cost_config.enabled = True
-profile.collision_cost_config.collision_margin_buffer = 0.025  # 2.5cm
+profile.collision_cost_config.contact_manager_config.default_margin = 0.025  # 2.5cm
 profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
 # HARD: Collision as constraint - must be satisfied at solution
 # Guarantees collision-free result (but may fail to find solution)
 profile.collision_constraint_config.enabled = True
-profile.collision_constraint_config.collision_margin_buffer = 0.01  # 1cm (tighter)
+profile.collision_constraint_config.contact_manager_config.default_margin = 0.01  # 1cm (tighter)
 profile.collision_constraint_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 ```
 

@@ -1376,6 +1376,23 @@ class TestProfileCreation:
 
         assert isinstance(profiles, ProfileDictionary)
 
+    def test_trajopt_collision_margins_match_cpp_car_seat(self):
+        """The margins C++ car_seat_example.cpp passes to TrajOptCollisionConfig(margin, coeff).
+
+        The cost's 5 mm margin is what holds a path off an obstacle; the buffer only widens contact
+        collection. Porting the buffer without the margin left the cost inert, and TrajOpt then
+        parked paths on the zero-distance boundary that DiscreteContactCheckTask rejects (#103).
+        """
+        from tesseract_robotics.planning.profiles import _create_trajopt_profiles
+
+        composite, _ = _create_trajopt_profiles()
+        constraint = composite.collision_constraint_config
+        cost = composite.collision_cost_config
+        assert constraint.contact_manager_config.default_margin == 0.0
+        assert cost.contact_manager_config.default_margin == 0.005
+        assert constraint.collision_margin_buffer == 0.005
+        assert cost.collision_margin_buffer == 0.01
+
     def test_create_trajopt_default_profiles_custom_names(self):
         """Test TrajOpt profile creation with custom names."""
         from tesseract_robotics.planning import create_trajopt_default_profiles

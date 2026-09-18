@@ -198,9 +198,10 @@ Checks collision along a trajectory segment (swept volume):
 Interpolates between waypoints and checks at discrete points:
 
 ```python
-# Configured via collision_margin_buffer
+# Configured via the collision check config
 collision_config = TrajOptCollisionConfig(margin=0.1, coeff=10.0)
-collision_config.collision_margin_buffer = 0.10
+collision_config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
+collision_config.collision_check_config.longest_valid_segment_length = 0.05  # check every 5cm
 ```
 
 ## Python Binding Notes

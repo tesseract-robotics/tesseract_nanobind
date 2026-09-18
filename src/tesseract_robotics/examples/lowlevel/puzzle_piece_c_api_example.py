@@ -17,7 +17,7 @@ Key concepts:
 C++ reference values:
 - Initial joints: [-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0]
 - Cartesian constraint coeff: [10, 10, 10, 10, 10, 0]
-- Collision cost: collision_margin_buffer=0.025m, coeff=20 (0.33 API)
+- Collision cost: margin=0.025m, coeff=20 (TrajOptCollisionConfig(0.025, 20))
 - ManipulatorInfo: manipulator="manipulator", tcp="grinder_frame", working_frame="part"
 """
 
@@ -194,10 +194,12 @@ def main():
     trajopt_composite_profile.collision_cost_config.enabled = True
 
     # 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig
-    # collision_margin_buffer: additional margin beyond contact (25mm)
+    # contact_manager_config.default_margin: the clearance the cost drives toward (25mm),
+    #   was safety_margin; collision_margin_buffer (was safety_margin_buffer) only widens
+    #   contact collection past it and adds no cost
     # collision_check_config.type: DISCRETE (was SINGLE_TIMESTEP)
     # collision_coeff_data: per-pair coefficients (default coeff = 20.0)
-    trajopt_composite_profile.collision_cost_config.collision_margin_buffer = 0.025
+    trajopt_composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025
     trajopt_composite_profile.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.DISCRETE
     )
