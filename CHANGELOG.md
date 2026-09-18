@@ -1,7 +1,11 @@
 # Changelog
 
-## [Unreleased] — TrajOptIfopt collision configs + SQP tunability + per-axis Cartesian constraints
+## [Unreleased] — TrajOptIfopt tuning + Cartesian planning fixes
 
+- **Cartesian planning works with the default pipeline** — `plan_cartesian()` and `TaskComposer.plan_cartesian()` now select the registered, double-precision `DescartesDPipeline`; the previous `DescartesPipeline` name did not exist in the generated configuration. Pipeline names and Descartes setup-cost guidance are corrected in the API and user guides ([74c00ef9]).
+- **Planning failures identify the failing task** — `PlanningResult.message` now reports the failed node and its specific diagnostic, such as a TrajOpt iteration limit or a failed contact check, instead of hiding it behind `ErrorTask: Error (Abort Triggered)` ([74c00ef9]).
+- **Basic Cartesian examples match the C++ scene and tool orientation** — both the high-level and low-level examples now build the reference obstacle from point-cloud data as an octree, replacing the smaller solid box, and use the reference TrajOpt profiles. The Eigen quaternion is correctly reordered to scalar-last `[0, 1, 0, 0]`, restoring the intended downward tool orientation ([74c00ef9]).
+- **macOS OpenMP troubleshooting** — documented the duplicate `libomp` runtime problem when a bundled wheel is installed alongside conda NumPy, including diagnosis and installation guidance for multithreaded Descartes crashes; the packaging limitation remains unresolved ([74c00ef9]).
 - **TrajOptIfopt collision configs and SQP parameters bound** — `TrajOptIfoptDefaultCompositeProfile` exposed only smoothing and `TrajOptIfoptSolverProfile` only OSQP settings, so from Python the IFOPT planner ran on C++ collision and SQP-loop defaults with no way to reach them. `collision_cost_config` / `collision_constraint_config` (`trajopt_common::TrajOptCollisionConfig`) and `opt_params` (`trajopt_sqp::SQPParameters`) are now bound. `opt_params` sits on the base solver profile — `create()` assigns it straight onto the `TrustRegionSQPSolver`, making it the only route to `max_iterations` (50), `max_qp_solver_failures` (3), the trust-region ratios, and merit-coeff inflation; the sco back-end has always exposed these via `TrajOptOSQPSolverProfile`, so an IFOPT migration silently lost them. The collision configs carry `max_num_cnt`, which **only** trajopt_ifopt honours (the constraint size must be fixed): it caps the collision constraint at that many rows per timestep, one per worst link pair, so QP size stops tracking contact count ([eb92e15]).
 - **`tesseract_motion_planners_trajopt_ifopt` re-exports the types its profiles need** — `TrajOptCollisionConfig`, `SQPParameters`, and `CollisionEvaluatorType` are re-exported from the planner module, matching `tesseract_motion_planners_trajopt`, so configuring a composite or solver profile no longer means importing from `trajopt_ifopt` / `trajopt_sqp` / `tesseract_collision` alongside it. The module's `__all__` also regains `TrajOptIfoptMoveProfile`, `TrajOptIfoptDefaultMoveProfile`, and `ProfileDictionary_addTrajOptIfoptMoveProfile`, which the stub declared but the package never re-exported.
 - **`CartPosConstraint`'s per-axis coefficients + bounds constructor bound** — only the equality-form ctor was wired, so from Python the constraint was an equality on all six axes at unit weight, with no way to free an axis or give one an asymmetric bound. The second C++ ctor (`coeffs`, `std::vector<Bounds>`) is now an additive overload, so existing callers are unaffected; `toBounds(lower, upper)` was already exposed to build the band. See *Low-Level SQP API → Per-axis Cartesian constraints* in the user guide for what the coefficients and `RangeBoundHandling` do.
@@ -130,7 +134,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 - Non-benchmark tests fail loud instead of being silently skipped ([a1d7607]).
 - Python 3.9 compatibility for example modules via `from __future__ import annotations` ([87ce68e]).
 
-[0.35.0.8]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.7...HEAD
+[Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.7...HEAD
 [0.35.0.7]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.6...0.35.0.7
 [0.35.0.6]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.5...0.35.0.6
 [0.35.0.5]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.4...0.35.0.5
@@ -272,6 +276,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [0f12535]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/0f12535
 [bcac229]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/bcac229
 [eb92e15]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/eb92e15
+[74c00ef9]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/74c00ef9
 [@Joelkang]: https://github.com/Joelkang
 [@johnwason]: https://github.com/johnwason
 [@marip8]: https://github.com/marip8
