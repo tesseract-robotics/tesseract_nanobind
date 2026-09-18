@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased] — TrajOptIfopt tuning + Cartesian planning fixes
+## [Unreleased]
+
+## [0.35.0.7] — TrajOptIfopt tuning + Cartesian planning fixes
 
 - **Cartesian planning works with the default pipeline** — `plan_cartesian()` and `TaskComposer.plan_cartesian()` now select the registered, double-precision `DescartesDPipeline`; the previous `DescartesPipeline` name did not exist in the generated configuration. Pipeline names and Descartes setup-cost guidance are corrected in the API and user guides ([74c00ef9]).
 - **Planning failures identify the failing task** — `PlanningResult.message` now reports the failed node and its specific diagnostic, such as a TrajOpt iteration limit or a failed contact check, instead of hiding it behind `ErrorTask: Error (Abort Triggered)` ([74c00ef9]).
@@ -135,6 +137,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 - Python 3.9 compatibility for example modules via `from __future__ import annotations` ([87ce68e]).
 
 [Unreleased]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.7...HEAD
+[0.35.0.8]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.7...0.35.0.8
 [0.35.0.7]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.6...0.35.0.7
 [0.35.0.6]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.5...0.35.0.6
 [0.35.0.5]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.35.0.4...0.35.0.5
