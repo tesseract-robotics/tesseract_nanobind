@@ -60,7 +60,7 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
 
 === "Cartesian (Descartes)"
 
-    `plan_cartesian` drives the `DescartesPipeline` — Descartes graph search for
+    `plan_cartesian` drives the `DescartesDPipeline` — Descartes graph search for
     precise Cartesian paths, with TrajOpt smoothing. Use this when the program
     contains `CartesianTarget` waypoints and you need tool-pose accuracy.
 
@@ -410,6 +410,33 @@ profiles.addProfile(
     itself runs single-threaded — only IK sampling parallelizes. Keep
     the Python evaluate body tight (numpy ops, no allocations) for best
     throughput.
+
+    On macOS, `num_threads > 1` may not be available at all: a wheel
+    installed into a conda or pixi environment brings a second OpenMP
+    runtime, and the ladder solver segfaults above one thread. See
+    [macOS Wheel Gotchas](../developer/macos-wheels.md).
+
+!!! warning "With vertex collision on, a Descartes solve is dominated by setup, not search"
+    Building each waypoint's sampler constructs a `DescartesCollision`, which
+    clones the environment's Bullet contact manager — and a Bullet clone
+    rebuilds and zero-fills its pool allocators. A `sample` profile of
+    `DescartesMotionPlannerD.solve` on a 419-waypoint contour
+    (`abb_irb2400`, redundant solutions on) puts ~97 % of the solve there,
+    serially on the calling thread, before the parallel ladder build starts;
+    the OpenMP workers wait throughout.
+
+    | Vertex collision | Threads | Wall | CPU / wall |
+    |---|---|---|---|
+    | on | 1 | 435.4 ms | 1.00 |
+    | on | 8 | 432.3 ms | 1.02 |
+    | off | 1 | 2.7 ms | 1.00 |
+    | off | 8 | 1.9 ms | 1.78 |
+
+    So `num_threads` changes nothing measurable while vertex collision is
+    on, and the graph search itself is cheap. Turning vertex collision off
+    needs `allow_collision = True` as well, or the planner refuses for want
+    of a checker — and then collisions must be checked elsewhere, for
+    instance by the pipeline's own `DiscreteContactCheckTask`.
 
 !!! tip "Use for joint-continuity across rasters"
     A custom edge evaluator is the cleanest way to globally enforce

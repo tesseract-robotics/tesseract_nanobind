@@ -160,7 +160,7 @@ See `TaskComposer.get_available_pipelines()` at runtime for the full 36.
 ```python
 composer.plan_freespace(robot, program)   # TrajOptPipeline
 composer.plan_ompl(robot, program)        # OMPLPipeline
-composer.plan_cartesian(robot, program)   # DescartesPipeline
+composer.plan_cartesian(robot, program)   # DescartesDPipeline
 ```
 
 Or use the module-level functions from `tesseract_robotics.planning`:

@@ -25,7 +25,10 @@ See the source at
 
 ## Basic Cartesian
 
-Cartesian straight-line motion with TrajOpt:
+Cartesian straight-line motion with TrajOpt, past an obstacle built from point-cloud data: the
+C++ example's octomap, a 1 m cube of points voxelised into 1000 boxes of 0.1 m — the collision
+load a scanned part presents. Replace the generated grid with a scanner's points and the rest of
+the example is unchanged:
 
 ```bash
 tesseract_basic_cartesian_example

@@ -261,8 +261,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     print("\n=== PLACE ===")
 
     # Place pose: middle_left_shelf from C++ example
-    # Quaternion (w=0, x=0, y=0.7071, z=0.7071) = 90 deg around Z
-    # Rotation matrix: [[-1,0,0], [0,0,1], [0,1,0]]
+    # C++ Eigen::Quaterniond(0, 0, 0.7071068, 0.7071068) is scalar-first (w=0, x=0, y=0.7071,
+    # z=0.7071): with w = 0 it is a 180 deg rotation about the axis (0, 1, 1)/sqrt(2), whose
+    # matrix is 2 n n^T - I = [[-1,0,0], [0,0,1], [0,1,0]]
     place_rotation = np.array([[-1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
     place_pos = [-0.148856, 0.73085, 1.16]  # middle_left_shelf coordinates
     place_pose = Pose.from_matrix_position(place_rotation, place_pos)

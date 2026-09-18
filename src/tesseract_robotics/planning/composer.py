@@ -153,6 +153,45 @@ class PlanningResult:
         return np.array([pt.positions for pt in self.trajectory])
 
 
+# What a pipeline's ErrorTask, the pipeline node, and every composite a failure propagates
+# through report. The node that actually failed carries its own, specific message.
+ABORT_PROPAGATION_MESSAGE = "Error (Abort Triggered)"
+# TaskComposerNodeInfo.status_code of a node that took its failure branch.
+FAILED_STATUS_CODE = 0
+
+
+def _failure_message(infos, aborting=None) -> str:
+    """Name the node that failed, not the ErrorTask a pipeline routes every failure into.
+
+    When a node fails, the pipeline triggers an abort, and its ErrorTask, the pipeline itself and each
+    composite on the way up all report "Error (Abort Triggered)". The informative message — a planner
+    that ran out of iterations, a contact check that found a collision — is on the node that failed.
+    Reporting the aborting node alone returned "ErrorTask: Error (Abort Triggered)" for a TrajOpt
+    solve that had ended at OPT_SCO_ITERATION_LIMIT.
+
+    Args:
+        infos: The failed run's ``TaskComposerNodeInfo`` objects (``name``, ``status_code``,
+            ``status_message``).
+        aborting: ``getAbortingNodeInfo()``, reported when no node carries a specific message.
+
+    Returns:
+        ``"<node>: <message>"`` for every failed node with a specific message, sorted by node and
+        joined with ``"; "``; else the aborting node's message; else ``"Planning failed"``.
+    """
+    specific = sorted(
+        f"{info.name}: {info.status_message}"
+        for info in infos
+        if info.status_code == FAILED_STATUS_CODE
+        and info.status_message
+        and info.status_message != ABORT_PROPAGATION_MESSAGE
+    )
+    if specific:
+        return "; ".join(specific)
+    if aborting is not None and aborting.status_message:
+        return f"{aborting.name}: {aborting.status_message}"
+    return "Planning failed"
+
+
 class TaskComposer:
     """
     High-level interface for task composer planning pipelines.
@@ -160,12 +199,14 @@ class TaskComposer:
     Wraps the TaskComposerPluginFactory and handles all the AnyPoly
     boilerplate for setting up and running planning tasks.
 
-    Available Pipelines:
-        FreespaceMotionPipeline: OMPL + TrajOpt smoothing + time param (recommended)
-        CartesianMotionPipeline: Cartesian path with TrajOpt
+    Available Pipelines (the full registry: ``get_available_pipelines()``):
+        FreespacePipeline: OMPL + TrajOpt smoothing + time param (recommended)
+        CartesianPipeline: Cartesian path with TrajOpt
         OMPLPipeline: OMPL sampling-based planning only
         TrajOptPipeline: TrajOpt optimization only
-        DescartesPipeline: Descartes graph search
+        DescartesDPipeline: Descartes graph search, double precision
+            (DescartesFPipeline in float; the *NPC variants skip the
+            post-plan contact check)
 
     Example:
         composer = TaskComposer.from_config()
@@ -509,26 +550,13 @@ class TaskComposer:
             future.wait()
 
             if not future.context.isSuccessful():
-                msg = "Planning failed"
-                try:
-                    task_infos = future.context.task_infos
-                    if task_infos:
-                        # Try aborting node first — most useful diagnostic
-                        aborting = task_infos.getAbortingNodeInfo()
-                        if aborting and aborting.status_message:
-                            msg = f"{aborting.name}: {aborting.status_message}"
-                        else:
-                            # Scan all node infos for first non-empty status_message
-                            for info in task_infos.getAllInfos():
-                                if info.status_message:
-                                    msg = f"{info.name}: {info.status_message}"
-                                    break
-                except (AttributeError, TypeError):
-                    pass
-                return PlanningResult(
-                    successful=False,
-                    message=msg,
+                task_infos = future.context.task_infos
+                message = (
+                    _failure_message(task_infos.getAllInfos(), task_infos.getAbortingNodeInfo())
+                    if task_infos is not None
+                    else "Planning failed"
                 )
+                return PlanningResult(successful=False, message=message)
 
             # Extract results
             output_composite = AnyPoly_as_CompositeInstruction(
@@ -624,7 +652,7 @@ class TaskComposer:
         Returns:
             PlanningResult
         """
-        return self.plan(robot, program, pipeline="DescartesPipeline", profiles=profiles)
+        return self.plan(robot, program, pipeline="DescartesDPipeline", profiles=profiles)
 
     def _extract_trajectory(self, composite: CompositeInstruction) -> list[TrajectoryPoint]:
         """Extract trajectory points from CompositeInstruction."""
