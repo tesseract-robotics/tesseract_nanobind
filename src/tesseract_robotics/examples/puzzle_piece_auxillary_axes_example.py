@@ -61,7 +61,7 @@ Plan profile (CARTESIAN):
 - Yaw (rz) FREE (coeff=0) - allows tool rotation
 
 Composite profile (DEFAULT):
-- collision_cost_config.collision_margin_buffer = 0.025m
+- collision_cost_config: margin 0.025m, coeff 1 (C++ TrajOptCollisionConfig(0.025, 1))
 - collision_cost_config.collision_check_config.type = DISCRETE
 - Solver: OSQP, max_iter=200
 
@@ -209,7 +209,7 @@ def create_profiles():
     composite = TrajOptDefaultCompositeProfile()
     composite.collision_constraint_config.enabled = False
     composite.collision_cost_config.enabled = True
-    composite.collision_cost_config.collision_margin_buffer = 0.025  # 25mm buffer
+    composite.collision_cost_config.contact_manager_config.default_margin = 0.025  # 25mm margin
     composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
     # Solver profile: OSQP with C++ settings

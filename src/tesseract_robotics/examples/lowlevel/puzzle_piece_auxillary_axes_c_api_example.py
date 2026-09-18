@@ -212,8 +212,8 @@ def main():
     )
     trajopt_composite_profile.collision_cost_config.enabled = True
     # 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig
-    trajopt_composite_profile.collision_cost_config.collision_margin_buffer = (
-        0.025  # 25mm collision buffer
+    trajopt_composite_profile.collision_cost_config.contact_manager_config.default_margin = (
+        0.025  # 25mm collision margin
     )
     trajopt_composite_profile.collision_cost_config.collision_check_config.type = (
         CollisionEvaluatorType.DISCRETE  # was SINGLE_TIMESTEP

@@ -42,7 +42,7 @@ Key Concepts:
 
 TrajOpt Profile Configuration (0.33 API):
     - Cartesian constraint: coeff=[10,10,10,10,10,10] for all 6 DOF
-    - Collision cost: enabled, collision_margin_buffer=0.025m, coeff=20
+    - Collision constraint: margin=0, coeff=10; collision cost: margin=0.005m, coeff=50
     - collision_check_config.longest_valid_segment_length = 0.05m
 
 C++ Source: tesseract_planning/tesseract_examples/src/pick_and_place_example.cpp

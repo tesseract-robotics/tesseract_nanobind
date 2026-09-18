@@ -382,7 +382,7 @@ needed.
 
 For a full collision-aware vs. collision-disabled comparison with a viewer
 walkthrough, see the
-[Point cloud → Octree](../examples/basic.md#point-cloud-octree) example.
+[Point cloud → Octree](../examples/basic.md#point-cloud-octree-example) example.
 
 ## Debugging Collisions
 

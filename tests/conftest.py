@@ -1,14 +1,15 @@
 """Shared test fixtures.
 
 OMPL RNG seeding: example and planning tests run OMPL (RRTConnect et al.),
-which seeds its samplers from entropy per process. Unseeded, every CI run
-plans a different path, and downstream TOTG time parameterization has a hard
-failure region in trajectory-shape space ("Negative path velocity",
-MoveIt-inherited, moveit#1665) — measured ~1-3% stochastic failure rate per
-run. Pinning the seed per test makes the pipeline deterministic on Linux and
-macOS (shared libompl: one RNGSeedGenerator per process). On Windows the
-conda-forge ompl is a STATIC lib, so the planner DLL has its own unreachable
-seed generator and this fixture is inert there — see #103 for the fix routes.
+which seeds its samplers from entropy per process. Pinning the seed per test
+makes a run reproducible on Linux and macOS (shared libompl: one
+RNGSeedGenerator per process). It is not what makes the tests pass: on Windows
+the conda-forge ompl is a STATIC lib, so the planner DLL has its own
+unreachable seed generator, this fixture is inert there, and every run plans
+a fresh path. A test therefore has to pass for every seed. Sweeping seeds
+found two stages that did not (#103), TOTG time parameterization after
+TrajOptIfopt and a TrajOpt collision cost with no margin; both were replaced,
+and the seeds that exposed them replay in tests/examples/test_examples.py.
 """
 
 import pytest
