@@ -96,3 +96,82 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     (`allow-prereleases: true`). Before PR #98 only Linux did this; macOS and
     Windows tested 3.9 + 3.12 only, leaving the cross-platform abi3 claim
     *asserted* but not *verified*. Now all three platforms verify it.
+
+## delocate bundles the very `libomp` the build was told to share
+
+!!! danger "The wheel carries its own `libomp.dylib`, so a conda consumer runs two OpenMP runtimes — and Descartes dies above one thread"
+    The build already takes the right side of this: it links pixi's
+    `llvm-openmp` rather than Homebrew's, precisely to avoid duplicate-runtime
+    crashes (`AGENTS.md`, `scripts/build_tesseract_cpp.sh`, the wheels
+    workflows). Packaging then undoes it. `scripts/build_macos_wheel.sh:81`
+    runs
+
+    ```bash
+    delocate-wheel -w wheelhouse -v dist/tesseract*.whl
+    ```
+
+    with no exclusions, and delocate's whole job is to copy every non-system
+    dylib into the wheel — so the shipped wheel contains
+    `tesseract_robotics/.dylibs/libomp.dylib`, a *copy* of the one the build
+    was pointed at.
+
+    Install that wheel into a conda or pixi environment and the process gets
+    two. MEASURED on macOS 14 arm64, binding 0.35.0.7, in an environment whose
+    `numpy` comes from conda-forge:
+
+    | Image | Provenance | Loaded by |
+    |---|---|---|
+    | `<env>/lib/libomp.dylib` | conda-forge `llvm-openmp` | `numpy`, at import — and it *initialises* the runtime |
+    | `<env>/lib/python3.13/site-packages/tesseract_robotics/.dylibs/libomp.dylib` | the delocated wheel | `import tesseract_robotics`, mapped but idle |
+
+    Different builds, different SHA-256. They coexist quietly, because the
+    wheel's copy is only *mapped* — nothing initialises it until some plugin
+    opens a parallel region. **Descartes' ladder solver is the first thing that
+    does**, which is why an entire motion test suite can pass while this is
+    sitting there:
+
+    - no flag: `OMP: Error #15: Initializing libomp.dylib, but found
+      libomp.dylib already initialized`, and the process aborts before a single
+      waypoint is planned;
+    - `KMP_DUPLICATE_LIB_OK=TRUE`: survives `num_threads=1`, and **segfaults at
+      `num_threads=2` and `3`** (exit 139, 84-waypoint contour on
+      `abb_irb2400`). The flag lets the second runtime load; it does not make
+      running on both safe, exactly as its own warning says.
+
+    The control confirms the cause. Point the wheel's `.dylibs/libomp.dylib`
+    at the environment's copy, so that `dyld` loads one runtime, and the same
+    solve runs at 1, 2, 4 and 8 threads **without** the flag. So on this
+    platform a conda consumer cannot use `num_threads > 1` at all until the
+    wheel stops carrying its own runtime.
+
+    Fixing it will not, on its own, make Descartes faster: with vertex
+    collision on, a profile puts ~97 % of a solve in serial setup — one
+    contact-manager clone per waypoint, see the Descartes section of the
+    [planning guide](../user-guide/planning.md) — so the threads it restores
+    mostly wait.
+
+!!! warning "CI tests threaded Descartes — in the one environment where it works"
+    The suite does solve through Descartes multi-threaded: `TestDescartesPipeline`
+    plans via `create_descartes_pipeline_profiles()`, whose `num_threads`
+    defaults to the CPU count, and `wheels-macos.yml` runs it on `macos-14`.
+    It passes because the `test-wheel` job installs the wheel into a plain
+    `python -m venv`, where only the wheel's own `libomp` is loaded (inferred
+    from CI passing, not measured). The configuration that fails — the
+    delocated wheel inside a conda or pixi environment whose `numpy` has
+    already initialised conda's `libomp` — is the one no CI job builds, and it
+    is how pixi-managed consumers install the wheel. Closing the gap means
+    testing the wheel in that environment, not adding a threaded test.
+
+!!! tip "The fix is a packaging decision, and it has a real trade-off"
+    `delocate-wheel --exclude libomp` leaves the wheel resolving the host
+    environment's OpenMP — one runtime, threading restored, and consistent with
+    the policy the build already follows. The cost is that the wheel then
+    *requires* the host to provide `libomp`, which a conda or pixi environment
+    always does and a bare `python -m venv` does not. Given the installation
+    guide already tells consumers to run inside pixi, excluding is the
+    defensible default; bundling is only right for a wheel meant to stand alone,
+    and then the duplication has to be documented rather than discovered.
+
+    Until it is decided, a consumer hitting this runs Descartes single-threaded
+    under `KMP_DUPLICATE_LIB_OK=TRUE` and treats any wall-clock comparison as
+    provisional.

@@ -1197,6 +1197,27 @@ class TestDescartesPipeline:
         )
         assert result.successful, f"custom-profile DescartesFPipeline failed: {result.message}"
 
+    def test_plan_cartesian_defaults_solve(self, robot):
+        """plan_cartesian with every default — DescartesDPipeline, one thread per CPU — solves.
+
+        This is the function's own docstring example. With the old default pipeline name it could
+        only return "Pipeline 'DescartesPipeline' not found".
+        """
+        from tesseract_robotics.planning import plan_cartesian
+
+        result = plan_cartesian(robot, self._raster_program(robot))
+        assert result.successful, f"plan_cartesian defaults failed: {result.message}"
+        assert len(result) > 0
+
+    def test_plan_cartesian_multithreaded_solve(self, robot):
+        """Four ladder-graph threads, pinned, so the threaded path is covered on any runner."""
+        from tesseract_robotics.planning import create_descartes_default_profiles, plan_cartesian
+
+        profiles = create_descartes_default_profiles(num_threads=4)
+        result = plan_cartesian(robot, self._raster_program(robot), profiles=profiles)
+        assert result.successful, f"4-thread Descartes failed: {result.message}"
+        assert len(result) > 0
+
     def test_move_profile_conflicts_with_knobs(self):
         """move_profile is a full override — combining it with knobs fails loud."""
         from tesseract_robotics.planning import create_descartes_pipeline_profiles
@@ -1208,6 +1229,139 @@ class TestDescartesPipeline:
             create_descartes_pipeline_profiles(
                 move_profile=DescartesDefaultMoveProfileD(), ik_solver="OPWInvKin"
             )
+
+
+WRAPPERS = ("plan_freespace", "plan_ompl", "plan_cartesian")
+
+
+@pytest.fixture(scope="module")
+def registered():
+    """The pipeline names the generated task composer config defines."""
+    from tesseract_robotics.planning import TaskComposer
+
+    return set(TaskComposer.from_config().get_available_pipelines())
+
+
+class TestConvenienceWrapperPipelines:
+    """Every convenience wrapper's default pipeline exists in the generated task composer config.
+
+    plan_cartesian defaulted to "DescartesPipeline" after the config's Descartes pipelines had become
+    DescartesDPipeline / DescartesFPipeline: the call returned an empty failed result, and the
+    function's own docstring example could never succeed.
+    """
+
+    @staticmethod
+    def _capture_pipeline(monkeypatch):
+        from tesseract_robotics.planning import TaskComposer
+
+        seen = {}
+
+        def plan(self, robot, program, pipeline="TrajOptPipeline", profiles=None, auto_seed=True):
+            seen["pipeline"] = pipeline
+
+        monkeypatch.setattr(TaskComposer, "plan", plan)
+        return seen
+
+    @pytest.mark.parametrize("wrapper", WRAPPERS)
+    def test_function_default_is_registered(self, wrapper, registered, monkeypatch):
+        import tesseract_robotics.planning as planning
+
+        seen = self._capture_pipeline(monkeypatch)
+        getattr(planning, wrapper)(None, None)
+        assert seen["pipeline"] in registered
+
+    @pytest.mark.parametrize("wrapper", WRAPPERS)
+    def test_method_default_is_registered(self, wrapper, registered, monkeypatch):
+        from tesseract_robotics.planning import TaskComposer
+
+        composer = TaskComposer.from_config()
+        seen = self._capture_pipeline(monkeypatch)
+        getattr(composer, wrapper)(None, None)
+        assert seen["pipeline"] in registered
+
+
+class TestFailureMessage:
+    """A failed plan names the node that failed, not the ErrorTask every failure is routed into.
+
+    The infos below are the ones a real TrajOptPipeline failure produces: the planner node carries
+    the specific message, and the ErrorTask, the pipeline and the composite report the propagated
+    abort. The aborting node is the ErrorTask, so reporting it alone said nothing.
+    """
+
+    @staticmethod
+    def _info(name, status_code, status_message):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(name=name, status_code=status_code, status_message=status_message)
+
+    def _failed_run(self):
+        from tesseract_robotics.planning.composer import ABORT_PROPAGATION_MESSAGE
+
+        return [
+            self._info(
+                "TrajOptMotionPlannerTask",
+                0,
+                "Failed to find valid solution: OPT_SCO_ITERATION_LIMIT",
+            ),
+            self._info("ErrorTask", 0, ABORT_PROPAGATION_MESSAGE),
+            self._info("TrajOptPipeline", 0, ABORT_PROPAGATION_MESSAGE),
+            self._info("MinLengthTask", 1, "Successful"),
+            self._info("MotionPlanningTask", 0, ABORT_PROPAGATION_MESSAGE),
+        ]
+
+    def test_the_failing_node_is_reported_over_the_abort(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        infos = self._failed_run()
+        aborting = infos[1]
+        assert _failure_message(infos, aborting) == (
+            "TrajOptMotionPlannerTask: Failed to find valid solution: OPT_SCO_ITERATION_LIMIT"
+        )
+
+    def test_every_failing_node_is_reported_in_name_order(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        infos = [
+            *self._failed_run(),
+            self._info("DiscreteContactCheckTask", 0, "Found 2 contacts"),
+        ]
+        assert _failure_message(infos) == (
+            "DiscreteContactCheckTask: Found 2 contacts; "
+            "TrajOptMotionPlannerTask: Failed to find valid solution: OPT_SCO_ITERATION_LIMIT"
+        )
+
+    def test_the_aborting_node_is_the_fallback(self):
+        from tesseract_robotics.planning.composer import (
+            ABORT_PROPAGATION_MESSAGE,
+            _failure_message,
+        )
+
+        aborting = self._info("ErrorTask", 0, ABORT_PROPAGATION_MESSAGE)
+        assert _failure_message([aborting], aborting) == f"ErrorTask: {ABORT_PROPAGATION_MESSAGE}"
+
+    def test_planning_failed_when_nothing_says_why(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        assert _failure_message([]) == "Planning failed"
+
+    def test_a_real_failure_names_the_planner(self):
+        """An out-of-reach Cartesian target: TrajOpt fails in about a second."""
+        from tesseract_robotics.planning import TaskComposer
+
+        robot = Robot.from_tesseract_support("abb_irb2400")
+        joint_names = robot.get_joint_names("manipulator")
+        start = np.zeros(6)
+        robot.set_joints(start, joint_names=joint_names)
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(joint_names)
+            .move_to(StateTarget(start, names=joint_names))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([3.0, 0.0, 1.0], [0, 1.0, 0, 0])))
+        )
+        result = TaskComposer.from_config().plan(robot, program, pipeline="TrajOptPipeline")
+        assert not result.successful
+        assert result.message.startswith("TrajOptMotionPlannerTask: "), result.message
+        assert "Abort Triggered" not in result.message
 
 
 class TestProfileCreation:

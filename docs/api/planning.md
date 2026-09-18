@@ -81,7 +81,7 @@ print(pose.quaternion)  # [qx, qy, qz, qw]
 |---|---|---|
 | `plan_freespace(robot, program)` | `TrajOptPipeline` | Optimization-based freespace motion |
 | `plan_ompl(robot, program)` | `FreespacePipeline` | OMPL sampling + TrajOpt smoothing |
-| `plan_cartesian(robot, program)` | `DescartesPipeline` | Descartes Cartesian path search |
+| `plan_cartesian(robot, program)` | `DescartesDPipeline` | Descartes Cartesian path search |
 | `assign_current_state_as_seed(program, robot)` | — | Seed Cartesian waypoints with the current robot state |
 
 All three `plan_*` helpers accept an optional `pipeline=` override and a

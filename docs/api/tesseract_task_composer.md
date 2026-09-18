@@ -68,7 +68,7 @@ factory = createTaskComposerPluginFactory()
 factory = TaskComposerPluginFactory(config_path)
 
 # Get available pipelines
-# Common pipelines: TrajOptPipeline, OMPLPipeline, FreespaceMotionPipeline
+# Common pipelines: TrajOptPipeline, OMPLPipeline, FreespacePipeline
 task = factory.createTaskComposerNode("TrajOptPipeline")
 ```
 
@@ -175,11 +175,11 @@ The `TaskComposer` class provides user-friendly pipeline names:
 
 | Pipeline | Description |
 |----------|-------------|
-| `FreespaceMotionPipeline` | OMPL + TrajOpt smoothing + time param |
-| `CartesianMotionPipeline` | Cartesian path with TrajOpt |
+| `FreespacePipeline` | OMPL + TrajOpt smoothing + time param |
+| `CartesianPipeline` | Cartesian path with TrajOpt |
 | `OMPLPipeline` | OMPL sampling-based planning only |
 | `TrajOptPipeline` | TrajOpt optimization only |
-| `DescartesPipeline` | Descartes graph search |
+| `DescartesDPipeline` | Descartes graph search, double precision (`DescartesFPipeline` in float; the `*NPC` variants skip the post-plan contact check) |
 
 ### Raw Config Pipelines
 
@@ -258,7 +258,7 @@ from tesseract_robotics.tesseract_command_language import (
 # Setup
 factory = createTaskComposerPluginFactory()
 executor = TaskflowTaskComposerExecutor(factory, 4)
-task = factory.createTaskComposerNode("FreespaceMotionPipeline")
+task = factory.createTaskComposerNode("FreespacePipeline")
 
 # Prepare data
 data = createTaskComposerDataStorage()

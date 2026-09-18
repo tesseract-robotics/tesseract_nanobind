@@ -6,7 +6,8 @@ the KUKA IIWA 7-DOF robot. Plans a multi-phase trajectory combining freespace an
 linear Cartesian moves around an obstacle.
 
 Pipeline Overview:
-1. Load robot and add box obstacle at (1.0, 0, 0)
+1. Load robot and build the C++ example's octomap from point-cloud data at (1.0, 0, 0):
+   a 1 m cube of points at 0.05 m pitch, voxelised into 1000 boxes of 0.1 m
 2. Create 4-phase program: start → freespace → linear → freespace back
 3. Execute TrajOptPipeline (trajectory optimization with collision/constraint costs)
 4. Return smooth, collision-free trajectory
@@ -39,9 +40,9 @@ from tesseract_robotics.planning import (
     Robot,
     StateTarget,
     TaskComposer,
-    box,
     create_obstacle,
 )
+from tesseract_robotics.tesseract_geometry import Octree, OctreeSubType, PointCloud, createOctree
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -58,27 +59,37 @@ def run():
     robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
     print(f"Loaded robot: {robot}")
 
-    # Add box obstacle for collision checking
-    # C++ uses 1x1x1m octomap (sparse point cloud) which allows paths through gaps;
-    # Python uses 0.5m solid box since solid geometry blocks more collision space
+    # Build the C++ example's octomap (addPointCloud in basic_cartesian_example.cpp): points
+    # every 0.05 m across a 1 m cube, voxelised at 0.1 m. Every voxel holds points, so this is a
+    # solid cube of 1000 boxes — the collision load of a scanned part.
+    pitch = 0.05
+    count = round(1.0 / pitch)
+    cloud = PointCloud()
+    for i in range(count):
+        for j in range(count):
+            for k in range(count):
+                cloud.addPoint(-0.5 + i * pitch, -0.5 + j * pitch, -0.5 + k * pitch)
+    tree = createOctree(cloud, 2 * pitch, prune=False, binary=True)
+    octree = Octree(tree, OctreeSubType.BOX, pruned=False, binary_octree=True)
     create_obstacle(
         robot,
-        name="box_obstacle",
-        geometry=box(0.5, 0.5, 0.5),  # 0.5m cube (smaller than C++ 1m octree)
+        name="octomap_attached",
+        geometry=octree,
         transform=Pose.from_xyz(1.0, 0, 0),
     )
-    print("Added box obstacle at (1.0, 0, 0)")
+    print(f"Added octomap of {octree.calcNumSubShapes()} boxes at (1.0, 0, 0)")
 
     # Get joint names and set initial robot configuration
     joint_names = robot.get_joint_names("manipulator")
     joint_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     robot.set_joints(joint_pos, joint_names=joint_names)
 
-    # Create Cartesian waypoints (6D tool poses in world frame). Project
-    # canonical quaternion order is scalar-last `[qx, qy, qz, qw]`.
-    # (0, 0, 1.0, 0) = 180° about Z (tool pointing down at the work surface).
-    wp1_pose = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 0, 1.0, 0])
-    wp2_pose = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 0, 1.0, 0])
+    # Create Cartesian waypoints (6D tool poses in world frame), tool pointing
+    # down. The C++ Eigen::Quaterniond(0, 0, 1.0, 0) is scalar-first (w=0, x=0,
+    # y=1, z=0): 180° about Y. Project order is scalar-last, so [0, 1.0, 0, 0].
+    # Copying the literal as [0, 0, 1.0, 0] turns the tool face-up instead.
+    wp1_pose = Pose.from_xyz_quat([0.5, -0.2, 0.62], [0, 1.0, 0, 0])
+    wp2_pose = Pose.from_xyz_quat([0.5, 0.3, 0.62], [0, 1.0, 0, 0])
 
     # Build 4-phase motion program using fluent API:
     # Phase 1: Start from known joint state (defines initial configuration)

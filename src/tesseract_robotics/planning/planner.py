@@ -147,7 +147,9 @@ def plan_cartesian(
     Args:
         robot: Robot instance
         program: Motion program with linear/Cartesian targets
-        pipeline: Pipeline name (default: "DescartesPipeline")
+        pipeline: Pipeline name (default: "DescartesDPipeline", the double-precision
+            Descartes pipeline; "DescartesFPipeline" is the float one, and their
+            "NPC" variants skip the post-plan contact check)
         profiles: Custom motion profiles
 
     Returns:
@@ -172,7 +174,7 @@ def plan_cartesian(
     return composer.plan(
         robot,
         program,
-        pipeline=pipeline or "DescartesPipeline",
+        pipeline=pipeline or "DescartesDPipeline",
         profiles=profiles,
     )
 
