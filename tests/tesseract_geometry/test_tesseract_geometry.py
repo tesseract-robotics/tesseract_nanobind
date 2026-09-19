@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import numpy.testing as nptest
+import pytest
 
 from tesseract_robotics import tesseract_common, tesseract_geometry
 
@@ -14,7 +15,7 @@ def test_geometry_instantiation():
     assert tesseract_geometry.Capsule(1, 1) is not None
     assert tesseract_geometry.Plane(1, 1, 1, 1) is not None
     assert tesseract_geometry.Sphere(1) is not None
-    # Mesh types require vertices/faces - see test_mesh, test_convex_mesh, test_sdf_mesh
+    # Mesh types require vertices/faces - see test_mesh, test_convex_mesh
 
 
 def test_geometry_box():
@@ -236,23 +237,203 @@ def test_octree_direct_construction():
     assert geom.getPruned() is False
 
 
-def test_sdf_mesh():
-    vertices = tesseract_common.VectorVector3d()
-    vertices.append(np.array([1, 1, 0], dtype=np.float64))
-    vertices.append(np.array([1, -1, 0], dtype=np.float64))
-    vertices.append(np.array([-1, -1, 0], dtype=np.float64))
-    vertices.append(np.array([1, -1, 0], dtype=np.float64))
+# --------------------------------------------------------------------------------------------
+# SignedDistanceField
+# --------------------------------------------------------------------------------------------
 
-    faces = np.array([3, 0, 1, 2, 3, 0, 2, 3], np.int32)
+SDF_DIMS = np.array([9, 9, 9], dtype=np.int32)
+SDF_MIN = np.array([-1.0, -1.0, -1.0])
+SDF_MAX = np.array([1.0, 1.0, 1.0])
+SDF_RADIUS = 0.5
 
-    geom = tesseract_geometry.SDFMesh(vertices, faces)
-    assert len(geom.getVertices()) > 0
-    assert len(geom.getFaces()) > 0
-    assert geom.getVertexCount() == 4
-    assert geom.getFaceCount() == 2
+
+def _sphere(point):
+    """Signed distance to a sphere at the origin, negative inside."""
+    return float(np.linalg.norm(point) - SDF_RADIUS)
+
+
+def _sphere_batched(points):
+    """Batched form of :func:`_sphere` - one call for all (N, 3) sample points."""
+    return np.linalg.norm(points, axis=1) - SDF_RADIUS
+
+
+def _sphere_grid():
+    """The sphere field sampled on the lattice, as a 3D array indexed [i, j, k]."""
+    axes = [np.linspace(SDF_MIN[i], SDF_MAX[i], SDF_DIMS[i]) for i in range(3)]
+    x, y, z = np.meshgrid(*axes, indexing="ij")
+    return np.sqrt(x**2 + y**2 + z**2) - SDF_RADIUS
+
+
+def test_signed_distance_field_from_grid():
+    grid = _sphere_grid()
+    geom = tesseract_geometry.SignedDistanceField(
+        SDF_MIN, SDF_MAX, SDF_DIMS, grid.ravel(order="F")
+    )
+
+    assert geom.getType() == tesseract_geometry.GeometryType.SIGNED_DISTANCE_FIELD
+    nptest.assert_allclose(geom.getDomainMin(), SDF_MIN)
+    nptest.assert_allclose(geom.getDomainMax(), SDF_MAX)
+    nptest.assert_array_equal(geom.getDimensions(), SDF_DIMS)
+    nptest.assert_allclose(geom.getScale(), [1, 1, 1])
+    assert geom.isDiscretized()
+
+    # distances are flat and x-fastest, so they reshape back with Fortran order
+    assert geom.getDistances().shape == (int(np.prod(SDF_DIMS)),)
+    nptest.assert_allclose(geom.getDistances().reshape(SDF_DIMS, order="F"), grid)
+
+    # centre of the sphere is one radius inside the surface
+    nptest.assert_almost_equal(geom.getDistance(np.zeros(3)), -SDF_RADIUS)
 
     geom_clone = geom.clone()
-    assert len(geom_clone.getVertices()) > 0
-    assert len(geom_clone.getFaces()) > 0
-    assert geom_clone.getVertexCount() == 4
-    assert geom_clone.getFaceCount() == 2
+    assert geom_clone.getType() == tesseract_geometry.GeometryType.SIGNED_DISTANCE_FIELD
+    nptest.assert_array_equal(geom_clone.getDistances(), geom.getDistances())
+    assert tesseract_geometry.isIdentical(geom, geom_clone)
+
+
+def test_signed_distance_field_scale():
+    grid = _sphere_grid().ravel(order="F")
+    geom = tesseract_geometry.SignedDistanceField(
+        SDF_MIN, SDF_MAX, SDF_DIMS, grid, np.array([2.0, 2.0, 2.0])
+    )
+    nptest.assert_allclose(geom.getScale(), [2, 2, 2])
+
+
+def test_signed_distance_field_invalid():
+    grid = _sphere_grid().ravel(order="F")
+
+    # distances must cover the whole grid
+    with pytest.raises(RuntimeError):
+        tesseract_geometry.SignedDistanceField(SDF_MIN, SDF_MAX, SDF_DIMS, np.zeros(5))
+
+    # every axis needs at least two samples
+    with pytest.raises(RuntimeError):
+        tesseract_geometry.SignedDistanceField(
+            SDF_MIN, SDF_MAX, np.array([1, 9, 9], dtype=np.int32), np.zeros(81)
+        )
+
+    # domain max must exceed domain min
+    with pytest.raises(RuntimeError):
+        tesseract_geometry.SignedDistanceField(SDF_MAX, SDF_MIN, SDF_DIMS, grid)
+
+
+def test_create_discrete_signed_distance_field():
+    expected = _sphere_grid().ravel(order="F")
+
+    per_point = tesseract_geometry.createDiscreteSignedDistanceField(
+        _sphere, SDF_MIN, SDF_MAX, SDF_DIMS
+    )
+    batched = tesseract_geometry.createDiscreteSignedDistanceField(
+        _sphere_batched, SDF_MIN, SDF_MAX, SDF_DIMS, batched=True
+    )
+
+    for geom in (per_point, batched):
+        assert geom.getType() == tesseract_geometry.GeometryType.SIGNED_DISTANCE_FIELD
+        assert geom.isDiscretized()
+        nptest.assert_allclose(geom.getDistances(), expected)
+
+    # both paths visit exactly the same lattice points
+    nptest.assert_array_equal(per_point.getDistances(), batched.getDistances())
+    assert tesseract_geometry.isIdentical(per_point, batched)
+
+
+def test_create_discrete_signed_distance_field_drops_the_sampler():
+    """The eager field must be pure data: no reference back to the Python callable.
+
+    A retained callable would take the GIL on every collision query and, via the callable's
+    __globals__, put the geometry in a reference cycle the GC cannot see through.
+    """
+    sentinel = []
+
+    def sampler(point):
+        sentinel.append(1)
+        return _sphere(point)
+
+    geom = tesseract_geometry.createDiscreteSignedDistanceField(
+        sampler, SDF_MIN, SDF_MAX, SDF_DIMS
+    )
+    called_during_construction = len(sentinel)
+    assert called_during_construction == int(np.prod(SDF_DIMS))
+
+    # querying the finished field interpolates the grid instead of calling back into Python
+    geom.getDistance(np.array([0.137, -0.42, 0.061]))
+    geom.getDistances()
+    assert len(sentinel) == called_during_construction
+
+
+def test_create_signed_distance_field_lazy():
+    lazy = tesseract_geometry.createSignedDistanceField(
+        _sphere_batched, SDF_MIN, SDF_MAX, SDF_DIMS, batched=True
+    )
+    assert not lazy.isDiscretized()
+
+    # a lazy field evaluates the sampler exactly, rather than interpolating the lattice
+    off_grid = np.array([0.137, -0.42, 0.061])
+    nptest.assert_almost_equal(lazy.getDistance(off_grid), _sphere(off_grid))
+
+    grid_backed = tesseract_geometry.createDiscreteSignedDistanceField(
+        _sphere_batched, SDF_MIN, SDF_MAX, SDF_DIMS, batched=True
+    )
+    assert abs(grid_backed.getDistance(off_grid) - _sphere(off_grid)) > 1e-6
+
+    lazy.discretize()
+    assert lazy.isDiscretized()
+    nptest.assert_allclose(lazy.getDistances(), _sphere_grid().ravel(order="F"))
+
+
+def test_create_signed_distance_field_discretizes_on_access():
+    lazy = tesseract_geometry.createSignedDistanceField(
+        _sphere, SDF_MIN, SDF_MAX, SDF_DIMS
+    )
+    assert not lazy.isDiscretized()
+    nptest.assert_allclose(lazy.getDistances(), _sphere_grid().ravel(order="F"))
+    assert lazy.isDiscretized()
+
+
+def test_signed_distance_field_sampler_errors():
+    # a batched sampler must return one distance per point
+    with pytest.raises(RuntimeError):
+        tesseract_geometry.createDiscreteSignedDistanceField(
+            lambda points: np.zeros(3), SDF_MIN, SDF_MAX, SDF_DIMS, batched=True
+        )
+
+    # an exception raised inside the sampler reaches the caller unchanged
+    def boom(point):
+        raise ValueError("sampler exploded")
+
+    with pytest.raises(ValueError, match="sampler exploded"):
+        tesseract_geometry.createDiscreteSignedDistanceField(
+            boom, SDF_MIN, SDF_MAX, SDF_DIMS
+        )
+
+
+@pytest.mark.parametrize(
+    ("write", "read"),
+    [
+        (
+            tesseract_geometry.writeSignedDistanceFieldVDB,
+            tesseract_geometry.readSignedDistanceFieldVDB,
+        ),
+        (
+            tesseract_geometry.writeSignedDistanceFieldNVDB,
+            tesseract_geometry.readSignedDistanceFieldNVDB,
+        ),
+    ],
+    ids=["vdb", "nvdb"],
+)
+def test_signed_distance_field_vdb_round_trip(write, read):
+    grid = _sphere_grid().ravel(order="F")
+    geom = tesseract_geometry.SignedDistanceField(SDF_MIN, SDF_MAX, SDF_DIMS, grid)
+
+    blob = write(geom)
+    assert isinstance(blob, bytes)
+    assert len(blob) > 0
+
+    restored = read(blob)
+    nptest.assert_array_equal(restored.getDimensions(), SDF_DIMS)
+    nptest.assert_allclose(restored.getDomainMin(), SDF_MIN, atol=1e-6)
+    nptest.assert_allclose(restored.getDomainMax(), SDF_MAX, atol=1e-6)
+    nptest.assert_allclose(restored.getDistances(), grid, atol=1e-5)
+
+    # scale is not carried in the grid and is supplied on read
+    scaled = read(blob, np.array([3.0, 3.0, 3.0]))
+    nptest.assert_allclose(scaled.getScale(), [3, 3, 3])
