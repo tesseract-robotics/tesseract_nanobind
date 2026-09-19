@@ -31,6 +31,13 @@ class OMPLSolverConfig:
     def simplify(self, arg: bool, /) -> None: ...
 
     @property
+    def simplify_time(self) -> float:
+        """Max time in seconds to spend simplifying when simplify is true (default: 0.0). <= 0 runs simplification to completion (unbounded); > 0 time-bounds it."""
+
+    @simplify_time.setter
+    def simplify_time(self, arg: float, /) -> None: ...
+
+    @property
     def optimize(self) -> bool:
         """Use all planning time to optimize trajectory (default: true)"""
 
