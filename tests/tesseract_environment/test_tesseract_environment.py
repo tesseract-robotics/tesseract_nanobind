@@ -231,3 +231,38 @@ def test_clear_cached_contact_managers():
     # New managers should be functional
     results2 = ContactResultMap()
     discrete_mgr2.contactTest(results2, request)
+
+
+def test_apply_command_releases_gil_and_still_calls_back():
+    """applyCommand drops the GIL, so its Python re-entry path has to still work.
+
+    The environment fires event callbacks from inside applyCommand, under its own unique lock
+    and now with the GIL released, so the callback wrapper has to re-acquire it.
+    """
+    from tesseract_robotics.tesseract_geometry import Box
+    from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
+
+    link = Link("gil_link")
+    collision = Collision()
+    collision.geometry = Box(0.1, 0.1, 0.1)
+    link.addCollision(collision)
+
+    joint = Joint("gil_joint")
+    joint.type = JointType.FIXED
+    joint.parent_link_name = "base_link"
+    joint.child_link_name = "gil_link"
+
+    env = get_environment()
+    # warm the caches so applyCommand builds the collision shape - the work the release is for -
+    # instead of deferring it to the first contact-manager call
+    assert env.getDiscreteContactManager() is not None
+    assert env.getContinuousContactManager() is not None
+
+    events = []
+    cb = tesseract_environment.EventCallbackFn(lambda evt: events.append(evt.type))
+    env.addEventCallback(1, cb)
+
+    assert env.applyCommand(tesseract_environment.AddLinkCommand(link, joint))
+    assert "gil_link" in env.getLinkNames()
+    # the callback re-entered the interpreter from the GIL-released region
+    assert events
