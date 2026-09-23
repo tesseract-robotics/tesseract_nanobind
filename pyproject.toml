@@ -73,6 +73,7 @@ tesseract_puzzle_piece_auxillary_axes_example = "tesseract_robotics.examples.puz
 tesseract_raster_example = "tesseract_robotics.examples.raster_example:main"
 tesseract_reeds_shepp_example = "tesseract_robotics.examples.reeds_shepp_example:run"
 tesseract_scene_graph_example = "tesseract_robotics.examples.scene_graph_example:main"
+tesseract_sdf_collision_example = "tesseract_robotics.examples.sdf_collision_example:main"
 tesseract_shapes_viewer = "tesseract_robotics.examples.shapes_viewer:main"
 tesseract_collision_example = "tesseract_robotics.examples.tesseract_collision_example:main"
 tesseract_kinematics_example = "tesseract_robotics.examples.tesseract_kinematics_example:main"
