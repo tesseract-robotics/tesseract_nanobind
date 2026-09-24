@@ -629,7 +629,10 @@ def create_descartes_default_profiles(
             to sampled (`target_pose_fixed = False`).
         sample_resolution: Rotation sampling step in radians (e.g. `radians(30)`)
         sample_min: Rotation sampling range start in radians (library default: -pi)
-        sample_max: Rotation sampling range end in radians (library default: +pi)
+        sample_max: Rotation sampling range end in radians (library default: +pi/2,
+            i.e. pi minus the default resolution: the header subtracts the resolution
+            so that -pi and +pi are not both sampled, and a caller who changes the
+            resolution sets the maximum with it)
         ik_solver: Override the kinematic group's IK solver for sampling
             (e.g. "OPWInvKin" — analytic solvers make the ladder graph fast)
         use_redundant_joint_solutions: Also sample joint-redundant IK solutions
