@@ -2,11 +2,11 @@
 Online Planning with Low-Level SQP API
 ======================================
 
-Demonstrates real-time trajectory replanning using the low-level SQP solver.
-This achieves 10-100+ Hz replanning rates, matching the C++ implementation.
+Demonstrates real-time trajectory replanning using the low-level SQP solver: tens of Hz
+(docs/examples/online-planning.md has measured rates for both collision modes).
 
 C++ Reference:
-    tesseract_planning/tesseract_examples/src/online_planning_example.cpp
+    tesseract_planning/examples/src/online_planning_example.cpp (0.35.0)
 
 Key Difference from online_planning_example.py
 ----------------------------------------------
@@ -48,6 +48,7 @@ import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.planning import Robot
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, ContactTestType
 from tesseract_robotics.tesseract_common import Isometry3d
 
 TesseractViewer = None
@@ -117,15 +118,25 @@ def build_optimization_problem(
     vel_constraint = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "JointVelocity")
     problem.addCostSet(vel_constraint, tsqp.CostPenaltyType.SQUARED)
 
-    # Add collision constraints
+    # Add collision constraints, configured as the C++ reference configures them
     margin = 0.1  # 10cm safety margin
     margin_coeff = 10.0
     collision_config = ti.TrajOptCollisionConfig(margin, margin_coeff)
+    collision_config.collision_check_config.contact_request.type = ContactTestType.ALL
+    # LVSDiscreteCollisionEvaluator rejects any check type but LVS_DISCRETE. The C++ reference
+    # sets DISCRETE for both modes, so its continuous mode throws on trajopt 0.35.0.
+    collision_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_DISCRETE
+        if use_continuous_collision
+        else CollisionEvaluatorType.DISCRETE
+    )
     collision_config.collision_margin_buffer = 0.10
     collision_evaluators = []
     collision_constraints = []
 
     if use_continuous_collision:
+        # The first segment starts at the pinned current state, so its start is fixed
+        fixed_start = True
         for i in range(1, steps):
             collision_evaluator = ti.LVSDiscreteCollisionEvaluator(
                 manip,
@@ -137,12 +148,13 @@ def build_optimization_problem(
                 collision_evaluator,
                 vars_list[i - 1],
                 vars_list[i],
-                False,
-                False,
-                1,
-                False,
-                f"LVSCollision_{i - 1}_{i}",
+                fixed_start,  # position_var0 fixed
+                False,  # position_var1 fixed
+                collision_config.max_num_cnt,
+                False,  # fixed_sparsity
+                f"LVSDiscreteCollision_{i}",
             )
+            fixed_start = False
             problem.addConstraintSet(collision_constraint)
             collision_evaluators.append(collision_evaluator)
             collision_constraints.append(collision_constraint)
@@ -155,7 +167,11 @@ def build_optimization_problem(
                 True,
             )
             collision_constraint = ti.DiscreteCollisionConstraint(
-                collision_evaluator, vars_list[i], 1, False, f"Collision_{i}"
+                collision_evaluator,
+                vars_list[i],
+                collision_config.max_num_cnt,
+                False,  # fixed_sparsity
+                f"SingleTimestepCollision_{i}",
             )
             problem.addConstraintSet(collision_constraint)
             collision_evaluators.append(collision_evaluator)

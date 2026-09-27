@@ -1,10 +1,15 @@
-"""The online SQP example builds the problem its C++ reference builds.
+"""The online SQP example builds the problem its C++ reference builds, in both collision modes.
 
 tesseract_planning's online_planning_example.cpp (0.35.0) builds a TrajOptQPProblem over the
 node variables: the start and target poses as constraints, the joint velocity as a squared
-cost, one collision constraint per step. The example used to add its velocity cost without a
-penalty type, to the NLP layer of the two-layer problem trajopt is removing. There the cost
-reached neither the QP's gradient nor its Gauss-Newton Hessian, so the QP had no cost term.
+cost, one collision constraint per step with the collision config's max_num_cnt rows. The
+example used to add its velocity cost without a penalty type, to the NLP layer of the
+two-layer problem trajopt is removing. There the cost reached neither the QP's gradient nor
+its Gauss-Newton Hessian, so the QP had no cost term.
+
+The continuous mode builds LVSDiscreteCollisionEvaluator, which rejects a config whose check
+type is not LVS_DISCRETE. The C++ reference configures DISCRETE for both modes, so its
+continuous mode throws; the example sets LVS_DISCRETE there.
 """
 
 from __future__ import annotations
@@ -30,12 +35,12 @@ def robot():
     return robot
 
 
-@pytest.fixture
-def problem_data(robot):
+@pytest.fixture(params=[False, True], ids=["discrete", "lvs_continuous"])
+def problem_data(robot, request):
     joint_names = robot.get_joint_names("manipulator")
     start = np.zeros(len(joint_names))
     return build_optimization_problem(
-        robot, joint_names, start, TARGET_JOINTS, STEPS, use_continuous_collision=False
+        robot, joint_names, start, TARGET_JOINTS, STEPS, use_continuous_collision=request.param
     )
 
 
@@ -46,6 +51,14 @@ def _trajectory(problem_data) -> np.ndarray:
 
 def test_builds_a_trajopt_qp_problem(problem_data):
     assert isinstance(problem_data["problem"], tsqp.TrajOptQPProblem)
+
+
+def test_each_collision_constraint_has_the_configs_max_num_cnt_rows(problem_data):
+    """As in the C++ reference: one set per step, sized by the config, not a literal 1."""
+    constraints = problem_data["collision_constraints"]
+    assert len(constraints) == STEPS - 1
+    max_num_cnt = problem_data["collision_config"].max_num_cnt
+    assert [c.getRows() for c in constraints] == [max_num_cnt] * (STEPS - 1)
 
 
 def test_the_velocity_cost_is_the_squared_joint_steps(problem_data):
