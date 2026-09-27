@@ -21,6 +21,7 @@ pixi task list
 | `fmt` | Format | ruff format |
 | `docs` | Live docs | mkdocs serve with auto-reload |
 | `docs-build` | Build docs | Static site to `site/` |
+| `check-changelog` | Check changelog | `CHANGELOG.md` release structure (the Docs workflow runs it too) |
 
 ### Daily Workflow
 
@@ -294,6 +295,26 @@ pre-commit install --hook-type pre-push
 | pytest --testmon | pre-push | Run affected tests |
 
 Skip when needed: `git commit --no-verify` / `git push --no-verify`
+
+---
+
+## Changelog at Release Time
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/) and is
+published on the docs site. `scripts/check_changelog.py` checks its release
+structure; the Docs workflow runs it before building, so a mis-cut release fails
+CI instead of publishing a wrong changelog (0.35.0.7 and 0.35.0.8 were both cut
+by hand, and both broke it). To cut `<version>`:
+
+1. Rename `## [Unreleased]` to `## [<version>] - <YYYY-MM-DD>` and add a new,
+   empty `## [Unreleased]` above it.
+2. Add `[<version>]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/<previous>...<version>`
+   above the previous release's link.
+3. Point `[Unreleased]:` at `compare/<version>...HEAD`.
+4. Run `pixi run check-changelog` before committing.
+
+Anything merged after the tag goes under `## [Unreleased]`, not into the
+release's section.
 
 ---
 

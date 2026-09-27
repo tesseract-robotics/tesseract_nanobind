@@ -229,6 +229,7 @@ build = { depends-on = [
 ], description = "Install bindings against the conda tesseract C++ libs" }
 docs = { cmd = "mkdocs serve --dev-addr=localhost:8000 --open", description = "Live docs server with auto-reload" }
 docs-build = { cmd = "mkdocs build", description = "Build static docs to site/" }
+check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
 docs-dotgraphs = { cmd = "python scripts/generate_pipeline_dotgraphs.py", depends-on = [
     "install",
 ], description = "Regenerate pipeline DOT graph SVGs embedded in the docs (requires graphviz)" }

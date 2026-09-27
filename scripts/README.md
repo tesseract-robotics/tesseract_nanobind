@@ -74,6 +74,16 @@ Builds documentation using mkdocs:
 ./scripts/build_docs.sh serve  # serve locally at http://localhost:8000
 ```
 
+### `check_changelog.py`
+Checks `CHANGELOG.md`'s release structure: `## [Unreleased]` first, dated and
+unique release headings listed newest first, and compare links that chain each
+release to the one before it. The Docs workflow runs it before building; see
+*Changelog at Release Time* in the developer guide for how to cut a release.
+
+```bash
+pixi run check-changelog
+```
+
 ### `run_scaling_benchmarks.sh`
 Runs OMPL parallel planner scaling benchmarks (1/2/4/8 planners):
 

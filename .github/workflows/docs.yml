@@ -31,6 +31,9 @@ jobs:
       with:
         python-version: '3.12'
 
+    - name: Check CHANGELOG release structure
+      run: python scripts/check_changelog.py
+
     - name: Install dependencies
       run: pip install -r docs/requirements.txt
 
