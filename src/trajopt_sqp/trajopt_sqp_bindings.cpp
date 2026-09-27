@@ -34,10 +34,12 @@ public:
     NB_TRAMPOLINE(tsqp::SQPCallback, 1);
 
     bool execute(const tsqp::QPProblem& problem, const tsqp::SQPResults& sqp_results) override {
-        // NB_OVERRIDE_PURE with explicit argument policies: its default for const& arguments
-        // is a copy, which aborts on a non-copyable problem (TrajOptQPProblem) and deep-copied
-        // every other problem on every trial. The problem goes by reference (Python gets the
-        // object passed to solve()); the results stay a copy, a per-trial snapshot.
+        // Mirrors nanobind 2.12.0 trampoline.h NB_OVERRIDE_PURE_NAME, with explicit argument
+        // policies: its default for const& arguments is a copy, which aborts on a non-copyable
+        // problem (TrajOptQPProblem) and deep-copied every other problem on every trial. The
+        // problem goes by reference (Python gets the object passed to solve()); a problem with
+        // no Python instance (none reachable today) would arrive as a non-owning view valid
+        // only for the duration of the call. The results stay a copy, a per-trial snapshot.
         nanobind::detail::ticket nb_ticket(nb_trampoline, "execute", true);  // takes the GIL
         return nb::cast<bool>(nb_trampoline.base().attr(nb_ticket.key)(
             nb::cast(problem, nb::rv_policy::reference),

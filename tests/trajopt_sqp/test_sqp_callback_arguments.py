@@ -1,13 +1,16 @@
 """What a Python SQPCallback receives: the solver's own problem, and a snapshot of the results.
 
-The trampoline used to cast both arguments of execute() with nanobind's policy for const&
-arguments, which is a copy. For a problem without a copy constructor (TrajOptQPProblem) the copy
-aborted the process; for IfoptQPProblem every callback got a detached deep copy of the whole QP
-problem on every trial. The problem now arrives by reference: it is the Python object that was
-passed to solve(). The results are still copied per call, so a callback may keep them.
+The trampoline used to cast both arguments of execute() with nanobind's default
+automatic_reference policy, which copies lvalue-reference arguments. For a problem without a
+copy constructor (TrajOptQPProblem) the copy aborted the process; for IfoptQPProblem every
+callback got a detached deep copy of the whole QP problem on every trial. The problem now
+arrives by reference: it is the Python object that was passed to solve(). The results are still
+copied per call, so a callback may keep them.
 
-The runs that aborted before the fix happen in a child process, so an abort fails one test
-instead of the whole session.
+Every check runs in a child process that keeps its solver alive through the check and prints
+one sentinel line; the parent asserts exit 0, then the sentinel. An abort fails one test instead
+of the session, and a regression to results by reference (a non-owning view of the solver's
+results) fails the snapshot check cleanly instead of reading freed memory in the test process.
 """
 
 from __future__ import annotations
@@ -16,10 +19,7 @@ import re
 import subprocess
 import sys
 
-import numpy as np
-
-from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics import trajopt_sqp as tsqp
+import pytest
 
 N_NODES = 4
 PINNED_NODE = 2
@@ -29,8 +29,14 @@ JOINT_LIMIT = 10.0  # rad, symmetric joint bound
 # The pin sits 1 rad from the seed and the initial trust box is 0.1 rad, so the solve needs
 # several trials: at least two results to compare.
 MIN_TRIALS = 2
+# s; a child imports the bindings and solves in about 1-2 s. A deadlock must fail the test, not
+# hang the session, and 60 s leaves room for a loaded runner.
+CHILD_TIMEOUT_S = 60.0
 
-_CHILD_PROBLEM = f"""\
+# The child's argv[1] picks the problem: "trajopt" (TrajOptQPProblem) or "ifopt" (IfoptQPProblem).
+_PROBLEM = f"""\
+import sys
+
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
@@ -44,19 +50,22 @@ nodes = ti.createNodesVariables(
 pin = ti.JointPosConstraint(
     np.array([{TARGET}]), nodes.getNodes()[{PINNED_NODE}].getVar("joints"), np.ones(1), "pin"
 )
-qp = tsqp.TrajOptQPProblem(nodes)
+if sys.argv[1] == "trajopt":
+    qp = tsqp.TrajOptQPProblem(nodes)
+else:
+    qp = tsqp.IfoptQPProblem(tsqp.IfoptProblem(nodes))
 qp.addCostSet(pin, tsqp.CostPenaltyType.SQUARED)
 qp.setup()
 solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
 """
 
-_CHILD_TRIVIAL_CALLBACK = (
-    _CHILD_PROBLEM
-    + """\
-
+_TRIVIAL_CALLBACK = (
+    _PROBLEM
+    + """
 class Continue(tsqp.SQPCallback):
     def execute(self, problem, sqp_results):
         return True
+
 
 solver.registerCallback(Continue())
 solver.solve(qp)
@@ -64,10 +73,9 @@ print("SOLVE COMPLETED:", solver.getStatus().name)
 """
 )
 
-_CHILD_IDENTITY = (
-    _CHILD_PROBLEM
-    + """\
-
+_IDENTITY = (
+    _PROBLEM
+    + """
 class Identity(tsqp.SQPCallback):
     def __init__(self):
         super().__init__()
@@ -77,6 +85,7 @@ class Identity(tsqp.SQPCallback):
         self.same.append(problem is qp)
         return True
 
+
 identity = Identity()
 solver.registerCallback(identity)
 solver.solve(qp)
@@ -84,80 +93,76 @@ print(f"IDENTITY calls={len(identity.same)} same={all(identity.same)}")
 """
 )
 
-
-def _run_child(script: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, check=False
-    )
-
-
-def _child_failure(proc: subprocess.CompletedProcess) -> str:
-    return f"child died (rc={proc.returncode}, SIGABRT is -6): {proc.stderr[-500:]}"
-
-
-class _Recorder(tsqp.SQPCallback):
-    """Records what each execute() call receives; always lets the solve continue."""
-
-    def __init__(self, solved_problem):
+_SNAPSHOT = (
+    _PROBLEM
+    + """
+class Snapshots(tsqp.SQPCallback):
+    def __init__(self):
         super().__init__()
-        self._solved_problem = solved_problem
-        self.same_problem: list[bool] = []
-        self.results: list = []
-        self.new_var_vals_at_call: list[np.ndarray] = []
+        self.kept = []
+        self.at_call = []
 
-    def execute(self, problem, sqp_results) -> bool:
-        self.same_problem.append(problem is self._solved_problem)
-        self.results.append(sqp_results)
-        self.new_var_vals_at_call.append(np.array(sqp_results.new_var_vals, copy=True))
+    def execute(self, problem, sqp_results):
+        self.kept.append(sqp_results)
+        self.at_call.append(np.array(sqp_results.new_var_vals, copy=True))
         return True
 
 
-def _solve_ifopt_problem_with_recorder() -> _Recorder:
-    nodes = ti.createNodesVariables(
-        "trajectory",
-        ["j0"],
-        [np.array([SEED])] * N_NODES,
-        ti.toBounds(np.array([[-JOINT_LIMIT, JOINT_LIMIT]])),
+snapshots = Snapshots()
+solver.registerCallback(snapshots)
+solver.solve(qp)
+# solver is still alive here, so even a live reference to its results would read valid memory.
+moved = len(snapshots.at_call) > 1 and not np.array_equal(
+    snapshots.at_call[0], snapshots.at_call[-1]
+)
+kept_match = all(
+    np.array_equal(np.array(kept.new_var_vals), at_call)
+    for kept, at_call in zip(snapshots.kept, snapshots.at_call)
+)
+print(f"SNAPSHOT trials={len(snapshots.kept)} moved={moved} kept_match={kept_match}")
+"""
+)
+
+
+def _run_child(script: str, problem_kind: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, "-c", script, problem_kind],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=CHILD_TIMEOUT_S,
     )
-    pin = ti.JointPosConstraint(
-        np.array([TARGET]), nodes.getNodes()[PINNED_NODE].getVar("joints"), np.ones(1), "pin"
+
+
+def _sentinel(proc: subprocess.CompletedProcess, pattern: str) -> re.Match:
+    """The child's sentinel match, after asserting that the child exited cleanly."""
+    assert proc.returncode == 0, (
+        f"child died (rc={proc.returncode}, SIGABRT is -6): {proc.stderr[-500:]}"
     )
-    qp = tsqp.IfoptQPProblem(tsqp.IfoptProblem(nodes))
-    qp.addCostSet(pin, tsqp.CostPenaltyType.SQUARED)
-    qp.setup()
-    recorder = _Recorder(qp)
-    solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
-    solver.registerCallback(recorder)
-    solver.solve(qp)
-    return recorder
+    match = re.search(pattern, proc.stdout)
+    assert match, f"no sentinel in the child's stdout: {proc.stdout[-500:]}"
+    return match
 
 
 class TestSQPCallbackArguments:
-    def test_a_callback_on_trajopt_qp_problem_lets_the_solve_complete(self):
-        proc = _run_child(_CHILD_TRIVIAL_CALLBACK)
-        assert proc.returncode == 0, _child_failure(proc)
-        assert "SOLVE COMPLETED:" in proc.stdout
+    def test_a_callback_on_trajopt_qp_problem_lets_the_solve_converge(self):
+        match = _sentinel(_run_child(_TRIVIAL_CALLBACK, "trajopt"), r"SOLVE COMPLETED: (\w+)")
+        assert match.group(1) == "NLP_CONVERGED"
 
-    def test_the_callback_receives_the_solved_ifopt_qp_problem(self):
-        recorder = _solve_ifopt_problem_with_recorder()
-        assert recorder.same_problem, "the callback was never called"
-        assert all(recorder.same_problem), f"copies received: {recorder.same_problem}"
-
-    def test_the_callback_receives_the_solved_trajopt_qp_problem(self):
-        proc = _run_child(_CHILD_IDENTITY)
-        assert proc.returncode == 0, _child_failure(proc)
-        match = re.search(r"IDENTITY calls=(\d+) same=(True|False)", proc.stdout)
-        assert match, proc.stdout
+    @pytest.mark.parametrize("problem_kind", ["ifopt", "trajopt"])
+    def test_the_callback_receives_the_solved_problem(self, problem_kind):
+        match = _sentinel(
+            _run_child(_IDENTITY, problem_kind), r"IDENTITY calls=(\d+) same=(True|False)"
+        )
         assert int(match.group(1)) > 0, "the callback was never called"
-        assert match.group(2) == "True", proc.stdout
+        assert match.group(2) == "True", "the callback received a copy of the problem"
 
     def test_kept_results_are_snapshots_of_their_trial(self):
         """Passes before and after the fix: results were and are copied per call."""
-        recorder = _solve_ifopt_problem_with_recorder()
-        assert len(recorder.results) >= MIN_TRIALS
-        assert len(recorder.results) == len(recorder.new_var_vals_at_call)
-        assert not np.array_equal(
-            recorder.new_var_vals_at_call[0], recorder.new_var_vals_at_call[-1]
-        ), "the trials did not move: the snapshot check would be vacuous"
-        for kept, at_call in zip(recorder.results, recorder.new_var_vals_at_call):
-            np.testing.assert_array_equal(np.array(kept.new_var_vals), at_call)
+        match = _sentinel(
+            _run_child(_SNAPSHOT, "ifopt"),
+            r"SNAPSHOT trials=(\d+) moved=(True|False) kept_match=(True|False)",
+        )
+        assert int(match.group(1)) >= MIN_TRIALS
+        assert match.group(2) == "True", "the trials did not move: the check would be vacuous"
+        assert match.group(3) == "True", "kept results changed after their call: not snapshots"
