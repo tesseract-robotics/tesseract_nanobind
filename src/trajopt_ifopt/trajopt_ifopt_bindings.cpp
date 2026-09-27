@@ -173,9 +173,10 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("getBounds", &ti::ConstraintSet::getBounds,
              "Get the constraint bounds")
         .def("getJacobian", [](const ti::ConstraintSet& self) {
-                 // Collision constraints (while a contact is active) and CartLineConstraint
-                 // assemble their Jacobian with coeffRef, which leaves it uncompressed;
-                 // nanobind's Eigen caster only returns compressed sparse matrices.
+                 // The collision constraints (analytic and numerical, discrete and continuous)
+                 // assemble their Jacobian with coeffRef while a contact is active, which
+                 // leaves it uncompressed; nanobind's Eigen caster only returns compressed
+                 // sparse matrices.
                  ti::Jacobian jacobian = self.getJacobian();
                  jacobian.makeCompressed();
                  return jacobian;
@@ -359,9 +360,11 @@ NB_MODULE(_trajopt_ifopt, m) {
                             const Eigen::VectorXd& coeffs,
                             std::string name,
                             ti::RangeBoundHandling range_bound_handling) {
-                 // trajopt 0.35.0 splits range bounds by indexing the coeffs argument once
-                 // per bound, before broadcasting a length-0/1 coeffs: it reads past the
-                 // end (fixed upstream in trajopt#592). Broadcast here, as its docs promise.
+                 // In trajopt 0.35.0 the range split indexes the caller's coeffs argument
+                 // instead of the broadcast member coeffs_, so a length-0/1 coeffs is read
+                 // past its end (fix proposed in the open PR tesseract-robotics/trajopt#592);
+                 // the binding broadcasts first. Remove the broadcast only once a release
+                 // containing #592 is pinned.
                  const auto n_dof = static_cast<Eigen::Index>(bounds.size());
                  Eigen::VectorXd per_joint = coeffs;
                  if (coeffs.size() == 0)
@@ -374,8 +377,9 @@ NB_MODULE(_trajopt_ifopt, m) {
              "bounds"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with one bound per joint: an equality, a "
-             "one-sided limit or a range. coeffs has length 1 (every joint) or n_dof. A "
-             "range becomes two one-sided rows unless range_bound_handling is KEEP_AS_IS.")
+             "one-sided limit or a range. coeffs has length n_dof, 1 (one weight for every "
+             "joint) or 0 (weight 1 for every joint). A range becomes two one-sided rows "
+             "unless range_bound_handling is KEEP_AS_IS.")
         .def("getValues", &ti::JointPosConstraint::getValues,
              "Get current constraint values");
 

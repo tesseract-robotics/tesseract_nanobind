@@ -1,10 +1,10 @@
 """ConstraintSet.getJacobian reaches Python whatever the set's sparse storage.
 
-trajopt assembles some Jacobians with coeffRef: the collision constraints while a contact is
-active, and CartLineConstraint. That leaves Eigen's sparse matrix uncompressed, and
-nanobind's Eigen caster only returns compressed matrices, so getJacobian() raised for
-exactly the rows a caller needs ("unable to return an Eigen sparse matrix that is not in a
-compressed format"). The binding returns a compressed copy.
+trajopt assembles some Jacobians with coeffRef: the collision constraints (analytic and
+numerical, discrete and continuous) while a contact is active. That leaves Eigen's sparse
+matrix uncompressed, and nanobind's Eigen caster only returns compressed matrices, so
+getJacobian() raised for exactly the rows a caller needs ("unable to return an Eigen sparse
+matrix that is not in a compressed format"). The binding returns a compressed copy.
 """
 
 from __future__ import annotations
