@@ -122,7 +122,6 @@ constraint = trajopt_ifopt.CartPosConstraint(
     Isometry3d.Identity(),
     Isometry3d.Identity(),
     "CartPos",
-    trajopt_ifopt.RangeBoundHandling.KEEP_AS_IS,
 )
 ```
 
@@ -131,7 +130,7 @@ Two semantics are worth knowing before you rely on the row count:
 | Behaviour | Effect |
 |---|---|
 | **Zero coefficient** | Drops that axis' row entirely — six rows become five. This is how an axis is *freed*, not merely de-weighted. |
-| `RangeBoundHandling.KEEP_AS_IS` | Each range stays one row with `[lower, upper]` — the form that preserves an asymmetric band as written. |
+| `RangeBoundHandling.KEEP_AS_IS` | Each range stays one row with `[lower, upper]` — the form that preserves an asymmetric band as written. `TrajOptQPProblem` takes no range row: `addConstraintSet` and `setup()` accept one, and the first `convexify()` raises `Unsupported bounds type!`. |
 | `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` (default) | Each *range* row becomes two one-sided rows, `g(x) >= lower` and `g(x) <= upper`, so five constrained axes report ten rows. Equality and already one-sided bounds are unaffected. |
 
 Both are prerequisites for adding the term as a **cost** rather than a hard constraint:
