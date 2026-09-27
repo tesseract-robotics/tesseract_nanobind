@@ -30,6 +30,20 @@ problem.setup()                                 # must call before solving
 `IfoptQPProblem` no longer has a default constructor — see
 [changes](../changes.md) for the full migration.
 
+### TrajOptQPProblem
+
+`TrajOptQPProblem(nodes_variables)` is the problem tesseract_planning's TrajOpt-Ifopt planner builds. It has one layer: costs and constraints go straight in, with no `IfoptProblem`.
+
+```python
+problem = tsqp.TrajOptQPProblem(nodes_variables)
+problem.addConstraintSet(joint_constraint)
+problem.addConstraintSet(collision_constraint)
+problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)  # equality bounds required
+problem.setup()
+```
+
+Its exact merit weights each squared cost row by `getCoefficients()`, as its convex model does, and counts every cost term once, so the trust-region ratio compares like with like. In trajopt 0.35.0, `IfoptQPProblem` weights the model but not the merit, and counts the model once per cost term ([trajopt#595](https://github.com/tesseract-robotics/trajopt/issues/595)). With several weighted cost terms, its solver can reject every step and report `NLP_CONVERGED` at the seed. `TrajOptQPProblem` keeps one merit coefficient per constraint set; `IfoptQPProblem` keeps one per row. A squared cost must have equality bounds; `addCostSet` raises otherwise.
+
 ## Solver
 
 ### TrustRegionSQPSolver

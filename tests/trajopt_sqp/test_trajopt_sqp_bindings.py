@@ -11,8 +11,12 @@ Updated for 0.34 API:
 - Bounds uses getLower()/getUpper() instead of .lower/.upper
 """
 
+import subprocess
+import sys
+
 import numpy as np
 import pytest
+import scipy.sparse
 
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
@@ -892,3 +896,180 @@ class TestConstraintSetInterface:
             tsqp.SQPStatus.NLP_CONVERGED,
             tsqp.SQPStatus.ITERATION_LIMIT,
         ]
+
+
+# ---------------------------------------------------------------------------
+# TrajOptQPProblem (tesseract_nanobind#145)
+# ---------------------------------------------------------------------------
+
+# Linear residuals make the Gauss-Newton model exact, so exact/model = 1 up to float64
+# cancellation (about 1e-11 at this step); defects of the kind trajopt#595 reports in
+# IfoptQPProblem read 1/c or 1/N.
+MODEL_ROUND_OFF = 1e-8
+MODEL_STEP = 1e-3
+# OSQP's absolute tolerance as the trajopt_sqp wrapper sets it: a QP solution is exact to this.
+OSQP_ABSOLUTE_TOLERANCE = 1e-4
+
+_TRAJOPT_QP_TEARDOWN_SCRIPT = """\
+import numpy as np
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import trajopt_sqp as tsqp
+nodes = ti.createNodesVariables(
+    "trajectory", ["j0"], [np.array([float(k)]) for k in range(6)],
+    ti.toBounds(np.array([[-10.0, 10.0]])),
+)
+vars_list = [node.getVar("joints") for node in nodes.getNodes()]
+problem = tsqp.TrajOptQPProblem(nodes)
+problem.addConstraintSet(ti.JointPosConstraint(np.zeros(1), vars_list[0], np.ones(1), "start"))
+problem.addCostSet(
+    ti.JointVelConstraint(np.zeros(1), vars_list, np.full(1, 10.0), "vel"),
+    tsqp.CostPenaltyType.SQUARED,
+)
+problem.setup()
+solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+solver.solve(problem)
+print("OK:", solver.getStatus().name)
+"""
+
+
+class _PinCost(ti.ConstraintSet):
+    """Squared cost (x_k - target)^2 on one variable: a linear residual written in Python."""
+
+    def __init__(self, index: int, target: float):
+        super().__init__("python_pin", 1)
+        self._index = index
+        self._target = target
+
+    def getValues(self) -> np.ndarray:
+        x = np.array(self.getVariables().getValues())
+        return np.array([x[self._index] - self._target])
+
+    def getBounds(self) -> list:
+        return [ti.Bounds(0.0, 0.0)]
+
+    def getJacobian(self):
+        n = len(self.getVariables().getValues())
+        return scipy.sparse.csr_matrix(([1.0], ([0], [self._index])), shape=(1, n))
+
+    def update(self) -> int:
+        return self.getRows()
+
+    def getCoefficients(self) -> np.ndarray:
+        return np.ones(1)
+
+
+def _one_joint_problem(values, specs):
+    """A set-up TrajOptQPProblem over one joint, one squared cost per (class, coeff)."""
+    nodes = ti.createNodesVariables(
+        "trajectory",
+        ["j0"],
+        [np.array([v]) for v in values],
+        ti.toBounds(np.array([[-100.0, 100.0]])),
+    )
+    vars_list = [node.getVar("joints") for node in nodes.getNodes()]
+    problem = tsqp.TrajOptQPProblem(nodes)
+    for k, (cls, coeff) in enumerate(specs):
+        problem.addCostSet(
+            cls(np.zeros(1), vars_list, np.full(1, coeff), f"cost_{k}"),
+            tsqp.CostPenaltyType.SQUARED,
+        )
+    problem.setup()
+    return problem
+
+
+class TestTrajOptQPProblem:
+    """TrajOptQPProblem: the QP problem tesseract_planning's TrajOpt-Ifopt planner builds."""
+
+    SPECS = [
+        (ti.JointVelConstraint, 10.0),
+        (ti.JointAccelConstraint, 1.0),
+        (ti.JointJerkConstraint, 2000.0),
+    ]
+
+    def test_is_a_qp_problem(self, kuka_setup):
+        _, _, joint_names, joint_limits = kuka_setup
+        nv, _ = _make_nodes_variables(joint_names, joint_limits, [np.zeros(len(joint_names))] * 3)
+        assert isinstance(tsqp.TrajOptQPProblem(nv), tsqp.QPProblem)
+
+    def test_solve_holds_the_pinned_start(self, kuka_setup):
+        _, _, joint_names, joint_limits = kuka_setup
+        start = np.zeros(len(joint_names))
+        target = np.array([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0])
+        nv, vars_list = _make_nodes_variables(
+            joint_names, joint_limits, ti.interpolate(start, target, 5)
+        )
+        problem = tsqp.TrajOptQPProblem(nv)
+        home = ti.JointPosConstraint(start, vars_list[0], np.full(len(joint_names), 5.0), "Home")
+        problem.addConstraintSet(home)
+        vel = ti.JointVelConstraint(np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity")
+        problem.addCostSet(vel, tsqp.CostPenaltyType.SQUARED)
+        problem.setup()
+        solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+
+        solver.solve(problem)
+
+        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        results = solver.getResults()
+        assert len(results.merit_error_coeffs) == 1  # one merit unit per constraint set
+        np.testing.assert_allclose(
+            np.array(vars_list[0].value()), start, atol=OSQP_ABSOLUTE_TOLERANCE
+        )
+
+    def test_model_matches_the_exact_cost(self):
+        rng = np.random.default_rng(0)
+        x0 = np.cumsum(rng.normal(size=8))
+        x1 = x0 + MODEL_STEP * rng.normal(size=8)
+        base = _one_joint_problem(x0, self.SPECS)
+        base.convexify()
+        trial = _one_joint_problem(x1, self.SPECS)
+        exact = trial.getExactCosts().sum() - base.getExactCosts().sum()
+        predicted = base.evaluateConvexCosts(x1).sum() - base.evaluateConvexCosts(x0).sum()
+        assert exact / predicted == pytest.approx(1.0, abs=MODEL_ROUND_OFF)
+
+    def test_total_exact_cost_is_the_sum(self):
+        x0 = np.cumsum(np.random.default_rng(0).normal(size=8))
+        problem = _one_joint_problem(x0, self.SPECS)
+        costs = problem.getExactCosts()
+        assert len(costs) == len(self.SPECS)
+        assert problem.getTotalExactCost() == pytest.approx(costs.sum(), rel=MODEL_ROUND_OFF)
+
+    def test_python_cost_set(self):
+        nodes = ti.createNodesVariables(
+            "trajectory",
+            ["j0"],
+            [np.array([1.95]) for _ in range(4)],
+            ti.toBounds(np.array([[-10.0, 10.0]])),
+        )
+        problem = tsqp.TrajOptQPProblem(nodes)
+        problem.addCostSet(_PinCost(index=2, target=2.0), tsqp.CostPenaltyType.SQUARED)
+        problem.setup()
+        solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+
+        solver.solve(problem)
+
+        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert nodes.getValues()[2] == pytest.approx(2.0, abs=OSQP_ABSOLUTE_TOLERANCE)
+
+    def test_squared_cost_needs_equality_bounds(self):
+        nodes = ti.createNodesVariables(
+            "trajectory", ["j0"], [np.zeros(1)] * 3, ti.toBounds(np.array([[-10.0, 10.0]]))
+        )
+        var = nodes.getNodes()[1].getVar("joints")
+        upper_limited = ti.JointPosConstraint([ti.Bounds(-np.inf, 1.0)], var, np.ones(1), "upper")
+        problem = tsqp.TrajOptQPProblem(nodes)
+        with pytest.raises(RuntimeError, match="equality bounds"):
+            problem.addCostSet(upper_limited, tsqp.CostPenaltyType.SQUARED)
+
+    def test_interpreter_teardown_without_ordered_del(self):
+        """Module globals die in the interpreter's order, not C++'s ownership order."""
+        proc = subprocess.run(
+            [sys.executable, "-c", _TRAJOPT_QP_TEARDOWN_SCRIPT],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, (
+            f"interpreter teardown died (rc={proc.returncode}, SIGSEGV is -11/139): "
+            f"{proc.stderr[-500:]}"
+        )
+        assert "OK: NLP_CONVERGED" in proc.stdout

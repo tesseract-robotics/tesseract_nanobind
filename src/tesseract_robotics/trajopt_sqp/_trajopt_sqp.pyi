@@ -503,6 +503,27 @@ class IfoptQPProblem(QPProblem):
 
     def print(self) -> None: ...
 
+class TrajOptQPProblem(QPProblem):
+    """
+    QP problem over trajopt_ifopt variables: the problem tesseract_planning's
+    TrajOpt-Ifopt planner builds. Costs and constraints are added directly.
+    """
+
+    def __init__(self, variables: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Variables) -> None:
+        """
+        Construct over the optimization variables (e.g. createNodesVariables(...))
+        """
+
+    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
+
+    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None: ...
+
+    def setup(self) -> None: ...
+
+    def convexify(self) -> None: ...
+
+    def print(self) -> None: ...
+
 class SQPCallback:
     """Base class for SQP optimization callbacks"""
 

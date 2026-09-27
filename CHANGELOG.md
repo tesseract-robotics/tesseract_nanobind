@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- **`TrajOptQPProblem` bound** — the QP problem tesseract_planning's TrajOpt-Ifopt planner builds is now reachable from Python: construct it over the node variables (`TrajOptQPProblem(createNodesVariables(...))`) and add costs and constraints directly, with no `IfoptProblem` layer. Its exact merit weights each squared cost row by its coefficient, as its convex model does, and counts every cost term once, so the trust-region ratio compares like with like; in trajopt 0.35.0 `IfoptQPProblem` does neither (tesseract-robotics/trajopt#595). One merit coefficient per constraint set. trajopt 0.35.0 defaults the move constructor in the header while the PIMPL type is incomplete, so nanobind binds a non-movable subclass that adds no state ([#145]).
+- **`ConstraintSet.getJacobian()` returns every set's Jacobian** — the collision constraints (while a contact is active) and `CartLineConstraint` assemble their Jacobian with `coeffRef`, which leaves it uncompressed, and nanobind's Eigen caster refused it: `getJacobian()` raised for exactly the rows a caller needs. The binding now returns a compressed copy.
+- **`JointPosConstraint`'s bounds constructor bound** — one bound per joint (equality, one-sided or range) as an additive overload next to the target constructor; a range becomes two one-sided rows unless `range_bound_handling=KEEP_AS_IS`. trajopt 0.35.0 splits ranges by indexing the `coeffs` argument per bound before broadcasting a length-1 `coeffs`, reading past its end (fixed upstream in tesseract-robotics/trajopt#592); the binding broadcasts first.
+- **Python `ConstraintSet` subclasses report `getNonZeros() == 0`** — the Jacobian non-zero hint kept trajopt's unset default of −1, which Python could not change. `TrajOptQPProblem` reserves storage from the sum of its cost hints, so a Python cost set on its own raised `ValueError: vector`. 0 is a valid hint: storage grows as needed.
+
 ## [0.35.0.7] — TrajOptIfopt tuning + Cartesian planning fixes
 
 - **Cartesian planning works with the default pipeline** — `plan_cartesian()` and `TaskComposer.plan_cartesian()` now select the registered, double-precision `DescartesDPipeline`; the previous `DescartesPipeline` name did not exist in the generated configuration. Pipeline names and Descartes setup-cost guidance are corrected in the API and user guides ([74c00ef9]).
@@ -188,6 +193,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#92]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/92
 [#110]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/110
 [#115]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/115
+[#145]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/145
 [#119]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/119
 [#121]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/121
 [#123]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/123

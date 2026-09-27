@@ -220,8 +220,15 @@ class CartPosConstraint(ConstraintSet):
     def use_numeric_differentiation(self, arg: bool, /) -> None: ...
 
 class JointPosConstraint(ConstraintSet):
+    @overload
     def __init__(self, target: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """Create joint position constraint with target values"""
+
+    @overload
+    def __init__(self, bounds: Sequence[Bounds], position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+        """
+        Create joint position constraint with one bound per joint: an equality, a one-sided limit or a range. coeffs has length 1 (every joint) or n_dof. A range becomes two one-sided rows unless range_bound_handling is KEEP_AS_IS.
+        """
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""

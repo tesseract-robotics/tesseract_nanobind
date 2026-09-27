@@ -38,6 +38,22 @@ public:
     }
 };
 
+// trajopt 0.35.0 defaults TrajOptQPProblem's move constructor in its header, where the PIMPL
+// Implementation is incomplete, so that constructor compiles only inside
+// trajopt_qp_problem.cpp. nanobind's class_ instantiates the move constructor of every
+// move-constructible type it binds (to return it by value). This subclass adds no state and no
+// overrides and deletes copy and move; Python sees it as TrajOptQPProblem. Bind
+// tsqp::TrajOptQPProblem directly once trajopt defaults the move out of line.
+class TrajOptQPProblemBinding final : public tsqp::TrajOptQPProblem {
+public:
+    using tsqp::TrajOptQPProblem::TrajOptQPProblem;
+    TrajOptQPProblemBinding(const TrajOptQPProblemBinding&) = delete;
+    TrajOptQPProblemBinding& operator=(const TrajOptQPProblemBinding&) = delete;
+    TrajOptQPProblemBinding(TrajOptQPProblemBinding&&) = delete;
+    TrajOptQPProblemBinding& operator=(TrajOptQPProblemBinding&&) = delete;
+    ~TrajOptQPProblemBinding() override = default;
+};
+
 NB_MODULE(_trajopt_sqp, m) {
     m.doc() = "trajopt_sqp Python bindings - SQP solver for trajectory optimization";
 
@@ -273,11 +289,25 @@ NB_MODULE(_trajopt_sqp, m) {
         .def("print", &tsqp::IfoptQPProblem::print);
 
     // ========== TrajOptQPProblem ==========
-    // NOTE: TrajOptQPProblem uses PIMPL with internal Implementation struct
-    // that's not exposed in headers. We cannot bind it directly because
-    // nanobind needs to see complete types for move/copy operations.
-    // Use IfoptQPProblem or create TrajOptQPProblem via C++ factory functions.
-    // For online planning, IfoptQPProblem is sufficient.
+    // The QP problem tesseract_planning's TrajOpt-Ifopt planner builds
+    // (trajopt_ifopt_motion_planner.cpp): costs and constraints go straight in, with no
+    // trajopt_ifopt::Problem layer. Its exact merit weights each squared cost row by its
+    // coefficient, as its convex model does, and counts every cost term once; it keeps one
+    // merit coefficient per constraint set. nanobind binds TrajOptQPProblemBinding (above):
+    // trajopt 0.35.0 defaults the move constructor in its header, where the PIMPL type is
+    // incomplete.
+    nb::class_<TrajOptQPProblemBinding, tsqp::QPProblem>(
+        m, "TrajOptQPProblem",
+        "QP problem over trajopt_ifopt variables: the problem tesseract_planning's\n"
+        "TrajOpt-Ifopt planner builds. Costs and constraints are added directly.")
+        .def(nb::init<std::shared_ptr<trajopt_ifopt::Variables>>(), "variables"_a,
+             "Construct over the optimization variables (e.g. createNodesVariables(...))")
+        .def("addConstraintSet", &tsqp::TrajOptQPProblem::addConstraintSet, "constraint_set"_a)
+        .def("addCostSet", &tsqp::TrajOptQPProblem::addCostSet,
+             "constraint_set"_a, "penalty_type"_a)
+        .def("setup", &tsqp::TrajOptQPProblem::setup)
+        .def("convexify", &tsqp::TrajOptQPProblem::convexify)
+        .def("print", &tsqp::TrajOptQPProblem::print);
 
     // ========== SQPCallback ==========
     // NOTE: PySQPCallback trampoline allows Python subclasses

@@ -18,7 +18,7 @@ Measured step rates for a reference 8-DOF gantry problem are printed at runtime 
 | Module | Purpose |
 |---|---|
 | `tesseract_robotics.trajopt_ifopt` | Variables (`Var`, `Node`, `NodesVariables`), constraints (joint, Cartesian, collision), factory helpers |
-| `tesseract_robotics.trajopt_sqp` | `IfoptProblem` (NLP), `IfoptQPProblem` (QP wrapper), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
+| `tesseract_robotics.trajopt_sqp` | `IfoptProblem` (NLP), `IfoptQPProblem` (QP wrapper), `TrajOptQPProblem` (one-layer QP problem), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
 
 The standalone `tesseract_robotics.ifopt` module was **removed in 0.34**.
 All types merged into `tesseract_robotics.trajopt_ifopt`. See the
@@ -142,6 +142,24 @@ be given up entirely.
     `coeffs`, `source_frame_offset`, and `target_frame_offset` have no Python-side
     defaults. Eigen default arguments raise `std::bad_cast` in this module, so pass
     them explicitly — `Isometry3d.Identity()` where you want no offset.
+
+### Per-joint bounds
+
+`JointPosConstraint` has two constructors. The target one pins every joint of a waypoint to a value. The bounds one takes one `Bounds` per joint, ahead of the variable: an equality, a one-sided limit, or a range.
+
+```python
+import numpy as np
+from tesseract_robotics import trajopt_ifopt
+
+bounds = [
+    trajopt_ifopt.Bounds(0.0, 0.0),      # joint 0 pinned
+    trajopt_ifopt.Bounds(-np.inf, 1.2),  # joint 1 at most 1.2 rad
+    trajopt_ifopt.Bounds(-0.5, 0.5),     # joint 2 within a band
+]
+constraint = trajopt_ifopt.JointPosConstraint(bounds, var, np.array([5.0]), "band")
+```
+
+By default a range becomes two one-sided rows (`RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES`), because the QP problems accept only equality and one-sided rows; pass `KEEP_AS_IS` to keep it as one. A length-1 `coeffs` weights every row.
 
 
 ## SQP Solver Loop

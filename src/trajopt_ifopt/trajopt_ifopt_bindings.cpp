@@ -55,6 +55,20 @@ class PyConstraintSet : public ti::ConstraintSet {
 public:
     NB_TRAMPOLINE(ti::ConstraintSet, 5);
 
+    // getNonZeros() is a Jacobian reservation hint; trajopt's default -1 means unset, and a
+    // Python set cannot set the protected non_zeros_. TrajOptQPProblem reserves the sum of its
+    // cost hints, so a Python cost set on its own asked for SIZE_MAX. 0 is a valid hint:
+    // storage grows as needed.
+    PyConstraintSet(std::string name, int n_constraints)
+        : ti::ConstraintSet(std::move(name), n_constraints) {
+        non_zeros_ = 0;
+    }
+
+    PyConstraintSet(std::string name, bool dynamic)
+        : ti::ConstraintSet(std::move(name), dynamic) {
+        non_zeros_ = 0;
+    }
+
     // Expose protected getVariables() for Python access
     using ti::ConstraintSet::getVariables;
 
@@ -158,7 +172,14 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get the current constraint values")
         .def("getBounds", &ti::ConstraintSet::getBounds,
              "Get the constraint bounds")
-        .def("getJacobian", &ti::ConstraintSet::getJacobian,
+        .def("getJacobian", [](const ti::ConstraintSet& self) {
+                 // Collision constraints (while a contact is active) and CartLineConstraint
+                 // assemble their Jacobian with coeffRef, which leaves it uncompressed;
+                 // nanobind's Eigen caster only returns compressed sparse matrices.
+                 ti::Jacobian jacobian = self.getJacobian();
+                 jacobian.makeCompressed();
+                 return jacobian;
+             },
              "Get the constraint Jacobian (sparse matrix)")
         .def("update", &ti::ConstraintSet::update,
              "Recompute sizing/state for dynamic-sized components")
@@ -332,6 +353,29 @@ NB_MODULE(_trajopt_ifopt, m) {
              "target"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with target values")
+        .def("__init__", [](ti::JointPosConstraint* self,
+                            const std::vector<ti::Bounds>& bounds,
+                            const std::shared_ptr<const ti::Var>& position_var,
+                            const Eigen::VectorXd& coeffs,
+                            std::string name,
+                            ti::RangeBoundHandling range_bound_handling) {
+                 // trajopt 0.35.0 splits range bounds by indexing the coeffs argument once
+                 // per bound, before broadcasting a length-0/1 coeffs: it reads past the
+                 // end (fixed upstream in trajopt#592). Broadcast here, as its docs promise.
+                 const auto n_dof = static_cast<Eigen::Index>(bounds.size());
+                 Eigen::VectorXd per_joint = coeffs;
+                 if (coeffs.size() == 0)
+                     per_joint = Eigen::VectorXd::Ones(n_dof);
+                 else if (coeffs.size() == 1)
+                     per_joint = Eigen::VectorXd::Constant(n_dof, coeffs(0));
+                 new (self) ti::JointPosConstraint(bounds, position_var, per_joint,
+                                                   std::move(name), range_bound_handling);
+             },
+             "bounds"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
+             "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
+             "Create joint position constraint with one bound per joint: an equality, a "
+             "one-sided limit or a range. coeffs has length 1 (every joint) or n_dof. A "
+             "range becomes two one-sided rows unless range_bound_handling is KEEP_AS_IS.")
         .def("getValues", &ti::JointPosConstraint::getValues,
              "Get current constraint values");
 

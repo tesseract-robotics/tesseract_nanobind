@@ -19,6 +19,7 @@ __all__ = [  # noqa: F405
     # Classes - problems
     "QPProblem",
     "IfoptQPProblem",
+    "TrajOptQPProblem",
     # Classes - main solver
     "TrustRegionSQPSolver",
     # Classes - callbacks
