@@ -1,3 +1,5 @@
+"""trajopt_sqp Python bindings - SQP solver for trajectory optimization"""
+
 from collections.abc import Sequence
 import enum
 from typing import Annotated, overload
@@ -414,6 +416,27 @@ class OSQPEigenSolver(QPSolver):
     def updateUpperBound(self, upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
 
     def updateBounds(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+
+    def setPolish(self, polish: bool) -> None:
+        """Enable solution polishing (default: true)"""
+
+    def setWarmStart(self, warm_start: bool) -> None:
+        """Enable warm-starting (default: true)"""
+
+    def setAdaptiveRho(self, adaptive_rho: bool) -> None:
+        """Enable adaptive step size (default: true)"""
+
+    def setMaxIteration(self, max_iter: int) -> None:
+        """Max OSQP iterations per QP solve (default: 8192)"""
+
+    def setAbsoluteTolerance(self, abs_tol: float) -> None:
+        """Absolute convergence tolerance (default: 1e-4)"""
+
+    def setRelativeTolerance(self, rel_tol: float) -> None:
+        """Relative convergence tolerance (default: 1e-6)"""
+
+    def setVerbosity(self, verbose: bool) -> None:
+        """Enable OSQP console output (default: false)"""
 
 class QPProblem:
     """Abstract base class for QP problems (convexified NLP)"""
