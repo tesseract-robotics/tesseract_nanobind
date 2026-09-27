@@ -34,7 +34,14 @@ public:
     NB_TRAMPOLINE(tsqp::SQPCallback, 1);
 
     bool execute(const tsqp::QPProblem& problem, const tsqp::SQPResults& sqp_results) override {
-        NB_OVERRIDE_PURE(execute, problem, sqp_results);
+        // NB_OVERRIDE_PURE with explicit argument policies: its default for const& arguments
+        // is a copy, which aborts on a non-copyable problem (TrajOptQPProblem) and deep-copied
+        // every other problem on every trial. The problem goes by reference (Python gets the
+        // object passed to solve()); the results stay a copy, a per-trial snapshot.
+        nanobind::detail::ticket nb_ticket(nb_trampoline, "execute", true);  // takes the GIL
+        return nb::cast<bool>(nb_trampoline.base().attr(nb_ticket.key)(
+            nb::cast(problem, nb::rv_policy::reference),
+            nb::cast(sqp_results, nb::rv_policy::copy)));
     }
 };
 
