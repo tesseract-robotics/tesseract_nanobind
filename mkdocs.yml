@@ -112,6 +112,9 @@ markdown_extensions:
   - pymdownx.smartsymbols
   - pymdownx.snippets:
       base_path: ['.', 'docs']
+      # Without this, a missing file or `--8<-- [start:region]` renders an empty
+      # block and even `mkdocs build --strict` passes.
+      check_paths: true
       auto_append:
         - includes/abbreviations.md
   - pymdownx.superfences:

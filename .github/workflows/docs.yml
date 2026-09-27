@@ -1,21 +1,14 @@
 name: Docs
 
+# No `paths:` filter, on purpose: mkdocstrings reads docstrings from
+# src/**/*.py as well as *.pyi, and pymdownx.snippets (base_path ['.', 'docs'])
+# can include any file, so the build's inputs are the whole repo. A filter is a
+# hand-kept copy of that set; once it drifts, commits stop publishing and the
+# site goes stale without any failure. A build takes ~30 s.
 on:
   pull_request:
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'CHANGELOG.md'
-      - '.github/workflows/docs.yml'
-      - 'src/tesseract_robotics/**/*.pyi'
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'CHANGELOG.md'
-      - '.github/workflows/docs.yml'
-      - 'src/tesseract_robotics/**/*.pyi'
   workflow_dispatch:
 
 permissions:
@@ -45,13 +38,15 @@ jobs:
       run: PYTHONPATH=src mkdocs build --strict
 
     - name: Upload artifact
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main'
       uses: actions/upload-pages-artifact@v3
       with:
         path: site
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Pushes to main and manual runs on main publish; pull requests run on
+    # refs/pull/<n>/merge and only build.
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
