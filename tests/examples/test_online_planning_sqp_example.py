@@ -2,9 +2,9 @@
 
 tesseract_planning's online_planning_example.cpp (0.35.0) builds a TrajOptQPProblem over the
 node variables: the start and target poses as constraints, the joint velocity as a squared
-cost, one collision constraint per step. The example used to add its velocity cost to a
-wrapped IfoptProblem instead, where IfoptQPProblem neither squares it nor feeds it to its
-Gauss-Newton Hessian: only IfoptQPProblem.addCostSet does either.
+cost, one collision constraint per step. The example used to add its velocity cost without a
+penalty type, to the NLP layer of the two-layer problem trajopt is removing. There the cost
+reached neither the QP's gradient nor its Gauss-Newton Hessian, so the QP had no cost term.
 """
 
 from __future__ import annotations

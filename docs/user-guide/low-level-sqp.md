@@ -214,7 +214,7 @@ critical items:
 - `JointPosition(...)` → `createNodesVariables(...)` + `Var` refs
 - `IfoptQPProblem()` → `TrajOptQPProblem(nodes_variables)`, with every constraint and cost
   set added to it; 0.34's `IfoptQPProblem(IfoptProblem(nodes_variables))` is no longer bound
-  (see [`trajopt_sqp`](../api/trajopt_sqp.md#the-qp-problem))
+  (see [Breaking API changes](../breaking-changes.md#ifoptqpproblem-and-ifoptproblem-removed))
 - `CartPosInfo` struct removed — `CartPosConstraint` takes args directly
 - `CollisionCache` removed — caching is internal
 - `getTotalExactCost()` / `getExactCosts()` take no arguments

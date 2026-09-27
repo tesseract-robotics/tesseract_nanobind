@@ -20,19 +20,13 @@ problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)  # equality bounds re
 problem.setup()                                             # must call before solving
 ```
 
-A squared or absolute cost must have equality bounds, a hinge cost inequality bounds; `addCostSet` raises otherwise. Each set is linked to the variables when it is added. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so the trust-region ratio compares like with like. The problem keeps one merit coefficient per constraint set, and counts and names constraint and cost sets, not rows.
+A squared or absolute cost must have equality bounds on every row, a hinge cost one-sided bounds; `addCostSet` raises otherwise, on a range row too. Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for costs the trust-region ratio compares like with like. Constraint coefficients are the exception in trajopt 0.35.0: they weight a set's slack in the QP but not its violation in the merit (tesseract-robotics/trajopt#592 fixes that). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
 
 !!! warning "`IfoptQPProblem` and `IfoptProblem` are no longer bound"
     `IfoptQPProblem(IfoptProblem(nodes_variables))`, the two-layer form of 0.34, is gone; trajopt
-    is removing `IfoptQPProblem`
-    ([trajopt#595](https://github.com/tesseract-robotics/trajopt/issues/595)). Its trust-region
-    ratio was inconsistent: in trajopt 0.35.0 it weights the model but not the merit, and counts
-    the model once per cost term, so with several weighted cost terms its solver can reject every
-    step and report `NLP_CONVERGED` at the seed. A cost added to the wrapped `IfoptProblem` fared
-    worse: it was neither squared nor fed to the Gauss-Newton Hessian. To migrate, construct
-    `TrajOptQPProblem` over the same variables and add every set to it: constraints with
-    `addConstraintSet`, costs with `addCostSet(cost, penalty_type)`, including costs that went
-    into the `IfoptProblem`.
+    is removing `IfoptQPProblem` (tesseract-robotics/trajopt#595). It is not a rename: see
+    [Breaking API changes](../breaking-changes.md#ifoptqpproblem-and-ifoptproblem-removed) for
+    the migration and the five ways the problems differ.
 
 ## Solver
 

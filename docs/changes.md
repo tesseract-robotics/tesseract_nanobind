@@ -208,10 +208,9 @@ problem.setup()                                # must call after adding all sets
 !!! warning "Removed: migrate to `TrajOptQPProblem`"
     The two-layer form above is 0.34's; `IfoptQPProblem` and `IfoptProblem` are no longer bound.
     `TrajOptQPProblem(nodes_variables)` replaces them: every constraint and cost set goes straight
-    in, each cost with its penalty type, as in tesseract_planning's own planner. trajopt is
-    removing `IfoptQPProblem`
-    ([trajopt#595](https://github.com/tesseract-robotics/trajopt/issues/595)); see
-    [`trajopt_sqp`](api/trajopt_sqp.md#the-qp-problem).
+    in, each cost with its penalty type, as in tesseract_planning's own planner. It is not a
+    rename; see
+    [Breaking API changes](breaking-changes.md#ifoptqpproblem-and-ifoptproblem-removed).
 
 ### `CartPosInfo` removed
 
