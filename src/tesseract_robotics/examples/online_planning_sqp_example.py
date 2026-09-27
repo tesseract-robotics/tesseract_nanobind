@@ -20,20 +20,19 @@ Collision Checking Modes
 - Discrete: Single timestep collision check (SingleTimestepCollisionEvaluator)
 - Continuous: LVS (longest valid segment) between timesteps (LVSDiscreteCollisionEvaluator)
 
-Architecture (0.34 API)
------------------------
-1. Build IFOPT problem with:
+Architecture
+------------
+1. Build a TrajOptQPProblem over the node variables, as the C++ reference does:
    - Node/Var for each waypoint (replaces JointPosition)
-   - NodesVariables container (passed to IfoptProblem constructor)
-   - JointPosConstraint for start position
-   - CartPosConstraint for target pose (direct params, no CartPosInfo)
-   - JointVelConstraint for smoothness
-   - CollisionConstraint for safety (no CollisionCache — now internal)
+   - NodesVariables container (passed to the TrajOptQPProblem constructor)
+   - JointPosConstraint for start position (constraint)
+   - CartPosConstraint for target pose (constraint; direct params, no CartPosInfo)
+   - JointVelConstraint for smoothness (squared cost)
+   - CollisionConstraint for safety (constraint; no CollisionCache — now internal)
 
-2. Create IfoptQPProblem(nlp) from IfoptProblem
-3. Create TrustRegionSQPSolver with OSQPEigenSolver
+2. Create TrustRegionSQPSolver with OSQPEigenSolver
 
-4. Loop:
+3. Loop:
    - Update obstacle position in environment
    - stepSQPSolver() for single SQP iteration
    - Extract trajectory from results
@@ -61,7 +60,7 @@ if "pytest" not in sys.modules:
 def build_optimization_problem(
     robot, joint_names, start_pos, target_pos, steps=10, use_continuous_collision=True
 ):
-    """Build the IFOPT optimization problem using 0.34 Var/Node API.
+    """Build the TrajOptQPProblem that online_planning_example.cpp builds.
 
     Args:
         robot: Robot instance with environment
@@ -87,7 +86,8 @@ def build_optimization_problem(
     nodes_variables = ti.createNodesVariables(
         "trajectory", list(joint_names), list(initial_states), bounds
     )
-    nlp = tsqp.IfoptProblem(nodes_variables)
+    # One layer: constraint and cost sets go straight into the QP problem
+    problem = tsqp.TrajOptQPProblem(nodes_variables)
 
     # Get Var references for constraints
     vars_list = []
@@ -97,7 +97,7 @@ def build_optimization_problem(
     # Add start position constraint (first waypoint = current position)
     home_coeffs = np.ones(len(joint_names)) * 5.0
     home_constraint = ti.JointPosConstraint(start_pos, vars_list[0], home_coeffs, "Home_Position")
-    nlp.addConstraintSet(home_constraint)
+    problem.addConstraintSet(home_constraint)
 
     # Add target pose constraint (last waypoint = target in Cartesian space)
     target_tf = manip.calcFwdKin(target_pos)["tool0"]
@@ -110,15 +110,12 @@ def build_optimization_problem(
         target_tf,  # target_frame_offset
         "Target_Pose",
     )
-    nlp.addConstraintSet(target_constraint)
+    problem.addConstraintSet(target_constraint)
 
-    # Add velocity cost (smooth motion)
+    # Add velocity cost (smooth motion): squared, which needs the set's equality bounds
     vel_target = np.zeros(len(joint_names))
     vel_constraint = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "JointVelocity")
-    nlp.addCostSet(vel_constraint)
-
-    # Create QP problem from NLP
-    problem = tsqp.IfoptQPProblem(nlp)
+    problem.addCostSet(vel_constraint, tsqp.CostPenaltyType.SQUARED)
 
     # Add collision constraints
     margin = 0.1  # 10cm safety margin
@@ -169,7 +166,6 @@ def build_optimization_problem(
 
     return {
         "problem": problem,
-        "nlp": nlp,
         "nodes_variables": nodes_variables,
         "vars_list": vars_list,
         "target_constraint": target_constraint,

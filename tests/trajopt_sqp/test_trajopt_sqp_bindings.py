@@ -5,7 +5,7 @@ Updated for 0.34 API:
 - CollisionCache removed (now internal)
 - CartPosInfo removed; CartPosConstraint takes direct params
 - ifopt module removed; types now in trajopt_ifopt
-- IfoptProblem(variables) constructor, then IfoptQPProblem(nlp)
+- TrajOptQPProblem(variables) takes constraint and cost sets directly
 - evaluateTotalExactCost() -> getTotalExactCost() (no args)
 - ConstraintType enum removed
 - Bounds uses getLower()/getUpper() instead of .lower/.upper
@@ -39,19 +39,14 @@ def _make_nodes_variables(joint_names, joint_limits, initial_states, name="traje
     return nodes_variables, vars_list
 
 
-def _make_problem(nodes_variables, vars_list, joint_names, constraints=None, costs=None):
-    """Helper: create IfoptProblem + IfoptQPProblem with given constraints/costs.
-
-    constraints added to nlp, costs added to qp_problem with SQUARED penalty.
-    Returns (nlp, problem).
-    """
-    nlp = tsqp.IfoptProblem(nodes_variables)
+def _make_problem(nodes_variables, constraints=None, costs=None):
+    """Helper: a TrajOptQPProblem with the given constraint sets and SQUARED cost sets."""
+    problem = tsqp.TrajOptQPProblem(nodes_variables)
     for c in constraints or []:
-        nlp.addConstraintSet(c)
+        problem.addConstraintSet(c)
     for c in costs or []:
-        nlp.addCostSet(c)
-    problem = tsqp.IfoptQPProblem(nlp)
-    return nlp, problem
+        problem.addCostSet(c, tsqp.CostPenaltyType.SQUARED)
+    return problem
 
 
 @pytest.fixture
@@ -235,17 +230,6 @@ class TestTrajOptSQPTypes:
         assert hasattr(solver, "params")
         solver.params.initial_trust_box_size = 0.1
 
-    def test_ifopt_qp_problem(self, kuka_setup):
-        """Test IfoptQPProblem creation (0.34: requires IfoptProblem(nv))."""
-        _, _, joint_names, joint_limits = kuka_setup
-
-        states = [np.zeros(len(joint_names))]
-        nv, vars_list = _make_nodes_variables(joint_names, joint_limits, states)
-
-        nlp = tsqp.IfoptProblem(nv)
-        problem = tsqp.IfoptQPProblem(nlp)
-        assert problem is not None
-
     def test_cost_penalty_types(self):
         """Test CostPenaltyType enum."""
         assert tsqp.CostPenaltyType.SQUARED is not None
@@ -312,7 +296,7 @@ class TestTrajOptSQPTypes:
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp, problem = _make_problem(nv, vars_list, joint_names, costs=[vel_cost])
+        problem = _make_problem(nv, costs=[vel_cost])
         problem.setup()
 
         qp_solver = tsqp.OSQPEigenSolver()
@@ -344,9 +328,7 @@ class TestTrajOptSQPTypes:
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp, problem = _make_problem(
-            nv, vars_list, joint_names, constraints=[constraint], costs=[vel_cost]
-        )
+        problem = _make_problem(nv, constraints=[constraint], costs=[vel_cost])
         problem.setup()
 
         qp_solver = tsqp.OSQPEigenSolver()
@@ -385,9 +367,7 @@ class TestSQPIntegration:
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp, problem = _make_problem(
-            nv, vars_list, joint_names, constraints=[home_constraint], costs=[vel_cost]
-        )
+        problem = _make_problem(nv, constraints=[home_constraint], costs=[vel_cost])
         problem.setup()
 
         qp_solver = tsqp.OSQPEigenSolver()
@@ -412,12 +392,12 @@ class TestSQPIntegration:
         initial_states = ti.interpolate(start_pos, target_pos, steps)
         nv, vars_list = _make_nodes_variables(joint_names, joint_limits, initial_states)
 
-        nlp = tsqp.IfoptProblem(nv)
+        problem = tsqp.TrajOptQPProblem(nv)
 
         # Start constraint
         home_coeffs = np.ones(len(joint_names)) * 5.0
         home_constraint = ti.JointPosConstraint(start_pos, vars_list[0], home_coeffs, "Home")
-        nlp.addConstraintSet(home_constraint)
+        problem.addConstraintSet(home_constraint)
 
         # Cartesian target constraint (0.34: direct params)
         target_constraint = ti.CartPosConstraint(
@@ -429,16 +409,13 @@ class TestSQPIntegration:
             target_tf,
             "Target",
         )
-        nlp.addConstraintSet(target_constraint)
+        problem.addConstraintSet(target_constraint)
 
         # Velocity cost
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp.addCostSet(vel_cost)
-
-        # Create QP problem
-        problem = tsqp.IfoptQPProblem(nlp)
+        problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
         problem.setup()
 
         qp_solver = tsqp.OSQPEigenSolver()
@@ -462,16 +439,13 @@ class TestSQPIntegration:
         initial_states = ti.interpolate(start_pos, target_pos, steps)
         nv, vars_list = _make_nodes_variables(joint_names, joint_limits, initial_states)
 
-        nlp = tsqp.IfoptProblem(nv)
+        problem = tsqp.TrajOptQPProblem(nv)
 
         # Velocity cost
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp.addCostSet(vel_cost)
-
-        # Create QP problem
-        problem = tsqp.IfoptQPProblem(nlp)
+        problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
 
         # Collision constraints (0.34: no cache)
         collision_config = ti.TrajOptCollisionConfig(0.05, 20.0)
@@ -509,16 +483,6 @@ class TestAdditionalBindings:
         assert hasattr(data, "getPairCollisionCoeff")
         assert hasattr(data, "setPairCollisionCoeff")
 
-    def test_ifopt_problem_base(self, kuka_setup):
-        """Test IfoptProblem (base NLP) creation via 0.34 API."""
-        _, _, joint_names, joint_limits = kuka_setup
-
-        states = [np.zeros(len(joint_names))]
-        nv, vars_list = _make_nodes_variables(joint_names, joint_limits, states)
-
-        nlp = tsqp.IfoptProblem(nv)
-        assert nlp.getNumberOfOptimizationVariables() >= len(joint_names)
-
     def test_qp_problem_interface(self, kuka_setup):
         """Test QPProblem interface methods."""
         _, _, joint_names, joint_limits = kuka_setup
@@ -526,8 +490,7 @@ class TestAdditionalBindings:
         states = [np.zeros(len(joint_names))]
         nv, vars_list = _make_nodes_variables(joint_names, joint_limits, states)
 
-        nlp = tsqp.IfoptProblem(nv)
-        problem = tsqp.IfoptQPProblem(nlp)
+        problem = tsqp.TrajOptQPProblem(nv)
         problem.setup()
         assert problem.getNumNLPVars() >= len(joint_names)
 
@@ -579,9 +542,8 @@ class TestAdditionalBindings:
         vel_cost = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "VelCost")
 
         # Adding as cost to QP problem works
-        nlp = tsqp.IfoptProblem(nv)
-        nlp.addCostSet(vel_cost)
-        problem = tsqp.IfoptQPProblem(nlp)
+        problem = tsqp.TrajOptQPProblem(nv)
+        problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
         assert problem is not None
 
     def test_get_total_exact_cost(self, kuka_setup):
@@ -594,7 +556,7 @@ class TestAdditionalBindings:
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp, problem = _make_problem(nv, vars_list, joint_names, costs=[vel_cost])
+        problem = _make_problem(nv, costs=[vel_cost])
         problem.setup()
 
         qp_solver = tsqp.OSQPEigenSolver()
@@ -617,7 +579,7 @@ class TestAdditionalBindings:
         vel_cost = ti.JointVelConstraint(
             np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity"
         )
-        nlp, problem = _make_problem(nv, vars_list, joint_names, costs=[vel_cost])
+        problem = _make_problem(nv, costs=[vel_cost])
         problem.setup()
 
         qp_solver = tsqp.OSQPEigenSolver()
@@ -881,9 +843,7 @@ class TestConstraintSetInterface:
             np.zeros(len(joint_names)), vars_list, np.ones(1), "VelCost"
         )
 
-        nlp, problem = _make_problem(
-            nv, vars_list, joint_names, constraints=[home_constraint], costs=[vel_cost]
-        )
+        problem = _make_problem(nv, constraints=[home_constraint], costs=[vel_cost])
         problem.setup()
 
         solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
@@ -903,8 +863,8 @@ class TestConstraintSetInterface:
 # ---------------------------------------------------------------------------
 
 # Linear residuals make the Gauss-Newton model exact, so exact/model = 1 up to float64
-# cancellation (about 1e-11 at this step); defects of the kind trajopt#595 reports in
-# IfoptQPProblem read 1/c or 1/N.
+# cancellation (about 1e-11 at this step); defects of the kind trajopt#595 reports (a merit
+# that ignores the cost coefficient c, a model counted once per cost term of N) read 1/c or 1/N.
 MODEL_ROUND_OFF = 1e-8
 MODEL_STEP = 1e-3
 # OSQP's absolute tolerance as the trajopt_sqp wrapper sets it: a QP solution is exact to this.

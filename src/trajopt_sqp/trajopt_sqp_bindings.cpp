@@ -16,7 +16,6 @@
 #include <trajopt_sqp/qp_solver.h>
 #include <trajopt_sqp/osqp_eigen_solver.h>
 #include <trajopt_sqp/qp_problem.h>
-#include <trajopt_sqp/ifopt_qp_problem.h>
 #include <trajopt_sqp/trajopt_qp_problem.h>
 #include <trajopt_sqp/trust_region_sqp_solver.h>
 #include <trajopt_sqp/sqp_callback.h>
@@ -24,7 +23,6 @@
 // trajopt_ifopt headers for types used in QPProblem interface
 #include <trajopt_ifopt/core/component.h>
 #include <trajopt_ifopt/core/constraint_set.h>
-#include <trajopt_ifopt/core/problem.h>
 
 namespace tsqp = trajopt_sqp;
 
@@ -283,28 +281,13 @@ NB_MODULE(_trajopt_sqp, m) {
         .def("getNLPCostNames", &tsqp::QPProblem::getNLPCostNames,
              nb::rv_policy::reference_internal, "Get cost names");
 
-    // ========== IfoptQPProblem ==========
-
-    nb::class_<tsqp::IfoptQPProblem, tsqp::QPProblem>(
-        m, "IfoptQPProblem",
-        "QP problem wrapper for trajopt_ifopt::Problem (general NLP)")
-        .def(nb::init<std::shared_ptr<trajopt_ifopt::Problem>>(), "nlp"_a,
-             "Construct from trajopt_ifopt Problem")
-        .def("addConstraintSet", &tsqp::IfoptQPProblem::addConstraintSet, "constraint_set"_a)
-        .def("addCostSet", &tsqp::IfoptQPProblem::addCostSet,
-             "constraint_set"_a, "penalty_type"_a)
-        .def("setup", &tsqp::IfoptQPProblem::setup)
-        .def("convexify", &tsqp::IfoptQPProblem::convexify)
-        .def("print", &tsqp::IfoptQPProblem::print);
-
     // ========== TrajOptQPProblem ==========
     // The QP problem tesseract_planning's TrajOpt-Ifopt planner builds
-    // (trajopt_ifopt_motion_planner.cpp): costs and constraints go straight in, with no
-    // trajopt_ifopt::Problem layer. Its exact merit weights each squared cost row by its
-    // coefficient, as its convex model does, and counts every cost term once; it keeps one
-    // merit coefficient per constraint set. nanobind binds TrajOptQPProblemBinding (above):
-    // trajopt 0.35.0 defaults the move constructor in its header, where the PIMPL type is
-    // incomplete.
+    // (trajopt_ifopt_motion_planner.cpp): costs and constraints go straight in. Its exact merit
+    // weights each squared cost row by its coefficient, as its convex model does, and counts
+    // every cost term once; it keeps one merit coefficient per constraint set. nanobind binds
+    // TrajOptQPProblemBinding (above): trajopt 0.35.0 defaults the move constructor in its
+    // header, where the PIMPL type is incomplete.
     nb::class_<TrajOptQPProblemBinding, tsqp::QPProblem>(
         m, "TrajOptQPProblem",
         "QP problem over trajopt_ifopt variables: the problem tesseract_planning's\n"
@@ -379,19 +362,4 @@ NB_MODULE(_trajopt_sqp, m) {
                 "The QP solver used internally")
         .def_rw("qp_problem", &tsqp::TrustRegionSQPSolver::qp_problem,
                 "The current QP problem");
-
-    // ========== trajopt_ifopt types (minimal bindings for use with QPProblem) ==========
-    // NOTE: trajopt_ifopt::Variables and trajopt_ifopt::ConstraintSet are already bound in the
-    // _trajopt_ifopt module. We only bind trajopt_ifopt::Problem here since it's not in _trajopt_ifopt.
-
-    // trajopt_ifopt::Problem - needed to construct IfoptQPProblem
-    nb::class_<trajopt_ifopt::Problem>(m, "IfoptProblem",
-        "trajopt_ifopt::Problem - generic NLP with variables, costs, constraints")
-        .def(nb::init<trajopt_ifopt::Variables::Ptr>(), "variables"_a)
-        .def("addConstraintSet", &trajopt_ifopt::Problem::addConstraintSet, "constraint_set"_a)
-        .def("addCostSet", &trajopt_ifopt::Problem::addCostSet, "cost_set"_a)
-        .def("getNumberOfOptimizationVariables", &trajopt_ifopt::Problem::getNumberOfOptimizationVariables)
-        .def("getNumberOfConstraints", &trajopt_ifopt::Problem::getNumberOfConstraints)
-        .def("getVariableValues", &trajopt_ifopt::Problem::getVariableValues)
-        .def("printCurrent", &trajopt_ifopt::Problem::printCurrent);
 }

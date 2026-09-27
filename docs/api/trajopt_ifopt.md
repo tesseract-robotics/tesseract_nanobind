@@ -17,7 +17,7 @@ Groups multiple `Var`s per waypoint (e.g., joints + velocities at one waypoint).
 
 ### NodesVariables
 
-Container of `Node`s. Passed to `IfoptProblem`.
+Container of `Node`s. Passed to `TrajOptQPProblem`.
 
 ### createNodesVariables
 

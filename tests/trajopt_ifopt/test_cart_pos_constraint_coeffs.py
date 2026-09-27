@@ -8,7 +8,7 @@ has no room for:
   axis-symmetric tool, say), which must not be pulled back to the target; and
 * an **asymmetric bound** -- a standoff that may open but never close.
 
-Both are needed to use the term as a COST (``IfoptProblem.addCostSet``) rather
+Both are needed to use the term as a COST (``TrajOptQPProblem.addCostSet``) rather
 than a hard pin. These tests pin the semantics that make that possible: a zero
 coefficient DROPS the axis' row, and the bounds survive the trip into C++
 unmangled.

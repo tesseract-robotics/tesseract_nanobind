@@ -205,6 +205,14 @@ problem.addConstraintSet(collision_constraint) # collision constraints on QP
 problem.setup()                                # must call after adding all sets
 ```
 
+!!! warning "Removed: migrate to `TrajOptQPProblem`"
+    The two-layer form above is 0.34's; `IfoptQPProblem` and `IfoptProblem` are no longer bound.
+    `TrajOptQPProblem(nodes_variables)` replaces them: every constraint and cost set goes straight
+    in, each cost with its penalty type, as in tesseract_planning's own planner. trajopt is
+    removing `IfoptQPProblem`
+    ([trajopt#595](https://github.com/tesseract-robotics/trajopt/issues/595)); see
+    [`trajopt_sqp`](api/trajopt_sqp.md#the-qp-problem).
+
 ### `CartPosInfo` removed
 
 `CartPosConstraint` now takes parameters directly instead of a `CartPosInfo` struct:
@@ -323,7 +331,7 @@ solver.stepSQPSolver()
 
 - [ ] Replace `from tesseract_robotics import ifopt` → `from tesseract_robotics import trajopt_ifopt`
 - [ ] Replace `JointPosition` with `createNodesVariables` factory + `Var` refs
-- [ ] Replace `IfoptQPProblem()` → `IfoptProblem(nodes_variables)` + `IfoptQPProblem(nlp)`
+- [ ] Replace `IfoptQPProblem()` → `TrajOptQPProblem(nodes_variables)`, adding every constraint and cost set to it
 - [ ] Replace `CartPosInfo` struct with direct `CartPosConstraint` parameters
 - [ ] Remove `CollisionCache` from evaluator constructors
 - [ ] Replace `evaluateTotalExactCost(x)` → `getTotalExactCost()`

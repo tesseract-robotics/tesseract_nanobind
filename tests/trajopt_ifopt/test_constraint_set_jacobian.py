@@ -55,9 +55,9 @@ def test_collision_constraint_with_an_active_contact():
         manip, env, ti.TrajOptCollisionConfig(MARGIN, COEFF), True
     )
     constraint = ti.DiscreteCollisionConstraint(evaluator, var, 1, False, "collision")
-    problem = tsqp.IfoptQPProblem(tsqp.IfoptProblem(nodes))
-    problem.addConstraintSet(constraint)
-    problem.setup()  # links the set to the variables and evaluates its contacts
+    problem = tsqp.TrajOptQPProblem(nodes)
+    problem.addConstraintSet(constraint)  # links the set to the variables
+    problem.setup()
     assert constraint.getValues()[0] > 0.0  # inside the margin: the row is active
 
     jacobian = constraint.getJacobian()

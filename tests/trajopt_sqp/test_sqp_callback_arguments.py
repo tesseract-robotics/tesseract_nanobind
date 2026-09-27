@@ -1,11 +1,10 @@
 """What a Python SQPCallback receives: the solver's own problem, and a snapshot of the results.
 
 The trampoline used to cast both arguments of execute() with nanobind's default
-automatic_reference policy, which copies lvalue-reference arguments. For a problem without a
-copy constructor (TrajOptQPProblem) the copy aborted the process; for IfoptQPProblem every
-callback got a detached deep copy of the whole QP problem on every trial. The problem now
-arrives by reference: it is the Python object that was passed to solve(). The results are still
-copied per call, so a callback may keep them.
+automatic_reference policy, which copies lvalue-reference arguments. TrajOptQPProblem has no
+copy constructor, so the copy aborted the process. The problem now arrives by reference: it is
+the Python object that was passed to solve(). The results are still copied per call, so a
+callback may keep them.
 
 Every check runs in a child process that keeps its solver alive through the check and prints
 one sentinel line; the parent asserts exit 0, then the sentinel. An abort fails one test instead
@@ -19,8 +18,6 @@ import re
 import subprocess
 import sys
 
-import pytest
-
 N_NODES = 4
 PINNED_NODE = 2
 SEED = 1.0  # rad, every node's initial joint value
@@ -33,10 +30,7 @@ MIN_TRIALS = 2
 # hang the session, and 60 s leaves room for a loaded runner.
 CHILD_TIMEOUT_S = 60.0
 
-# The child's argv[1] picks the problem: "trajopt" (TrajOptQPProblem) or "ifopt" (IfoptQPProblem).
 _PROBLEM = f"""\
-import sys
-
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
@@ -50,10 +44,7 @@ nodes = ti.createNodesVariables(
 pin = ti.JointPosConstraint(
     np.array([{TARGET}]), nodes.getNodes()[{PINNED_NODE}].getVar("joints"), np.ones(1), "pin"
 )
-if sys.argv[1] == "trajopt":
-    qp = tsqp.TrajOptQPProblem(nodes)
-else:
-    qp = tsqp.IfoptQPProblem(tsqp.IfoptProblem(nodes))
+qp = tsqp.TrajOptQPProblem(nodes)
 qp.addCostSet(pin, tsqp.CostPenaltyType.SQUARED)
 qp.setup()
 solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
@@ -124,9 +115,9 @@ print(f"SNAPSHOT trials={len(snapshots.kept)} moved={moved} kept_match={kept_mat
 )
 
 
-def _run_child(script: str, problem_kind: str) -> subprocess.CompletedProcess:
+def _run_child(script: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-c", script, problem_kind],
+        [sys.executable, "-c", script],
         capture_output=True,
         text=True,
         check=False,
@@ -146,21 +137,18 @@ def _sentinel(proc: subprocess.CompletedProcess, pattern: str) -> re.Match:
 
 class TestSQPCallbackArguments:
     def test_a_callback_on_trajopt_qp_problem_lets_the_solve_converge(self):
-        match = _sentinel(_run_child(_TRIVIAL_CALLBACK, "trajopt"), r"SOLVE COMPLETED: (\w+)")
+        match = _sentinel(_run_child(_TRIVIAL_CALLBACK), r"SOLVE COMPLETED: (\w+)")
         assert match.group(1) == "NLP_CONVERGED"
 
-    @pytest.mark.parametrize("problem_kind", ["ifopt", "trajopt"])
-    def test_the_callback_receives_the_solved_problem(self, problem_kind):
-        match = _sentinel(
-            _run_child(_IDENTITY, problem_kind), r"IDENTITY calls=(\d+) same=(True|False)"
-        )
+    def test_the_callback_receives_the_solved_problem(self):
+        match = _sentinel(_run_child(_IDENTITY), r"IDENTITY calls=(\d+) same=(True|False)")
         assert int(match.group(1)) > 0, "the callback was never called"
         assert match.group(2) == "True", "the callback received a copy of the problem"
 
     def test_kept_results_are_snapshots_of_their_trial(self):
-        """Passes before and after the fix: results were and are copied per call."""
+        """Results were copied per call before the fix too; the fix must keep that."""
         match = _sentinel(
-            _run_child(_SNAPSHOT, "ifopt"),
+            _run_child(_SNAPSHOT),
             r"SNAPSHOT trials=(\d+) moved=(True|False) kept_match=(True|False)",
         )
         assert int(match.group(1)) >= MIN_TRIALS

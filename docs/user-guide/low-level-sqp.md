@@ -18,7 +18,7 @@ Measured step rates for a reference 8-DOF gantry problem are printed at runtime 
 | Module | Purpose |
 |---|---|
 | `tesseract_robotics.trajopt_ifopt` | Variables (`Var`, `Node`, `NodesVariables`), constraints (joint, Cartesian, collision), factory helpers |
-| `tesseract_robotics.trajopt_sqp` | `IfoptProblem` (NLP), `IfoptQPProblem` (QP wrapper), `TrajOptQPProblem` (one-layer QP problem), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
+| `tesseract_robotics.trajopt_sqp` | `TrajOptQPProblem` (the QP problem), `TrustRegionSQPSolver`, `OSQPEigenSolver` |
 
 The standalone `tesseract_robotics.ifopt` module was **removed in 0.34**.
 All types merged into `tesseract_robotics.trajopt_ifopt`. See the
@@ -57,9 +57,10 @@ vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 
 ## Constraints and Costs
 
-The `build_optimization_problem` function shows the full 0.34 pattern — `NodesVariables`
-factory, `IfoptProblem` (NLP) for joint/Cartesian constraints, then `IfoptQPProblem(nlp)`
-wrapping for collision constraints, followed by `problem.setup()`:
+The `build_optimization_problem` function builds the problem tesseract_planning's
+`online_planning_example.cpp` builds: a `TrajOptQPProblem` over the `NodesVariables`, the
+start and target poses and one collision constraint per step as constraint sets, the joint
+velocity as a squared cost, then `problem.setup()`:
 
 ```python
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
@@ -133,10 +134,21 @@ Two semantics are worth knowing before you rely on the row count:
 | `RangeBoundHandling.KEEP_AS_IS` | Each range stays one row with `[lower, upper]` — the form that preserves an asymmetric band as written. |
 | `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` (default) | Each *range* row becomes two one-sided rows, `g(x) >= lower` and `g(x) <= upper`, so five constrained axes report ten rows. Equality and already one-sided bounds are unaffected. |
 
-Both are prerequisites for adding the term as a **cost** (`IfoptProblem.addCostSet`)
-rather than a hard constraint: as an equality it only ever pulls straight back to the
-target pose, so a soft Cartesian preference is unexpressible and the free axis has to
-be given up entirely.
+Both are prerequisites for adding the term as a **cost** rather than a hard constraint:
+as an equality it only ever pulls straight back to the target pose, so a soft Cartesian
+preference is unexpressible and the free axis has to be given up entirely.
+`TrajOptQPProblem.addCostSet` checks every row against the penalty type:
+
+| Term | `SQUARED` / `ABSOLUTE` | `HINGE` |
+|---|---|---|
+| Equality on every constrained axis | accepted | raises |
+| Band, split (default): one-sided rows | raises | accepted |
+| Band, `KEEP_AS_IS`: range rows | raises | raises |
+| Equality and band axes mixed | raises | raises |
+
+A band is a cost only as a hinge on its split rows. A term that mixes equality and band
+axes goes in as a constraint, or as two terms, one per kind, freeing the other kind's axes
+with zero coefficients.
 
 !!! note "Eigen arguments are required"
     `coeffs`, `source_frame_offset`, and `target_frame_offset` have no Python-side
@@ -201,7 +213,9 @@ critical items:
 
 - `from tesseract_robotics import ifopt` → `from tesseract_robotics import trajopt_ifopt`
 - `JointPosition(...)` → `createNodesVariables(...)` + `Var` refs
-- `IfoptQPProblem()` → `IfoptProblem(nodes_variables)` + `IfoptQPProblem(nlp)`
+- `IfoptQPProblem()` → `TrajOptQPProblem(nodes_variables)`, with every constraint and cost
+  set added to it; 0.34's `IfoptQPProblem(IfoptProblem(nodes_variables))` is no longer bound
+  (see [`trajopt_sqp`](../api/trajopt_sqp.md#the-qp-problem))
 - `CartPosInfo` struct removed — `CartPosConstraint` takes args directly
 - `CollisionCache` removed — caching is internal
 - `getTotalExactCost()` / `getExactCosts()` take no arguments

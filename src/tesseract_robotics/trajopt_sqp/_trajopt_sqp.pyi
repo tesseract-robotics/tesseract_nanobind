@@ -510,22 +510,6 @@ class QPProblem:
     def getNLPCostNames(self) -> list[str]:
         """Get cost names"""
 
-class IfoptQPProblem(QPProblem):
-    """QP problem wrapper for trajopt_ifopt::Problem (general NLP)"""
-
-    def __init__(self, nlp: IfoptProblem) -> None:
-        """Construct from trajopt_ifopt Problem"""
-
-    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
-
-    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None: ...
-
-    def setup(self) -> None: ...
-
-    def convexify(self) -> None: ...
-
-    def print(self) -> None: ...
-
 class TrajOptQPProblem(QPProblem):
     """
     QP problem over trajopt_ifopt variables: the problem tesseract_planning's
@@ -650,22 +634,3 @@ class TrustRegionSQPSolver:
 
     @qp_problem.setter
     def qp_problem(self, arg: QPProblem, /) -> None: ...
-
-class IfoptProblem:
-    """
-    trajopt_ifopt::Problem - generic NLP with variables, costs, constraints
-    """
-
-    def __init__(self, variables: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Variables) -> None: ...
-
-    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
-
-    def addCostSet(self, cost_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
-
-    def getNumberOfOptimizationVariables(self) -> int: ...
-
-    def getNumberOfConstraints(self) -> int: ...
-
-    def getVariableValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
-
-    def printCurrent(self) -> None: ...

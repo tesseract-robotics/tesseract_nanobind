@@ -18,12 +18,9 @@ __all__ = [  # noqa: F405
     "OSQPEigenSolver",
     # Classes - problems
     "QPProblem",
-    "IfoptQPProblem",
     "TrajOptQPProblem",
     # Classes - main solver
     "TrustRegionSQPSolver",
     # Classes - callbacks
     "SQPCallback",
-    # trajopt_ifopt types
-    "IfoptProblem",
 ]

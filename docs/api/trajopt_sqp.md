@@ -3,14 +3,9 @@
 Sequential Quadratic Programming (SQP) solver for trajectory optimization.
 See the [Low-Level SQP guide](../user-guide/low-level-sqp.md) for the user-guide walkthrough.
 
-## Problem hierarchy (0.34)
+## The QP problem
 
-0.34 splits the problem into two layers:
-
-- **`IfoptProblem(nodes_variables)`** — the non-linear program (NLP). Holds
-  the variables and accepts joint/cartesian/cost sets.
-- **`IfoptQPProblem(nlp)`** — the QP wrapper passed to the solver. Accepts
-  collision constraints and must be `setup()` before solving.
+`TrajOptQPProblem(nodes_variables)` is the problem the solver takes: the one tesseract_planning's TrajOpt-Ifopt planner and its `online_planning_example.cpp` build. Constraint and cost sets go straight in, and `setup()` runs after the last one:
 
 ```python
 from tesseract_robotics import trajopt_ifopt as ti
@@ -18,31 +13,26 @@ from tesseract_robotics import trajopt_sqp as tsqp
 
 nodes_variables = ti.createNodesVariables("trajectory", joint_names, states, bounds)
 
-nlp = tsqp.IfoptProblem(nodes_variables)
-nlp.addConstraintSet(joint_constraint)   # joint / cartesian constraints on NLP
-nlp.addCostSet(vel_cost)                 # costs on NLP
-
-problem = tsqp.IfoptQPProblem(nlp)
-problem.addConstraintSet(collision_constraint)  # collision constraints on QP
-problem.setup()                                 # must call before solving
-```
-
-`IfoptQPProblem` no longer has a default constructor — see
-[changes](../changes.md) for the full migration.
-
-### TrajOptQPProblem
-
-`TrajOptQPProblem(nodes_variables)` is the problem tesseract_planning's TrajOpt-Ifopt planner builds. It has one layer: costs and constraints go straight in, with no `IfoptProblem`.
-
-```python
 problem = tsqp.TrajOptQPProblem(nodes_variables)
-problem.addConstraintSet(joint_constraint)
-problem.addConstraintSet(collision_constraint)
+problem.addConstraintSet(joint_constraint)                  # joint / Cartesian constraints
+problem.addConstraintSet(collision_constraint)              # collision constraints
 problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)  # equality bounds required
-problem.setup()
+problem.setup()                                             # must call before solving
 ```
 
-Its exact merit weights each squared cost row by `getCoefficients()`, as its convex model does, and counts every cost term once, so the trust-region ratio compares like with like. In trajopt 0.35.0, `IfoptQPProblem` weights the model but not the merit, and counts the model once per cost term ([trajopt#595](https://github.com/tesseract-robotics/trajopt/issues/595)). With several weighted cost terms, its solver can reject every step and report `NLP_CONVERGED` at the seed. `TrajOptQPProblem` keeps one merit coefficient per constraint set; `IfoptQPProblem` keeps one per row. A squared cost must have equality bounds; `addCostSet` raises otherwise.
+A squared or absolute cost must have equality bounds, a hinge cost inequality bounds; `addCostSet` raises otherwise. Each set is linked to the variables when it is added. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so the trust-region ratio compares like with like. The problem keeps one merit coefficient per constraint set, and counts and names constraint and cost sets, not rows.
+
+!!! warning "`IfoptQPProblem` and `IfoptProblem` are no longer bound"
+    `IfoptQPProblem(IfoptProblem(nodes_variables))`, the two-layer form of 0.34, is gone; trajopt
+    is removing `IfoptQPProblem`
+    ([trajopt#595](https://github.com/tesseract-robotics/trajopt/issues/595)). Its trust-region
+    ratio was inconsistent: in trajopt 0.35.0 it weights the model but not the merit, and counts
+    the model once per cost term, so with several weighted cost terms its solver can reject every
+    step and report `NLP_CONVERGED` at the seed. A cost added to the wrapped `IfoptProblem` fared
+    worse: it was neither squared nor fed to the Gauss-Newton Hessian. To migrate, construct
+    `TrajOptQPProblem` over the same variables and add every set to it: constraints with
+    `addConstraintSet`, costs with `addCostSet(cost, penalty_type)`, including costs that went
+    into the `IfoptProblem`.
 
 ## Solver
 

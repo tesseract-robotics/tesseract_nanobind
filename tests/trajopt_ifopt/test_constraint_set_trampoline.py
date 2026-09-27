@@ -5,7 +5,7 @@ Verifies that Python subclasses of ConstraintSet work correctly:
 - Virtual method dispatch: getValues, getBounds, getJacobian, update, getCoefficients
 - linkWithVariables / getVariables integration with NodesVariables
 - Sparse Jacobian round-trip (scipy.sparse ↔ Eigen::SparseMatrix)
-- addConstraintSet / addCostSet on IfoptProblem
+- addConstraintSet / addCostSet on TrajOptQPProblem
 """
 
 from __future__ import annotations
@@ -212,32 +212,35 @@ class TestConstraintSetWithVariables:
         np.testing.assert_allclose(c.getValues(), [0.0, 0.0], atol=1e-12)
 
 
-class TestConstraintSetInIfoptProblem:
-    """Verify Python ConstraintSet works when added to IfoptProblem."""
+class TestConstraintSetInTrajOptQPProblem:
+    """Python ConstraintSet as a constraint and as a cost in TrajOptQPProblem.
 
-    def test_add_constraint_to_nlp(self):
-        """Python constraint can be added as constraint set."""
-        from tesseract_robotics.trajopt_sqp import IfoptProblem
+    TrajOptQPProblem counts and names constraint and cost sets, not rows.
+    """
 
-        nodes = _make_nodes_variables(3, 2)
-        nlp = IfoptProblem(nodes)
-        c = SimpleConstraint("test_constraint")
-        nlp.addConstraintSet(c)
+    def test_add_constraint(self):
+        from tesseract_robotics.trajopt_sqp import TrajOptQPProblem
 
-    def test_add_cost_to_nlp(self):
-        """Python constraint can be added as cost set."""
-        from tesseract_robotics.trajopt_sqp import IfoptProblem
+        problem = TrajOptQPProblem(_make_nodes_variables(3, 2))
+        problem.addConstraintSet(SimpleConstraint("test_constraint"))
+        problem.setup()
+        assert problem.getNLPConstraintNames() == ["test_constraint"]
 
-        nodes = _make_nodes_variables(3, 2)
-        nlp = IfoptProblem(nodes)
-        cost = ScalarCost(6, "test_cost")
-        nlp.addCostSet(cost)
+    def test_add_squared_cost(self):
+        """A squared cost needs equality bounds; ScalarCost has them."""
+        from tesseract_robotics.trajopt_sqp import CostPenaltyType, TrajOptQPProblem
+
+        problem = TrajOptQPProblem(_make_nodes_variables(3, 2))
+        problem.addCostSet(ScalarCost(6, "test_cost"), CostPenaltyType.SQUARED)
+        problem.setup()
+        assert problem.getNLPCostNames() == ["test_cost"]
 
     def test_constraint_and_cost_together(self):
-        """Both constraint and cost can coexist on same problem."""
-        from tesseract_robotics.trajopt_sqp import IfoptProblem
+        from tesseract_robotics.trajopt_sqp import CostPenaltyType, TrajOptQPProblem
 
-        nodes = _make_nodes_variables(3, 2)
-        nlp = IfoptProblem(nodes)
-        nlp.addConstraintSet(SimpleConstraint("c1"))
-        nlp.addCostSet(ScalarCost(6, "cost1"))
+        problem = TrajOptQPProblem(_make_nodes_variables(3, 2))
+        problem.addConstraintSet(SimpleConstraint("c1"))
+        problem.addCostSet(ScalarCost(6, "cost1"), CostPenaltyType.SQUARED)
+        problem.setup()
+        assert problem.getNumNLPConstraints() == 1
+        assert problem.getNumNLPCosts() == 1
