@@ -66,14 +66,17 @@ velocity as a squared cost, then `problem.setup()`:
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
 ```
 
-Available constraint types in `tesseract_robotics.trajopt_ifopt`:
+Available constraint types in `tesseract_robotics.trajopt_ifopt`. Each goes in as a constraint
+or as a cost with a penalty type its row bounds allow; the
+[`trajopt_ifopt` reference](../api/trajopt_ifopt.md#constraints) lists the bounds and penalty types
+per class:
 
 | Constraint | Purpose |
 |---|---|
-| `JointPosConstraint` | Target joint values at specific waypoints |
-| `JointVelConstraint` | Velocity limits across waypoints |
-| `JointAccelConstraint` | Acceleration limits |
-| `JointJerkConstraint` | Jerk (3rd derivative) limits — smoother motion |
+| `JointPosConstraint` | Joint values, or per-joint bounds, at a waypoint |
+| `JointVelConstraint` | Joint velocity toward a target (zero for smoothing) |
+| `JointAccelConstraint` | Joint acceleration toward a target |
+| `JointJerkConstraint` | Joint jerk (3rd derivative) toward a target — smoother motion |
 | `CartPosConstraint` | TCP pose at a waypoint |
 | `CartLineConstraint` | TCP on a line segment |
 | `DiscreteCollisionConstraint` | Collision at single timesteps |
@@ -81,13 +84,14 @@ Available constraint types in `tesseract_robotics.trajopt_ifopt`:
 | `ContinuousCollisionConstraint` | Collision across segments (LVS) |
 | `InverseKinematicsConstraint` | IK-based optimization |
 
-Available collision evaluators:
+Available collision evaluators. Each needs its own collision check type in the config, and its
+constructor raises otherwise:
 
-| Evaluator | Pairs with |
-|---|---|
-| `SingleTimestepCollisionEvaluator` | `DiscreteCollisionConstraint` |
-| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete) |
-| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous) |
+| Evaluator | Pairs with | Check type |
+|---|---|---|
+| `SingleTimestepCollisionEvaluator` | `DiscreteCollisionConstraint` | `DISCRETE` (the default) |
+| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete) | `LVS_DISCRETE` |
+| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous) | `LVS_CONTINUOUS` or `CONTINUOUS` |
 
 
 ### Per-axis Cartesian constraints

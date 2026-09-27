@@ -1,204 +1,69 @@
-# Constraint Bindings Completion (0.34)
+# TrajOpt-Ifopt constraint bindings
 
-All 4 C++ constraint classes now have Python bindings, completed during the 0.34 upgrade.
-This page remains as a historical record of which constraints landed and their use cases.
+All ten constraint classes of trajopt 0.35.0's `trajopt_ifopt` are bound, in
+[`src/trajopt_ifopt/trajopt_ifopt_bindings.cpp`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/trajopt_ifopt/trajopt_ifopt_bindings.cpp).
+The [`trajopt_ifopt` reference](../api/trajopt_ifopt.md#constraints) has how each one enters a
+`TrajOptQPProblem`: as a constraint, or as a cost with the penalty types its row bounds allow.
+This page records what the bindings do beyond a one-to-one wrap, and why. That covers the
+workarounds for trajopt 0.35.0, tracked for removal in #146, and the patterns to follow when
+binding the next class.
 
-Current bindings live in [`src/trajopt_ifopt/trajopt_ifopt_bindings.cpp`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/trajopt_ifopt/trajopt_ifopt_bindings.cpp).
+## Bound classes
 
-## Summary
+| Class | Python constructors | Binding notes |
+|---|---|---|
+| `JointPosConstraint` | `(target, position_var, coeffs, name, range_bound_handling)`; `(bounds, position_var, coeffs, name, range_bound_handling)` | The bounds form broadcasts `coeffs` before calling trajopt. In 0.35.0 its range split reads the caller's `coeffs` instead of the broadcast member, so a length-1 `coeffs` is read past its end (fix in the open tesseract-robotics/trajopt#592). |
+| `JointVelConstraint`, `JointAccelConstraint`, `JointJerkConstraint` | `(targets, position_vars, coeffs, name)` | Acceleration needs at least four waypoints and jerk six; fewer raise `RuntimeError`. |
+| `CartPosConstraint` | `(position_var, manip, source_frame, target_frame, source_frame_offset, target_frame_offset, name, range_bound_handling)`; `(position_var, coeffs, bounds, manip, …)` | The per-axis form: a zero coefficient drops that axis' row. |
+| `CartLineConstraint` | `(info: CartLineInfo, position_var, coeffs, name)` | `use_numeric_differentiation` is exposed and defaults to `True`. |
+| `DiscreteCollisionConstraint`, `DiscreteCollisionNumericalConstraint` | `(collision_evaluator, position_var, max_num_cnt=1, fixed_sparsity=False, name)` | `max_num_cnt` defaults to trajopt's 1 contact row; tesseract_planning's planner and example pass the collision config's `max_num_cnt` (3 by default). |
+| `ContinuousCollisionConstraint` | `(collision_evaluator, position_var0, position_var1, fixed0=False, fixed1=False, max_num_cnt=1, fixed_sparsity=False, name)` | trajopt takes the two variables as a `std::array`; a custom `__init__` builds it. |
+| `InverseKinematicsConstraint` | `(target_pose, kinematic_info: InverseKinematicsInfo, constraint_var, seed_var, name)` | `InverseKinematicsInfo` takes a `KinematicGroup`, not a `JointGroup`. trajopt 0.35.0 marks its `working_frame`, `tcp_frame` and `tcp_offset` "Not currently respected". |
 
-| Constraint | Status | Complexity | Use Case |
-|-----------|--------|------------|----------|
-| `JointJerkConstraint` | **Bound** | Low | Smoother trajectories |
-| `CartLineConstraint` | **Bound** | Medium | Linear tool paths |
-| `DiscreteCollisionNumericalConstraint` | **Bound** | Low | Alternative collision jacobian |
-| `InverseKinematicsConstraint` | **Bound** | High | IK-based optimization |
+The collision evaluators each accept one collision check type, and their constructors raise
+otherwise: `SingleTimestepCollisionEvaluator` takes `DISCRETE`, `LVSDiscreteCollisionEvaluator`
+`LVS_DISCRETE`, and `LVSContinuousCollisionEvaluator` `LVS_CONTINUOUS` or `CONTINUOUS`.
 
----
+## Behaviour the bindings add
 
-## 1. JointJerkConstraint
+**`getJacobian()` returns a compressed copy.** The collision constraints (analytic and numerical,
+discrete and continuous) assemble their Jacobian with `coeffRef` while a contact is active. That
+leaves Eigen's sparse matrix uncompressed, and nanobind's Eigen caster returns only compressed
+matrices, so `getJacobian()` raised for exactly the rows a caller needs. The binding compresses a
+copy. `tests/trajopt_ifopt/test_constraint_set_jacobian.py` covers a collision set with an active
+contact.
 
-**File:** `trajopt_ifopt/constraints/joint_jerk_constraint.h`
+**Python `ConstraintSet` subclasses report `getNonZeros() == 0`.** trajopt's unset default is −1,
+which a Python subclass could not change. `TrajOptQPProblem` reserves storage from the sum of its
+cost sets' hints, so a Python cost set on its own raised `ValueError: vector`. 0 is a valid hint:
+storage grows as needed (#146).
 
-**Purpose:** Bounds on joint jerk (3rd derivative of position). Enables smoother trajectories by limiting rate of acceleration change.
+**`TrajOptQPProblem` is bound as a non-movable subclass.** This one lives in
+`src/trajopt_sqp/trajopt_sqp_bindings.cpp`. trajopt 0.35.0 defaults the move constructor in the
+header, where the PIMPL type is incomplete, and nanobind instantiates the move constructor of
+every move-constructible type it binds. `TrajOptQPProblemBinding` adds no state and deletes copy
+and move; bind `TrajOptQPProblem` directly once trajopt defines the move out of line (#146).
 
-**Formula:** `jerk = pos[i+2] - 3*pos[i+1] + 3*pos[i] - pos[i-1]` (finite difference)
+## Binding patterns
 
-**Constructor:**
-```cpp
-JointJerkConstraint(
-    const Eigen::VectorXd& targets,                          // jerk targets per DOF
-    const std::vector<std::shared_ptr<const Var>>& position_vars,  // 4+ consecutive waypoints
-    const Eigen::VectorXd& coeffs,                           // weights per DOF
-    const std::string& name = "JointJerk"
-);
-```
+1. **No Eigen default arguments.** An Eigen default argument raises `std::bad_cast` in this module,
+   so the Python signatures leave Eigen parameters without defaults and callers pass them, for
+   example `Isometry3d.Identity()`.
+2. **`std::array` parameters get a custom `__init__`.** Take the elements as separate arguments and
+   build the array in a lambda, as `ContinuousCollisionConstraint` does.
+3. **Import the base module first.** `ConstraintSet` is bound in `_trajopt_ifopt` and used by
+   `_trajopt_sqp`, so `tesseract_robotics.trajopt_sqp` imports `trajopt_ifopt` before its own
+   extension.
+4. **Python subclasses go through the trampoline.** A `ConstraintSet` subclass overrides
+   `getValues`, `getBounds`, `getJacobian`, `update` and `getCoefficients`; `getJacobian` returns a
+   `scipy.sparse` matrix, which makes scipy a hard runtime dependency.
 
-**Binding complexity:** LOW - follows exact same pattern as `JointAccelConstraint` (already wrapped).
+## History
 
-**Use cases:**
-- Industrial robots where servo drives have jerk limits
-- Smooth motion for camera/sensor payload
-- Reducing mechanical wear
+The 0.34 upgrade bound the four classes the 0.33 bindings lacked:
+- `JointJerkConstraint`: smoother trajectories, servo jerk limits.
+- `CartLineConstraint`: the tool on a line, for approach and retract or welding along a segment.
+- `DiscreteCollisionNumericalConstraint`: checking the analytic collision Jacobian.
+- `InverseKinematicsConstraint`: keeping the joints near an IK solution.
 
----
-
-## 2. CartLineConstraint
-
-**File:** `trajopt_ifopt/constraints/cartesian_line_constraint.h`
-
-**Purpose:** Constrain TCP to lie on a line segment between two poses. The constraint finds the nearest point on the line and measures error from that point.
-
-**Info struct (`CartLineInfo`):**
-```cpp
-struct CartLineInfo {
-    std::shared_ptr<const tesseract_kinematics::JointGroup> manip;
-    std::string source_frame;           // TCP frame
-    std::string target_frame;           // reference frame
-    Eigen::Isometry3d source_frame_offset;   // TCP offset
-    Eigen::Isometry3d target_frame_offset1;  // line start pose
-    Eigen::Isometry3d target_frame_offset2;  // line end pose
-    Eigen::VectorXi indices;            // which DOF to constrain (default: all 6)
-};
-```
-
-**Constructor:**
-```cpp
-CartLineConstraint(
-    CartLineInfo info,
-    std::shared_ptr<const Var> position_var,
-    const Eigen::VectorXd& coeffs,
-    const std::string& name = "CartLine"
-);
-```
-
-**Key method:**
-```cpp
-// Finds nearest point on line (uses SLERP for orientation)
-Eigen::Isometry3d GetLinePoint(
-    const Eigen::Isometry3d& source_tf,
-    const Eigen::Isometry3d& target_tf1,
-    const Eigen::Isometry3d& target_tf2
-) const;
-```
-
-**Binding complexity:** MEDIUM - requires new `CartLineInfo` struct binding.
-
-**Use cases:**
-- Approach/retract motions along a line
-- Welding/milling along linear segments
-- Assembly insertion with linear compliance
-
-**Note:** Uses numeric differentiation by default (`use_numeric_differentiation = true`).
-
----
-
-## 3. DiscreteCollisionNumericalConstraint
-
-**File:** `trajopt_ifopt/constraints/collision/discrete_collision_numerical_constraint.h`
-
-**Purpose:** Same as `DiscreteCollisionConstraint` but uses numerical differentiation for jacobians instead of analytical.
-
-**Constructor:**
-```cpp
-DiscreteCollisionNumericalConstraint(
-    std::shared_ptr<DiscreteCollisionEvaluator> collision_evaluator,
-    std::shared_ptr<const Var> position_var,
-    int max_num_cnt = 1,
-    bool fixed_sparsity = false,
-    const std::string& name = "DiscreteCollisionNumerical"
-);
-```
-
-**Binding complexity:** LOW - identical signature to `DiscreteCollisionConstraint`.
-
-**Use cases:**
-- Debugging when analytical jacobians produce issues
-- Validating analytical collision jacobians
-- Fallback when analytical fails
-
-**Note:** The analytical version (`DiscreteCollisionConstraint`) is generally preferred for performance.
-
----
-
-## 4. InverseKinematicsConstraint
-
-**File:** `trajopt_ifopt/constraints/inverse_kinematics_constraint.h`
-
-**Purpose:** Constrains joints to stay within bounds of an IK solution. Uses a seed variable to compute IK, then constrains deviation from that solution.
-
-**Info struct (`InverseKinematicsInfo`):**
-```cpp
-struct InverseKinematicsInfo {
-    std::shared_ptr<const tesseract_kinematics::KinematicGroup> manip;  // NOTE: KinematicGroup, not JointGroup
-    std::string working_frame;   // (not currently respected)
-    std::string tcp_frame;       // (not currently respected)
-    Eigen::Isometry3d tcp_offset;  // (not currently respected)
-};
-```
-
-**Constructor:**
-```cpp
-InverseKinematicsConstraint(
-    const Eigen::Isometry3d& target_pose,
-    InverseKinematicsInfo::ConstPtr kinematic_info,
-    std::shared_ptr<const Var> constraint_var,  // variable being constrained
-    std::shared_ptr<const Var> seed_var,        // seed for IK (usually adjacent waypoint)
-    const std::string& name = "InverseKinematics"
-);
-```
-
-**Binding complexity:** HIGH
-- Requires `KinematicGroup` (vs `JointGroup` used elsewhere) - may need additional bindings
-- Takes two `JointPosition` variables with different roles
-- Several members marked "not currently respected" - API may be unstable
-
-**Use cases:**
-- Maintaining IK consistency across trajectory
-- Preventing large joint jumps between waypoints
-- Descartes-style redundancy resolution (see TODO in header)
-
-**Note:** Header comments suggest integration with descartes_light samplers for z-free constraints.
-
----
-
-## Existing Bindings Reference
-
-Already wrapped in `trajopt_ifopt_bindings.cpp`:
-
-| Constraint | Lines | Notes |
-|-----------|-------|-------|
-| `JointPosition` (variable) | 48-65 | Variable set, not constraint |
-| `CartPosInfo` | 83-92 | Info struct |
-| `CartPosConstraint` | 95-110 | Cartesian pose |
-| `JointPosConstraint` | 113-119 | Joint position |
-| `JointVelConstraint` | 122-128 | Joint velocity |
-| `JointAccelConstraint` | 131-137 | Joint acceleration |
-| `DiscreteCollisionConstraint` | 175-184 | Single-state collision |
-| `ContinuousCollisionConstraint` | 216-232 | Two-state swept collision |
-
----
-
-## Implementation Status
-
-All 4 constraints are now bound in `trajopt_ifopt_bindings.cpp`:
-
-1. **JointJerkConstraint** - Requires 6+ JointPosition variables (higher than accel's 3+).
-
-2. **CartLineConstraint** - Uses `CartLineInfo` struct with `Isometry3d` transforms.
-
-3. **DiscreteCollisionNumericalConstraint** - Same API as analytical version.
-
-4. **InverseKinematicsConstraint** - Uses `KinematicGroup` (inherits from `JointGroup`).
-
----
-
-## Implementation Notes
-
-From existing bindings:
-
-1. **Eigen default args cause `std::bad_cast`** - Use default constructor + member assignment (see `CartPosInfo` pattern at line 83).
-
-2. **`std::array` args need lambda wrapper** - See `ContinuousCollisionConstraint` at line 217.
-
-3. **Cross-module inheritance** - Import parent module first (line 44).
+This page was that plan's record; the table above replaces its per-class notes.

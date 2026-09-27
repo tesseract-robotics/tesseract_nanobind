@@ -93,7 +93,7 @@ if result.successful:
 The low-level SQP API enables real-time trajectory optimization.
 Rates depend on problem size and collision mode. See
 [`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py)
-which prints measured rates for a reference 6-DOF problem on your machine.
+which prints measured rates for its 8-DOF gantry workcell on your machine.
 
 ## Next Steps
 

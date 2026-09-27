@@ -64,12 +64,6 @@
   box-shadow: 0 2px 0 1px var(--md-default-fg-color--lighter);
 }
 
-/* Performance table highlighting */
-.md-typeset table tr:has(td:first-child:contains("128 Hz")) td,
-.md-typeset table tr:has(td:first-child:contains("73 Hz")) td {
-  font-weight: 600;
-}
-
 /* Module listing styling */
 .module-table th:first-child,
 .module-table td:first-child {

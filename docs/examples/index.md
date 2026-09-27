@@ -83,7 +83,7 @@ handles optional viewer launch, `run()` returns results for testing / reuse.
 | Example | Console script | Description |
 |---------|----------------|-------------|
 | `online_planning_example.py` | `tesseract_online_planning_example` | TaskComposer replanning |
-| `online_planning_sqp_example.py` | `tesseract_online_planning_sqp_example` | Low-level SQP (73 Hz) |
+| `online_planning_sqp_example.py` | `tesseract_online_planning_sqp_example` | Low-level SQP replanning ([rates](online-planning.md#performance-comparison)) |
 
 ### Visualization
 

@@ -1,6 +1,7 @@
 # tesseract_robotics.trajopt_ifopt
 
-Constraints, costs, and variables for the low-level SQP solver.
+Variables and constraint sets for the low-level SQP solver, and how each set becomes a
+constraint or a cost of a `TrajOptQPProblem`.
 See the [Low-Level SQP guide](../user-guide/low-level-sqp.md) for the user-guide walkthrough.
 
 ## Variables (0.34+)
@@ -37,31 +38,47 @@ vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 
 ## Constraints
 
-| Class | Purpose |
-|---|---|
-| `JointPosConstraint` | Target joint values at a waypoint |
-| `JointVelConstraint` | Velocity limits across consecutive waypoints |
-| `JointAccelConstraint` | Acceleration limits |
-| `JointJerkConstraint` | Jerk limits |
-| `CartPosConstraint` | TCP pose at a waypoint |
-| `CartLineConstraint` | TCP on a line segment between two poses |
-| `DiscreteCollisionConstraint` | Collision at a single waypoint |
-| `DiscreteCollisionNumericalConstraint` | Alternative collision jacobian (numerical) |
-| `ContinuousCollisionConstraint` | Collision between two consecutive waypoints |
-| `InverseKinematicsConstraint` | IK-based constraint |
+Every class below is a `ConstraintSet`. It goes into a `TrajOptQPProblem` either as a
+constraint, with `addConstraintSet`, or as a cost, with `addCostSet(set, penalty_type)`. Every
+class is accepted as a constraint. As a cost, the set's row bounds decide the penalty type:
+`SQUARED` and `ABSOLUTE` need equality bounds on every row, `HINGE` one-sided bounds, and
+`addCostSet` raises otherwise. There is no cost without a penalty type.
+
+| Class | Purpose | Row bounds | As a cost |
+|---|---|---|---|
+| `JointPosConstraint` (target) | Joint values at a waypoint | equality | `SQUARED`, `ABSOLUTE` |
+| `JointPosConstraint` (bounds) | Per-joint bounds at a waypoint | a range splits into two one-sided rows (the default) | `HINGE` if every row is one-sided; `SQUARED`, `ABSOLUTE` if every row is an equality |
+| `JointVelConstraint` | Joint velocity toward a target (zero for smoothing) | equality | `SQUARED`, `ABSOLUTE` |
+| `JointAccelConstraint` | Joint acceleration toward a target | equality | `SQUARED`, `ABSOLUTE` |
+| `JointJerkConstraint` | Joint jerk toward a target | equality | `SQUARED`, `ABSOLUTE` |
+| `CartPosConstraint` (pose) | TCP pose at a waypoint | equality | `SQUARED`, `ABSOLUTE` |
+| `CartPosConstraint` (per-axis) | TCP pose with free axes and bands | per axis | see [per-axis Cartesian constraints](../user-guide/low-level-sqp.md#per-axis-cartesian-constraints) |
+| `CartLineConstraint` | TCP on a line segment between two poses | equality | `SQUARED`, `ABSOLUTE` |
+| `DiscreteCollisionConstraint` | Collision at a waypoint | one-sided (upper) | `HINGE` |
+| `DiscreteCollisionNumericalConstraint` | The same, with a numerical Jacobian | one-sided (upper) | `HINGE` |
+| `ContinuousCollisionConstraint` | Collision along the segment between two waypoints | one-sided (upper) | `HINGE` |
+| `InverseKinematicsConstraint` | Joints toward an IK solution of a target pose | equality | `SQUARED`, `ABSOLUTE` |
+
+A range row kept whole (`RangeBoundHandling.KEEP_AS_IS`) goes into neither: `addCostSet` raises,
+and a constraint raises `Unsupported bounds type!` at the first `convexify()`. Measured on trajopt
+0.35.0: each form in the table was added to a `TrajOptQPProblem` as a constraint and with each
+penalty type, then set up and convexified.
 
 0.34 constraint constructors take `Var` references directly (not
 `JointPosition` lists). See [changes](../changes.md) for the migration details.
 
 ## Collision Evaluators
 
-| Class | Pairs with |
-|---|---|
-| `SingleTimestepCollisionEvaluator` | `DiscreteCollisionConstraint` |
-| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete mode) |
-| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous mode) |
-| `DiscreteCollisionEvaluator` | Base class |
-| `ContinuousCollisionEvaluator` | Base class |
+| Class | Pairs with | Collision check type in the config |
+|---|---|---|
+| `SingleTimestepCollisionEvaluator` | `DiscreteCollisionConstraint` | `DISCRETE` (the default); the constructor raises otherwise |
+| `LVSDiscreteCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS discrete mode) | `LVS_DISCRETE`; the constructor raises otherwise |
+| `LVSContinuousCollisionEvaluator` | `ContinuousCollisionConstraint` (LVS continuous mode) | `LVS_CONTINUOUS` or `CONTINUOUS`; the constructor raises otherwise |
+| `DiscreteCollisionEvaluator` | Base class | |
+| `ContinuousCollisionEvaluator` | Base class | |
+
+Set the type with `config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE`
+(`CollisionEvaluatorType` is in `tesseract_robotics.tesseract_collision`).
 
 `CollisionCache` was removed in 0.34 — caching is internal to each evaluator.
 

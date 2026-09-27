@@ -26,17 +26,18 @@ sequenceDiagram
 | Method | Rate | Use Case |
 |--------|------|----------|
 | Task Composer | 1-5 Hz | Moderate scene changes |
-| Low-Level SQP (discrete) | 73 Hz | Fast replanning |
-| Low-Level SQP (no collision) | 128 Hz | Safe environments |
-| Low-Level SQP (LVS continuous) | 5-10 Hz | High precision |
+| Low-Level SQP (discrete) | ~70 Hz (14 ms per replan) | Fast replanning |
+| Low-Level SQP (LVS continuous) | ~20 Hz (52 ms per replan) | Swept collision between waypoints |
 
-Numbers are from the reference
+The low-level SQP rates come from the reference
 [`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py)
-on an 8-DOF gantry workcell. Run it on your machine to get local numbers.
+on its 8-DOF gantry workcell: the median over three runs of the mean replan step after the
+initial solve, on an Apple M1 Max with trajopt 0.35.0. The machine was shared at the time, so
+treat them as indicative, and run the example to get local numbers.
 
 ## Low-Level SQP Example
 
-Real-time replanning at ~73 Hz using discrete collision. The snippets below
+Real-time replanning at about 70 Hz using discrete collision. The snippets below
 are the real shipped source, split into three regions: `setup`, `problem`,
 `sqp_loop`. For the accompanying conceptual guide see the
 [Low-Level SQP API](../user-guide/low-level-sqp.md) page.
@@ -48,6 +49,12 @@ are the real shipped source, split into three regions: `setup`, `problem`,
 ```
 
 ### Problem construction
+
+The problem is a `TrajOptQPProblem`, built as tesseract_planning's
+`online_planning_example.cpp` builds it. The start and target poses and one collision constraint
+per step are constraint sets, and the joint velocity is a squared cost. Continuous mode sets the
+collision check type to `LVS_DISCRETE`, which its evaluator requires; the C++ reference sets
+`DISCRETE` there and throws.
 
 ```python title="online_planning_sqp_example.py (problem)"
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:problem"
@@ -65,10 +72,20 @@ Run the complete example:
 tesseract_online_planning_sqp_example
 ```
 
-??? example "Expected Output (indicative)"
+??? example "Expected output (indicative; the timings vary by machine)"
+    ```text
+    Manipulator joints (8): ['gantry_axis_1', 'gantry_axis_2', 'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6']
+    Building optimization problem (collision: discrete)...
+    Running initial global solve...
+    Initial solve: cost=3.9284, time=31.5ms
+    Online replanning (10 iterations)...
+    Replan timing: avg=14.7ms (68 Hz)
+    Trajectory: 12 waypoints x 8 joints
     ```
-    Performance: ~13ms avg (~73 Hz discrete / ~128 Hz no-collision)
-    ```
+
+    Between the second and third line, `problem.print()` dumps the problem's state, as the C++
+    reference does. Before the first solve, trajopt 0.35.0 prints zero counts and uninitialized
+    bounds there.
 
 ## Key Concepts
 
@@ -127,25 +144,32 @@ for i in range(n_steps):
 
 ## Continuous Collision
 
-For higher precision (5-10 Hz) use the LVS continuous evaluator with
-`ContinuousCollisionConstraint`:
+To check the motion between waypoints, not only the waypoints, use
+`ContinuousCollisionConstraint` with an LVS evaluator. Each evaluator requires its own check type
+in the collision config, and its constructor raises otherwise: `LVSDiscreteCollisionEvaluator`
+needs `LVS_DISCRETE` (the example's continuous mode, about 20 Hz), and
+`LVSContinuousCollisionEvaluator` needs `LVS_CONTINUOUS` or `CONTINUOUS`:
 
 ```python
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.trajopt_ifopt import (
-    LVSContinuousCollisionEvaluator, ContinuousCollisionConstraint
+    ContinuousCollisionConstraint,
+    LVSContinuousCollisionEvaluator,
+    TrajOptCollisionConfig,
 )
 
-evaluator = LVSContinuousCollisionEvaluator(
-    manip, env, config,
-    dynamic_environment=True,
-)
+config = TrajOptCollisionConfig(0.1, 10.0)  # margin (m), coefficient
+config.collision_check_config.type = CollisionEvaluatorType.LVS_CONTINUOUS
 
-# Add constraint between consecutive waypoints
+# One constraint per segment between consecutive waypoints. The first segment starts at the
+# pinned current state, so its start is fixed.
 for i in range(n_steps - 1):
+    evaluator = LVSContinuousCollisionEvaluator(manip, env, config, dynamic_environment=True)
     constraint = ContinuousCollisionConstraint(
         evaluator,
         variables[i], variables[i + 1],
-        fixed0=False, fixed1=False,
+        fixed0=(i == 0), fixed1=False,
+        max_num_cnt=config.max_num_cnt,
         name=f"cont_collision_{i}",
     )
     problem.addConstraintSet(constraint)
@@ -181,7 +205,7 @@ tesseract_online_planning_example
 ## Running the Examples
 
 ```bash
-# Low-level SQP (~73 Hz discrete)
+# Low-level SQP (discrete collision)
 tesseract_online_planning_sqp_example
 
 # Task Composer based

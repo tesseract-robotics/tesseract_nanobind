@@ -4,8 +4,8 @@ Low-Level Planning with TrajOptIfopt (OSQP-based SQP)
 This example demonstrates using OMPL + TrajOptIfopt directly WITHOUT TaskComposer.
 TrajOptIfopt uses OSQP (a fast QP solver) instead of sco (sequential convex optimizer).
 
-For real-time/online planning at 100+ Hz, see online_planning_sqp_example.py which
-uses the even lower-level trajopt_sqp.TrustRegionSQPSolver API.
+For real-time/online replanning, see online_planning_sqp_example.py, which uses the even
+lower-level trajopt_sqp.TrustRegionSQPSolver API.
 
 Comparison:
 - TrajOpt: sco-based optimizer, mature, well-tested
