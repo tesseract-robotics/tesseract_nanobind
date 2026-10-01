@@ -1,6 +1,4 @@
 import os
-import threading
-import time
 import traceback
 
 import numpy as np
@@ -270,71 +268,27 @@ def test_apply_command_releases_gil_and_still_calls_back():
     assert events
 
 
-# Fixed box links added to the test env so clone() runs long enough to observe: 400 links clone in
-# ~90 ms on an M-series Mac (measured), well above thread-scheduling noise.
-CLONE_LOAD_LINKS = 400
-# Floor on the measured clone duration [s]; below it the env is too light to tell a held GIL from
-# a released one, and the test fails instead of passing vacuously.
-CLONE_MIN_DURATION_S = 0.02
-# Longest ticker stall allowed during clone, as a fraction of the clone duration. A held GIL stalls
-# the ticker for the whole clone (ratio ~1); a released one only for scheduling hiccups.
-CLONE_MAX_STALL_FRACTION = 0.25
+def test_gil_probe_detects_held_gil():
+    """The oracle is not vacuous: a copy made with the GIL held counts as such."""
+    from tesseract_robotics.tesseract_environment._tesseract_environment import _GilProbe
+
+    probe = _GilProbe()
+    probe.attach(get_environment())  # the binding copies the callback with the GIL held
+    assert probe.copies_with_gil >= 1
+    assert probe.copies_without_gil == 0
 
 
 def test_clone_releases_gil():
-    """Another Python thread keeps running while Environment.clone() executes (gh-134)."""
-    from tesseract_robotics.tesseract_geometry import Box
-    from tesseract_robotics.tesseract_scene_graph import (
-        Collision,
-        Joint,
-        JointType,
-        Link,
-        SceneGraph,
-    )
-
-    blocks = SceneGraph("blocks")
-    blocks.addLink(Link("blocks_root"))
-    for i in range(CLONE_LOAD_LINKS):
-        link = Link(f"block_{i}")
-        collision = Collision()
-        collision.geometry = Box(0.1, 0.1, 0.1)
-        link.addCollision(collision)
-        joint = Joint(f"block_joint_{i}")
-        joint.type = JointType.FIXED
-        joint.parent_link_name = "blocks_root"
-        joint.child_link_name = link.getName()
-        blocks.addLink(link, joint)
+    """Environment.clone() runs its native copy without the GIL (gh-134)."""
+    from tesseract_robotics.tesseract_environment._tesseract_environment import _GilProbe
 
     env = get_environment()
-    assert env.applyCommand(tesseract_environment.AddSceneGraphCommand(blocks))
-    # contact managers are cloned too; build them now so clone copies them
-    assert env.getDiscreteContactManager() is not None
-    assert env.getContinuousContactManager() is not None
+    probe = _GilProbe()
+    probe.attach(env)
+    probe.reset()
 
-    ticks = []
-    stop = threading.Event()
+    clone = env.clone()
 
-    def ticker():
-        while not stop.is_set():
-            ticks.append(time.perf_counter())
-
-    thread = threading.Thread(target=ticker)
-    thread.start()
-    try:
-        start = time.perf_counter()
-        clone = env.clone()
-        end = time.perf_counter()
-    finally:
-        stop.set()
-        thread.join()
-
-    assert clone is not None
     assert len(clone.getLinkNames()) == len(env.getLinkNames())
-
-    duration = end - start
-    assert duration >= CLONE_MIN_DURATION_S, f"clone took {duration:.4f}s; env too light to measure"
-    window = [start, *(t for t in ticks if start < t < end), end]
-    stall = max(b - a for a, b in zip(window, window[1:]))
-    assert stall < CLONE_MAX_STALL_FRACTION * duration, (
-        f"ticker stalled {stall:.4f}s of a {duration:.4f}s clone: clone() holds the GIL"
-    )
+    assert probe.copies_without_gil >= 1, "clone() never copied the probe"
+    assert probe.copies_with_gil == 0, "clone() copied the probe with the GIL held"

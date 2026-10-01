@@ -9,6 +9,7 @@
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/set.h>
 
+#include <atomic>
 #include <algorithm>  // std::find (setState validation, GH #43)
 #include <stdexcept>  // std::invalid_argument
 
@@ -94,6 +95,45 @@ void validate_set_state(const te::Environment& env,
                                     ") != joint_values length (" + std::to_string(values.size()) + ")");
     validate_set_state_joint_names(env, names);
 }
+
+// Test oracle for the GIL guards (gh-134): counts its copies by whether the copying thread holds
+// the GIL. Environment::clone copies every find-TCP callback, so a probe attached as one reports
+// exactly whether clone's native work ran with the GIL, independent of threads and timing.
+struct GilProbeCounts {
+    std::atomic<int> with_gil{0};
+    std::atomic<int> without_gil{0};
+};
+
+struct GilProbeFn {
+    std::shared_ptr<GilProbeCounts> counts;
+
+    explicit GilProbeFn(std::shared_ptr<GilProbeCounts> c) : counts(std::move(c)) {}
+    GilProbeFn(const GilProbeFn& other) : counts(other.counts) { record(); }
+    GilProbeFn(GilProbeFn&&) noexcept = default;
+    GilProbeFn& operator=(const GilProbeFn& other) {
+        counts = other.counts;
+        record();
+        return *this;
+    }
+    GilProbeFn& operator=(GilProbeFn&&) noexcept = default;
+
+    // Not a TCP source: findTCPOffset catches the throw and tries the next callback.
+    Eigen::Isometry3d operator()(const tc::ManipulatorInfo&) const {
+        throw std::runtime_error("GIL probe is not a TCP source");
+    }
+
+    // PyGILState_Check is not in the stable ABI the wheels build against; Ensure reports
+    // PyGILState_LOCKED exactly when this thread already held the GIL, and Release restores it.
+    void record() const {
+        const PyGILState_STATE state = PyGILState_Ensure();
+        ++(state == PyGILState_LOCKED ? counts->with_gil : counts->without_gil);
+        PyGILState_Release(state);
+    }
+};
+
+struct GilProbe {
+    std::shared_ptr<GilProbeCounts> counts = std::make_shared<GilProbeCounts>();
+};
 }  // namespace
 
 // Wrapper for Python event callbacks
@@ -578,4 +618,17 @@ NB_MODULE(_tesseract_environment, m) {
         // UI thread — the collision scan clones off-thread for a responsive sweep.
         .def("clone", [](const te::Environment& self) { return self.clone(); },
              nb::call_guard<nb::gil_scoped_release>());
+
+    // Private test oracle; see GilProbeFn.
+    nb::class_<GilProbe>(m, "_GilProbe")
+        .def(nb::init<>())
+        .def("attach", [](const GilProbe& self, te::Environment& env) {
+            env.addFindTCPOffsetCallback(GilProbeFn(self.counts));
+        }, "env"_a, "Register as a find-TCP callback of env, which clone() copies")
+        .def("reset", [](const GilProbe& self) {
+            self.counts->with_gil = 0;
+            self.counts->without_gil = 0;
+        })
+        .def_prop_ro("copies_with_gil", [](const GilProbe& self) { return self.counts->with_gil.load(); })
+        .def_prop_ro("copies_without_gil", [](const GilProbe& self) { return self.counts->without_gil.load(); });
 }
