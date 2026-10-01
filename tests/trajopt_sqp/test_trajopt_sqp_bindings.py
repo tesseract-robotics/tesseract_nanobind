@@ -1043,9 +1043,9 @@ class TestTrajOptQPProblem:
 
 # "trajopt 0.35.0" in this section is trajopt as every tesseract-robotics-nanobind 0.35.0.x wheel
 # bundles it. No release has TrajOptQPProblem yet (0.35.0.8, the latest, binds only
-# IfoptQPProblem); the behaviour pinned here was measured on the dev builds 0.35.0.9.dev16
-# (0d408bee) and 0.35.0.9.dev13 (CI, f6279773). trajopt#592's fix reaches a wheel only once one is
-# built on a newer trajopt.
+# IfoptQPProblem); the behaviour pinned here was measured on #149's development builds
+# 0.35.0.9.dev13–dev16, before the merge. trajopt#592's fix reaches a wheel only once one is built
+# on a newer trajopt.
 # Every joint value below is dyadic, so each residual, violation and sum is exact in float64
 # and exact costs compare with ==.
 PENALTY_JOINT_LIMIT = 10.0  # rad, symmetric; no variable bound is active below
@@ -1395,7 +1395,7 @@ class TestConvexEvaluatorArguments:
 
     trajopt 0.35.0 multiplies a penalty cost's full QP rows, slack columns included, into
     var_vals unchecked (trajopt_qp_problem.cpp:187-188), so an NLP-sized var_vals was read past
-    its end: on a build with f6279773's C++ (before this guard), through a view of the first
+    its end: on a #149 development build from before this guard, through a view of the first
     three entries of a longer buffer, an absolute cost of 0.5 read 3.5, a hinge one 0.0,
     depending on the entries after the view. Before the first convexify() there is no model and getNumQPVars() is 0; an
     empty or NLP-sized var_vals then segfaulted on a squared cost. The binding raises ValueError
