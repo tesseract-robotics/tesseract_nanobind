@@ -20,7 +20,6 @@ import asyncio
 import os
 import threading
 import time
-import traceback
 
 import importlib_resources
 
@@ -36,6 +35,14 @@ from .util import (
     tesseract_trajectory_to_list,
     trajectory_list_to_json,
 )
+
+# Seconds close() waits for the event loop thread to exit after loop.stop(); generous
+# against the aiohttp runner cleanup, which completes before stop() is scheduled.
+LOOP_JOIN_TIMEOUT_S = 2.0
+
+
+class ViewerCloseTimeoutError(RuntimeError):
+    """The viewer's event loop thread did not exit within `LOOP_JOIN_TIMEOUT_S`."""
 
 
 class TesseractViewer:
@@ -89,25 +96,43 @@ class TesseractViewer:
 
     def close(self):
         """
-        Close the web server and stop the background thread.
-        """
-        try:
-            res = asyncio.run_coroutine_threadsafe(self._a_close(), self.loop)
-            res.result()
-        except Exception:
-            traceback.print_exc()
+        Close the web server, stop the background thread and close its event loop.
 
-        if self.loop is not None:
+        Idempotent: calling close() on an already closed viewer is a no-op.
+
+        Raises:
+            ViewerCloseTimeoutError: the event loop thread did not exit within
+                `LOOP_JOIN_TIMEOUT_S`.
+        """
+        if self.loop.is_closed():
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self._a_close(), self.loop).result()
+        finally:
             self.loop.call_soon_threadsafe(self.loop.stop)
-            self.loop_thread.join(timeout=2.0)
+            self.loop_thread.join(timeout=LOOP_JOIN_TIMEOUT_S)
+        if self.loop_thread.is_alive():
+            raise ViewerCloseTimeoutError(
+                f"viewer event loop thread still running {LOOP_JOIN_TIMEOUT_S} s after stop"
+            )
 
     async def _a_start(self):
         await self.aio_viewer.start()
 
     def _run(self):
         self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
         self._loop_ready_evt.set()
-        self.loop.run_forever()
+        try:
+            self.loop.run_forever()
+        finally:
+            # Drain what is left after stop() (e.g. aiohttp handler tasks), then close the loop.
+            pending = asyncio.all_tasks(self.loop)
+            for task in pending:
+                task.cancel()
+            self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.close()
 
     async def _a_update_environment(self, scene_gltf, scene_glb, t_env):
         if self.aio_viewer is not None:
@@ -191,7 +216,7 @@ class TesseractViewer:
         """
         Serve the web page forever. This method blocks until the server is closed.
         """
-        self.start_server_background()
+        self.start_serve_background()
         # wait for keyboard interrupt
         try:
             while True:

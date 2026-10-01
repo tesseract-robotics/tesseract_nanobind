@@ -296,7 +296,9 @@ NB_MODULE(_tesseract_task_composer, m) {
 
     // ========== TaskComposerPluginFactory ==========
     // Move-only class (deleted copy, has move). Use unique_ptr internally to handle moves.
-    // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
+    // The locator binds to the ResourceLocator base (registered by _tesseract_common, imported
+    // at module init), so GeneralResourceLocator and Python subclasses are both accepted (gh-150).
+    // The locator is only consulted during construction; the factory keeps no reference to it.
     //
     // createTaskComposer{Node,Executor} triggers dlopen of plugin dylibs via
     // boost_plugin_loader. On macOS those dylibs are pinned with RTLD_NODELETE
@@ -308,17 +310,10 @@ NB_MODULE(_tesseract_task_composer, m) {
     // dylibs, so it logically depends on the factory even though the pinning
     // already makes that safe.
     nb::class_<tp::TaskComposerPluginFactory>(m, "TaskComposerPluginFactory")
-        .def("__init__", [](tp::TaskComposerPluginFactory* self, const std::string& config_str, nb::handle locator_handle) {
-            std::filesystem::path config(config_str);
-            auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
-            auto grl_type = common_module.attr("GeneralResourceLocator");
-            if (!nb::isinstance(locator_handle, grl_type)) {
-                throw nb::type_error("locator must be a GeneralResourceLocator");
-            }
-            auto* locator = nb::cast<tc::GeneralResourceLocator*>(locator_handle);
-            new (self) tp::TaskComposerPluginFactory(config, *locator);
+        .def("__init__", [](tp::TaskComposerPluginFactory* self, const std::string& config_str, const tc::ResourceLocator& locator) {
+            new (self) tp::TaskComposerPluginFactory(std::filesystem::path(config_str), locator);
         }, "config"_a, "locator"_a,
-             "Create from config file path (string) and GeneralResourceLocator")
+             "Create from config file path (string) and a ResourceLocator")
         .def("createTaskComposerExecutor", [](tp::TaskComposerPluginFactory& self, const std::string& name) {
 #ifdef __APPLE__
             auto before = snapshot_loaded_dylibs();
@@ -347,25 +342,10 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getDefaultTaskComposerNodePlugin", &tp::TaskComposerPluginFactory::getDefaultTaskComposerNodePlugin);
 
     // Keep factory functions for backwards compatibility
-    // Note: Cross-module inheritance with ResourceLocator - use nb::handle with manual type check
-    m.def("createTaskComposerPluginFactory", [](const std::string& config_str, nb::handle locator_handle) {
-        // Convert config string to path
-        std::filesystem::path config(config_str);
-
-        // Get the GeneralResourceLocator type from the tesseract_common module
-        auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
-        auto grl_type = common_module.attr("GeneralResourceLocator");
-
-        // Check if locator is a GeneralResourceLocator
-        if (!nb::isinstance(locator_handle, grl_type)) {
-            throw nb::type_error("locator must be a GeneralResourceLocator");
-        }
-
-        // Cast using the imported type
-        auto* locator = nb::cast<tc::GeneralResourceLocator*>(locator_handle);
-        return std::make_unique<tp::TaskComposerPluginFactory>(config, *locator);
+    m.def("createTaskComposerPluginFactory", [](const std::string& config_str, const tc::ResourceLocator& locator) {
+        return std::make_unique<tp::TaskComposerPluginFactory>(std::filesystem::path(config_str), locator);
     }, "config"_a, "locator"_a,
-    "Create a TaskComposerPluginFactory from a config file path (string) and GeneralResourceLocator");
+    "Create a TaskComposerPluginFactory from a config file path (string) and a ResourceLocator");
 
     // ========== AnyPoly ==========
     // Bind AnyPoly class for type-erased data storage

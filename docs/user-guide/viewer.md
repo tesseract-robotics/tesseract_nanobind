@@ -69,8 +69,9 @@ The Tesseract Robotics Workcell Collection (TWC) ships multi-robot positioner ce
 | `update_trajectory(tesseract_trajectory)` | Animate a `CompositeInstruction` trajectory |
 | `update_trajectory_list(joint_names, trajectory)` | Animate a raw list-of-waypoints trajectory |
 | `plot_trajectory(tesseract_trajectory, manipulator_info)` | Draw trajectory path + waypoint axes in the scene |
-| `start_serve_background()` | Start HTTP server on `server_address` |
-| `close()` | Stop the server and join the background thread |
+| `start_serve_background()` | Start HTTP server on `server_address`; returns once the port accepts connections, raises if it cannot bind |
+| `close()` | Close every client connection, release the port, join the background thread and close its event loop; idempotent |
+| `serve_forever()` | Start the server and block until Ctrl-C, then `close()` |
 | `add_axes_marker / add_arrow_marker / add_box_marker / add_sphere_marker / add_cylinder_marker / add_capsule_marker / add_lines_marker` | Add geometric markers to the scene |
 | `clear_all_markers / clear_markers_by_tags / clear_markers_by_name` | Remove markers |
 | `save(directory)` / `save_scene_gltf(fname)` / `save_scene_glb(fname)` | Export the scene for offline viewing |

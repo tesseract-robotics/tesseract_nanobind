@@ -58,7 +58,7 @@ graph TD
         TaskComposerPluginFactory,
     )
 
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator()  # any ResourceLocator, including a Python subclass
     factory = TaskComposerPluginFactory(FilesystemPath(str(config_path)), locator)
 
     # Executor + pipeline node

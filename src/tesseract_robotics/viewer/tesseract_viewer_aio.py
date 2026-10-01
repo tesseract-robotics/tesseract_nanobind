@@ -22,6 +22,44 @@ if not mimetypes.inited:
     mimetypes.init()
 
 
+class _TrackedProtocol(asyncio.Protocol):
+    """Forwards to an aiohttp request handler and registers the live connection.
+
+    aiohttp's shutdown only closes handlers whose `connection_made` already ran; a
+    connection accepted just before close registers with aiohttp too late and is never
+    closed. Tracking every connection here lets the server force-close those.
+    """
+
+    def __init__(self, handler, server):
+        self._handler = handler
+        self._server = server
+        self.transport = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+        self._server._connections.add(self)
+        self._handler.connection_made(transport)
+        if self._server._closing:
+            # Arrived after close() swept the live connections.
+            transport.close()
+
+    def connection_lost(self, exc):
+        self._server._connections.discard(self)
+        self._handler.connection_lost(exc)
+
+    def data_received(self, data):
+        self._handler.data_received(data)
+
+    def eof_received(self):
+        return self._handler.eof_received()
+
+    def pause_writing(self):
+        self._handler.pause_writing()
+
+    def resume_writing(self):
+        self._handler.resume_writing()
+
+
 class _TesseractViewerAIOServer:
     def __init__(self):
         self._static_pkg = importlib_resources.files("tesseract_robotics.viewer.resources.static")
@@ -35,6 +73,10 @@ class _TesseractViewerAIOServer:
         self.markers_json_etag = self.hash_bytes(self.markers_json)
         self._ws = []
         self._ws_send_lock = asyncio.Lock()
+        self._runner = None
+        self._server = None
+        self._connections = set()
+        self._closing = False
 
     def hash_bytes(self, data):
         if data is None:
@@ -86,8 +128,16 @@ class _TesseractViewerAIOServer:
 
             self._runner = aiohttp_web.AppRunner(self._app)
             await self._runner.setup()
-            self._site = aiohttp_web.TCPSite(self._runner, host, port, ssl_context=ssl_context)
-            await self._site.start()
+            handler_factory = self._runner.server
+            assert handler_factory is not None  # set by setup()
+            # Own the asyncio.Server (instead of aiohttp's TCPSite) so close() can drain
+            # every accepted connection, including ones aiohttp's shutdown never saw.
+            self._server = await asyncio.get_running_loop().create_server(
+                lambda: _TrackedProtocol(handler_factory(), self),
+                host,
+                port,
+                ssl=ssl_context,
+            )
 
         except:
             traceback.print_exc()
@@ -182,6 +232,28 @@ class _TesseractViewerAIOServer:
         for ws in self._ws:
             await ws.close()
         self._ws = []
+
+    async def close(self):
+        """Close open websockets and every connection, and release the listening port."""
+        await self.close_ws()
+        if self._server is None:
+            return
+        self._closing = True
+        # Accepts the loop already queued must attach before the listener closes:
+        # asyncio.Server._attach asserts the server is open, and a failed attach leaks
+        # the accepted socket. Those accept tasks precede this coroutine in the FIFO
+        # ready queue, so one yield runs them.
+        await asyncio.sleep(0)
+        self._server.close()
+        await self._runner.cleanup()
+        for conn in list(self._connections):
+            conn.transport.close()
+        await self._server.wait_closed()
+        self._server = None
+        self._runner = None
+        self._server = None
+        self._connections = set()
+        self._closing = False
 
     async def get_static_file(self, filename):
         with importlib_resources.as_file(self._static_pkg / filename) as f_path:
@@ -404,6 +476,8 @@ class TesseractViewerAIO:
             self.server_task = asyncio.create_task(
                 self.server.start(self.server_address[0], self.server_address[1], self.ssl_context)
             )
+            # Return once the port is listening; bind errors propagate to the caller.
+            await self.server_task
 
     async def close(self):
         """
@@ -411,8 +485,9 @@ class TesseractViewerAIO:
         """
         if self.server_task is not None:
             async with self._lock:
-                await self.server.close()
                 await self.server_task
+                await self.server.close()
+                self.server_task = None
 
     def _new_marker_dict(self, marker_type, parent_link, position, quaternion, name, color, tags):
         if name is None:

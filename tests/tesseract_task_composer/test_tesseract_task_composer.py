@@ -5,11 +5,16 @@ import gc
 import pytest
 
 import tesseract_robotics
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import (
+    FilesystemPath,
+    GeneralResourceLocator,
+    ResourceLocator,
+)
 from tesseract_robotics.tesseract_task_composer import (
     TaskComposerNodeInfo,
     TaskComposerNodeInfoContainer,
     TaskComposerPluginFactory,
+    createTaskComposerPluginFactory,
 )
 
 
@@ -18,8 +23,53 @@ def _resolve_task_composer_config():
     return str(tesseract_robotics.get_task_composer_config_path())
 
 
+class _DelegatingResourceLocator(ResourceLocator):
+    """Python ResourceLocator subclass that records every URL it resolves."""
+
+    def __init__(self):
+        super().__init__()
+        self._inner = GeneralResourceLocator()
+        self.urls: list[str] = []
+
+    def locateResource(self, url):
+        self.urls.append(url)
+        return self._inner.locateResource(url)
+
+
 class TestTaskComposerPluginFactory:
     """Test TaskComposerPluginFactory."""
+
+    def test_accepts_python_resource_locator_subclass(self, tmp_path):
+        """Any ResourceLocator is accepted, not only GeneralResourceLocator (gh-150)."""
+        config = tmp_path / "task_composer_plugins.yaml"
+        config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
+        factory = TaskComposerPluginFactory(
+            FilesystemPath(str(config)), _DelegatingResourceLocator()
+        )
+        assert not factory.hasTaskComposerNodePlugins()
+
+    def test_python_resource_locator_subclass_builds_pipeline(self):
+        """A delegating Python locator loads the real config and yields a pipeline (gh-150)."""
+        locator = _DelegatingResourceLocator()
+        factory = TaskComposerPluginFactory(
+            FilesystemPath(_resolve_task_composer_config()), locator
+        )
+        node = factory.createTaskComposerNode("TrajOptPipeline")
+        assert node.getName() == "TrajOptPipeline"
+
+    def test_free_function_accepts_python_resource_locator_subclass(self, tmp_path):
+        """createTaskComposerPluginFactory takes any ResourceLocator too (gh-150)."""
+        config = tmp_path / "task_composer_plugins.yaml"
+        config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
+        factory = createTaskComposerPluginFactory(str(config), _DelegatingResourceLocator())
+        assert not factory.hasTaskComposerNodePlugins()
+
+    def test_rejects_non_locator(self, tmp_path):
+        """A non-ResourceLocator is still a TypeError."""
+        config = tmp_path / "task_composer_plugins.yaml"
+        config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
+        with pytest.raises(TypeError):
+            TaskComposerPluginFactory(FilesystemPath(str(config)), object())
 
     def test_create_factory_and_nodes(self):
         """Test factory creation and pipeline node creation."""

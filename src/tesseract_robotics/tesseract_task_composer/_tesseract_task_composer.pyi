@@ -4,6 +4,8 @@ from collections.abc import Sequence
 import datetime
 from typing import overload
 
+import tesseract_robotics.tesseract_common._tesseract_common
+
 
 class TaskComposerKeys:
     def __init__(self) -> None: ...
@@ -186,8 +188,8 @@ class TaskflowTaskComposerExecutor(TaskComposerExecutor):
     def getTaskCount(self) -> int: ...
 
 class TaskComposerPluginFactory:
-    def __init__(self, config: str, locator: object) -> None:
-        """Create from config file path (string) and GeneralResourceLocator"""
+    def __init__(self, config: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None:
+        """Create from config file path (string) and a ResourceLocator"""
 
     def createTaskComposerExecutor(self, name: str) -> TaskComposerExecutor:
         """Create a task composer executor by name"""
@@ -203,9 +205,9 @@ class TaskComposerPluginFactory:
 
     def getDefaultTaskComposerNodePlugin(self) -> str: ...
 
-def createTaskComposerPluginFactory(config: str, locator: object) -> TaskComposerPluginFactory:
+def createTaskComposerPluginFactory(config: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> TaskComposerPluginFactory:
     """
-    Create a TaskComposerPluginFactory from a config file path (string) and GeneralResourceLocator
+    Create a TaskComposerPluginFactory from a config file path (string) and a ResourceLocator
     """
 
 class AnyPoly:
