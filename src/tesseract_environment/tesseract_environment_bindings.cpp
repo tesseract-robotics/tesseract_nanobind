@@ -572,5 +572,10 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getResourceLocator", &te::Environment::getResourceLocator)
         // Kinematics information (from SRDF)
         .def("getKinematicsInformation", &te::Environment::getKinematicsInformation)
-        .def("clone", [](const te::Environment& self) { return self.clone(); });
+        // clone() is a pure C++ deep-copy (no Python callback) and is mutex-serialised
+        // against setState() (Environment::clone takes a shared_lock on the same mutex_),
+        // so releasing the GIL lets a background thread clone the env WITHOUT blocking the
+        // UI thread — the collision scan clones off-thread for a responsive sweep.
+        .def("clone", [](const te::Environment& self) { return self.clone(); },
+             nb::call_guard<nb::gil_scoped_release>());
 }

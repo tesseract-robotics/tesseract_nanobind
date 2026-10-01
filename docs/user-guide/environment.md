@@ -254,8 +254,14 @@ All scene modifications use the command pattern. The full list is bound in `tess
 ## Best Practices
 
 !!! warning "Thread Safety"
-    The Environment is **not thread-safe**. Use `env.clone()` if you need
-    concurrent access from multiple threads.
+    `Environment` methods serialise on an internal reader/writer lock, but the
+    objects it hands out (contact managers, state solvers) are **not
+    thread-safe**. Give each thread its own `env.clone()`.
+
+    `clone()` releases the GIL while it copies, so a background thread can
+    clone a large environment without stalling the UI thread. The copy holds
+    the environment's read lock: concurrent reads proceed, and writers such as
+    `setState` or `applyCommand` wait for it to finish.
 
 !!! tip "Cloning for Planning"
     Motion planners internally clone the environment. You don't need to

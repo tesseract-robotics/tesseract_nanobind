@@ -32,6 +32,7 @@
 - **Margin vs buffer, docs and puzzle-piece ports** — the migration guide mapped 0.2x's `safety_margin` onto `collision_margin_buffer`, which trajopt_common documents as "not used when calculating the error"; it maps onto `contact_manager_config.default_margin`. Corrected across the migration, planning, TrajOpt API and concepts pages, and the three puzzle-piece examples now set C++'s 25 mm cost margin ([#135]).
 
 - **`applyCommand` releases the GIL for the two commands that carry geometry** — adding a link whose collision geometry is a mesh spends seconds inside `Environment::applyCommand` building collision shapes, all of it holding the GIL, so every other Python thread stalled on what is pure C++ work. `applyCommand(AddLinkCommand)` and `applyCommand(AddSceneGraphCommand)` now drop the GIL around the C++ call, matching the `solve()` / `contactTest` guards, as do `getDiscreteContactManager` / `getContinuousContactManager` — `applyCommand` only updates a contact manager that is already cached, so with a cold cache the shape build lands in the first getter call instead. `EventCallbackFn` now re-acquires the GIL, since the environment fires event callbacks from inside that released region (and from C++ threads such as the ROS 2 monitor). Known ceiling: a registered Python event callback plus a concurrent Python thread calling a non-releasing `Environment` method can deadlock, because upstream fires event callbacks under the environment's unique lock.
+- **`Environment.clone()` releases the GIL** — cloning a large environment held the GIL for the whole native deep copy, so a worker cloning off the UI thread still froze it. Audited against tesseract 0.35.0: `Environment::clone` holds the environment's shared lock (serialised against `setState` / `applyCommand`), and the copy touches no Python state — event callbacks are not cloned, `find_tcp_cb` has no Python binding, and Python-owned resources are only `shared_ptr`-copied. A binding test proves another Python thread keeps running during the clone ([#134]).
 
 ## [0.35.0.7] — multi-brand emitter subsystem + coordinated external axes
 
@@ -212,6 +213,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#127]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/127
 [#128]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/128
 [#135]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/135
+[#134]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/134
 [#145]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/145
 [#148]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/148
 [#149]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/149
