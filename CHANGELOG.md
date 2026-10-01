@@ -5,6 +5,7 @@
 ### Breaking changes
 
 - **`IfoptQPProblem` and `IfoptProblem` removed; `TrajOptQPProblem` replaces them** — code that builds `IfoptQPProblem(IfoptProblem(nodes))` now fails with `AttributeError`: build `TrajOptQPProblem(nodes)` and add every constraint and cost set to it, each cost with its penalty type. It is not a rename, and results change: merit coefficients, names and violations are per set, not per row; `addCostSet` checks bounds; no cost bypasses the QP; the merit matches the model for costs; dynamic sets are accepted. `docs/breaking-changes.md` has the migration and the five differences ([#148]). trajopt is removing `IfoptQPProblem` (tesseract-robotics/trajopt#595), and `IfoptProblem` was bound only to construct it. The online SQP example, the tests and the docs build `TrajOptQPProblem`, as tesseract_planning's planner and its `online_planning_example.cpp` do. The example added its velocity cost to the wrapped `IfoptProblem`, which kept it out of the QP (only `IfoptQPProblem.addCostSet` feeds the gradient and the Gauss-Newton Hessian) while the merit read it raw, so OSQP solved with no cost term and an empty Hessian: the global solve's squared joint steps summed to 23.2. As a squared cost they sum to 3.9, against 3.6 for the straight-line seed, and `getTotalExactCost()` reports that sum instead of the first velocity row.
+- **The convex evaluators take the QP solution vector** — `evaluateConvexCosts`, `evaluateTotalConvexCost` and `evaluateConvexConstraintViolations` raise `ValueError` unless `var_vals` has exactly `getNumQPVars()` entries, the NLP variables followed by the slack variables, and before the first `convexify()`. trajopt documents that size but does not check it, and 0.35.0 multiplies a hinge or absolute cost's full QP rows into `var_vals`, so a shorter vector was read past its end: on a one-joint problem whose absolute cost is 0.5, a view of the first three entries of a longer buffer read 3.5 or 0.5 depending on the entries after it, and a fresh three-entry array 14.6. Before the first `convexify()` an empty or NLP-sized vector segfaulted. What breaks: an NLP-sized `var_vals` on a problem with constraint sets and no hinge or absolute cost, which 0.35.0 read correctly; append zeros for the slack variables. A problem with squared costs only has no slack variables, so nothing changes there. `docs/breaking-changes.md` has the migration ([#149]).
 
 ### Changes
 
@@ -213,6 +214,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#135]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/135
 [#145]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/145
 [#148]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/148
+[#149]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/149
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

@@ -26,6 +26,32 @@
 
 namespace tsqp = trajopt_sqp;
 
+namespace {
+// The convex evaluators read var_vals in the layout of the last convexify(): the NLP variables
+// followed by the slack variables, getNumQPVars() entries, as trajopt documents ("Should be size
+// num_qp_vars", qp_problem.h:59, :67) but does not check. trajopt 0.35.0 multiplies a hinge or
+// absolute cost's full QP rows into var_vals (trajopt_qp_problem.cpp:187-188), so a shorter
+// vector is read past its end; before the first convexify() getNumQPVars() is 0, there is no
+// model to read, and an empty or NLP-sized vector segfaults. The binding owns the Python
+// boundary, so validate here and fail loud (std::invalid_argument -> ValueError). One contract
+// for all three evaluators, although 0.35.0 reads only the NLP block in two of them.
+void validate_qp_solution(const tsqp::QPProblem& problem,
+                          const Eigen::Ref<const Eigen::VectorXd>& var_vals,
+                          const char* method)
+{
+    const Eigen::Index n_qp = problem.getNumQPVars();
+    if (n_qp < problem.getNumNLPVars())
+        throw std::invalid_argument(std::string(method) +
+                                    ": the problem has no convex model yet; call convexify() first");
+    if (var_vals.size() != n_qp)
+        throw std::invalid_argument(std::string(method) + ": var_vals has " +
+                                    std::to_string(var_vals.size()) +
+                                    " entries; it must be the QP solution vector of getNumQPVars() = " +
+                                    std::to_string(n_qp) +
+                                    " entries, the NLP variables followed by the slack variables");
+}
+}  // namespace
+
 // Trampoline for SQPCallback (allow Python subclasses)
 class PySQPCallback : public tsqp::SQPCallback {
 public:
@@ -245,16 +271,59 @@ NB_MODULE(_trajopt_sqp, m) {
              "Get current optimization variable values")
         .def("convexify", &tsqp::QPProblem::convexify,
              "Run the full convexification routine")
-        .def("evaluateTotalConvexCost", &tsqp::QPProblem::evaluateTotalConvexCost,
-             "var_vals"_a, "Evaluate convexified cost at given point")
-        .def("evaluateConvexCosts", &tsqp::QPProblem::evaluateConvexCosts,
-             "var_vals"_a, "Evaluate individual convexified costs")
+        .def("evaluateTotalConvexCost",
+             [](const tsqp::QPProblem& self, const Eigen::Ref<const Eigen::VectorXd>& var_vals) {
+                 validate_qp_solution(self, var_vals, "evaluateTotalConvexCost");
+                 return self.evaluateTotalConvexCost(var_vals);
+             },
+             "var_vals"_a,
+             "Evaluate the convexified total cost at var_vals.\n\n"
+             "Args:\n"
+             "    var_vals: A point of the QP built by the last convexify(): getNumQPVars()\n"
+             "        entries, the NLP variables followed by the slack variables, as in a QP\n"
+             "        solution. To evaluate at an NLP point, append zeros for the slacks.\n\n"
+             "Returns:\n"
+             "    The sum of evaluateConvexCosts(var_vals).\n\n"
+             "Raises:\n"
+             "    ValueError: if var_vals does not have getNumQPVars() entries, or before the\n"
+             "        first convexify().")
+        .def("evaluateConvexCosts",
+             [](const tsqp::QPProblem& self, const Eigen::Ref<const Eigen::VectorXd>& var_vals) {
+                 validate_qp_solution(self, var_vals, "evaluateConvexCosts");
+                 return self.evaluateConvexCosts(var_vals);
+             },
+             "var_vals"_a,
+             "Evaluate each cost term of the convexified problem at var_vals.\n\n"
+             "Args:\n"
+             "    var_vals: A point of the QP built by the last convexify(): getNumQPVars()\n"
+             "        entries, the NLP variables followed by the slack variables, as in a QP\n"
+             "        solution. To evaluate at an NLP point, append zeros for the slacks.\n\n"
+             "Returns:\n"
+             "    One convexified cost per cost term, in getNLPCostNames() order.\n\n"
+             "Raises:\n"
+             "    ValueError: if var_vals does not have getNumQPVars() entries, or before the\n"
+             "        first convexify().")
         .def("getTotalExactCost", &tsqp::QPProblem::getTotalExactCost,
              "Get exact (non-convexified) total cost")
         .def("getExactCosts", &tsqp::QPProblem::getExactCosts,
              "Get current exact costs")
-        .def("evaluateConvexConstraintViolations", &tsqp::QPProblem::evaluateConvexConstraintViolations,
-             "var_vals"_a, "Evaluate convexified constraint violations")
+        .def("evaluateConvexConstraintViolations",
+             [](const tsqp::QPProblem& self, const Eigen::Ref<const Eigen::VectorXd>& var_vals) {
+                 validate_qp_solution(self, var_vals, "evaluateConvexConstraintViolations");
+                 return self.evaluateConvexConstraintViolations(var_vals);
+             },
+             "var_vals"_a,
+             "Evaluate the convexified constraint violations at var_vals.\n\n"
+             "Args:\n"
+             "    var_vals: A point of the QP built by the last convexify(): getNumQPVars()\n"
+             "        entries, the NLP variables followed by the slack variables, as in a QP\n"
+             "        solution. To evaluate at an NLP point, append zeros for the slacks.\n\n"
+             "Returns:\n"
+             "    One violation per constraint set, in getNLPConstraintNames() order; 0 where\n"
+             "    satisfied.\n\n"
+             "Raises:\n"
+             "    ValueError: if var_vals does not have getNumQPVars() entries, or before the\n"
+             "        first convexify().")
         .def("getExactConstraintViolations", &tsqp::QPProblem::getExactConstraintViolations,
              "Get current exact constraint violations")
         .def("scaleBoxSize", &tsqp::QPProblem::scaleBoxSize, "scale"_a,

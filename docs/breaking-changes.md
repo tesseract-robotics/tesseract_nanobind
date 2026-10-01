@@ -2,18 +2,63 @@
 
 Changes that break existing Python code, newest first, each with what replaces it. The next
 release removes `IfoptQPProblem` and `IfoptProblem`: build a `TrajOptQPProblem` instead, and
-expect different results wherever a cost went in without a penalty type. The
-[changelog](CHANGELOG.md) lists every change; the [upgrade guide](changes.md) covers the tesseract
-upgrades in full.
+expect different results wherever a cost went in without a penalty type. Its convex evaluators
+take only the QP solution vector. The [changelog](CHANGELOG.md) lists every change; the
+[upgrade guide](changes.md) covers the tesseract upgrades in full.
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `ValueError` on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
 | Unreleased | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### The convex evaluators take the QP solution vector
+
+`QPProblem.evaluateConvexCosts`, `evaluateTotalConvexCost` and
+`evaluateConvexConstraintViolations` read `var_vals` in the layout of the QP that the last
+`convexify()` built: `getNumQPVars()` entries, the NLP variables followed by the slack variables
+([L28][t28]). trajopt documents that size ([L59][h59], [L67][h67]) but does not check it. The
+binding now raises `ValueError` for any other size, and before the first `convexify()`, while
+`getNumQPVars()` is still 0 ([L831][t831]):
+
+```text
+ValueError: evaluateConvexCosts: var_vals has 3 entries; it must be the QP solution vector of getNumQPVars() = 5 entries, the NLP variables followed by the slack variables
+ValueError: evaluateConvexCosts: the problem has no convex model yet; call convexify() first
+```
+
+What used to work and now raises: an NLP-sized `var_vals` on a problem with constraint sets
+and no hinge or absolute cost. Each constraint row adds one or two slack variables, and trajopt
+0.35.0 reads only the NLP block there, so the call returned the right values. Append zeros for
+the slack variables:
+
+```python
+problem.convexify()
+n_slack = problem.getNumQPVars() - problem.getNumNLPVars()
+model_costs = problem.evaluateConvexCosts(np.concatenate([x, np.zeros(n_slack)]))
+```
+
+A QP solution, such as `SQPResults.new_var_vals` in a callback, already has the right size. A
+problem with squared costs only has no slack variables, so its NLP point is a QP point and
+nothing changes.
+
+Why the binding checks: with a hinge or absolute cost, trajopt 0.35.0 multiplies the cost's full
+QP rows, slack columns included, into `var_vals` ([L187–L188][t187]), so an NLP-sized vector was
+read past its end. On a one-joint problem whose absolute cost is 0.5, a view of the first three
+entries of a longer buffer read 3.5 or 0.5, depending on the two entries after the view, and a
+fresh three-entry array read 14.6. Before the first `convexify()`, an empty or NLP-sized vector
+segfaulted on a squared cost. The rule covers all three evaluators, although 0.35.0 reads only
+the NLP block in two of them: one contract, the one trajopt documents for all three once
+tesseract-robotics/trajopt#592 is in.
+
+[t28]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L28
+[t187]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L187-L188
+[t831]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L831
+[h59]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/include/trajopt_sqp/qp_problem.h#L59
+[h67]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/include/trajopt_sqp/qp_problem.h#L67
 
 ### `IfoptQPProblem` and `IfoptProblem` removed
 

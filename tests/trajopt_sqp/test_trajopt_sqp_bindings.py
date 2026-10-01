@@ -1052,9 +1052,10 @@ OFF_SEED_NODE_1 = 2.25  # rad, a second point: past the ABSOLUTE target, further
 LARGE_COEFF = 10.0  # a cost coefficient other than 1: an exact cost that drops it reads 0.5, not 5
 
 
-def _penalty_problem(node_1, cost_sets):
+def _penalty_problem(node_1, cost_sets, constraint_sets=()):
     """A set-up TrajOptQPProblem over three nodes: node 1 at the joint values node_1, the
-    other two at 0. Each (make, penalty_type) of cost_sets adds make(vars_list) as a cost.
+    other two at 0. Each (make, penalty_type) of cost_sets adds make(vars_list) as a cost, each
+    make of constraint_sets make(vars_list) as a constraint.
 
     Returns:
         (nodes, problem).
@@ -1069,6 +1070,8 @@ def _penalty_problem(node_1, cost_sets):
     problem = tsqp.TrajOptQPProblem(nodes)
     for make, penalty_type in cost_sets:
         problem.addCostSet(make(vars_list), penalty_type)
+    for make in constraint_sets:
+        problem.addConstraintSet(make(vars_list))
     problem.setup()
     return nodes, problem
 
@@ -1274,3 +1277,120 @@ class TestTrajOptQPProblemPenaltyCosts:
         """
         _, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, LARGE_COEFF)])
         assert problem.getExactCosts().tolist() == [SEED_VIOLATION]
+
+
+# ---------------------------------------------------------------------------
+# Convex evaluators take the QP solution vector (tesseract_nanobind#149 review)
+# ---------------------------------------------------------------------------
+
+# rad: a constraint row x_0 = 0.5 on node 0, which the seed (x_0 = 0) violates by 0.5. It gives
+# evaluateConvexConstraintViolations a set to report and the QP two more slack variables.
+START_TARGET = 0.5
+# s; a child imports the bindings and evaluates in about 1-2 s. A hang must fail the test, not
+# the session, and 60 s leaves room for a loaded runner.
+EVALUATOR_CHILD_TIMEOUT_S = 60.0
+CONVEX_EVALUATORS = (
+    "evaluateConvexCosts",
+    "evaluateTotalConvexCost",
+    "evaluateConvexConstraintViolations",
+)
+
+
+def _start_pin(vars_list):
+    """The constraint x_0 = START_TARGET on node 0."""
+    return ti.JointPosConstraint(np.array([START_TARGET]), vars_list[0], np.ones(1), "start")
+
+
+_BEFORE_CONVEXIFY_SCRIPT = f"""\
+import numpy as np
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import trajopt_sqp as tsqp
+nodes = ti.createNodesVariables(
+    "trajectory", ["j0"], [np.array([v]) for v in (0.0, {SEED_NODE_1}, 0.0)],
+    ti.toBounds(np.array([[-{PENALTY_JOINT_LIMIT}, {PENALTY_JOINT_LIMIT}]])),
+)
+vars_list = [node.getVar("joints") for node in nodes.getNodes()]
+problem = tsqp.TrajOptQPProblem(nodes)
+problem.addCostSet(
+    ti.JointVelConstraint(np.zeros(1), vars_list, np.ones(1), "vel"),
+    tsqp.CostPenaltyType.SQUARED,
+)
+problem.setup()
+for name in {CONVEX_EVALUATORS!r}:
+    for var_vals in (np.zeros(0), np.zeros(3)):
+        try:
+            getattr(problem, name)(var_vals)
+        except ValueError as exc:
+            print(f"RAISED {{name}} {{len(var_vals)}}: {{exc}}", flush=True)
+        else:
+            print(f"RETURNED {{name}} {{len(var_vals)}}", flush=True)
+"""
+
+
+class TestConvexEvaluatorArguments:
+    """evaluateConvexCosts, evaluateTotalConvexCost and evaluateConvexConstraintViolations take
+    the QP solution vector of the last convexify(): getNumQPVars() entries, the NLP variables
+    followed by the slack variables (trajopt_qp_problem.cpp:28).
+
+    trajopt 0.35.0 multiplies a penalty cost's full QP rows, slack columns included, into
+    var_vals unchecked (trajopt_qp_problem.cpp:187-188), so an NLP-sized var_vals was read past
+    its end: a view of the first three entries of a longer buffer read 3.5 or 0.0 where the cost
+    is 0.5, depending on the entries after the view. Before the first convexify() there is no
+    model and getNumQPVars() is 0; an empty or NLP-sized var_vals then segfaulted on a squared
+    cost. The binding raises ValueError in both cases, for all three evaluators, although 0.35.0
+    reads only the NLP block in two of them: one contract.
+    """
+
+    @pytest.mark.parametrize("evaluator", CONVEX_EVALUATORS)
+    @_PENALTY_TYPES
+    def test_nlp_sized_var_vals_raises(self, evaluator, penalty_type):
+        _, problem = _penalty_problem(
+            (SEED_NODE_1,), [_seed_cost(penalty_type, 1.0)], constraint_sets=[_start_pin]
+        )
+        problem.convexify()
+        nlp_point = np.array([0.0, SEED_NODE_1, 0.0])
+        assert problem.getNumNLPVars() == len(nlp_point) < problem.getNumQPVars()
+
+        with pytest.raises(ValueError, match=r"getNumQPVars\(\)"):
+            getattr(problem, evaluator)(nlp_point)
+
+    @_PENALTY_TYPES
+    def test_qp_sized_var_vals_is_accepted(self, penalty_type):
+        """At the convexification point with its slacks at 0, each evaluator reads the exact
+        values there: the seed's SEED_VIOLATION for the cost and the start pin alike."""
+        _, problem = _penalty_problem(
+            (SEED_NODE_1,), [_seed_cost(penalty_type, 1.0)], constraint_sets=[_start_pin]
+        )
+        problem.convexify()
+        n_slack = problem.getNumQPVars() - problem.getNumNLPVars()
+        qp_point = np.concatenate([[0.0, SEED_NODE_1, 0.0], np.zeros(n_slack)])
+
+        costs = problem.evaluateConvexCosts(qp_point)
+        total = problem.evaluateTotalConvexCost(qp_point)
+        violations = problem.evaluateConvexConstraintViolations(qp_point)
+
+        assert costs == pytest.approx(problem.getExactCosts(), abs=MODEL_ROUND_OFF)
+        assert total == pytest.approx(problem.getTotalExactCost(), abs=MODEL_ROUND_OFF)
+        assert violations == pytest.approx(
+            problem.getExactConstraintViolations(), abs=MODEL_ROUND_OFF
+        )
+        assert costs.tolist() == violations.tolist() == [SEED_VIOLATION]
+
+    def test_before_convexify_raises(self):
+        """No model before the first convexify(): every evaluator raises, for an empty and an
+        NLP-sized var_vals alike. Runs in a child process: the call used to segfault, and a
+        regression must fail this test, not the session."""
+        proc = subprocess.run(
+            [sys.executable, "-c", _BEFORE_CONVEXIFY_SCRIPT],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=EVALUATOR_CHILD_TIMEOUT_S,
+        )
+        assert proc.returncode == 0, (
+            f"child died (rc={proc.returncode}, SIGSEGV is -11/139): {proc.stderr[-500:]}"
+        )
+        outcomes = [ln for ln in proc.stdout.splitlines() if ln.startswith(("RAISED", "RETURNED"))]
+        assert len(outcomes) == 2 * len(CONVEX_EVALUATORS), proc.stdout[-500:]
+        for outcome in outcomes:
+            assert outcome.startswith("RAISED") and "convexify()" in outcome, outcome

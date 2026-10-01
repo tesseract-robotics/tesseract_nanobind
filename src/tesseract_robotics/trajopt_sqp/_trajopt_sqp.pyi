@@ -457,10 +457,38 @@ class QPProblem:
         """Run the full convexification routine"""
 
     def evaluateTotalConvexCost(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> float:
-        """Evaluate convexified cost at given point"""
+        """
+        Evaluate the convexified total cost at var_vals.
+
+        Args:
+            var_vals: A point of the QP built by the last convexify(): getNumQPVars()
+                entries, the NLP variables followed by the slack variables, as in a QP
+                solution. To evaluate at an NLP point, append zeros for the slacks.
+
+        Returns:
+            The sum of evaluateConvexCosts(var_vals).
+
+        Raises:
+            ValueError: if var_vals does not have getNumQPVars() entries, or before the
+                first convexify().
+        """
 
     def evaluateConvexCosts(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
-        """Evaluate individual convexified costs"""
+        """
+        Evaluate each cost term of the convexified problem at var_vals.
+
+        Args:
+            var_vals: A point of the QP built by the last convexify(): getNumQPVars()
+                entries, the NLP variables followed by the slack variables, as in a QP
+                solution. To evaluate at an NLP point, append zeros for the slacks.
+
+        Returns:
+            One convexified cost per cost term, in getNLPCostNames() order.
+
+        Raises:
+            ValueError: if var_vals does not have getNumQPVars() entries, or before the
+                first convexify().
+        """
 
     def getTotalExactCost(self) -> float:
         """Get exact (non-convexified) total cost"""
@@ -469,7 +497,22 @@ class QPProblem:
         """Get current exact costs"""
 
     def evaluateConvexConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
-        """Evaluate convexified constraint violations"""
+        """
+        Evaluate the convexified constraint violations at var_vals.
+
+        Args:
+            var_vals: A point of the QP built by the last convexify(): getNumQPVars()
+                entries, the NLP variables followed by the slack variables, as in a QP
+                solution. To evaluate at an NLP point, append zeros for the slacks.
+
+        Returns:
+            One violation per constraint set, in getNLPConstraintNames() order; 0 where
+            satisfied.
+
+        Raises:
+            ValueError: if var_vals does not have getNumQPVars() entries, or before the
+                first convexify().
+        """
 
     def getExactConstraintViolations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current exact constraint violations"""
