@@ -54,6 +54,9 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
             "Max number of solutions to find before exiting (default: 10)")
         .def_rw("simplify", &tp::OMPLSolverConfig::simplify,
             "Simplify trajectory (default: false). Ignores n_output_states if true.")
+        .def_rw("simplify_time", &tp::OMPLSolverConfig::simplify_time,
+            "Max time in seconds to spend simplifying when simplify is true (default: 0.0). "
+            "<= 0 runs simplification to completion (unbounded); > 0 time-bounds it.")
         .def_rw("optimize", &tp::OMPLSolverConfig::optimize,
             "Use all planning time to optimize trajectory (default: true)")
         .def("addPlanner", [](tp::OMPLSolverConfig& self, std::shared_ptr<tp::OMPLPlannerConfigurator> planner) {
