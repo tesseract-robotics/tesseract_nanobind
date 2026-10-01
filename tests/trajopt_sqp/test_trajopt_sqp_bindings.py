@@ -1043,8 +1043,8 @@ class TestTrajOptQPProblem:
 
 # "trajopt 0.35.0" in this section is trajopt as every tesseract-robotics-nanobind 0.35.0.x wheel
 # bundles it. TrajOptQPProblem is first bound in 0.35.0.9 (0.35.0.8 has none). The behaviour
-# pinned here is the same on 0.35.0.9.dev16, built from PR #149's head 0d408bee, and on its CI
-# wheel 0.35.0.9.dev13. trajopt#592's fix reaches a wheel only once one is built on a newer trajopt.
+# pinned here is the same on 0.35.0.9.dev16, built from 0d408bee, and on PR #149's CI wheel
+# 0.35.0.9.dev13. trajopt#592's fix reaches a wheel only once one is built on a newer trajopt.
 # Every joint value below is dyadic, so each residual, violation and sum is exact in float64
 # and exact costs compare with ==.
 PENALTY_JOINT_LIMIT = 10.0  # rad, symmetric; no variable bound is active below
@@ -1287,8 +1287,8 @@ class TestTrajOptQPProblemPenaltyCosts:
         test_penalty_only_cost_the_trust_box_cuts_by_a_quarter_is_reduced.
 
         tesseract-robotics/trajopt#592 (merged 2026-09-30) evaluates penalty rows on the
-        slack-free linear model, so this test fails on purpose in the first wheel built on a
-        trajopt that includes it. Then assert instead: new_approx_costs equals new_costs within
+        slack-free linear model, so this test fails on purpose once the linked trajopt includes
+        it. Then assert instead: new_approx_costs equals new_costs within
         MODEL_ROUND_OFF (the model is exact on this linear residual), node 1 ends at
         ABSOLUTE_TARGET (ABSOLUTE) or at most HINGE_UPPER (HINGE), and the exact cost ends at 0,
         both within OSQP_ABSOLUTE_TOLERANCE.
@@ -1336,7 +1336,7 @@ class TestTrajOptQPProblemPenaltyCosts:
         row's coefficient (:798). At c = 10 the exact cost reads 0.5, as at c = 1.
 
         tesseract-robotics/trajopt#592 (merged 2026-09-30) weights it, so this test fails on
-        purpose in the first wheel built on a trajopt that includes it. Then assert instead
+        purpose once the linked trajopt includes it. Then assert instead
         LARGE_COEFF * SEED_VIOLATION (5.0).
         """
         _, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, LARGE_COEFF)])
@@ -1398,8 +1398,8 @@ class TestConvexEvaluatorArguments:
 
     trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles, multiplies a
     penalty cost's full QP rows, slack columns included, into var_vals unchecked
-    (trajopt_qp_problem.cpp:187-188), so an NLP-sized var_vals was read past its end: on
-    0.35.0.9.dev10 (f6279773, before this guard), through a view of the first three entries of a
+    (trajopt_qp_problem.cpp:187-188), so an NLP-sized var_vals was read past its end: on a build
+    with f6279773's C++ (before this guard), through a view of the first three entries of a
     longer buffer, an absolute cost of 0.5 read 3.5, a hinge one 0.0, depending on the entries
     after the view. Before the first convexify() there is no model and getNumQPVars() is 0; an
     empty or NLP-sized var_vals then segfaulted on a squared cost. The binding raises ValueError
