@@ -12,7 +12,7 @@ binding the next class.
 
 | Class | Python constructors | Binding notes |
 |---|---|---|
-| `JointPosConstraint` | `(target, position_var, coeffs, name, range_bound_handling)`; `(bounds, position_var, coeffs, name, range_bound_handling)` | The bounds form broadcasts `coeffs` before calling trajopt. In 0.35.0 its range split reads the caller's `coeffs` instead of the broadcast member, so a length-1 `coeffs` is read past its end (fixed by tesseract-robotics/trajopt#592, merged 2026-09-30, unreleased). |
+| `JointPosConstraint` | `(target, position_var, coeffs, name, range_bound_handling)`; `(bounds, position_var, coeffs, name, range_bound_handling)` | The bounds form broadcasts `coeffs` before calling trajopt. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles, its range split reads the caller's `coeffs` instead of the broadcast member, so a length-1 `coeffs` is read past its end (fixed by tesseract-robotics/trajopt#592, merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt). |
 | `JointVelConstraint`, `JointAccelConstraint`, `JointJerkConstraint` | `(targets, position_vars, coeffs, name)` | Acceleration needs at least four waypoints and jerk six; fewer raise `RuntimeError`. |
 | `CartPosConstraint` | `(position_var, manip, source_frame, target_frame, source_frame_offset, target_frame_offset, name, range_bound_handling)`; `(position_var, coeffs, bounds, manip, …)` | The per-axis form: a zero coefficient drops that axis' row. |
 | `CartLineConstraint` | `(info: CartLineInfo, position_var, coeffs, name)` | `use_numeric_differentiation` is exposed and defaults to `True`. |

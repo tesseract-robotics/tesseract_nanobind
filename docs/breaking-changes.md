@@ -32,8 +32,8 @@ ValueError: evaluateConvexCosts: the problem has no convex model yet; call conve
 
 What used to work and now raises: an NLP-sized `var_vals` on a problem with constraint sets
 and no hinge or absolute cost. Each constraint row adds one or two slack variables, and trajopt
-0.35.0 reads only the NLP block there, so the call returned the right values. Append zeros for
-the slack variables:
+0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles, reads only the NLP block
+there, so the call returned the right values. Append zeros for the slack variables:
 
 ```python
 problem.convexify()
@@ -42,8 +42,9 @@ model_costs = problem.evaluateConvexCosts(np.concatenate([x, np.zeros(n_slack)])
 ```
 
 A QP solution, such as `SQPResults.new_var_vals` in a callback, already has the right size. The
-input most callers hit is `SQPResults.best_var_vals`: on 0.35.0 it is NLP-sized until the first
-accepted step and QP-sized after it (always NLP-sized once tesseract-robotics/trajopt#592 is in),
+input most callers hit is `SQPResults.best_var_vals`: on trajopt 0.35.0 it is NLP-sized until the
+first accepted step and QP-sized after it (always NLP-sized in a wheel built on a trajopt that
+contains tesseract-robotics/trajopt#592),
 so take its first `getNumNLPVars()` entries and pad them as above. A problem with no constraint
 sets and only squared costs has no slack variables, so its NLP point is a QP point and nothing
 changes.
@@ -53,8 +54,8 @@ QP rows, slack columns included, into `var_vals` ([L187–L188][t187]), so an NL
 read past its end. On a one-joint problem whose absolute cost is 0.5, a view of the first three
 entries of a longer buffer read 3.5 or 0.5, depending on the two entries after the view, and a
 fresh three-entry array read 14.6. Before the first `convexify()`, an empty or NLP-sized vector
-segfaulted on a squared cost. The rule covers all three evaluators, although 0.35.0 reads only
-the NLP block in two of them: one contract, the one trajopt documents for all three once
+segfaulted on a squared cost. The rule covers all three evaluators, although trajopt 0.35.0 reads
+only the NLP block in two of them: one contract, the one trajopt documents for all three once
 tesseract-robotics/trajopt#592 is in.
 
 [t28]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L28
@@ -90,15 +91,16 @@ problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
 problem.setup()
 ```
 
-It is not a rename. In trajopt 0.35.0 the two problems differ in five ways, and the third and
-fourth change results:
+It is not a rename. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel
+bundles (0.35.0.8 binds `IfoptQPProblem`, 0.35.0.9 `TrajOptQPProblem`), the two problems differ in
+five ways, and the third and fourth change results:
 
 | | `IfoptQPProblem` (removed) | `TrajOptQPProblem` |
 |---|---|---|
 | **1. Per set, not per row** | One merit coefficient, name and violation per constraint row; names are `<set>_<row>` ([L93][i93], [L100][i100]). | One per constraint set ([L668][t668], [L675][t675], [L1021–L1043][t1021]). Code that indexes names, violations or merit coefficients by row breaks, and the solver inflates a whole set's merit coefficient at once. |
 | **2. `addCostSet` checks bounds** | Checks nothing; rejects `HINGE` ([L50–L78][i50]). | `SQUARED` and `ABSOLUTE` need equality bounds on every row, `HINGE` one-sided bounds; anything else, a range row included, raises ([L416–L476][t416]). |
-| **3. No raw-cost path** | A cost added with `IfoptProblem.addCostSet` bypasses `IfoptQPProblem::addCostSet` ([L59][i59]): it gets no gradient and no Hessian in the QP ([L190][i190], [L263][i263]), while the merit still reads its raw, signed rows ([L525–L531][i525]). | Every cost goes in with `addCostSet(set, penalty_type)`. A squared cost that was inert now shapes the steps; for `ABSOLUTE` and `HINGE` costs on 0.35.0, see the fourth difference. |
-| **4. The merit matches the model for squared costs** | Weights the model but not the merit, and counts the model once per cost term, so the solver can reject every step and stop at the seed (tesseract-robotics/trajopt#595). | The merit weights and counts squared costs as the model does, so steps the old ratio rejected can be accepted. 0.35.0 has two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30, unreleased). Constraint coefficients weight a set's slack in the QP ([L798][t798]) but not its violation in the merit ([L1021–L1043][t1021]). The model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution ([L166–L196][t166]) while its exact cost ignores its coefficient ([L1015][t1015]), so the model predicts the whole cost away and the solver rejects a step that removes less than `improve_ratio_threshold` of it; a violation the trust box cannot cut by that much stops at its seed ([the QP problem](api/trajopt_sqp.md#the-qp-problem)). |
+| **3. No raw-cost path** | A cost added with `IfoptProblem.addCostSet` bypasses `IfoptQPProblem::addCostSet` ([L59][i59]): it gets no gradient and no Hessian in the QP ([L190][i190], [L263][i263]), while the merit still reads its raw, signed rows ([L525–L531][i525]). | Every cost goes in with `addCostSet(set, penalty_type)`. A squared cost that was inert now shapes the steps; for `ABSOLUTE` and `HINGE` costs on trajopt 0.35.0, see the fourth difference. |
+| **4. The merit matches the model for squared costs** | Weights the model but not the merit, and counts the model once per cost term, so the solver can reject every step and stop at the seed (tesseract-robotics/trajopt#595). | The merit weights and counts squared costs as the model does, so steps the old ratio rejected can be accepted. trajopt 0.35.0 has two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt, none yet). Constraint coefficients weight a set's slack in the QP ([L798][t798]) but not its violation in the merit ([L1021–L1043][t1021]). The model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution ([L166–L196][t166]) while its exact cost ignores its coefficient ([L1015][t1015]), so the model predicts the whole cost away and the solver rejects a step that removes less than `improve_ratio_threshold` of it; a violation the trust box cannot cut by that much stops at its seed ([the QP problem](api/trajopt_sqp.md#the-qp-problem)). |
 | **5. Dynamic sets** | Throws on `isDynamic()` sets ([L42–L48][i42]). | Accepts them ([L404–L414][t404]). |
 
 How much the third difference moves a result: this package's online SQP example added its velocity
