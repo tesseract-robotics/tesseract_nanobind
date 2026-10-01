@@ -850,3 +850,89 @@ def test_mul_chained_iso_translation_quaternion():
     nptest.assert_allclose(iso.translation, [1.0, 2.0, 3.0], atol=DEFAULT_PREC)
     # Rotation: 90°Z sends +X → +Y.
     nptest.assert_allclose(iso.linear @ X_AXIS, Y_AXIS, atol=DEFAULT_PREC)
+
+
+# ---------------------------------------------------------------------------
+# Isometry3d batched apply: apply_points / apply_directions.
+# The oracle is the binding's own per-point product `iso * p`. A row of the
+# batched product is the same 3x3-times-column plus translation, so equality
+# is bitwise (assert_array_equal), not approximate.
+# ---------------------------------------------------------------------------
+
+
+def _random_rigid(seed):
+    rng = np.random.default_rng(seed)
+    q, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+    q *= np.sign(np.linalg.det(q))
+    matrix = np.eye(4)
+    matrix[:3, :3] = q
+    matrix[:3, 3] = rng.normal(size=3)
+    return Isometry3d(matrix)
+
+
+def _rotation_only(iso):
+    # The binding's own rotation-only transform: the translation cancels exactly (t + (-t) == 0).
+    rotation = Isometry3d(iso)
+    rotation.pretranslate(-iso.translation)
+    return rotation
+
+
+@pytest.mark.parametrize("n", [0, 1, 2000])
+def test_apply_points_is_the_per_point_product_bitwise(n):
+    iso = _random_rigid(18)
+    points = np.random.default_rng(n).normal(size=(n, 3))
+    mapped = iso.apply_points(points)
+    assert mapped.shape == (n, 3)
+    assert mapped.dtype == np.float64
+    nptest.assert_array_equal(mapped, np.array([iso * p for p in points]).reshape(n, 3))
+
+
+@pytest.mark.parametrize("n", [0, 1, 2000])
+def test_apply_directions_rotates_without_translating_bitwise(n):
+    iso = _random_rigid(19)
+    vectors = np.random.default_rng(n).normal(size=(n, 3))
+    rotation = _rotation_only(iso)
+    nptest.assert_array_equal(rotation.translation, np.zeros(3))
+    nptest.assert_array_equal(
+        iso.apply_directions(vectors), np.array([rotation * v for v in vectors]).reshape(n, 3)
+    )
+
+
+def test_apply_points_reads_strided_and_fortran_inputs_by_value():
+    iso = _random_rigid(20)
+    rng = np.random.default_rng(20)
+    wide = rng.normal(size=(64, 4))
+    rows = rng.normal(size=(128, 3))
+    for points in (wide[:, :3], rows[::2], np.asfortranarray(rows)):
+        nptest.assert_array_equal(iso.apply_points(points), iso.apply_points(np.array(points)))
+
+
+def test_apply_points_converts_float32_and_integer_input_to_float64():
+    iso = _random_rigid(21)
+    points = np.arange(12).reshape(4, 3)
+    expected = iso.apply_points(points.astype(np.float64))
+    nptest.assert_array_equal(iso.apply_points(points), expected)
+    nptest.assert_array_equal(iso.apply_points(points.astype(np.float32)), expected)
+
+
+def test_apply_points_returns_a_new_array_and_leaves_its_input():
+    iso = _random_rigid(22)
+    points = np.random.default_rng(22).normal(size=(10, 3))
+    before = points.copy()
+    mapped = iso.apply_points(points)
+    nptest.assert_array_equal(points, before)
+    assert not np.shares_memory(mapped, points)
+    assert mapped.flags.c_contiguous and mapped.flags.writeable
+    iso.translate(X_AXIS)  # mutating the transform afterwards leaves the result alone
+    nptest.assert_array_equal(mapped, _random_rigid(22).apply_points(points))
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [np.zeros(3), np.zeros((4, 4)), np.zeros((4, 2)), np.zeros((2, 3, 3))],
+    ids=["single (3,)", "(N, 4)", "(N, 2)", "3-d"],
+)
+@pytest.mark.parametrize("method", ["apply_points", "apply_directions"])
+def test_apply_refuses_what_is_not_n_by_3(method, bad):
+    with pytest.raises(TypeError):
+        getattr(_random_rigid(23), method)(bad)
