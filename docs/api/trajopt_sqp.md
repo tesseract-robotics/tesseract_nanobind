@@ -20,7 +20,7 @@ problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)  # equality bounds re
 problem.setup()                                             # must call before solving
 ```
 
-A squared or absolute cost must have equality bounds on every row, a hinge cost one-sided bounds; `addCostSet` raises otherwise, on a range row too. Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for costs the trust-region ratio compares like with like. Constraint coefficients are the exception in trajopt 0.35.0: they weight a set's slack in the QP but not its violation in the merit (tesseract-robotics/trajopt#592 fixes that). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
+A squared or absolute cost must have equality bounds on every row, a hinge cost one-sided bounds; `addCostSet` raises otherwise, on a range row too. Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for squared costs the trust-region ratio compares like with like. In trajopt 0.35.0 there are two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30, unreleased): constraint coefficients weight a set's slack in the QP but not its violation in the merit, and `ABSOLUTE` and `HINGE` costs are mis-modelled (below). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
 
 !!! warning "`ABSOLUTE` and `HINGE` costs on trajopt 0.35.0"
     The convex model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution: it
@@ -28,7 +28,7 @@ A squared or absolute cost must have equality bounds on every row, a hinge cost 
     improvement then counts the whole cost, so a problem whose only costs are `ABSOLUTE` or
     `HINGE` rejects every step and reports `NLP_CONVERGED` at its seed. The exact cost of such
     a set also ignores its coefficient, at which the QP prices the slack.
-    tesseract-robotics/trajopt#592 (merged, unreleased) fixes both.
+    tesseract-robotics/trajopt#592 (merged 2026-09-30, unreleased) fixes both.
 
 !!! warning "`IfoptQPProblem` and `IfoptProblem` are no longer bound"
     `IfoptQPProblem(IfoptProblem(nodes_variables))`, the two-layer form of 0.34, is gone; trajopt

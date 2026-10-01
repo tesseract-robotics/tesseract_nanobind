@@ -42,7 +42,11 @@ Every class below is a `ConstraintSet`. It goes into a `TrajOptQPProblem` either
 constraint, with `addConstraintSet`, or as a cost, with `addCostSet(set, penalty_type)`. Every
 class is accepted as a constraint. As a cost, the set's row bounds decide the penalty type:
 `SQUARED` and `ABSOLUTE` need equality bounds on every row, `HINGE` one-sided bounds, and
-`addCostSet` raises otherwise. There is no cost without a penalty type.
+`addCostSet` raises otherwise. There is no cost without a penalty type. The last column lists
+what `addCostSet` accepts. On trajopt 0.35.0 the SQP models only `SQUARED` costs as it charges
+them: it reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution, and that cost's exact
+value ignores its coefficient (see [the QP problem](trajopt_sqp.md#the-qp-problem));
+tesseract-robotics/trajopt#592 fixes both, unreleased.
 
 | Class | Purpose | Row bounds | As a cost |
 |---|---|---|---|
@@ -62,7 +66,8 @@ class is accepted as a constraint. As a cost, the set's row bounds decide the pe
 A range row kept whole (`RangeBoundHandling.KEEP_AS_IS`) goes into neither: `addCostSet` raises,
 and a constraint raises `Unsupported bounds type!` at the first `convexify()`. Measured on trajopt
 0.35.0: each form in the table was added to a `TrajOptQPProblem` as a constraint and with each
-penalty type, then set up and convexified.
+penalty type, then set up and convexified. That measures acceptance, not how the SQP models the
+cost.
 
 0.34 constraint constructors take `Var` references directly (not
 `JointPosition` lists). See [changes](../changes.md) for the migration details.

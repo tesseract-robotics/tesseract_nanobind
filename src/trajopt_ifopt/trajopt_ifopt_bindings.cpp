@@ -362,9 +362,9 @@ NB_MODULE(_trajopt_ifopt, m) {
                             ti::RangeBoundHandling range_bound_handling) {
                  // In trajopt 0.35.0 the range split indexes the caller's coeffs argument
                  // instead of the broadcast member coeffs_, so a length-0/1 coeffs is read
-                 // past its end (fix proposed in the open PR tesseract-robotics/trajopt#592);
-                 // the binding broadcasts first. Remove the broadcast only once a release
-                 // containing #592 is pinned.
+                 // past its end (fixed by tesseract-robotics/trajopt#592, merged 2026-09-30,
+                 // in no release yet); the binding broadcasts first. Remove the broadcast only
+                 // once a release containing #592 is pinned.
                  const auto n_dof = static_cast<Eigen::Index>(bounds.size());
                  Eigen::VectorXd per_joint = coeffs;
                  if (coeffs.size() == 0)
