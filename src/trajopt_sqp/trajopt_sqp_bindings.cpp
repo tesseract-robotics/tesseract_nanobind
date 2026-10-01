@@ -29,12 +29,12 @@ namespace tsqp = trajopt_sqp;
 namespace {
 // The convex evaluators read var_vals in the layout of the last convexify(): the NLP variables
 // followed by the slack variables, getNumQPVars() entries, as trajopt documents ("Should be size
-// num_qp_vars", qp_problem.h:59, :67) but does not check. trajopt 0.35.0 multiplies a hinge or
-// absolute cost's full QP rows into var_vals (trajopt_qp_problem.cpp:187-188), so a shorter
-// vector is read past its end; before the first convexify() getNumQPVars() is 0, there is no
-// model to read, and an empty or NLP-sized vector segfaults. The binding owns the Python
-// boundary, so validate here and fail loud (std::invalid_argument -> ValueError). One contract
-// for all three evaluators, although 0.35.0 reads only the NLP block in two of them.
+// num_qp_vars", qp_problem.h:59, :67) but does not check. trajopt 0.35.0 (every 0.35.0.x wheel)
+// multiplies a penalty cost's full QP rows into var_vals (trajopt_qp_problem.cpp:187-188), so a
+// shorter vector is read past its end; before the first convexify() getNumQPVars() is 0 and an
+// empty or NLP-sized vector segfaults on a squared cost and reads garbage otherwise. The binding
+// owns the Python boundary, so validate here and fail loud (std::invalid_argument -> ValueError).
+// One contract for all three evaluators, although trajopt 0.35.0 reads only the NLP block in two.
 void validate_qp_solution(const tsqp::QPProblem& problem,
                           const Eigen::Ref<const Eigen::VectorXd>& var_vals,
                           const char* method)

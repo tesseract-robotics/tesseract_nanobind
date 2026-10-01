@@ -41,13 +41,12 @@ n_slack = problem.getNumQPVars() - problem.getNumNLPVars()
 model_costs = problem.evaluateConvexCosts(np.concatenate([x, np.zeros(n_slack)]))
 ```
 
-A QP solution, such as `SQPResults.new_var_vals` in a callback, already has the right size. The
-input most callers hit is `SQPResults.best_var_vals`: on trajopt 0.35.0 it is NLP-sized until the
-first accepted step and QP-sized after it (always NLP-sized in a wheel built on a trajopt that
-contains tesseract-robotics/trajopt#592),
-so take its first `getNumNLPVars()` entries and pad them as above. A problem with no constraint
-sets and only squared costs has no slack variables, so its NLP point is a QP point and nothing
-changes.
+A QP solution, such as `SQPResults.new_var_vals` in a callback, already has the right size.
+`SQPResults.best_var_vals` needs it too: on trajopt 0.35.0 it is NLP-sized until the first
+accepted step and QP-sized after it (always NLP-sized in a wheel built on a trajopt that contains
+tesseract-robotics/trajopt#592), so take its first `getNumNLPVars()` entries and pad them as
+above. A problem with no constraint sets and only squared costs has no slack variables, so its
+NLP point is a QP point and nothing changes.
 
 Why the binding checks: with a hinge or absolute cost, trajopt 0.35.0 multiplies the cost's full
 QP rows, slack columns included, into `var_vals` ([L187–L188][t187]), so an NLP-sized vector was

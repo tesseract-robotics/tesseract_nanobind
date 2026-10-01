@@ -1049,12 +1049,13 @@ class TestTrajOptQPProblem:
 # and exact costs compare with ==.
 PENALTY_JOINT_LIMIT = 10.0  # rad, symmetric; no variable bound is active below
 SEED_NODE_1 = 1.5  # rad, node 1's joint value at the seed; nodes 0 and 2 sit at 0
-ABSOLUTE_TARGET = 2.0  # rad: the ABSOLUTE row x_1 = 2, which the seed misses by SEED_VIOLATION
-HINGE_UPPER = 1.0  # rad: the HINGE row x_1 <= 1, which the seed exceeds by SEED_VIOLATION
-# rad: |1.5 - 2| = 1.5 - 1. It must exceed initial_trust_box_size / improve_ratio_threshold =
-# 0.1 / 0.25 = 0.4: trajopt 0.35.0 reads a penalty cost's model as 0, so a trial's ratio is
-# box / SEED_VIOLATION = 0.2 < 0.25 and the seed stalls; at 0.4 or less the first step is taken.
+# rad: how far the seed misses each penalty cost below. It must exceed initial_trust_box_size /
+# improve_ratio_threshold = 0.1 / 0.25 = 0.4: trajopt 0.35.0 reads a penalty cost's model as 0, so
+# a trial's ratio is box / SEED_VIOLATION = 0.2 < 0.25 and the seed stalls; at 0.4 or less the
+# first step is taken.
 SEED_VIOLATION = 0.5
+ABSOLUTE_TARGET = SEED_NODE_1 + SEED_VIOLATION  # rad: the ABSOLUTE row x_1 = 2
+HINGE_UPPER = SEED_NODE_1 - SEED_VIOLATION  # rad: the HINGE row x_1 <= 1
 # rad: a violation the default first trust box cuts by more than a quarter (box /
 # SMALL_VIOLATION = 0.1 / 0.25 = 0.4 >= improve_ratio_threshold = 0.25), so even trajopt 0.35.0
 # removes it: the contrast to SEED_VIOLATION.
@@ -1252,7 +1253,11 @@ class TestTrajOptQPProblemPenaltyCosts:
         solver.solve(problem)
 
         assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
-        assert problem.getExactCosts().tolist() == pytest.approx([0.0], abs=OSQP_ABSOLUTE_TOLERANCE)
+        # The position is exact to OSQP_ABSOLUTE_TOLERANCE; after trajopt#592 the exact cost is
+        # that residual times coeff, so the cost's tolerance scales with coeff.
+        assert problem.getExactCosts().tolist() == pytest.approx(
+            [0.0], abs=coeff * OSQP_ABSOLUTE_TOLERANCE
+        )
         node_1 = nodes.getValues()[1]
         if penalty_type == tsqp.CostPenaltyType.ABSOLUTE:
             assert node_1 == pytest.approx(
