@@ -9,6 +9,10 @@ using VectorVector3d = tesseract::common::VectorVector3d;  // std::vector<Eigen:
 using VectorIsometry3d = tesseract::common::VectorIsometry3d;  // std::vector<Eigen::Isometry3d>
 NB_MAKE_OPAQUE(VectorVector3d)
 NB_MAKE_OPAQUE(VectorIsometry3d)
+
+// (N, 3) points or directions as numpy holds them: row-major, one point per row.
+using PointsRowMajor = Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>;
+
 #include <tesseract/common/resource_locator.h>
 #include <tesseract/common/manipulator_info.h>
 #include <tesseract/common/joint_state.h>
@@ -149,6 +153,42 @@ NB_MODULE(_tesseract_common, m) {
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::Vector3d& v) {
             return self * v;
         })
+        // Batched apply over an (N, 3) array: one call instead of a Python loop
+        // over `iso * p`. Each column runs the fixed-size `iso * v` itself, so
+        // row i is bitwise `iso * points[i]`; a dynamic 3 x N product (GEMM or
+        // lazy) vectorises and fuses differently, up to ~4e-16 apart (measured).
+        // A row-major (N, 3) block is the same memory as a column-major 3 x N
+        // one with the same outer stride, so a strided view (`a[:, :3]` of an
+        // (N, 4)) is read in place; a Fortran or non-float64 array is converted
+        // by nanobind first. The result is a new array. A (3,) input raises
+        // TypeError: the single point is `iso * p`.
+        .def("apply_points", [](const Eigen::Isometry3d& self,
+                                const Eigen::Ref<const PointsRowMajor>& points) -> PointsRowMajor {
+            const Eigen::Map<const Eigen::Matrix3Xd, 0, Eigen::OuterStride<>> columns(
+                points.data(), 3, points.rows(), Eigen::OuterStride<>(points.outerStride()));
+            PointsRowMajor mapped(points.rows(), 3);
+            Eigen::Map<Eigen::Matrix3Xd> out(mapped.data(), 3, mapped.rows());
+            for (Eigen::Index i = 0; i < out.cols(); ++i) {
+                out.col(i) = self * Eigen::Vector3d(columns.col(i));
+            }
+            return mapped;
+        }, "points"_a)
+        // Rotation only: the same isometry with its translation zeroed, so a
+        // direction runs the scalar sequence a point does (Eigen fuses the
+        // translation into the product; `linear() * v` alone rounds differently).
+        .def("apply_directions", [](const Eigen::Isometry3d& self,
+                                    const Eigen::Ref<const PointsRowMajor>& vectors) -> PointsRowMajor {
+            const Eigen::Map<const Eigen::Matrix3Xd, 0, Eigen::OuterStride<>> columns(
+                vectors.data(), 3, vectors.rows(), Eigen::OuterStride<>(vectors.outerStride()));
+            PointsRowMajor mapped(vectors.rows(), 3);
+            Eigen::Isometry3d rotation = self;
+            rotation.translation().setZero();
+            Eigen::Map<Eigen::Matrix3Xd> out(mapped.data(), 3, mapped.rows());
+            for (Eigen::Index i = 0; i < out.cols(); ++i) {
+                out.col(i) = rotation * Eigen::Vector3d(columns.col(i));
+            }
+            return mapped;
+        }, "vectors"_a)
         // In-place composition mutators. Return self so callers can chain
         // (`iso.translate(v).rotate(q)`), matching Eigen's fluent C++ API.
         //

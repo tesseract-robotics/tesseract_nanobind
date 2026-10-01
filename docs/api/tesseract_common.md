@@ -20,14 +20,25 @@ mat = np.eye(4)
 mat[:3, 3] = [0.5, 0.2, 0.3]
 pose = Isometry3d(mat)
 
-# Access components (translation() / rotation() / matrix() are METHODS)
-position = pose.translation()  # np.array([x, y, z])
-rotation = pose.rotation()     # 3x3 rotation matrix
-matrix = pose.matrix()         # 4x4 homogeneous matrix
+# Access components (read-only properties; each returns a copy)
+position = pose.translation  # np.array([x, y, z])
+rotation = pose.rotation     # 3x3 rotation matrix
+matrix = pose.matrix         # 4x4 homogeneous matrix
 
 # Compose
 combined = pose1 * pose2
+
+# Apply to many points at once: (N, 3) in, (N, 3) out, in one call
+points = np.random.default_rng(0).normal(size=(1000, 3))
+mapped = pose.apply_points(points)       # row i == pose * points[i], bitwise
+rotated = pose.apply_directions(points)  # rotation only, no translation
 ```
+
+`apply_points` and `apply_directions` take an `(N, 3)` array, including `N = 0` and strided views
+such as `a[:, :3]`, and return a new `(N, 3)` float64 array. A single point stays `pose * p`; a
+`(3,)` array passed to `apply_points` raises `TypeError`. Each row is computed exactly as
+`pose * p` computes it, so the results agree bit for bit. A Python loop over `pose * p` costs about
+1 µs per point; `apply_points` costs about 1 µs per call up to a few dozen points.
 
 !!! tip "Prefer `planning.Pose` for authoring"
     For building/serializing transforms in Python, use
