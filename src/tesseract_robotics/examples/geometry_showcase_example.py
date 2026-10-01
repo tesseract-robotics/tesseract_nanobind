@@ -26,7 +26,10 @@ Geometry Types
 **Mesh Types** (from vertices/faces or files):
     - Mesh: General triangulated surface - for complex visual geometry
     - ConvexMesh: Convex hull - efficient collision for convex objects
-    - SDFMesh: Signed Distance Field mesh - for smooth distance queries
+
+**Volumetric Types**:
+    - SignedDistanceField: Distance to the surface sampled on a grid, negative inside -
+      gives distance and gradient everywhere, including for concave shapes
 
 **File Loaders**:
     - createMeshFromPath(): Load Mesh from STL/OBJ/DAE files
@@ -71,10 +74,12 @@ from tesseract_robotics.tesseract_geometry import (
     GeometryType,
     Mesh,
     Plane,
-    SDFMesh,
     Sphere,
     createConvexMeshFromPath,
+    createDiscreteSignedDistanceField,
     createMeshFromPath,
+    readSignedDistanceFieldVDB,
+    writeSignedDistanceFieldVDB,
 )
 from tesseract_robotics.tesseract_scene_graph import (
     Collision,
@@ -128,7 +133,7 @@ def create_geometry_link(
     link.addVisual(visual)
 
     # Collision component: used for physics queries, often simplified geometry
-    # Note: Some geometry types (SDFMesh, PolygonMesh) aren't supported by Bullet
+    # Note: Some geometry types (PolygonMesh) aren't supported by Bullet
     if add_collision:
         collision = Collision()
         collision.geometry = geometry
@@ -245,6 +250,38 @@ def create_pyramid_vertices_faces():
     return vertices, faces
 
 
+def create_sphere_sdf(radius: float = 0.08, samples: int = 17):
+    """
+    Bake an analytic sphere into a SignedDistanceField.
+
+    An SDF is defined by a distance function rather than by vertices: negative inside the
+    surface, zero on it, positive outside. `createDiscreteSignedDistanceField` evaluates that
+    function once per grid point and keeps only the samples, so the returned geometry holds no
+    reference back into Python - nothing takes the GIL during collision checking.
+
+    The batched form hands the callable every sample point as one (N, 3) array instead of
+    calling it N times, which is how you would drive a vectorised or GPU evaluator.
+
+    Args:
+        radius: Sphere radius in metres
+        samples: Number of grid samples along each axis (>= 2)
+
+    Returns:
+        SignedDistanceField spanning a cube that comfortably contains the sphere
+    """
+    half_extent = radius * 1.5
+    domain_min = np.full(3, -half_extent)
+    domain_max = np.full(3, half_extent)
+    dimensions = np.full(3, samples, dtype=np.int32)
+
+    def sphere_distance(points):
+        return np.linalg.norm(points, axis=1) - radius
+
+    return createDiscreteSignedDistanceField(
+        sphere_distance, domain_min, domain_max, dimensions, batched=True
+    )
+
+
 def run(**kwargs):
     """Demonstrate all geometry types in tesseract_robotics.
 
@@ -348,7 +385,6 @@ def run(**kwargs):
     # Meshes allow arbitrary geometry but have different collision performance:
     # - Mesh: BVH tree, handles concave shapes, slowest
     # - ConvexMesh: GJK algorithm, requires convex shape, faster
-    # - SDFMesh: Signed distance field, smooth gradients for optimization
     print("\n--- Mesh Types (programmatic) ---")
 
     z_row2 = z_base + 0.35
@@ -384,25 +420,38 @@ def run(**kwargs):
     )
     robot.add_link(link, joint)
 
-    # SDFMesh: provides signed distance field for smooth gradient queries
-    # Essential for trajectory optimization (TrajOpt) which needs distance gradients
-    # Positive distance = outside, negative = inside, smooth transition at surface
-    vertices, faces = create_tetrahedron_vertices_faces()
-    sdf_mesh = SDFMesh(vertices, faces)
-    print(f"SDFMesh: {sdf_mesh.getVertexCount()} vertices, {sdf_mesh.getFaceCount()} faces")
-    assert sdf_mesh.getType() == GeometryType.SDF_MESH
-    # Note: SDFMesh not supported by Bullet collision checker, so skip collision
-    link, joint = create_geometry_link(
-        "sdf_mesh_link",
-        sdf_mesh,
-        Pose.from_xyz(x_offset, 1 * y_spacing, z_row2),
-        color=(0.8, 0.2, 0.6, 1.0),  # magenta
-        add_collision=False,
-    )
-    robot.add_link(link, joint)
+    # =========================================================================
+    # 3. SIGNED DISTANCE FIELD (volumetric)
+    # =========================================================================
+    # Unlike the mesh types, an SDF stores no surface at all: it samples the signed
+    # distance to the surface on a regular grid (negative inside, positive outside).
+    # That gives distance and gradient everywhere in the volume, which is what
+    # trajectory optimization (TrajOpt) consumes, and it handles concave shapes that
+    # a convex hull cannot.
+    print("\n--- Signed Distance Field ---")
+
+    sdf = create_sphere_sdf(radius=0.08)
+    dims = sdf.getDimensions()
+    print(f"SignedDistanceField: {dims[0]}x{dims[1]}x{dims[2]} samples")
+    print(f"  distance at centre:  {sdf.getDistance(np.zeros(3)):+.4f} m (inside)")
+    print(f"  distance at corner:  {sdf.getDistance(np.full(3, 0.15)):+.4f} m (outside)")
+    assert sdf.getType() == GeometryType.SIGNED_DISTANCE_FIELD
+
+    # Fields round-trip through the standard OpenVDB and NanoVDB grid formats, so a
+    # field baked offline (or fused from sensor data) can be loaded straight in.
+    blob = writeSignedDistanceFieldVDB(sdf)
+    print(f"  OpenVDB round trip:  {len(blob)} bytes")
+    assert readSignedDistanceFieldVDB(blob).getType() == GeometryType.SIGNED_DISTANCE_FIELD
+
+    # Not added to this scene. An SDF is concave, so continuous (cast) contact managers
+    # reject it, and this robot loads the stock contact-manager config which declares one -
+    # adding the link would raise. Fields need an environment configured with discrete
+    # plugins only; see sdf_collision_example.py for that setup end to end.
+    print("  (collision-only, and needs a discrete-only environment - see")
+    print("   sdf_collision_example.py; nothing to render, so not added here)")
 
     # =========================================================================
-    # 3. MESH FROM FILE
+    # 4. MESH FROM FILE
     # =========================================================================
     # Load mesh geometry from CAD files (STL, OBJ, DAE, PLY supported)
     # Scale parameter allows resizing on import: [sx, sy, sz]
@@ -474,7 +523,10 @@ Primitive Shapes (front row, left to right):
 Programmatic Meshes (middle row):
   - Mesh (purple): Triangulated surface from vertices/faces
   - ConvexMesh (cyan): Convex hull for efficient collision
-  - SDFMesh (magenta): Signed distance field mesh
+
+Volumetric (constructed above, not added to this scene):
+  - SignedDistanceField: collision-only, and needs a discrete-only environment
+    (see sdf_collision_example.py)
 
 File-based Meshes (top row, if available):
   - Loaded Mesh (olive): From STL file
