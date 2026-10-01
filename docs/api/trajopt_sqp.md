@@ -25,9 +25,12 @@ A squared or absolute cost must have equality bounds on every row, a hinge cost 
 !!! warning "`ABSOLUTE` and `HINGE` costs on trajopt 0.35.0"
     The convex model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution: it
     evaluates the cost with its slack variables, which absorb the violation. The predicted
-    improvement then counts the whole cost, so a problem whose only costs are `ABSOLUTE` or
-    `HINGE` rejects every step and reports `NLP_CONVERGED` at its seed. The exact cost of such
-    a set also ignores its coefficient, at which the QP prices the slack.
+    improvement then counts the whole cost, so a step is accepted only if it removes at least
+    `improve_ratio_threshold` (0.25) of that cost inside the trust box. When it cannot, every
+    trial is rejected, the box collapses, and the solve reports `NLP_CONVERGED` at its seed:
+    measured for a joint 0.5 from its target or bound under the default box of 0.1, while at
+    0.375 or less the cost reaches 0. The exact cost of such a set also ignores its
+    coefficient, at which the QP prices the slack.
     tesseract-robotics/trajopt#592 (merged 2026-09-30, unreleased) fixes both.
 
 !!! warning "`IfoptQPProblem` and `IfoptProblem` are no longer bound"

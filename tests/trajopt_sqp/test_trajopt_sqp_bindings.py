@@ -1047,7 +1047,14 @@ PENALTY_JOINT_LIMIT = 10.0  # rad, symmetric; no variable bound is active below
 SEED_NODE_1 = 1.5  # rad, node 1's joint value at the seed; nodes 0 and 2 sit at 0
 ABSOLUTE_TARGET = 2.0  # rad: the ABSOLUTE row x_1 = 2, which the seed misses by SEED_VIOLATION
 HINGE_UPPER = 1.0  # rad: the HINGE row x_1 <= 1, which the seed exceeds by SEED_VIOLATION
-SEED_VIOLATION = 0.5  # rad: |1.5 - 2| = 1.5 - 1
+# rad: |1.5 - 2| = 1.5 - 1. It must exceed initial_trust_box_size / improve_ratio_threshold =
+# 0.1 / 0.25 = 0.4: trajopt 0.35.0 reads a penalty cost's model as 0, so a trial's ratio is
+# box / SEED_VIOLATION = 0.2 < 0.25 and the seed stalls; at 0.4 or less the first step is taken.
+SEED_VIOLATION = 0.5
+# rad: a violation the default first trust box cuts by more than a quarter (box /
+# SMALL_VIOLATION = 0.1 / 0.25 = 0.4 >= improve_ratio_threshold = 0.25), so even trajopt 0.35.0
+# removes it: the contrast to SEED_VIOLATION.
+SMALL_VIOLATION = 0.25
 OFF_SEED_NODE_1 = 2.25  # rad, a second point: past the ABSOLUTE target, further past HINGE_UPPER
 LARGE_COEFF = 10.0  # a cost coefficient other than 1: an exact cost that drops it reads 0.5, not 5
 
@@ -1093,11 +1100,13 @@ def _hinge_cost(bounds, coeff=1.0, name="hinge"):
     )
 
 
-def _seed_cost(penalty_type, coeff):
-    """(make, penalty_type): the node-1 cost the seed violates by SEED_VIOLATION."""
+def _seed_cost(penalty_type, coeff, violation=SEED_VIOLATION):
+    """(make, penalty_type): a node-1 cost the seed violates by `violation`: the target
+    SEED_NODE_1 + violation (ABSOLUTE) or the upper bound SEED_NODE_1 - violation (HINGE). The
+    default puts them at ABSOLUTE_TARGET and HINGE_UPPER."""
     if penalty_type == tsqp.CostPenaltyType.ABSOLUTE:
-        return _absolute_cost((ABSOLUTE_TARGET,), coeff), penalty_type
-    return _hinge_cost(((-np.inf, HINGE_UPPER),), coeff), penalty_type
+        return _absolute_cost((SEED_NODE_1 + violation,), coeff), penalty_type
+    return _hinge_cost(((-np.inf, SEED_NODE_1 - violation),), coeff), penalty_type
 
 
 _PENALTY_TYPES = pytest.mark.parametrize(
@@ -1147,7 +1156,7 @@ class TestTrajOptQPProblemPenaltyCosts:
         one above: e = (-0.5, +0.25) reads 0.75, where the signed sum is -0.25 and the squared
         sum 0.3125 (trajopt_qp_problem.cpp:1002-1016)."""
         _, problem = _penalty_problem(
-            (1.5, 2.25),
+            (SEED_NODE_1, OFF_SEED_NODE_1),
             [(_absolute_cost((ABSOLUTE_TARGET, ABSOLUTE_TARGET)), tsqp.CostPenaltyType.ABSOLUTE)],
         )
         assert problem.getExactCosts().tolist() == [0.75]
@@ -1177,7 +1186,7 @@ class TestTrajOptQPProblemPenaltyCosts:
         _, problem = _penalty_problem(
             (SEED_NODE_1,),
             [
-                (_absolute_cost((2.25,)), tsqp.CostPenaltyType.ABSOLUTE),
+                (_absolute_cost((OFF_SEED_NODE_1,)), tsqp.CostPenaltyType.ABSOLUTE),
                 (_hinge_cost(((-np.inf, HINGE_UPPER),)), tsqp.CostPenaltyType.HINGE),
                 (
                     lambda vars_list: ti.JointVelConstraint(
@@ -1189,7 +1198,8 @@ class TestTrajOptQPProblemPenaltyCosts:
         )
         assert problem.getNLPCostNames() == ["squared", "hinge", "absolute"]
         assert problem.getNumNLPCosts() == 3
-        # squared: velocities (1.5, -1.5), 2.25 + 2.25; hinge: 1.5 - 1; absolute: |1.5 - 2.25|
+        # squared: velocities (1.5, -1.5), 2.25 + 2.25; hinge: 1.5 - 1; absolute: |1.5 - 2.25|,
+        # the target at OFF_SEED_NODE_1
         assert problem.getExactCosts().tolist() == [4.5, 0.5, 0.75]
         assert problem.getTotalExactCost() == 5.75
 
@@ -1215,15 +1225,54 @@ class TestTrajOptQPProblemPenaltyCosts:
 
     @_COEFFS
     @_PENALTY_TYPES
-    def test_trajopt_0_35_0_penalty_only_cost_is_never_reduced(self, penalty_type, coeff):
-        """Characterizes trajopt 0.35.0: the SQP never reduces an ABSOLUTE- or HINGE-only cost.
+    def test_penalty_only_cost_the_trust_box_cuts_by_a_quarter_is_reduced(
+        self, penalty_type, coeff
+    ):
+        """A penalty-only cost whose violation the first trust box cuts by
+        improve_ratio_threshold is removed: SMALL_VIOLATION = 0.25 <= initial_trust_box_size /
+        improve_ratio_threshold = 0.4. On trajopt 0.35.0 the model reads the cost as 0, so the
+        first trial's ratio is box / SMALL_VIOLATION = 0.4 >= 0.25, the trial is accepted, and
+        the solve reaches the target; after trajopt#592 the model is exact on this linear
+        residual and the ratio is 1. The contrast to
+        test_trajopt_0_35_0_penalty_only_cost_beyond_the_trust_box_is_not_reduced: what stalls
+        there is the violation's size, not every penalty cost."""
+        nodes, problem = _penalty_problem(
+            (SEED_NODE_1,), [_seed_cost(penalty_type, coeff, SMALL_VIOLATION)]
+        )
+        solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+        params = solver.params
+        assert SMALL_VIOLATION <= params.initial_trust_box_size / params.improve_ratio_threshold
+
+        solver.solve(problem)
+
+        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert problem.getExactCosts().tolist() == pytest.approx([0.0], abs=OSQP_ABSOLUTE_TOLERANCE)
+        node_1 = nodes.getValues()[1]
+        if penalty_type == tsqp.CostPenaltyType.ABSOLUTE:
+            assert node_1 == pytest.approx(
+                SEED_NODE_1 + SMALL_VIOLATION, abs=OSQP_ABSOLUTE_TOLERANCE
+            )
+        else:
+            assert node_1 <= SEED_NODE_1 - SMALL_VIOLATION + OSQP_ABSOLUTE_TOLERANCE
+
+    @_COEFFS
+    @_PENALTY_TYPES
+    def test_trajopt_0_35_0_penalty_only_cost_beyond_the_trust_box_is_not_reduced(
+        self, penalty_type, coeff
+    ):
+        """Characterizes trajopt 0.35.0: an ABSOLUTE- or HINGE-only cost whose violation the
+        trust box cannot cut by improve_ratio_threshold is not reduced.
 
         evaluateConvexCosts evaluates a penalty cost on its full QP rows, slack columns
         included (trajopt_qp_problem.cpp:166-196). Every QP solution satisfies those rows, its
         slacks absorbing the violation, so the model reads 0 at the QP solution and predicts
-        the whole cost away, while the exact improvement is at most the trust box. Each trial's
-        ratio stays below improve_ratio_threshold (0.2 at box 0.1, then 0.02, ...), the box
-        collapses, and the solve reports NLP_CONVERGED at the seed.
+        the whole cost away, while the exact improvement is at most the trust box. A trial is
+        rejected when its ratio is below improve_ratio_threshold
+        (trust_region_sqp_solver.cpp:339): here the ratio is box / SEED_VIOLATION = 0.1 / 0.5 =
+        0.2 < 0.25, and each rejection shrinks the box tenfold, dividing the ratio by 10 (0.02,
+        0.002, ...), until the box collapses and the solve reports NLP_CONVERGED at the seed. A
+        violation of 0.4 or less is removed:
+        test_penalty_only_cost_the_trust_box_cuts_by_a_quarter_is_reduced.
 
         tesseract-robotics/trajopt#592 (merged 2026-09-30) evaluates penalty rows on the
         slack-free linear model, so this test fails on purpose once the bundled trajopt
@@ -1234,6 +1283,8 @@ class TestTrajOptQPProblemPenaltyCosts:
         """
         nodes, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, coeff)])
         solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+        params = solver.params
+        assert SEED_VIOLATION > params.initial_trust_box_size / params.improve_ratio_threshold
 
         solver.solve(problem)
 
@@ -1252,7 +1303,7 @@ class TestTrajOptQPProblemPenaltyCosts:
         assert problem.evaluateConvexCosts(zero_slacks) == pytest.approx(
             np.array(results.new_costs), abs=MODEL_ROUND_OFF
         )
-        assert results.new_costs[0] > 0.0
+        assert results.new_costs[0] > OSQP_ABSOLUTE_TOLERANCE
         # The whole cost reads as predicted improvement, so the trial is rejected.
         assert results.approx_merit_improve == pytest.approx(
             SEED_VIOLATION, abs=OSQP_ABSOLUTE_TOLERANCE
@@ -1334,11 +1385,11 @@ class TestConvexEvaluatorArguments:
 
     trajopt 0.35.0 multiplies a penalty cost's full QP rows, slack columns included, into
     var_vals unchecked (trajopt_qp_problem.cpp:187-188), so an NLP-sized var_vals was read past
-    its end: a view of the first three entries of a longer buffer read 3.5 or 0.0 where the cost
-    is 0.5, depending on the entries after the view. Before the first convexify() there is no
-    model and getNumQPVars() is 0; an empty or NLP-sized var_vals then segfaulted on a squared
-    cost. The binding raises ValueError in both cases, for all three evaluators, although 0.35.0
-    reads only the NLP block in two of them: one contract.
+    its end: through a view of the first three entries of a longer buffer, an absolute cost of
+    0.5 read 3.5, a hinge one 0.0, depending on the entries after the view. Before the first
+    convexify() there is no model and getNumQPVars() is 0; an empty or NLP-sized var_vals then
+    segfaulted on a squared cost. The binding raises ValueError in both cases, for all three
+    evaluators, although 0.35.0 reads only the NLP block in two of them: one contract.
     """
 
     @pytest.mark.parametrize("evaluator", CONVEX_EVALUATORS)
@@ -1354,10 +1405,25 @@ class TestConvexEvaluatorArguments:
         with pytest.raises(ValueError, match=r"getNumQPVars\(\)"):
             getattr(problem, evaluator)(nlp_point)
 
+    @pytest.mark.parametrize("evaluator", CONVEX_EVALUATORS)
+    @_PENALTY_TYPES
+    def test_over_long_var_vals_raises(self, evaluator, penalty_type):
+        """The rule is exactly getNumQPVars() entries: one more raises too, although 0.35.0
+        would read only the leading ones and return a value."""
+        _, problem = _penalty_problem(
+            (SEED_NODE_1,), [_seed_cost(penalty_type, 1.0)], constraint_sets=[_start_pin]
+        )
+        problem.convexify()
+        over_long = np.zeros(problem.getNumQPVars() + 1)
+
+        with pytest.raises(ValueError, match=r"getNumQPVars\(\)"):
+            getattr(problem, evaluator)(over_long)
+
     @_PENALTY_TYPES
     def test_qp_sized_var_vals_is_accepted(self, penalty_type):
         """At the convexification point with its slacks at 0, each evaluator reads the exact
-        values there: the seed's SEED_VIOLATION for the cost and the start pin alike."""
+        values there: SEED_VIOLATION for the cost, and START_TARGET for the start pin, which
+        the seed's x_0 = 0 misses by that much."""
         _, problem = _penalty_problem(
             (SEED_NODE_1,), [_seed_cost(penalty_type, 1.0)], constraint_sets=[_start_pin]
         )
@@ -1374,7 +1440,8 @@ class TestConvexEvaluatorArguments:
         assert violations == pytest.approx(
             problem.getExactConstraintViolations(), abs=MODEL_ROUND_OFF
         )
-        assert costs.tolist() == violations.tolist() == [SEED_VIOLATION]
+        assert costs.tolist() == [SEED_VIOLATION]
+        assert violations.tolist() == [START_TARGET]
 
     def test_before_convexify_raises(self):
         """No model before the first convexify(): every evaluator raises, for an empty and an
