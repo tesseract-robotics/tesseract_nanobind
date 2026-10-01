@@ -151,7 +151,9 @@ preference is unexpressible and the free axis has to be given up entirely.
 
 A band is a cost only as a hinge on its split rows. A term that mixes equality and band
 axes goes in as a constraint, or as two terms, one per kind, freeing the other kind's axes
-with zero coefficients.
+with zero coefficients. On trajopt 0.35.0, `ABSOLUTE` and `HINGE` costs have two defects
+that tesseract-robotics/trajopt#592 (unreleased) fixes; see
+[the QP problem](../api/trajopt_sqp.md#the-qp-problem).
 
 !!! note "Eigen arguments are required"
     `coeffs`, `source_frame_offset`, and `target_frame_offset` have no Python-side

@@ -231,7 +231,9 @@ class TestTrajOptSQPTypes:
         solver.params.initial_trust_box_size = 0.1
 
     def test_cost_penalty_types(self):
-        """Test CostPenaltyType enum."""
+        """CostPenaltyType's members exist; TestTrajOptQPProblemPenaltyCosts tests what ABSOLUTE
+        and HINGE costs do: bounds checks, exact values, bookkeeping and two trajopt 0.35.0
+        defects."""
         assert tsqp.CostPenaltyType.SQUARED is not None
         assert tsqp.CostPenaltyType.ABSOLUTE is not None
         assert tsqp.CostPenaltyType.HINGE is not None
@@ -1033,3 +1035,242 @@ class TestTrajOptQPProblem:
             f"{proc.stderr[-500:]}"
         )
         assert "OK: NLP_CONVERGED" in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# ABSOLUTE and HINGE cost sets on TrajOptQPProblem (tesseract_nanobind#149 review)
+# ---------------------------------------------------------------------------
+
+# Every joint value below is dyadic, so each residual, violation and sum is exact in float64
+# and exact costs compare with ==.
+PENALTY_JOINT_LIMIT = 10.0  # rad, symmetric; no variable bound is active below
+SEED_NODE_1 = 1.5  # rad, node 1's joint value at the seed; nodes 0 and 2 sit at 0
+ABSOLUTE_TARGET = 2.0  # rad: the ABSOLUTE row x_1 = 2, which the seed misses by SEED_VIOLATION
+HINGE_UPPER = 1.0  # rad: the HINGE row x_1 <= 1, which the seed exceeds by SEED_VIOLATION
+SEED_VIOLATION = 0.5  # rad: |1.5 - 2| = 1.5 - 1
+OFF_SEED_NODE_1 = 2.25  # rad, a second point: past the ABSOLUTE target, further past HINGE_UPPER
+LARGE_COEFF = 10.0  # a cost coefficient other than 1: an exact cost that drops it reads 0.5, not 5
+
+
+def _penalty_problem(node_1, cost_sets):
+    """A set-up TrajOptQPProblem over three nodes: node 1 at the joint values node_1, the
+    other two at 0. Each (make, penalty_type) of cost_sets adds make(vars_list) as a cost.
+
+    Returns:
+        (nodes, problem).
+    """
+    n_joints = len(node_1)
+    zeros = np.zeros(n_joints)
+    nodes, vars_list = _make_nodes_variables(
+        [f"j{k}" for k in range(n_joints)],
+        np.tile([-PENALTY_JOINT_LIMIT, PENALTY_JOINT_LIMIT], (n_joints, 1)),
+        [zeros, np.array(node_1, dtype=float), zeros],
+    )
+    problem = tsqp.TrajOptQPProblem(nodes)
+    for make, penalty_type in cost_sets:
+        problem.addCostSet(make(vars_list), penalty_type)
+    problem.setup()
+    return nodes, problem
+
+
+def _absolute_cost(targets, coeff=1.0, name="absolute"):
+    """make(vars_list): equality rows x_1j = targets[j] on node 1, each weighted by coeff."""
+    return lambda vars_list: ti.JointPosConstraint(
+        np.array(targets, dtype=float), vars_list[1], np.full(len(targets), coeff), name
+    )
+
+
+def _hinge_cost(bounds, coeff=1.0, name="hinge"):
+    """make(vars_list): one one-sided (lower, upper) row per joint of node 1, weighted by coeff."""
+    return lambda vars_list: ti.JointPosConstraint(
+        [ti.Bounds(lower, upper) for lower, upper in bounds],
+        vars_list[1],
+        np.full(len(bounds), coeff),
+        name,
+    )
+
+
+def _seed_cost(penalty_type, coeff):
+    """(make, penalty_type): the node-1 cost the seed violates by SEED_VIOLATION."""
+    if penalty_type == tsqp.CostPenaltyType.ABSOLUTE:
+        return _absolute_cost((ABSOLUTE_TARGET,), coeff), penalty_type
+    return _hinge_cost(((-np.inf, HINGE_UPPER),), coeff), penalty_type
+
+
+_PENALTY_TYPES = pytest.mark.parametrize(
+    "penalty_type",
+    [tsqp.CostPenaltyType.ABSOLUTE, tsqp.CostPenaltyType.HINGE],
+    ids=["absolute", "hinge"],
+)
+_COEFFS = pytest.mark.parametrize("coeff", [1.0, LARGE_COEFF], ids=["c1", "c10"])
+
+
+class TestTrajOptQPProblemPenaltyCosts:
+    """ABSOLUTE and HINGE cost sets on TrajOptQPProblem.
+
+    QP layout (trajopt 0.35.0, trajopt_qp_problem.cpp:28, :798-822): each ABSOLUTE row adds
+    two slack variables, each HINGE row one, after the NLP variables; the QP prices a slack at
+    its row's coefficient (:798). The tests without `trajopt_0_35_0` in their name hold on
+    0.35.0 and, by its diff, after tesseract-robotics/trajopt#592. The two
+    `test_trajopt_0_35_0_*` tests characterize 0.35.0 defects that #592 (merged 2026-09-30,
+    unreleased) fixes: each fails on purpose once the bundled trajopt includes #592, and its
+    docstring says what to assert then.
+    """
+
+    def test_absolute_cost_needs_equality_bounds(self):
+        nodes, vars_list = _make_nodes_variables(
+            ["j0"], np.array([[-PENALTY_JOINT_LIMIT, PENALTY_JOINT_LIMIT]]), [np.zeros(1)] * 3
+        )
+        upper_limited = ti.JointPosConstraint(
+            [ti.Bounds(-np.inf, HINGE_UPPER)], vars_list[1], np.ones(1), "upper"
+        )
+        problem = tsqp.TrajOptQPProblem(nodes)
+        with pytest.raises(RuntimeError, match="absolute cost must have equality bounds"):
+            problem.addCostSet(upper_limited, tsqp.CostPenaltyType.ABSOLUTE)
+
+    def test_hinge_cost_needs_inequality_bounds(self):
+        nodes, vars_list = _make_nodes_variables(
+            ["j0"], np.array([[-PENALTY_JOINT_LIMIT, PENALTY_JOINT_LIMIT]]), [np.zeros(1)] * 3
+        )
+        pinned = ti.JointPosConstraint(
+            np.array([ABSOLUTE_TARGET]), vars_list[1], np.ones(1), "pinned"
+        )
+        problem = tsqp.TrajOptQPProblem(nodes)
+        with pytest.raises(RuntimeError, match="hinge cost must have inequality bounds"):
+            problem.addCostSet(pinned, tsqp.CostPenaltyType.HINGE)
+
+    def test_absolute_exact_cost_is_the_summed_absolute_error(self):
+        """At c = 1 the exact cost is the sum over rows of |e|, one row below its target and
+        one above: e = (-0.5, +0.25) reads 0.75, where the signed sum is -0.25 and the squared
+        sum 0.3125 (trajopt_qp_problem.cpp:1002-1016)."""
+        _, problem = _penalty_problem(
+            (1.5, 2.25),
+            [(_absolute_cost((ABSOLUTE_TARGET, ABSOLUTE_TARGET)), tsqp.CostPenaltyType.ABSOLUTE)],
+        )
+        assert problem.getExactCosts().tolist() == [0.75]
+
+    @pytest.mark.parametrize(
+        ("bound", "node_1", "expected"),
+        [
+            ((-np.inf, HINGE_UPPER), (1.5, 1.25), 0.75),  # both rows above: 0.5 + 0.25
+            ((-np.inf, HINGE_UPPER), (0.5, 1.0), 0.0),  # one row inside, one on the bound
+            ((HINGE_UPPER, np.inf), (0.5, 0.75), 0.75),  # both rows below: 0.5 + 0.25
+            ((HINGE_UPPER, np.inf), (1.5, 1.0), 0.0),  # one row inside, one on the bound
+        ],
+        ids=["upper-violated", "upper-satisfied", "lower-violated", "lower-satisfied"],
+    )
+    def test_hinge_exact_cost_is_the_summed_violation(self, bound, node_1, expected):
+        """At c = 1 the exact cost sums each row's distance outside its one-sided bound, and is
+        0 when every row holds (trajopt_qp_problem.cpp:1002-1016)."""
+        _, problem = _penalty_problem(
+            node_1, [(_hinge_cost((bound, bound)), tsqp.CostPenaltyType.HINGE)]
+        )
+        assert problem.getExactCosts().tolist() == [expected]
+
+    def test_cost_terms_are_reported_by_penalty_type(self):
+        """One exact cost per term, in the order squared, hinge, absolute, whatever the order
+        they were added in: setup() concatenates the squared, then the hinge, then the absolute
+        sets (trajopt_qp_problem.cpp:569-577). getTotalExactCost() is their sum."""
+        _, problem = _penalty_problem(
+            (SEED_NODE_1,),
+            [
+                (_absolute_cost((2.25,)), tsqp.CostPenaltyType.ABSOLUTE),
+                (_hinge_cost(((-np.inf, HINGE_UPPER),)), tsqp.CostPenaltyType.HINGE),
+                (
+                    lambda vars_list: ti.JointVelConstraint(
+                        np.zeros(1), vars_list, np.ones(1), "squared"
+                    ),
+                    tsqp.CostPenaltyType.SQUARED,
+                ),
+            ],
+        )
+        assert problem.getNLPCostNames() == ["squared", "hinge", "absolute"]
+        assert problem.getNumNLPCosts() == 3
+        # squared: velocities (1.5, -1.5), 2.25 + 2.25; hinge: 1.5 - 1; absolute: |1.5 - 2.25|
+        assert problem.getExactCosts().tolist() == [4.5, 0.5, 0.75]
+        assert problem.getTotalExactCost() == 5.75
+
+    @_COEFFS
+    @_PENALTY_TYPES
+    def test_zero_slack_model_is_the_exact_cost(self, penalty_type, coeff):
+        """With its slack entries at 0, a penalty cost's convex model is the slack-free linear
+        model, so on a linear residual it equals the exact cost anywhere: at the
+        convexification point and away from it. trajopt 0.35.0 reads the slack columns (zeros
+        here) and leaves the coefficient out of both sides; trajopt#592 reads only the NLP
+        block and weights both sides by it."""
+        make, penalty_type = _seed_cost(penalty_type, coeff)
+        _, base = _penalty_problem((SEED_NODE_1,), [(make, penalty_type)])
+        base.convexify()
+        n_slack = base.getNumQPVars() - base.getNumNLPVars()
+        assert n_slack > 0
+
+        for node_1 in (SEED_NODE_1, OFF_SEED_NODE_1):
+            _, at_point = _penalty_problem((node_1,), [(make, penalty_type)])
+            qp_point = np.concatenate([[0.0, node_1, 0.0], np.zeros(n_slack)])
+            model = base.evaluateConvexCosts(qp_point)
+            assert model == pytest.approx(at_point.getExactCosts(), abs=MODEL_ROUND_OFF)
+
+    @_COEFFS
+    @_PENALTY_TYPES
+    def test_trajopt_0_35_0_penalty_only_cost_is_never_reduced(self, penalty_type, coeff):
+        """Characterizes trajopt 0.35.0: the SQP never reduces an ABSOLUTE- or HINGE-only cost.
+
+        evaluateConvexCosts evaluates a penalty cost on its full QP rows, slack columns
+        included (trajopt_qp_problem.cpp:166-196). Every QP solution satisfies those rows, its
+        slacks absorbing the violation, so the model reads 0 at the QP solution and predicts
+        the whole cost away, while the exact improvement is at most the trust box. Each trial's
+        ratio stays below improve_ratio_threshold (0.2 at box 0.1, then 0.02, ...), the box
+        collapses, and the solve reports NLP_CONVERGED at the seed.
+
+        tesseract-robotics/trajopt#592 (merged 2026-09-30) evaluates penalty rows on the
+        slack-free linear model, so this test fails on purpose once the bundled trajopt
+        includes it. Then assert instead: new_approx_costs equals new_costs within
+        MODEL_ROUND_OFF (the model is exact on this linear residual), node 1 ends at
+        ABSOLUTE_TARGET (ABSOLUTE) or at most HINGE_UPPER (HINGE), and the exact cost ends at 0,
+        both within OSQP_ABSOLUTE_TOLERANCE.
+        """
+        nodes, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, coeff)])
+        solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+
+        solver.solve(problem)
+
+        results = solver.getResults()
+        qp_solution = np.array(results.new_var_vals)  # the last trial: NLP variables, slacks
+        n_nlp = problem.getNumNLPVars()
+        # At the QP solution the model reads 0, in the solver's record and re-evaluated ...
+        assert results.new_approx_costs.tolist() == pytest.approx(
+            [0.0], abs=OSQP_ABSOLUTE_TOLERANCE
+        )
+        assert problem.evaluateConvexCosts(qp_solution).tolist() == pytest.approx(
+            [0.0], abs=OSQP_ABSOLUTE_TOLERANCE
+        )
+        # ... while the same NLP point with its slacks at 0 reads the exact cost there.
+        zero_slacks = np.concatenate([qp_solution[:n_nlp], np.zeros(len(qp_solution) - n_nlp)])
+        assert problem.evaluateConvexCosts(zero_slacks) == pytest.approx(
+            np.array(results.new_costs), abs=MODEL_ROUND_OFF
+        )
+        assert results.new_costs[0] > 0.0
+        # The whole cost reads as predicted improvement, so the trial is rejected.
+        assert results.approx_merit_improve == pytest.approx(
+            SEED_VIOLATION, abs=OSQP_ABSOLUTE_TOLERANCE
+        )
+        assert results.merit_improve_ratio < solver.params.improve_ratio_threshold
+        # The outcome: converged, at the seed, the cost untouched.
+        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        np.testing.assert_array_equal(nodes.getValues(), [0.0, SEED_NODE_1, 0.0])
+        assert problem.getExactCosts().tolist() == [SEED_VIOLATION]
+
+    @_PENALTY_TYPES
+    def test_trajopt_0_35_0_penalty_exact_cost_ignores_the_coefficient(self, penalty_type):
+        """Characterizes trajopt 0.35.0: a penalty cost's exact value ignores its coefficient.
+
+        getExactCosts() sums a penalty cost's row violations unweighted
+        (trajopt_qp_problem.cpp:1015, err.sum()), while the QP prices each row's slack at the
+        row's coefficient (:798). At c = 10 the exact cost reads 0.5, as at c = 1.
+
+        tesseract-robotics/trajopt#592 (merged 2026-09-30) weights it, so this test fails on
+        purpose once the bundled trajopt includes it. Then assert instead
+        LARGE_COEFF * SEED_VIOLATION (5.0).
+        """
+        _, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, LARGE_COEFF)])
+        assert problem.getExactCosts().tolist() == [SEED_VIOLATION]
