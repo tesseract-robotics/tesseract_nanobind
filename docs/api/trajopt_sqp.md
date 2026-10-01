@@ -20,15 +20,15 @@ problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)  # equality bounds re
 problem.setup()                                             # must call before solving
 ```
 
-A squared or absolute cost must have equality bounds on every row, a hinge cost one-sided bounds; `addCostSet` raises otherwise, on a range row too. Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for squared costs the trust-region ratio compares like with like. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles (`TrajOptQPProblem` is bound from 0.35.0.9 on; 0.35.0.8 has none), there are two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt, none yet): constraint coefficients weight a set's slack in the QP but not its violation in the merit, and `ABSOLUTE` and `HINGE` costs are mis-modelled (below). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
+A squared or absolute cost must have equality bounds on every row, a hinge cost one-sided bounds; `addCostSet` raises otherwise, on a range row too. Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for squared costs the trust-region ratio compares like with like. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles (`TrajOptQPProblem` is in no release yet; 0.35.0.8, the latest, binds only `IfoptQPProblem`), there are two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt, none yet): constraint coefficients weight a set's slack in the QP but not its violation in the merit, and `ABSOLUTE` and `HINGE` costs are mis-modelled (below). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
 
-!!! warning "`ABSOLUTE` and `HINGE` costs on trajopt 0.35.0 (tesseract-robotics-nanobind 0.35.0.9)"
+!!! warning "`ABSOLUTE` and `HINGE` costs on trajopt 0.35.0"
     The convex model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution: it
     evaluates the cost with its slack variables, which absorb the violation. The predicted
     improvement then counts the whole cost, so a step is accepted only if it removes at least
     `improve_ratio_threshold` (0.25) of that cost inside the trust box. When it cannot, every
     trial is rejected, the box collapses, and the solve reports `NLP_CONVERGED` at its seed:
-    measured on the 0.35.0.9 pre-release builds for a joint 0.5 from its target or bound
+    measured on development builds of this branch for a joint 0.5 from its target or bound
     under the default box of 0.1, while at 0.375 or less the cost reaches 0. The exact cost of
     such a set also ignores its coefficient, at which the QP prices the slack.
     tesseract-robotics/trajopt#592 (merged 2026-09-30, unreleased) fixes both; it reaches a

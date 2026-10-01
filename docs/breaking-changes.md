@@ -91,8 +91,8 @@ problem.setup()
 ```
 
 It is not a rename. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel
-bundles (0.35.0.8 binds `IfoptQPProblem`, 0.35.0.9 `TrajOptQPProblem`), the two problems differ in
-five ways, and the third and fourth change results:
+bundles (0.35.0.8, the latest release, binds `IfoptQPProblem`; `TrajOptQPProblem` is unreleased),
+the two problems differ in five ways, and the third and fourth change results:
 
 | | `IfoptQPProblem` (removed) | `TrajOptQPProblem` |
 |---|---|---|
