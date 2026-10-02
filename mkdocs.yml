@@ -180,6 +180,7 @@ nav:
     - Windows Wheel Gotchas: developer/windows-wheels.md
     - macOS Wheel Gotchas: developer/macos-wheels.md
     - Linux Wheel Gotchas: developer/linux-wheels.md
+    - Building Against Upstream Main: developer/upstream-main.md
 
 extra:
   version:
