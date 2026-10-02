@@ -1,3 +1,30 @@
 [submodule "ws/src/tesseract_ros_workcell"]
 	path = ws/src/tesseract_ros_workcell
 	url = https://github.com/tesseract-robotics/tesseract_ros_workcell.git
+[submodule "packaging/tesseract-robotics-feedstock"]
+	path = packaging/tesseract-robotics-feedstock
+	url = https://github.com/jf---/tesseract-robotics-feedstock.git
+[submodule "packaging/trajopt-feedstock"]
+	path = packaging/trajopt-feedstock
+	url = https://github.com/jf---/trajopt-feedstock.git
+[submodule "packaging/descartes-light-feedstock"]
+	path = packaging/descartes-light-feedstock
+	url = https://github.com/jf---/descartes-light-feedstock.git
+[submodule "packaging/tesseract-robotics-planning-feedstock"]
+	path = packaging/tesseract-robotics-planning-feedstock
+	url = https://github.com/jf---/tesseract-robotics-planning-feedstock.git
+[submodule "packaging/boost-plugin-loader-feedstock"]
+	path = packaging/boost-plugin-loader-feedstock
+	url = https://github.com/jf---/boost-plugin-loader-feedstock.git
+[submodule "upstream/boost_plugin_loader"]
+	path = upstream/boost_plugin_loader
+	url = https://github.com/tesseract-robotics/boost_plugin_loader.git
+[submodule "upstream/tesseract"]
+	path = upstream/tesseract
+	url = https://github.com/tesseract-robotics/tesseract.git
+[submodule "upstream/trajopt"]
+	path = upstream/trajopt
+	url = https://github.com/tesseract-robotics/trajopt.git
+[submodule "upstream/tesseract_planning"]
+	path = upstream/tesseract_planning
+	url = https://github.com/tesseract-robotics/tesseract_planning.git
