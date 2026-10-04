@@ -51,7 +51,7 @@ def _cart_waypoint_poly(pose: Pose):
 
 def _joint_waypoint_poly(joints_rad, names):
     jw = JointWaypoint()
-    jw.setNames(names)
+    jw.setJointIds(names)
     jw.setPosition(np.asarray(joints_rad, dtype=np.float64))
     return JointWaypointPoly_wrap_JointWaypoint(jw)
 

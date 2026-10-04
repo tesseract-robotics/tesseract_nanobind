@@ -274,8 +274,8 @@ def create_obstacle(
 
     # Create fixed joint with transform from parent to child
     joint = Joint(f"joint_{name}")
-    joint.parent_link_name = parent_link
-    joint.child_link_name = name
+    joint.parent_link_id = parent_link
+    joint.child_link_id = name
     joint.type = JointType.FIXED
     joint.parent_to_joint_origin_transform = transform
 
@@ -329,8 +329,8 @@ def create_fixed_joint(
         Configured Joint object
     """
     joint = Joint(name)
-    joint.parent_link_name = parent_link
-    joint.child_link_name = child_link
+    joint.parent_link_id = parent_link
+    joint.child_link_id = child_link
     joint.type = JointType.FIXED
 
     if origin is not None:

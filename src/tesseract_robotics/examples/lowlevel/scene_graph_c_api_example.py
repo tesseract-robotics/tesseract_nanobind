@@ -66,9 +66,9 @@ def main():
         return False
 
     print(f"Environment initialized: {env.getName()}")
-    print(f"Root link: {env.getRootLinkName()}")
-    print(f"Links: {list(env.getLinkNames())}")
-    print(f"Joints: {list(env.getJointNames())}")
+    print(f"Root link: {env.getRootLinkId()}")
+    print(f"Links: {list(env.getLinkIds())}")
+    print(f"Joints: {list(env.getJointIds())}")
 
     # Scene graph is a directed acyclic graph of links connected by joints
     scene_graph = env.getSceneGraph()
@@ -88,8 +88,8 @@ def main():
     # Query current joint configuration before modification
     joint = scene_graph.getJoint("joint_a4")
     if joint:
-        print(f"  Current parent: {joint.parent_link_name}")
-        print(f"  Current child: {joint.child_link_name}")
+        print(f"  Current parent: {joint.parent_link_id}")
+        print(f"  Current child: {joint.child_link_id}")
 
     # MoveJointCommand(joint_name, new_parent_link)
     # This preserves the joint but changes parent_link_name
@@ -99,7 +99,7 @@ def main():
         # Verify the change took effect
         joint = env.getSceneGraph().getJoint("joint_a4")
         if joint:
-            print(f"  New parent: {joint.parent_link_name}")
+            print(f"  New parent: {joint.parent_link_id}")
     else:
         print("  Failed to apply command")
 
@@ -117,8 +117,8 @@ def main():
 
     # Create the new joint that will connect link_1 -> link_4
     new_joint = Joint("moved_link_joint")
-    new_joint.parent_link_name = "link_1"
-    new_joint.child_link_name = "link_4"
+    new_joint.parent_link_id = "link_1"
+    new_joint.child_link_id = "link_4"
     new_joint.type = JointType.FIXED  # Could also be REVOLUTE, PRISMATIC, etc.
 
     # Build transform: rotate -90deg around Y, then translate (0.15, 0, 0)
@@ -137,8 +137,8 @@ def main():
         # Verify the new joint exists in scene graph
         joint = env.getSceneGraph().getJoint("moved_link_joint")
         if joint:
-            print(f"  New joint parent: {joint.parent_link_name}")
-            print(f"  New joint child: {joint.child_link_name}")
+            print(f"  New joint parent: {joint.parent_link_id}")
+            print(f"  New joint child: {joint.child_link_id}")
     else:
         print("  Failed to apply command")
 
@@ -151,8 +151,8 @@ def main():
     print(f"Number of joints: {scene_graph.getJoints().__len__()}")
 
     # getAdjacentLinkNames returns links directly connected by a joint
-    root_link = env.getRootLinkName()
-    adjacent = scene_graph.getAdjacentLinkNames(root_link)
+    root_link = env.getRootLinkId()
+    adjacent = scene_graph.getAdjacentLinkIds(root_link)
     print(f"\nLinks adjacent to '{root_link}': {list(adjacent)}")
 
     # Traverse kinematic tree using DFS
@@ -170,8 +170,8 @@ def main():
 
         # Find child links by iterating joints where this is parent
         for joint in scene_graph.getJoints():
-            if joint.parent_link_name == link_name:
-                stack.append((joint.child_link_name, depth + 1))
+            if joint.parent_link_id == link_name:
+                stack.append((joint.child_link_id, depth + 1))
 
     # Optional: visualize with viewer
     if TesseractViewer is not None:

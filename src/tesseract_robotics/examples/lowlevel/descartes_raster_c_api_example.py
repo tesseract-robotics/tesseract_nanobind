@@ -190,7 +190,7 @@ def main():
     manip_info.manipulator_ik_solver = "OPWInvKin"
 
     kin_group = env.getKinematicGroup(manip_info.manipulator, manip_info.manipulator_ik_solver)
-    joint_names = list(kin_group.getJointNames())
+    joint_names = list(kin_group.getJointIds())
 
     # Build the raster program: from_start, 3 raster passes with UNORDERED
     # transitions between them, to_end. Mirrors the C++ program exactly.

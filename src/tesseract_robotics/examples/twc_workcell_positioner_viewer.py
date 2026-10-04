@@ -225,8 +225,8 @@ def main():
     # --8<-- [end:load_workcell]
 
     print(f"Environment initialized: {t_env.getName()}")
-    print(f"Links: {len(list(t_env.getLinkNames()))}")
-    print(f"Joints: {len(list(t_env.getJointNames()))}")
+    print(f"Links: {len(list(t_env.getLinkIds()))}")
+    print(f"Joints: {len(list(t_env.getJointIds()))}")
 
     if not headless:
         print("\nStarting viewer at http://127.0.0.1:8000 ...")

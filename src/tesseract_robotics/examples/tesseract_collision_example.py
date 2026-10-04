@@ -112,7 +112,7 @@ def main():
 
     # Specify which links to include in collision checking
     # getActiveLinkNames() returns all links with collision geometry
-    manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+    manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 
     # Collision margin: report contacts when objects are within 10cm
     # Larger margin = earlier detection but more false positives
@@ -160,8 +160,8 @@ def main():
             print(f"Contact {j}:")
             # distance < 0: penetration, distance > 0: within margin but separated
             print(f"\tDistance: {contact_result.distance}")
-            print(f"\tLink A: {contact_result.link_names[0]}")
-            print(f"\tLink B: {contact_result.link_names[1]}")
+            print(f"\tLink A: {contact_result.link_ids[0]}")
+            print(f"\tLink B: {contact_result.link_ids[1]}")
         print()
 
 

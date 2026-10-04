@@ -116,7 +116,7 @@ class TestCompositeInstructionSerialization:
         rest_wp = WaypointPoly_as_JointWaypointPoly(rest_inst.getWaypoint())
 
         np.testing.assert_array_almost_equal(orig_wp.getPosition(), rest_wp.getPosition())
-        assert orig_wp.getNames() == rest_wp.getNames()
+        assert orig_wp.getJointIds() == rest_wp.getJointIds()
 
     def test_empty_program(self):
         """Test serialization of empty program."""
@@ -154,9 +154,9 @@ def make_test_environment():
 
 def _env_fingerprint(env):
     return (
-        sorted(env.getLinkNames()),
-        sorted(env.getJointNames()),
-        sorted(env.getActiveLinkNames()),
+        sorted(env.getLinkIds()),
+        sorted(env.getJointIds()),
+        sorted(env.getActiveLinkIds()),
     )
 
 

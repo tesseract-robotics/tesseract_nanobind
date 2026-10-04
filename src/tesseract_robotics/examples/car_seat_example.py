@@ -241,8 +241,8 @@ def add_seats(robot):
 
         # Fixed joint to world (rotated 180deg around Z, positioned along X)
         joint = Joint(f"joint_seat_{i + 1}")
-        joint.parent_link_name = "world"
-        joint.child_link_name = seat_name
+        joint.parent_link_id = "world"
+        joint.child_link_id = seat_name
         joint.type = JointType.FIXED
         transform = np.eye(4)
         transform[0, 0] = transform[1, 1] = -1.0  # 180deg Z rotation
@@ -283,8 +283,8 @@ def attach_seat(robot, seat_name="seat_1"):
     # Create fixed joint: reparent seat from world to end_effector
     # Compute relative transform: T_ee_seat = T_world_ee^-1 * T_world_seat
     joint = Joint(f"joint_{seat_name}_robot")
-    joint.parent_link_name = "end_effector"
-    joint.child_link_name = seat_name
+    joint.parent_link_id = "end_effector"
+    joint.child_link_id = seat_name
     joint.type = JointType.FIXED
     relative_tf = np.linalg.inv(ee_tf.matrix) @ seat_tf.matrix
     joint.parent_to_joint_origin_transform = Isometry3d(relative_tf)
@@ -364,7 +364,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     # Get joint ordering from SRDF-defined "manipulator" group
     joint_group = robot.env.getJointGroup("manipulator")
-    joint_names = list(joint_group.getJointNames())
+    joint_names = list(joint_group.getJointIds())
     print(f"Joint names: {joint_names}")
 
     # === PHASE 1: ADD SEATS TO ENVIRONMENT ===

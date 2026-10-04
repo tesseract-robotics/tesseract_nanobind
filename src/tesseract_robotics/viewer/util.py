@@ -25,11 +25,11 @@ def tesseract_trajectory_to_list(tesseract_trajectory):
 
         if wp.isStateWaypoint():
             state_wp = WaypointPoly_as_StateWaypointPoly(wp)
-            joint_names = list(state_wp.getNames())
+            joint_names = list(state_wp.getJointIds())
             break
         elif wp.isJointWaypoint():
             joint_wp = WaypointPoly_as_JointWaypointPoly(wp)
-            joint_names = list(joint_wp.getNames())
+            joint_names = list(joint_wp.getJointIds())
             break
 
     if joint_names is None:
