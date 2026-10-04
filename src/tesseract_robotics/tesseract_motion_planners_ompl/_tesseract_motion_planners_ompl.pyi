@@ -1,3 +1,5 @@
+"""tesseract_motion_planners_ompl Python bindings"""
+
 import enum
 from typing import TypeAlias
 
@@ -32,7 +34,9 @@ class OMPLSolverConfig:
 
     @property
     def simplify_time(self) -> float:
-        """Max time in seconds to spend simplifying when simplify is true (default: 0.0). <= 0 runs simplification to completion (unbounded); > 0 time-bounds it."""
+        """
+        Max time in seconds to spend simplifying when simplify is true (default: 0.0). <= 0 runs simplification to completion (unbounded); > 0 time-bounds it.
+        """
 
     @simplify_time.setter
     def simplify_time(self, arg: float, /) -> None: ...

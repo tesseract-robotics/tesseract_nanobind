@@ -1,3 +1,5 @@
+"""tesseract_motion_planners_trajopt Python bindings"""
+
 from typing import Annotated, TypeAlias
 
 import numpy

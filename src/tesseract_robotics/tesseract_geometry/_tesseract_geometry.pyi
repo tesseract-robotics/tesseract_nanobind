@@ -209,7 +209,7 @@ class MeshMaterial:
         """Get emissive factor (RGBA)"""
 
 class MeshTexture:
-    def getTextureImage(self) -> "tesseract_common::Resource":
+    def getTextureImage(self) -> "tesseract::common::Resource":
         """Get the texture image resource"""
 
     def getUVs(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]]:
@@ -241,7 +241,7 @@ class PolygonMesh(Geometry):
     def getTextures(self) -> list[MeshTexture] | None:
         """Get mesh textures (optional)"""
 
-    def getResource(self) -> "tesseract_common::Resource":
+    def getResource(self) -> "tesseract::common::Resource":
         """Get mesh resource"""
 
 class Mesh(PolygonMesh):
@@ -311,7 +311,7 @@ class CompoundMesh(Geometry):
     def getMeshes(self) -> list[PolygonMesh]:
         """Get the vector of meshes"""
 
-    def getResource(self) -> "tesseract_common::Resource":
+    def getResource(self) -> "tesseract::common::Resource":
         """Get the resource used to create this mesh"""
 
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
@@ -426,10 +426,10 @@ def createMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(
 def createConvexMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
     """Load mesh from file and return vector of ConvexMesh geometries"""
 
-def createMeshFromResource(resource: "tesseract_common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
+def createMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
     """Load Mesh from resource (e.g., package:// URL)"""
 
-def createConvexMeshFromResource(resource: "tesseract_common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
+def createConvexMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
     """Load ConvexMesh from resource (e.g., package:// URL)"""
 
 def createDiscreteSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., batched: bool = False) -> SignedDistanceField:
@@ -454,11 +454,22 @@ def createSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy
     the resolution used when that happens.
 
     Use createDiscreteSignedDistanceField unless you specifically need exact sampling. The field
-    keeps sdf alive and re-enters it from C++, which costs you three things: sdf must be
-    thread-safe; every evaluation takes the GIL, so a lazy field in a contact manager serializes
-    collision checking against the interpreter; and because the field references sdf (and so its
-    __globals__), storing the field in a module-level global forms a reference cycle the garbage
-    collector cannot see through - drop the field explicitly or keep it out of module scope.
+    keeps sdf alive and re-enters it from C++, which costs you three things.
+
+    1. sdf must be thread-safe.
+    2. Every evaluation takes the GIL, and the collision backends call getDistance() once per
+       sample point. contactTest releases the GIL precisely so trajectory sweeps can run in
+       parallel; a lazy field re-acquires it per query, serializing that work back against the
+       interpreter. Call discretize() before handing the field to a contact manager - after that
+       the sampler is never invoked again and the field behaves like pure data.
+    3. The field references sdf (and so its __globals__), so storing it in a module-level global
+       forms a reference cycle the garbage collector cannot see through - drop the field
+       explicitly or keep it out of module scope.
+
+    Discretizing from a thread that does not hold the GIL is also a deadlock risk: discretize()
+    holds a process-wide static mutex while calling the sampler, so it must not run inside a
+    GIL-released region. The bindings never do that (the VDB writers discretize up front), but do
+    not arrange it yourself by, say, discretizing from inside a C++ callback.
     """
 
 def writeSignedDistanceFieldVDB(sdf: SignedDistanceField) -> bytes:

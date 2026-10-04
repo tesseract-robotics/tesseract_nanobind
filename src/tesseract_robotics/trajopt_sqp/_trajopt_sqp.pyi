@@ -186,6 +186,29 @@ class SQPParameters:
     @log_dir.setter
     def log_dir(self, arg: str, /) -> None: ...
 
+class ConstraintViolations:
+    """Per merit unit constraint violations (non-negative; 0 = satisfied)"""
+
+    def __init__(self) -> None: ...
+
+    @property
+    def raw(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """
+        Unweighted violation per merit unit; its sum is compared against cnt_tolerance
+        """
+
+    @raw.setter
+    def raw(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+
+    @property
+    def weighted(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """
+        Violation times row weight; the merit charges weighted.dot(merit_error_coeffs)
+        """
+
+    @weighted.setter
+    def weighted(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+
 class SQPResults:
     """Results and state from SQP optimization"""
 
@@ -273,32 +296,32 @@ class SQPResults:
     def merit_error_coeffs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
 
     @property
-    def best_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def best_constraint_violations(self) -> ConstraintViolations:
         """Constraint violations for best solution (positive = violation)"""
 
     @best_constraint_violations.setter
-    def best_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_constraint_violations(self, arg: ConstraintViolations, /) -> None: ...
 
     @property
-    def new_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def new_constraint_violations(self) -> ConstraintViolations:
         """Constraint violations this iteration"""
 
     @new_constraint_violations.setter
-    def new_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_constraint_violations(self, arg: ConstraintViolations, /) -> None: ...
 
     @property
-    def best_approx_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def best_approx_constraint_violations(self) -> ConstraintViolations:
         """Convexified constraint violations for best solution"""
 
     @best_approx_constraint_violations.setter
-    def best_approx_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_approx_constraint_violations(self, arg: ConstraintViolations, /) -> None: ...
 
     @property
-    def new_approx_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def new_approx_constraint_violations(self) -> ConstraintViolations:
         """Convexified constraint violations this iteration"""
 
     @new_approx_constraint_violations.setter
-    def new_approx_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_approx_constraint_violations(self, arg: ConstraintViolations, /) -> None: ...
 
     @property
     def best_costs(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -496,7 +519,7 @@ class QPProblem:
     def getExactCosts(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current exact costs"""
 
-    def evaluateConvexConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def evaluateConvexConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> ConstraintViolations:
         """
         Evaluate the convexified constraint violations at var_vals.
 
@@ -514,7 +537,7 @@ class QPProblem:
                 first convexify().
         """
 
-    def getExactConstraintViolations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def getExactConstraintViolations(self) -> ConstraintViolations:
         """Get current exact constraint violations"""
 
     def scaleBoxSize(self, scale: float) -> None:
