@@ -407,15 +407,20 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def(nb::init<double>(), "default_collision_coeff"_a)
         .def("setDefaultCollisionCoeff", &tc::CollisionCoeffData::setDefaultCollisionCoeff)
         .def("getDefaultCollisionCoeff", &tc::CollisionCoeffData::getDefaultCollisionCoeff)
-        .def("setCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
+        .def("setCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&, double>(
+                 &tc::CollisionCoeffData::setCollisionCoeff),
              "obj1"_a, "obj2"_a, "collision_coeff"_a)
-        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
-             "obj1"_a, "obj2"_a)
+        .def("setCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkIdPair&, double>(&tc::CollisionCoeffData::setCollisionCoeff),
+             "pair"_a, "collision_coeff"_a)
+        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff, "pair"_a)
         // Backwards compatibility aliases
-        .def("setPairCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
+        .def("setPairCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&, double>(
+                 &tc::CollisionCoeffData::setCollisionCoeff),
              "obj1"_a, "obj2"_a, "collision_coeff"_a)
-        .def("getPairCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
-             "obj1"_a, "obj2"_a);
+        .def("getPairCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff, "pair"_a);
 
     // ========== trajopt_common::TrajOptCollisionConfig ==========
     nb::class_<tc::TrajOptCollisionConfig>(m, "TrajOptCollisionConfig")

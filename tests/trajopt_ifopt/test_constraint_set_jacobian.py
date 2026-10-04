@@ -39,14 +39,14 @@ def test_collision_constraint_with_an_active_contact():
     obstacle.addCollision(collision)
     joint = Joint("obstacle_joint")
     joint.type = JointType.FIXED
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = "obstacle"
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = "obstacle"
     joint.parent_to_joint_origin_transform = manip.calcFwdKin(STATE)["tool0"]
     assert env.applyCommand(AddLinkCommand(obstacle, joint))
 
     nodes = ti.createNodesVariables(
         "trajectory",
-        list(manip.getJointNames()),
+        list(manip.getJointIds()),
         [STATE],
         ti.toBounds(manip.getLimits().joint_limits),
     )

@@ -68,7 +68,7 @@ def kuka_setup():
     assert env.init(urdf_path, srdf_path, locator)
 
     manip = env.getKinematicGroup("manipulator")
-    joint_names = list(manip.getJointNames())
+    joint_names = list(manip.getJointIds())
     joint_limits = manip.getLimits().joint_limits
 
     return env, manip, joint_names, joint_limits
