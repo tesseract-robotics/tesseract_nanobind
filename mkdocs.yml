@@ -174,6 +174,7 @@ nav:
     - "tesseract 0.33 → 0.35": changes.md
   - Developer:
     - developer/index.md
+    - Binding API Audit: developer/binding-api-audit.md
     - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md

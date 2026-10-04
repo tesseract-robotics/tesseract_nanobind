@@ -5,6 +5,7 @@ The default env ignores this directory via `addopts`.
 """
 
 import importlib.util
+import json
 import re
 import sys
 from pathlib import Path
@@ -274,3 +275,40 @@ def test_environment_init_try_import_reported(real_reports):
 def test_quaternion_scalar_last_accepted(real_reports):
     accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
     assert ("Quaterniond.from_xyzw", "scalar-last-quaternion") in accepted
+
+
+PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
+
+
+def test_render_is_deterministic_and_sorted(fixture_report):
+    a = audit.render_markdown([fixture_report], PROV)
+    b = audit.render_markdown([fixture_report], PROV)
+    assert a == b
+    assert "abc1234" in a and "==0.35.0" in a
+    gaps = a[a.index("### Gaps") : a.index("### Deviations")]
+    gap_rows = [line for line in gaps.splitlines() if line.startswith("| `")]
+    assert len(gap_rows) == 4
+    assert gap_rows == sorted(gap_rows)
+
+
+def test_render_conclusion_precedes_tables(fixture_report):
+    text = audit.render_markdown([fixture_report], PROV)
+    assert text.index("| fixture |") < text.index("### Gaps")
+
+
+def test_json_roundtrip(fixture_report):
+    data = json.loads(audit.to_json([fixture_report], PROV))
+    assert data["provenance"] == PROV
+    module = data["modules"]["fixture"]
+    assert {g["symbol"] for g in module["gaps"]} == {
+        "Base",
+        "Owner",
+        "Widget.resize",
+        "Widget.operator+",
+    }
+    assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted"}
+
+
+def test_cli_rejects_unknown_module():
+    with pytest.raises(audit.UnknownModuleError):
+        audit.main(["tesseract_nope"])
