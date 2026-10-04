@@ -147,9 +147,64 @@ public:
 
 using tesseract_nb_common::PyOutputHandler;
 
+// LinkId / JointId: upstream's hash-of-name identity (tesseract IDENTITY_DESIGN.md).
+// Python sees the name: equality with str and hash(name) let an id-keyed dict answer d["tool0"].
+// The C++ order (by hash) is not exposed; __lt__ sorts by name so Python sorting is deterministic.
+template <typename Tag>
+void bindNameId(nb::module_& m, const char* py_name) {
+    using Id = tesseract::common::NameId<Tag>;
+    nb::class_<Id>(m, py_name)
+        .def(nb::init<>())
+        .def(nb::init<std::string>(), "name"_a)
+        .def("name", &Id::name)
+        .def("value", &Id::value)
+        .def("isValid", &Id::isValid)
+        .def("__eq__", [](const Id& a, const Id& b) { return a == b; }, nb::is_operator())
+        .def("__eq__", [](const Id& a, const std::string& b) { return a.name() == b; }, nb::is_operator())
+        .def("__ne__", [](const Id& a, const Id& b) { return a != b; }, nb::is_operator())
+        .def("__ne__", [](const Id& a, const std::string& b) { return a.name() != b; }, nb::is_operator())
+        .def("__lt__", [](const Id& a, const Id& b) { return a.name() < b.name(); }, nb::is_operator())
+        .def("__hash__", [](const Id& a) { return nb::hash(nb::str(a.name().c_str(), a.name().size())); })
+        .def("__str__", &Id::name)
+        .def("__repr__", [py_name](const Id& a) { return std::string(py_name) + "('" + a.name() + "')"; })
+        .def("__getstate__", &Id::name)
+        .def("__setstate__", [](Id& self, const std::string& name) { new (&self) Id(name); });
+    nb::implicitly_convertible<std::string, Id>();
+}
+
 NB_MODULE(_tesseract_common, m) {
     m.doc() = "tesseract_common Python bindings (nanobind)";
     register_python_error_translator();  // ResourceLocator and OutputHandler trampolines
+
+    // ========== Identity types (bound first: every link/joint-addressing API below takes them) ==========
+    bindNameId<tesseract::common::LinkTag>(m, "LinkId");
+    bindNameId<tesseract::common::JointTag>(m, "JointId");
+
+    using tesseract::common::LinkId;
+    using tesseract::common::LinkIdPair;
+    nb::class_<LinkIdPair>(m, "LinkIdPair")
+        .def(nb::init<const LinkId&, const LinkId&>(), "link_id1"_a, "link_id2"_a)
+        .def("__init__", [](LinkIdPair* self, const std::pair<LinkId, LinkId>& p) {
+            new (self) LinkIdPair(p.first, p.second);
+        }, "pair"_a)
+        // first()/second() are in canonical (hash) order, not alphabetical; orderedNameView() is alphabetical.
+        .def("first", &LinkIdPair::first, nb::rv_policy::copy)
+        .def("second", &LinkIdPair::second, nb::rv_policy::copy)
+        .def("orderedNameView", [](const LinkIdPair& self) {
+            const auto view = self.orderedNameView();
+            return std::make_pair(std::string(view.first), std::string(view.second));
+        })
+        .def("__eq__", [](const LinkIdPair& a, const LinkIdPair& b) { return a == b; }, nb::is_operator())
+        .def("__ne__", [](const LinkIdPair& a, const LinkIdPair& b) { return !(a == b); }, nb::is_operator())
+        .def("__hash__", [](const LinkIdPair& self) {
+            const auto view = self.orderedNameView();
+            return nb::hash(nb::make_tuple(view.first, view.second));
+        })
+        .def("__repr__", [](const LinkIdPair& self) {
+            const auto view = self.orderedNameView();
+            return "LinkIdPair('" + view.first + "', '" + view.second + "')";
+        });
+    nb::implicitly_convertible<std::pair<LinkId, LinkId>, LinkIdPair>();
 
     // Single source of truth for the float64 default precision used across
     // the project. Eigen exposes this as `NumTraits<double>::dummy_precision()`
@@ -903,8 +958,8 @@ NB_MODULE(_tesseract_common, m) {
             return ss.str();
         });
 
-    // Note: TransformMap (std::map<string, Isometry3d>) is handled automatically by nanobind's
-    // stl/map type caster - Python dict with Isometry3d values will convert automatically
+    // Note: LinkIdTransformMap (unordered_map<LinkId, Isometry3d>) is handled by nanobind's
+    // stl/unordered_map caster: a dict keyed by LinkId (or str, implicitly) with Isometry3d values
 
     // ========== ResourceLocator Hierarchy ==========
     // Registered before Resource, which derives from it (resource_locator.h:146).
@@ -973,10 +1028,10 @@ NB_MODULE(_tesseract_common, m) {
     // and the property share nanobind's variant caster, so any other type raises TypeError. The
     // getter returns a copy, not def_rw's reference_internal: a Python Isometry3d pointing into
     // the variant would dangle once the field is set to a str.
-    using TcpOffset = std::variant<std::string, Eigen::Isometry3d>;
+    using TcpOffset = std::variant<LinkId, Eigen::Isometry3d>;
     auto manipulator_info = nb::class_<tesseract::common::ManipulatorInfo>(m, "ManipulatorInfo")
         .def(nb::init<>())
-        .def(nb::init<std::string, std::string, std::string, TcpOffset>(),
+        .def(nb::init<std::string, LinkId, LinkId, TcpOffset>(),
              "manipulator"_a, "working_frame"_a, "tcp_frame"_a,
              "tcp_offset"_a = Eigen::Isometry3d::Identity())
         .def_rw("manipulator", &tesseract::common::ManipulatorInfo::manipulator)
@@ -986,7 +1041,7 @@ NB_MODULE(_tesseract_common, m) {
         .def_prop_rw("tcp_offset",
             [](const tesseract::common::ManipulatorInfo& self) -> TcpOffset { return self.tcp_offset; },
             [](tesseract::common::ManipulatorInfo& self, TcpOffset value) { self.tcp_offset = std::move(value); },
-            "TCP offset: a link name (str) or a pose (Isometry3d). Reading returns a copy.")
+            "TCP offset: a link (LinkId, or its name as str) or a pose (Isometry3d). Reading returns a copy.")
         // Copy of self with every non-empty field of the override; an overriding tcp_frame
         // brings its tcp_offset along (manipulator_info.cpp).
         .def("getCombined", &tesseract::common::ManipulatorInfo::getCombined, "manip_info_override"_a)
@@ -1002,8 +1057,8 @@ NB_MODULE(_tesseract_common, m) {
     // with almostEqualRelativeAndAbs(1e-5).
     auto joint_state = nb::class_<tesseract::common::JointState>(m, "JointState")
         .def(nb::init<>())
-        .def(nb::init<const std::vector<std::string>&, const Eigen::VectorXd&>())
-        .def_rw("joint_names", &tesseract::common::JointState::joint_names)
+        .def(nb::init<std::vector<tesseract::common::JointId>, const Eigen::VectorXd&>(), "joint_ids"_a, "position"_a)
+        .def_rw("joint_ids", &tesseract::common::JointState::joint_ids)
         .def_rw("position", &tesseract::common::JointState::position)
         .def_rw("velocity", &tesseract::common::JointState::velocity)
         .def_rw("acceleration", &tesseract::common::JointState::acceleration)
@@ -1075,16 +1130,25 @@ NB_MODULE(_tesseract_common, m) {
         .def(nb::init<>())
         .def(nb::init<const tesseract::common::AllowedCollisionEntries&>(), "entries"_a)
         .def("addAllowedCollision",
-             nb::overload_cast<const std::string&, const std::string&, const std::string&>(
-                 &tesseract::common::AllowedCollisionMatrix::addAllowedCollision))
+             nb::overload_cast<const LinkId&, const LinkId&, const std::string&>(
+                 &tesseract::common::AllowedCollisionMatrix::addAllowedCollision),
+             "link_id1"_a, "link_id2"_a, "reason"_a)
+        .def("addAllowedCollision",
+             nb::overload_cast<const LinkIdPair&, const std::string&>(
+                 &tesseract::common::AllowedCollisionMatrix::addAllowedCollision),
+             "pair"_a, "reason"_a)
         .def("removeAllowedCollision",
-             nb::overload_cast<const std::string&, const std::string&>(
-                 &tesseract::common::AllowedCollisionMatrix::removeAllowedCollision))
-        // Removes every entry that involves `link_name`.
+             nb::overload_cast<const LinkId&, const LinkId&>(
+                 &tesseract::common::AllowedCollisionMatrix::removeAllowedCollision),
+             "link_id1"_a, "link_id2"_a)
         .def("removeAllowedCollision",
-             nb::overload_cast<const std::string&>(&tesseract::common::AllowedCollisionMatrix::removeAllowedCollision),
-             "link_name"_a)
-        .def("isCollisionAllowed", &tesseract::common::AllowedCollisionMatrix::isCollisionAllowed)
+             nb::overload_cast<const LinkIdPair&>(&tesseract::common::AllowedCollisionMatrix::removeAllowedCollision),
+             "pair"_a)
+        // Removes every entry that involves `link_id`.
+        .def("removeAllowedCollision",
+             nb::overload_cast<const LinkId&>(&tesseract::common::AllowedCollisionMatrix::removeAllowedCollision),
+             "link_id"_a)
+        .def("isCollisionAllowed", &tesseract::common::AllowedCollisionMatrix::isCollisionAllowed, "pair"_a)
         .def("clearAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::clearAllowedCollisions)
         .def("getAllAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::getAllAllowedCollisions)
         .def("insertAllowedCollisionMatrix", &tesseract::common::AllowedCollisionMatrix::insertAllowedCollisionMatrix)
@@ -1109,7 +1173,7 @@ NB_MODULE(_tesseract_common, m) {
     // ========== ContactAllowedValidator ==========
     // Abstract base. Determines whether two links are allowed to be in collision.
     nb::class_<tesseract::common::ContactAllowedValidator>(m, "ContactAllowedValidator")
-        .def("__call__", &tesseract::common::ContactAllowedValidator::operator(), "link_name1"_a, "link_name2"_a);
+        .def("__call__", &tesseract::common::ContactAllowedValidator::operator(), "pair"_a);
 
     // Validator backed by an AllowedCollisionMatrix
     nb::class_<tesseract::common::ACMContactAllowedValidator, tesseract::common::ContactAllowedValidator>(
@@ -1147,16 +1211,17 @@ NB_MODULE(_tesseract_common, m) {
     auto collision_margin_pair_data = nb::class_<tesseract::common::CollisionMarginPairData>(m, "CollisionMarginPairData")
         .def(nb::init<>())
         .def(nb::init<const tesseract::common::PairsCollisionMarginData&>(), "pair_margins"_a)
-        .def("setCollisionMargin", &tesseract::common::CollisionMarginPairData::setCollisionMargin)
-        .def("getCollisionMargin", &tesseract::common::CollisionMarginPairData::getCollisionMargin)
+        .def("setCollisionMargin", &tesseract::common::CollisionMarginPairData::setCollisionMargin,
+             "link_id1"_a, "link_id2"_a, "margin"_a)
+        .def("getCollisionMargin", &tesseract::common::CollisionMarginPairData::getCollisionMargin, "pair"_a)
         .def("getCollisionMargins", &tesseract::common::CollisionMarginPairData::getCollisionMargins)
         .def("getMaxCollisionMargin",
              nb::overload_cast<>(&tesseract::common::CollisionMarginPairData::getMaxCollisionMargin, nb::const_),
              "Largest pair margin, or None when no pair margin is set.")
         .def("getMaxCollisionMargin",
-             nb::overload_cast<const std::string&>(&tesseract::common::CollisionMarginPairData::getMaxCollisionMargin,
-                                                   nb::const_),
-             "obj"_a, "Largest pair margin involving `obj`, or None when no pair involves it.")
+             nb::overload_cast<const LinkId&>(&tesseract::common::CollisionMarginPairData::getMaxCollisionMargin,
+                                              nb::const_),
+             "obj_id"_a, "Largest pair margin involving `obj_id`, or None when no pair involves it.")
         .def("incrementMargins", &tesseract::common::CollisionMarginPairData::incrementMargins, "increment"_a)
         .def("scaleMargins", &tesseract::common::CollisionMarginPairData::scaleMargins, "scale"_a)
         .def("apply", &tesseract::common::CollisionMarginPairData::apply, "pair_margin_data"_a, "override_type"_a)
@@ -1172,14 +1237,20 @@ NB_MODULE(_tesseract_common, m) {
         .def(nb::init<tesseract::common::CollisionMarginPairData>(), "pair_collision_margins"_a)
         .def("getDefaultCollisionMargin", &tesseract::common::CollisionMarginData::getDefaultCollisionMargin)
         .def("setDefaultCollisionMargin", &tesseract::common::CollisionMarginData::setDefaultCollisionMargin)
-        .def("getCollisionMargin", &tesseract::common::CollisionMarginData::getCollisionMargin)
-        .def("setCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin)
+        .def("getCollisionMargin",
+             nb::overload_cast<const LinkId&, const LinkId&>(&tesseract::common::CollisionMarginData::getCollisionMargin, nb::const_),
+             "link_id1"_a, "link_id2"_a)
+        .def("getCollisionMargin",
+             nb::overload_cast<const LinkIdPair&>(&tesseract::common::CollisionMarginData::getCollisionMargin, nb::const_),
+             "pair"_a)
+        .def("setCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin,
+             "link_id1"_a, "link_id2"_a, "collision_margin"_a)
         .def("getCollisionMarginPairData", &tesseract::common::CollisionMarginData::getCollisionMarginPairData)
         .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract::common::CollisionMarginData::getMaxCollisionMargin, nb::const_))
         .def("getMaxCollisionMargin",
-             nb::overload_cast<const std::string&>(&tesseract::common::CollisionMarginData::getMaxCollisionMargin,
+             nb::overload_cast<const LinkId&>(&tesseract::common::CollisionMarginData::getMaxCollisionMargin,
                                                    nb::const_),
-             "obj"_a, "Largest margin involving `obj`: its largest pair margin or the default, whichever is larger.")
+             "obj_id"_a, "Largest margin involving `obj_id`: its largest pair margin or the default, whichever is larger.")
         .def("incrementMargins", &tesseract::common::CollisionMarginData::incrementMargins, "increment"_a)
         .def("scaleMargins", &tesseract::common::CollisionMarginData::scaleMargins, "scale"_a)
         .def("apply", &tesseract::common::CollisionMarginData::apply, "pair_margin_data"_a, "override_type"_a);

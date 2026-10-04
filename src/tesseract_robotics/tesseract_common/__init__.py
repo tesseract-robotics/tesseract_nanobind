@@ -15,6 +15,10 @@ Z_AXIS.flags.writeable = False
 
 
 __all__ = [
+    # Identity types (upstream LinkId / JointId; str converts implicitly)
+    "LinkId",
+    "JointId",
+    "LinkIdPair",
     # Core types
     "ResourceLocator",
     "Resource",
