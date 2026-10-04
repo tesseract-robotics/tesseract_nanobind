@@ -61,3 +61,11 @@ def test_continuous_manager_geometry_getters_declared():
     body = text.split("class ContinuousContactManager:", 1)[1].split("\nclass ", 1)[0]
     assert "def getCollisionObjectGeometries(" in body
     assert "def getCollisionObjectGeometriesTransforms(" in body
+
+
+def test_executor_thread_default_is_machine_independent():
+    """`hardware_concurrency()` is evaluated at import; its value must not reach the stub."""
+    text = _mod.stub_path(
+        "tesseract_robotics.tesseract_task_composer._tesseract_task_composer"
+    ).read_text(encoding="utf-8")
+    assert "name: str = 'TaskflowExecutor', num_threads: int = ...)" in text

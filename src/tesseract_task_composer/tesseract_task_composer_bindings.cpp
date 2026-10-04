@@ -281,7 +281,8 @@ NB_MODULE(_tesseract_task_composer, m) {
     // ========== TaskflowTaskComposerExecutor ==========
     nb::class_<tp::TaskflowTaskComposerExecutor, tp::TaskComposerExecutor>(m, "TaskflowTaskComposerExecutor")
         .def(nb::init<std::string, size_t>(), "name"_a = "TaskflowExecutor",
-             "num_threads"_a = std::thread::hardware_concurrency())
+             // sig("..."): the default is this machine's core count; keep it out of the stub
+             nb::arg("num_threads").sig("...") = std::thread::hardware_concurrency())
         .def(nb::init<size_t>(), "num_threads"_a)
         // Re-expose base class methods (public run is from TaskComposerExecutor)
         .def("getName", &tp::TaskflowTaskComposerExecutor::getName)
