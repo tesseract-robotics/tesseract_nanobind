@@ -23,7 +23,7 @@ def get_environment():
     manip_info.manipulator = "manipulator"
     manip_info.tcp_frame = "tool0"
     manip_info.working_frame = "base_link"
-    joint_names = list(env.getJointGroup("manipulator").getJointNames())
+    joint_names = list(env.getJointGroup("manipulator").getJointIds())
 
     # Return locator to keep it alive (prevent segfault on gc)
     return env, manip_info, joint_names, locator
@@ -51,7 +51,7 @@ def test_kinematic_group():
 
     ik = KinGroupIKInput()
     ik.pose = pose
-    ik.tip_link_name = "tool0"
+    ik.tip_link_id = "tool0"
     ik.working_frame = "base_link"
     iks = KinGroupIKInputs()
     iks.append(ik)
@@ -101,7 +101,7 @@ def test_kinematic_group_lifetime_after_setstate():
     kin_group = env.getKinematicGroup(manip_info.manipulator)
 
     # Verify it works initially
-    base_link = kin_group.getBaseLinkName()
+    base_link = kin_group.getBaseLinkId()
     assert base_link == "base_link"
 
     # Call setState - this used to invalidate the kinematic group reference
@@ -109,7 +109,7 @@ def test_kinematic_group_lifetime_after_setstate():
     env.setState(joint_names, test_joints)
 
     # This used to segfault before the fix
-    base_link_after = kin_group.getBaseLinkName()
+    base_link_after = kin_group.getBaseLinkId()
     assert base_link_after == "base_link"
 
     # FK should still work too
@@ -173,7 +173,7 @@ def test_kinematic_group_single_ik_input():
     # Create single IK input (not collection)
     ik_input = KinGroupIKInput()
     ik_input.pose = target_pose
-    ik_input.tip_link_name = manip_info.tcp_frame
+    ik_input.tip_link_id = manip_info.tcp_frame
     ik_input.working_frame = manip_info.working_frame
 
     # Solve with single input - this is the API tesseract_qt_py uses

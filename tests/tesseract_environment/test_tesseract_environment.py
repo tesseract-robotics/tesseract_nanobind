@@ -249,8 +249,8 @@ def test_apply_command_releases_gil_and_still_calls_back():
 
     joint = Joint("gil_joint")
     joint.type = JointType.FIXED
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = "gil_link"
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = "gil_link"
 
     env = get_environment()
     # warm the caches so applyCommand builds the collision shape - the work the release is for -
@@ -263,7 +263,7 @@ def test_apply_command_releases_gil_and_still_calls_back():
     env.addEventCallback(1, cb)
 
     assert env.applyCommand(tesseract_environment.AddLinkCommand(link, joint))
-    assert "gil_link" in env.getLinkNames()
+    assert "gil_link" in env.getLinkIds()
     # the callback re-entered the interpreter from the GIL-released region
     assert events
 
@@ -289,6 +289,6 @@ def test_clone_releases_gil():
 
     clone = env.clone()
 
-    assert len(clone.getLinkNames()) == len(env.getLinkNames())
+    assert len(clone.getLinkIds()) == len(env.getLinkIds())
     assert probe.copies_without_gil >= 1, "clone() never copied the probe"
     assert probe.copies_with_gil == 0, "clone() copied the probe with the GIL held"

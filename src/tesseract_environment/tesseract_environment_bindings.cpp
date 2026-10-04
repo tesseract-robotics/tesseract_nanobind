@@ -72,14 +72,14 @@ namespace {
 // traceback. The binding owns the Python boundary, so validate here and fail
 // loud (std::invalid_argument -> ValueError). Valid targets are the ACTIVE
 // joints: fixed/mimic joints aren't in the solver's map and crash identically.
-void validate_set_state_joint_names(const te::Environment& env, const std::vector<std::string>& names)
+void validate_set_state_joint_names(const te::Environment& env, const std::vector<tc::JointId>& ids)
 {
-    const std::vector<std::string> active = env.getActiveJointNames();
+    const std::vector<tc::JointId> active = env.getActiveJointIds();
     std::string unknown;
-    for (const auto& name : names) {
-        if (std::find(active.begin(), active.end(), name) == active.end()) {
+    for (const auto& id : ids) {
+        if (std::find(active.begin(), active.end(), id) == active.end()) {
             if (!unknown.empty()) unknown += ", ";
-            unknown += name;
+            unknown += id.name();
         }
     }
     if (!unknown.empty())
@@ -87,7 +87,7 @@ void validate_set_state_joint_names(const te::Environment& env, const std::vecto
 }
 
 void validate_set_state(const te::Environment& env,
-                        const std::vector<std::string>& names,
+                        const std::vector<tc::JointId>& names,
                         const Eigen::Ref<const Eigen::VectorXd>& values)
 {
     if (static_cast<Eigen::Index>(names.size()) != values.size())
@@ -195,7 +195,7 @@ NB_MODULE(_tesseract_environment, m) {
     // ========== RemoveJointCommand ==========
     nb::class_<te::RemoveJointCommand, te::Command>(m, "RemoveJointCommand")
         .def(nb::init<std::string>(), "joint_name"_a)
-        .def("getJointName", &te::RemoveJointCommand::getJointName);
+        .def("getJointId", &te::RemoveJointCommand::getJointId);
 
     // ========== AddLinkCommand ==========
     nb::class_<te::AddLinkCommand, te::Command>(m, "AddLinkCommand")
@@ -209,7 +209,7 @@ NB_MODULE(_tesseract_environment, m) {
     // ========== RemoveLinkCommand ==========
     nb::class_<te::RemoveLinkCommand, te::Command>(m, "RemoveLinkCommand")
         .def(nb::init<std::string>(), "link_name"_a)
-        .def("getLinkName", &te::RemoveLinkCommand::getLinkName);
+        .def("getLinkId", &te::RemoveLinkCommand::getLinkId);
 
     // ========== AddSceneGraphCommand ==========
     nb::class_<te::AddSceneGraphCommand, te::Command>(m, "AddSceneGraphCommand")
@@ -249,24 +249,24 @@ NB_MODULE(_tesseract_environment, m) {
     // ========== RemoveAllowedCollisionLinkCommand ==========
     nb::class_<te::RemoveAllowedCollisionLinkCommand, te::Command>(m, "RemoveAllowedCollisionLinkCommand")
         .def(nb::init<std::string>(), "link_name"_a)
-        .def("getLinkName", &te::RemoveAllowedCollisionLinkCommand::getLinkName);
+        .def("getLinkId", &te::RemoveAllowedCollisionLinkCommand::getLinkId);
 
     // ========== ChangeJointPositionLimitsCommand ==========
     nb::class_<te::ChangeJointPositionLimitsCommand, te::Command>(m, "ChangeJointPositionLimitsCommand")
-        .def(nb::init<std::string, double, double>(), "joint_name"_a, "lower"_a, "upper"_a)
-        .def(nb::init<std::unordered_map<std::string, std::pair<double, double>>>(), "limits"_a)
+        .def(nb::init<tc::JointId, double, double>(), "joint_id"_a, "lower"_a, "upper"_a)
+        .def(nb::init<std::unordered_map<tc::JointId, std::pair<double, double>>>(), "limits"_a)
         .def("getLimits", &te::ChangeJointPositionLimitsCommand::getLimits);
 
     // ========== ChangeJointVelocityLimitsCommand ==========
     nb::class_<te::ChangeJointVelocityLimitsCommand, te::Command>(m, "ChangeJointVelocityLimitsCommand")
-        .def(nb::init<std::string, double>(), "joint_name"_a, "limit"_a)
-        .def(nb::init<std::unordered_map<std::string, double>>(), "limits"_a)
+        .def(nb::init<tc::JointId, double>(), "joint_id"_a, "limit"_a)
+        .def(nb::init<std::unordered_map<tc::JointId, double>>(), "limits"_a)
         .def("getLimits", &te::ChangeJointVelocityLimitsCommand::getLimits);
 
     // ========== ChangeJointAccelerationLimitsCommand ==========
     nb::class_<te::ChangeJointAccelerationLimitsCommand, te::Command>(m, "ChangeJointAccelerationLimitsCommand")
-        .def(nb::init<std::string, double>(), "joint_name"_a, "limit"_a)
-        .def(nb::init<std::unordered_map<std::string, double>>(), "limits"_a)
+        .def(nb::init<tc::JointId, double>(), "joint_id"_a, "limit"_a)
+        .def(nb::init<std::unordered_map<tc::JointId, double>>(), "limits"_a)
         .def("getLimits", &te::ChangeJointAccelerationLimitsCommand::getLimits);
 
     // ========== ChangeCollisionMarginsCommand ==========
@@ -282,31 +282,31 @@ NB_MODULE(_tesseract_environment, m) {
     // ========== ChangeLinkCollisionEnabledCommand ==========
     nb::class_<te::ChangeLinkCollisionEnabledCommand, te::Command>(m, "ChangeLinkCollisionEnabledCommand")
         .def(nb::init<std::string, bool>(), "link_name"_a, "enabled"_a)
-        .def("getLinkName", &te::ChangeLinkCollisionEnabledCommand::getLinkName)
+        .def("getLinkId", &te::ChangeLinkCollisionEnabledCommand::getLinkId)
         .def("getEnabled", &te::ChangeLinkCollisionEnabledCommand::getEnabled);
 
     // ========== ChangeLinkVisibilityCommand ==========
     nb::class_<te::ChangeLinkVisibilityCommand, te::Command>(m, "ChangeLinkVisibilityCommand")
         .def(nb::init<std::string, bool>(), "link_name"_a, "visible"_a)
-        .def("getLinkName", &te::ChangeLinkVisibilityCommand::getLinkName)
+        .def("getLinkId", &te::ChangeLinkVisibilityCommand::getLinkId)
         .def("getEnabled", &te::ChangeLinkVisibilityCommand::getEnabled);
 
     // ========== ChangeJointOriginCommand ==========
     nb::class_<te::ChangeJointOriginCommand, te::Command>(m, "ChangeJointOriginCommand")
         .def(nb::init<std::string, const Eigen::Isometry3d&>(), "joint_name"_a, "origin"_a)
-        .def("getJointName", &te::ChangeJointOriginCommand::getJointName)
+        .def("getJointId", &te::ChangeJointOriginCommand::getJointId)
         .def("getOrigin", &te::ChangeJointOriginCommand::getOrigin);
 
     // ========== ChangeLinkOriginCommand ==========
     nb::class_<te::ChangeLinkOriginCommand, te::Command>(m, "ChangeLinkOriginCommand")
         .def(nb::init<std::string, const Eigen::Isometry3d&>(), "link_name"_a, "origin"_a)
-        .def("getLinkName", &te::ChangeLinkOriginCommand::getLinkName)
+        .def("getLinkId", &te::ChangeLinkOriginCommand::getLinkId)
         .def("getOrigin", &te::ChangeLinkOriginCommand::getOrigin);
 
     // ========== MoveJointCommand ==========
     nb::class_<te::MoveJointCommand, te::Command>(m, "MoveJointCommand")
         .def(nb::init<std::string, std::string>(), "joint_name"_a, "parent_link"_a)
-        .def("getJointName", &te::MoveJointCommand::getJointName)
+        .def("getJointId", &te::MoveJointCommand::getJointId)
         .def("getParentLink", &te::MoveJointCommand::getParentLink);
 
     // ========== MoveLinkCommand ==========
@@ -373,35 +373,35 @@ NB_MODULE(_tesseract_environment, m) {
             return self.getState();
         })
         .def("getStateByMap", [](const te::Environment& self,
-                                  const std::unordered_map<std::string, double>& joints) {
+                                  const tsg::SceneState::JointValues& joints) {
             return self.getState(joints);
         }, "joints"_a)
         .def("getStateByNamesAndValues", [](const te::Environment& self,
-                                             const std::vector<std::string>& joint_names,
+                                             const std::vector<tc::JointId>& joint_ids,
                                              const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            return self.getState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a, nb::call_guard<nb::gil_scoped_release>())
+            return self.getState(joint_ids, joint_values);
+        }, "joint_ids"_a, "joint_values"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("setState", [](te::Environment& self,
-                            const std::unordered_map<std::string, double>& joints) {
-            std::vector<std::string> names;
-            names.reserve(joints.size());
-            for (const auto& kv : joints) names.push_back(kv.first);
-            validate_set_state_joint_names(self, names);  // GH #43
+                            const tsg::SceneState::JointValues& joints) {
+            std::vector<tc::JointId> ids;
+            ids.reserve(joints.size());
+            for (const auto& kv : joints) ids.push_back(kv.first);
+            validate_set_state_joint_names(self, ids);  // GH #43
             self.setState(joints);
         }, "joints"_a)
         .def("setStateByNamesAndValues", [](te::Environment& self,
-                                             const std::vector<std::string>& joint_names,
+                                             const std::vector<tc::JointId>& joint_ids,
                                              const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            validate_set_state(self, joint_names, joint_values);  // GH #43
-            self.setState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
+            validate_set_state(self, joint_ids, joint_values);  // GH #43
+            self.setState(joint_ids, joint_values);
+        }, "joint_ids"_a, "joint_values"_a)
         // setState with (names, values) - SWIG compatibility
         .def("setState", [](te::Environment& self,
-                            const std::vector<std::string>& joint_names,
+                            const std::vector<tc::JointId>& joint_ids,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            validate_set_state(self, joint_names, joint_values);  // GH #43
-            self.setState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
+            validate_set_state(self, joint_ids, joint_values);  // GH #43
+            self.setState(joint_ids, joint_values);
+        }, "joint_ids"_a, "joint_values"_a)
         // Event callbacks
         .def("addEventCallback", [](te::Environment& self, std::size_t hash, const PyEventCallbackFn& fn) {
             self.addEventCallback(hash, fn);
@@ -410,7 +410,7 @@ NB_MODULE(_tesseract_environment, m) {
         .def("clearEventCallbacks", &te::Environment::clearEventCallbacks)
         // Commands - RemoveJointCommand
         .def("applyCommand", [](te::Environment& self, const te::RemoveJointCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::RemoveJointCommand>(cmd.getJointName());
+            auto cmd_ptr = std::make_shared<te::RemoveJointCommand>(cmd.getJointId());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - AddLinkCommand
@@ -433,7 +433,7 @@ NB_MODULE(_tesseract_environment, m) {
         }, "command"_a)
         // Commands - RemoveLinkCommand
         .def("applyCommand", [](te::Environment& self, const te::RemoveLinkCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::RemoveLinkCommand>(cmd.getLinkName());
+            auto cmd_ptr = std::make_shared<te::RemoveLinkCommand>(cmd.getLinkId());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - AddSceneGraphCommand
@@ -459,7 +459,7 @@ NB_MODULE(_tesseract_environment, m) {
         }, "command"_a)
         // Commands - RemoveAllowedCollisionLinkCommand
         .def("applyCommand", [](te::Environment& self, const te::RemoveAllowedCollisionLinkCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::RemoveAllowedCollisionLinkCommand>(cmd.getLinkName());
+            auto cmd_ptr = std::make_shared<te::RemoveAllowedCollisionLinkCommand>(cmd.getLinkId());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ChangeJointPositionLimitsCommand
@@ -494,27 +494,27 @@ NB_MODULE(_tesseract_environment, m) {
         }, "command"_a)
         // Commands - ChangeLinkCollisionEnabledCommand
         .def("applyCommand", [](te::Environment& self, const te::ChangeLinkCollisionEnabledCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeLinkCollisionEnabledCommand>(cmd.getLinkName(), cmd.getEnabled());
+            auto cmd_ptr = std::make_shared<te::ChangeLinkCollisionEnabledCommand>(cmd.getLinkId(), cmd.getEnabled());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ChangeLinkVisibilityCommand
         .def("applyCommand", [](te::Environment& self, const te::ChangeLinkVisibilityCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeLinkVisibilityCommand>(cmd.getLinkName(), cmd.getEnabled());
+            auto cmd_ptr = std::make_shared<te::ChangeLinkVisibilityCommand>(cmd.getLinkId(), cmd.getEnabled());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ChangeJointOriginCommand
         .def("applyCommand", [](te::Environment& self, const te::ChangeJointOriginCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeJointOriginCommand>(cmd.getJointName(), cmd.getOrigin());
+            auto cmd_ptr = std::make_shared<te::ChangeJointOriginCommand>(cmd.getJointId(), cmd.getOrigin());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ChangeLinkOriginCommand
         .def("applyCommand", [](te::Environment& self, const te::ChangeLinkOriginCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::ChangeLinkOriginCommand>(cmd.getLinkName(), cmd.getOrigin());
+            auto cmd_ptr = std::make_shared<te::ChangeLinkOriginCommand>(cmd.getLinkId(), cmd.getOrigin());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - MoveJointCommand
         .def("applyCommand", [](te::Environment& self, const te::MoveJointCommand& cmd) {
-            auto cmd_ptr = std::make_shared<te::MoveJointCommand>(cmd.getJointName(), cmd.getParentLink());
+            auto cmd_ptr = std::make_shared<te::MoveJointCommand>(cmd.getJointId(), cmd.getParentLink());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - MoveLinkCommand
@@ -532,41 +532,41 @@ NB_MODULE(_tesseract_environment, m) {
             return self.getStateSolver();
         })
         // Joint/Link info
-        .def("getJointNames", &te::Environment::getJointNames)
-        .def("getActiveJointNames", &te::Environment::getActiveJointNames)
-        .def("getLinkNames", &te::Environment::getLinkNames)
-        .def("getActiveLinkNames", [](const te::Environment& self) {
-            return self.getActiveLinkNames();
+        .def("getJointIds", &te::Environment::getJointIds)
+        .def("getActiveJointIds", &te::Environment::getActiveJointIds)
+        .def("getLinkIds", &te::Environment::getLinkIds)
+        .def("getActiveLinkIds", [](const te::Environment& self) {
+            return self.getActiveLinkIds();
         })
-        .def("getStaticLinkNames", [](const te::Environment& self) {
-            return self.getStaticLinkNames();
+        .def("getStaticLinkIds", [](const te::Environment& self) {
+            return self.getStaticLinkIds();
         })
-        .def("getRootLinkName", &te::Environment::getRootLinkName)
+        .def("getRootLinkId", &te::Environment::getRootLinkId)
         .def("getCurrentJointValues", [](const te::Environment& self) {
             return self.getCurrentJointValues();
         })
         .def("getCurrentJointValuesByNames", [](const te::Environment& self,
-                                                 const std::vector<std::string>& joint_names) {
-            return self.getCurrentJointValues(joint_names);
-        }, "joint_names"_a)
+                                                 const std::vector<tc::JointId>& joint_ids) {
+            return self.getCurrentJointValues(joint_ids);
+        }, "joint_ids"_a)
         // Transforms
-        .def("getLinkTransform", &te::Environment::getLinkTransform, "link_name"_a)
+        .def("getLinkTransform", &te::Environment::getLinkTransform, "link_id"_a)
         .def("getRelativeLinkTransform", &te::Environment::getRelativeLinkTransform,
-             "from_link_name"_a, "to_link_name"_a)
+             "from_link_id"_a, "to_link_id"_a)
         // Link/Joint access - dereference shared_ptr for cross-module compatibility
-        .def("getLink", [](const te::Environment& self, const std::string& name) -> const tsg::Link& {
+        .def("getLink", [](const te::Environment& self, const tc::LinkId& name) -> const tsg::Link& {
             auto ptr = self.getLink(name);
-            if (!ptr) throw std::runtime_error("Link not found: " + name);
+            if (!ptr) throw std::runtime_error("Link not found: " + name.name());
             return *ptr;
         }, "name"_a, nb::rv_policy::reference_internal)
-        .def("getJoint", [](const te::Environment& self, const std::string& name) -> const tsg::Joint& {
+        .def("getJoint", [](const te::Environment& self, const tc::JointId& name) -> const tsg::Joint& {
             auto ptr = self.getJoint(name);
-            if (!ptr) throw std::runtime_error("Joint not found: " + name);
+            if (!ptr) throw std::runtime_error("Joint not found: " + name.name());
             return *ptr;
         }, "name"_a, nb::rv_policy::reference_internal)
         // Groups
         .def("getGroupNames", &te::Environment::getGroupNames)
-        .def("getGroupJointNames", &te::Environment::getGroupJointNames, "group_name"_a)
+        .def("getGroupJointIds", &te::Environment::getGroupJointIds, "group_name"_a)
         // Return unique_ptr directly - nanobind transfers ownership to Python
         // Previously returned a reference which became dangling when the unique_ptr
         // was destroyed at the end of the lambda, causing segfaults after setState()

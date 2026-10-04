@@ -187,4 +187,4 @@ def test_rop_solver_usable_after_factory_and_env_release():
     del factory, env, locator
     gc.collect()
     assert solver.numJoints() == 7
-    assert list(solver.getJointNames()) == _ROP_EXPECTED_JOINTS
+    assert list(solver.getJointIds()) == _ROP_EXPECTED_JOINTS

@@ -96,8 +96,8 @@ class TestAddLinkCommand:
         link = Link("test_link")
         joint = Joint("test_joint")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "world"
-        joint.child_link_name = "test_link"
+        joint.parent_link_id = "world"
+        joint.child_link_id = "test_link"
         cmd = AddLinkCommand(link, joint)
         assert cmd.getLink().getName() == "test_link"
         assert cmd.getJoint().getName() == "test_joint"
@@ -111,13 +111,13 @@ class TestAddLinkCommand:
 
         joint = Joint("new_joint")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "link1"
-        joint.child_link_name = "new_link"
+        joint.parent_link_id = "link1"
+        joint.child_link_id = "new_link"
 
         cmd = AddLinkCommand(link, joint)
-        assert "new_link" not in env.getLinkNames()
+        assert "new_link" not in env.getLinkIds()
         env.applyCommand(cmd)
-        assert "new_link" in env.getLinkNames()
+        assert "new_link" in env.getLinkIds()
 
 
 class TestRemoveLinkCommand:
@@ -125,22 +125,22 @@ class TestRemoveLinkCommand:
 
     def test_constructor(self):
         cmd = RemoveLinkCommand("test_link")
-        assert cmd.getLinkName() == "test_link"
+        assert cmd.getLinkId() == "test_link"
 
     def test_apply_command(self, env):
         # First add a link
         link = Link("temp_link")
         joint = Joint("temp_joint")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "link2"
-        joint.child_link_name = "temp_link"
+        joint.parent_link_id = "link2"
+        joint.child_link_id = "temp_link"
         env.applyCommand(AddLinkCommand(link, joint))
-        assert "temp_link" in env.getLinkNames()
+        assert "temp_link" in env.getLinkIds()
 
         # Then remove it
         cmd = RemoveLinkCommand("temp_link")
         env.applyCommand(cmd)
-        assert "temp_link" not in env.getLinkNames()
+        assert "temp_link" not in env.getLinkIds()
 
 
 class TestRemoveJointCommand:
@@ -148,7 +148,7 @@ class TestRemoveJointCommand:
 
     def test_constructor(self):
         cmd = RemoveJointCommand("test_joint")
-        assert cmd.getJointName() == "test_joint"
+        assert cmd.getJointId() == "test_joint"
 
 
 class TestChangeJointPositionLimitsCommand:
@@ -213,7 +213,7 @@ class TestChangeLinkCollisionEnabledCommand:
 
     def test_constructor(self):
         cmd = ChangeLinkCollisionEnabledCommand("link1", False)
-        assert cmd.getLinkName() == "link1"
+        assert cmd.getLinkId() == "link1"
         assert not cmd.getEnabled()
 
     def test_apply_command(self, env):
@@ -226,7 +226,7 @@ class TestChangeLinkVisibilityCommand:
 
     def test_constructor(self):
         cmd = ChangeLinkVisibilityCommand("link1", False)
-        assert cmd.getLinkName() == "link1"
+        assert cmd.getLinkId() == "link1"
         assert not cmd.getEnabled()
 
     def test_apply_command(self, env):
@@ -255,7 +255,7 @@ class TestRemoveAllowedCollisionLinkCommand:
 
     def test_constructor(self):
         cmd = RemoveAllowedCollisionLinkCommand("link1")
-        assert cmd.getLinkName() == "link1"
+        assert cmd.getLinkId() == "link1"
 
     def test_apply_command(self, env):
         cmd = RemoveAllowedCollisionLinkCommand("link1")
@@ -294,7 +294,7 @@ class TestChangeJointOriginCommand:
     def test_constructor(self):
         origin = Isometry3d.Identity()
         cmd = ChangeJointOriginCommand("joint1", origin)
-        assert cmd.getJointName() == "joint1"
+        assert cmd.getJointId() == "joint1"
 
     def test_apply_command(self, env):
         origin = Isometry3d.Identity()
@@ -308,7 +308,7 @@ class TestChangeLinkOriginCommand:
     def test_constructor(self):
         origin = Isometry3d.Identity()
         cmd = ChangeLinkOriginCommand("link1", origin)
-        assert cmd.getLinkName() == "link1"
+        assert cmd.getLinkId() == "link1"
 
     def test_apply_command_not_implemented(self, env):
         """ChangeLinkOriginCommand exists but Environment.applyCommand raises RuntimeError.
@@ -327,7 +327,7 @@ class TestMoveJointCommand:
 
     def test_constructor(self):
         cmd = MoveJointCommand("joint2", "world")
-        assert cmd.getJointName() == "joint2"
+        assert cmd.getJointId() == "joint2"
         assert cmd.getParentLink() == "world"
 
 
@@ -337,8 +337,8 @@ class TestMoveLinkCommand:
     def test_constructor(self):
         joint = Joint("move_joint")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "world"
-        joint.child_link_name = "link2"
+        joint.parent_link_id = "world"
+        joint.child_link_id = "link2"
         cmd = MoveLinkCommand(joint)
         assert cmd.getJoint().getName() == "move_joint"
 
@@ -349,15 +349,15 @@ class TestReplaceJointCommand:
     def test_constructor(self):
         joint = Joint("joint1")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "world"
-        joint.child_link_name = "link1"
+        joint.parent_link_id = "world"
+        joint.child_link_id = "link1"
         cmd = ReplaceJointCommand(joint)
         assert cmd.getJoint().getName() == "joint1"
 
     def test_apply_command(self, env):
         joint = Joint("joint1")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "world"
-        joint.child_link_name = "link1"
+        joint.parent_link_id = "world"
+        joint.child_link_id = "link1"
         cmd = ReplaceJointCommand(joint)
         env.applyCommand(cmd)
