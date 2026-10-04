@@ -177,6 +177,29 @@ The tolerance pair of `applyTolerances` and of the tolerance overloads of
 size (6 for the error diff); anything else raises `ToleranceSizeMismatchError`, a
 `ValueError`.
 
+## Ids
+
+Links and joints are addressed by id (upstream `IDENTITY_DESIGN.md`). An id is
+built from a name; anywhere an id is expected a `str` converts implicitly.
+
+```python
+from tesseract_robotics.tesseract_common import JointId, LinkId, LinkIdPair
+
+tool0 = LinkId("tool0")
+tool0.name()                 # "tool0"; str(tool0) is the same
+tool0 == "tool0"             # True: ids compare equal to their name
+{tool0: 1}["tool0"]          # 1: hash(id) == hash(name), so str keys find id-keyed entries
+LinkIdPair("a", "b").orderedNameView()   # ("a", "b"), alphabetical
+```
+
+Id-keyed results (`SceneState.link_transforms`, `calcFwdKin`) are plain
+`dict[LinkId, ...]`. `LinkId` and `JointId` do not convert into each other.
+
+!!! note "Type checkers"
+    The stubs accept `LinkId | str` wherever a parameter takes an id. Looking up an
+    id-keyed dict with a literal `str` (`transforms["tool0"]`) works at runtime but
+    is flagged by type checkers; use `transforms[LinkId("tool0")]` to keep them quiet.
+
 ## Resource Locators
 
 ### GeneralResourceLocator
@@ -247,7 +270,7 @@ acm = AllowedCollisionMatrix()
 acm.addAllowedCollision("link_1", "link_2", "Adjacent links")
 
 # Check if allowed
-is_allowed = acm.isCollisionAllowed("link_1", "link_2")
+is_allowed = acm.isCollisionAllowed(("link_1", "link_2"))
 
 # Remove entry
 acm.removeAllowedCollision("link_1", "link_2")
@@ -327,7 +350,7 @@ Joint positions and velocities.
 from tesseract_robotics.tesseract_common import JointState
 
 state = JointState()
-state.joint_names = ["j1", "j2", "j3"]
+state.joint_ids = ["j1", "j2", "j3"]
 state.position = np.array([0.0, 0.5, -0.5])
 state.velocity = np.array([0.0, 0.0, 0.0])
 ```
@@ -483,75 +506,35 @@ unequal.
 
 ## Logging
 
-Control console_bridge logging level.
+Tesseract logs through spdlog (upstream #1367). The default logger is named
+`"tesseract"`; its level controls tesseract's console output.
 
 ```python
 from tesseract_robotics.tesseract_common import (
-    getLogLevel, setLogLevel,
-    LogLevel,
+    LoggerLevel, addLogRecordHandler, getLogger, isLogLevelEnabled, removeLogRecordHandler,
 )
 
-# Suppress warnings
-setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
+logger = getLogger()                 # getLogger("tesseract")
+logger.set_level(LoggerLevel.err)    # suppress warnings
+logger.set_level(LoggerLevel.debug)  # enable debug output
+assert isLogLevelEnabled(LoggerLevel.debug)
 
-# Enable debug output
-setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
-```
-
-### Python output handlers
-
-A subclass of `OutputHandler` installed with `useOutputHandler` gets its messages asynchronously,
-on a delivery thread, in the order they were logged, from every thread, including the one
-holding the GIL. It is never called inside console_bridge's output lock. Called there, a Python
-handler that gave the GIL away mid-call deadlocked against any thread that logged while holding
-the GIL, such as an executor worker against a failing `createTaskComposerNode`.
-
-- `flushOutputHandlers()` waits until the handlers have received everything logged so far.
-  Called from inside a handler, it returns at once. Don't call it from code that a handler waits
-  for: the handler blocks it. Where the bindings know a handler may be waiting for the calling
-  thread, it raises `OutputHandlerFlushForbiddenError` (a `RuntimeError`) instead of waiting:
-  inside a `TaskComposerServer` reload (`loadConfig`, `addTask`, `addExecutor`, for example from
-  a `ResourceLocator`), since a handler that calls that server waits for the reload.
-- `useOutputHandler` and `restorePreviousOutputHandler` don't wait. Each queued message goes to
-  the handler that was installed when it was logged.
-- The handler stays alive while console_bridge can call it: until it is replaced, or restored
-  away from.
-- The queue holds up to 10 000 messages. Beyond that, messages are dropped, and the handler whose
-  messages were dropped later gets a warning naming how many, even if it was uninstalled
-  meanwhile. A logger never waits for the queue.
-- A handler that raises is reported through `sys.unraisablehook`, and delivery goes on.
-- In a forked child, delivery starts again on the first message, also when a handler forked. The
-  parent's queued messages stay with the parent. A child forked inside a handler ends once the
-  handler has returned and the child's other threads have ended; the delivery thread does not keep
-  it alive. The thread that forked is the child's main thread: its Python thread state stays when
-  it ends (on CPython 3.12 the child aborted once its threads had all ended and another started),
-  so in the child `threading.main_thread().is_alive()` stays true. Windows has no `fork`.
-- At interpreter exit, queued messages are delivered for up to 2 s in all (the task composer's
-  exit hook, which waits for runs in flight, spends the same 2 s). Then every message no handler
-  has received goes to stderr, with a line for each handler's unreported drops, and so does
-  anything logged later. A handler that never returns does not hold up exit, nor crash it; the
-  message it is handling is not repeated.
-- A message C++ logged without a file reaches the handler with `filename` set to `None`.
-
-```python
-from tesseract_robotics.tesseract_common import (
-    OutputHandler, flushOutputHandlers, restorePreviousOutputHandler, useOutputHandler,
-)
-
-class Collect(OutputHandler):
-    def __init__(self):
-        super().__init__()
-        self.texts = []
-
-    def log(self, text, level, filename, line):
-        self.texts.append(text)  # on the delivery thread
-
-handler = Collect()
-useOutputHandler(handler)
+# Route records into Python (any thread; the handler runs with the GIL held)
+records = []
+handler_id = addLogRecordHandler(records.append)
 ...
-flushOutputHandlers()  # handler.texts now holds everything logged so far
-restorePreviousOutputHandler()
+removeLogRecordHandler(handler_id)
 ```
+
+A `LogRecord` carries `level`, `message`, `logger_name`, `component_name`,
+`attributes`, `timestamp`, `filename`, `line` and `function_name`. An exception
+raised by a handler is reported through `sys.unraisablehook`.
+
+!!! warning "console_bridge API no longer reaches tesseract"
+    `setLogLevel`, `getLogLevel`, `useOutputHandler`, `OutputHandler`, `log` and
+    the `CONSOLE_BRIDGE_LOG_*` constants are still importable, but upstream
+    tesseract no longer logs through console_bridge: they have no effect on its
+    output.
 
 ## Container Types
 

@@ -15,7 +15,7 @@ from tesseract_robotics.tesseract_kinematics import KinematicGroup
 manip = env.getKinematicGroup("manipulator")
 
 # Joint information
-joint_names = manip.getJointNames()
+joint_names = manip.getJointIds()
 n_joints = len(joint_names)
 
 # Limits

@@ -144,7 +144,7 @@ result_vector = ContactResultVector()
 result_map.flattenMoveResults(result_vector)   # or flattenCopyResults()
 
 for contact in result_vector:
-    print(f"Contact: {contact.link_names[0]} <-> {contact.link_names[1]}")
+    print(f"Contact: {contact.link_ids[0]} <-> {contact.link_ids[1]}")
     print(f"  Distance: {contact.distance}")
     print(f"  Point A: {contact.nearest_points[0]}")
     print(f"  Point B: {contact.nearest_points[1]}")
@@ -154,7 +154,7 @@ for contact in result_vector:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `distance` | `float` | Signed distance (negative = penetration) |
-| `link_names` | `list[str]` (2) | Colliding link names |
+| `link_ids` | `list[LinkId]` (2) | Colliding links (`str(link_id)` is the link name) |
 | `type_id` | `list[int]` (2) | Collision object type ids |
 | `shape_id` | `list[int]` (2) | Shape index within each link (`-1` if unset) |
 | `subshape_id` | `list[int]` (2) | Sub-shape index within each shape (`-1` if unset) |
@@ -221,7 +221,7 @@ all_contacts = ContactResultVector()
 result_map.flattenMoveResults(all_contacts)   # or flattenCopyResults to keep map data
 
 for contact in all_contacts:
-    print(contact.distance, contact.link_names)
+    print(contact.distance, contact.link_ids)
 ```
 
 ## Configuration
@@ -353,7 +353,7 @@ if not results.empty():
     results.flattenMoveResults(contacts)
     for c in contacts:
         if c.distance < 0:
-            print(f"Penetration: {c.link_names} depth={-c.distance:.4f}")
+            print(f"Penetration: {c.link_ids} depth={-c.distance:.4f}")
 ```
 
 ## Auto-generated API Reference
