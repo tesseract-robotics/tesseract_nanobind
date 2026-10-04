@@ -256,9 +256,14 @@ build-feedstock-trajopt = { cmd = "git checkout -- .ci_support && python build-l
 build-feedstock-planning = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-planning-feedstock", env = { EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
     "build-feedstock-trajopt",
 ], description = "Build the tesseract_planning feedstock (dev branch) against the local tesseract + trajopt" }
-build-feedstock = { depends-on = [
+# rattler-build indexes packaging/output after every build with a rattler-index
+# >=0.31, whose `repodata_revisions` map pixi 0.70.1 (the pinned CI version) can't
+# parse ("invalid type: map, expected a sequence"). Re-index with 0.30.x, the last
+# format it reads, after the last feedstock build.
+index-feedstock-channel = { cmd = "pixi exec --spec 'rattler-index==0.30.11' rattler-index fs --force packaging/output", description = "Re-index packaging/output in the repodata format pixi 0.70.1 reads" }
+build-feedstock = { cmd = "pixi run index-feedstock-channel", depends-on = [
     "build-feedstock-planning",
-], description = "Build the upstream-main C++ stack from the packaging/ feedstocks, then the bindings against it" }
+], description = "Build the upstream-main C++ stack from the packaging/ feedstocks, then index them as a local channel" }
 
 [tool.pixi.target.osx-arm64.activation.env]
 FEEDSTOCK_CONFIG = "osx_arm64_"
@@ -307,14 +312,13 @@ setuptools-scm = ">=8"
 [tool.pixi.feature.py39.target.osx-arm64.tasks]
 build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build portable cp39 macOS wheel against TESSERACT_CPP_PREFIX" }
 
-# Inner loop for upstream main: the upstream/ submodules are compiled incrementally
-# (scripts/build_upstream.sh) and installed into this env's prefix, so the env carries
-# only their third-party deps — the union of the feedstock recipes' host sections —
-# and no tesseract packages. Built with conda's compilers, as the feedstocks are.
-[tool.pixi.feature.upstream]
+# Tooling to build and test the bindings against a 0.36 C++ stack, shared by the
+# upstream (source-built) and packaged (feedstock-built) envs. Built with conda's
+# compilers, as the feedstocks are.
+[tool.pixi.feature.bindings-dev]
 platforms = ["osx-arm64", "linux-64"]
 
-[tool.pixi.feature.upstream.dependencies]
+[tool.pixi.feature.bindings-dev.dependencies]
 python = "3.12.*"
 cmake = ">=3.15,<4"
 ninja = "*"
@@ -329,6 +333,32 @@ scikit-build-core = ">=0.10,<1"
 nanobind = ">=1.3.2,<3"
 pytest = ">=7.0"
 pytest-xdist = ">=3.0"
+
+# Compilers as in the feedstocks' .ci_support (compiler('c') / compiler('cxx')): these
+# activation packages export CC/CXX, CXXFLAGS and CMAKE_ARGS, which the
+# c-compiler 2.x metapackage no longer pulls in.
+[tool.pixi.feature.bindings-dev.target.osx-arm64.dependencies]
+clang_osx-arm64 = "19.*"
+clangxx_osx-arm64 = "19.*"
+
+[tool.pixi.feature.bindings-dev.target.linux-64.dependencies]
+gcc_linux-64 = "14.*"
+gxx_linux-64 = "14.*"
+
+[tool.pixi.feature.bindings-dev.pypi-dependencies]
+numpy = ">=1.21.0"
+loguru = ">=0.7.0"
+scipy = ">=1.7.0"
+pyyaml = "*"
+
+# Inner loop for upstream main: the upstream/ submodules are compiled incrementally
+# (scripts/build_upstream.sh) and installed into this env's prefix, so the env carries
+# only their third-party deps — the union of the feedstock recipes' host sections —
+# and no tesseract packages.
+[tool.pixi.feature.upstream]
+platforms = ["osx-arm64", "linux-64"]
+
+[tool.pixi.feature.upstream.dependencies]
 # third-party C++ deps (versions as pinned in the feedstocks' conda_build_config / .ci_support)
 libboost-devel = "1.88.*"
 eigen-abi-devel = "5.0.1.*"
@@ -361,23 +391,6 @@ descartes-light = "*"
 libruckig = "*"
 llvm-openmp = "*"
 
-# Compilers as in the feedstocks' .ci_support (compiler('c') / compiler('cxx')): these
-# activation packages export CC/CXX, CXXFLAGS and CMAKE_ARGS, which the
-# c-compiler 2.x metapackage no longer pulls in.
-[tool.pixi.feature.upstream.target.osx-arm64.dependencies]
-clang_osx-arm64 = "19.*"
-clangxx_osx-arm64 = "19.*"
-
-[tool.pixi.feature.upstream.target.linux-64.dependencies]
-gcc_linux-64 = "14.*"
-gxx_linux-64 = "14.*"
-
-[tool.pixi.feature.upstream.pypi-dependencies]
-numpy = ">=1.21.0"
-loguru = ">=0.7.0"
-scipy = ">=1.7.0"
-pyyaml = "*"
-
 [tool.pixi.feature.upstream.tasks]
 build-upstream-cpp = { cmd = "bash scripts/build_upstream.sh", description = "Incrementally build the upstream/ C++ submodules into the upstream env" }
 build-upstream = { cmd = "pip install -e . --no-build-isolation", env = { SKBUILD_BUILD_DIR = "build/upstream-{wheel_tag}" }, depends-on = [
@@ -387,9 +400,33 @@ test-upstream = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q 
     "build-upstream",
 ], description = "Run the test suite against the upstream-main build" }
 
+# The 0.36 dev packages from `pixi run build-feedstock`, consumed from packaging/output
+# as a local channel ahead of tesseract-robotics / conda-forge. This is the publish
+# gate of tesseract_nanobind#162; the local channel is later swapped for
+# tesseract-robotics/label/dev. Local channels need a ./ prefix: a bare name is an
+# anaconda.org channel. Run `pixi run index-feedstock-channel` before solving.
+[tool.pixi.feature.packaged]
+platforms = ["osx-arm64"]
+channels = [{ channel = "./packaging/output", priority = 10 }]
+
+[tool.pixi.feature.packaged.dependencies]
+tesseract-robotics = "==0.36.0.dev20260929"
+tesseract-robotics-planning = "==0.36.0.dev20260929"
+trajopt = "==0.36.0.dev20260930"
+# header-only, no run_exports, run dep unpinned in the planning recipe: match the
+# taskflow tesseract-robotics-planning was built with (its rendered_recipe.yaml)
+taskflow = "3.11.*"
+
+[tool.pixi.feature.packaged.tasks]
+build-packaged = { cmd = "pip install -e . --no-build-isolation", env = { SKBUILD_BUILD_DIR = "build/packaged-{wheel_tag}" }, description = "Build the bindings against the packaged 0.36 dev stack" }
+test-packaged = { cmd = "python -m pytest tests --ignore=tests/benchmarks -q -n auto", depends-on = [
+    "build-packaged",
+], description = "Run the test suite against the packaged 0.36 dev stack" }
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
-upstream = { features = ["upstream"], no-default-feature = true, solve-group = "upstream" }
+upstream = { features = ["bindings-dev", "upstream"], no-default-feature = true, solve-group = "upstream" }
+packaged = { features = ["bindings-dev", "packaged"], no-default-feature = true, solve-group = "packaged" }
 py39 = { features = ["py39"], no-default-feature = true, solve-group = "py39" }
 py310 = { features = ["py310"], solve-group = "py310" }
 py311 = { features = ["py311"], solve-group = "py311" }
