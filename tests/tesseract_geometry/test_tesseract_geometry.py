@@ -190,9 +190,7 @@ def test_octree():
     nptest.assert_almost_equal(ot.getResolution(), 0.05)
     assert ot.getNumLeafNodes() == 3
 
-    geom = tesseract_geometry.Octree(
-        ot, tesseract_geometry.OctreeSubType.BOX, True, True
-    )
+    geom = tesseract_geometry.Octree(ot, tesseract_geometry.OctreeSubType.BOX, True, True)
     assert geom.getType() == tesseract_geometry.GeometryType.OCTREE
     assert geom.getSubType() == tesseract_geometry.OctreeSubType.BOX
     assert geom.getPruned() is True
@@ -230,9 +228,7 @@ def test_octree_direct_construction():
     ot.toMaxLikelihood()
     assert ot.size() > 0
 
-    geom = tesseract_geometry.Octree(
-        ot, tesseract_geometry.OctreeSubType.SPHERE_INSIDE
-    )
+    geom = tesseract_geometry.Octree(ot, tesseract_geometry.OctreeSubType.SPHERE_INSIDE)
     assert geom.getSubType() == tesseract_geometry.OctreeSubType.SPHERE_INSIDE
     assert geom.getPruned() is False
 
@@ -266,9 +262,7 @@ def _sphere_grid():
 
 def test_signed_distance_field_from_grid():
     grid = _sphere_grid()
-    geom = tesseract_geometry.SignedDistanceField(
-        SDF_MIN, SDF_MAX, SDF_DIMS, grid.ravel(order="F")
-    )
+    geom = tesseract_geometry.SignedDistanceField(SDF_MIN, SDF_MAX, SDF_DIMS, grid.ravel(order="F"))
 
     assert geom.getType() == tesseract_geometry.GeometryType.SIGNED_DISTANCE_FIELD
     nptest.assert_allclose(geom.getDomainMin(), SDF_MIN)
@@ -348,9 +342,7 @@ def test_create_discrete_signed_distance_field_drops_the_sampler():
         sentinel.append(1)
         return _sphere(point)
 
-    geom = tesseract_geometry.createDiscreteSignedDistanceField(
-        sampler, SDF_MIN, SDF_MAX, SDF_DIMS
-    )
+    geom = tesseract_geometry.createDiscreteSignedDistanceField(sampler, SDF_MIN, SDF_MAX, SDF_DIMS)
     called_during_construction = len(sentinel)
     assert called_during_construction == int(np.prod(SDF_DIMS))
 
@@ -381,9 +373,7 @@ def test_create_signed_distance_field_lazy():
 
 
 def test_create_signed_distance_field_discretizes_on_access():
-    lazy = tesseract_geometry.createSignedDistanceField(
-        _sphere, SDF_MIN, SDF_MAX, SDF_DIMS
-    )
+    lazy = tesseract_geometry.createSignedDistanceField(_sphere, SDF_MIN, SDF_MAX, SDF_DIMS)
     assert not lazy.isDiscretized()
     nptest.assert_allclose(lazy.getDistances(), _sphere_grid().ravel(order="F"))
     assert lazy.isDiscretized()
@@ -401,9 +391,7 @@ def test_signed_distance_field_sampler_errors():
         raise ValueError("sampler exploded")
 
     with pytest.raises(ValueError, match="sampler exploded"):
-        tesseract_geometry.createDiscreteSignedDistanceField(
-            boom, SDF_MIN, SDF_MAX, SDF_DIMS
-        )
+        tesseract_geometry.createDiscreteSignedDistanceField(boom, SDF_MIN, SDF_MAX, SDF_DIMS)
 
 
 @pytest.mark.parametrize(

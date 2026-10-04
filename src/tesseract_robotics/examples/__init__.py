@@ -19,5 +19,6 @@ from .shapes_viewer import main as shapes_viewer
 from .tesseract_collision_example import main as tesseract_collision_example
 from .tesseract_kinematics_example import main as tesseract_kinematics_example
 from .tesseract_material_mesh_viewer import main as tesseract_material_mesh_viewer
+
 # from .twc_workcell_positioner_viewer import run as twc_workcell_positioner_viewer
 from .lowlevel import *
