@@ -137,7 +137,7 @@ package supersedes it.
 
 At tesseract `f4cc080`, trajopt `de9e941`, tesseract_planning `4efed5f` every
 binding module compiles (`pixi run -e upstream build-upstream` exits 0) and the test
-suite passes except the six #151 reference tests below. The user-facing changes are
+suite passes in the `upstream` env. The user-facing changes are
 in [API Changes: 0.35 → 0.36](../changes-0.36.md).
 
 | Module | Was | Resolution |
@@ -191,8 +191,8 @@ Checked against trajopt `de9e941`:
 
 | Item | Upstream fix | In `de9e941`? | Status |
 |---|---|---|---|
-| #151 ABSOLUTE / HINGE penalty costs mis-modelled | trajopt#592 (`4634678`…`de9e941`) | yes | the six `test_trajopt_0_35_0_penalty_*` tests fail exactly as their docstrings predict; the docstring-named replacement assertions pass (6/6) |
-| #146.1 `JointPosConstraint` bounds ctor broadcasts `coeffs` | trajopt#592 | yes | upstream's split now indexes `coeffs_` and the ctor broadcasts length 0 / 1 itself; the binding broadcast is redundant |
+| #151 ABSOLUTE / HINGE penalty costs mis-modelled | trajopt#592 (`4634678`…`de9e941`) | yes | the two 0.35.0 characterization tests failed exactly as their docstrings predicted; replaced by `test_penalty_only_cost_beyond_the_trust_box_is_reduced` and `test_penalty_exact_cost_is_weighted_by_the_coefficient` (the assertions those docstrings named). The 0.35.0 caveats in `docs/api/trajopt_sqp.md`, `trajopt_ifopt.md` and `user-guide/low-level-sqp.md` stay: they describe the released wheels |
+| #146.1 `JointPosConstraint` bounds ctor broadcasts `coeffs` | trajopt#592 | yes | upstream's split now indexes `coeffs_` and the ctor broadcasts length 0 / 1 itself; binding broadcast removed, `test_joint_pos_constraint_bounds.py` passes against trajopt's own ctor |
 | #146.2 `TrajOptQPProblemBinding` subclass | trajopt#598 | no (move ctor still `= default` in the header) | keep |
 | #146.3 trampoline `non_zeros_ = 0` | trajopt#599 | no (raw `getNonZeros()` sum still reserves) | keep |
 
