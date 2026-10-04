@@ -21,9 +21,15 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <cmath>
 #include <filesystem>
 #include <sstream>
+#include <utility>
 
 // console_bridge
 #include <console_bridge/console.h>
+
+// spdlog-backed tesseract logging (upstream #1367)
+#include <tesseract/common/logging.h>
+#include <nanobind/stl/chrono.h>
+#include <nanobind/stl/string_view.h>
 
 // Trampoline class for ResourceLocator
 class PyResourceLocator : public tesseract::common::ResourceLocator {
@@ -43,6 +49,41 @@ public:
     void log(const std::string& text, console_bridge::LogLevel level, const char* filename, int line) override {
         NB_OVERRIDE_PURE(log, text, level, filename, line);
     }
+};
+
+// A Python callable as upstream's LogRecordHandler. Upstream calls handlers from whichever
+// thread logs and swallows their exceptions, so this takes the GIL, hands Python a copy of
+// the record, and reports a raising handler through sys.unraisablehook. The callable is
+// released under the GIL (removeLogRecordHandler runs without it); after interpreter
+// finalization there is no Python left to call or to decref, so it is leaked instead.
+class PyLogRecordHandler {
+public:
+    explicit PyLogRecordHandler(nb::callable fn)
+        : fn_(new nb::object(std::move(fn)), &PyLogRecordHandler::release) {}
+
+    void operator()(const tesseract::common::LogRecord& record) const {
+        if (!Py_IsInitialized())
+            return;
+        nb::gil_scoped_acquire gil;
+        try {
+            (*fn_)(nb::cast(record, nb::rv_policy::copy));
+        } catch (nb::python_error& e) {
+            e.discard_as_unraisable("tesseract log record handler");
+        }
+    }
+
+private:
+    static void release(nb::object* fn) {
+        if (!Py_IsInitialized()) {
+            fn->release();
+            delete fn;
+            return;
+        }
+        nb::gil_scoped_acquire gil;
+        delete fn;
+    }
+
+    std::shared_ptr<nb::object> fn_;
 };
 
 // LinkId / JointId: upstream's hash-of-name identity (tesseract IDENTITY_DESIGN.md).
@@ -1035,6 +1076,72 @@ NB_MODULE(_tesseract_common, m) {
     }, "filename"_a, "line"_a, "level"_a, "msg"_a);
     m.def("useOutputHandler", &console_bridge::useOutputHandler, "handler"_a);
     m.def("restorePreviousOutputHandler", &console_bridge::restorePreviousOutputHandler);
+
+    // ========== Logging (spdlog, upstream #1367) ==========
+    // The console_bridge API above no longer reaches tesseract's output; this mirrors
+    // upstream: getLogger(name) for the level, addLogRecordHandler for custom sinks.
+    nb::enum_<spdlog::level::level_enum>(m, "LoggerLevel")
+        .value("trace", spdlog::level::trace)
+        .value("debug", spdlog::level::debug)
+        .value("info", spdlog::level::info)
+        .value("warn", spdlog::level::warn)
+        .value("err", spdlog::level::err)
+        .value("critical", spdlog::level::critical)
+        .value("off", spdlog::level::off);
+
+    nb::class_<spdlog::logger>(m, "Logger", "A named spdlog logger (tesseract's default is 'tesseract')")
+        .def("name", [](const spdlog::logger& self) { return self.name(); })
+        .def("level", &spdlog::logger::level)
+        .def("set_level", &spdlog::logger::set_level, "level"_a)
+        .def("should_log", &spdlog::logger::should_log, "level"_a);
+
+    using tesseract::common::LogRecord;
+    nb::class_<LogRecord>(m, "LogRecord", "One tesseract log event, as passed to a record handler")
+        .def_ro("timestamp", &LogRecord::timestamp)
+        .def_ro("level", &LogRecord::level)
+        .def_ro("logger_name", &LogRecord::logger_name)
+        .def_ro("component_name", &LogRecord::component_name)
+        .def_ro("message", &LogRecord::message)
+        .def_ro("attributes", &LogRecord::attributes)
+        .def_prop_ro("filename", [](const LogRecord& self) {
+            return std::string(self.source_location.filename ? self.source_location.filename : "");
+        })
+        .def_prop_ro("line", [](const LogRecord& self) { return self.source_location.line; })
+        .def_prop_ro("function_name", [](const LogRecord& self) {
+            return std::string(self.source_location.funcname ? self.source_location.funcname : "");
+        });
+
+    m.def("getLogger", &tesseract::common::getLogger, "name"_a = "tesseract",
+          "Get (or create) a tesseract spdlog logger; set_level() on it controls tesseract's output");
+    m.def("isLogLevelEnabled", &tesseract::common::isLogLevelEnabled, "level"_a,
+          "Whether the default tesseract logger emits at this level");
+    // Ids of the handlers registered from Python, guarded by the GIL. At interpreter exit the
+    // ones still registered are removed, so their callables (and whatever they captured) are
+    // released while Python is still alive rather than leaked at static destruction.
+    static std::set<tesseract::common::LogRecordHandlerId> py_handler_ids;
+    m.def("addLogRecordHandler",
+          [](nb::callable handler) {
+              const auto id = tesseract::common::addLogRecordHandler(PyLogRecordHandler(std::move(handler)));
+              py_handler_ids.insert(id);
+              return id;
+          },
+          "handler"_a,
+          "Register handler(record: LogRecord), called for every emitted record; returns its id");
+    m.def("removeLogRecordHandler",
+          [](tesseract::common::LogRecordHandlerId id) {
+              py_handler_ids.erase(id);
+              // Upstream waits here for the handler's in-flight calls on other threads, which need the GIL.
+              nb::gil_scoped_release release;
+              return tesseract::common::removeLogRecordHandler(id);
+          },
+          "handler_id"_a,
+          "Unregister a handler by id; False if the id is not registered");
+    nb::module_::import_("atexit").attr("register")(nb::cpp_function([]() {
+        const auto ids = std::exchange(py_handler_ids, {});
+        nb::gil_scoped_release release;
+        for (const auto id : ids)
+            tesseract::common::removeLogRecordHandler(id);
+    }));
 
     // ========== STL Container Bindings ==========
     // VectorVector3d - explicit binding for aligned Eigen vectors (NB_MAKE_OPAQUE at top)

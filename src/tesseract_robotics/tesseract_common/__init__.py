@@ -79,6 +79,14 @@ __all__ = [
     "getLogLevel",
     "useOutputHandler",
     "restorePreviousOutputHandler",
+    # Logging (spdlog)
+    "LoggerLevel",
+    "Logger",
+    "LogRecord",
+    "getLogger",
+    "isLogLevelEnabled",
+    "addLogRecordHandler",
+    "removeLogRecordHandler",
     # Logging levels
     "CONSOLE_BRIDGE_LOG_DEBUG",
     "CONSOLE_BRIDGE_LOG_INFO",
