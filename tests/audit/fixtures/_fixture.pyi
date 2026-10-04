@@ -59,6 +59,13 @@ class Color(enum.Enum):
 
 Color_RED: Color = Color.RED
 
+class Level(enum.Enum):
+    LEVEL_LOW = 0
+
+    LEVEL_HIGH = 1
+
+LEVEL_LOW: Level = Level.LEVEL_LOW
+
 def scale(value: int, factor: float = 1.0) -> int: ...
 @overload
 def area(w: int) -> int: ...

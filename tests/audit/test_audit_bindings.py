@@ -120,6 +120,9 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "Color",
         "Color.RED",
         "Color.GREEN",
+        "Level",
+        "Level.LEVEL_LOW",
+        "Level.LEVEL_HIGH",
         "scale",
         "area",
         "collect",
@@ -299,6 +302,7 @@ def test_fixture_deviations_exact(fixture_report):
         ("Widget.widget_samples", audit.Kind.METHOD, "—"),
         ("Gadget.__len__", audit.Kind.PROTOCOL, "—"),  # C++ Gadget has no size()
         ("Color_RED", audit.Kind.CONSTANT, "—"),
+        ("LEVEL_LOW", audit.Kind.CONSTANT, "—"),  # aliases an unscoped enum value (Note 1)
         ("scale_twice", audit.Kind.FUNCTION, "—"),
         ("area", audit.Kind.OVERLOAD, "2"),
         ("FilesystemPath", audit.Kind.CLASS, "—"),
@@ -426,6 +430,13 @@ def test_real_rows_accepted_by_new_rules(real_reports, module, symbol, rule):
 def test_eigen_templated_mul_is_not_a_deviation(real_reports, symbol):
     """M13: Eigen declares `operator*` as a member template; `__mul__` is its binding."""
     assert symbol not in {d.name for d in real_reports["tesseract_common"].deviations}
+
+
+@pytest.mark.parametrize("level", ["DEBUG", "INFO", "WARN", "ERROR", "NONE"])
+def test_console_bridge_log_constants_are_deviations(real_reports, level):
+    """Note 1: module constants aliasing `LogLevel` values, though C++ has the same name."""
+    deviations = {(d.name, d.kind) for d in real_reports["tesseract_common"].deviations}
+    assert (f"CONSOLE_BRIDGE_LOG_{level}", audit.Kind.CONSTANT) in deviations
 
 
 def test_raw_pointer_bytes_resource_ctor_stays_a_gap(real_reports):

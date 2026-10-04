@@ -56,6 +56,14 @@ enum class Color
   GREEN
 };
 
+// Unscoped: LEVEL_LOW is also a namespace-scope C++ name, yet a module constant
+// aliasing Level.LEVEL_LOW is still a deviation (Note 1).
+enum Level
+{
+  LEVEL_LOW,
+  LEVEL_HIGH
+};
+
 struct Runner  // abstract and bound: no __init__ gap (I3); operator() is __call__ (I5)
 {
   Runner() = default;

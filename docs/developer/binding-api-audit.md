@@ -6,7 +6,7 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `50835
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
 | tesseract_collision | 180 | 53 | 10 | 3 | 6 |
-| tesseract_common | 95 | 115 | 6 | 21 | 0 |
+| tesseract_common | 95 | 115 | 11 | 21 | 0 |
 | tesseract_environment | 119 | 82 | 14 | 21 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
@@ -254,6 +254,11 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 | Python name | kind | stub:line | arity |
 |---|---|---|---|
+| `CONSOLE_BRIDGE_LOG_DEBUG` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:612 | — |
+| `CONSOLE_BRIDGE_LOG_ERROR` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:618 | — |
+| `CONSOLE_BRIDGE_LOG_INFO` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:614 | — |
+| `CONSOLE_BRIDGE_LOG_NONE` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:620 | — |
+| `CONSOLE_BRIDGE_LOG_WARN` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:616 | — |
 | `CollisionMarginData.getPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:502 | — |
 | `CollisionMarginData.setPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:504 | — |
 | `CollisionMarginOverrideType` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:468 | — |

@@ -541,6 +541,7 @@ class PySymbol:
     line: int
     overloads: list[PyOverload] = field(default_factory=list)
     bases: tuple[str, ...] = ()  # stub base-class expressions, for inherited members
+    enum_alias: bool = False  # module constant whose value is a stub enum member (Note 1)
 
 
 @dataclass(frozen=True, order=True)
@@ -618,6 +619,14 @@ def _quoted_names(annotation: ast.expr) -> list[str]:
     ]
 
 
+def _enum_member(value: ast.expr | None, symbols: dict[str, PySymbol]) -> bool:
+    """Whether `value` spells `E.member` for an enum `E` the stub declared earlier."""
+    if not (isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name)):
+        return False
+    owner = symbols.get(value.value.id)
+    return owner is not None and owner.kind is Kind.ENUM
+
+
 def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
     """Names, kinds and overload arities a stub declares, plus quoted C++ annotations."""
     symbols: dict[str, PySymbol] = {}
@@ -654,7 +663,8 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                             Kind.ENUMERATOR if in_enum else Kind.FIELD if prefix else Kind.CONSTANT
                         )
                         name = prefix + t.id
-                        symbols[name] = PySymbol(name, kind, node.lineno)
+                        alias = kind is Kind.CONSTANT and _enum_member(node.value, symbols)
+                        symbols[name] = PySymbol(name, kind, node.lineno, enum_alias=alias)
             else:
                 continue
             for ann in _annotations(node) if not isinstance(node, ast.Assign) else []:
@@ -850,7 +860,9 @@ def match(
         where = f"{stub_rel}:{ps.line}"
         rule = ACCEPTED_SYMBOLS.get((module, name))
         leaf = name.rpartition(".")[2]
-        if ps.kind is Kind.PROTOCOL and name not in cpp:
+        if ps.enum_alias:
+            found = None  # a second name for an enum value, even if C++ has it unscoped
+        elif ps.kind is Kind.PROTOCOL and name not in cpp:
             proto = _protocol_rule(name, cpp, tu_names)
             if proto:
                 accepted.append(Accepted(name, proto, where))
