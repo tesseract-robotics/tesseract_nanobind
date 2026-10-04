@@ -1128,11 +1128,9 @@ class TestTrajOptQPProblemPenaltyCosts:
 
     QP layout (trajopt 0.35.0, trajopt_qp_problem.cpp:28, :798-822): each ABSOLUTE row adds two
     slack variables, each HINGE row one, after the NLP variables; the QP prices a slack at its
-    row's coefficient (:798). The tests without `trajopt_0_35_0` in their name hold on trajopt
-    0.35.0 and, by its diff, after tesseract-robotics/trajopt#592. The two
-    `test_trajopt_0_35_0_*` tests characterize trajopt 0.35.0 defects that #592 (merged
-    2026-09-30, unreleased) fixes: each fails on purpose once the linked trajopt includes #592,
-    and its docstring says what to assert then.
+    row's coefficient (:798). This branch links a trajopt that includes
+    tesseract-robotics/trajopt#592, which fixes the two trajopt 0.35.0 penalty defects of
+    tesseract_nanobind#151; `main` (trajopt 0.35.0) still pins the defective behaviour.
     """
 
     def test_absolute_cost_needs_equality_bounds(self):
@@ -1240,8 +1238,8 @@ class TestTrajOptQPProblemPenaltyCosts:
         first trial's ratio is box / SMALL_VIOLATION = 0.4 >= 0.25, the trial is accepted, and
         the solve reaches the target; after trajopt#592 the model is exact on this linear
         residual and the ratio is 1. The contrast to
-        test_trajopt_0_35_0_penalty_only_cost_beyond_the_trust_box_is_not_reduced: what stalls
-        there is the violation's size, not every penalty cost."""
+        test_penalty_only_cost_beyond_the_trust_box_is_reduced, which stalled on trajopt
+        0.35.0 because of the violation's size."""
         nodes, problem = _penalty_problem(
             (SEED_NODE_1,), [_seed_cost(penalty_type, coeff, SMALL_VIOLATION)]
         )
@@ -1267,29 +1265,15 @@ class TestTrajOptQPProblemPenaltyCosts:
 
     @_COEFFS
     @_PENALTY_TYPES
-    def test_trajopt_0_35_0_penalty_only_cost_beyond_the_trust_box_is_not_reduced(
-        self, penalty_type, coeff
-    ):
-        """Characterizes trajopt 0.35.0: an ABSOLUTE- or HINGE-only cost whose violation the
-        trust box cannot cut by improve_ratio_threshold is not reduced.
+    def test_penalty_only_cost_beyond_the_trust_box_is_reduced(self, penalty_type, coeff):
+        """An ABSOLUTE- or HINGE-only cost whose violation the first trust box cannot cut by
+        improve_ratio_threshold is still removed.
 
-        evaluateConvexCosts evaluates a penalty cost on its full QP rows, slack columns
-        included (trajopt_qp_problem.cpp:166-196). Every QP solution satisfies those rows, its
-        slacks absorbing the violation, so the model reads 0 at the QP solution and predicts
-        the whole cost away, while the exact improvement is at most the trust box. A trial is
-        rejected when its ratio is below improve_ratio_threshold
-        (trust_region_sqp_solver.cpp:339): here the ratio is box / SEED_VIOLATION = 0.1 / 0.5 =
-        0.2 < 0.25, and each rejection shrinks the box tenfold, dividing the ratio by 10 (0.02,
-        0.002, ...), until the box collapses and the solve reports NLP_CONVERGED at the seed. A
-        violation of 0.4 or less is removed:
-        test_penalty_only_cost_the_trust_box_cuts_by_a_quarter_is_reduced.
-
-        tesseract-robotics/trajopt#592 (merged 2026-09-30) evaluates penalty rows on the
-        slack-free linear model, so this test fails on purpose once the linked trajopt includes
-        it. Then assert instead: new_approx_costs equals new_costs within
-        MODEL_ROUND_OFF (the model is exact on this linear residual), node 1 ends at
-        ABSOLUTE_TARGET (ABSOLUTE) or at most HINGE_UPPER (HINGE), and the exact cost ends at 0,
-        both within OSQP_ABSOLUTE_TOLERANCE.
+        trajopt#592 evaluates penalty rows on the slack-free linear model, so the model is exact
+        on this linear residual: the predicted improvement equals the exact one and every trial
+        within the box is accepted. trajopt 0.35.0 read the slack columns too, predicted the whole
+        cost away, rejected every trial (ratio box / SEED_VIOLATION = 0.2 < 0.25) and reported
+        NLP_CONVERGED at the seed (tesseract_nanobind#151).
         """
         nodes, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, coeff)])
         solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
@@ -1299,45 +1283,24 @@ class TestTrajOptQPProblemPenaltyCosts:
         solver.solve(problem)
 
         results = solver.getResults()
-        qp_solution = np.array(results.new_var_vals)  # the last trial: NLP variables, slacks
-        n_nlp = problem.getNumNLPVars()
-        # At the QP solution the model reads 0, in the solver's record and re-evaluated ...
-        assert results.new_approx_costs.tolist() == pytest.approx(
-            [0.0], abs=OSQP_ABSOLUTE_TOLERANCE
-        )
-        assert problem.evaluateConvexCosts(qp_solution).tolist() == pytest.approx(
-            [0.0], abs=OSQP_ABSOLUTE_TOLERANCE
-        )
-        # ... while the same NLP point with its slacks at 0 reads the exact cost there.
-        zero_slacks = np.concatenate([qp_solution[:n_nlp], np.zeros(len(qp_solution) - n_nlp)])
-        assert problem.evaluateConvexCosts(zero_slacks) == pytest.approx(
+        assert results.new_approx_costs == pytest.approx(
             np.array(results.new_costs), abs=MODEL_ROUND_OFF
         )
-        assert results.new_costs[0] > OSQP_ABSOLUTE_TOLERANCE
-        # The whole cost reads as predicted improvement, so the trial is rejected.
-        assert results.approx_merit_improve == pytest.approx(
-            SEED_VIOLATION, abs=OSQP_ABSOLUTE_TOLERANCE
-        )
-        assert results.merit_improve_ratio < solver.params.improve_ratio_threshold
-        # The outcome: converged, at the seed, the cost untouched.
-        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
-        np.testing.assert_array_equal(nodes.getValues(), [0.0, SEED_NODE_1, 0.0])
-        assert problem.getExactCosts().tolist() == [SEED_VIOLATION]
+        node_1 = nodes.getValues()[1]
+        if penalty_type == tsqp.CostPenaltyType.ABSOLUTE:
+            assert node_1 == pytest.approx(ABSOLUTE_TARGET, abs=OSQP_ABSOLUTE_TOLERANCE)
+        else:
+            assert node_1 <= HINGE_UPPER + OSQP_ABSOLUTE_TOLERANCE
+        assert problem.getExactCosts().tolist() == pytest.approx([0.0], abs=OSQP_ABSOLUTE_TOLERANCE)
 
     @_PENALTY_TYPES
-    def test_trajopt_0_35_0_penalty_exact_cost_ignores_the_coefficient(self, penalty_type):
-        """Characterizes trajopt 0.35.0: a penalty cost's exact value ignores its coefficient.
-
-        getExactCosts() sums a penalty cost's row violations unweighted
-        (trajopt_qp_problem.cpp:1015, err.sum()), while the QP prices each row's slack at the
-        row's coefficient (:798). At c = 10 the exact cost reads 0.5, as at c = 1.
-
-        tesseract-robotics/trajopt#592 (merged 2026-09-30) weights it, so this test fails on
-        purpose once the linked trajopt includes it. Then assert instead
-        LARGE_COEFF * SEED_VIOLATION (5.0).
-        """
+    def test_penalty_exact_cost_is_weighted_by_the_coefficient(self, penalty_type):
+        """getExactCosts() weights a penalty cost's row violations by the row coefficient, as
+        the QP prices each row's slack: at c = 10 the exact cost reads 10 * 0.5 = 5. trajopt
+        0.35.0 summed them unweighted and read 0.5 (tesseract_nanobind#151, fixed by
+        trajopt#592)."""
         _, problem = _penalty_problem((SEED_NODE_1,), [_seed_cost(penalty_type, LARGE_COEFF)])
-        assert problem.getExactCosts().tolist() == [SEED_VIOLATION]
+        assert problem.getExactCosts().tolist() == [LARGE_COEFF * SEED_VIOLATION]
 
 
 # ---------------------------------------------------------------------------
