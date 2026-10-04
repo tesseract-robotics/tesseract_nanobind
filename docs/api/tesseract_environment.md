@@ -283,7 +283,7 @@ links before the missing one.) The GIL is released during the contact test.
 ```python
 # Check initialization
 if env.isInitialized():
-    print(f"Root link: {env.getRootLinkName()}")
+    print(f"Root link: {env.getRootLinkId()}")
     print(f"Revision: {env.getRevision()}")
     print(f"Revision after init: {env.getInitRevision()}")
 
@@ -318,8 +318,8 @@ link = Link("obstacle")
 
 joint = Joint("obstacle_joint")
 joint.type = JointType.FIXED
-joint.parent_link_name = "world"
-joint.child_link_name = "obstacle"
+joint.parent_link_id = "world"
+joint.child_link_id = "obstacle"
 
 cmd = AddLinkCommand(link, joint)
 env.applyCommand(cmd)
