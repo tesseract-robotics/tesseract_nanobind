@@ -125,6 +125,15 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "collect",
         "describe",
         "flatten",
+        "Bag",
+        "Bag.__init__",
+        "Bag.size",
+        "Bag.__getitem__",
+        "Bag.begin",
+        "Bag.end",
+        "Bag.__str__",  # free operator<<(std::ostream&, const Bag&) (M5)
+        "Record",
+        "Record.__init__",
     }  # fmt: skip  (no std::hash (I1), no free serialize (I2), no Detail (C1))
 
 
@@ -281,7 +290,7 @@ def test_fixture_deviations_exact(fixture_report):
     assert {(d.name, d.kind, d.arity) for d in fixture_report.deviations} == {
         ("Widget.widget_grow", audit.Kind.METHOD, "—"),
         ("Widget.widget_samples", audit.Kind.METHOD, "—"),
-        ("Widget.__repr__", audit.Kind.PROTOCOL, "—"),
+        ("Gadget.__len__", audit.Kind.PROTOCOL, "—"),  # C++ Gadget has no size()
         ("Color_RED", audit.Kind.CONSTANT, "—"),
         ("scale_twice", audit.Kind.FUNCTION, "—"),
         ("area", audit.Kind.OVERLOAD, "2"),
@@ -295,7 +304,42 @@ def test_fixture_accepted_exact(fixture_report):
         ("collect", "out-param"),
         ("describe", "stringstream"),
         ("flatten", "out-param"),  # void + one out-param returned directly (I6)
+        ("Bag.__len__", "container-protocol"),  # C14
+        ("Bag.__setitem__", "container-protocol"),  # M18
+        ("Bag.__iter__", "iterator-pair"),  # C6
+        ("Bag.__str__", "stream-insertion"),  # M5
+        ("Widget.__repr__", "presentation-dunder"),  # M12
+        ("Record.__init__", "serialization-default-ctor"),  # E2
     }
+
+
+def test_container_members_covered_by_protocol_dunders(fixture_report):
+    """C14/C6: size and begin/end are covered by __len__/__iter__, neither gap nor row."""
+    assert not {g.symbol for g in fixture_report.gaps} & {"Bag.size", "Bag.begin", "Bag.end"}
+
+
+def test_stream_insertion_operator_keyed_on_its_class(fixture_cpp):
+    """M5: `operator<<(std::ostream&, const Bag&)` is Bag.__str__, arity 0."""
+    assert "operator<<" not in fixture_cpp
+    assert [
+        str(ov.arity)
+        for ov in fixture_cpp.get(
+            "Bag.__str__", audit.CppSymbol("", audit.Kind.OPERATOR, "")
+        ).overloads
+    ] == ["0"]
+
+
+def test_new_accepted_rules_rendered_with_reasons(fixture_report):
+    text = audit.render_markdown([fixture_report], PROV)
+    for rule in (
+        "container-protocol",
+        "iterator-pair",
+        "stream-insertion",
+        "presentation-dunder",
+        "serialization-default-ctor",
+    ):
+        assert audit.ACCEPTED.get(rule), rule  # a non-empty reason
+        assert f"`{rule}`: {audit.ACCEPTED[rule]}" in text
 
 
 def test_fixture_quoted(fixture_report):
@@ -345,6 +389,38 @@ def test_environment_init_try_import_reported(real_reports):
 def test_quaternion_scalar_last_accepted(real_reports):
     accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
     assert ("Quaterniond.from_xyzw", "scalar-last-quaternion") in accepted
+
+
+@pytest.mark.parametrize(
+    ("module", "symbol", "rule"),
+    [
+        ("tesseract_collision", "ContactResultMap.__len__", "container-protocol"),
+        ("tesseract_collision", "ContactResultVector.__len__", "container-protocol"),
+        ("tesseract_common", "VectorVector3d.__setitem__", "container-protocol"),
+        ("tesseract_common", "Isometry3d.__repr__", "presentation-dunder"),
+        ("tesseract_common", "SimpleLocatedResource.__init__", "serialization-default-ctor"),
+        ("tesseract_environment", "AddLinkCommand.__init__", "serialization-default-ctor"),
+        ("tesseract_common", "Hyperplane3d", "eigen-template-instance"),
+        ("tesseract_common", "ParametrizedLine3d", "eigen-template-instance"),
+        ("tesseract_common", "Quaterniond.from_rpy", "quaternion-rpy"),
+        ("tesseract_common", "Quaterniond.to_rpy", "quaternion-rpy"),
+        ("tesseract_common", "EIGEN_DEFAULT_PREC", "eigen-default-precision"),
+    ],
+)
+def test_real_rows_accepted_by_new_rules(real_reports, module, symbol, rule):
+    report = real_reports[module]
+    assert (symbol, rule) in {(a.symbol, a.rule) for a in report.accepted}
+    assert symbol not in {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
+
+
+def test_raw_pointer_bytes_resource_ctor_stays_a_gap(real_reports):
+    """E2 covers only the arity-0 ctor; BytesResource(url, ptr, len, parent) is M3 won't fix."""
+    accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
+    assert ("BytesResource.__init__", "serialization-default-ctor") in accepted
+    rows = [
+        g for g in real_reports["tesseract_common"].gaps if g.symbol == "BytesResource.__init__"
+    ]
+    assert [g.arity for g in rows] == ["3-4"]
 
 
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}

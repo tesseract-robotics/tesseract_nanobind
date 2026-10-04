@@ -1,6 +1,7 @@
 // Audit contract fixture: every declaration exercises one matching rule.
 #pragma once
 #include <functional>
+#include <ostream>
 #include <sstream>
 #include <vector>
 
@@ -73,6 +74,33 @@ template <class Archive>
 void serialize(Archive& ar, Owner& owner);  // excluded: free cereal hook (I2)
 
 void flatten(std::vector<int>& out);  // void + one out-param: Python returns it directly (I6)
+
+class Bag
+{
+public:
+  std::size_t size() const;        // container-protocol: bound as __len__ (C14)
+  int& operator[](std::size_t i);  // __getitem__; container-protocol: __setitem__ too (M18)
+  const int* begin() const;        // iterator-pair: begin/end bound as __iter__ (C6)
+  const int* end() const;
+};
+
+std::ostream& operator<<(std::ostream& os, const Bag& bag);  // stream-insertion: Bag.__str__ (M5)
+
+class Record;
+template <class Archive>
+void serialize(Archive& ar, Record& obj);  // excluded: free cereal hook (I2)
+
+class Record
+{
+public:
+  Record();  // serialization-default-ctor: befriends serialize + another ctor, unbound (E2)
+  explicit Record(int id);
+
+private:
+  int id_ = 0;
+  template <class Archive>
+  friend void ::tesseract::fixture::serialize(Archive& ar, Record& obj);
+};
 
 int scale(int value, double factor = 1.0);  // defaulted: arity 1-2
 int scale(int value, double factor);        // redeclaration: must not add an overload

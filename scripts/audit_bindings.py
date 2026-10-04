@@ -200,6 +200,28 @@ OPERATOR_DUNDERS = {
     "operator bool": "__bool__",
     "operator()": "__call__",
 }
+# C++ members a Python protocol dunder covers (container-protocol, iterator-pair rules): a
+# class that binds the dunder needs no binding under the C++ name.
+PROTOCOL_MEMBERS = {
+    "size": "__len__",
+    "begin": "__iter__",
+    "end": "__iter__",
+    "cbegin": "__iter__",
+    "cend": "__iter__",
+}
+# Python protocol dunders accepted by rule: dunder -> (ACCEPTED key, C++ members, keyed as in
+# `cpp_api`, the owner must declare). An owner with no C++ class (a bound std container
+# typedef) is checked against the TU's declaration names instead.
+PROTOCOL_RULES = {
+    "__len__": ("container-protocol", ("size",)),
+    "__setitem__": ("container-protocol", ("__getitem__",)),
+    "__iter__": ("iterator-pair", ("begin", "end")),
+    "__repr__": ("presentation-dunder", ()),
+    "__str__": ("presentation-dunder", ()),
+}
+# `operator<<(std::ostream&, const T&)` is bound as `T.__str__`; libclang spells the stream
+# parameter's canonical declaration so.
+OSTREAM_DECL = "basic_ostream"
 # Namespaces that audited headers reopen to specialise library templates
 # (`std::hash<LinkNamesPair>` in tesseract/common/types.h): not module API.
 FOREIGN_NAMESPACES = frozenset({"std"})
@@ -259,6 +281,8 @@ class CppOverload:
     out_params: tuple[str, ...]  # pointee type spellings
     location: str
     returns_void: bool = False
+    mapped: str | None = None  # ACCEPTED rule when bound under its mapped Python name
+    absent_ok: str | None = None  # ACCEPTED rule under which leaving it unbound is accepted
 
 
 @dataclass
@@ -338,6 +362,29 @@ def _has_default(parm: ci.Cursor) -> bool:
     return any(c.kind.is_expression() for c in parm.get_children())
 
 
+def _record_path(decl: ci.Cursor) -> str:
+    """Dotted name of a record within its namespace (`Outer.Inner`)."""
+    parts = [decl.spelling]
+    parent = decl.semantic_parent
+    while parent is not None and parent.kind in RECORD_KINDS:
+        parts.append(parent.spelling)
+        parent = parent.semantic_parent
+    return ".".join(reversed(parts))
+
+
+def _stream_insertion_owner(c: ci.Cursor) -> str | None:
+    """`T` of a free `operator<<(std::ostream&, const T&)` with `T` a class, else None."""
+    if c.spelling != "operator<<":
+        return None
+    params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
+    if len(params) != 2:
+        return None
+    stream, value = (p.type.get_pointee().get_canonical().get_declaration() for p in params)
+    if stream.spelling != OSTREAM_DECL or value.kind not in RECORD_KINDS:
+        return None
+    return _record_path(value)
+
+
 def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSymbol]:
     """The audited C++ API: public, non-deprecated declarations in `headers`.
 
@@ -357,15 +404,28 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
     def add(name: str, kind: Kind, c: ci.Cursor) -> CppSymbol:
         return symbols.setdefault(name, CppSymbol(name, kind, location(c)))
 
-    def add_callable(name: str, kind: Kind, c: ci.Cursor) -> None:
+    def add_callable(
+        name: str,
+        kind: Kind,
+        c: ci.Cursor,
+        mapped: str | None = None,
+        nullary_absent_ok: str | None = None,
+    ) -> None:
         if not first_time(c):
+            return
+        if mapped is not None:
+            # A mapped operator's operands become `self` and the result: nothing positional.
+            ov = CppOverload(Arity(0, 0), (), location(c), mapped=mapped)
+            add(name, kind, c).overloads.append(ov)
             return
         params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
         n_default = sum(_has_default(p) for p in params)
         out = tuple(p.type.get_pointee().spelling for p in params if _is_out_param(p))
         arity = Arity(len(params) - n_default, len(params))
         void = c.result_type.kind == ci.TypeKind.VOID
-        add(name, kind, c).overloads.append(CppOverload(arity, out, location(c), void))
+        absent_ok = nullary_absent_ok if arity.hi == 0 else None
+        ov = CppOverload(arity, out, location(c), void, absent_ok=absent_ok)
+        add(name, kind, c).overloads.append(ov)
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
@@ -380,9 +440,13 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         # An abstract class cannot be constructed from Python: no __init__ to audit.
         abstract = c.is_abstract_record()
         declares_ctor = False
+        befriends_cereal = False
+        ctors: list[ci.Cursor] = []
         for m in c.get_children():
             if m.kind == ci.CursorKind.CONSTRUCTOR:
                 declares_ctor = True
+            if m.kind == ci.CursorKind.FRIEND_DECL:
+                befriends_cereal |= any(f.spelling in CEREAL_HOOKS for f in m.get_children())
             if m.access_specifier != ci.AccessSpecifier.PUBLIC:
                 continue
             if m.availability == ci.AvailabilityKind.DEPRECATED:
@@ -394,7 +458,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                     or m.is_move_constructor()
                     or m.is_deleted_method()
                 ):
-                    add_callable(f"{name}.__init__", Kind.CONSTRUCTOR, m)
+                    ctors.append(m)
             elif m.kind in METHOD_KINDS:
                 if (
                     m.spelling in CEREAL_HOOKS
@@ -415,6 +479,11 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 add_record(f"{name}.", m)
             elif m.kind == ci.CursorKind.ENUM_DECL and m.is_definition():
                 add_enum(f"{name}.", m)
+        # A cereal-befriending class with another public ctor has its default ctor for
+        # deserialization only (serialization-default-ctor).
+        serial = "serialization-default-ctor" if befriends_cereal and len(ctors) > 1 else None
+        for m in ctors:
+            add_callable(f"{name}.__init__", Kind.CONSTRUCTOR, m, nullary_absent_ok=serial)
         if not (declares_ctor or abstract):
             # The compiler declares an implicit default constructor.
             add(f"{name}.__init__", Kind.CONSTRUCTOR, c).overloads.append(
@@ -436,7 +505,11 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             elif c.kind == ci.CursorKind.ENUM_DECL and c.is_definition() and first_time(c):
                 add_enum("", c)
             elif c.kind in FUNCTION_KINDS and c.spelling not in CEREAL_HOOKS:
-                add_callable(c.spelling, Kind.FUNCTION, c)
+                owner = _stream_insertion_owner(c)
+                if owner is not None:
+                    add_callable(f"{owner}.__str__", Kind.OPERATOR, c, mapped="stream-insertion")
+                else:
+                    add_callable(c.spelling, Kind.FUNCTION, c)
 
     visit(tu.cursor)
     return symbols
@@ -627,11 +700,33 @@ ACCEPTED = {
     "stringstream": "A `std::stringstream&` parameter the C++ writes into is returned as `str`.",
     "scalar-last-quaternion": "Quaterniond takes (x, y, z, w), the project-wide scalar-last "
     "order; Eigen's constructor is (w, x, y, z).",
+    "container-protocol": "`size()` is bound as `__len__` and `operator[]` as "
+    "`__getitem__`/`__setitem__`, the Python container protocol.",
+    "iterator-pair": "A `begin()`/`end()` pair (and `cbegin`/`cend`) is bound as `__iter__`.",
+    "stream-insertion": "A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__`.",
+    "presentation-dunder": "`__repr__` and `__str__` are Python presentation and need no C++ "
+    "counterpart.",
+    "serialization-default-ctor": "The default constructor of a class that befriends cereal "
+    "`serialize` and declares another public constructor exists for deserialization only.",
+    "eigen-template-instance": "`Eigen::Hyperplane<double, 3>` and "
+    "`Eigen::ParametrizedLine<double, 3>` have no Eigen typedef; the class takes Eigen's own "
+    "`…3d` naming (`Vector3d`, `Quaterniond`).",
+    "quaternion-rpy": "`Quaterniond.from_rpy`/`to_rpy` convert roll-pitch-yaw in the ROS/tf2 "
+    "convention, which Eigen spells as three composed `AngleAxisd` rotations; `to_rpy` returns "
+    "tf2's canonical ranges, which `eulerAngles` does not guarantee.",
+    "eigen-default-precision": "`EIGEN_DEFAULT_PREC` re-exports "
+    "`Eigen::NumTraits<double>::dummy_precision()` (1e-12) so Python compares with Eigen's "
+    "own default tolerance instead of a duplicated literal.",
 }
 # Python names accepted by a named rule: (module, python name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
     ("tesseract_common", "Quaterniond.__init__"): "scalar-last-quaternion",
     ("tesseract_common", "Quaterniond.from_xyzw"): "scalar-last-quaternion",
+    ("tesseract_common", "Hyperplane3d"): "eigen-template-instance",
+    ("tesseract_common", "ParametrizedLine3d"): "eigen-template-instance",
+    ("tesseract_common", "Quaterniond.from_rpy"): "quaternion-rpy",
+    ("tesseract_common", "Quaterniond.to_rpy"): "quaternion-rpy",
+    ("tesseract_common", "EIGEN_DEFAULT_PREC"): "eigen-default-precision",
 }
 
 
@@ -676,8 +771,21 @@ def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
         if ov.returns_void and len(ov.out_params) == 1 and fits:
             return "out-param"  # nothing else to return: the out-param is the result
     if any(p.arity.overlaps(ov.arity) for p in pys):
-        return "exact"
+        return ov.mapped or "exact"
     return None
+
+
+def _protocol_rule(name: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str]) -> str | None:
+    """The ACCEPTED rule covering a Python protocol dunder that has no C++ symbol, or None."""
+    owner, _, leaf = name.rpartition(".")
+    if leaf not in PROTOCOL_RULES:
+        return None
+    rule, members = PROTOCOL_RULES[leaf]
+    if owner in cpp:
+        ok = all(f"{owner}.{m}" in cpp for m in members)
+    else:
+        ok = all(DUNDER_OPERATORS.get(m, m) in tu_names for m in members)
+    return rule if ok else None
 
 
 def _py_member(name: str, py: PyApi) -> PySymbol | None:
@@ -717,12 +825,19 @@ def match(
             continue  # the missing class is the one row
         ps = _py_member(name, py)
         if ps is None:
-            gaps.append(Gap(name, sym.kind, sym.location))
+            owner, _, leaf = name.rpartition(".")
+            dunder = PROTOCOL_MEMBERS.get(leaf)
+            if dunder and _py_member(f"{owner}.{dunder}", py):
+                covered += 1  # the dunder's own row names the rule
+            else:
+                gaps.append(Gap(name, sym.kind, sym.location))
             continue
         ok = True
         for ov in sym.overloads:
             how = _cover(ov, ps.overloads)
-            if how is None:
+            if how is None and ov.absent_ok:
+                accepted.append(Accepted(name, ov.absent_ok, ov.location))
+            elif how is None:
                 gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
                 ok = False
             elif how != "exact":
@@ -734,8 +849,14 @@ def match(
         where = f"{stub_rel}:{ps.line}"
         rule = ACCEPTED_SYMBOLS.get((module, name))
         leaf = name.rpartition(".")[2]
-        if ps.kind is Kind.PROTOCOL:
+        if ps.kind is Kind.PROTOCOL and name not in cpp:
+            proto = _protocol_rule(name, cpp, tu_names)
+            if proto:
+                accepted.append(Accepted(name, proto, where))
+                continue
             found = None
+        elif ps.kind is Kind.PROTOCOL:
+            found = True
         elif leaf == "__init__":
             found = "ctor"
         else:

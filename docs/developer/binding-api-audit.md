@@ -5,9 +5,9 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `50835
 
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
-| tesseract_collision | 180 | 53 | 12 | 1 | 6 |
-| tesseract_common | 94 | 117 | 26 | 2 | 0 |
-| tesseract_environment | 102 | 99 | 14 | 4 | 1 |
+| tesseract_collision | 180 | 53 | 10 | 3 | 6 |
+| tesseract_common | 95 | 115 | 9 | 21 | 0 |
+| tesseract_environment | 119 | 82 | 14 | 21 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
@@ -22,8 +22,16 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | tesseract_environment | `Command.getType` | `tesseract::environment::CommandType` | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:61 |
 
 !!! note "Accepted deviation rules"
+    - `container-protocol`: `size()` is bound as `__len__` and `operator[]` as `__getitem__`/`__setitem__`, the Python container protocol.
+    - `eigen-default-precision`: `EIGEN_DEFAULT_PREC` re-exports `Eigen::NumTraits<double>::dummy_precision()` (1e-12) so Python compares with Eigen's own default tolerance instead of a duplicated literal.
+    - `eigen-template-instance`: `Eigen::Hyperplane<double, 3>` and `Eigen::ParametrizedLine<double, 3>` have no Eigen typedef; the class takes Eigen's own `…3d` naming (`Vector3d`, `Quaterniond`).
+    - `iterator-pair`: A `begin()`/`end()` pair (and `cbegin`/`cend`) is bound as `__iter__`.
     - `out-param`: A non-const lvalue-reference out-param is returned in a tuple with the result (Phase A precedent: checkTrajectory), or alone when the C++ returns `void`.
+    - `presentation-dunder`: `__repr__` and `__str__` are Python presentation and need no C++ counterpart.
+    - `quaternion-rpy`: `Quaterniond.from_rpy`/`to_rpy` convert roll-pitch-yaw in the ROS/tf2 convention, which Eigen spells as three composed `AngleAxisd` rotations; `to_rpy` returns tf2's canonical ranges, which `eulerAngles` does not guarantee.
     - `scalar-last-quaternion`: Quaterniond takes (x, y, z, w), the project-wide scalar-last order; Eigen's constructor is (w, x, y, z).
+    - `serialization-default-ctor`: The default constructor of a class that befriends cereal `serialize` and declares another public constructor exists for deserialization only.
+    - `stream-insertion`: A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__`.
     - `stringstream`: A `std::stringstream&` parameter the C++ writes into is returned as `str`.
 
 !!! note "Unaudited headers"
@@ -102,8 +110,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | Python name | kind | stub:line | arity |
 |---|---|---|---|
 | `ContactManagerConfig.margin_data_override_type` | field | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:405 | — |
-| `ContactResultMap.__len__` | protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:174 | — |
-| `ContactResultVector.__len__` | protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:147 | — |
 | `ContactTestType_ALL` | constant | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:35 | — |
 | `ContactTestType_CLOSEST` | constant | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:33 | — |
 | `ContactTestType_FIRST` | constant | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:31 | — |
@@ -118,7 +124,9 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 | symbol | rule | location |
 |---|---|---|
+| `ContactResultMap.__len__` | container-protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:174 |
 | `ContactResultMap.flattenCopyResults` | out-param | tesseract/collision/types.h:214 |
+| `ContactResultVector.__len__` | container-protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:147 |
 
 ## tesseract_common
 
@@ -129,10 +137,10 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `AllowedCollisionMatrix.__eq__` | operator | tesseract/common/allowed_collision_matrix.h:99 | — |
 | `AllowedCollisionMatrix.__init__` | constructor | tesseract/common/allowed_collision_matrix.h:35 | 1 |
 | `AllowedCollisionMatrix.__ne__` | operator | tesseract/common/allowed_collision_matrix.h:100 | — |
+| `AllowedCollisionMatrix.__str__` | operator | tesseract/common/allowed_collision_matrix.h:108 | — |
 | `AllowedCollisionMatrix.removeAllowedCollision` | method | tesseract/common/allowed_collision_matrix.h:71 | 1 |
 | `AllowedCollisionMatrix.reserveAllowedCollisionMatrix` | method | tesseract/common/allowed_collision_matrix.h:97 | — |
 | `BytesResource.__eq__` | operator | tesseract/common/resource_locator.h:265 | — |
-| `BytesResource.__init__` | constructor | tesseract/common/resource_locator.h:248 | 0 |
 | `BytesResource.__init__` | constructor | tesseract/common/resource_locator.h:251 | 3-4 |
 | `BytesResource.__ne__` | operator | tesseract/common/resource_locator.h:266 | — |
 | `BytesResource.locateResource` | method | tesseract/common/resource_locator.h:263 | — |
@@ -187,7 +195,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `ResourceLocator.__eq__` | operator | tesseract/common/resource_locator.h:74 | — |
 | `ResourceLocator.__ne__` | operator | tesseract/common/resource_locator.h:75 | — |
 | `SimpleLocatedResource.__eq__` | operator | tesseract/common/resource_locator.h:232 | — |
-| `SimpleLocatedResource.__init__` | constructor | tesseract/common/resource_locator.h:205 | 0 |
 | `SimpleLocatedResource.__ne__` | operator | tesseract/common/resource_locator.h:233 | — |
 | `SimpleLocatedResource.locateResource` | method | tesseract/common/resource_locator.h:230 | — |
 | `StringAttribute` | function | tesseract/common/utils.h:465 | — |
@@ -216,7 +223,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `ltrim` | function | tesseract/common/utils.h:260 | — |
 | `makeOrderedLinkPair` | function | tesseract/common/types.h:46 | — |
 | `numeric_cast` | function | tesseract/common/utils.h:617 | — |
-| `operator<<` | function | tesseract/common/allowed_collision_matrix.h:108 | — |
 | `operator==` | function | tesseract/common/allowed_collision_matrix.h:17 | — |
 | `pointersComparison` | function | tesseract/common/utils.h:404 | — |
 | `pointersEqual` | function | tesseract/common/utils.h:393 | — |
@@ -248,39 +254,41 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 | Python name | kind | stub:line | arity |
 |---|---|---|---|
-| `AngleAxisd.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:236 | — |
 | `CollisionMarginData.getPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:502 | — |
 | `CollisionMarginData.setPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:504 | — |
 | `CollisionMarginOverrideType` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:468 | — |
-| `EIGEN_DEFAULT_PREC` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:12 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/__init__.py:22 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:300 | — |
-| `FilesystemPath.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:311 | — |
-| `FilesystemPath.__str__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:309 | — |
-| `Hyperplane3d` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:238 | — |
-| `Hyperplane3d.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:268 | — |
 | `Isometry3d.__mul__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:59 | — |
-| `Isometry3d.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:97 | — |
-| `ManipulatorInfo.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:379 | — |
-| `ParametrizedLine3d` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:270 | — |
-| `ParametrizedLine3d.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:298 | — |
 | `Quaterniond.__mul__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:183 | — |
-| `Quaterniond.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:212 | — |
-| `Quaterniond.from_rpy` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:156 | — |
-| `Quaterniond.to_rpy` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:208 | — |
 | `TransformMap` | class | src/tesseract_robotics/tesseract_common/__init__.py:39 | — |
 | `Translation3d.__mul__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:120 | — |
-| `Translation3d.__repr__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:130 | — |
-| `VectorIsometry3d.__len__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:653 | — |
-| `VectorVector3d.__len__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:640 | — |
-| `VectorVector3d.__setitem__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:644 | — |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
+| `AngleAxisd.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:236 |
+| `BytesResource.__init__` | serialization-default-ctor | tesseract/common/resource_locator.h:248 |
+| `EIGEN_DEFAULT_PREC` | eigen-default-precision | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:12 |
+| `FilesystemPath.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:311 |
+| `FilesystemPath.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:309 |
+| `Hyperplane3d` | eigen-template-instance | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:238 |
+| `Hyperplane3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:268 |
+| `Isometry3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:97 |
+| `ManipulatorInfo.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:379 |
+| `ParametrizedLine3d` | eigen-template-instance | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:270 |
+| `ParametrizedLine3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:298 |
 | `Quaterniond.__init__` | scalar-last-quaternion | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:134 |
+| `Quaterniond.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:212 |
+| `Quaterniond.from_rpy` | quaternion-rpy | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:156 |
 | `Quaterniond.from_xyzw` | scalar-last-quaternion | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:152 |
+| `Quaterniond.to_rpy` | quaternion-rpy | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:208 |
+| `SimpleLocatedResource.__init__` | serialization-default-ctor | tesseract/common/resource_locator.h:205 |
+| `Translation3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:130 |
+| `VectorIsometry3d.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:653 |
+| `VectorVector3d.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:640 |
+| `VectorVector3d.__setitem__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:644 |
 
 ## tesseract_environment
 
@@ -291,34 +299,24 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `AddKinematicsInformationCommand.__eq__` | operator | tesseract/environment/commands/add_kinematics_information_command.h:56 | — |
 | `AddKinematicsInformationCommand.__ne__` | operator | tesseract/environment/commands/add_kinematics_information_command.h:57 | — |
 | `AddLinkCommand.__eq__` | operator | tesseract/environment/commands/add_link_command.h:97 | — |
-| `AddLinkCommand.__init__` | constructor | tesseract/environment/commands/add_link_command.h:47 | 0 |
 | `AddLinkCommand.__ne__` | operator | tesseract/environment/commands/add_link_command.h:98 | — |
 | `AddSceneGraphCommand.__eq__` | operator | tesseract/environment/commands/add_scene_graph_command.h:79 | — |
-| `AddSceneGraphCommand.__init__` | constructor | tesseract/environment/commands/add_scene_graph_command.h:48 | 0 |
 | `AddSceneGraphCommand.__ne__` | operator | tesseract/environment/commands/add_scene_graph_command.h:80 | — |
 | `ChangeCollisionMarginsCommand.__eq__` | operator | tesseract/environment/commands/change_collision_margins_command.h:68 | — |
-| `ChangeCollisionMarginsCommand.__init__` | constructor | tesseract/environment/commands/change_collision_margins_command.h:51 | 0 |
 | `ChangeCollisionMarginsCommand.__ne__` | operator | tesseract/environment/commands/change_collision_margins_command.h:69 | — |
 | `ChangeJointAccelerationLimitsCommand.__eq__` | operator | tesseract/environment/commands/change_joint_acceleration_limits_command.h:65 | — |
-| `ChangeJointAccelerationLimitsCommand.__init__` | constructor | tesseract/environment/commands/change_joint_acceleration_limits_command.h:48 | 0 |
 | `ChangeJointAccelerationLimitsCommand.__ne__` | operator | tesseract/environment/commands/change_joint_acceleration_limits_command.h:66 | — |
 | `ChangeJointOriginCommand.__eq__` | operator | tesseract/environment/commands/change_joint_origin_command.h:67 | — |
-| `ChangeJointOriginCommand.__init__` | constructor | tesseract/environment/commands/change_joint_origin_command.h:52 | 0 |
 | `ChangeJointOriginCommand.__ne__` | operator | tesseract/environment/commands/change_joint_origin_command.h:68 | — |
 | `ChangeJointPositionLimitsCommand.__eq__` | operator | tesseract/environment/commands/change_joint_position_limits_command.h:66 | — |
-| `ChangeJointPositionLimitsCommand.__init__` | constructor | tesseract/environment/commands/change_joint_position_limits_command.h:48 | 0 |
 | `ChangeJointPositionLimitsCommand.__ne__` | operator | tesseract/environment/commands/change_joint_position_limits_command.h:67 | — |
 | `ChangeJointVelocityLimitsCommand.__eq__` | operator | tesseract/environment/commands/change_joint_velocity_limits_command.h:65 | — |
-| `ChangeJointVelocityLimitsCommand.__init__` | constructor | tesseract/environment/commands/change_joint_velocity_limits_command.h:48 | 0 |
 | `ChangeJointVelocityLimitsCommand.__ne__` | operator | tesseract/environment/commands/change_joint_velocity_limits_command.h:66 | — |
 | `ChangeLinkCollisionEnabledCommand.__eq__` | operator | tesseract/environment/commands/change_link_collision_enabled_command.h:59 | — |
-| `ChangeLinkCollisionEnabledCommand.__init__` | constructor | tesseract/environment/commands/change_link_collision_enabled_command.h:47 | 0 |
 | `ChangeLinkCollisionEnabledCommand.__ne__` | operator | tesseract/environment/commands/change_link_collision_enabled_command.h:60 | — |
 | `ChangeLinkOriginCommand.__eq__` | operator | tesseract/environment/commands/change_link_origin_command.h:58 | — |
-| `ChangeLinkOriginCommand.__init__` | constructor | tesseract/environment/commands/change_link_origin_command.h:51 | 0 |
 | `ChangeLinkOriginCommand.__ne__` | operator | tesseract/environment/commands/change_link_origin_command.h:59 | — |
 | `ChangeLinkVisibilityCommand.__eq__` | operator | tesseract/environment/commands/change_link_visibility_command.h:59 | — |
-| `ChangeLinkVisibilityCommand.__init__` | constructor | tesseract/environment/commands/change_link_visibility_command.h:47 | 0 |
 | `ChangeLinkVisibilityCommand.__ne__` | operator | tesseract/environment/commands/change_link_visibility_command.h:60 | — |
 | `Command.__eq__` | operator | tesseract/environment/command.h:87 | — |
 | `Command.__init__` | constructor | tesseract/environment/command.h:78 | — |
@@ -356,25 +354,18 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `EnvironmentContactAllowedValidator` | class | tesseract/environment/environment.h:72 | — |
 | `Event.__init__` | constructor | tesseract/environment/events.h:48 | — |
 | `ModifyAllowedCollisionsCommand.__eq__` | operator | tesseract/environment/commands/modify_allowed_collisions_command.h:61 | — |
-| `ModifyAllowedCollisionsCommand.__init__` | constructor | tesseract/environment/commands/modify_allowed_collisions_command.h:54 | 0 |
 | `ModifyAllowedCollisionsCommand.__ne__` | operator | tesseract/environment/commands/modify_allowed_collisions_command.h:62 | — |
 | `MoveJointCommand.__eq__` | operator | tesseract/environment/commands/move_joint_command.h:62 | — |
-| `MoveJointCommand.__init__` | constructor | tesseract/environment/commands/move_joint_command.h:47 | 0 |
 | `MoveJointCommand.__ne__` | operator | tesseract/environment/commands/move_joint_command.h:63 | — |
 | `MoveLinkCommand.__eq__` | operator | tesseract/environment/commands/move_link_command.h:60 | — |
-| `MoveLinkCommand.__init__` | constructor | tesseract/environment/commands/move_link_command.h:47 | 0 |
 | `MoveLinkCommand.__ne__` | operator | tesseract/environment/commands/move_link_command.h:61 | — |
 | `RemoveAllowedCollisionLinkCommand.__eq__` | operator | tesseract/environment/commands/remove_allowed_collision_link_command.h:57 | — |
-| `RemoveAllowedCollisionLinkCommand.__init__` | constructor | tesseract/environment/commands/remove_allowed_collision_link_command.h:47 | 0 |
 | `RemoveAllowedCollisionLinkCommand.__ne__` | operator | tesseract/environment/commands/remove_allowed_collision_link_command.h:58 | — |
 | `RemoveJointCommand.__eq__` | operator | tesseract/environment/commands/remove_joint_command.h:60 | — |
-| `RemoveJointCommand.__init__` | constructor | tesseract/environment/commands/remove_joint_command.h:47 | 0 |
 | `RemoveJointCommand.__ne__` | operator | tesseract/environment/commands/remove_joint_command.h:61 | — |
 | `RemoveLinkCommand.__eq__` | operator | tesseract/environment/commands/remove_link_command.h:60 | — |
-| `RemoveLinkCommand.__init__` | constructor | tesseract/environment/commands/remove_link_command.h:47 | 0 |
 | `RemoveLinkCommand.__ne__` | operator | tesseract/environment/commands/remove_link_command.h:61 | — |
 | `ReplaceJointCommand.__eq__` | operator | tesseract/environment/commands/replace_joint_command.h:65 | — |
-| `ReplaceJointCommand.__init__` | constructor | tesseract/environment/commands/replace_joint_command.h:46 | 0 |
 | `ReplaceJointCommand.__ne__` | operator | tesseract/environment/commands/replace_joint_command.h:66 | — |
 | `SceneStateChangedEvent.__init__` | constructor | tesseract/environment/events.h:77 | — |
 | `checkTrajectorySegment` | function | tesseract/environment/utils.h:67 | — |
@@ -411,6 +402,23 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 | symbol | rule | location |
 |---|---|---|
+| `AddLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_link_command.h:47 |
+| `AddSceneGraphCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_scene_graph_command.h:48 |
+| `ChangeCollisionMarginsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_collision_margins_command.h:51 |
+| `ChangeJointAccelerationLimitsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_acceleration_limits_command.h:48 |
+| `ChangeJointOriginCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_origin_command.h:52 |
+| `ChangeJointPositionLimitsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_position_limits_command.h:48 |
+| `ChangeJointVelocityLimitsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_velocity_limits_command.h:48 |
+| `ChangeLinkCollisionEnabledCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_link_collision_enabled_command.h:47 |
+| `ChangeLinkOriginCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_link_origin_command.h:51 |
+| `ChangeLinkVisibilityCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_link_visibility_command.h:47 |
+| `ModifyAllowedCollisionsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/modify_allowed_collisions_command.h:54 |
+| `MoveJointCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/move_joint_command.h:47 |
+| `MoveLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/move_link_command.h:47 |
+| `RemoveAllowedCollisionLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/remove_allowed_collision_link_command.h:47 |
+| `RemoveJointCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/remove_joint_command.h:47 |
+| `RemoveLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/remove_link_command.h:47 |
+| `ReplaceJointCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/replace_joint_command.h:46 |
 | `checkTrajectory` | out-param | tesseract/environment/utils.h:109 |
 | `checkTrajectory` | out-param | tesseract/environment/utils.h:127 |
 | `checkTrajectory` | out-param | tesseract/environment/utils.h:145 |
