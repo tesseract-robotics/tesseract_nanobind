@@ -82,8 +82,9 @@ def tesseract_env_to_glb(t_env, origin_offset=[0, 0, 0], name=None):
 def tesseract_env_to_gltf_dict_and_buf(t_env, origin_offset=[0, 0, 0], name=None):
     assert len(list(origin_offset)) == 3
 
-    link_names = t_env.getLinkIds()
-    joint_names = t_env.getJointIds()
+    # ids stop here: gltf names and extras are JSON strings
+    link_names = [i.name() for i in t_env.getLinkIds()]
+    joint_names = [i.name() for i in t_env.getJointIds()]
 
     link_map = dict()
     joint_map = dict()
@@ -93,7 +94,7 @@ def tesseract_env_to_gltf_dict_and_buf(t_env, origin_offset=[0, 0, 0], name=None
     for j in joint_names:
         joint_map[j] = t_env.getJoint(j)
 
-    root_link_name = t_env.getRootLinkId()
+    root_link_name = t_env.getRootLinkId().name()
 
     gltf_scene = {"nodes": [0]}
     if name is not None:
@@ -190,7 +191,7 @@ def _append_link_recursive(
             gltf_buf_io,
             link_map,
             joint_map,
-            j.child_link_id,
+            j.child_link_id.name(),
             shapes_mesh_inds,
         )
         joint_node["children"] = [j_link_ind]
