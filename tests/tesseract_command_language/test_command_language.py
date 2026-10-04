@@ -114,7 +114,7 @@ class TestCartesianWaypoint:
         wp.setSeed(JointState(names, position))
 
         seed = wp.getSeed()
-        assert seed.joint_names == names
+        assert seed.joint_ids == names
         np.testing.assert_array_almost_equal(seed.position, position)
 
 
@@ -153,7 +153,7 @@ class TestWaypointPoly:
         assert poly.hasSeed()
 
         seed = poly.getSeed()
-        assert seed.joint_names == names
+        assert seed.joint_ids == names
         np.testing.assert_array_almost_equal(seed.position, position)
 
         poly.clearSeed()

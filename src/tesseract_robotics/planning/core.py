@@ -37,6 +37,7 @@ from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
+    LinkId,
     ManipulatorInfo,
 )
 from tesseract_robotics.tesseract_environment import (
@@ -250,7 +251,7 @@ class Robot:
 
         if joint_names is None:
             # Get all joint names from the state's joints dict
-            joint_names = list(env_state.joints.keys())
+            joint_names = [jid.name() for jid in env_state.joints]
 
         positions = env_state.getJointValues(joint_names)
 
@@ -293,11 +294,11 @@ class Robot:
             List of joint names
         """
         group = self.env.getJointGroup(group_name)
-        return list(group.getJointIds())
+        return [jid.name() for jid in group.getJointIds()]
 
     def get_link_names(self) -> list[str]:
         """Get all link names in the robot."""
-        return list(self.env.getLinkIds())
+        return [lid.name() for lid in self.env.getLinkIds()]
 
     def get_joint_limits(self, group_name: str) -> dict[str, dict[str, float]]:
         """
@@ -313,7 +314,7 @@ class Robot:
         limits = group.getLimits()
 
         result = {}
-        joint_names = list(group.getJointIds())
+        joint_names = [jid.name() for jid in group.getJointIds()]
         for i, name in enumerate(joint_names):
             result[name] = {
                 "lower": float(limits.joint_limits[i, 0]),
@@ -345,7 +346,7 @@ class Robot:
 
         poses = group.calcFwdKin(joint_positions)
 
-        return Pose(poses[tip_link])
+        return Pose(poses[LinkId(tip_link)])
 
     def ik(
         self,
@@ -373,7 +374,7 @@ class Robot:
         group = self.env.getKinematicGroup(group_name)
 
         if seed is None:
-            seed = self.get_state(list(group.getJointIds())).joint_positions
+            seed = self.get_state([jid.name() for jid in group.getJointIds()]).joint_positions
         else:
             seed = np.asarray(seed, dtype=np.float64)
 

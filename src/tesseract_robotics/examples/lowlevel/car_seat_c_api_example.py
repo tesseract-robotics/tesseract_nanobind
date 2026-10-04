@@ -395,7 +395,7 @@ def run():
 
     # Get joint ordering from SRDF-defined "manipulator" group
     joint_group = robot.env.getJointGroup("manipulator")
-    joint_names = list(joint_group.getJointIds())
+    joint_names = [jid.name() for jid in joint_group.getJointIds()]
     print(f"Joint names: {joint_names}")
 
     # === PHASE 1: ADD SEATS TO ENVIRONMENT ===
