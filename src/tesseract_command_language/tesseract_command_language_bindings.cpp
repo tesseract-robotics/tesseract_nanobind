@@ -128,12 +128,12 @@ NB_MODULE(_tesseract_command_language, m) {
     // ========== JointWaypoint ==========
     auto joint_waypoint = nb::class_<tp::JointWaypoint>(m, "JointWaypoint")
         .def(nb::init<>())
-        .def(nb::init<std::vector<std::string>, const Eigen::VectorXd&, bool>(),
-             "names"_a, "position"_a, "is_constrained"_a = true)
-        .def(nb::init<std::vector<std::string>, const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&>(),
-             "names"_a, "position"_a, "lower_tol"_a, "upper_tol"_a)
-        .def("setNames", &tp::JointWaypoint::setNames, "names"_a)
-        .def("getNames", [](const tp::JointWaypoint& self) { return self.getNames(); })
+        .def(nb::init<std::vector<tesseract::common::JointId>, const Eigen::VectorXd&, bool>(),
+             "joint_ids"_a, "position"_a, "is_constrained"_a = true)
+        .def(nb::init<std::vector<tesseract::common::JointId>, const Eigen::VectorXd&, const Eigen::VectorXd&, const Eigen::VectorXd&>(),
+             "joint_ids"_a, "position"_a, "lower_tol"_a, "upper_tol"_a)
+        .def("setJointIds", &tp::JointWaypoint::setJointIds, "ids"_a)
+        .def("getJointIds", [](const tp::JointWaypoint& self) { return self.getJointIds(); })
         .def("setPosition", &tp::JointWaypoint::setPosition, "position"_a)
         .def("getPosition", [](const tp::JointWaypoint& self) -> Eigen::VectorXd { return self.getPosition(); })
         .def("setUpperTolerance", &tp::JointWaypoint::setUpperTolerance, "upper_tol"_a)
@@ -171,13 +171,13 @@ NB_MODULE(_tesseract_command_language, m) {
     // ========== StateWaypoint ==========
     auto state_waypoint = nb::class_<tp::StateWaypoint>(m, "StateWaypoint")
         .def(nb::init<>())
-        .def(nb::init<std::vector<std::string>, const Eigen::Ref<const Eigen::VectorXd>&>(),
-             "joint_names"_a, "position"_a)
-        .def(nb::init<const std::vector<std::string>&, const Eigen::VectorXd&, const Eigen::VectorXd&,
+        .def(nb::init<std::vector<tesseract::common::JointId>, const Eigen::Ref<const Eigen::VectorXd>&>(),
+             "joint_ids"_a, "position"_a)
+        .def(nb::init<const std::vector<tesseract::common::JointId>&, const Eigen::VectorXd&, const Eigen::VectorXd&,
                       const Eigen::VectorXd&, double>(),
-             "names"_a, "position"_a, "velocity"_a, "acceleration"_a, "time"_a)
-        .def("setNames", &tp::StateWaypoint::setNames, "names"_a)
-        .def("getNames", [](const tp::StateWaypoint& self) { return self.getNames(); })
+             "joint_ids"_a, "position"_a, "velocity"_a, "acceleration"_a, "time"_a)
+        .def("setJointIds", &tp::StateWaypoint::setJointIds, "ids"_a)
+        .def("getJointIds", [](const tp::StateWaypoint& self) { return self.getJointIds(); })
         .def("setPosition", &tp::StateWaypoint::setPosition, "position"_a)
         .def("getPosition", [](const tp::StateWaypoint& self) -> Eigen::VectorXd { return self.getPosition(); })
         .def("setVelocity", &tp::StateWaypoint::setVelocity, "velocity"_a)
@@ -288,8 +288,8 @@ NB_MODULE(_tesseract_command_language, m) {
     joint_waypoint_poly
         .def(nb::init<>())
         .def(nb::init<tp::JointWaypoint>(), "waypoint"_a)
-        .def("getNames", [](const tp::JointWaypointPoly& self) { return self.getNames(); })
-        .def("setNames", &tp::JointWaypointPoly::setNames, "names"_a)
+        .def("getJointIds", [](const tp::JointWaypointPoly& self) { return self.getJointIds(); })
+        .def("setJointIds", &tp::JointWaypointPoly::setJointIds, "ids"_a)
         .def("getPosition", [](const tp::JointWaypointPoly& self) -> Eigen::VectorXd {
             return self.getPosition();
         })
@@ -320,8 +320,8 @@ NB_MODULE(_tesseract_command_language, m) {
     state_waypoint_poly
         .def(nb::init<>())
         .def(nb::init<tp::StateWaypoint>(), "waypoint"_a)
-        .def("getNames", [](const tp::StateWaypointPoly& self) { return self.getNames(); })
-        .def("setNames", &tp::StateWaypointPoly::setNames, "names"_a)
+        .def("getJointIds", [](const tp::StateWaypointPoly& self) { return self.getJointIds(); })
+        .def("setJointIds", &tp::StateWaypointPoly::setJointIds, "ids"_a)
         .def("getPosition", [](const tp::StateWaypointPoly& self) -> Eigen::VectorXd {
             return self.getPosition();
         })

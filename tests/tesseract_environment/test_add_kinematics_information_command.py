@@ -114,14 +114,14 @@ class TestAddKinematicsInformationCommand:
 
         kg = env.getKinematicGroup("manipulator")
         assert kg is not None
-        assert len(list(kg.getJointNames())) == 6
+        assert len(list(kg.getJointIds())) == 6
 
         # FK -> IK round trip actually solves through the registered KDL plugin.
         q = np.array([0.1, 0.2, -0.15, 0.05, 0.3, 0.12])
         target = kg.calcFwdKin(q)["tool0"]
         ik_in = KinGroupIKInput()
         ik_in.pose = target
-        ik_in.tip_link_name = "tool0"
+        ik_in.tip_link_id = "tool0"
         ik_in.working_frame = "base_link"
         ik_ins = KinGroupIKInputs()
         ik_ins.append(ik_in)
