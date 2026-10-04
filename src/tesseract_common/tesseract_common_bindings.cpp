@@ -8,6 +8,9 @@
 // Opaque declarations for vector types we want to bind as classes
 using VectorVector3d = tesseract::common::VectorVector3d;  // std::vector<Eigen::Vector3d>
 using VectorIsometry3d = tesseract::common::VectorIsometry3d;  // std::vector<Eigen::Isometry3d>
+
+// [joint units: rad or m] satisfiesLimits' scalar max_diff default, copied from kinematic_limits.h
+constexpr double SATISFIES_LIMITS_DEFAULT_MAX_DIFF = 1e-6;
 NB_MAKE_OPAQUE(VectorVector3d)
 NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract/common/resource_locator.h>
@@ -894,6 +897,24 @@ NB_MODULE(_tesseract_common, m) {
         .def_rw("joint_limits", &tesseract::common::KinematicLimits::joint_limits)
         .def_rw("velocity_limits", &tesseract::common::KinematicLimits::velocity_limits)
         .def_rw("acceleration_limits", &tesseract::common::KinematicLimits::acceleration_limits);
+
+    // satisfiesLimits<double>: scalar-tolerance overload (with upstream's defaults) and
+    // per-axis-tolerance overload. Defaults mirror kinematic_limits.h.
+    using RefVectorXd = Eigen::Ref<const Eigen::VectorXd>;
+    using RefLimits = Eigen::Ref<const Eigen::Matrix<double, Eigen::Dynamic, 2>>;
+    m.def("satisfiesLimits",
+        [](const RefVectorXd& values, const RefLimits& limits, double max_diff, double max_rel_diff) {
+            return tesseract::common::satisfiesLimits<double>(values, limits, max_diff, max_rel_diff);
+        },
+        "values"_a, "limits"_a,
+        "max_diff"_a = SATISFIES_LIMITS_DEFAULT_MAX_DIFF,
+        "max_rel_diff"_a = std::numeric_limits<double>::epsilon());
+    m.def("satisfiesLimits",
+        [](const RefVectorXd& values, const RefLimits& limits,
+           const RefVectorXd& max_diff, const RefVectorXd& max_rel_diff) {
+            return tesseract::common::satisfiesLimits<double>(values, limits, max_diff, max_rel_diff);
+        },
+        "values"_a, "limits"_a, "max_diff"_a, "max_rel_diff"_a);
 
     // ========== PluginInfo ==========
     // `config` is a YAML::Node in C++, which nanobind has no caster for. Expose it as a

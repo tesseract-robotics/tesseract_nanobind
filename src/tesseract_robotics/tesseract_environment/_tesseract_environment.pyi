@@ -42,6 +42,18 @@ def cast_CommandAppliedEvent(arg: Event, /) -> CommandAppliedEvent:
 def cast_SceneStateChangedEvent(arg: Event, /) -> SceneStateChangedEvent:
     """Cast Event to SceneStateChangedEvent"""
 
+@overload
+def checkTrajectory(manager: tesseract_robotics.tesseract_collision._tesseract_collision.DiscreteContactManager, state_solver: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.StateSolver, joint_names: Sequence[str], traj: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')], config: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig) -> tuple[tesseract_robotics.tesseract_collision._tesseract_collision.ContactTrajectoryResults, list[tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap]]: ...
+
+@overload
+def checkTrajectory(manager: tesseract_robotics.tesseract_collision._tesseract_collision.DiscreteContactManager, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, traj: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')], config: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig) -> tuple[tesseract_robotics.tesseract_collision._tesseract_collision.ContactTrajectoryResults, list[tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap]]: ...
+
+@overload
+def checkTrajectory(manager: tesseract_robotics.tesseract_collision._tesseract_collision.ContinuousContactManager, state_solver: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.StateSolver, joint_names: Sequence[str], traj: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')], config: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig) -> tuple[tesseract_robotics.tesseract_collision._tesseract_collision.ContactTrajectoryResults, list[tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap]]: ...
+
+@overload
+def checkTrajectory(manager: tesseract_robotics.tesseract_collision._tesseract_collision.ContinuousContactManager, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, traj: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')], config: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig) -> tuple[tesseract_robotics.tesseract_collision._tesseract_collision.ContactTrajectoryResults, list[tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap]]: ...
+
 class EventCallbackFn:
     def __init__(self, callback: Callable) -> None: ...
 

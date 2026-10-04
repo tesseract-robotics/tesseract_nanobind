@@ -26,6 +26,11 @@
   - `KinematicsPluginFactory` found `FilesystemPath` only if `tesseract_common` had been imported first. Kinematics now imports it itself.
 
   A test rejects any `std::` type left in a stub ([#159]).
+- **`checkTrajectory`, `satisfiesLimits` and the continuous contact fields bound** ([#158]):
+  - `tesseract_environment.checkTrajectory` binds all four C++ overloads: a discrete or continuous manager, each with either a `StateSolver` plus joint names or a `JointGroup`. The C++ `contacts` out-parameter is returned instead: the call returns `(ContactTrajectoryResults, list[ContactResultMap])`. The GIL is released while the trajectory is checked.
+  - `ContactTrajectoryResults`, `ContactTrajectoryStepResults` and `ContactTrajectorySubstepResults` are new in `tesseract_collision`. Their table and summary methods return `str`.
+  - `ContactResult.cc_time` and `cc_type` (two entries each) are bound. Assigning a list of any other length raises `TypeError`.
+  - `tesseract_common.satisfiesLimits` has a scalar-tolerance overload, with the C++ defaults (`max_diff=1e-6`, `max_rel_diff` = double epsilon), and a per-joint-tolerance overload.
 
 ## [0.35.0.7] — TrajOptIfopt tuning + Cartesian planning fixes
 
@@ -229,6 +234,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#149]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/149
 [#150]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/150
 [#157]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/157
+[#158]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/158
 [#159]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/159
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593

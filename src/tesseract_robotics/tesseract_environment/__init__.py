@@ -50,6 +50,8 @@ __all__ = [
     "Event",
     "CommandAppliedEvent",
     "SceneStateChangedEvent",
+    # Utils
+    "checkTrajectory",
     # AnyPoly wrapper (re-exported from task_composer for SWIG compatibility)
     "AnyPoly_wrap_EnvironmentConst",
 ]

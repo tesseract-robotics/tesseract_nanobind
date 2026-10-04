@@ -16,6 +16,7 @@
 // tesseract_environment
 #include <tesseract/environment/environment.h>
 #include <tesseract/environment/events.h>
+#include <tesseract/environment/utils.h>
 #include <tesseract/environment/command.h>
 #include <tesseract/environment/commands/add_link_command.h>
 #include <tesseract/environment/commands/add_kinematics_information_command.h>
@@ -65,8 +66,40 @@ namespace te = tesseract::environment;
 namespace tsg = tesseract::scene_graph;
 namespace tc = tesseract::common;
 namespace tk = tesseract::kinematics;
+namespace tcol = tesseract::collision;
 
 namespace {
+// checkTrajectory's `std::vector<ContactResultMap>& contacts` out-param is returned
+// alongside the summary instead: Python gets (ContactTrajectoryResults, list[ContactResultMap]).
+using CheckTrajectoryResult = std::pair<tcol::ContactTrajectoryResults, std::vector<tcol::ContactResultMap>>;
+
+// The trajectory loop is pure C++ and can run for seconds, so the GIL is released for it.
+// Released in-body rather than via call_guard so the result is cast back with the GIL held.
+template <typename Manager>
+CheckTrajectoryResult check_trajectory(Manager& manager,
+                                       const tsg::StateSolver& state_solver,
+                                       const std::vector<std::string>& joint_names,
+                                       const tc::TrajArray& traj,
+                                       const tcol::CollisionCheckConfig& config)
+{
+    CheckTrajectoryResult out;
+    nb::gil_scoped_release release;
+    out.first = te::checkTrajectory(out.second, manager, state_solver, joint_names, traj, config);
+    return out;
+}
+
+template <typename Manager>
+CheckTrajectoryResult check_trajectory(Manager& manager,
+                                       const tk::JointGroup& manip,
+                                       const tc::TrajArray& traj,
+                                       const tcol::CollisionCheckConfig& config)
+{
+    CheckTrajectoryResult out;
+    nb::gil_scoped_release release;
+    out.first = te::checkTrajectory(out.second, manager, manip, traj, config);
+    return out;
+}
+
 // GH #43: Environment::setState forwards joint names straight into the state
 // solver, which dereferences unknown names unchecked -> SIGSEGV with no Python
 // traceback. The binding owns the Python boundary, so validate here and fail
@@ -183,6 +216,31 @@ NB_MODULE(_tesseract_environment, m) {
     m.def("cast_SceneStateChangedEvent", [](const te::Event& evt) -> const te::SceneStateChangedEvent& {
         return static_cast<const te::SceneStateChangedEvent&>(evt);
     }, nb::rv_policy::reference, "Cast Event to SceneStateChangedEvent");
+
+    // ========== checkTrajectory (utils.h) ==========
+    // {discrete, continuous} manager x {StateSolver + joint_names, JointGroup}
+    m.def("checkTrajectory",
+        [](tcol::DiscreteContactManager& manager, const tsg::StateSolver& state_solver,
+           const std::vector<std::string>& joint_names, const tc::TrajArray& traj,
+           const tcol::CollisionCheckConfig& config) {
+            return check_trajectory(manager, state_solver, joint_names, traj, config);
+        }, "manager"_a, "state_solver"_a, "joint_names"_a, "traj"_a, "config"_a);
+    m.def("checkTrajectory",
+        [](tcol::DiscreteContactManager& manager, const tk::JointGroup& manip,
+           const tc::TrajArray& traj, const tcol::CollisionCheckConfig& config) {
+            return check_trajectory(manager, manip, traj, config);
+        }, "manager"_a, "manip"_a, "traj"_a, "config"_a);
+    m.def("checkTrajectory",
+        [](tcol::ContinuousContactManager& manager, const tsg::StateSolver& state_solver,
+           const std::vector<std::string>& joint_names, const tc::TrajArray& traj,
+           const tcol::CollisionCheckConfig& config) {
+            return check_trajectory(manager, state_solver, joint_names, traj, config);
+        }, "manager"_a, "state_solver"_a, "joint_names"_a, "traj"_a, "config"_a);
+    m.def("checkTrajectory",
+        [](tcol::ContinuousContactManager& manager, const tk::JointGroup& manip,
+           const tc::TrajArray& traj, const tcol::CollisionCheckConfig& config) {
+            return check_trajectory(manager, manip, traj, config);
+        }, "manager"_a, "manip"_a, "traj"_a, "config"_a);
 
     // EventCallbackFn wrapper for Python callbacks
     nb::class_<PyEventCallbackFn>(m, "EventCallbackFn")

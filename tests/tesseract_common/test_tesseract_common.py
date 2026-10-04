@@ -1,6 +1,7 @@
 import io
 from inspect import currentframe, getframeinfo
 
+import numpy as np
 import numpy.testing as nptest
 
 from tesseract_robotics import tesseract_common
@@ -70,3 +71,44 @@ def test_manipulator_info():
     info.tcp_offset = transform
     transform2 = info.tcp_offset
     nptest.assert_allclose(transform2.matrix, transform.matrix)
+
+
+# satisfiesLimits (gh-158). Tolerances in joint units (rad); upstream scalar default max_diff is 1e-6.
+SATISFIES_LIMITS_INSIDE_DEFAULT_TOL = 1e-7  # [rad] overshoot below the 1e-6 default max_diff
+SATISFIES_LIMITS_OUTSIDE_DEFAULT_TOL = 1e-5  # [rad] overshoot above the 1e-6 default max_diff
+SATISFIES_LIMITS_LOOSE_TOL = 1e-4  # [rad] max_diff that admits the 1e-5 overshoot
+SATISFIES_LIMITS_NO_REL_TOL = 0.0  # disable the relative check so only max_diff decides
+
+_LIMITS = np.array([[-1.0, 1.0], [-2.0, 2.0]])
+
+
+def test_satisfies_limits_inside():
+    assert tesseract_common.satisfiesLimits(np.array([0.5, -1.5]), _LIMITS)
+
+
+def test_satisfies_limits_outside():
+    assert not tesseract_common.satisfiesLimits(np.array([1.1, 0.0]), _LIMITS)
+
+
+def test_satisfies_limits_default_max_diff():
+    near = np.array([1.0 + SATISFIES_LIMITS_INSIDE_DEFAULT_TOL, 0.0])
+    over = np.array([1.0 + SATISFIES_LIMITS_OUTSIDE_DEFAULT_TOL, 0.0])
+    assert tesseract_common.satisfiesLimits(near, _LIMITS)
+    assert not tesseract_common.satisfiesLimits(over, _LIMITS)
+
+
+def test_satisfies_limits_scalar_tolerance_kwargs():
+    over = np.array([1.0 + SATISFIES_LIMITS_OUTSIDE_DEFAULT_TOL, 0.0])
+    assert tesseract_common.satisfiesLimits(
+        over, _LIMITS, max_diff=SATISFIES_LIMITS_LOOSE_TOL, max_rel_diff=SATISFIES_LIMITS_NO_REL_TOL
+    )
+
+
+def test_satisfies_limits_per_axis_tolerance():
+    # both joints overshoot by 1e-5; only axis 0 gets the loose tolerance
+    over = np.array([1.0, 2.0]) + SATISFIES_LIMITS_OUTSIDE_DEFAULT_TOL
+    no_rel = np.full(2, SATISFIES_LIMITS_NO_REL_TOL)
+    loose_0 = np.array([SATISFIES_LIMITS_LOOSE_TOL, SATISFIES_LIMITS_INSIDE_DEFAULT_TOL])
+    loose_both = np.full(2, SATISFIES_LIMITS_LOOSE_TOL)
+    assert not tesseract_common.satisfiesLimits(over, _LIMITS, loose_0, no_rel)
+    assert tesseract_common.satisfiesLimits(over, _LIMITS, loose_both, no_rel)

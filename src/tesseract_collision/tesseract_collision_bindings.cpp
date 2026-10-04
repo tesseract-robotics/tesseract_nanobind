@@ -129,7 +129,9 @@ NB_MODULE(_tesseract_collision, m) {
                 if (v.size() >= 2) { self.transform[0] = v[0]; self.transform[1] = v[1]; }
             })
         .def_rw("normal", &tc::ContactResult::normal)
-        .def_rw("single_contact_point", &tc::ContactResult::single_contact_point)
+        .def_rw("cc_time", &tc::ContactResult::cc_time)
+        .def_rw("cc_type", &tc::ContactResult::cc_type)
+        .def_rw("single_contact_point",&tc::ContactResult::single_contact_point)
         .def("clear", &tc::ContactResult::clear);
 
     // ========== ContactResultVector ==========
@@ -164,6 +166,69 @@ NB_MODULE(_tesseract_collision, m) {
             self.flattenMoveResults(v);
         }, "results"_a)
         .def("__len__", &tc::ContactResultMap::size);
+
+    // ========== ContactTrajectory{Substep,Step,}Results ==========
+    // Returned by tesseract_environment.checkTrajectory. The std::stringstream summaries are
+    // exposed as str.
+    nb::class_<tc::ContactTrajectorySubstepResults>(m, "ContactTrajectorySubstepResults")
+        .def(nb::init<>())
+        .def(nb::init<int, const Eigen::VectorXd&, const Eigen::VectorXd&>(),
+             "substep"_a, "start_state"_a, "end_state"_a)
+        .def(nb::init<int, const Eigen::VectorXd&>(), "substep"_a, "state"_a)
+        .def("__bool__", [](const tc::ContactTrajectorySubstepResults& self) { return static_cast<bool>(self); })
+        .def("addContact", &tc::ContactTrajectorySubstepResults::addContact,
+             "substep_number"_a, "start_substate"_a, "end_substate"_a, "new_contacts"_a)
+        .def("numContacts", &tc::ContactTrajectorySubstepResults::numContacts)
+        .def("worstCollision", &tc::ContactTrajectorySubstepResults::worstCollision)
+        .def_rw("contacts", &tc::ContactTrajectorySubstepResults::contacts)
+        .def_rw("substep", &tc::ContactTrajectorySubstepResults::substep)
+        .def_rw("state0", &tc::ContactTrajectorySubstepResults::state0)
+        .def_rw("state1", &tc::ContactTrajectorySubstepResults::state1);
+
+    nb::class_<tc::ContactTrajectoryStepResults>(m, "ContactTrajectoryStepResults")
+        .def(nb::init<>())
+        .def(nb::init<int, const Eigen::VectorXd&, const Eigen::VectorXd&, int>(),
+             "step_number"_a, "start_state"_a, "end_state"_a, "num_substeps"_a)
+        .def(nb::init<int, const Eigen::VectorXd&>(), "step_number"_a, "state"_a)
+        .def("__bool__", [](const tc::ContactTrajectoryStepResults& self) { return static_cast<bool>(self); })
+        .def("addContact", &tc::ContactTrajectoryStepResults::addContact,
+             "step_number"_a, "substep_number"_a, "num_substeps"_a, "start_state"_a, "end_state"_a,
+             "start_substate"_a, "end_substate"_a, "contacts"_a)
+        .def("resize", &tc::ContactTrajectoryStepResults::resize, "num_substeps"_a)
+        .def("numSubsteps", &tc::ContactTrajectoryStepResults::numSubsteps)
+        .def("numContacts", &tc::ContactTrajectoryStepResults::numContacts)
+        .def("worstSubstep", &tc::ContactTrajectoryStepResults::worstSubstep)
+        .def("worstCollision", &tc::ContactTrajectoryStepResults::worstCollision)
+        .def("mostCollisionsSubstep", &tc::ContactTrajectoryStepResults::mostCollisionsSubstep)
+        .def_rw("substeps", &tc::ContactTrajectoryStepResults::substeps)
+        .def_rw("step", &tc::ContactTrajectoryStepResults::step)
+        .def_rw("state0", &tc::ContactTrajectoryStepResults::state0)
+        .def_rw("state1", &tc::ContactTrajectoryStepResults::state1)
+        .def_rw("total_substeps", &tc::ContactTrajectoryStepResults::total_substeps);
+
+    nb::class_<tc::ContactTrajectoryResults>(m, "ContactTrajectoryResults")
+        .def(nb::init<>())
+        .def(nb::init<std::vector<std::string>>(), "j_names"_a)
+        .def(nb::init<std::vector<std::string>, int>(), "j_names"_a, "num_steps"_a)
+        .def("__bool__", [](const tc::ContactTrajectoryResults& self) { return static_cast<bool>(self); })
+        .def("addContact", &tc::ContactTrajectoryResults::addContact,
+             "step_number"_a, "substep_number"_a, "num_substeps"_a, "start_state"_a, "end_state"_a,
+             "start_substate"_a, "end_substate"_a, "contacts"_a)
+        .def("resize", &tc::ContactTrajectoryResults::resize, "num_steps"_a)
+        .def("numSteps", &tc::ContactTrajectoryResults::numSteps)
+        .def("numContacts", &tc::ContactTrajectoryResults::numContacts)
+        .def("worstStep", &tc::ContactTrajectoryResults::worstStep)
+        .def("worstCollision", &tc::ContactTrajectoryResults::worstCollision)
+        .def("mostCollisionsStep", &tc::ContactTrajectoryResults::mostCollisionsStep)
+        .def("trajectoryCollisionResultsTable",
+             [](const tc::ContactTrajectoryResults& self) { return self.trajectoryCollisionResultsTable().str(); })
+        .def("collisionFrequencyPerLink",
+             [](const tc::ContactTrajectoryResults& self) { return self.collisionFrequencyPerLink().str(); })
+        .def("condensedSummary",
+             [](const tc::ContactTrajectoryResults& self) { return self.condensedSummary().str(); })
+        .def_rw("steps", &tc::ContactTrajectoryResults::steps)
+        .def_rw("joint_names", &tc::ContactTrajectoryResults::joint_names)
+        .def_rw("total_steps", &tc::ContactTrajectoryResults::total_steps);
 
     // ========== ContactRequest ==========
     nb::class_<tc::ContactRequest>(m, "ContactRequest")

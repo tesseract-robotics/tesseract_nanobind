@@ -135,6 +135,37 @@ contacts = ContactResultMap()
 manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
 ```
 
+Each continuous `ContactResult` says where along the sweep the contact happened. `cc_time[i]` is in `[0, 1]` for a cast link `i` and `-1` for a static one. `cc_type[i]` is a `ContinuousCollisionType`: `CCType_Time0`, `CCType_Time1`, `CCType_Between`, or `CCType_None` for a link that was not cast.
+
+## Trajectory Checking
+
+`checkTrajectory` (from `tesseract_environment`) checks a whole joint trajectory and stops at the first collision. It is a port of the C++ `tesseract::environment::checkTrajectory`, with one difference: C++ fills a `contacts` out-parameter, while Python gets it back as the second element of the returned tuple. That element holds one `ContactResultMap` per checked step or segment.
+
+```python
+import numpy as np
+
+from tesseract_robotics.tesseract_collision import CollisionCheckConfig, CollisionEvaluatorType
+from tesseract_robotics.tesseract_environment import checkTrajectory
+
+traj = np.linspace(start_joints, end_joints, 10)  # (steps, joints), one row per step
+
+config = CollisionCheckConfig()
+config.type = CollisionEvaluatorType.DISCRETE  # CONTINUOUS with a continuous manager
+
+manager = env.getDiscreteContactManager()
+# By joint group...
+results, contacts = checkTrajectory(manager, env.getJointGroup("manipulator"), traj, config)
+# ...or by state solver + joint names (same order as the trajectory columns)
+names = env.getGroupJointNames("manipulator")
+results, contacts = checkTrajectory(manager, env.getStateSolver(), names, traj, config)
+
+if results:  # ContactTrajectoryResults is truthy when any step collided
+    print(results.condensedSummary())
+    worst = results.worstStep()  # ContactTrajectoryStepResults: .step, .substeps, .state0/.state1
+```
+
+Every overload accepts either a `DiscreteContactManager` or a `ContinuousContactManager`. The GIL is released while the trajectory is checked.
+
 ## LVS (Longest Valid Segment)
 
 LVS interpolates between waypoints and checks at discrete points:

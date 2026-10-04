@@ -68,6 +68,7 @@ __all__ = [
     "CollisionMarginOverrideType",
     # Kinematics
     "KinematicLimits",
+    "satisfiesLimits",
     # Console bridge
     "OutputHandler",
     "LogLevel",
