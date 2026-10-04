@@ -282,8 +282,8 @@ def add_seats(robot):
 
         # === JOINT: attach seat to world frame ===
         joint_seat = Joint(f"joint_seat_{i + 1}")
-        joint_seat.parent_link_name = "world"
-        joint_seat.child_link_name = seat_name
+        joint_seat.parent_link_id = "world"
+        joint_seat.child_link_id = seat_name
         joint_seat.type = JointType.FIXED  # Static object, not actuated
 
         # Transform: position (0.5+i, 2.15, 0.45) with 180deg Z rotation
@@ -329,8 +329,8 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
     # === REPARENT SEAT: world -> end_effector ===
     # Create new joint that makes seat a child of end_effector
     joint_seat_robot = Joint(f"joint_{seat_name}_robot")
-    joint_seat_robot.parent_link_name = "end_effector"
-    joint_seat_robot.child_link_name = seat_name
+    joint_seat_robot.parent_link_id = "end_effector"
+    joint_seat_robot.child_link_id = seat_name
     joint_seat_robot.type = JointType.FIXED  # Rigidly attached
 
     # Compute relative transform: T_ee_seat = T_world_ee^-1 * T_world_seat
@@ -395,7 +395,7 @@ def run():
 
     # Get joint ordering from SRDF-defined "manipulator" group
     joint_group = robot.env.getJointGroup("manipulator")
-    joint_names = list(joint_group.getJointNames())
+    joint_names = list(joint_group.getJointIds())
     print(f"Joint names: {joint_names}")
 
     # === PHASE 1: ADD SEATS TO ENVIRONMENT ===

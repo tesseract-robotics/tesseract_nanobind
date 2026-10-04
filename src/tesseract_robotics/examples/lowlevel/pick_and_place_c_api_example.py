@@ -295,8 +295,8 @@ def run():
     # ==== CREATE NEW JOINT ====
     # move_link() reparents an existing link by defining a new joint
     joint_box2 = Joint("joint_box2")
-    joint_box2.parent_link_name = LINK_END_EFFECTOR_NAME  # New parent: tool flange
-    joint_box2.child_link_name = LINK_BOX_NAME  # Box link to reparent
+    joint_box2.parent_link_id = LINK_END_EFFECTOR_NAME  # New parent: tool flange
+    joint_box2.child_link_id = LINK_BOX_NAME  # Box link to reparent
     joint_box2.type = JointType.FIXED  # Rigid attachment
 
     # ==== TRANSFORM: TOOL -> BOX CENTER ====

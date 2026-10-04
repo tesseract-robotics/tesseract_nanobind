@@ -60,7 +60,7 @@ def kuka_iiwa_environment():
     manip_info.manipulator = "manipulator"
     manip_info.working_frame = "base_link"
 
-    joint_names = list(t_env.getJointGroup("manipulator").getJointNames())
+    joint_names = list(t_env.getJointGroup("manipulator").getJointIds())
     return t_env, manip_info, joint_names
 
 

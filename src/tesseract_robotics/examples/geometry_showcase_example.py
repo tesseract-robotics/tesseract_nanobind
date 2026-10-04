@@ -142,8 +142,8 @@ def create_geometry_link(
     # Fixed joint attaches this link rigidly to the robot's base_link
     # The transform positions the geometry in world coordinates
     joint = Joint(f"joint_{name}")
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = name
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = name
     joint.type = JointType.FIXED
     joint.parent_to_joint_origin_transform = transform
 

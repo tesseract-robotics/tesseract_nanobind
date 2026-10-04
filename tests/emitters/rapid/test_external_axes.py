@@ -53,7 +53,7 @@ _DEG_ROUNDTRIP_ATOL = 1e-2
 def _joint_move(names, positions_rad):
     """A single FREESPACE joint move whose waypoint carries ``names`` + positions."""
     jw = JointWaypoint()
-    jw.setNames(list(names))
+    jw.setJointIds(list(names))
     jw.setPosition(np.asarray(positions_rad, dtype=np.float64))
     poly = JointWaypointPoly_wrap_JointWaypoint(jw)
     move = MoveInstruction(poly, MoveInstructionType_FREESPACE, "P")

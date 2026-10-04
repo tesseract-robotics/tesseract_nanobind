@@ -68,7 +68,7 @@ def abb_irb2400_environment():
     manip_info.manipulator_ik_solver = "OPWInvKin"
     manip_info.working_frame = "base_link"
 
-    joint_names = list(t_env.getJointGroup("manipulator").getJointNames())
+    joint_names = list(t_env.getJointGroup("manipulator").getJointIds())
     return t_env, manip_info, joint_names
 
 
@@ -233,7 +233,7 @@ class TestDescartesPlanning:
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
                     state_wp = WaypointPoly_as_StateWaypointPoly(wp)
-                    assert len(state_wp.getNames()) == 6  # ABB IRB2400 has 6 joints
+                    assert len(state_wp.getJointIds()) == 6  # ABB IRB2400 has 6 joints
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 6
                 count += 1

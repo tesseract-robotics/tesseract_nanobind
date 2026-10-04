@@ -275,7 +275,7 @@ def _min_distance_to(obstacle, env, joint_names, positions):
 
     solver = OFKTStateSolver(env.getSceneGraph())
     manager = env.getDiscreteContactManager()
-    manager.setActiveCollisionObjects(env.getActiveLinkNames())
+    manager.setActiveCollisionObjects(env.getActiveLinkIds())
     manager.setCollisionMarginData(CollisionMarginData(CLEARANCE_REPORT_DISTANCE_M))
     closest = np.inf
     for start, end in zip(positions[:-1], positions[1:]):
@@ -288,7 +288,7 @@ def _min_distance_to(obstacle, env, joint_names, positions):
             flat = ContactResultVector()
             contacts.flattenMoveResults(flat)
             for index in range(len(flat)):
-                if obstacle in list(flat[index].link_names):
+                if obstacle in list(flat[index].link_ids):
                     closest = min(closest, flat[index].distance)
     return closest
 

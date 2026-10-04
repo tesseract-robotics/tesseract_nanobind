@@ -706,8 +706,8 @@ class TestRobotLinkManagement:
         # Create fixed joint
         joint = Joint("joint_test_obstacle")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "base_link"
-        joint.child_link_name = "test_obstacle"
+        joint.parent_link_id = "base_link"
+        joint.child_link_id = "test_obstacle"
 
         # Verify not present initially
         assert "test_obstacle" not in robot.get_link_names()
@@ -843,8 +843,8 @@ class TestRobotLinkManagement:
         link.addCollision(collision)
 
         joint = Joint("moveable_box_joint")
-        joint.parent_link_name = "base_link"
-        joint.child_link_name = "moveable_box"
+        joint.parent_link_id = "base_link"
+        joint.child_link_id = "moveable_box"
         joint.type = JointType.FIXED
 
         robot.add_link(link, joint)
@@ -852,8 +852,8 @@ class TestRobotLinkManagement:
 
         # Now move it to a different parent (link_3)
         new_joint = Joint("moveable_box_joint")
-        new_joint.parent_link_name = "link_3"
-        new_joint.child_link_name = "moveable_box"
+        new_joint.parent_link_id = "link_3"
+        new_joint.child_link_id = "moveable_box"
         new_joint.type = JointType.FIXED
 
         result = robot.move_link(new_joint)
