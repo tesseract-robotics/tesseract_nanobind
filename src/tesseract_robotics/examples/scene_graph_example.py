@@ -242,11 +242,11 @@ def run(pipeline=None, num_planners=None, *, composer: TaskComposer | None = Non
 
     print("\n=== Scene Graph Structure ===")
     print(f"Name: {scene_graph.getName()}")
-    print(f"Root link: {robot.env.getRootLinkName()}")
+    print(f"Root link: {robot.env.getRootLinkId()}")
 
     # Get all link and joint names
-    link_names = list(robot.env.getLinkNames())
-    joint_names = list(robot.env.getJointNames())
+    link_names = list(robot.env.getLinkIds())
+    joint_names = list(robot.env.getJointIds())
     print(f"Links ({len(link_names)}): {link_names}")
     print(f"Joints ({len(joint_names)}): {joint_names}")
 
@@ -256,7 +256,7 @@ def run(pipeline=None, num_planners=None, *, composer: TaskComposer | None = Non
     for jname in joint_names[:4]:  # First 4 joints
         joint = scene_graph.getJoint(jname)
         if joint:
-            print(f"  {joint.parent_link_name} --[{jname}]--> {joint.child_link_name}")
+            print(f"  {joint.parent_link_id} --[{jname}]--> {joint.child_link_id}")
 
     # === QUERY LINK TRANSFORMS ===
     # Get current link positions in world frame
@@ -270,7 +270,7 @@ def run(pipeline=None, num_planners=None, *, composer: TaskComposer | None = Non
     # === QUERY ACTIVE JOINTS ===
     # Active joints are moveable (not fixed)
     print("\n=== Active Joints ===")
-    active_joints = list(robot.env.getActiveJointNames())
+    active_joints = list(robot.env.getActiveJointIds())
     print(f"Active joints ({len(active_joints)}): {active_joints}")
 
     # Get joint limits
