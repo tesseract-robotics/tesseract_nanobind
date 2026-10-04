@@ -78,7 +78,7 @@ def test_contact_manager_config_acm_and_modify_object_enabled():
     acm.addAllowedCollision("box_link", "cone_link", "unit_test")
     cfg.acm = acm
     cfg.acm_override_type = ACMOverrideType.OR
-    assert cfg.acm.isCollisionAllowed("box_link", "cone_link")
+    assert cfg.acm.isCollisionAllowed(("box_link", "cone_link"))
     assert cfg.acm_override_type == ACMOverrideType.OR
 
     cfg.modify_object_enabled = {"thin_box_link": True, "cone_link": False}
@@ -100,12 +100,12 @@ def test_contact_allowed_validator_types():
     acm.addAllowedCollision("a", "b", "unit_test")
 
     validator = ACMContactAllowedValidator(acm)
-    assert validator("a", "b") is True
-    assert validator("a", "c") is False
+    assert validator(("a", "b")) is True
+    assert validator(("a", "c")) is False
 
     combined = CombinedContactAllowedValidator([validator], CombinedContactAllowedValidatorType.OR)
-    assert combined("a", "b") is True
-    assert combined("a", "c") is False
+    assert combined(("a", "b")) is True
+    assert combined(("a", "c")) is False
 
 
 # --------------------------------------------------------------------------- #

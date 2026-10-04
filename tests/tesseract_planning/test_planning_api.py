@@ -284,6 +284,14 @@ class TestRobot:
         assert len(joints) == 6
         assert "joint_1" in joints
 
+    def test_names_cross_the_planning_boundary_as_str(self, robot):
+        """The planning API keeps `str` in its signatures; upstream ids stop at the boundary."""
+        assert all(type(n) is str for n in robot.get_link_names())
+        assert all(type(n) is str for n in robot.get_joint_names("manipulator"))
+        assert all(type(n) is str for n in robot.get_joint_limits("manipulator"))
+        assert all(type(n) is str for n in robot.get_state().joint_names)
+        assert type(robot.get_manipulator_info("manipulator").tcp_frame.name()) is str
+
     def test_get_state(self, robot):
         state = robot.get_state()
         assert isinstance(state, RobotState)
@@ -1039,6 +1047,7 @@ class TestTaskComposer:
 
         assert result.successful
         assert len(result) > 0
+        assert all(type(n) is str for n in result.trajectory[0].joint_names)
 
     def test_ompl_pipeline_with_cartesian_targets(self, robot):
         """Test OMPLPipeline execution with Cartesian targets.

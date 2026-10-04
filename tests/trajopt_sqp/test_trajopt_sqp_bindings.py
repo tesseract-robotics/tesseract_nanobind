@@ -68,7 +68,7 @@ def kuka_setup():
     assert env.init(urdf_path, srdf_path, locator)
 
     manip = env.getKinematicGroup("manipulator")
-    joint_names = list(manip.getJointIds())
+    joint_names = [jid.name() for jid in manip.getJointIds()]
     joint_limits = manip.getLimits().joint_limits
 
     return env, manip, joint_names, joint_limits
@@ -1448,11 +1448,11 @@ class TestConvexEvaluatorArguments:
 
         assert costs == pytest.approx(problem.getExactCosts(), abs=MODEL_ROUND_OFF)
         assert total == pytest.approx(problem.getTotalExactCost(), abs=MODEL_ROUND_OFF)
-        assert violations == pytest.approx(
-            problem.getExactConstraintViolations(), abs=MODEL_ROUND_OFF
-        )
+        exact = problem.getExactConstraintViolations()
+        assert violations.raw == pytest.approx(exact.raw, abs=MODEL_ROUND_OFF)
+        assert violations.weighted == pytest.approx(exact.weighted, abs=MODEL_ROUND_OFF)
         assert costs.tolist() == [SEED_VIOLATION]
-        assert violations.tolist() == [START_TARGET]
+        assert violations.raw.tolist() == [START_TARGET]
 
     def test_before_convexify_raises(self):
         """No model before the first convexify(): every evaluator raises, for an empty and an

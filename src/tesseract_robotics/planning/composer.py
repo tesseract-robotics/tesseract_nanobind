@@ -687,7 +687,7 @@ class TaskComposer:
             # To enable velocity/acceleration output, use a pipeline with
             # TimeOptimalTrajectoryGeneration (TOTG) or IterativeSplineParameterization
             point = TrajectoryPoint(
-                joint_names=list(state_wp.getJointIds()),
+                joint_names=[jid.name() for jid in state_wp.getJointIds()],
                 positions=np.array(state_wp.getPosition()),
                 velocities=_extract_array_field(state_wp.getVelocity, "Velocity"),
                 accelerations=_extract_array_field(state_wp.getAcceleration, "Acceleration"),

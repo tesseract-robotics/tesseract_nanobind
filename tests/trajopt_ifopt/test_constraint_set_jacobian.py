@@ -46,7 +46,7 @@ def test_collision_constraint_with_an_active_contact():
 
     nodes = ti.createNodesVariables(
         "trajectory",
-        list(manip.getJointIds()),
+        [jid.name() for jid in manip.getJointIds()],
         [STATE],
         ti.toBounds(manip.getLimits().joint_limits),
     )

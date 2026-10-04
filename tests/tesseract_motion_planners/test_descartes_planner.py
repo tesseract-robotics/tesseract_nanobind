@@ -132,7 +132,7 @@ class TestDescartesProfiles:
         profile.vertex_contact_manager_config = vertex_cfg
 
         assert profile.vertex_contact_manager_config.acm_override_type == ACMOverrideType.OR
-        assert profile.vertex_contact_manager_config.acm.isCollisionAllowed("link_1", "link_2")
+        assert profile.vertex_contact_manager_config.acm.isCollisionAllowed(("link_1", "link_2"))
         assert dict(profile.vertex_contact_manager_config.modify_object_enabled) == {
             "link_2": False
         }
