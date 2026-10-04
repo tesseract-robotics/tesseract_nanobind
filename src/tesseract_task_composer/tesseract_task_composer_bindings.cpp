@@ -21,7 +21,7 @@
 #include <tesseract/task_composer/task_composer_future.h>
 #include <tesseract/task_composer/task_composer_node.h>
 #include <tesseract/task_composer/task_composer_node_info.h>
-#include <tesseract/task_composer/task_composer_keys.h>
+#include <tesseract/task_composer/task_composer_port_map.h>
 #include <tesseract/task_composer/task_composer_plugin_factory.h>
 #include <tesseract/task_composer/task_composer_server.h>
 
@@ -45,8 +45,8 @@
 // std::vector<ContactResultMap> on its node info's data_storage)
 #include <tesseract/collision/types.h>
 
-// console_bridge for log output visible alongside the rest of tesseract's logging
-#include <console_bridge/console.h>
+// tesseract's logger (spdlog since tesseract #1367), so output sits alongside tesseract's own
+#include <tesseract/common/logging.h>
 
 // Plugin-dylib pinning: on macOS the TaskComposerPluginFactory dlclose's every
 // plugin dylib it loaded when the factory is GC'd. Re-dlopen'ing those dylibs
@@ -101,15 +101,13 @@ void pin_newly_loaded_dylibs(const std::unordered_set<std::string>& before) {
         // Handle is intentionally leaked for the process lifetime.
         void* handle = ::dlopen(path.c_str(), RTLD_LAZY | RTLD_NODELETE);
         if (handle == nullptr) {
-            CONSOLE_BRIDGE_logWarn("tesseract_nanobind: failed to pin plugin dylib '%s': %s",
-                                   path.c_str(), dlerror());
+            TESSERACT_LOG_WARN("tesseract_nanobind: failed to pin plugin dylib '{}': {}", path, dlerror());
             continue;
         }
         already_pinned.insert(path);
         const auto slash = path.find_last_of('/');
         const char* basename = slash == std::string::npos ? path.c_str() : path.c_str() + slash + 1;
-        // stderr rather than console_bridge::logInform because tesseract's
-        // default log threshold suppresses anything below ERROR.
+        // stderr rather than TESSERACT_LOG_INFO: tesseract's default log level may suppress INFO.
         std::fprintf(stderr, "[tesseract_nanobind] pinned plugin dylib %s (GH #48)\n", basename);
     }
 }
@@ -123,18 +121,25 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Import tesseract_common module to ensure type hierarchy is available
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
 
-    // ========== TaskComposerKeys ==========
-    nb::class_<tp::TaskComposerKeys>(m, "TaskComposerKeys")
+    // ========== TaskComposerPortMap ==========
+    // Replaces TaskComposerKeys (tesseract_planning #760): port name -> storage key, or a list of keys.
+    nb::class_<tp::TaskComposerPortMap>(m, "TaskComposerPortMap")
         .def(nb::init<>())
-        .def("add", nb::overload_cast<const std::string&, std::string>(&tp::TaskComposerKeys::add), "port"_a, "key"_a)
-        .def("addKeys", nb::overload_cast<const std::string&, std::vector<std::string>>(&tp::TaskComposerKeys::add), "port"_a, "keys"_a)
-        .def("get", [](const tp::TaskComposerKeys& self, const std::string& port) -> std::string {
-            return self.get<std::string>(port);
-        }, "port"_a)
-        .def("has", &tp::TaskComposerKeys::has, "port"_a)
-        .def("empty", &tp::TaskComposerKeys::empty)
-        .def("size", &tp::TaskComposerKeys::size)
-        .def("data", &tp::TaskComposerKeys::data);
+        .def("set", nb::overload_cast<std::string, std::string>(&tp::TaskComposerPortMap::set),
+             "port"_a, "storage_key"_a)
+        .def("set", nb::overload_cast<std::string, std::vector<std::string>>(&tp::TaskComposerPortMap::set),
+             "port"_a, "storage_keys"_a)
+        .def("erase", &tp::TaskComposerPortMap::erase, "port"_a)
+        .def("contains", &tp::TaskComposerPortMap::contains, "port"_a)
+        .def("at", &tp::TaskComposerPortMap::at, "port"_a, nb::rv_policy::copy)
+        .def("single", &tp::TaskComposerPortMap::single, "port"_a, nb::rv_policy::copy)
+        .def("multiple", &tp::TaskComposerPortMap::multiple, "port"_a, nb::rv_policy::copy)
+        .def("renameStorageKeys", &tp::TaskComposerPortMap::renameStorageKeys, "storage_key_remapping"_a)
+        .def("data", &tp::TaskComposerPortMap::data, nb::rv_policy::copy)
+        .def("size", &tp::TaskComposerPortMap::size)
+        .def("empty", &tp::TaskComposerPortMap::empty)
+        .def("__eq__", &tp::TaskComposerPortMap::operator==)
+        .def("__ne__", &tp::TaskComposerPortMap::operator!=);
 
     // ========== TaskComposerDataStorage ==========
     // Use shared_ptr for proper lifetime management with executor.run()
@@ -205,10 +210,10 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getNamespace", &tp::TaskComposerNode::getNamespace)
         .def("getUUIDString", &tp::TaskComposerNode::getUUIDString)
         .def("isConditional", &tp::TaskComposerNode::isConditional)
-        .def("getInputKeys", &tp::TaskComposerNode::getInputKeys, nb::rv_policy::reference)
-        .def("getOutputKeys", &tp::TaskComposerNode::getOutputKeys, nb::rv_policy::reference)
-        .def("setInputKeys", &tp::TaskComposerNode::setInputKeys, "input_keys"_a)
-        .def("setOutputKeys", &tp::TaskComposerNode::setOutputKeys, "output_keys"_a)
+        .def("getInputPortMappings", &tp::TaskComposerNode::getInputPortMappings, nb::rv_policy::reference_internal)
+        .def("getOutputPortMappings", &tp::TaskComposerNode::getOutputPortMappings, nb::rv_policy::reference_internal)
+        .def("setPortMappings", &tp::TaskComposerNode::setPortMappings,
+             "input_port_mappings"_a, "output_port_mappings"_a)
         .def("getDotgraph", [](const tp::TaskComposerNode& self) {
             std::ostringstream oss;
             auto sub = self.dump(oss);
