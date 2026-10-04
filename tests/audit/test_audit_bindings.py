@@ -131,6 +131,7 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "Bag.__getitem__",
         "Bag.begin",
         "Bag.end",
+        "Bag.__mul__",  # templated operator* (M13)
         "Bag.__str__",  # free operator<<(std::ostream&, const Bag&) (M5)
         "Record",
         "Record.__init__",
@@ -411,6 +412,14 @@ def test_real_rows_accepted_by_new_rules(real_reports, module, symbol, rule):
     report = real_reports[module]
     assert (symbol, rule) in {(a.symbol, a.rule) for a in report.accepted}
     assert symbol not in {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
+
+
+@pytest.mark.parametrize(
+    "symbol", ["Isometry3d.__mul__", "Quaterniond.__mul__", "Translation3d.__mul__"]
+)
+def test_eigen_templated_mul_is_not_a_deviation(real_reports, symbol):
+    """M13: Eigen declares `operator*` as a member template; `__mul__` is its binding."""
+    assert symbol not in {d.name for d in real_reports["tesseract_common"].deviations}
 
 
 def test_raw_pointer_bytes_resource_ctor_stays_a_gap(real_reports):

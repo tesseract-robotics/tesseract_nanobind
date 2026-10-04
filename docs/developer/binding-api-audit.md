@@ -6,7 +6,7 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `50835
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
 | tesseract_collision | 180 | 53 | 10 | 3 | 6 |
-| tesseract_common | 95 | 115 | 9 | 21 | 0 |
+| tesseract_common | 95 | 115 | 6 | 21 | 0 |
 | tesseract_environment | 119 | 82 | 14 | 21 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
@@ -259,10 +259,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `CollisionMarginOverrideType` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:468 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/__init__.py:22 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:300 | — |
-| `Isometry3d.__mul__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:59 | — |
-| `Quaterniond.__mul__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:183 | — |
 | `TransformMap` | class | src/tesseract_robotics/tesseract_common/__init__.py:39 | — |
-| `Translation3d.__mul__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:120 | — |
 
 ### Accepted
 

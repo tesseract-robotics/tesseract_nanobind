@@ -199,6 +199,7 @@ OPERATOR_DUNDERS = {
     "operator<": "__lt__",
     "operator bool": "__bool__",
     "operator()": "__call__",
+    "operator*": "__mul__",  # Eigen's is a member template; libclang still spells it so (M13)
 }
 # C++ members a Python protocol dunder covers (container-protocol, iterator-pair rules): a
 # class that binds the dunder needs no binding under the C++ name.

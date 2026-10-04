@@ -82,6 +82,8 @@ public:
   int& operator[](std::size_t i);  // __getitem__; container-protocol: __setitem__ too (M18)
   const int* begin() const;        // iterator-pair: begin/end bound as __iter__ (C6)
   const int* end() const;
+  template <typename T>
+  Bag operator*(const T& factor) const;  // templated operator* bound as __mul__ (M13)
 };
 
 std::ostream& operator<<(std::ostream& os, const Bag& bag);  // stream-insertion: Bag.__str__ (M5)
