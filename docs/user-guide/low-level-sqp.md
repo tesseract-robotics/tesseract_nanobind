@@ -150,8 +150,8 @@ preference is unexpressible and the free axis has to be given up entirely.
 | Equality and band axes mixed | raises | raises |
 
 A band is a cost only as a hinge on its split rows. On trajopt 0.35.0, which every
-tesseract-robotics-nanobind 0.35.0.x wheel bundles (`TrajOptQPProblem` is in no release yet;
-0.35.0.8, the latest, binds only `IfoptQPProblem`), the SQP's model reads a `HINGE` or
+tesseract-robotics-nanobind 0.35.0.x wheel bundles (`TrajOptQPProblem` first ships in 0.35.0.9;
+earlier releases bind only `IfoptQPProblem`), the SQP's model reads a `HINGE` or
 `ABSOLUTE` cost as 0 at every QP solution, so it predicts the whole cost away at every step (a
 violation the trust box cannot cut by a quarter stalls at its seed), and the exact cost ignores
 the coefficient; tesseract-robotics/trajopt#592 fixes both, unreleased (see

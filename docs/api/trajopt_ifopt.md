@@ -44,7 +44,7 @@ class is accepted as a constraint. As a cost, the set's row bounds decide the pe
 `SQUARED` and `ABSOLUTE` need equality bounds on every row, `HINGE` one-sided bounds, and
 `addCostSet` raises otherwise. There is no cost without a penalty type. The last column lists
 what `addCostSet` accepts. On trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x
-wheel bundles (`TrajOptQPProblem` is in no release yet; 0.35.0.8, the latest, binds only
+wheel bundles (`TrajOptQPProblem` first ships in 0.35.0.9; earlier releases bind only
 `IfoptQPProblem`), the SQP models only `SQUARED` costs as it charges them: it reads an `ABSOLUTE`
 or `HINGE` cost as 0 at every QP solution, and that cost's exact value ignores its coefficient
 (see [the QP problem](trajopt_sqp.md#the-qp-problem)). tesseract-robotics/trajopt#592 fixes both;

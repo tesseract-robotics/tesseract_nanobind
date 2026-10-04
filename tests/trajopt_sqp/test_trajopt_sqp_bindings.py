@@ -1042,7 +1042,7 @@ class TestTrajOptQPProblem:
 # ---------------------------------------------------------------------------
 
 # "trajopt 0.35.0" in this section is trajopt as every tesseract-robotics-nanobind 0.35.0.x wheel
-# bundles it. No release has TrajOptQPProblem yet (0.35.0.8, the latest, binds only
+# bundles it. TrajOptQPProblem first ships in 0.35.0.9 (earlier releases bind only
 # IfoptQPProblem); the behaviour pinned here was measured on #149's development builds
 # 0.35.0.9.dev13–dev16, before the merge. trajopt#592's fix reaches a wheel only once one is built
 # on a newer trajopt.
