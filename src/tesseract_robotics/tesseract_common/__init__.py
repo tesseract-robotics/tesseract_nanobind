@@ -72,27 +72,14 @@ __all__ = [
     "CollisionMarginOverrideType",
     # Kinematics
     "KinematicLimits",
-    # Console bridge
-    "OutputHandler",
-    "LogLevel",
-    "setLogLevel",
-    "getLogLevel",
-    "useOutputHandler",
-    "restorePreviousOutputHandler",
     # Logging (spdlog)
-    "LoggerLevel",
+    "LogLevel",
     "Logger",
     "LogRecord",
     "getLogger",
     "isLogLevelEnabled",
     "addLogRecordHandler",
     "removeLogRecordHandler",
-    # Logging levels
-    "CONSOLE_BRIDGE_LOG_DEBUG",
-    "CONSOLE_BRIDGE_LOG_INFO",
-    "CONSOLE_BRIDGE_LOG_WARN",
-    "CONSOLE_BRIDGE_LOG_ERROR",
-    "CONSOLE_BRIDGE_LOG_NONE",
     # Eigen helper types
     "Isometry3d",
     "Translation3d",

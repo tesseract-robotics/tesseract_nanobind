@@ -223,13 +223,13 @@ Tesseract logs through spdlog (upstream #1367). The default logger is named
 
 ```python
 from tesseract_robotics.tesseract_common import (
-    LoggerLevel, addLogRecordHandler, getLogger, isLogLevelEnabled, removeLogRecordHandler,
+    LogLevel, addLogRecordHandler, getLogger, isLogLevelEnabled, removeLogRecordHandler,
 )
 
-logger = getLogger()                 # getLogger("tesseract")
-logger.set_level(LoggerLevel.err)    # suppress warnings
-logger.set_level(LoggerLevel.debug)  # enable debug output
-assert isLogLevelEnabled(LoggerLevel.debug)
+logger = getLogger()              # getLogger("tesseract")
+logger.set_level(LogLevel.err)    # suppress warnings
+logger.set_level(LogLevel.debug)  # enable debug output
+assert isLogLevelEnabled(LogLevel.debug)
 
 # Route records into Python (any thread; the handler runs with the GIL held)
 records = []
@@ -242,11 +242,16 @@ A `LogRecord` carries `level`, `message`, `logger_name`, `component_name`,
 `attributes`, `timestamp`, `filename`, `line` and `function_name`. An exception
 raised by a handler is reported through `sys.unraisablehook`.
 
-!!! warning "console_bridge API no longer reaches tesseract"
-    `setLogLevel`, `getLogLevel`, `useOutputHandler`, `OutputHandler`, `log` and
-    the `CONSOLE_BRIDGE_LOG_*` constants are still importable, but upstream
-    tesseract no longer logs through console_bridge: they have no effect on its
-    output.
+!!! warning "Python handlers and C++ threads"
+    A Python handler takes the GIL on whichever thread logs. C++ code that joins
+    logging threads while the caller holds the GIL then deadlocks: drain an
+    executor's futures (`wait()`) before dropping it while a handler is registered.
+
+!!! note "console_bridge API removed"
+    `setLogLevel`, `getLogLevel`, `log`, `useOutputHandler`,
+    `restorePreviousOutputHandler`, `OutputHandler` and the `CONSOLE_BRIDGE_LOG_*`
+    constants are gone: upstream tesseract no longer logs through console_bridge,
+    so they had no effect on its output.
 
 ## Container Types
 

@@ -710,42 +710,6 @@ class KinematicsPluginInfo:
     def empty(self) -> bool: ...
 
 class LogLevel(enum.Enum):
-    CONSOLE_BRIDGE_LOG_DEBUG = 0
-
-    CONSOLE_BRIDGE_LOG_INFO = 1
-
-    CONSOLE_BRIDGE_LOG_WARN = 2
-
-    CONSOLE_BRIDGE_LOG_ERROR = 3
-
-    CONSOLE_BRIDGE_LOG_NONE = 4
-
-CONSOLE_BRIDGE_LOG_DEBUG: LogLevel = LogLevel.CONSOLE_BRIDGE_LOG_DEBUG
-
-CONSOLE_BRIDGE_LOG_INFO: LogLevel = LogLevel.CONSOLE_BRIDGE_LOG_INFO
-
-CONSOLE_BRIDGE_LOG_WARN: LogLevel = LogLevel.CONSOLE_BRIDGE_LOG_WARN
-
-CONSOLE_BRIDGE_LOG_ERROR: LogLevel = LogLevel.CONSOLE_BRIDGE_LOG_ERROR
-
-CONSOLE_BRIDGE_LOG_NONE: LogLevel = LogLevel.CONSOLE_BRIDGE_LOG_NONE
-
-class OutputHandler:
-    def __init__(self) -> None: ...
-
-    def log(self, arg0: str, arg1: LogLevel, arg2: str, arg3: int, /) -> None: ...
-
-def setLogLevel(level: LogLevel) -> None: ...
-
-def getLogLevel() -> LogLevel: ...
-
-def log(filename: str, line: int, level: LogLevel, msg: str) -> None: ...
-
-def useOutputHandler(handler: OutputHandler) -> None: ...
-
-def restorePreviousOutputHandler() -> None: ...
-
-class LoggerLevel(enum.Enum):
     trace = 0
 
     debug = 1
@@ -765,11 +729,11 @@ class Logger:
 
     def name(self) -> str: ...
 
-    def level(self) -> LoggerLevel: ...
+    def level(self) -> LogLevel: ...
 
-    def set_level(self, level: LoggerLevel) -> None: ...
+    def set_level(self, level: LogLevel) -> None: ...
 
-    def should_log(self, level: LoggerLevel) -> bool: ...
+    def should_log(self, level: LogLevel) -> bool: ...
 
 class LogRecord:
     """One tesseract log event, as passed to a record handler"""
@@ -778,7 +742,7 @@ class LogRecord:
     def timestamp(self) -> datetime.datetime: ...
 
     @property
-    def level(self) -> LoggerLevel: ...
+    def level(self) -> LogLevel: ...
 
     @property
     def logger_name(self) -> str: ...
@@ -806,7 +770,7 @@ def getLogger(name: str = 'tesseract') -> Logger:
     Get (or create) a tesseract spdlog logger; set_level() on it controls tesseract's output
     """
 
-def isLogLevelEnabled(level: LoggerLevel) -> bool:
+def isLogLevelEnabled(level: LogLevel) -> bool:
     """Whether the default tesseract logger emits at this level"""
 
 def addLogRecordHandler(handler: Callable) -> int:

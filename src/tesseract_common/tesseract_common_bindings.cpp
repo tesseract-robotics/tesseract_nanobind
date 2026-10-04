@@ -23,9 +23,6 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <sstream>
 #include <utility>
 
-// console_bridge
-#include <console_bridge/console.h>
-
 // spdlog-backed tesseract logging (upstream #1367)
 #include <tesseract/common/logging.h>
 #include <nanobind/stl/chrono.h>
@@ -38,16 +35,6 @@ public:
 
     std::shared_ptr<tesseract::common::Resource> locateResource(const std::string& url) const override {
         NB_OVERRIDE_PURE(locateResource, url);
-    }
-};
-
-// Trampoline class for OutputHandler
-class PyOutputHandler : public console_bridge::OutputHandler {
-public:
-    NB_TRAMPOLINE(console_bridge::OutputHandler, 1);
-
-    void log(const std::string& text, console_bridge::LogLevel level, const char* filename, int line) override {
-        NB_OVERRIDE_PURE(log, text, level, filename, line);
     }
 };
 
@@ -1052,38 +1039,10 @@ NB_MODULE(_tesseract_common, m) {
         .def("clear", &tesseract::common::KinematicsPluginInfo::clear)
         .def("empty", &tesseract::common::KinematicsPluginInfo::empty);
 
-    // ========== Console Bridge ==========
-    nb::enum_<console_bridge::LogLevel>(m, "LogLevel")
-        .value("CONSOLE_BRIDGE_LOG_DEBUG", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_DEBUG)
-        .value("CONSOLE_BRIDGE_LOG_INFO", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_INFO)
-        .value("CONSOLE_BRIDGE_LOG_WARN", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_WARN)
-        .value("CONSOLE_BRIDGE_LOG_ERROR", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_ERROR)
-        .value("CONSOLE_BRIDGE_LOG_NONE", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_NONE);
-
-    // Export log level constants at module level
-    m.attr("CONSOLE_BRIDGE_LOG_DEBUG") = console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_DEBUG;
-    m.attr("CONSOLE_BRIDGE_LOG_INFO") = console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_INFO;
-    m.attr("CONSOLE_BRIDGE_LOG_WARN") = console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_WARN;
-    m.attr("CONSOLE_BRIDGE_LOG_ERROR") = console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_ERROR;
-    m.attr("CONSOLE_BRIDGE_LOG_NONE") = console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_NONE;
-
-    nb::class_<console_bridge::OutputHandler, PyOutputHandler>(m, "OutputHandler")
-        .def(nb::init<>())
-        .def("log", &console_bridge::OutputHandler::log);
-
-    m.def("setLogLevel", &console_bridge::setLogLevel, "level"_a);
-    m.def("getLogLevel", &console_bridge::getLogLevel);
-    // Wrapper for console_bridge::log (variadic function)
-    m.def("log", [](const std::string& filename, int line, console_bridge::LogLevel level, const std::string& msg) {
-        console_bridge::log(filename.c_str(), line, level, "%s", msg.c_str());
-    }, "filename"_a, "line"_a, "level"_a, "msg"_a);
-    m.def("useOutputHandler", &console_bridge::useOutputHandler, "handler"_a);
-    m.def("restorePreviousOutputHandler", &console_bridge::restorePreviousOutputHandler);
-
     // ========== Logging (spdlog, upstream #1367) ==========
-    // The console_bridge API above no longer reaches tesseract's output; this mirrors
-    // upstream: getLogger(name) for the level, addLogRecordHandler for custom sinks.
-    nb::enum_<spdlog::level::level_enum>(m, "LoggerLevel")
+    // Mirrors upstream: getLogger(name) for the level, addLogRecordHandler for custom sinks.
+    // Replaces the console_bridge API, which no longer reached tesseract's output.
+    nb::enum_<spdlog::level::level_enum>(m, "LogLevel")
         .value("trace", spdlog::level::trace)
         .value("debug", spdlog::level::debug)
         .value("info", spdlog::level::info)
