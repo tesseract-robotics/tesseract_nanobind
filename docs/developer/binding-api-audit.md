@@ -5,9 +5,9 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `50835
 
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
-| tesseract_collision | 180 | 53 | 10 | 3 | 6 |
-| tesseract_common | 95 | 115 | 11 | 21 | 0 |
-| tesseract_environment | 119 | 82 | 14 | 21 | 1 |
+| tesseract_collision | 180 | 52 | 10 | 3 | 6 |
+| tesseract_common | 95 | 110 | 11 | 21 | 0 |
+| tesseract_environment | 119 | 79 | 14 | 21 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
@@ -40,6 +40,14 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
     - `bullet/*`: Bullet backend internals, loaded as a contact manager plugin; Python reaches them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.
     - `fcl/*`: FCL backend internals, loaded as a contact manager plugin; Python reaches them through the `DiscreteContactManager` interface.
     - `vhacd/VHACD.h`: Vendored third-party V-HACD library (namespace `VHACD`).
+    - `bullet/convex_decomposition_hacd.h`: Declared but not built in 0.35.0: no HACD symbol in any collision library and no CMake target.
+    - `cereal_make_array.h`: cereal text-I/O helper for serialization, not API.
+    - `serialization_extensions.h`: Macros and SFINAE checks behind `TESSERACT_CLASS_EXTENSION`, not API.
+    - `sfinae_utils.h`: Compile-time member-detection templates, not API.
+    - `unit_test_utils.h`: gtest serialization helpers for plugin authors' tests.
+    - `environment_cache.h`: No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.
+    - `environment_monitor.h`: Abstract ROS-side interface; no implementation in the installed tesseract libraries.
+    - `environment_monitor_interface.h`: Abstract ROS-side interface; no implementation in the installed tesseract libraries.
     - Headers another binding #includes directly are audited with that module.
 
 !!! warning "Limitations"
@@ -103,7 +111,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `tesseract/collision/convex_decomposition.h` | header | tesseract/collision/convex_decomposition.h:33 | — |
 | `tesseract/collision/utils.h` | header | tesseract/collision/utils.h:40 | — |
 | `tesseract/collision/vhacd/convex_decomposition_vhacd.h` | header | tesseract/collision/vhacd/convex_decomposition_vhacd.h:38 | — |
-| `tesseract/collision/yaml_extensions.h` | header | tesseract/collision/yaml_extensions.h:39 | — |
 
 ### Deviations
 
@@ -231,19 +238,14 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `reorder` | function | tesseract/common/utils.h:422 | — |
 | `rtrim` | function | tesseract/common/utils.h:266 | — |
 | `strFormat` | function | tesseract/common/utils.h:63 | — |
-| `tesseract/common/cereal_make_array.h` | header | tesseract/common/cereal_make_array.h:22 | — |
 | `tesseract/common/clone_cache.h` | header | tesseract/common/clone_cache.h:49 | — |
 | `tesseract/common/ply_io.h` | header | tesseract/common/ply_io.h:42 | — |
 | `tesseract/common/profile_plugin_factory.h` | header | tesseract/common/profile_plugin_factory.h:62 | — |
 | `tesseract/common/property_tree.h` | header | tesseract/common/property_tree.h:46 | — |
 | `tesseract/common/schema_registration.h` | header | tesseract/common/schema_registration.h:39 | — |
 | `tesseract/common/schema_registry.h` | header | tesseract/common/schema_registry.h:42 | — |
-| `tesseract/common/serialization_extensions.h` | header | tesseract/common/serialization_extensions.h:33 | — |
-| `tesseract/common/sfinae_utils.h` | header | tesseract/common/sfinae_utils.h:23 | — |
 | `tesseract/common/stopwatch.h` | header | tesseract/common/stopwatch.h:35 | — |
 | `tesseract/common/timer.h` | header | tesseract/common/timer.h:38 | — |
-| `tesseract/common/unit_test_utils.h` | header | tesseract/common/unit_test_utils.h:42 | — |
-| `tesseract/common/yaml_extensions.h` | header | tesseract/common/yaml_extensions.h:45 | — |
 | `tesseract/common/yaml_utils.h` | header | tesseract/common/yaml_utils.h:65 | — |
 | `toNumeric` | function | tesseract/common/utils.h:565 | — |
 | `trim` | function | tesseract/common/utils.h:272 | — |
@@ -377,9 +379,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `tesseract/environment/commands/add_trajectory_link_command.h` | header | tesseract/environment/commands/add_trajectory_link_command.h:41 | — |
 | `tesseract/environment/commands/set_active_continuous_contact_manager_command.h` | header | tesseract/environment/commands/set_active_continuous_contact_manager_command.h:41 | — |
 | `tesseract/environment/commands/set_active_discrete_contact_manager_command.h` | header | tesseract/environment/commands/set_active_discrete_contact_manager_command.h:41 | — |
-| `tesseract/environment/environment_cache.h` | header | tesseract/environment/environment_cache.h:37 | — |
-| `tesseract/environment/environment_monitor.h` | header | tesseract/environment/environment_monitor.h:38 | — |
-| `tesseract/environment/environment_monitor_interface.h` | header | tesseract/environment/environment_monitor_interface.h:43 | — |
 
 ### Deviations
 

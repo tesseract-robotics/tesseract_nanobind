@@ -284,6 +284,16 @@ def test_unaudited_header_pattern_is_never_parsed(fixture_report):
     assert not [g for g in fixture_report.gaps if "broken_unit" in g.symbol]
 
 
+def test_yaml_only_header_has_no_row(fixture_report):
+    """PE-C4: `YAML::convert` specialisations are yaml-cpp's namespace, not module API."""
+    assert not [g for g in fixture_report.gaps if "yaml_convert" in g.symbol]
+
+
+def test_hacd_header_has_its_own_reason():
+    """Q1: declared but not built in 0.35.0, stated apart from the Bullet internals."""
+    assert "not built" in audit.UNAUDITED_HEADERS.get("bullet/convex_decomposition_hacd.h", "")
+
+
 def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
     text = audit.render_markdown([fixture_report], PROV)
     for pattern, reason in audit.UNAUDITED_HEADERS.items():
@@ -437,6 +447,24 @@ def test_console_bridge_log_constants_are_deviations(real_reports, level):
     """Note 1: module constants aliasing `LogLevel` values, though C++ has the same name."""
     deviations = {(d.name, d.kind) for d in real_reports["tesseract_common"].deviations}
     assert (f"CONSOLE_BRIDGE_LOG_{level}", audit.Kind.CONSTANT) in deviations
+
+
+@pytest.mark.parametrize(
+    ("module", "header"),
+    [
+        ("tesseract_collision", "tesseract/collision/yaml_extensions.h"),  # PE-C4
+        ("tesseract_common", "tesseract/common/yaml_extensions.h"),  # PE-M9
+        ("tesseract_common", "tesseract/common/cereal_make_array.h"),  # PE-M8
+        ("tesseract_common", "tesseract/common/serialization_extensions.h"),
+        ("tesseract_common", "tesseract/common/sfinae_utils.h"),
+        ("tesseract_common", "tesseract/common/unit_test_utils.h"),
+        ("tesseract_environment", "tesseract/environment/environment_cache.h"),  # PE-E4
+        ("tesseract_environment", "tesseract/environment/environment_monitor.h"),  # PE-E5
+        ("tesseract_environment", "tesseract/environment/environment_monitor_interface.h"),
+    ],
+)
+def test_post_e0_wont_fix_headers_have_no_row(real_reports, module, header):
+    assert header not in {g.symbol for g in real_reports[module].gaps}
 
 
 def test_raw_pointer_bytes_resource_ctor_stays_a_gap(real_reports):

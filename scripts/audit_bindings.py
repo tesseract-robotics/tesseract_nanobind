@@ -126,6 +126,15 @@ UNAUDITED_HEADERS = {
     "fcl/*": "FCL backend internals, loaded as a contact manager plugin; Python reaches them "
     "through the `DiscreteContactManager` interface.",
     "vhacd/VHACD.h": "Vendored third-party V-HACD library (namespace `VHACD`).",
+    "bullet/convex_decomposition_hacd.h": "Declared but not built in 0.35.0: no HACD symbol in any collision library and no CMake target.",
+    # Patterns match below every module prefix; these four exist only under tesseract/common.
+    "cereal_make_array.h": "cereal text-I/O helper for serialization, not API.",
+    "serialization_extensions.h": "Macros and SFINAE checks behind `TESSERACT_CLASS_EXTENSION`, not API.",
+    "sfinae_utils.h": "Compile-time member-detection templates, not API.",
+    "unit_test_utils.h": "gtest serialization helpers for plugin authors' tests.",
+    "environment_cache.h": "No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.",
+    "environment_monitor.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
+    "environment_monitor_interface.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
 }
 # A header another binding TU #includes directly (`<…>` form) is audited with that module.
 INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
@@ -224,8 +233,9 @@ PROTOCOL_RULES = {
 # parameter's canonical declaration so.
 OSTREAM_DECL = "basic_ostream"
 # Namespaces that audited headers reopen to specialise library templates
-# (`std::hash<LinkNamesPair>` in tesseract/common/types.h): not module API.
-FOREIGN_NAMESPACES = frozenset({"std"})
+# (`std::hash<LinkNamesPair>` in tesseract/common/types.h, `YAML::convert<PluginInfo>` in
+# tesseract/common/yaml_extensions.h): not module API.
+FOREIGN_NAMESPACES = frozenset({"std", "YAML"})
 RECORD_KINDS = frozenset(
     {ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_TEMPLATE}
 )
