@@ -354,26 +354,10 @@ NB_MODULE(_trajopt_ifopt, m) {
              "target"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with target values")
-        .def("__init__", [](ti::JointPosConstraint* self,
-                            const std::vector<ti::Bounds>& bounds,
-                            const std::shared_ptr<const ti::Var>& position_var,
-                            const Eigen::VectorXd& coeffs,
-                            std::string name,
-                            ti::RangeBoundHandling range_bound_handling) {
-                 // In trajopt 0.35.0 the range split indexes the caller's coeffs argument
-                 // instead of the broadcast member coeffs_, so a length-0/1 coeffs is read
-                 // past its end (fixed by tesseract-robotics/trajopt#592, merged 2026-09-30,
-                 // in no release yet); the binding broadcasts first. Remove the broadcast only
-                 // once a release containing #592 is pinned.
-                 const auto n_dof = static_cast<Eigen::Index>(bounds.size());
-                 Eigen::VectorXd per_joint = coeffs;
-                 if (coeffs.size() == 0)
-                     per_joint = Eigen::VectorXd::Ones(n_dof);
-                 else if (coeffs.size() == 1)
-                     per_joint = Eigen::VectorXd::Constant(n_dof, coeffs(0));
-                 new (self) ti::JointPosConstraint(bounds, position_var, per_joint,
-                                                   std::move(name), range_bound_handling);
-             },
+        // trajopt#592 broadcasts length-0/1 coeffs before the range split; the binding-side
+        // broadcast trajopt 0.35.0 needed (tesseract_nanobind#146) is gone on this branch.
+        .def(nb::init<const std::vector<ti::Bounds>&, const std::shared_ptr<const ti::Var>&,
+                      const Eigen::VectorXd&, std::string, ti::RangeBoundHandling>(),
              "bounds"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with one bound per joint: an equality, a "
