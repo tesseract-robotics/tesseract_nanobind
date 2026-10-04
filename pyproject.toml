@@ -83,7 +83,8 @@ tesseract_twc_workcell_positioner_viewer = "tesseract_robotics.examples.twc_work
 minversion = "6.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = ["-ra", "--strict-markers", "--tb=short"]
+# tests/audit needs libclang, which only the `audit` env has: run it with `pixi run -e audit audit-test`.
+addopts = ["-ra", "--strict-markers", "--tb=short", "--ignore=tests/audit"]
 markers = [
     "viewer: Viewer examples (deselect with '-m \"not viewer\"')",
     "planning: Motion planning examples",
@@ -277,9 +278,28 @@ setuptools-scm = ">=8"
 [tool.pixi.feature.py39.target.osx-arm64.tasks]
 build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build portable cp39 macOS wheel against TESSERACT_CPP_PREFIX" }
 
+# Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding
+# TUs, ast reads the committed stubs. Dev-only: never in the default env or the wheel.
+[tool.pixi.feature.audit.dependencies]
+# libclang Python bindings; pulls libclang 22. Exact build: every python-clang build since
+# 2026-08 (h3fd057f_*, incl. all of 23.1.x) is noarch but depends on __glibc/libgcc, so it
+# cannot install on macOS or Windows. default_hccd1708_2 is the newest portable build.
+python-clang = { version = "==22.1.8", build = "default_hccd1708_2" }
+# lib/clang/22/include: the builtin headers (stdarg.h, stddef.h) libclang expects in its
+# resource dir; python-clang/libclang do not ship them.
+clang-22 = "==22.1.8"
+
+[tool.pixi.feature.audit.tasks]
+audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff each binding's C++ API against its committed stub; writes docs/developer/binding-api-audit.md" }
+# -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
+# which imports the (uninstalled) extension modules.
+audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
 py39 = { features = ["py39"], no-default-feature = true, solve-group = "py39" }
 py310 = { features = ["py310"], solve-group = "py310" }
 py311 = { features = ["py311"], solve-group = "py311" }
 py312 = { features = ["py312"], solve-group = "py312" }
+# Own solve group: libclang 22 must not move libcxx/llvm-openmp in the env CI builds wheels from.
+audit = { features = ["audit"], solve-group = "audit" }
