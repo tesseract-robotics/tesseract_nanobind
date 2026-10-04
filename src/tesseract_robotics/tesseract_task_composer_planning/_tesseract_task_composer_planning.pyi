@@ -47,7 +47,7 @@ class ContactCheckProfile(tesseract_robotics.tesseract_command_language._tessera
         """
 
 class FixStateBoundsProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
-    def __init__(self, mode: FixStateBoundsProfile.Settings = FixStateBoundsProfile.Settings.ALL) -> None: ...
+    def __init__(self, mode: Settings = Settings.ALL) -> None: ...
 
     class Settings(enum.Enum):
         START_ONLY = 0
@@ -100,7 +100,7 @@ class FixStateBoundsProfile(tesseract_robotics.tesseract_command_language._tesse
         """
 
 class FixStateCollisionProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
-    def __init__(self, mode: FixStateCollisionProfile.Settings = FixStateCollisionProfile.Settings.ALL) -> None: ...
+    def __init__(self, mode: Settings = Settings.ALL) -> None: ...
 
     class Settings(enum.Enum):
         START_ONLY = 0
