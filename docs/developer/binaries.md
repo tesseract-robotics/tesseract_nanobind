@@ -111,7 +111,7 @@ flowchart TB
     P39[py39] -->|TESSERACT_CPP_PREFIX| D
     U[upstream] -->|scripts/build_upstream.sh<br/>installs into the env prefix| SM
     FS[build-feedstock tasks] -->|build-locally.py| OUT
-    OUT -.->|consumed by no env yet| U
+    PK[packaged] -->|local channel<br/>./packaging/output| OUT
 ```
 
 | Environment | Python | C++ stack comes from | Used for |
@@ -120,6 +120,12 @@ flowchart TB
 | `py310`, `py311`, `py312` | pinned | same as `default` | CI wheel builds |
 | `py39` | 3.9 | none of its own: the pcl → vtk closure has no cp39 builds, so the build reads the `py312` env through `TESSERACT_CPP_PREFIX` | CI wheels for Python 3.9 (macOS, Windows) |
 | `upstream` | 3.12 | the `upstream/` submodules, compiled by `pixi run -e upstream build-upstream-cpp` and installed into the env prefix; third-party libraries from conda-forge | 0.36 inner loop |
+| `packaged` (osx-arm64) | 3.12 | the `0.36.0.dev` packages in `packaging/output`, read as a local channel ahead of `conda-forge` / `tesseract-robotics`; `taskflow` pinned to the 3.11 that planning was built with | publish gate for the dev packages (#162) |
+
+`upstream` and `packaged` share the `bindings-dev` feature (Python 3.12,
+conda's clang 19 / gcc 14, scikit-build-core, nanobind, pytest), so they
+differ only in where the C++ stack comes from. Each builds the bindings into
+its own `SKBUILD_BUILD_DIR` (`build/upstream-*`, `build/packaged-*`).
 
 The pins are in `pyproject.toml` under `[tool.pixi.dependencies]`. Only the two
 top-level tesseract packages are pinned: pinning trajopt or eigen as well
@@ -264,13 +270,16 @@ Two local loops exist, described in [Building against upstream main](upstream-ma
       `packaging/*-feedstock` submodules. A fresh clone builds the 0.35.0
       recipes.
     - **Confirmed:** packages exist for osx-arm64 only, in `packaging/output`.
-      No pixi env consumes them, so the bindings have never been built or
-      tested against them.
-    - **Under verification:** the tesseract and tesseract_planning feedstocks
-      do not strip `-fvisibility-inlines-hidden` on macOS, as upstream's own
-      conda recipes do. Without the strip each dylib keeps its own cereal
-      registry and serialization fails with "unregistered polymorphic type"
-      (seen in the inner loop before its build script stripped the flag).
+      The `packaged` env consumes them; the bindings build and the full suite
+      passes (997 passed, 3 skipped), matching the source-built `upstream` env.
+      See [Packaged stack](upstream-main.md#packaged-stack-162-step-0).
+    - **Confirmed and fixed:** the tesseract feedstock has to strip
+      `-fvisibility-inlines-hidden` on macOS, as upstream's own conda recipe
+      does. Without it every cereal registry singleton in the packaged dylibs
+      is non-external and serialization fails with "unregistered polymorphic
+      type". The strip is in the dev `recipe/build.sh` (build `_1`).
+    - **Refuted:** tesseract_planning needs no strip. On macOS it registers
+      its cereal types in headers, so its dylibs carry no registry singletons.
 
 Landing the 0.36 stack on the channel for every platform needs a `dev` track in
 the packaging feedstocks, uploaded to a separate label. A

@@ -132,6 +132,49 @@ package supersedes it.
 - The `.ci_support` files still pin `console_bridge`, which the `dev` recipes no
   longer use (upstream switched to spdlog). Harmless; a conda-smithy rerender
   refreshes them.
+- **rattler-build's index is unreadable to pixi 0.70.1.** rattler-build indexes
+  `packaging/output` with rattler-index ≥ 0.31, which writes a
+  `repodata_revisions` map; pixi 0.70.1 (the version CI pins) fails with
+  "invalid type: map, expected a sequence". pixi 0.81 reads it. Rather than move
+  the pixi pin, `build-feedstock` ends with `index-feedstock-channel`, which
+  re-indexes with rattler-index 0.30.11, the last format 0.70.1 reads.
+  anaconda.org serves its own classic index, so this is local-only.
+- **A re-solve needs a readable channel before any task runs.** `pixi run`
+  re-locks first when `pyproject.toml` changed, and that reads
+  `packaging/output`. If the channel is missing or carries rattler-build's index,
+  bootstrap the index outside `pixi run`:
+  `pixi exec --spec 'rattler-index==0.30.11' rattler-index fs --force packaging/output`.
+  With an up-to-date lock, `pixi run` doesn't read the channel.
+- **Local channels need a `./` prefix.** A bare `chan` is an anaconda.org
+  channel name. `pixi.lock` records the channel and every package from it as an
+  absolute `file://` path, so the `packaged` lock entries are machine-specific
+  until the channel becomes `tesseract-robotics/label/dev`.
+- **A rebuild that keeps the filename keeps the old lock entry.** Bump
+  `build.number` in a recipe whose content changes (tesseract went `_0` → `_1`
+  for the visibility strip), so the artifact gets a new identity and
+  `pixi update -e packaged` picks it up.
+
+## Packaged stack (#162 step 0)
+
+`pixi run -e packaged test-packaged` builds the bindings against the
+`0.36.0.dev` packages in `packaging/output` and runs the suite. It is the gate
+before anything goes to the `tesseract-robotics` channel.
+
+**Result (2026-10-04, osx-arm64): 997 passed, 3 skipped, same as the
+source-built `upstream` env**, against tesseract `0.36.0.dev20260929 _1`,
+trajopt `0.36.0.dev20260930 _0`, tesseract-robotics-planning
+`0.36.0.dev20260929 _1` and boost-plugin-loader `0.4.5`. The 3 skips are the
+benchmark modules (`pytest_benchmark` isn't in the env). Logs:
+`packaging/logs/test-packaged-2.log`.
+
+| Run | tesseract package | Result |
+|---|---|---|
+| 1 | `_0`, built with `-fvisibility-inlines-hidden` | 993 passed, 4 failed: `TestEnvironmentSerialization`, "Trying to save an unregistered polymorphic type (tesseract::common::GeneralResourceLocator)" |
+| 2 | `_1`, flag stripped in `recipe/build.sh` | 997 passed |
+
+Run 1 used the packages as built, so the failure is attributable to them. The
+root cause is the cereal visibility gotcha below; the feedstock fix is the
+same strip upstream's own recipe carries.
 
 ## Binding status
 
@@ -171,8 +214,14 @@ converts ids with `.name()` at its boundary
   `VISIBILITY_INLINES_HIDDEN OFF` only stops CMake *adding* the flag, it never
   removed the one from the environment. CMake reads `CXXFLAGS` at first configure
   only: an existing `upstream/build/<name>` needs
-  `cmake -DCMAKE_CXX_FLAGS="…" upstream/build/<name>` once. The feedstocks need the
-  same strip when they move past #1305.
+  `cmake -DCMAKE_CXX_FLAGS="…" upstream/build/<name>` once. The tesseract feedstock
+  strips it too (`recipe/build.sh`, build `_1`). Without the strip, all 1121
+  `create()::t` singletons in the packaged `libtesseract_{common,geometry,collision,environment}`
+  were non-external and `TestEnvironmentSerialization` failed 4/9; with it, all
+  1121 are external and the suite passes. tesseract_planning needs no strip: on
+  macOS it registers its types in headers (`command_language/CMakeLists.txt`),
+  so its dylibs carry no cereal symbols and the singletons live in the binding
+  modules, which `CMakeLists.txt` already builds without the flag.
 - **Implicit id conversions are invisible to stubgen.** `scripts/generate_stubs.sh`
   runs `scripts/widen_implicit_id_stubs.py`, which widens parameter-position
   `LinkId` / `JointId` to `| str` and `LinkIdPair` to `| tuple[str, str]`. Mapping
