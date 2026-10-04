@@ -1025,12 +1025,16 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def(nb::init<double>(), "default_collision_coeff"_a)
         .def("setDefaultCollisionCoeff", &tc::CollisionCoeffData::setDefaultCollisionCoeff)
         .def("getDefaultCollisionCoeff", &tc::CollisionCoeffData::getDefaultCollisionCoeff)
-        .def("setCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
+        .def("setCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&, double>(
+                 &tc::CollisionCoeffData::setCollisionCoeff),
              "obj1"_a, "obj2"_a, "collision_coeff"_a)
-        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
-             "obj1"_a, "obj2"_a)
+        .def("setCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkIdPair&, double>(&tc::CollisionCoeffData::setCollisionCoeff),
+             "pair"_a, "collision_coeff"_a)
+        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff, "pair"_a)
         .def("getCollisionCoeffPairData", &tc::CollisionCoeffData::getCollisionCoeffPairData,
-             "Every pair with a coefficient: {(link_a, link_b): coeff}")
+             "Every pair with a coefficient: {LinkIdPair: coeff}")
         .def("getPairsWithZeroCoeff", &tc::CollisionCoeffData::getPairsWithZeroCoeff,
              "The pairs whose coefficient is 0 (collision checking switched off)");
 
