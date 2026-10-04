@@ -508,18 +508,19 @@ class TaskComposer:
         except TaskComposerPluginError as e:
             return PlanningResult(successful=False, message=str(e))
 
-        output_key = task.getOutputKeys().get("program")
-        if output_key is None:
+        output_ports = task.getOutputPortMappings()
+        if not output_ports.contains("program"):
             return PlanningResult(
                 successful=False,
                 message=f"Pipeline '{pipeline}' has no 'program' output key",
             )
+        output_key = output_ports.single("program")
         # Different pipelines use different input keys
-        input_keys = task.getInputKeys()
-        if input_keys.has("planning_input"):
-            input_key = input_keys.get("planning_input")
-        elif input_keys.has("program"):
-            input_key = input_keys.get("program")
+        input_ports = task.getInputPortMappings()
+        if input_ports.contains("planning_input"):
+            input_key = input_ports.single("planning_input")
+        elif input_ports.contains("program"):
+            input_key = input_ports.single("program")
         else:
             return PlanningResult(
                 successful=False,
@@ -682,7 +683,7 @@ class TaskComposer:
             # To enable velocity/acceleration output, use a pipeline with
             # TimeOptimalTrajectoryGeneration (TOTG) or IterativeSplineParameterization
             point = TrajectoryPoint(
-                joint_names=list(state_wp.getNames()),
+                joint_names=list(state_wp.getJointIds()),
                 positions=np.array(state_wp.getPosition()),
                 velocities=_extract_array_field(state_wp.getVelocity, "Velocity"),
                 accelerations=_extract_array_field(state_wp.getAcceleration, "Acceleration"),

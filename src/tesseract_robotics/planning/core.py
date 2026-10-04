@@ -293,11 +293,11 @@ class Robot:
             List of joint names
         """
         group = self.env.getJointGroup(group_name)
-        return list(group.getJointNames())
+        return list(group.getJointIds())
 
     def get_link_names(self) -> list[str]:
         """Get all link names in the robot."""
-        return list(self.env.getLinkNames())
+        return list(self.env.getLinkIds())
 
     def get_joint_limits(self, group_name: str) -> dict[str, dict[str, float]]:
         """
@@ -313,7 +313,7 @@ class Robot:
         limits = group.getLimits()
 
         result = {}
-        joint_names = list(group.getJointNames())
+        joint_names = list(group.getJointIds())
         for i, name in enumerate(joint_names):
             result[name] = {
                 "lower": float(limits.joint_limits[i, 0]),
@@ -373,12 +373,12 @@ class Robot:
         group = self.env.getKinematicGroup(group_name)
 
         if seed is None:
-            seed = self.get_state(list(group.getJointNames())).joint_positions
+            seed = self.get_state(list(group.getJointIds())).joint_positions
         else:
             seed = np.asarray(seed, dtype=np.float64)
 
         # Get working frame from group
-        working_frame = group.getBaseLinkName()
+        working_frame = group.getBaseLinkId()
 
         # Create proper IK input
         ik_input = KinGroupIKInput(target_pose, working_frame, tip_link)

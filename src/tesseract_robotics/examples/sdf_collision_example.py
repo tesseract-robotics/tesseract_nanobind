@@ -130,13 +130,16 @@ contact_manager_plugins:
 """
 
 # For step 5 - the stock arrangement, which does declare a cast manager.
-CAST_ENABLED_CONTACT_MANAGER_PLUGINS = DISCRETE_ONLY_CONTACT_MANAGER_PLUGINS + """\
+CAST_ENABLED_CONTACT_MANAGER_PLUGINS = (
+    DISCRETE_ONLY_CONTACT_MANAGER_PLUGINS
+    + """\
   continuous_plugins:
     default: BulletCastBVHManager
     plugins:
       BulletCastBVHManager:
         class: BulletCastBVHManagerFactory
 """
+)
 
 # A prismatic "probe" sphere on a rail, so a joint value slides it toward the obstacle.
 # tesseract:make_convex is required on the robot tag by tesseract 0.35's URDF parser.
@@ -203,6 +206,8 @@ def build_field():
         dimensions=np.full(3, SAMPLES_PER_AXIS, dtype=np.int32),
         batched=True,
     )
+
+
 # --8<-- [end:build_field]
 
 
@@ -305,8 +310,8 @@ def attach_link(
         link.addCollision(collision_component)
 
     joint = Joint(f"joint_{name}")
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = name
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = name
     joint.type = JointType.FIXED
     joint.parent_to_joint_origin_transform = Pose.from_xyz(0, 0, 0)
 
@@ -339,6 +344,8 @@ def sweep(robot: Robot, positions) -> list[tuple[float, float | None, float]]:
         reported = contacts[0].distance if len(contacts) else None
         rows.append((float(x), reported, float(x) - BALL_RADIUS - PROBE_RADIUS))
     return rows
+
+
 # --8<-- [end:sweep]
 
 
@@ -360,7 +367,9 @@ def run(**kwargs):
     field = build_field()
     dims = field.getDimensions()
     voxel = 2 * DOMAIN_HALF_EXTENT / (SAMPLES_PER_AXIS - 1)
-    print(f"SignedDistanceField: {dims[0]}x{dims[1]}x{dims[2]} samples, voxel {voxel * 1000:.1f} mm")
+    print(
+        f"SignedDistanceField: {dims[0]}x{dims[1]}x{dims[2]} samples, voxel {voxel * 1000:.1f} mm"
+    )
     assert field.getType() == GeometryType.SIGNED_DISTANCE_FIELD
     assert field.isDiscretized()
 
@@ -407,9 +416,7 @@ def run(**kwargs):
 
         # Display-only companion so the viewer has something to draw where the field is.
         proxy = level_set_octree(field)
-        attach_link(
-            robot, "bored_ball_surface", proxy, visual_color=(0.85, 0.35, 0.15, 1.0)
-        )
+        attach_link(robot, "bored_ball_surface", proxy, visual_color=(0.85, 0.35, 0.15, 1.0))
         print(f"  level-set proxy: {proxy.calcNumSubShapes()} cubes (visual only)")
         print(f"  links: {robot.get_link_names()}")
 

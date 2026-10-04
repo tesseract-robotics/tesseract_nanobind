@@ -48,7 +48,7 @@ Key Concepts
 **ContactResultMap / ContactResultVector**:
     - ContactResultMap: Nested map keyed by (link_a, link_b) pairs
     - ContactResultVector: Flattened list for simpler iteration
-    - Each ContactResult contains: distance, link_names, nearest_points, normal
+    - Each ContactResult contains: distance, link_ids, nearest_points, normal
 
 **OFKTStateSolver (Optimized Forward Kinematics Tree)**:
     Computes link transforms from joint positions. More efficient than full
@@ -186,8 +186,8 @@ def main():
     # Joint connects child link to parent link with a transform
     # JointType.FIXED means no relative motion (obstacle is stationary)
     sphere_joint = Joint("sphere_joint")
-    sphere_joint.parent_link_name = "base_link"
-    sphere_joint.child_link_name = sphere_link.getName()
+    sphere_joint.parent_link_id = "base_link"
+    sphere_joint.child_link_id = sphere_link.getName()
     sphere_joint.type = JointType.FIXED
 
     # Position sphere at (0.7, 0, 1.5)m relative to base_link
@@ -215,8 +215,8 @@ def main():
     manager = env.getDiscreteContactManager()
 
     # Specify which links participate in collision checking
-    # getActiveLinkNames() returns all links with collision geometry
-    manager.setActiveCollisionObjects(env.getActiveLinkNames())
+    # getActiveLinkIds() returns all links with collision geometry
+    manager.setActiveCollisionObjects(env.getActiveLinkIds())
 
     # Collision margin: report contacts when objects are within this distance
     # margin=0.1 means contacts reported when separation < 10cm
@@ -264,8 +264,8 @@ def main():
             #   = 0: touching at surface
             #   > 0: separated but within collision margin
             print(f"\tDistance: {contact_result.distance}")
-            print(f"\tLink A: {contact_result.link_names[0]}")
-            print(f"\tLink B: {contact_result.link_names[1]}")
+            print(f"\tLink A: {contact_result.link_ids[0]}")
+            print(f"\tLink B: {contact_result.link_ids[1]}")
         print()
 
 

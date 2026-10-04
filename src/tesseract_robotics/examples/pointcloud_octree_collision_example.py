@@ -242,7 +242,7 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     )
 
     manager = robot.env.getDiscreteContactManager()
-    manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+    manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
     # Zero margin: only report actual penetrations, not near-misses. This
     # makes the colliding-vs-collision-aware comparison binary — the
     # collision-aware trajectory should report 0 contacts.
@@ -376,7 +376,7 @@ def main() -> int:
     # material. Mutating link.visual[i].material.color and re-calling
     # update_environment recolours the URDF-loaded robot live.
     def _tint_robot(rgba: np.ndarray) -> None:
-        for name in robot.env.getLinkNames():
+        for name in robot.env.getLinkIds():
             if name == "pcd_octree":
                 continue
             for v in robot.env.getLink(name).visual:
