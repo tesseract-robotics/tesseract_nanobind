@@ -23,6 +23,9 @@ namespace tg = tesseract::geometry;
 NB_MODULE(_tesseract_scene_graph, m) {
     m.doc() = "tesseract_scene_graph Python bindings";
 
+    // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // ==================== Joint-related classes ====================
 
     // JointType enum

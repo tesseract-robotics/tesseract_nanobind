@@ -28,6 +28,9 @@ namespace tc = tesseract::common;
 NB_MODULE(_tesseract_state_solver, m) {
     m.doc() = "tesseract_state_solver Python bindings";
 
+    // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // ========== SceneState ==========
     nb::class_<tsg::SceneState>(m, "SceneState")
         .def(nb::init<>())

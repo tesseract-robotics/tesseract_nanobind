@@ -19,6 +19,9 @@ namespace ts = tesseract::srdf;
 NB_MODULE(_tesseract_srdf, m) {
     m.doc() = "tesseract_srdf Python bindings";
 
+    // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // KinematicsInformation
     nb::class_<ts::KinematicsInformation>(m, "KinematicsInformation")
         .def(nb::init<>())

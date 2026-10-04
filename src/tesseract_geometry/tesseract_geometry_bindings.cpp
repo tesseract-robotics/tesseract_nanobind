@@ -43,6 +43,9 @@ NB_MAKE_OPAQUE(std::vector<std::shared_ptr<const tg::Geometry>>);
 NB_MODULE(_tesseract_geometry, m) {
     m.doc() = "tesseract_geometry Python bindings";
 
+    // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // GeometryType enum
     nb::enum_<tg::GeometryType>(m, "GeometryType")
         .value("UNINITIALIZED", tg::GeometryType::UNINITIALIZED)

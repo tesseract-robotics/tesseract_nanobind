@@ -7,6 +7,8 @@ from typing import Annotated, overload
 import numpy
 from numpy.typing import NDArray
 
+import tesseract_robotics.tesseract_common._tesseract_common
+
 
 class GeometryType(enum.Enum):
     UNINITIALIZED = 0
@@ -209,7 +211,7 @@ class MeshMaterial:
         """Get emissive factor (RGBA)"""
 
 class MeshTexture:
-    def getTextureImage(self) -> "tesseract::common::Resource":
+    def getTextureImage(self) -> tesseract_robotics.tesseract_common._tesseract_common.Resource:
         """Get the texture image resource"""
 
     def getUVs(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]]:
@@ -241,7 +243,7 @@ class PolygonMesh(Geometry):
     def getTextures(self) -> list[MeshTexture] | None:
         """Get mesh textures (optional)"""
 
-    def getResource(self) -> "tesseract::common::Resource":
+    def getResource(self) -> tesseract_robotics.tesseract_common._tesseract_common.Resource:
         """Get mesh resource"""
 
 class Mesh(PolygonMesh):
@@ -259,7 +261,7 @@ class CompoundMesh(Geometry):
     def getMeshes(self) -> list[PolygonMesh]:
         """Get the vector of meshes"""
 
-    def getResource(self) -> "tesseract::common::Resource":
+    def getResource(self) -> tesseract_robotics.tesseract_common._tesseract_common.Resource:
         """Get the resource used to create this mesh"""
 
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
@@ -377,22 +379,22 @@ def createConvexMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64],
 def createSDFMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
     """Load mesh from file and return vector of SDFMesh geometries"""
 
-def createMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
+def createMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
     """Load Mesh from resource (e.g., package:// URL)"""
 
-def createConvexMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
+def createConvexMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
     """Load ConvexMesh from resource (e.g., package:// URL)"""
 
-def createSDFMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
+def createSDFMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
     """Load SDFMesh from resource (e.g., package:// URL)"""
 
 def isIdentical(geom1: Geometry, geom2: Geometry) -> bool:
     """Check if two geometries are identical"""
 
-def extractVertices(geom: Geometry, origin: "Eigen::Transform<double, 3, 1, 0>") -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+def extractVertices(geom: Geometry, origin: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
     """
     Extract vertices from a geometry, transforming primitives to a mesh first
     """
 
-def toTriangleMesh(geom: Geometry, tolerance: float, origin: "Eigen::Transform<double, 3, 1, 0>") -> Mesh:
+def toTriangleMesh(geom: Geometry, tolerance: float, origin: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> Mesh:
     """Convert a primitive geometry to a triangle Mesh"""

@@ -27,8 +27,9 @@ MODULES = _mod.discover_modules()
 
 # A C++ type nanobind could not map to Python is emitted as its quoted C++ name.
 # Standard-library spellings differ per platform (libc++ `std::__1::`, libstdc++
-# `std::__cxx11::`), so any such leak makes the stubs platform-dependent.
-STD_TYPE_LEAK = re.compile(r'"[^"\n]*\bstd::[^"\n]*"')
+# `std::__cxx11::`), so any such leak makes the stubs platform-dependent. Eigen
+# template names too: MSVC drops the spaces (`Transform<double,3,1,0>`).
+PLATFORM_TYPE_LEAK = re.compile(r'"[^"\n]*\b(?:std|Eigen)::[^"\n]*"')
 
 
 def test_modules_discovered():
@@ -49,8 +50,8 @@ def test_stub_is_valid_python(module):
 
 @pytest.mark.parametrize("module", MODULES)
 def test_stub_has_no_std_type_leak(module):
-    leaks = STD_TYPE_LEAK.findall(_mod.stub_path(module).read_text(encoding="utf-8"))
-    assert not leaks, f"unconverted std:: types in {module}: {leaks}"
+    leaks = PLATFORM_TYPE_LEAK.findall(_mod.stub_path(module).read_text(encoding="utf-8"))
+    assert not leaks, f"unconverted std::/Eigen:: types in {module}: {leaks}"
 
 
 def test_continuous_manager_geometry_getters_declared():
