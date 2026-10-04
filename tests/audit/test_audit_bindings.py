@@ -129,3 +129,57 @@ def test_location_is_header_line(fixture_cpp):
     assert path == "tests/audit/fixtures/include/tesseract/fixture/widget.h"
     source = (REPO_ROOT / path).read_text(encoding="utf-8").splitlines()
     assert "void resize(int n);" in source[int(line) - 1]
+
+
+FIXTURE_STUB = FIXTURES / "_fixture.pyi"
+
+
+@pytest.fixture(scope="module")
+def fixture_py():
+    return audit.py_api(audit.load_stub(FIXTURE_STUB), audit.rel(FIXTURE_STUB))
+
+
+def test_py_symbols_and_kinds(fixture_py):
+    kinds = {n: s.kind for n, s in fixture_py.symbols.items()}
+    assert kinds["Widget"] is audit.Kind.CLASS
+    assert kinds["Color"] is audit.Kind.ENUM
+    assert kinds["Color.RED"] is audit.Kind.ENUMERATOR
+    assert kinds["Widget.count"] is audit.Kind.FIELD  # property; setter folded in
+    assert kinds["Widget.__init__"] is audit.Kind.CONSTRUCTOR
+    assert kinds["Widget.__eq__"] is audit.Kind.OPERATOR
+    assert kinds["Widget.__repr__"] is audit.Kind.PROTOCOL
+    assert kinds["Color_RED"] is audit.Kind.CONSTANT
+    assert kinds["scale"] is audit.Kind.FUNCTION
+
+
+def test_py_arity_excludes_self_and_counts_defaults(fixture_py):
+    assert [str(o.arity) for o in fixture_py.symbols["Widget.__init__"].overloads] == ["0", "1"]
+    assert [str(o.arity) for o in fixture_py.symbols["scale"].overloads] == ["1-2"]
+    assert [str(o.arity) for o in fixture_py.symbols["area"].overloads] == ["1", "2"]
+
+
+def test_py_return_annotation_kept(fixture_py):
+    [ov] = fixture_py.symbols["collect"].overloads
+    assert ov.returns == "tuple[bool, list[int]]"
+
+
+def test_quoted_type_found_by_ast(fixture_py):
+    assert [(q.name, q.annotation) for q in fixture_py.quoted] == [
+        ("Widget.owner", "tesseract::fixture::Owner")
+    ]
+
+
+def test_docstring_with_quoted_cpp_name_is_not_a_quoted_type(fixture_py):
+    assert all(q.name != "Widget.size" for q in fixture_py.quoted)
+
+
+def test_numpy_order_literal_is_not_a_quoted_type(fixture_py):
+    assert all(q.name != "Widget.widget_samples" for q in fixture_py.quoted)
+
+
+def test_init_findings():
+    rows = {(d.name, d.kind) for d in audit.init_findings(FIXTURES / "package_init.py")}
+    assert rows == {
+        ("FilesystemPath", audit.Kind.CLASS),
+        ("try: import … except ImportError", audit.Kind.FAIL_LOUD),
+    }
