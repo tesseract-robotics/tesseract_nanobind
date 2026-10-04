@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import difflib
 import importlib.machinery
 import importlib.util
 import os
@@ -90,6 +91,18 @@ def render_all(modules: list[str]) -> dict[str, str]:
         return dict(zip(modules, pool.map(render, modules)))
 
 
+def drift_report(path: Path, committed: str, rendered: str) -> str:
+    """Unified diff of a stale stub; in CI the log is the only place a platform leak shows."""
+    return "".join(
+        difflib.unified_diff(
+            committed.splitlines(keepends=True),
+            rendered.splitlines(keepends=True),
+            fromfile=f"committed/{path.as_posix()}",
+            tofile=f"rendered/{path.as_posix()}",
+        )
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="report drift instead of writing")
@@ -99,10 +112,13 @@ def main(argv: list[str] | None = None) -> int:
     stale = []
     for module, text in rendered.items():
         path = stub_path(module)
-        if path.is_file() and path.read_text(encoding="utf-8") == text:
+        committed = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if path.is_file() and committed == text:
             continue
         stale.append(path.relative_to(REPO_ROOT))
-        if not args.check:
+        if args.check:
+            print(drift_report(stale[-1], committed, text))
+        else:
             path.write_text(text, encoding="utf-8")
     (STUB_ROOT / "py.typed").touch()
 

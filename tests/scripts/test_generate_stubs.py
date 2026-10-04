@@ -69,3 +69,11 @@ def test_executor_thread_default_is_machine_independent():
         "tesseract_robotics.tesseract_task_composer._tesseract_task_composer"
     ).read_text(encoding="utf-8")
     assert "name: str = 'TaskflowExecutor', num_threads: int = ...)" in text
+
+
+def test_check_reports_unified_diff():
+    """A failing drift gate must show what differs, not only which file (CI logs are the only view)."""
+    report = _mod.drift_report(Path("pkg/_m.pyi"), "a\nkeep\n", "b\nkeep\n")
+    assert "--- committed/pkg/_m.pyi" in report
+    assert "+++ rendered/pkg/_m.pyi" in report
+    assert "-a\n" in report and "+b\n" in report
