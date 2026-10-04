@@ -37,7 +37,7 @@ wp = StateWaypoint(joint_names, joint_values)
 wp_poly = StateWaypointPoly_wrap_StateWaypoint(wp)
 
 # Access values
-print(f"Names: {wp.getNames()}")
+print(f"Names: {wp.getJointIds()}")
 print(f"Position: {wp.getPosition()}")
 ```
 
