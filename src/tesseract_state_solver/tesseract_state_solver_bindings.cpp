@@ -7,6 +7,7 @@
 #include <nanobind/stl/map.h>
 #include <algorithm>
 #include <stdexcept>
+#include <nanobind/stl/unordered_map.h>
 
 // tesseract_state_solver
 #include <tesseract/state_solver/state_solver.h>
@@ -29,77 +30,78 @@ namespace tc = tesseract::common;
 
 namespace {
 
-// gh-219, GH #43: OFKTStateSolver stores a value through nodes_[name] for every given joint
-// name (ofkt_state_solver.cpp:226, :246, :268), so an unknown name default-inserts a null node
+// gh-219, GH #43: OFKTStateSolver stores a value through nodes_[id] for every given joint
+// id (ofkt_state_solver.cpp:226, :246, :268), so an unknown name default-inserts a null node
 // and dereferences it; KDLStateSolver logs and skips it. Its vector forms check sizes only with
-// assert, and an unknown floating name is std::out_of_range after the joint values were stored.
+// assert, and an unknown floating id is std::out_of_range after the joint values were stored.
 // The binding owns the Python boundary: validate first, std::invalid_argument -> ValueError.
 
-// The names not in `allowed`, comma-separated, or "" when all are.
-std::string unknown_names(const std::vector<std::string>& names, const std::vector<std::string>& allowed)
+// The ids not in `allowed`, their names comma-separated, or "" when all are.
+template <typename Id>
+std::string unknown_names(const std::vector<Id>& ids, const std::vector<Id>& allowed)
 {
     std::string unknown;
-    for (const auto& name : names) {
-        if (std::find(allowed.begin(), allowed.end(), name) == allowed.end()) {
+    for (const auto& id : ids) {
+        if (std::find(allowed.begin(), allowed.end(), id) == allowed.end()) {
             if (!unknown.empty()) unknown += ", ";
-            unknown += name;
+            unknown += id.name();
         }
     }
     return unknown;
 }
 
 template <typename Map>
-std::vector<std::string> keys_of(const Map& map)
+std::vector<typename Map::key_type> keys_of(const Map& map)
 {
-    std::vector<std::string> keys;
+    std::vector<typename Map::key_type> keys;
     keys.reserve(map.size());
     for (const auto& kv : map) keys.push_back(kv.first);
     return keys;
 }
 
-// Joint values are set by name on the active joints only: fixed and mimic joints have no node
+// Joint values are set by id on the active joints only: fixed and mimic joints have no node
 // value, floating joints take a transform.
-void validate_joint_names(const tsg::StateSolver& solver, const std::vector<std::string>& names,
+void validate_joint_names(const tsg::StateSolver& solver, const std::vector<tc::JointId>& joint_ids,
                           const char* caller)
 {
-    const std::string unknown = unknown_names(names, solver.getActiveJointNames());
+    const std::string unknown = unknown_names(joint_ids, solver.getActiveJointIds());
     if (!unknown.empty())
         throw std::invalid_argument(std::string(caller) + ": unknown or non-active joint names: " + unknown);
 }
 
-void validate_names_values(const tsg::StateSolver& solver, const std::vector<std::string>& names,
+void validate_names_values(const tsg::StateSolver& solver, const std::vector<tc::JointId>& joint_ids,
                            const Eigen::Ref<const Eigen::VectorXd>& values, const char* caller)
 {
-    if (static_cast<Eigen::Index>(names.size()) != values.size())
-        throw std::invalid_argument(std::string(caller) + ": joint_names length (" + std::to_string(names.size()) +
+    if (static_cast<Eigen::Index>(joint_ids.size()) != values.size())
+        throw std::invalid_argument(std::string(caller) + ": joint_ids length (" + std::to_string(joint_ids.size()) +
                                     ") != joint_values length (" + std::to_string(values.size()) + ")");
-    validate_joint_names(solver, names, caller);
+    validate_joint_names(solver, joint_ids, caller);
 }
 
-// A bare joint vector is in getActiveJointNames() order and covers every active joint.
+// A bare joint vector is in getActiveJointIds() order and covers every active joint.
 void validate_joint_vector(const tsg::StateSolver& solver, const Eigen::Ref<const Eigen::VectorXd>& values,
                            const char* caller)
 {
-    const std::size_t n_active = solver.getActiveJointNames().size();
+    const std::size_t n_active = solver.getActiveJointIds().size();
     if (static_cast<Eigen::Index>(n_active) != values.size())
         throw std::invalid_argument(std::string(caller) + ": joint_values length (" + std::to_string(values.size()) +
                                     ") != number of active joints (" + std::to_string(n_active) + ")");
 }
 
-void validate_floating_joints(const tsg::StateSolver& solver, const tc::TransformMap& floating_joint_values,
+void validate_floating_joints(const tsg::StateSolver& solver, const tc::JointIdTransformMap& floating_joint_values,
                               const char* caller)
 {
-    if (floating_joint_values.empty()) return;  // the common call: skip the name copy
-    const std::string unknown = unknown_names(keys_of(floating_joint_values), solver.getFloatingJointNames());
+    if (floating_joint_values.empty()) return;  // the common call: skip the id copy
+    const std::string unknown = unknown_names(keys_of(floating_joint_values), solver.getFloatingJointIds());
     if (!unknown.empty())
         throw std::invalid_argument(std::string(caller) + ": unknown floating joint names: " + unknown);
 }
 
-// getJacobian reads link_map_.at(link_name) (OFKT, std::out_of_range) or logs and throws (KDL).
-void require_link(const tsg::StateSolver& solver, const std::string& link_name, const char* caller)
+// getJacobian reads link_map_.at(link_id) (OFKT, std::out_of_range) or logs and throws (KDL).
+void require_link(const tsg::StateSolver& solver, const tc::LinkId& link_id, const char* caller)
 {
-    if (!solver.hasLinkName(link_name))
-        throw nb::key_error((std::string(caller) + ": unknown link name: " + link_name).c_str());
+    if (!solver.hasLinkId(link_id))
+        throw nb::key_error((std::string(caller) + ": unknown link name: " + link_id.name()).c_str());
 }
 
 }  // namespace
@@ -107,70 +109,48 @@ void require_link(const tsg::StateSolver& solver, const std::string& link_name, 
 NB_MODULE(_tesseract_state_solver, m) {
     m.doc() = "tesseract_state_solver Python bindings";
 
-    // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
+    // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific);
+    // LinkId / JointId are registered there too
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
     // SceneGraph, Joint and Link in the solver constructors and MutableStateSolver (else stubs quote the C++ name)
     nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
+
+    // Id-keyed transform maps leave C++ as plain dicts keyed by LinkId / JointId; ids hash and
+    // compare like their names, so Python can still index them with a str.
+    using LinkTransforms = std::unordered_map<tc::LinkId, Eigen::Isometry3d>;
+    using JointTransforms = std::unordered_map<tc::JointId, Eigen::Isometry3d>;
 
     // ========== SceneState ==========
     nb::class_<tsg::SceneState> scene_state(m, "SceneState");
     scene_state
         .def(nb::init<>())
         .def_rw("joints", &tsg::SceneState::joints)
-        .def_prop_rw("floating_joints",
-            [](const tsg::SceneState& self) {
-                std::map<std::string, Eigen::Isometry3d> result;
-                for (const auto& p : self.floating_joints) {
-                    result[p.first] = p.second;
-                }
-                return result;
-            },
-            [](tsg::SceneState& self, const std::map<std::string, Eigen::Isometry3d>& m) {
-                self.floating_joints.clear();
-                for (const auto& p : m) {
-                    self.floating_joints[p.first] = p.second;
-                }
-            })
+        .def_rw("floating_joints", &tsg::SceneState::floating_joints)
         .def_prop_rw("link_transforms",
             [](const tsg::SceneState& self) {
-                // Convert AlignedMap to std::map for Python
-                std::map<std::string, Eigen::Isometry3d> result;
-                for (const auto& p : self.link_transforms) {
-                    result[p.first] = p.second;
-                }
-                return result;
+                return LinkTransforms(self.link_transforms.begin(), self.link_transforms.end());
             },
-            [](tsg::SceneState& self, const std::map<std::string, Eigen::Isometry3d>& m) {
-                self.link_transforms.clear();
-                for (const auto& p : m) {
-                    self.link_transforms[p.first] = p.second;
-                }
+            [](tsg::SceneState& self, const LinkTransforms& m) {
+                self.link_transforms = tc::LinkIdTransformMap(m.begin(), m.end());
             })
         .def_prop_rw("joint_transforms",
             [](const tsg::SceneState& self) {
-                std::map<std::string, Eigen::Isometry3d> result;
-                for (const auto& p : self.joint_transforms) {
-                    result[p.first] = p.second;
-                }
-                return result;
+                return JointTransforms(self.joint_transforms.begin(), self.joint_transforms.end());
             },
-            [](tsg::SceneState& self, const std::map<std::string, Eigen::Isometry3d>& m) {
-                self.joint_transforms.clear();
-                for (const auto& p : m) {
-                    self.joint_transforms[p.first] = p.second;
-                }
+            [](tsg::SceneState& self, const JointTransforms& m) {
+                self.joint_transforms = tc::JointIdTransformMap(m.begin(), m.end());
             })
-        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_names"_a)
+        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_ids"_a)
         // #232: upstream's floating_joints.at(name) (scene_state.cpp:48) throws std::out_of_range
         // for an unknown name; a missing mapping key is KeyError in Python.
         .def("getFloatingJointValues",
-            [](const tsg::SceneState& self, const std::vector<std::string>& joint_names) {
-                for (const auto& name : joint_names)
-                    if (self.floating_joints.find(name) == self.floating_joints.end())
-                        throw nb::key_error(("getFloatingJointValues: unknown floating joint name: " + name).c_str());
-                return self.getFloatingJointValues(joint_names);
+            [](const tsg::SceneState& self, const std::vector<tc::JointId>& joint_ids) {
+                for (const auto& id : joint_ids)
+                    if (self.floating_joints.find(id) == self.floating_joints.end())
+                        throw nb::key_error(("getFloatingJointValues: unknown floating joint name: " + id.name()).c_str());
+                return self.getFloatingJointValues(joint_ids);
             },
-            "joint_names"_a);
+            "joint_ids"_a);
     // Upstream compares the transforms with isApprox(1e-5) (scene_state.cpp:56).
     bind_value_equality(scene_state);
 
@@ -179,130 +159,123 @@ NB_MODULE(_tesseract_state_solver, m) {
     // name, validated as above. The Python-only aliases setStateByMap / setStateByNamesAndValues are
     // bound to the same lambdas as their native forms (kept until a separate removal).
     // Dispatch: {name: float} matches only the joint-value map, {name: Isometry3d} only the
-    // TransformMap; an empty {} converts to both and reaches the joint-value map first.
+    // JointIdTransformMap; an empty {} converts to both and reaches the joint-value map first.
     const auto set_state_map = [](tsg::StateSolver& self,
-                                  const std::unordered_map<std::string, double>& joint_values,
-                                  const tc::TransformMap& floating_joint_values) {
+                                  const tsg::SceneState::JointValues& joint_values,
+                                  const tc::JointIdTransformMap& floating_joint_values) {
         validate_joint_names(self, keys_of(joint_values), "setState");
         validate_floating_joints(self, floating_joint_values, "setState");
         self.setState(joint_values, floating_joint_values);
     };
     const auto set_state_names_values = [](tsg::StateSolver& self,
-                                           const std::vector<std::string>& joint_names,
+                                           const std::vector<tc::JointId>& joint_ids,
                                            const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                           const tc::TransformMap& floating_joint_values) {
-        validate_names_values(self, joint_names, joint_values, "setState");
+                                           const tc::JointIdTransformMap& floating_joint_values) {
+        validate_names_values(self, joint_ids, joint_values, "setState");
         validate_floating_joints(self, floating_joint_values, "setState");
-        self.setState(joint_names, joint_values, floating_joint_values);
+        self.setState(joint_ids, joint_values, floating_joint_values);
     };
 
     nb::class_<tsg::StateSolver>(m, "StateSolver")
         .def("setState", [](tsg::StateSolver& self,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                            const tc::TransformMap& floating_joint_values) {
+                            const tc::JointIdTransformMap& floating_joint_values) {
             validate_joint_vector(self, joint_values, "setState");
             validate_floating_joints(self, floating_joint_values, "setState");
             self.setState(joint_values, floating_joint_values);
-        }, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
-        .def("setState", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
+        }, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+        .def("setState", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("setState", set_state_names_values,
-             "joint_names"_a, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
-        .def("setState", [](tsg::StateSolver& self, const tc::TransformMap& floating_joint_values) {
+             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+        .def("setState", [](tsg::StateSolver& self, const tc::JointIdTransformMap& floating_joint_values) {
             validate_floating_joints(self, floating_joint_values, "setState");
             self.setState(floating_joint_values);
         }, "floating_joint_values"_a)
-        .def("setStateByMap", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
+        .def("setStateByMap", set_state_map, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("setStateByNamesAndValues", set_state_names_values,
-             "joint_names"_a, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
+             "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getState", [](const tsg::StateSolver& self) {
             return self.getState();
         })
         .def("getState", [](const tsg::StateSolver& self,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                            const tc::TransformMap& floating_joint_values) {
+                            const tc::JointIdTransformMap& floating_joint_values) {
             validate_joint_vector(self, joint_values, "getState");
             validate_floating_joints(self, floating_joint_values, "getState");
             return self.getState(joint_values, floating_joint_values);
-        }, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
+        }, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getState", [](const tsg::StateSolver& self,
-                            const std::unordered_map<std::string, double>& joint_values,
-                            const tc::TransformMap& floating_joint_values) {
+                            const tsg::SceneState::JointValues& joint_values,
+                            const tc::JointIdTransformMap& floating_joint_values) {
             validate_joint_names(self, keys_of(joint_values), "getState");
             validate_floating_joints(self, floating_joint_values, "getState");
             return self.getState(joint_values, floating_joint_values);
-        }, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
+        }, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getState", [](const tsg::StateSolver& self,
-                            const std::vector<std::string>& joint_names,
+                            const std::vector<tc::JointId>& joint_ids,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                            const tc::TransformMap& floating_joint_values) {
-            validate_names_values(self, joint_names, joint_values, "getState");
+                            const tc::JointIdTransformMap& floating_joint_values) {
+            validate_names_values(self, joint_ids, joint_values, "getState");
             validate_floating_joints(self, floating_joint_values, "getState");
-            return self.getState(joint_names, joint_values, floating_joint_values);
-        }, "joint_names"_a, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
-        .def("getState", [](const tsg::StateSolver& self, const tc::TransformMap& floating_joint_values) {
+            return self.getState(joint_ids, joint_values, floating_joint_values);
+        }, "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+        .def("getState", [](const tsg::StateSolver& self, const tc::JointIdTransformMap& floating_joint_values) {
             validate_floating_joints(self, floating_joint_values, "getState");
             return self.getState(floating_joint_values);
         }, "floating_joint_values"_a)
-        // getLinkTransforms(names, values[, floating]): the C++ out-param returned (out-param rule).
+        // getLinkTransforms(ids, values[, floating]): the C++ out-param returned (out-param rule).
         // One Python overload covers both C++ ones: the 3-argument one is the 4-argument one with
         // the current floating joint values, which an empty map leaves in place.
         .def("getLinkTransforms", [](const tsg::StateSolver& self) {
             return self.getLinkTransforms();
         })
         .def("getLinkTransforms", [](const tsg::StateSolver& self,
-                                     const std::vector<std::string>& joint_names,
+                                     const std::vector<tc::JointId>& joint_ids,
                                      const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                     const tc::TransformMap& floating_joint_values) {
-            validate_names_values(self, joint_names, joint_values, "getLinkTransforms");
+                                     const tc::JointIdTransformMap& floating_joint_values) {
+            validate_names_values(self, joint_ids, joint_values, "getLinkTransforms");
             validate_floating_joints(self, floating_joint_values, "getLinkTransforms");
-            tc::TransformMap link_transforms;
-            self.getLinkTransforms(link_transforms, joint_names, joint_values, floating_joint_values);
+            tc::LinkIdTransformMap link_transforms;
+            self.getLinkTransforms(link_transforms, joint_ids, joint_values, floating_joint_values);
             return link_transforms;
-        }, "joint_names"_a, "joint_values"_a, "floating_joint_values"_a = tc::TransformMap{})
+        }, "joint_ids"_a, "joint_values"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getRandomState", &tsg::StateSolver::getRandomState)
+        // 0.36 dropped the joint-value-map getJacobian (state_solver.h:170-189): vector and ids + vector only
         .def("getJacobian", [](const tsg::StateSolver& self,
                                const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                               const std::string& link_name,
-                               const tc::TransformMap& floating_joint_values) {
+                               const tc::LinkId& link_id,
+                               const tc::JointIdTransformMap& floating_joint_values) {
             validate_joint_vector(self, joint_values, "getJacobian");
             validate_floating_joints(self, floating_joint_values, "getJacobian");
-            require_link(self, link_name, "getJacobian");
-            return self.getJacobian(joint_values, link_name, floating_joint_values);
-        }, "joint_values"_a, "link_name"_a, "floating_joint_values"_a = tc::TransformMap{})
+            require_link(self, link_id, "getJacobian");
+            return self.getJacobian(joint_values, link_id, floating_joint_values);
+        }, "joint_values"_a, "link_id"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
         .def("getJacobian", [](const tsg::StateSolver& self,
-                               const std::unordered_map<std::string, double>& joint_values,
-                               const std::string& link_name,
-                               const tc::TransformMap& floating_joint_values) {
-            validate_joint_names(self, keys_of(joint_values), "getJacobian");
-            validate_floating_joints(self, floating_joint_values, "getJacobian");
-            require_link(self, link_name, "getJacobian");
-            return self.getJacobian(joint_values, link_name, floating_joint_values);
-        }, "joint_values"_a, "link_name"_a, "floating_joint_values"_a = tc::TransformMap{})
-        .def("getJacobian", [](const tsg::StateSolver& self,
-                               const std::vector<std::string>& joint_names,
+                               const std::vector<tc::JointId>& joint_ids,
                                const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                               const std::string& link_name,
-                               const tc::TransformMap& floating_joint_values) {
-            validate_names_values(self, joint_names, joint_values, "getJacobian");
+                               const tc::LinkId& link_id,
+                               const tc::JointIdTransformMap& floating_joint_values) {
+            validate_names_values(self, joint_ids, joint_values, "getJacobian");
             validate_floating_joints(self, floating_joint_values, "getJacobian");
-            require_link(self, link_name, "getJacobian");
-            return self.getJacobian(joint_names, joint_values, link_name, floating_joint_values);
-        }, "joint_names"_a, "joint_values"_a, "link_name"_a, "floating_joint_values"_a = tc::TransformMap{})
-        // Name getters
-        .def("getJointNames", &tsg::StateSolver::getJointNames)
-        .def("getFloatingJointNames", &tsg::StateSolver::getFloatingJointNames)
-        .def("getActiveJointNames", &tsg::StateSolver::getActiveJointNames)
-        .def("getBaseLinkName", &tsg::StateSolver::getBaseLinkName)
-        .def("getLinkNames", &tsg::StateSolver::getLinkNames)
-        .def("getActiveLinkNames", &tsg::StateSolver::getActiveLinkNames)
-        .def("getStaticLinkNames", &tsg::StateSolver::getStaticLinkNames)
+            require_link(self, link_id, "getJacobian");
+            return self.getJacobian(joint_ids, joint_values, link_id, floating_joint_values);
+        }, "joint_ids"_a, "joint_values"_a, "link_id"_a, "floating_joint_values"_a = tc::JointIdTransformMap{})
+        // Id getters
+        .def("getJointIds", &tsg::StateSolver::getJointIds)
+        .def("getFloatingJointIds", &tsg::StateSolver::getFloatingJointIds)
+        .def("getActiveJointIds", &tsg::StateSolver::getActiveJointIds)
+        .def("getBaseLinkId", &tsg::StateSolver::getBaseLinkId)
+        .def("getLinkIds", &tsg::StateSolver::getLinkIds)
+        .def("getActiveLinkIds", &tsg::StateSolver::getActiveLinkIds)
+        .def("getStaticLinkIds", &tsg::StateSolver::getStaticLinkIds)
         // Link queries
-        .def("isActiveLinkName", &tsg::StateSolver::isActiveLinkName, "link_name"_a)
-        .def("hasLinkName", &tsg::StateSolver::hasLinkName, "link_name"_a)
+        .def("isActiveLinkId", &tsg::StateSolver::isActiveLinkId, "link_id"_a)
+        .def("hasLinkId", &tsg::StateSolver::hasLinkId, "link_id"_a)
         // Transform getters
-        .def("getLinkTransform", &tsg::StateSolver::getLinkTransform, "link_name"_a)
+        .def("getLinkTransform", nb::overload_cast<const tc::LinkId&>(&tsg::StateSolver::getLinkTransform, nb::const_),
+             "link_id"_a)
         .def("getRelativeLinkTransform", &tsg::StateSolver::getRelativeLinkTransform,
-             "from_link_name"_a, "to_link_name"_a)
+             "from_link_id"_a, "to_link_id"_a)
         .def("getLimits", &tsg::StateSolver::getLimits)
         .def("clone", [](const tsg::StateSolver& self) { return self.clone(); });
 
@@ -349,7 +322,7 @@ NB_MODULE(_tesseract_state_solver, m) {
         // graph (ofkt_state_solver.cpp:1053, :1075) and throws for any non-empty prefix (#247)
         .def(nb::init<const tsg::SceneGraph&>(), "scene_graph"_a)
         // #247: the root link only; grow it with addLink / moveLink
-        .def(nb::init<const std::string&>(), "root_name"_a)
+        .def(nb::init<const tc::LinkId&>(), "root_link_id"_a)
         .def("clone", [](const tsg::OFKTStateSolver& self) {
             return self.clone();
         });
