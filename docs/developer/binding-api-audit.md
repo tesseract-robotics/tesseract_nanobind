@@ -43,7 +43,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
     - Headers another binding #includes directly are audited with that module.
 
 !!! warning "Limitations"
-    Python member names are checked against every declaration in the TU, so a Python-only member that shares a common C++ name (`size`, `clear`) is not flagged. Parameter types are not compared beyond quoted C++ names.
+    Python member names are checked against every declaration in the TU, so a Python-only member that shares a common C++ name (`size`, `clear`) is not flagged. Parameter types are not compared beyond quoted C++ names. Overloads are matched by arity only: a C++ overload is never reported while a bound overload takes the same number of arguments (e.g. `Environment::init(commands)` hidden by `init(scene_graph)`).
 
 ## tesseract_collision
 

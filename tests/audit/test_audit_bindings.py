@@ -287,6 +287,12 @@ def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
         assert f"`{pattern}`: {reason}" in text
 
 
+def test_limitations_say_overloads_match_by_arity_only(fixture_report):
+    """Note 2: an overload with a bound overload of the same arity is never reported."""
+    text = audit.render_markdown([fixture_report], PROV)
+    assert "Overloads are matched by arity only" in text
+
+
 def test_fixture_deviations_exact(fixture_report):
     assert {(d.name, d.kind, d.arity) for d in fixture_report.deviations} == {
         ("Widget.widget_grow", audit.Kind.METHOD, "—"),
