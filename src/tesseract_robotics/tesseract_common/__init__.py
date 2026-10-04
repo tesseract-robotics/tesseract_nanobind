@@ -65,6 +65,14 @@ __all__ = [
     "restorePreviousOutputHandler",
     "flushOutputHandlers",
     "OutputHandlerFlushForbiddenError",
+    # Logging (spdlog)
+    "LoggerLevel",
+    "Logger",
+    "LogRecord",
+    "getLogger",
+    "isLogLevelEnabled",
+    "addLogRecordHandler",
+    "removeLogRecordHandler",
     # Eigen helper types
     "Isometry3d",
     "Translation3d",
