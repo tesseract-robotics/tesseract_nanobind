@@ -1,7 +1,10 @@
 // Audit contract fixture: every declaration exercises one matching rule.
 #pragma once
+#include <functional>
 #include <sstream>
 #include <vector>
+
+#include <tesseract/fixture/gadget.h>  // first inclusion of gadget.h: the TU's own #include must still count (C1)
 
 namespace tesseract::fixture
 {
@@ -52,9 +55,37 @@ enum class Color
   GREEN
 };
 
+struct Runner  // abstract and bound: no __init__ gap (I3); operator() is __call__ (I5)
+{
+  Runner() = default;
+  virtual ~Runner() = default;
+  virtual void go() = 0;
+  virtual bool operator()(int n) const = 0;
+};
+
+struct FastRunner : Runner  // Python inherits go/__call__ from the bound Runner (I4)
+{
+  void go() override;
+  bool operator()(int n) const override;
+};
+
+template <class Archive>
+void serialize(Archive& ar, Owner& owner);  // excluded: free cereal hook (I2)
+
+void flatten(std::vector<int>& out);  // void + one out-param: Python returns it directly (I6)
+
 int scale(int value, double factor = 1.0);  // defaulted: arity 1-2
 int scale(int value, double factor);        // redeclaration: must not add an overload
 int area(int w);                            // Python adds an arity-2 overload: deviation
 bool collect(std::vector<int>& out, Base& runner, int n);  // out-param: out only; arity 3 -> 2
 void describe(std::stringstream& ss, int n);               // stringstream -> str; arity 2 -> 1
 }  // namespace tesseract::fixture
+
+namespace std
+{
+template <>
+struct hash<tesseract::fixture::Owner>  // std specialisation: not module API (I1)
+{
+  std::size_t operator()(const tesseract::fixture::Owner& owner) const;
+};
+}  // namespace std

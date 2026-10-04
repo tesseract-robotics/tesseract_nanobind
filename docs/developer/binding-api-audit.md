@@ -5,9 +5,9 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `50835
 
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
-| tesseract_collision | 179 | 50 | 13 | 0 | 6 |
-| tesseract_common | 75 | 75 | 27 | 2 | 0 |
-| tesseract_environment | 102 | 93 | 14 | 4 | 1 |
+| tesseract_collision | 180 | 47 | 12 | 1 | 6 |
+| tesseract_common | 94 | 64 | 26 | 2 | 0 |
+| tesseract_environment | 102 | 92 | 14 | 4 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
@@ -22,7 +22,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | tesseract_environment | `Command.getType` | `tesseract::environment::CommandType` | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:61 |
 
 !!! note "Accepted deviation rules"
-    - `out-param`: A non-const lvalue-reference out-param is returned in a tuple with the result (Phase A precedent: checkTrajectory).
+    - `out-param`: A non-const lvalue-reference out-param is returned in a tuple with the result (Phase A precedent: checkTrajectory), or alone when the C++ returns `void`.
     - `scalar-last-quaternion`: Quaterniond takes (x, y, z, w), the project-wide scalar-last order; Eigen's constructor is (w, x, y, z).
     - `stringstream`: A `std::stringstream&` parameter the C++ writes into is returned as `str`.
 
@@ -72,17 +72,14 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `ContactResultMap.end` | method | tesseract/collision/types.h:270 | — |
 | `ContactResultMap.filter` | method | tesseract/collision/types.h:222 | — |
 | `ContactResultMap.find` | method | tesseract/collision/types.h:281 | — |
-| `ContactResultMap.flattenCopyResults` | method | tesseract/collision/types.h:214 | 1 |
 | `ContactResultMap.flattenWrapperResults` | method | tesseract/collision/types.h:215 | — |
 | `ContactResultMap.getContainer` | method | tesseract/collision/types.h:262 | — |
 | `ContactResultMap.setContactResult` | method | tesseract/collision/types.h:184 | — |
 | `ContactResultMap.shrinkToFit` | method | tesseract/collision/types.h:253 | — |
 | `ContactTestData` | class | tesseract/collision/types.h:326 | — |
-| `ContinuousContactManager.__init__` | constructor | tesseract/collision/continuous_contact_manager.h:49 | — |
 | `ContinuousContactManager.setCollisionObjectsTransform` | method | tesseract/collision/continuous_contact_manager.h:172 | 3 |
 | `ContinuousContactManager.setCollisionObjectsTransform` | method | tesseract/collision/continuous_contact_manager.h:186 | 3 |
 | `ContinuousContactManagerFactory` | class | tesseract/collision/contact_managers_plugin_factory.h:78 | — |
-| `DiscreteContactManager.__init__` | constructor | tesseract/collision/discrete_contact_manager.h:51 | — |
 | `DiscreteContactManagerFactory` | class | tesseract/collision/contact_managers_plugin_factory.h:57 | — |
 | `createConvexHull` | function | tesseract/collision/bullet/convex_hull_utils.h:45 | — |
 
@@ -92,7 +89,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 |---|---|---|---|
 | `ContactManagerConfig.margin_data_override_type` | field | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:405 | — |
 | `ContactResultMap.__len__` | protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:174 | — |
-| `ContactResultMap.flattenCopyResults` | overload | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:170 | 0 |
 | `ContactResultVector.__len__` | protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:147 | — |
 | `ContactTestType_ALL` | constant | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:35 | — |
 | `ContactTestType_CLOSEST` | constant | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi:33 | — |
@@ -106,7 +102,9 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 ### Accepted
 
-None.
+| symbol | rule | location |
+|---|---|---|
+| `ContactResultMap.flattenCopyResults` | out-param | tesseract/collision/types.h:214 |
 
 ## tesseract_common
 
@@ -114,16 +112,15 @@ None.
 
 | C++ symbol | kind | header:line | missing overload (arity) |
 |---|---|---|---|
-| `ACMContactAllowedValidator.operator()` | operator | tesseract/common/contact_allowed_validator.h:70 | — |
+| `AllowedCollisionMatrix.__eq__` | operator | tesseract/common/allowed_collision_matrix.h:99 | — |
+| `AllowedCollisionMatrix.__init__` | constructor | tesseract/common/allowed_collision_matrix.h:35 | 1 |
+| `AllowedCollisionMatrix.__ne__` | operator | tesseract/common/allowed_collision_matrix.h:100 | — |
+| `AllowedCollisionMatrix.removeAllowedCollision` | method | tesseract/common/allowed_collision_matrix.h:71 | 1 |
+| `AllowedCollisionMatrix.reserveAllowedCollisionMatrix` | method | tesseract/common/allowed_collision_matrix.h:97 | — |
 | `BytesResource.__eq__` | operator | tesseract/common/resource_locator.h:265 | — |
 | `BytesResource.__init__` | constructor | tesseract/common/resource_locator.h:248 | 0 |
 | `BytesResource.__init__` | constructor | tesseract/common/resource_locator.h:251 | 3-4 |
 | `BytesResource.__ne__` | operator | tesseract/common/resource_locator.h:266 | — |
-| `BytesResource.getFilePath` | method | tesseract/common/resource_locator.h:260 | — |
-| `BytesResource.getResourceContentStream` | method | tesseract/common/resource_locator.h:262 | — |
-| `BytesResource.getResourceContents` | method | tesseract/common/resource_locator.h:261 | — |
-| `BytesResource.getUrl` | method | tesseract/common/resource_locator.h:259 | — |
-| `BytesResource.isFile` | method | tesseract/common/resource_locator.h:258 | — |
 | `BytesResource.locateResource` | method | tesseract/common/resource_locator.h:263 | — |
 | `CollisionMarginData.__eq__` | operator | tesseract/common/collision_margin_data.h:259 | — |
 | `CollisionMarginData.__init__` | constructor | tesseract/common/collision_margin_data.h:178 | 2 |
@@ -139,16 +136,12 @@ None.
 | `CollisionMarginPairData.getMaxCollisionMargin` | method | tesseract/common/collision_margin_data.h:101 | — |
 | `CollisionMarginPairData.incrementMargins` | method | tesseract/common/collision_margin_data.h:119 | — |
 | `CollisionMarginPairData.scaleMargins` | method | tesseract/common/collision_margin_data.h:125 | — |
-| `CombinedContactAllowedValidator.operator()` | operator | tesseract/common/contact_allowed_validator.h:101 | — |
-| `ContactAllowedValidator.__init__` | constructor | tesseract/common/contact_allowed_validator.h:46 | — |
-| `ContactAllowedValidator.operator()` | operator | tesseract/common/contact_allowed_validator.h:56 | — |
 | `ContactManagersPluginInfo` | class | tesseract/common/plugin_info.h:128 | — |
 | `GeneralResourceLocator.__eq__` | operator | tesseract/common/resource_locator.h:115 | — |
 | `GeneralResourceLocator.__init__` | constructor | tesseract/common/resource_locator.h:103 | 1-2 |
 | `GeneralResourceLocator.__ne__` | operator | tesseract/common/resource_locator.h:116 | — |
 | `GeneralResourceLocator.addPath` | method | tesseract/common/resource_locator.h:125 | — |
 | `GeneralResourceLocator.loadEnvironmentVariable` | method | tesseract/common/resource_locator.h:134 | — |
-| `GeneralResourceLocator.locateResource` | method | tesseract/common/resource_locator.h:113 | — |
 | `JointState.__eq__` | operator | tesseract/common/joint_state.h:62 | — |
 | `JointState.__ne__` | operator | tesseract/common/joint_state.h:64 | — |
 | `JointTrajectory` | class | tesseract/common/joint_state.h:68 | — |
@@ -170,25 +163,19 @@ None.
 | `PluginInfoContainer.__ne__` | operator | tesseract/common/plugin_info.h:65 | — |
 | `ProfilesPluginInfo` | class | tesseract/common/plugin_info.h:69 | — |
 | `Resource.__eq__` | operator | tesseract/common/resource_locator.h:187 | — |
-| `Resource.__init__` | constructor | tesseract/common/resource_locator.h:146 | — |
 | `Resource.__ne__` | operator | tesseract/common/resource_locator.h:188 | — |
 | `ResourceLocator.__eq__` | operator | tesseract/common/resource_locator.h:74 | — |
 | `ResourceLocator.__ne__` | operator | tesseract/common/resource_locator.h:75 | — |
 | `SimpleLocatedResource.__eq__` | operator | tesseract/common/resource_locator.h:232 | — |
 | `SimpleLocatedResource.__init__` | constructor | tesseract/common/resource_locator.h:205 | 0 |
 | `SimpleLocatedResource.__ne__` | operator | tesseract/common/resource_locator.h:233 | — |
-| `SimpleLocatedResource.getFilePath` | method | tesseract/common/resource_locator.h:224 | — |
-| `SimpleLocatedResource.getResourceContentStream` | method | tesseract/common/resource_locator.h:228 | — |
-| `SimpleLocatedResource.getResourceContents` | method | tesseract/common/resource_locator.h:226 | — |
-| `SimpleLocatedResource.getUrl` | method | tesseract/common/resource_locator.h:222 | — |
-| `SimpleLocatedResource.isFile` | method | tesseract/common/resource_locator.h:220 | — |
 | `SimpleLocatedResource.locateResource` | method | tesseract/common/resource_locator.h:230 | — |
 | `TaskComposerPluginInfo` | class | tesseract/common/plugin_info.h:159 | — |
 | `enforceLimits` | function | tesseract/common/kinematic_limits.h:150 | — |
-| `hash` | class | tesseract/common/types.h:67 | — |
 | `isWithinLimits` | function | tesseract/common/kinematic_limits.h:67 | — |
 | `makeOrderedLinkPair` | function | tesseract/common/types.h:46 | — |
-| `serialize` | function | tesseract/common/resource_locator.h:46 | — |
+| `operator<<` | function | tesseract/common/allowed_collision_matrix.h:108 | — |
+| `operator==` | function | tesseract/common/allowed_collision_matrix.h:17 | — |
 
 ### Deviations
 
@@ -198,7 +185,6 @@ None.
 | `CollisionMarginData.getPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:502 | — |
 | `CollisionMarginData.setPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:504 | — |
 | `CollisionMarginOverrideType` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:468 | — |
-| `ContactAllowedValidator.__call__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:440 | — |
 | `EIGEN_DEFAULT_PREC` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:12 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/__init__.py:22 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:300 | — |
@@ -327,7 +313,6 @@ None.
 | `checkTrajectorySegment` | function | tesseract/environment/utils.h:67 | — |
 | `checkTrajectoryState` | function | tesseract/environment/utils.h:80 | — |
 | `getActiveLinkNamesRecursive` | function | tesseract/environment/utils.h:53 | — |
-| `serialize` | function | tesseract/environment/environment.h:66 | — |
 
 ### Deviations
 

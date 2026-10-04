@@ -85,19 +85,47 @@ def test_audited_headers_are_direct_includes_under_prefix(fixture_tu):
     headers = audit.audited_headers(
         fixture_tu, FIXTURE_PREFIX, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
     )
-    assert {h.name for h in headers} == {"widget.h"}
+    # gadget.h is first included by widget.h, then by the TU itself (C1);
+    # detail.h is only included transitively.
+    assert {h.name for h in headers} == {"widget.h", "gadget.h"}
 
 
 def test_cpp_symbols_exact_set(fixture_cpp):
     assert set(fixture_cpp) == {
-        "Base", "Base.run", "Base.__init__",
-        "Owner", "Owner.__init__",
-        "Plain", "Plain.__init__", "Plain.x",
-        "Widget", "Widget.__init__", "Widget.size", "Widget.resize", "Widget.__eq__",
-        "Widget.operator+", "Widget.__bool__", "Widget.owner", "Widget.count",
-        "Color", "Color.RED", "Color.GREEN",
-        "scale", "area", "collect", "describe",
-    }  # fmt: skip
+        "Base",
+        "Base.run",  # abstract: no __init__ (I3)
+        "Gadget",
+        "Gadget.__init__",  # directly included after a transitive include (C1)
+        "Runner",
+        "Runner.go",
+        "Runner.__call__",  # abstract (I3); operator() -> __call__ (I5)
+        "FastRunner",
+        "FastRunner.__init__",
+        "FastRunner.go",
+        "FastRunner.__call__",
+        "Owner",
+        "Owner.__init__",
+        "Plain",
+        "Plain.__init__",
+        "Plain.x",
+        "Widget",
+        "Widget.__init__",
+        "Widget.size",
+        "Widget.resize",
+        "Widget.__eq__",
+        "Widget.operator+",
+        "Widget.__bool__",
+        "Widget.owner",
+        "Widget.count",
+        "Color",
+        "Color.RED",
+        "Color.GREEN",
+        "scale",
+        "area",
+        "collect",
+        "describe",
+        "flatten",
+    }  # fmt: skip  (no std::hash (I1), no free serialize (I2), no Detail (C1))
 
 
 def test_constructor_overloads_exclude_copy(fixture_cpp):
@@ -225,6 +253,7 @@ def test_fixture_accepted_exact(fixture_report):
     assert {(a.symbol, a.rule) for a in fixture_report.accepted} == {
         ("collect", "out-param"),
         ("describe", "stringstream"),
+        ("flatten", "out-param"),  # void + one out-param returned directly (I6)
     }
 
 
@@ -312,3 +341,21 @@ def test_json_roundtrip(fixture_report):
 def test_cli_rejects_unknown_module():
     with pytest.raises(audit.UnknownModuleError):
         audit.main(["tesseract_nope"])
+
+
+def test_inherited_bound_members_are_not_gaps(fixture_report):
+    """I4: FastRunner.go/__call__ are covered by the stub's base class Runner."""
+    assert not {g.symbol for g in fixture_report.gaps} & {"FastRunner.go", "FastRunner.__call__"}
+
+
+def test_call_operator_is_neither_gap_nor_deviation(fixture_report):
+    """I5: operator() is bound as __call__."""
+    assert "Runner.__call__" not in {g.symbol for g in fixture_report.gaps}
+    assert "Runner.__call__" not in {d.name for d in fixture_report.deviations}
+
+
+def test_common_audits_directly_included_acm():
+    """C1: allowed_collision_matrix.h reaches the TU via utils.h before its own #include."""
+    tu = audit.parse_tu(audit.binding_source("tesseract_common"))
+    headers = audit.audited_headers(tu, "tesseract/common/", audit.INCLUDE_DIRS)
+    assert "allowed_collision_matrix.h" in {h.name for h in headers}

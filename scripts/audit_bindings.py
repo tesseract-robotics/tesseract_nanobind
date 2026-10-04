@@ -59,8 +59,13 @@ PARSE_ARGS = (
     "-resource-dir",
     str(CLANG_RESOURCE_DIR),
 )
-# Declarations only: binding bodies (the NB_MODULE block) carry no API.
-PARSE_OPTIONS = ci.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+# Declarations only: binding bodies (the NB_MODULE block) carry no API. The detailed
+# processing record keeps the main file's #include directives as cursors: get_includes()
+# reports a header only at its first inclusion, which may be transitive.
+PARSE_OPTIONS = (
+    ci.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+    | ci.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
+)
 # The first 20 diagnostics locate a missing -I or define; the count reports the rest.
 MAX_REPORTED_DIAGNOSTICS = 20
 
@@ -157,7 +162,7 @@ def load_stub(path: Path) -> ast.Module:
 
 # libclang spells this parameter's pointee type so; the spec accepts it bound as a `str` return.
 STRINGSTREAM = "std::stringstream"
-# cereal serialization hooks: not API.
+# cereal serialization hooks, member or free function: not API.
 CEREAL_HOOKS = frozenset({"serialize", "load", "save"})
 # EIGEN_MAKE_ALIGNED_OPERATOR_NEW expands to these in every aligned tesseract type: memory
 # management, not API (spec amendment A4).
@@ -171,7 +176,11 @@ OPERATOR_DUNDERS = {
     "operator[]": "__getitem__",
     "operator<": "__lt__",
     "operator bool": "__bool__",
+    "operator()": "__call__",
 }
+# Namespaces that audited headers reopen to specialise library templates
+# (`std::hash<LinkNamesPair>` in tesseract/common/types.h): not module API.
+FOREIGN_NAMESPACES = frozenset({"std"})
 RECORD_KINDS = frozenset(
     {ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_TEMPLATE}
 )
@@ -226,6 +235,7 @@ class CppOverload:
     arity: Arity
     out_params: tuple[str, ...]  # pointee type spellings
     location: str
+    returns_void: bool = False
 
 
 @dataclass
@@ -246,9 +256,19 @@ def location(cursor: ci.Cursor) -> str:
 def audited_headers(
     tu: ci.TranslationUnit, prefix: str, include_dirs: Sequence[Path]
 ) -> frozenset[Path]:
-    """Headers the TU's main file includes directly and that live under `prefix`."""
+    """Headers the TU's main file `#include`s itself and that live under `prefix`.
+
+    Read from the main file's inclusion directives, not `get_includes()` depth: a header
+    that an earlier include already pulled in is reported there only at that depth.
+    """
     roots = [(d / prefix).resolve() for d in include_dirs]
-    direct = (Path(i.include.name).resolve() for i in tu.get_includes() if i.depth == 1)
+    main = Path(tu.spelling).resolve()
+    direct = (
+        Path(c.get_included_file().name).resolve()
+        for c in tu.cursor.get_children()
+        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
+        and Path(c.location.file.name).resolve() == main
+    )
     return frozenset(h for h in direct if any(h.is_relative_to(r) for r in roots))
 
 
@@ -291,7 +311,8 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         n_default = sum(_has_default(p) for p in params)
         out = tuple(p.type.get_pointee().spelling for p in params if _is_out_param(p))
         arity = Arity(len(params) - n_default, len(params))
-        add(name, kind, c).overloads.append(CppOverload(arity, out, location(c)))
+        void = c.result_type.kind == ci.TypeKind.VOID
+        add(name, kind, c).overloads.append(CppOverload(arity, out, location(c), void))
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
@@ -303,6 +324,8 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
     def add_record(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
         add(name, Kind.CLASS, c)
+        # An abstract class cannot be constructed from Python: no __init__ to audit.
+        abstract = c.is_abstract_record()
         declares_ctor = False
         for m in c.get_children():
             if m.kind == ci.CursorKind.CONSTRUCTOR:
@@ -313,7 +336,10 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 continue
             if m.kind == ci.CursorKind.CONSTRUCTOR:
                 if not (
-                    m.is_copy_constructor() or m.is_move_constructor() or m.is_deleted_method()
+                    abstract
+                    or m.is_copy_constructor()
+                    or m.is_move_constructor()
+                    or m.is_deleted_method()
                 ):
                     add_callable(f"{name}.__init__", Kind.CONSTRUCTOR, m)
             elif m.kind in METHOD_KINDS:
@@ -336,7 +362,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 add_record(f"{name}.", m)
             elif m.kind == ci.CursorKind.ENUM_DECL and m.is_definition():
                 add_enum(f"{name}.", m)
-        if not declares_ctor:
+        if not (declares_ctor or abstract):
             # The compiler declares an implicit default constructor.
             add(f"{name}.__init__", Kind.CONSTRUCTOR, c).overloads.append(
                 CppOverload(Arity(0, 0), (), location(c))
@@ -345,7 +371,8 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
     def visit(scope: ci.Cursor) -> None:
         for c in scope.get_children():
             if c.kind == ci.CursorKind.NAMESPACE:
-                visit(c)
+                if c.spelling not in FOREIGN_NAMESPACES:
+                    visit(c)
                 continue
             if c.location.file is None or Path(c.location.file.name).resolve() not in headers:
                 continue
@@ -355,7 +382,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 add_record("", c)
             elif c.kind == ci.CursorKind.ENUM_DECL and c.is_definition() and first_time(c):
                 add_enum("", c)
-            elif c.kind in FUNCTION_KINDS:
+            elif c.kind in FUNCTION_KINDS and c.spelling not in CEREAL_HOOKS:
                 add_callable(c.spelling, Kind.FUNCTION, c)
 
     visit(tu.cursor)
@@ -386,6 +413,7 @@ class PySymbol:
     kind: Kind
     line: int
     overloads: list[PyOverload] = field(default_factory=list)
+    bases: tuple[str, ...] = ()  # stub base-class expressions, for inherited members
 
 
 @dataclass(frozen=True, order=True)
@@ -473,7 +501,12 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
             if isinstance(node, ast.ClassDef):
                 is_enum = any(ast.unparse(b) in ENUM_BASES for b in node.bases)
                 name = prefix + node.name
-                symbols[name] = PySymbol(name, Kind.ENUM if is_enum else Kind.CLASS, node.lineno)
+                symbols[name] = PySymbol(
+                    name,
+                    Kind.ENUM if is_enum else Kind.CLASS,
+                    node.lineno,
+                    bases=tuple(ast.unparse(b) for b in node.bases),
+                )
                 visit(node.body, f"{name}.", is_enum)
                 continue
             if isinstance(node, ast.FunctionDef):
@@ -537,7 +570,7 @@ def init_findings(path: Path) -> list[Deviation]:
 # Deviations accepted by rule; each is printed with its reason in the report.
 ACCEPTED = {
     "out-param": "A non-const lvalue-reference out-param is returned in a tuple with the result "
-    "(Phase A precedent: checkTrajectory).",
+    "(Phase A precedent: checkTrajectory), or alone when the C++ returns `void`.",
     "stringstream": "A `std::stringstream&` parameter the C++ writes into is returned as `str`.",
     "scalar-last-quaternion": "Quaterniond takes (x, y, z, w), the project-wide scalar-last "
     "order; Eigen's constructor is (w, x, y, z).",
@@ -587,8 +620,29 @@ def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
             return "stringstream"
         if any(p.returns.startswith("tuple[") for p in fits):
             return "out-param"
+        if ov.returns_void and len(ov.out_params) == 1 and fits:
+            return "out-param"  # nothing else to return: the out-param is the result
     if any(p.arity.overlaps(ov.arity) for p in pys):
         return "exact"
+    return None
+
+
+def _py_member(name: str, py: PyApi) -> PySymbol | None:
+    """The stub symbol for `Class.member`, looked up through the stub's base classes.
+
+    nanobind subclasses inherit bound members, so a C++ override needs no own binding.
+    Only bases declared in the same stub resolve; others cannot be checked here.
+    """
+    if name in py.symbols:
+        return py.symbols[name]
+    owner, _, member = name.rpartition(".")
+    cls = py.symbols.get(owner)
+    if cls is None:
+        return None
+    for base in cls.bases:
+        found = _py_member(f"{base}.{member}", py)
+        if found is not None:
+            return found
     return None
 
 
@@ -608,12 +662,13 @@ def match(
     for name, sym in cpp.items():
         if _ancestor_missing(name, cpp, py):
             continue  # the missing class is the one row
-        if name not in py.symbols:
+        ps = _py_member(name, py)
+        if ps is None:
             gaps.append(Gap(name, sym.kind, sym.location))
             continue
         ok = True
         for ov in sym.overloads:
-            how = _cover(ov, py.symbols[name].overloads)
+            how = _cover(ov, ps.overloads)
             if how is None:
                 gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
                 ok = False
