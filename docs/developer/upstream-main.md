@@ -209,6 +209,18 @@ calls, and handlers still registered at interpreter exit are removed by an `atex
 hook. Upstream ships no migration note for #1367; a draft issue asking for one is
 pending.
 
+## Ids at the Python boundary
+
+- Id-typed data members (`Joint.parent_link_id`, `ManipulatorInfo.tcp_frame`, …)
+  are bound with `nb::rv_policy::copy`. `def_rw` defaults to `reference_internal`,
+  so a read id would alias C++ storage and a later assignment would rewrite a dict
+  key in place.
+- `LinkIdPair.__eq__` takes its argument with `noconvert()`: the implicit
+  `tuple → LinkIdPair` conversion would make `("b", "a") == pair` true while the
+  hashes differ.
+- `planning` and `viewer` convert ids with `.name()` where they leave tesseract
+  (signatures, glTF/JSON payloads).
+
 ## Default environment (gate 4)
 
 This branch does not build against the 0.35.0 packages, by design, until 0.36 is

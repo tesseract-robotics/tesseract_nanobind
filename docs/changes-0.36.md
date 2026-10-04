@@ -37,7 +37,12 @@ transforms["tool0"]         # str keys still find id-keyed entries
 | `CollisionCoeffData.getCollisionCoeff("a", "b")` | `getCollisionCoeff(("a", "b"))` |
 
 `LinkId` and `JointId` do not convert into each other. To get a plain name back, call
-`.name()` or `str()`.
+`.name()` or `str()`. An id is not a `str`: `"link_" + lid`, `json.dumps` and format
+specs need `.name()` first.
+
+A `LinkIdPair` is unordered, so it never compares equal to a tuple (a tuple's hash
+depends on order). Methods taking a pair accept `("a", "b")`; index a pair-keyed dict,
+such as `acm.getAllAllowedCollisions()`, by `LinkIdPair("a", "b")`.
 
 The high-level `tesseract_robotics.planning` API keeps `str` in its signatures:
 `Robot.get_joint_names()`, `get_link_names()`, `RobotState.joint_names` and

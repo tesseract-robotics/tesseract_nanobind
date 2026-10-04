@@ -69,8 +69,8 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def(nb::init<const Eigen::Isometry3d&, tcommon::LinkId, tcommon::LinkId>(),
              "pose"_a, "working_frame"_a, "tip_link_id"_a)
         .def_rw("pose", &tk::KinGroupIKInput::pose)
-        .def_rw("working_frame", &tk::KinGroupIKInput::working_frame)
-        .def_rw("tip_link_id", &tk::KinGroupIKInput::tip_link_id);
+        .def_rw("working_frame", &tk::KinGroupIKInput::working_frame, nb::rv_policy::copy)
+        .def_rw("tip_link_id", &tk::KinGroupIKInput::tip_link_id, nb::rv_policy::copy);
 
     // ========== KinGroupIKInputs (vector of KinGroupIKInput) ==========
     nb::class_<tk::KinGroupIKInputs>(m, "KinGroupIKInputs")

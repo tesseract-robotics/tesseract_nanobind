@@ -132,8 +132,11 @@ NB_MODULE(_tesseract_common, m) {
             const auto view = self.orderedNameView();
             return std::make_pair(std::string(view.first), std::string(view.second));
         })
-        .def("__eq__", [](const LinkIdPair& a, const LinkIdPair& b) { return a == b; }, nb::is_operator())
-        .def("__ne__", [](const LinkIdPair& a, const LinkIdPair& b) { return !(a == b); }, nb::is_operator())
+        // noconvert: a tuple's hash is order-dependent, so a tuple must never compare equal to an unordered pair
+        .def("__eq__", [](const LinkIdPair& a, const LinkIdPair& b) { return a == b; },
+             nb::arg().noconvert(), nb::is_operator())
+        .def("__ne__", [](const LinkIdPair& a, const LinkIdPair& b) { return !(a == b); },
+             nb::arg().noconvert(), nb::is_operator())
         .def("__hash__", [](const LinkIdPair& self) {
             const auto view = self.orderedNameView();
             return nb::hash(nb::make_tuple(view.first, view.second));
@@ -877,8 +880,8 @@ NB_MODULE(_tesseract_common, m) {
         .def(nb::init<std::string, LinkId, LinkId>(), "manipulator"_a, "working_frame"_a, "tcp_frame"_a)
         .def_rw("manipulator", &tesseract::common::ManipulatorInfo::manipulator)
         .def_rw("manipulator_ik_solver", &tesseract::common::ManipulatorInfo::manipulator_ik_solver)
-        .def_rw("working_frame", &tesseract::common::ManipulatorInfo::working_frame)
-        .def_rw("tcp_frame", &tesseract::common::ManipulatorInfo::tcp_frame)
+        .def_rw("working_frame", &tesseract::common::ManipulatorInfo::working_frame, nb::rv_policy::copy)
+        .def_rw("tcp_frame", &tesseract::common::ManipulatorInfo::tcp_frame, nb::rv_policy::copy)
         .def_prop_rw("tcp_offset",
             [](const tesseract::common::ManipulatorInfo& self) -> nb::object {
                 if (self.tcp_offset.index() == 0) {

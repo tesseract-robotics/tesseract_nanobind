@@ -505,8 +505,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::class_<ti::CartLineInfo>(m, "CartLineInfo")
         .def(nb::init<>())
         .def_rw("manip", &ti::CartLineInfo::manip, "The joint group")
-        .def_rw("source_frame", &ti::CartLineInfo::source_frame, "TCP frame")
-        .def_rw("target_frame", &ti::CartLineInfo::target_frame, "Reference frame")
+        .def_rw("source_frame", &ti::CartLineInfo::source_frame, "TCP frame", nb::rv_policy::copy)
+        .def_rw("target_frame", &ti::CartLineInfo::target_frame, "Reference frame", nb::rv_policy::copy)
         .def_rw("source_frame_offset", &ti::CartLineInfo::source_frame_offset, "TCP offset")
         .def_rw("target_frame_offset1", &ti::CartLineInfo::target_frame_offset1, "Line start pose")
         .def_rw("target_frame_offset2", &ti::CartLineInfo::target_frame_offset2, "Line end pose")
@@ -546,8 +546,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::class_<ti::InverseKinematicsInfo>(m, "InverseKinematicsInfo")
         .def(nb::init<>())
         .def_rw("manip", &ti::InverseKinematicsInfo::manip, "The kinematic group (with IK solver)")
-        .def_rw("working_frame", &ti::InverseKinematicsInfo::working_frame, "Working frame (not currently used)")
-        .def_rw("tcp_frame", &ti::InverseKinematicsInfo::tcp_frame, "TCP frame (not currently used)")
+        .def_rw("working_frame", &ti::InverseKinematicsInfo::working_frame, "Working frame (not currently used)", nb::rv_policy::copy)
+        .def_rw("tcp_frame", &ti::InverseKinematicsInfo::tcp_frame, "TCP frame (not currently used)", nb::rv_policy::copy)
         .def_rw("tcp_offset", &ti::InverseKinematicsInfo::tcp_offset, "TCP offset (not currently used)");
 
     // ========== InverseKinematicsConstraint ==========
