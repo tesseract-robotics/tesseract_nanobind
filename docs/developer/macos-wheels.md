@@ -59,22 +59,20 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     install compatibility without touching the runner or the architecture. Use
     that, not the runner label.
 
-## colcon cache key over-invalidates on unrelated pyproject edits
+## The build cache key over-invalidates on unrelated pyproject edits
 
-!!! warning "The colcon cache key hashes all of `pyproject.toml`, so a one-line edit forces a ~15-min C++ rebuild"
-    The C++ dependency cache key is
-    `colcon-macos-v2-py${python}-${hashFiles('dependencies.repos', 'pyproject.toml')}`.
-    Because it hashes the **entire** `pyproject.toml`, any edit — even one that
-    touches no C++ dependency (a `setuptools_scm` setting, a ruff rule, a trove
-    classifier) — changes the hash, misses the cache, and rebuilds all of
-    tesseract from scratch (~15–18 min per Python). There is no `restore-keys`
-    fallback, so the miss is total.
+!!! warning "The bindings build cache hashes all of `pyproject.toml`, so a one-line edit forces a cold bindings build"
+    CI no longer compiles tesseract: the C++ stack comes prebuilt from the
+    `tesseract-robotics` conda channel (see [How the binaries are built](binaries.md)).
+    What is cached is the scikit-build directory of the nanobind modules, keyed
+    `nanobind-wheel-build-macos-py${python}-${hashFiles(CMakeLists.txt, pyproject.toml, pixi.lock, src/**/*.{cpp,h,hpp})}`.
+    Because it hashes the **entire** `pyproject.toml`, any edit (a
+    `setuptools_scm` setting, a ruff rule, a trove classifier) misses the cache
+    and recompiles every binding module. There is no `restore-keys` fallback.
 
-    This degrades *speed*, never *correctness* (a fresh build is still a correct
-    build), but it makes otherwise-trivial PRs unexpectedly slow. Worth narrowing
-    to a deps-only hash if cold-build time becomes a problem. It is **not** a
-    cause of any wheel-fragmentation failure — those are the upload and publish
-    issues above; the cache only affects how long the green path takes.
+    This costs time, never correctness: a cold build is still a correct build.
+    It is **not** a cause of any wheel-fragmentation failure; those are the
+    upload and publish issues above.
 
 ## STABLE_ABI: the wheel under test is not the Python under test
 
@@ -100,10 +98,10 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
 ## delocate bundles the very `libomp` the build was told to share
 
 !!! danger "The wheel carries its own `libomp.dylib`, so a conda consumer runs two OpenMP runtimes — and Descartes dies above one thread"
-    The build already takes the right side of this: it links pixi's
-    `llvm-openmp` rather than Homebrew's, precisely to avoid duplicate-runtime
-    crashes (`AGENTS.md`, `scripts/build_tesseract_cpp.sh`, the wheels
-    workflows). Packaging then undoes it. `scripts/build_macos_wheel.sh:81`
+    The build already takes the right side of this: it links the pixi env's
+    `llvm-openmp` (a conda-forge dependency of the tesseract packages) rather
+    than Homebrew's, precisely to avoid duplicate-runtime crashes (`AGENTS.md`,
+    the wheels workflows). Packaging then undoes it. `scripts/build_macos_wheel.sh:81`
     runs
 
     ```bash

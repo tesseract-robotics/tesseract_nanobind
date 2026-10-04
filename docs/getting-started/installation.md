@@ -52,7 +52,7 @@ incremental after).
 That's it. Run an example:
 
 ```bash
-pixi run python examples/freespace_ompl_example.py
+pixi run tesseract_freespace_ompl_example
 ```
 
 ---
@@ -128,13 +128,16 @@ cp39 wheel carries the same lib set as the others.
 
 ### Submodule (Optional)
 
-One git submodule provides industrial workcell models:
+The `ws/src/tesseract_ros_workcell` submodule provides industrial workcell models:
 
 ```bash
-git submodule update --init
+git submodule update --init ws/src/tesseract_ros_workcell
 ```
 
-This fetches `ws/src/tesseract_ros_workcell` (~50MB) - URDF/mesh assets for a complex multi-robot workcell with positioner and rail. Required for `examples/twc_workcell_positioner_viewer.py`.
+It fetches about 50 MB of URDF/mesh assets for a multi-robot workcell with
+positioner and rail, used by `src/tesseract_robotics/examples/twc_workcell_positioner_viewer.py`.
+Name the path: a bare `git submodule update --init` also clones the `upstream/`
+sources and `packaging/` feedstocks, which only the 0.36 build loops need.
 
 ---
 

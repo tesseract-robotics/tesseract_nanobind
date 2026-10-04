@@ -204,44 +204,14 @@ TrajOpt output uses `StateWaypointPoly`, which is compatible with time parameter
 
 ## C++ Build Issues
 
-### Qt6 Cross-Compile Error - RESOLVED
-
-When building tesseract_task_composer with planning components, CMake may fail with:
-```
-CMake Error: To use a cross-compiled Qt, please set the QT_HOST_PATH cache variable...
-```
-
-This happens because PCL/VTK pulls in Qt6 as a dependency, and the Qt6 package is misconfigured on macOS.
-
-**Solution:** Set `QT_HOST_PATH` to point to the pixi environment:
-
-```bash
-colcon build --merge-install --cmake-args \
-    -DTESSERACT_BUILD_TASK_COMPOSER_PLANNING=ON \
-    -DQT_HOST_PATH=$CONDA_PREFIX
-```
-
-Note: pixi sets `CONDA_PREFIX` to the environment path.
-
-### Missing libode - RESOLVED
-
-If build fails with `library 'ode' not found`, add libode to pyproject.toml dependencies (already included).
-
-### Task Composer Planning Component
-
-By default, `TESSERACT_BUILD_TASK_COMPOSER_PLANNING` is OFF. To enable planning pipelines (FreespacePipeline, TrajOptPipeline, etc.):
-
-```bash
-colcon build --merge-install --cmake-args \
-    -DTESSERACT_BUILD_TASK_COMPOSER_PLANNING=ON \
-    -DQT_HOST_PATH=$CONDA_PREFIX
-```
-
-This builds `libtesseract_task_composer_planning_factories.dylib` which is required for:
-- ProcessPlanningInputTaskFactory
-- OMPLPipeline
-- TrajOptPipeline
-- FreespacePipeline
+The tesseract C++ stack is no longer built in this repository: it comes prebuilt
+from the `tesseract-robotics` conda channel (see
+[How the binaries are built](binaries.md)). The colcon build issues recorded
+here during the migration (Qt6 `QT_HOST_PATH` under PCL/VTK, a missing `libode`,
+`TESSERACT_BUILD_TASK_COMPOSER_PLANNING` being off by default) no longer apply.
+The `tesseract-robotics-planning` package ships
+`libtesseract_task_composer_planning_factories`, which the planning pipelines
+(`FreespacePipeline`, `TrajOptPipeline`, `OMPLPipeline`, …) need.
 
 ## Task Composer API Differences
 
