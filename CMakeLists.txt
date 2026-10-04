@@ -14,6 +14,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# VISIBILITY_INLINES_HIDDEN OFF (below) only stops CMake adding the flag; conda's clang
+# activation still injects it through CXXFLAGS. Hidden inlines give this .so its own
+# cereal registry singleton under Mach-O's two-level namespace, so polymorphic types
+# registered inside libtesseract_* (upstream tesseract#1305) read as unregistered here.
+if(APPLE)
+  string(REPLACE "-fvisibility-inlines-hidden" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+endif()
+
 # Find Python and nanobind
 find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
