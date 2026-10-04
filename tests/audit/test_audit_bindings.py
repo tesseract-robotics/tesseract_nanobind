@@ -34,3 +34,30 @@ def test_real_binding_tu_parses_clean(module):
 def test_syntax_error_raises_header_parse_error():
     with pytest.raises(audit.HeaderParseError, match="broken_bindings.cpp"):
         audit.parse_tu(FIXTURES / "broken_bindings.cpp")
+
+
+def test_binding_modules_are_the_23_extension_modules():
+    modules = audit.binding_modules()
+    assert len(modules) == 23
+    assert {"tesseract_collision", "ompl_base", "trajopt_sqp"} <= set(modules)
+
+
+def test_unknown_module_raises():
+    with pytest.raises(audit.UnknownModuleError, match="tesseract_nope"):
+        audit.resolve_module("tesseract_nope")
+
+
+def test_unmapped_module_raises():
+    """A2: a binding module without an AUDITED_HEADER_PREFIX entry is not auditable yet."""
+    with pytest.raises(audit.UnknownModuleError, match="AUDITED_HEADER_PREFIX"):
+        audit.resolve_module("tesseract_geometry")
+
+
+@pytest.mark.parametrize("module", FIRST_PASS)
+def test_first_pass_modules_resolve(module):
+    assert audit.resolve_module(module) == module
+
+
+def test_missing_stub_raises(tmp_path):
+    with pytest.raises(audit.StubMissingError, match="missing.pyi"):
+        audit.load_stub(tmp_path / "missing.pyi")

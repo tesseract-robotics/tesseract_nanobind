@@ -78,3 +78,12 @@ def test_check_reports_unified_diff():
     assert "--- committed/pkg/_m.pyi" in report
     assert "+++ rendered/pkg/_m.pyi" in report
     assert "-a\n" in report and "+b\n" in report
+
+
+def test_binding_sources_match_extension_modules():
+    """The audit (scripts/audit_bindings.py, BINDING_GLOB) takes its module list from
+    src/*/*_bindings.cpp because it must not import the package; this pins that set
+    to the modules the build actually produces."""
+    sources = {p.parent.name for p in (REPO_ROOT / "src").glob("*/*_bindings.cpp")}
+    built = {m.rsplit(".", 1)[-1].removeprefix("_") for m in MODULES}
+    assert sources == built

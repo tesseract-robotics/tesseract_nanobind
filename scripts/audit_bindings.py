@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import os
 import sysconfig
 from collections.abc import Sequence
@@ -81,3 +82,67 @@ def parse_tu(cpp: Path, extra_include_dirs: Sequence[Path] = ()) -> ci.Translati
         shown = "\n".join(str(d) for d in errors[:MAX_REPORTED_DIAGNOSTICS])
         raise HeaderParseError(f"{cpp}: {len(errors)} error diagnostics\n{shown}")
     return tu
+
+
+# One extension module per binding TU: src/<module>/<module>_bindings.cpp.
+# tests/scripts/test_generate_stubs.py pins this set == generate_stubs.discover_modules().
+BINDING_GLOB = "*/*_bindings.cpp"
+
+# Directly included headers under this prefix (relative to an include dir) are a module's
+# audited API; every other declaration in the TU only resolves Python names. Explicit per
+# module because binding TUs also include other components' headers (spec amendment A2).
+AUDITED_HEADER_PREFIX = {
+    "tesseract_collision": "tesseract/collision/",
+    "tesseract_common": "tesseract/common/",
+    "tesseract_environment": "tesseract/environment/",
+}
+
+
+class UnknownModuleError(LookupError):
+    """The requested module is not an auditable binding module."""
+
+
+class StubMissingError(FileNotFoundError):
+    """The module has no committed stub."""
+
+
+def binding_modules() -> list[str]:
+    """Short names of all binding modules, sorted."""
+    return sorted(p.parent.name for p in SRC.glob(BINDING_GLOB))
+
+
+def binding_source(module: str) -> Path:
+    """`tesseract_collision` → `src/tesseract_collision/tesseract_collision_bindings.cpp`."""
+    return SRC / module / f"{module}_bindings.cpp"
+
+
+def committed_stub(module: str) -> Path:
+    """`tesseract_collision` → `src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi`."""
+    return STUB_ROOT / module / f"_{module}.pyi"
+
+
+def resolve_module(module: str) -> str:
+    """Validate a short module name for auditing.
+
+    Raises:
+        UnknownModuleError: not a binding module, or no `AUDITED_HEADER_PREFIX` entry yet.
+        StubMissingError: no committed stub.
+    """
+    known = binding_modules()
+    if module not in known:
+        raise UnknownModuleError(f"{module!r} is not a binding module; known: {', '.join(known)}")
+    if module not in AUDITED_HEADER_PREFIX:
+        raise UnknownModuleError(f"{module!r} has no AUDITED_HEADER_PREFIX entry yet")
+    load_stub(committed_stub(module))
+    return module
+
+
+def load_stub(path: Path) -> ast.Module:
+    """Parse a committed stub.
+
+    Raises:
+        StubMissingError: `path` does not exist.
+    """
+    if not path.is_file():
+        raise StubMissingError(f"no committed stub {path}; run `pixi run stubs`")
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
