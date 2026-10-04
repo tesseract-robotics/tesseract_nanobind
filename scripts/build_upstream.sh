@@ -15,6 +15,15 @@ root="${PIXI_PROJECT_ROOT:?run through pixi: pixi run build-upstream}"
 src="$root/upstream"
 build="$src/build"
 
+# As upstream's own conda recipe (tesseract#1305): conda's clang adds
+# -fvisibility-inlines-hidden, which hides cereal's registry singleton; under Mach-O's
+# two-level namespace every dylib then keeps its own registry, and since #1305 moved
+# registration into the compiled libs, consumers throw "unregistered polymorphic type".
+# Read at first configure only: an existing build dir needs -DCMAKE_CXX_FLAGS="$CXXFLAGS".
+if [[ "$OSTYPE" == darwin* ]]; then
+    export CXXFLAGS="${CXXFLAGS//-fvisibility-inlines-hidden/}"
+fi
+
 # configure on first use (or after `rm -rf upstream/build/<name>`), then build + install
 build_pkg() {
     local name=$1 source_dir=$2
