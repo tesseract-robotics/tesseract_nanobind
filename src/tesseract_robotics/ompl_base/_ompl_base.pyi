@@ -94,7 +94,7 @@ class SE2StateSpace:
     def distance(self, state1: State, state2: State) -> float:
         """Compute distance between two states"""
 
-    def interpolate(self, from: State, to: State, t: float, state: State) -> None:
+    def interpolate(self, from_: State, to: State, t: float, state: State) -> None:
         """Interpolate: state = from + t*(to-from), t in [0,1]"""
 
     def getStateAs(self, state: State) -> SE2State:
@@ -145,7 +145,7 @@ class ReedsSheppStateSpace(SE2StateSpace):
     def distance(self, state1: State, state2: State) -> float:
         """Reeds-Shepp curve length (not Euclidean distance)"""
 
-    def interpolate(self, from: State, to: State, t: float, state: State) -> None:
+    def interpolate(self, from_: State, to: State, t: float, state: State) -> None:
         """Interpolate along the optimal Reeds-Shepp curve"""
 
     def reedsShepp(self, state1: State, state2: State) -> ReedsSheppPath:
@@ -193,7 +193,7 @@ class DubinsStateSpace(SE2StateSpace):
     def distance(self, state1: State, state2: State) -> float:
         """Dubins curve length"""
 
-    def interpolate(self, from: State, to: State, t: float, state: State) -> None:
+    def interpolate(self, from_: State, to: State, t: float, state: State) -> None:
         """Interpolate along the optimal Dubins curve"""
 
     def dubins(self, state1: State, state2: State) -> DubinsPath:

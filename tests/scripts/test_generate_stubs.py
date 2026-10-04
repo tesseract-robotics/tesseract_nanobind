@@ -9,6 +9,7 @@ so it runs as `pixi run stubs-check` in the CI build jobs. The checks here read
 only the committed files and run everywhere.
 """
 
+import ast
 import importlib.util
 import re
 from pathlib import Path
@@ -37,6 +38,13 @@ def test_modules_discovered():
 @pytest.mark.parametrize("module", MODULES)
 def test_committed_stub_exists(module):
     assert _mod.stub_path(module).is_file(), f"no committed stub for {module}; run `pixi run stubs`"
+
+
+@pytest.mark.parametrize("module", MODULES)
+def test_stub_is_valid_python(module):
+    """A binding arg named after a keyword (`"from"_a`) yields a stub that does not parse."""
+    path = _mod.stub_path(module)
+    ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 @pytest.mark.parametrize("module", MODULES)

@@ -83,7 +83,7 @@ NB_MODULE(_ompl_base, m) {
         .def("interpolate", [](ob::SE2StateSpace& ss, ob::State* from,
                                ob::State* to, double t, ob::State* state) {
             ss.interpolate(from, to, t, state);
-        }, "from"_a, "to"_a, "t"_a, "state"_a,
+        }, "from_"_a, "to"_a, "t"_a, "state"_a,
             "Interpolate: state = from + t*(to-from), t in [0,1]")
         .def("getStateAs", [](ob::SE2StateSpace&, ob::State* s) {
             return s->as<ob::SE2StateSpace::StateType>();
@@ -128,7 +128,7 @@ NB_MODULE(_ompl_base, m) {
         .def("interpolate", [](ob::ReedsSheppStateSpace& ss, ob::State* from,
                                ob::State* to, double t, ob::State* state) {
             ss.interpolate(from, to, t, state);
-        }, "from"_a, "to"_a, "t"_a, "state"_a,
+        }, "from_"_a, "to"_a, "t"_a, "state"_a,
             "Interpolate along the optimal Reeds-Shepp curve")
         .def("reedsShepp", [](ob::ReedsSheppStateSpace& ss, ob::State* s1, ob::State* s2) {
             return ss.reedsShepp(s1, s2);
@@ -169,7 +169,7 @@ NB_MODULE(_ompl_base, m) {
         .def("interpolate", [](ob::DubinsStateSpace& ss, ob::State* from,
                                ob::State* to, double t, ob::State* state) {
             ss.interpolate(from, to, t, state);
-        }, "from"_a, "to"_a, "t"_a, "state"_a,
+        }, "from_"_a, "to"_a, "t"_a, "state"_a,
             "Interpolate along the optimal Dubins curve")
         .def("dubins", [](ob::DubinsStateSpace& ss, ob::State* s1, ob::State* s2) {
             return ss.dubins(s1, s2);
