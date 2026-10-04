@@ -1,0 +1,60 @@
+// Audit contract fixture: every declaration exercises one matching rule.
+#pragma once
+#include <sstream>
+#include <vector>
+
+namespace tesseract::fixture
+{
+struct Base  // abstract: a non-const Base& is an in/out object, not an out-param (A3)
+{
+  virtual ~Base() = default;
+  virtual void run() = 0;
+};
+
+struct Owner
+{
+};
+
+struct Plain  // no declared constructor: implicit arity-0 __init__
+{
+  int x = 0;
+};
+
+class Widget
+{
+public:
+  Widget();
+  explicit Widget(int size);
+  Widget(const Widget& other) = default;  // excluded: copy constructor
+  ~Widget();                              // excluded: destructor
+
+  int size() const;
+  void resize(int n);                           // gap: no Python method
+  bool operator==(const Widget& other) const;   // covered by __eq__
+  Widget operator+(const Widget& other) const;  // gap: unmapped operator
+  explicit operator bool() const;               // covered by __bool__ (A4)
+  static void* operator new(std::size_t n);     // excluded: allocation operator (A4)
+  Owner owner() const;                          // stub annotates it as a quoted C++ name
+  [[deprecated]] void old();                    // excluded: deprecated
+
+  template <class Archive>
+  void serialize(Archive& ar);  // excluded: cereal hook
+
+  int count = 0;  // field: covered by a property
+
+private:
+  int secret_ = 0;  // excluded: private
+};
+
+enum class Color
+{
+  RED,
+  GREEN
+};
+
+int scale(int value, double factor = 1.0);  // defaulted: arity 1-2
+int scale(int value, double factor);        // redeclaration: must not add an overload
+int area(int w);                            // Python adds an arity-2 overload: deviation
+bool collect(std::vector<int>& out, Base& runner, int n);  // out-param: out only; arity 3 -> 2
+void describe(std::stringstream& ss, int n);               // stringstream -> str; arity 2 -> 1
+}  // namespace tesseract::fixture

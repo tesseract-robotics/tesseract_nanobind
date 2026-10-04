@@ -61,3 +61,71 @@ def test_first_pass_modules_resolve(module):
 def test_missing_stub_raises(tmp_path):
     with pytest.raises(audit.StubMissingError, match="missing.pyi"):
         audit.load_stub(tmp_path / "missing.pyi")
+
+
+FIXTURE_PREFIX = "tesseract/fixture/"
+
+
+@pytest.fixture(scope="module")
+def fixture_tu():
+    return audit.parse_tu(FIXTURES / "fixture_bindings.cpp", (FIXTURE_INCLUDE,))
+
+
+@pytest.fixture(scope="module")
+def fixture_cpp(fixture_tu):
+    headers = audit.audited_headers(
+        fixture_tu, FIXTURE_PREFIX, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
+    )
+    return audit.cpp_api(fixture_tu, headers)
+
+
+def test_audited_headers_are_direct_includes_under_prefix(fixture_tu):
+    headers = audit.audited_headers(
+        fixture_tu, FIXTURE_PREFIX, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
+    )
+    assert {h.name for h in headers} == {"widget.h"}
+
+
+def test_cpp_symbols_exact_set(fixture_cpp):
+    assert set(fixture_cpp) == {
+        "Base", "Base.run", "Base.__init__",
+        "Owner", "Owner.__init__",
+        "Plain", "Plain.__init__", "Plain.x",
+        "Widget", "Widget.__init__", "Widget.size", "Widget.resize", "Widget.__eq__",
+        "Widget.operator+", "Widget.__bool__", "Widget.owner", "Widget.count",
+        "Color", "Color.RED", "Color.GREEN",
+        "scale", "area", "collect", "describe",
+    }  # fmt: skip
+
+
+def test_constructor_overloads_exclude_copy(fixture_cpp):
+    arities = sorted(str(o.arity) for o in fixture_cpp["Widget.__init__"].overloads)
+    assert arities == ["0", "1"]
+
+
+def test_implicit_default_constructor(fixture_cpp):
+    [ov] = fixture_cpp["Plain.__init__"].overloads
+    assert str(ov.arity) == "0"
+
+
+def test_defaulted_argument_gives_arity_range_and_redeclaration_dedups(fixture_cpp):
+    [ov] = fixture_cpp["scale"].overloads
+    assert str(ov.arity) == "1-2"
+
+
+def test_out_param_excludes_abstract_reference(fixture_cpp):
+    [ov] = fixture_cpp["collect"].overloads
+    assert (str(ov.arity), len(ov.out_params)) == ("3", 1)
+    assert str(ov.arity.reduced(len(ov.out_params))) == "2"
+
+
+def test_stringstream_out_param_recorded(fixture_cpp):
+    [ov] = fixture_cpp["describe"].overloads
+    assert ov.out_params == (audit.STRINGSTREAM,)
+
+
+def test_location_is_header_line(fixture_cpp):
+    path, line = fixture_cpp["Widget.resize"].location.rsplit(":", 1)
+    assert path == "tests/audit/fixtures/include/tesseract/fixture/widget.h"
+    source = (REPO_ROOT / path).read_text(encoding="utf-8").splitlines()
+    assert "void resize(int n);" in source[int(line) - 1]

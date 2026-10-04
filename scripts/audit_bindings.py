@@ -16,6 +16,8 @@ import ast
 import os
 import sysconfig
 from collections.abc import Sequence
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 
 import clang.cindex as ci
@@ -146,3 +148,215 @@ def load_stub(path: Path) -> ast.Module:
     if not path.is_file():
         raise StubMissingError(f"no committed stub {path}; run `pixi run stubs`")
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
+# libclang spells this parameter's pointee type so; the spec accepts it bound as a `str` return.
+STRINGSTREAM = "std::stringstream"
+# cereal serialization hooks: not API.
+CEREAL_HOOKS = frozenset({"serialize", "load", "save"})
+# EIGEN_MAKE_ALIGNED_OPERATOR_NEW expands to these in every aligned tesseract type: memory
+# management, not API (spec amendment A4).
+ALLOCATION_OPERATORS = frozenset(
+    {"operator new", "operator new[]", "operator delete", "operator delete[]"}
+)
+# C++ operators a binding exposes as Python dunders. Any other operator is a gap.
+OPERATOR_DUNDERS = {
+    "operator==": "__eq__",
+    "operator!=": "__ne__",
+    "operator[]": "__getitem__",
+    "operator<": "__lt__",
+    "operator bool": "__bool__",
+}
+RECORD_KINDS = frozenset(
+    {ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_TEMPLATE}
+)
+FUNCTION_KINDS = frozenset({ci.CursorKind.FUNCTION_DECL, ci.CursorKind.FUNCTION_TEMPLATE})
+METHOD_KINDS = frozenset(
+    {ci.CursorKind.CXX_METHOD, ci.CursorKind.FUNCTION_TEMPLATE, ci.CursorKind.CONVERSION_FUNCTION}
+)
+FIELD_KINDS = frozenset({ci.CursorKind.FIELD_DECL, ci.CursorKind.VAR_DECL})
+
+
+class Kind(str, Enum):
+    """What a report row refers to."""
+
+    CLASS = "class"
+    ENUM = "enum"
+    FUNCTION = "function"
+    METHOD = "method"
+    CONSTRUCTOR = "constructor"
+    FIELD = "field"
+    ENUMERATOR = "enumerator"
+    OPERATOR = "operator"
+    OVERLOAD = "overload"
+    CONSTANT = "constant"
+    PROTOCOL = "protocol"
+    FAIL_LOUD = "fail-loud"
+
+
+@dataclass(frozen=True)
+class Arity:
+    """Accepted positional-argument counts; `hi is None` means unbounded (`*args`)."""
+
+    lo: int
+    hi: int | None
+
+    def overlaps(self, other: Arity) -> bool:
+        return (self.hi is None or other.lo <= self.hi) and (
+            other.hi is None or self.lo <= other.hi
+        )
+
+    def reduced(self, k: int) -> Arity:
+        """Arity after `k` out-params move to the return value."""
+        return Arity(max(0, self.lo - k), None if self.hi is None else self.hi - k)
+
+    def __str__(self) -> str:
+        if self.hi is None:
+            return f"{self.lo}+"
+        return str(self.lo) if self.lo == self.hi else f"{self.lo}-{self.hi}"
+
+
+@dataclass(frozen=True)
+class CppOverload:
+    arity: Arity
+    out_params: tuple[str, ...]  # pointee type spellings
+    location: str
+
+
+@dataclass
+class CppSymbol:
+    name: str
+    kind: Kind
+    location: str
+    overloads: list[CppOverload] = field(default_factory=list)
+
+
+def location(cursor: ci.Cursor) -> str:
+    """`header:line`, relative to the conda include dir or the repo."""
+    path = Path(cursor.location.file.name).resolve()
+    base = CONDA_INCLUDE if path.is_relative_to(CONDA_INCLUDE) else REPO_ROOT
+    return f"{path.relative_to(base).as_posix()}:{cursor.location.line}"
+
+
+def audited_headers(
+    tu: ci.TranslationUnit, prefix: str, include_dirs: Sequence[Path]
+) -> frozenset[Path]:
+    """Headers the TU's main file includes directly and that live under `prefix`."""
+    roots = [(d / prefix).resolve() for d in include_dirs]
+    direct = (Path(i.include.name).resolve() for i in tu.get_includes() if i.depth == 1)
+    return frozenset(h for h in direct if any(h.is_relative_to(r) for r in roots))
+
+
+def _is_out_param(parm: ci.Cursor) -> bool:
+    """Non-const lvalue reference to a non-abstract type (spec amendment A3)."""
+    t = parm.type
+    if t.kind != ci.TypeKind.LVALUEREFERENCE or t.get_pointee().is_const_qualified():
+        return False
+    decl = t.get_pointee().get_canonical().get_declaration()
+    return not (decl.kind in RECORD_KINDS and decl.is_abstract_record())
+
+
+def _has_default(parm: ci.Cursor) -> bool:
+    return any(c.kind.is_expression() for c in parm.get_children())
+
+
+def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSymbol]:
+    """The audited C++ API: public, non-deprecated declarations in `headers`.
+
+    Keys are dotted names within the namespace; operators that a binding maps to a
+    dunder are keyed by the dunder, constructors by `__init__`.
+    """
+    symbols: dict[str, CppSymbol] = {}
+    seen: set[str] = set()
+
+    def first_time(c: ci.Cursor) -> bool:
+        usr = c.get_usr()
+        if usr in seen:
+            return False
+        seen.add(usr)
+        return True
+
+    def add(name: str, kind: Kind, c: ci.Cursor) -> CppSymbol:
+        return symbols.setdefault(name, CppSymbol(name, kind, location(c)))
+
+    def add_callable(name: str, kind: Kind, c: ci.Cursor) -> None:
+        if not first_time(c):
+            return
+        params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
+        n_default = sum(_has_default(p) for p in params)
+        out = tuple(p.type.get_pointee().spelling for p in params if _is_out_param(p))
+        arity = Arity(len(params) - n_default, len(params))
+        add(name, kind, c).overloads.append(CppOverload(arity, out, location(c)))
+
+    def add_enum(prefix: str, c: ci.Cursor) -> None:
+        name = prefix + c.spelling
+        add(name, Kind.ENUM, c)
+        for e in c.get_children():
+            if e.kind == ci.CursorKind.ENUM_CONSTANT_DECL:
+                add(f"{name}.{e.spelling}", Kind.ENUMERATOR, e)
+
+    def add_record(prefix: str, c: ci.Cursor) -> None:
+        name = prefix + c.spelling
+        add(name, Kind.CLASS, c)
+        declares_ctor = False
+        for m in c.get_children():
+            if m.kind == ci.CursorKind.CONSTRUCTOR:
+                declares_ctor = True
+            if m.access_specifier != ci.AccessSpecifier.PUBLIC:
+                continue
+            if m.availability == ci.AvailabilityKind.DEPRECATED:
+                continue
+            if m.kind == ci.CursorKind.CONSTRUCTOR:
+                if not (
+                    m.is_copy_constructor() or m.is_move_constructor() or m.is_deleted_method()
+                ):
+                    add_callable(f"{name}.__init__", Kind.CONSTRUCTOR, m)
+            elif m.kind in METHOD_KINDS:
+                if (
+                    m.spelling in CEREAL_HOOKS
+                    or m.spelling in ALLOCATION_OPERATORS
+                    or m.is_deleted_method()
+                    or m.is_copy_assignment_operator_method()
+                    or m.is_move_assignment_operator_method()
+                ):
+                    continue
+                if m.spelling.startswith("operator"):
+                    dunder = OPERATOR_DUNDERS.get(m.spelling, m.spelling)
+                    add_callable(f"{name}.{dunder}", Kind.OPERATOR, m)
+                else:
+                    add_callable(f"{name}.{m.spelling}", Kind.METHOD, m)
+            elif m.kind in FIELD_KINDS:
+                add(f"{name}.{m.spelling}", Kind.FIELD, m)
+            elif m.kind in RECORD_KINDS and m.is_definition():
+                add_record(f"{name}.", m)
+            elif m.kind == ci.CursorKind.ENUM_DECL and m.is_definition():
+                add_enum(f"{name}.", m)
+        if not declares_ctor:
+            # The compiler declares an implicit default constructor.
+            add(f"{name}.__init__", Kind.CONSTRUCTOR, c).overloads.append(
+                CppOverload(Arity(0, 0), (), location(c))
+            )
+
+    def visit(scope: ci.Cursor) -> None:
+        for c in scope.get_children():
+            if c.kind == ci.CursorKind.NAMESPACE:
+                visit(c)
+                continue
+            if c.location.file is None or Path(c.location.file.name).resolve() not in headers:
+                continue
+            if c.availability == ci.AvailabilityKind.DEPRECATED:
+                continue
+            if c.kind in RECORD_KINDS and c.is_definition() and first_time(c):
+                add_record("", c)
+            elif c.kind == ci.CursorKind.ENUM_DECL and c.is_definition() and first_time(c):
+                add_enum("", c)
+            elif c.kind in FUNCTION_KINDS:
+                add_callable(c.spelling, Kind.FUNCTION, c)
+
+    visit(tu.cursor)
+    return symbols
+
+
+def decl_names(tu: ci.TranslationUnit) -> frozenset[str]:
+    """Spelling of every declaration in the TU: what a Python name may resolve to."""
+    return frozenset(c.spelling for c in tu.cursor.walk_preorder() if c.kind.is_declaration())
