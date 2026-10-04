@@ -82,6 +82,29 @@ aa = AngleAxisd(np.pi/2, np.array([0, 0, 1]))
 rotation_matrix = aa.toRotationMatrix()
 ```
 
+## Ids
+
+Links and joints are addressed by id (upstream `IDENTITY_DESIGN.md`). An id is
+built from a name; anywhere an id is expected a `str` converts implicitly.
+
+```python
+from tesseract_robotics.tesseract_common import JointId, LinkId, LinkIdPair
+
+tool0 = LinkId("tool0")
+tool0.name()                 # "tool0"; str(tool0) is the same
+tool0 == "tool0"             # True: ids compare equal to their name
+{tool0: 1}["tool0"]          # 1: hash(id) == hash(name), so str keys find id-keyed entries
+LinkIdPair("a", "b").orderedNameView()   # ("a", "b"), alphabetical
+```
+
+Id-keyed results (`SceneState.link_transforms`, `calcFwdKin`) are plain
+`dict[LinkId, ...]`. `LinkId` and `JointId` do not convert into each other.
+
+!!! note "Type checkers"
+    The stubs accept `LinkId | str` wherever a parameter takes an id. Looking up an
+    id-keyed dict with a literal `str` (`transforms["tool0"]`) works at runtime but
+    is flagged by type checkers; use `transforms[LinkId("tool0")]` to keep them quiet.
+
 ## Resource Locators
 
 ### GeneralResourceLocator
@@ -124,7 +147,7 @@ acm = AllowedCollisionMatrix()
 acm.addAllowedCollision("link_1", "link_2", "Adjacent links")
 
 # Check if allowed
-is_allowed = acm.isCollisionAllowed("link_1", "link_2")
+is_allowed = acm.isCollisionAllowed(("link_1", "link_2"))
 
 # Remove entry
 acm.removeAllowedCollision("link_1", "link_2")
@@ -158,7 +181,7 @@ Joint positions and velocities.
 from tesseract_robotics.tesseract_common import JointState
 
 state = JointState()
-state.joint_names = ["j1", "j2", "j3"]
+state.joint_ids = ["j1", "j2", "j3"]
 state.position = np.array([0.0, 0.5, -0.5])
 state.velocity = np.array([0.0, 0.0, 0.0])
 ```
@@ -195,24 +218,35 @@ info.tcp_offset = Isometry3d.Identity() # optional TCP offset
 
 ## Logging
 
-Control console_bridge logging level.
+Tesseract logs through spdlog (upstream #1367). The default logger is named
+`"tesseract"`; its level controls tesseract's console output.
 
 ```python
 from tesseract_robotics.tesseract_common import (
-    getLogLevel, setLogLevel,
-    CONSOLE_BRIDGE_LOG_NONE,
-    CONSOLE_BRIDGE_LOG_ERROR,
-    CONSOLE_BRIDGE_LOG_WARN,
-    CONSOLE_BRIDGE_LOG_INFO,
-    CONSOLE_BRIDGE_LOG_DEBUG,
+    LoggerLevel, addLogRecordHandler, getLogger, isLogLevelEnabled, removeLogRecordHandler,
 )
 
-# Suppress warnings
-setLogLevel(CONSOLE_BRIDGE_LOG_ERROR)
+logger = getLogger()                 # getLogger("tesseract")
+logger.set_level(LoggerLevel.err)    # suppress warnings
+logger.set_level(LoggerLevel.debug)  # enable debug output
+assert isLogLevelEnabled(LoggerLevel.debug)
 
-# Enable debug output
-setLogLevel(CONSOLE_BRIDGE_LOG_DEBUG)
+# Route records into Python (any thread; the handler runs with the GIL held)
+records = []
+handler_id = addLogRecordHandler(records.append)
+...
+removeLogRecordHandler(handler_id)
 ```
+
+A `LogRecord` carries `level`, `message`, `logger_name`, `component_name`,
+`attributes`, `timestamp`, `filename`, `line` and `function_name`. An exception
+raised by a handler is reported through `sys.unraisablehook`.
+
+!!! warning "console_bridge API no longer reaches tesseract"
+    `setLogLevel`, `getLogLevel`, `useOutputHandler`, `OutputHandler`, `log` and
+    the `CONSOLE_BRIDGE_LOG_*` constants are still importable, but upstream
+    tesseract no longer logs through console_bridge: they have no effect on its
+    output.
 
 ## Container Types
 

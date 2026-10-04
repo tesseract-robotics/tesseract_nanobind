@@ -46,7 +46,7 @@ future.wait()
 
 # Get result
 context = future.context
-output_key = task.getOutputKeys().get("program")
+output_key = task.getOutputPortMappings().single("program")
 result = AnyPoly_as_CompositeInstruction(context.data_storage.getData(output_key))
 ```
 
@@ -208,18 +208,18 @@ Different pipelines use different data keys:
 
 ```python
 # Get keys from task
-input_keys = task.getInputKeys()   # TaskComposerKeys
-output_keys = task.getOutputKeys()
+input_ports = task.getInputPortMappings()   # TaskComposerPortMap: port -> storage key(s)
+output_ports = task.getOutputPortMappings()
 
 # Common patterns:
 # TrajOptPipeline: input="planning_input", output="program"
 # OMPLPipeline: input="program", output="program"
 
-# Check available keys
-if input_keys.has("planning_input"):
-    data.setData("planning_input", ...)
-elif input_keys.has("program"):
-    data.setData("program", ...)
+# Check available ports; write to the storage key the port maps to
+if input_ports.contains("planning_input"):
+    data.setData(input_ports.single("planning_input"), ...)
+elif input_ports.contains("program"):
+    data.setData(input_ports.single("program"), ...)
 ```
 
 ## AnyPoly Wrapping
@@ -273,7 +273,7 @@ future.wait()
 # Extract result
 context = future.context
 if context.isSuccessful():
-    output_key = task.getOutputKeys().get("program")
+    output_key = task.getOutputPortMappings().single("program")
     result = AnyPoly_as_CompositeInstruction(
         context.data_storage.getData(output_key)
     )

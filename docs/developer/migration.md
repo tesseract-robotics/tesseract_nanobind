@@ -264,10 +264,10 @@ Different pipelines have different input key names:
 
 ```python
 # TrajOptPipeline, FreespacePipeline
-input_key = task.getInputKeys().get("planning_input")
+input_key = task.getInputPortMappings().single("planning_input")
 
 # OMPLPipeline (direct, without TrajOpt refinement)
-input_key = task.getInputKeys().get("program")
+input_key = task.getInputPortMappings().single("program")
 ```
 
 ## TrajOpt Profile Configuration (0.33 API)

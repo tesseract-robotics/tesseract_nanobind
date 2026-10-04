@@ -171,6 +171,7 @@ nav:
   - Changelog: CHANGELOG.md
   - Migration Guides:
     - Breaking API changes: breaking-changes.md
+    - "tesseract 0.35 → 0.36 (upstream main)": changes-0.36.md
     - "tesseract 0.33 → 0.35": changes.md
   - Developer:
     - developer/index.md

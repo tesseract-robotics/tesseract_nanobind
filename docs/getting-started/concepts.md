@@ -176,7 +176,7 @@ from tesseract_robotics.tesseract_collision import (
 
 robot.set_joints(joint_values_dict)
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 
 contacts = ContactResultMap()
@@ -302,22 +302,17 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
 ProfileDictionary_addProfile_OMPLPlanProfile(profiles, "DEFAULT", ompl_profile)
 ```
 
-### Console Bridge Logging
+### Logging
 
-Tesseract uses `console_bridge` for logging. Control logging level via:
+Tesseract logs through spdlog. Its default logger, `"tesseract"`, sets the level:
 
 ```python
-from tesseract_robotics.tesseract_common import (
-    getLogLevel, setLogLevel,
-    CONSOLE_BRIDGE_LOG_NONE,
-    CONSOLE_BRIDGE_LOG_ERROR,
-    CONSOLE_BRIDGE_LOG_WARN,
-    CONSOLE_BRIDGE_LOG_INFO,
-    CONSOLE_BRIDGE_LOG_DEBUG,
-)
+from tesseract_robotics.tesseract_common import LoggerLevel, getLogger
 
-setLogLevel(CONSOLE_BRIDGE_LOG_WARN)
+getLogger().set_level(LoggerLevel.warn)
 ```
+
+See [tesseract_common logging](../api/tesseract_common.md#logging) for record handlers.
 
 ## Next Steps
 

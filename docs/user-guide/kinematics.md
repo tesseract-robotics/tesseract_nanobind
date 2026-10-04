@@ -22,10 +22,10 @@ robot = Robot.from_tesseract_support("abb_irb2400")
 manip = robot.env.getKinematicGroup("manipulator")
 
 # Group info
-print(f"Joint names:     {list(manip.getJointNames())}")
-print(f"Link names:      {list(manip.getLinkNames())}")
-print(f"Base link:       {manip.getBaseLinkName()}")
-print(f"Tip link(s):     {list(manip.getTipLinkNames())}")
+print(f"Joint names:     {list(manip.getJointIds())}")
+print(f"Link names:      {list(manip.getLinkIds())}")
+print(f"Base link:       {manip.getBaseLinkId()}")
+print(f"Tip link(s):     {list(manip.getTipLinkIds())}")
 ```
 
 ## Forward Kinematics
@@ -124,8 +124,8 @@ Find joint values that achieve a target pose.
     from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
 
     # Pose subclasses Isometry3d, so KinGroupIKInput accepts it directly.
-    working_frame = manip.getBaseLinkName()
-    tip_link = list(manip.getActiveLinkNames())[-1]
+    working_frame = manip.getBaseLinkId()
+    tip_link = list(manip.getActiveLinkIds())[-1]
 
     ik_input = KinGroupIKInput(target, working_frame, tip_link)
     seed = np.zeros(6)

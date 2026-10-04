@@ -25,7 +25,7 @@ robot.set_joints(joints, joint_names=joint_names)
 state = robot.env.getState()
 
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(state.link_transforms)
 
 # contactTest() populates the ContactResultMap passed in (returns None)
@@ -39,7 +39,7 @@ results = ContactResultVector()
 contacts.flattenMoveResults(results)
 for i in range(len(results)):
     r = results[i]
-    print(f"{r.link_names[0]} <-> {r.link_names[1]}: distance = {r.distance:.4f} m")
+    print(f"{r.link_ids[0]} <-> {r.link_ids[1]}: distance = {r.distance:.4f} m")
 ```
 
 ## Collision Managers
@@ -88,7 +88,7 @@ request.calculate_distance = True
 request.calculate_penetration = True
 
 # Sync manager with current state
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 manager.setDefaultCollisionMargin(0.05)  # 5cm margin
 
@@ -102,7 +102,7 @@ results = ContactResultVector()
 contacts.flattenMoveResults(results)
 for i in range(len(results)):
     r = results[i]
-    print(f"{r.link_names[0]} <-> {r.link_names[1]}: {r.distance:.4f}m")
+    print(f"{r.link_ids[0]} <-> {r.link_ids[1]}: {r.distance:.4f}m")
 ```
 
 ## Continuous Collision Checking
@@ -123,7 +123,7 @@ end_transforms = robot.env.getState(joint_names, end_joints).link_transforms
 
 # Get continuous manager
 manager = robot.env.getContinuousContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 
 # Set start and end poses per link
 for link_name, pose_start in start_transforms.items():
@@ -208,7 +208,7 @@ Skip collision checks for adjacent or always-safe pairs. The ACM lives on the sc
 acm = robot.env.getAllowedCollisionMatrix()
 
 # Query whether a pair is allowed
-if acm.isCollisionAllowed("link_1", "link_2"):
+if acm.isCollisionAllowed(("link_1", "link_2")):
     print("link_1 and link_2 are whitelisted")
 ```
 
@@ -364,7 +364,7 @@ defaults work fine — set a single value on the manager:
 
 ```python
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2 cm safety buffer
 ```
 
@@ -539,7 +539,7 @@ def debug_collision(robot, joints, joint_names):
     state = robot.env.getState()
 
     manager = robot.env.getDiscreteContactManager()
-    manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+    manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
     manager.setCollisionObjectsTransform(state.link_transforms)
 
     contacts = ContactResultMap()
@@ -555,7 +555,7 @@ def debug_collision(robot, joints, joint_names):
     for i in range(len(results)):
         r = results[i]
         print(f"\n  Contact {i + 1}:")
-        print(f"    Links: {r.link_names[0]} <-> {r.link_names[1]}")
+        print(f"    Links: {r.link_ids[0]} <-> {r.link_ids[1]}")
         print(f"    Distance: {r.distance:.4f} m")
         print(f"    Normal: {r.normal}")
         if r.distance < 0:

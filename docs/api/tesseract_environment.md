@@ -84,7 +84,7 @@ acm = env.getAllowedCollisionMatrix()
 ```python
 # Check initialization
 if env.isInitialized():
-    print(f"Root link: {env.getRootLinkName()}")
+    print(f"Root link: {env.getRootLinkId()}")
     print(f"Revision: {env.getRevision()}")
 ```
 
@@ -105,8 +105,8 @@ link = Link("obstacle")
 
 joint = Joint("obstacle_joint")
 joint.type = JointType.FIXED
-joint.parent_link_name = "world"
-joint.child_link_name = "obstacle"
+joint.parent_link_id = "world"
+joint.child_link_id = "obstacle"
 
 cmd = AddLinkCommand(link, joint)
 env.applyCommand(cmd)
