@@ -1,4 +1,4 @@
-// Audit contract fixture: under the audited prefix but only included transitively, so not audited.
+// Audit contract fixture: under the audited prefix, only included transitively: audited per symbol (E0).
 #pragma once
 
 namespace tesseract::fixture

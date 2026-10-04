@@ -224,16 +224,57 @@ def fixture_report():
         FIXTURES / "package_init.py",
         FIXTURE_PREFIX,
         (FIXTURE_INCLUDE,),
+        other_bindings=(FIXTURES / "other_bindings.cpp",),
     )
+
+
+ORPHAN_HEADER = "tesseract/fixture/orphan.h"
 
 
 def test_fixture_gaps_exact(fixture_report):
     assert {(g.symbol, g.kind, g.arity) for g in fixture_report.gaps} == {
         ("Base", audit.Kind.CLASS, "—"),  # whole class: one row, members not listed
+        ("Detail", audit.Kind.CLASS, "—"),  # transitive include under the prefix (E0)
         ("Owner", audit.Kind.CLASS, "—"),
         ("Widget.resize", audit.Kind.METHOD, "—"),
         ("Widget.operator+", audit.Kind.OPERATOR, "—"),
+        (ORPHAN_HEADER, audit.Kind.HEADER, "—"),  # never included: one row (E0)
     }
+
+
+def test_unincluded_header_row_locates_its_first_declaration(fixture_report):
+    """E0: the row points at the header's first auditable declaration, not line 1."""
+    [row] = [g for g in fixture_report.gaps if g.kind is audit.Kind.HEADER]
+    path, line = row.location.rsplit(":", 1)
+    assert path == f"tests/audit/fixtures/include/{ORPHAN_HEADER}"
+    source = (REPO_ROOT / path).read_text(encoding="utf-8").splitlines()
+    assert "struct Orphan" in source[int(line) - 1]
+
+
+def test_unincluded_header_members_are_not_listed(fixture_report):
+    """E0: like a missing class, the missing header is the one row."""
+    assert not {g.symbol for g in fixture_report.gaps} & {"Orphan", "orphanHelper"}
+
+
+def test_forward_declaration_header_has_no_row(fixture_report):
+    """E0: fwd.h declares nothing auditable."""
+    assert not [g for g in fixture_report.gaps if g.symbol.endswith("fwd.h")]
+
+
+def test_header_owned_by_another_binding_has_no_row(fixture_report):
+    """E0: shared.h is #included directly by other_bindings.cpp, so it is audited there."""
+    assert not [g for g in fixture_report.gaps if "Shared" in g.symbol or "shared.h" in g.symbol]
+
+
+def test_unaudited_header_pattern_is_never_parsed(fixture_report):
+    """E0: test_suite/broken_unit.hpp has a syntax error; matching UNAUDITED_HEADERS skips it."""
+    assert not [g for g in fixture_report.gaps if "broken_unit" in g.symbol]
+
+
+def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
+    text = audit.render_markdown([fixture_report], PROV)
+    for pattern, reason in audit.UNAUDITED_HEADERS.items():
+        assert f"`{pattern}`: {reason}" in text
 
 
 def test_fixture_deviations_exact(fixture_report):
@@ -316,7 +357,7 @@ def test_render_is_deterministic_and_sorted(fixture_report):
     assert "abc1234" in a and "==0.35.0" in a
     gaps = a[a.index("### Gaps") : a.index("### Deviations")]
     gap_rows = [line for line in gaps.splitlines() if line.startswith("| `")]
-    assert len(gap_rows) == 4
+    assert len(gap_rows) == 6
     assert gap_rows == sorted(gap_rows)
 
 
@@ -331,9 +372,11 @@ def test_json_roundtrip(fixture_report):
     module = data["modules"]["fixture"]
     assert {g["symbol"] for g in module["gaps"]} == {
         "Base",
+        "Detail",
         "Owner",
         "Widget.resize",
         "Widget.operator+",
+        ORPHAN_HEADER,
     }
     assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted"}
 

@@ -2,8 +2,10 @@
 
 For each extension module, libclang parses `src/<module>/<module>_bindings.cpp`
 (exactly the headers and macros the binding sees) and `ast` parses the
-committed `_<module>.pyi` and the package `__init__.py`. No extension module is
-imported. Gaps (C++ without Python), deviations (Python without C++) and
+committed `_<module>.pyi` and the package `__init__.py`. Every header under the
+module's prefix is audited: one the binding never includes is parsed in a
+synthetic TU (the binding plus that header) and reported as one `header` row.
+No extension module is imported. Gaps (C++ without Python), deviations (Python without C++) and
 accepted deviations go to `docs/developer/binding-api-audit.md`.
 
 Usage:
@@ -14,8 +16,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
 import sysconfig
@@ -74,12 +78,15 @@ class HeaderParseError(RuntimeError):
     """libclang reported an error; a partial AST would silently under-report."""
 
 
-def parse_tu(cpp: Path, extra_include_dirs: Sequence[Path] = ()) -> ci.TranslationUnit:
+def parse_tu(
+    cpp: Path, extra_include_dirs: Sequence[Path] = (), unsaved: str | None = None
+) -> ci.TranslationUnit:
     """Parse one binding translation unit.
 
     Args:
-        cpp: The binding `.cpp`.
+        cpp: The binding `.cpp`, or the name of a synthetic TU.
         extra_include_dirs: Searched before `INCLUDE_DIRS` (test fixtures).
+        unsaved: Source text of `cpp` that exists only in memory (a synthetic TU).
 
     Returns:
         The translation unit, free of error diagnostics.
@@ -88,7 +95,8 @@ def parse_tu(cpp: Path, extra_include_dirs: Sequence[Path] = ()) -> ci.Translati
         HeaderParseError: any diagnostic of severity >= error.
     """
     args = [*PARSE_ARGS, *(f"-I{d}" for d in (*extra_include_dirs, *INCLUDE_DIRS))]
-    tu = ci.Index.create().parse(str(cpp), args=args, options=PARSE_OPTIONS)
+    files = [(str(cpp), unsaved)] if unsaved is not None else None
+    tu = ci.Index.create().parse(str(cpp), args=args, unsaved_files=files, options=PARSE_OPTIONS)
     errors = [d for d in tu.diagnostics if d.severity >= ci.Diagnostic.Error]
     if errors:
         shown = "\n".join(str(d) for d in errors[:MAX_REPORTED_DIAGNOSTICS])
@@ -108,6 +116,20 @@ AUDITED_HEADER_PREFIX = {
     "tesseract_common": "tesseract/common/",
     "tesseract_environment": "tesseract/environment/",
 }
+# Headers under a prefix that are not Python API, as fnmatch patterns on the path below the
+# prefix (`*` also matches `/`). A header the binding #includes directly is audited anyway.
+UNAUDITED_HEADERS = {
+    "test_suite/*": "gtest and Google Benchmark sources installed for plugin authors' tests.",
+    "*_impl.hpp": "cereal implementation fragment, valid only after its `cereal_serialization.h`.",
+    "bullet/*": "Bullet backend internals, loaded as a contact manager plugin; Python reaches "
+    "them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.",
+    "fcl/*": "FCL backend internals, loaded as a contact manager plugin; Python reaches them "
+    "through the `DiscreteContactManager` interface.",
+    "vhacd/VHACD.h": "Vendored third-party V-HACD library (namespace `VHACD`).",
+}
+# A header another binding TU #includes directly (`<…>` form) is audited with that module.
+INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
+HEADER_SUFFIXES = frozenset({".h", ".hpp"})
 
 
 class UnknownModuleError(LookupError):
@@ -206,6 +228,7 @@ class Kind(str, Enum):
     CONSTANT = "constant"
     PROTOCOL = "protocol"
     FAIL_LOUD = "fail-loud"
+    HEADER = "header"
 
 
 @dataclass(frozen=True)
@@ -246,11 +269,16 @@ class CppSymbol:
     overloads: list[CppOverload] = field(default_factory=list)
 
 
+def header_rel(path: Path) -> str:
+    """A header path relative to the conda include dir or the repo."""
+    path = path.resolve()
+    base = CONDA_INCLUDE if path.is_relative_to(CONDA_INCLUDE) else REPO_ROOT
+    return path.relative_to(base).as_posix()
+
+
 def location(cursor: ci.Cursor) -> str:
     """`header:line`, relative to the conda include dir or the repo."""
-    path = Path(cursor.location.file.name).resolve()
-    base = CONDA_INCLUDE if path.is_relative_to(CONDA_INCLUDE) else REPO_ROOT
-    return f"{path.relative_to(base).as_posix()}:{cursor.location.line}"
+    return f"{header_rel(Path(cursor.location.file.name))}:{cursor.location.line}"
 
 
 def audited_headers(
@@ -270,6 +298,31 @@ def audited_headers(
         and Path(c.location.file.name).resolve() == main
     )
     return frozenset(h for h in direct if any(h.is_relative_to(r) for r in roots))
+
+
+def prefix_headers(prefix: str, include_dirs: Sequence[Path]) -> dict[Path, str]:
+    """Every header under `prefix` in the include dirs: resolved path → `#include` spelling."""
+    found: dict[Path, str] = {}
+    for d in include_dirs:
+        root = d / prefix
+        if not root.is_dir():
+            continue
+        for h in sorted(root.rglob("*")):
+            if h.suffix in HEADER_SUFFIXES:
+                found.setdefault(h.resolve(), h.relative_to(d).as_posix())
+    return found
+
+
+def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
+    """`<…>` spellings the files #include, read as text (other bindings are not parsed)."""
+    return frozenset(
+        m for s in sources for m in INCLUDE_DIRECTIVE.findall(s.read_text(encoding="utf-8"))
+    )
+
+
+def is_unaudited(spelling: str, prefix: str) -> bool:
+    below = spelling.removeprefix(prefix)
+    return any(fnmatch.fnmatchcase(below, pattern) for pattern in UNAUDITED_HEADERS)
 
 
 def _is_out_param(parm: ci.Cursor) -> bool:
@@ -707,6 +760,34 @@ def match(
     )
 
 
+def unincluded_header_gaps(
+    cpp_path: Path, headers: dict[Path, str], extra_include_dirs: Sequence[Path] = ()
+) -> list[Gap]:
+    """One `header` gap per header the binding never includes, if it declares any API.
+
+    The headers are parsed in a synthetic TU that includes the binding first, so they see
+    the binding's flags and macros. The row points at the header's first auditable
+    declaration; a header of forward declarations or macros only gets no row.
+    """
+    if not headers:
+        return []
+    synthetic = cpp_path.with_name(f"{cpp_path.stem}_unincluded_headers.cpp")
+    text = f'#include "{cpp_path.name}"\n' + "".join(
+        f"#include <{spelling}>\n" for spelling in sorted(headers.values())
+    )
+    tu = parse_tu(synthetic, extra_include_dirs, unsaved=text)
+    lines: dict[str, list[int]] = {}
+    for sym in cpp_api(tu, frozenset(headers)).values():
+        path, line = sym.location.rsplit(":", 1)
+        lines.setdefault(path, []).append(int(line))
+    gaps = []
+    for h, spelling in headers.items():
+        found = lines.get(header_rel(h))
+        if found:
+            gaps.append(Gap(spelling, Kind.HEADER, f"{header_rel(h)}:{min(found)}"))
+    return gaps
+
+
 def audit_tu(
     module: str,
     cpp_path: Path,
@@ -714,16 +795,33 @@ def audit_tu(
     init_path: Path,
     prefix: str,
     extra_include_dirs: Sequence[Path] = (),
+    other_bindings: Sequence[Path] = (),
 ) -> ModuleReport:
-    """Audit one translation unit against one stub and package `__init__.py`."""
+    """Audit one translation unit against one stub and package `__init__.py`.
+
+    Audits every header under `prefix`, except `UNAUDITED_HEADERS` and headers that one of
+    `other_bindings` #includes directly; the binding's own direct includes always count.
+    """
+    include_dirs = (*extra_include_dirs, *INCLUDE_DIRS)
     tu = parse_tu(cpp_path, extra_include_dirs)
-    headers = audited_headers(tu, prefix, (*extra_include_dirs, *INCLUDE_DIRS))
+    direct = audited_headers(tu, prefix, include_dirs)
+    owned_elsewhere = direct_include_spellings(other_bindings)
+    audited = {
+        h: spelling
+        for h, spelling in prefix_headers(prefix, include_dirs).items()
+        if h in direct or not (is_unaudited(spelling, prefix) or spelling in owned_elsewhere)
+    }
+    included = frozenset(Path(i.include.name).resolve() for i in tu.get_includes())
     report = match(
         module,
-        cpp_api(tu, headers),
+        cpp_api(tu, frozenset(audited) & included),
         decl_names(tu),
         py_api(load_stub(stub_path), rel(stub_path)),
         rel(stub_path),
+    )
+    unincluded = {h: s for h, s in audited.items() if h not in included}
+    report.gaps = sorted(
+        [*report.gaps, *unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)]
     )
     report.deviations = sorted([*report.deviations, *init_findings(init_path)])
     return report
@@ -744,6 +842,7 @@ def audit_module(module: str) -> ModuleReport:
         committed_stub(module),
         STUB_ROOT / module / "__init__.py",
         AUDITED_HEADER_PREFIX[module],
+        other_bindings=[binding_source(m) for m in binding_modules() if m != module],
     )
 
 
@@ -821,6 +920,10 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
         ),
         '!!! note "Accepted deviation rules"',
         *(f"    - `{k}`: {v}" for k, v in sorted(ACCEPTED.items())),
+        "",
+        '!!! note "Unaudited headers"',
+        *(f"    - `{k}`: {v}" for k, v in UNAUDITED_HEADERS.items()),
+        "    - Headers another binding #includes directly are audited with that module.",
         "",
         f'!!! warning "Limitations"\n    {LIMITATION}',
         "",

@@ -5,9 +5,9 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `50835
 
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
-| tesseract_collision | 180 | 47 | 12 | 1 | 6 |
-| tesseract_common | 94 | 64 | 26 | 2 | 0 |
-| tesseract_environment | 102 | 92 | 14 | 4 | 1 |
+| tesseract_collision | 180 | 53 | 12 | 1 | 6 |
+| tesseract_common | 94 | 117 | 26 | 2 | 0 |
+| tesseract_environment | 102 | 99 | 14 | 4 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
@@ -25,6 +25,14 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
     - `out-param`: A non-const lvalue-reference out-param is returned in a tuple with the result (Phase A precedent: checkTrajectory), or alone when the C++ returns `void`.
     - `scalar-last-quaternion`: Quaterniond takes (x, y, z, w), the project-wide scalar-last order; Eigen's constructor is (w, x, y, z).
     - `stringstream`: A `std::stringstream&` parameter the C++ writes into is returned as `str`.
+
+!!! note "Unaudited headers"
+    - `test_suite/*`: gtest and Google Benchmark sources installed for plugin authors' tests.
+    - `*_impl.hpp`: cereal implementation fragment, valid only after its `cereal_serialization.h`.
+    - `bullet/*`: Bullet backend internals, loaded as a contact manager plugin; Python reaches them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.
+    - `fcl/*`: FCL backend internals, loaded as a contact manager plugin; Python reaches them through the `DiscreteContactManager` interface.
+    - `vhacd/VHACD.h`: Vendored third-party V-HACD library (namespace `VHACD`).
+    - Headers another binding #includes directly are audited with that module.
 
 !!! warning "Limitations"
     Python member names are checked against every declaration in the TU, so a Python-only member that shares a common C++ name (`size`, `clear`) is not flagged. Parameter types are not compared beyond quoted C++ names.
@@ -82,6 +90,12 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `ContinuousContactManagerFactory` | class | tesseract/collision/contact_managers_plugin_factory.h:78 | — |
 | `DiscreteContactManagerFactory` | class | tesseract/collision/contact_managers_plugin_factory.h:57 | — |
 | `createConvexHull` | function | tesseract/collision/bullet/convex_hull_utils.h:45 | — |
+| `tesseract/collision/common.h` | header | tesseract/collision/common.h:49 | — |
+| `tesseract/collision/contact_result_validator.h` | header | tesseract/collision/contact_result_validator.h:39 | — |
+| `tesseract/collision/convex_decomposition.h` | header | tesseract/collision/convex_decomposition.h:33 | — |
+| `tesseract/collision/utils.h` | header | tesseract/collision/utils.h:40 | — |
+| `tesseract/collision/vhacd/convex_decomposition_vhacd.h` | header | tesseract/collision/vhacd/convex_decomposition_vhacd.h:38 | — |
+| `tesseract/collision/yaml_extensions.h` | header | tesseract/collision/yaml_extensions.h:39 | — |
 
 ### Deviations
 
@@ -162,6 +176,12 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `PluginInfoContainer.__eq__` | operator | tesseract/common/plugin_info.h:64 | — |
 | `PluginInfoContainer.__ne__` | operator | tesseract/common/plugin_info.h:65 | — |
 | `ProfilesPluginInfo` | class | tesseract/common/plugin_info.h:69 | — |
+| `QueryDoubleAttributeRequired` | function | tesseract/common/utils.h:493 | — |
+| `QueryIntAttributeRequired` | function | tesseract/common/utils.h:507 | — |
+| `QueryStringAttribute` | function | tesseract/common/utils.h:456 | — |
+| `QueryStringAttributeRequired` | function | tesseract/common/utils.h:479 | — |
+| `QueryStringText` | function | tesseract/common/utils.h:438 | — |
+| `QueryStringValue` | function | tesseract/common/utils.h:430 | — |
 | `Resource.__eq__` | operator | tesseract/common/resource_locator.h:187 | — |
 | `Resource.__ne__` | operator | tesseract/common/resource_locator.h:188 | — |
 | `ResourceLocator.__eq__` | operator | tesseract/common/resource_locator.h:74 | — |
@@ -170,12 +190,59 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `SimpleLocatedResource.__init__` | constructor | tesseract/common/resource_locator.h:205 | 0 |
 | `SimpleLocatedResource.__ne__` | operator | tesseract/common/resource_locator.h:233 | — |
 | `SimpleLocatedResource.locateResource` | method | tesseract/common/resource_locator.h:230 | — |
+| `StringAttribute` | function | tesseract/common/utils.h:465 | — |
 | `TaskComposerPluginInfo` | class | tesseract/common/plugin_info.h:159 | — |
+| `almostEqualRelativeAndAbs` | function | tesseract/common/utils.h:519 | — |
+| `applyTolerances` | function | tesseract/common/utils.h:212 | — |
+| `calcJacobianTransformErrorDiff` | function | tesseract/common/utils.h:142 | — |
+| `calcRotationalError` | function | tesseract/common/utils.h:122 | — |
+| `calcTransformError` | function | tesseract/common/utils.h:131 | — |
+| `computeRandomColor` | function | tesseract/common/utils.h:220 | — |
+| `concat` | function | tesseract/common/utils.h:113 | — |
 | `enforceLimits` | function | tesseract/common/kinematic_limits.h:150 | — |
+| `fileToString` | function | tesseract/common/utils.h:80 | — |
+| `generateRandomNumber` | function | tesseract/common/utils.h:254 | — |
+| `getAllowedCollisions` | function | tesseract/common/utils.h:603 | — |
+| `getTempPath` | function | tesseract/common/utils.h:233 | — |
+| `getTimestampString` | function | tesseract/common/utils.h:415 | — |
+| `isIdentical` | function | tesseract/common/utils.h:284 | — |
+| `isIdenticalArray` | function | tesseract/common/utils.h:369 | — |
+| `isIdenticalMap` | function | tesseract/common/utils.h:311 | — |
+| `isIdenticalSet` | function | tesseract/common/utils.h:340 | — |
+| `isNumeric` | function | tesseract/common/utils.h:240 | — |
 | `isWithinLimits` | function | tesseract/common/kinematic_limits.h:67 | — |
+| `jacobianChangeBase` | function | tesseract/common/utils.h:102 | — |
+| `jacobianChangeRefPoint` | function | tesseract/common/utils.h:110 | — |
+| `ltrim` | function | tesseract/common/utils.h:260 | — |
 | `makeOrderedLinkPair` | function | tesseract/common/types.h:46 | — |
+| `numeric_cast` | function | tesseract/common/utils.h:617 | — |
 | `operator<<` | function | tesseract/common/allowed_collision_matrix.h:108 | — |
 | `operator==` | function | tesseract/common/allowed_collision_matrix.h:17 | — |
+| `pointersComparison` | function | tesseract/common/utils.h:404 | — |
+| `pointersEqual` | function | tesseract/common/utils.h:393 | — |
+| `printNestedException` | function | tesseract/common/utils.h:227 | — |
+| `removeDuplicates` | function | tesseract/common/utils.h:590 | — |
+| `reorder` | function | tesseract/common/utils.h:422 | — |
+| `rtrim` | function | tesseract/common/utils.h:266 | — |
+| `strFormat` | function | tesseract/common/utils.h:63 | — |
+| `tesseract/common/cereal_make_array.h` | header | tesseract/common/cereal_make_array.h:22 | — |
+| `tesseract/common/clone_cache.h` | header | tesseract/common/clone_cache.h:49 | — |
+| `tesseract/common/ply_io.h` | header | tesseract/common/ply_io.h:42 | — |
+| `tesseract/common/profile_plugin_factory.h` | header | tesseract/common/profile_plugin_factory.h:62 | — |
+| `tesseract/common/property_tree.h` | header | tesseract/common/property_tree.h:46 | — |
+| `tesseract/common/schema_registration.h` | header | tesseract/common/schema_registration.h:39 | — |
+| `tesseract/common/schema_registry.h` | header | tesseract/common/schema_registry.h:42 | — |
+| `tesseract/common/serialization_extensions.h` | header | tesseract/common/serialization_extensions.h:33 | — |
+| `tesseract/common/sfinae_utils.h` | header | tesseract/common/sfinae_utils.h:23 | — |
+| `tesseract/common/stopwatch.h` | header | tesseract/common/stopwatch.h:35 | — |
+| `tesseract/common/timer.h` | header | tesseract/common/timer.h:38 | — |
+| `tesseract/common/unit_test_utils.h` | header | tesseract/common/unit_test_utils.h:42 | — |
+| `tesseract/common/yaml_extensions.h` | header | tesseract/common/yaml_extensions.h:45 | — |
+| `tesseract/common/yaml_utils.h` | header | tesseract/common/yaml_utils.h:65 | — |
+| `toNumeric` | function | tesseract/common/utils.h:565 | — |
+| `trim` | function | tesseract/common/utils.h:272 | — |
+| `twistChangeBase` | function | tesseract/common/utils.h:95 | — |
+| `twistChangeRefPoint` | function | tesseract/common/utils.h:88 | — |
 
 ### Deviations
 
@@ -313,6 +380,13 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `checkTrajectorySegment` | function | tesseract/environment/utils.h:67 | — |
 | `checkTrajectoryState` | function | tesseract/environment/utils.h:80 | — |
 | `getActiveLinkNamesRecursive` | function | tesseract/environment/utils.h:53 | — |
+| `tesseract/environment/commands/add_contact_managers_plugin_info_command.h` | header | tesseract/environment/commands/add_contact_managers_plugin_info_command.h:41 | — |
+| `tesseract/environment/commands/add_trajectory_link_command.h` | header | tesseract/environment/commands/add_trajectory_link_command.h:41 | — |
+| `tesseract/environment/commands/set_active_continuous_contact_manager_command.h` | header | tesseract/environment/commands/set_active_continuous_contact_manager_command.h:41 | — |
+| `tesseract/environment/commands/set_active_discrete_contact_manager_command.h` | header | tesseract/environment/commands/set_active_discrete_contact_manager_command.h:41 | — |
+| `tesseract/environment/environment_cache.h` | header | tesseract/environment/environment_cache.h:37 | — |
+| `tesseract/environment/environment_monitor.h` | header | tesseract/environment/environment_monitor.h:38 | — |
+| `tesseract/environment/environment_monitor_interface.h` | header | tesseract/environment/environment_monitor_interface.h:43 | — |
 
 ### Deviations
 
