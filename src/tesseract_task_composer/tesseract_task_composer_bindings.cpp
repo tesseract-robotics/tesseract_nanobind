@@ -33,13 +33,13 @@
 #include <tesseract/task_composer/task_composer_executor.h>
 #include <tesseract/task_composer/task_composer_future.h>
 #include <tesseract/task_composer/task_composer_graph.h>
-#include <tesseract/task_composer/task_composer_keys.h>
 #include <tesseract/task_composer/task_composer_log.h>
 #include <tesseract/task_composer/task_composer_node.h>
 #include <tesseract/task_composer/task_composer_node_info.h>
 #include <tesseract/task_composer/task_composer_node_ports.h>
 #include <tesseract/task_composer/task_composer_node_types.h>
 #include <tesseract/task_composer/task_composer_pipeline.h>
+#include <tesseract/task_composer/task_composer_port_map.h>
 #include <tesseract/task_composer/task_composer_plugin_factory.h>
 #include <tesseract/task_composer/task_composer_server.h>
 #include <tesseract/task_composer/task_composer_task.h>
@@ -65,8 +65,8 @@
 // std::vector<ContactResultMap> on its node info's data_storage)
 #include <tesseract/collision/types.h>
 
-// console_bridge for log output visible alongside the rest of tesseract's logging
-#include <console_bridge/console.h>
+// tesseract's logger (spdlog since tesseract #1367), so output sits alongside tesseract's own
+#include <tesseract/common/logging.h>
 
 // Plugin libraries stay loaded for the process lifetime (macOS, Windows): see plugin_pinning.h.
 #include "tesseract_task_composer/plugin_pinning.h"
@@ -549,30 +549,31 @@ NB_MODULE(_tesseract_task_composer, m) {
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
     nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
 
-    // ========== TaskComposerKeys ==========
-    // A port maps to one key or a list of keys (EntryType = variant<string, vector<string>>).
-    // nanobind never converts a str to vector<string>, so the two `add` overloads dispatch on
+    // ========== TaskComposerPortMap ==========
+    // Replaces TaskComposerKeys (tesseract_planning #760): port name -> storage key, or a list of keys.
+    // nanobind never converts a str to vector<string>, so the two `set` overloads dispatch on
     // the argument's type.
-    auto keys = nb::class_<tp::TaskComposerKeys>(m, "TaskComposerKeys")
+    auto port_map = nb::class_<tp::TaskComposerPortMap>(m, "TaskComposerPortMap")
         .def(nb::init<>())
-        .def("add", nb::overload_cast<const std::string&, std::string>(&tp::TaskComposerKeys::add), "port"_a, "key"_a)
-        .def("add", nb::overload_cast<const std::string&, std::vector<std::string>>(&tp::TaskComposerKeys::add),
-             "port"_a, "keys"_a)
-        .def("remove", &tp::TaskComposerKeys::remove, "port"_a)
-        .def("rename", &tp::TaskComposerKeys::rename, "keys"_a)
-        .def("get", [](const tp::TaskComposerKeys& self, const std::string& port) -> tp::TaskComposerKeys::EntryType {
-            return self.data().at(port);
-        }, "port"_a, "The key, or list of keys, of `port`. Raises IndexError for an unknown port.")
-        .def("has", &tp::TaskComposerKeys::has, "port"_a)
-        .def("empty", &tp::TaskComposerKeys::empty)
-        .def("size", &tp::TaskComposerKeys::size)
-        .def("data", &tp::TaskComposerKeys::data)
-        .def("__str__", [](const tp::TaskComposerKeys& self) {
+        .def("set", nb::overload_cast<std::string, std::string>(&tp::TaskComposerPortMap::set),
+             "port"_a, "storage_key"_a)
+        .def("set", nb::overload_cast<std::string, std::vector<std::string>>(&tp::TaskComposerPortMap::set),
+             "port"_a, "storage_keys"_a)
+        .def("erase", &tp::TaskComposerPortMap::erase, "port"_a)
+        .def("contains", &tp::TaskComposerPortMap::contains, "port"_a)
+        .def("at", &tp::TaskComposerPortMap::at, "port"_a, nb::rv_policy::copy)
+        .def("single", &tp::TaskComposerPortMap::single, "port"_a, nb::rv_policy::copy)
+        .def("multiple", &tp::TaskComposerPortMap::multiple, "port"_a, nb::rv_policy::copy)
+        .def("renameStorageKeys", &tp::TaskComposerPortMap::renameStorageKeys, "storage_key_remapping"_a)
+        .def("data", &tp::TaskComposerPortMap::data, nb::rv_policy::copy)
+        .def("size", &tp::TaskComposerPortMap::size)
+        .def("empty", &tp::TaskComposerPortMap::empty)
+        .def("__str__", [](const tp::TaskComposerPortMap& self) {
             std::ostringstream os;
             os << self;
             return os.str();
         });
-    bind_value_equality(keys);
+    bind_value_equality(port_map);
 
     // ========== TaskComposerDataStorage ==========
     auto data_storage = nb::class_<tp::TaskComposerDataStorage>(m, "TaskComposerDataStorage")
@@ -838,10 +839,10 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("setConditional", &tp::TaskComposerNode::setConditional, "enable"_a)
         .def("validatePorts", &tp::TaskComposerNode::validatePorts,
              "Raise RuntimeError if a required port has no key or a key names no port.")
-        .def("getInputKeys", &tp::TaskComposerNode::getInputKeys, nb::rv_policy::reference)
-        .def("getOutputKeys", &tp::TaskComposerNode::getOutputKeys, nb::rv_policy::reference)
-        .def("setInputKeys", &tp::TaskComposerNode::setInputKeys, "input_keys"_a)
-        .def("setOutputKeys", &tp::TaskComposerNode::setOutputKeys, "output_keys"_a)
+        .def("getInputPortMappings", &tp::TaskComposerNode::getInputPortMappings, nb::rv_policy::reference_internal)
+        .def("getOutputPortMappings", &tp::TaskComposerNode::getOutputPortMappings, nb::rv_policy::reference_internal)
+        .def("setPortMappings", &tp::TaskComposerNode::setPortMappings,
+             "input_port_mappings"_a, "output_port_mappings"_a)
         .def("getPorts", &tp::TaskComposerNode::getPorts)
         .def("getDataStorage", &tp::TaskComposerNode::getDataStorage, "context"_a,
              "The context's data storage for a root node, else its parent graph's.")
