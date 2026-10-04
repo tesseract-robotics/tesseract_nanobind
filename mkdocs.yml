@@ -188,6 +188,7 @@ nav:
     - Binding API Audit: developer/binding-api-audit.md
     - Binding Audit Coverage: developer/binding-audit-coverage.md
     - Threading and the GIL: developer/threading.md
+    - How the Binaries Are Built: developer/binaries.md
     - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md
@@ -205,8 +206,8 @@ extra:
       link: https://github.com/tesseract-robotics
       name: tesseract-robotics on GitHub
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/tesseract-robotics/
-      name: tesseract-robotics on PyPI
+      link: https://pypi.org/project/tesseract-robotics-nanobind/
+      name: tesseract-robotics-nanobind on PyPI
   analytics:
     provider: google
     property: !ENV GOOGLE_ANALYTICS_KEY
