@@ -56,17 +56,8 @@ __all__ = [
     "calcJacobianTransformErrorDiff",
     "applyTolerances",
     "ToleranceSizeMismatchError",
-    # Console bridge
-    "OutputHandler",
-    "LogLevel",
-    "setLogLevel",
-    "getLogLevel",
-    "useOutputHandler",
-    "restorePreviousOutputHandler",
-    "flushOutputHandlers",
-    "OutputHandlerFlushForbiddenError",
     # Logging (spdlog)
-    "LoggerLevel",
+    "LogLevel",
     "Logger",
     "LogRecord",
     "getLogger",

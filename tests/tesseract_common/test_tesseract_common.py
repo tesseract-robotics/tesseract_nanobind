@@ -1,6 +1,5 @@
 import io
 import os
-from inspect import currentframe, getframeinfo
 from pathlib import Path
 
 import numpy as np
@@ -27,44 +26,6 @@ def test_bytes_resource_content_stream():
     stream = bytes_resource.getResourceContentStream()
     assert isinstance(stream, io.BytesIO)
     assert stream.read() == my_bytes
-
-
-class _TestOutputHandler(tesseract_common.OutputHandler):
-    def __init__(self):
-        super().__init__()
-        self.last_text = None
-
-    def log(self, text, level, filename, line):
-        self.last_text = text
-
-
-def test_console_bridge():
-    tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
-
-    frameinfo = getframeinfo(currentframe())
-    tesseract_common.log(
-        frameinfo.filename,
-        frameinfo.lineno,
-        tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG,
-        "This is a test message",
-    )
-
-    output_handler = _TestOutputHandler()
-    tesseract_common.useOutputHandler(output_handler)
-
-    tesseract_common.log(
-        frameinfo.filename,
-        frameinfo.lineno,
-        tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG,
-        "This is a test message 2",
-    )
-    # A Python handler gets its messages on a delivery thread: wait for them.
-    tesseract_common.flushOutputHandlers()
-    tesseract_common.restorePreviousOutputHandler()
-
-    assert output_handler.last_text == "This is a test message 2"
-
-    tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
 
 
 def test_manipulator_info():
