@@ -5,6 +5,7 @@ The default env ignores this directory via `addopts`.
 """
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -183,3 +184,93 @@ def test_init_findings():
         ("FilesystemPath", audit.Kind.CLASS),
         ("try: import … except ImportError", audit.Kind.FAIL_LOUD),
     }
+
+
+@pytest.fixture(scope="module")
+def fixture_report():
+    return audit.audit_tu(
+        "fixture",
+        FIXTURES / "fixture_bindings.cpp",
+        FIXTURE_STUB,
+        FIXTURES / "package_init.py",
+        FIXTURE_PREFIX,
+        (FIXTURE_INCLUDE,),
+    )
+
+
+def test_fixture_gaps_exact(fixture_report):
+    assert {(g.symbol, g.kind, g.arity) for g in fixture_report.gaps} == {
+        ("Base", audit.Kind.CLASS, "—"),  # whole class: one row, members not listed
+        ("Owner", audit.Kind.CLASS, "—"),
+        ("Widget.resize", audit.Kind.METHOD, "—"),
+        ("Widget.operator+", audit.Kind.OPERATOR, "—"),
+    }
+
+
+def test_fixture_deviations_exact(fixture_report):
+    assert {(d.name, d.kind, d.arity) for d in fixture_report.deviations} == {
+        ("Widget.widget_grow", audit.Kind.METHOD, "—"),
+        ("Widget.widget_samples", audit.Kind.METHOD, "—"),
+        ("Widget.__repr__", audit.Kind.PROTOCOL, "—"),
+        ("Color_RED", audit.Kind.CONSTANT, "—"),
+        ("scale_twice", audit.Kind.FUNCTION, "—"),
+        ("area", audit.Kind.OVERLOAD, "2"),
+        ("FilesystemPath", audit.Kind.CLASS, "—"),
+        (audit.TRY_IMPORT, audit.Kind.FAIL_LOUD, "—"),
+    }
+
+
+def test_fixture_accepted_exact(fixture_report):
+    assert {(a.symbol, a.rule) for a in fixture_report.accepted} == {
+        ("collect", "out-param"),
+        ("describe", "stringstream"),
+    }
+
+
+def test_fixture_quoted(fixture_report):
+    assert [q.name for q in fixture_report.quoted] == ["Widget.owner"]
+
+
+def test_every_row_has_a_location(fixture_report):
+    rows = [*fixture_report.gaps, *fixture_report.deviations, *fixture_report.accepted]
+    assert all(re.search(r"\.(h|pyi|py):\d+$", r.location) for r in rows)
+
+
+@pytest.fixture(scope="module")
+def real_reports():
+    return {m: audit.audit_module(m) for m in FIRST_PASS}
+
+
+def test_contact_trajectory_results_has_zero_gaps(real_reports):
+    gaps = [g for g in real_reports["tesseract_collision"].gaps
+            if g.symbol.split(".")[0] == "ContactTrajectoryResults"]  # fmt: skip
+    assert gaps == []
+
+
+def test_contact_result_cc_fields_covered(real_reports):
+    names = {g.symbol for g in real_reports["tesseract_collision"].gaps}
+    assert not {"ContactResult.cc_time", "ContactResult.cc_type"} & names
+
+
+def test_check_trajectory_covered_via_out_param(real_reports):
+    report = real_reports["tesseract_environment"]
+    assert [g for g in report.gaps if g.symbol == "checkTrajectory"] == []
+    assert [d for d in report.deviations if d.name == "checkTrajectory"] == []
+    rules = [a.rule for a in report.accepted if a.symbol == "checkTrajectory"]
+    assert rules == ["out-param"] * 4
+
+
+def test_satisfies_limits_all_overloads_covered(real_reports):
+    report = real_reports["tesseract_common"]
+    assert [g for g in report.gaps if g.symbol == "satisfiesLimits"] == []
+    assert [d for d in report.deviations if d.name == "satisfiesLimits"] == []
+
+
+def test_environment_init_try_import_reported(real_reports):
+    kinds = {d.kind for d in real_reports["tesseract_environment"].deviations}
+    assert audit.Kind.FAIL_LOUD in kinds
+
+
+def test_quaternion_scalar_last_accepted(real_reports):
+    accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
+    assert ("Quaterniond.from_xyzw", "scalar-last-quaternion") in accepted

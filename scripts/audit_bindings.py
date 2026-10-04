@@ -527,3 +527,161 @@ def init_findings(path: Path) -> list[Deviation]:
         if isinstance(n, ast.Try) and any(_catches_import_error(h) for h in n.handlers)
     ]
     return sorted(rows)
+
+
+# Deviations accepted by rule; each is printed with its reason in the report.
+ACCEPTED = {
+    "out-param": "A non-const lvalue-reference out-param is returned in a tuple with the result "
+    "(Phase A precedent: checkTrajectory).",
+    "stringstream": "A `std::stringstream&` parameter the C++ writes into is returned as `str`.",
+    "scalar-last-quaternion": "Quaterniond takes (x, y, z, w), the project-wide scalar-last "
+    "order; Eigen's constructor is (w, x, y, z).",
+}
+# Python names accepted by a named rule: (module, python name) -> ACCEPTED key.
+ACCEPTED_SYMBOLS = {
+    ("tesseract_common", "Quaterniond.__init__"): "scalar-last-quaternion",
+    ("tesseract_common", "Quaterniond.from_xyzw"): "scalar-last-quaternion",
+}
+
+
+@dataclass(frozen=True, order=True)
+class Gap:
+    symbol: str
+    kind: Kind
+    location: str
+    arity: str = NOT_AN_OVERLOAD
+
+
+@dataclass(frozen=True, order=True)
+class Accepted:
+    symbol: str
+    rule: str
+    location: str
+
+
+@dataclass
+class ModuleReport:
+    module: str
+    covered: int
+    gaps: list[Gap]
+    deviations: list[Deviation]
+    accepted: list[Accepted]
+    quoted: list[QuotedType]
+
+
+def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
+    """How a C++ overload is covered by Python overloads: "exact", an ACCEPTED rule, or None.
+
+    Out-param rules are tried first: `checkTrajectory`'s 5-parameter C++ overload would
+    otherwise pair by raw arity with the wrong 5-argument Python overload.
+    """
+    if ov.out_params:
+        reduced = ov.arity.reduced(len(ov.out_params))
+        fits = [p for p in pys if p.arity.overlaps(reduced)]
+        if set(ov.out_params) == {STRINGSTREAM} and any(p.returns == "str" for p in fits):
+            return "stringstream"
+        if any(p.returns.startswith("tuple[") for p in fits):
+            return "out-param"
+    if any(p.arity.overlaps(ov.arity) for p in pys):
+        return "exact"
+    return None
+
+
+def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
+    parts = name.split(".")
+    owners = (".".join(parts[:i]) for i in range(1, len(parts)))
+    return any(o in cpp and o not in py.symbols for o in owners)
+
+
+def match(
+    module: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str], py: PyApi, stub_rel: str
+) -> ModuleReport:
+    """Diff the audited C++ API against the stub."""
+    gaps: list[Gap] = []
+    accepted: list[Accepted] = []
+    covered = 0
+    for name, sym in cpp.items():
+        if _ancestor_missing(name, cpp, py):
+            continue  # the missing class is the one row
+        if name not in py.symbols:
+            gaps.append(Gap(name, sym.kind, sym.location))
+            continue
+        ok = True
+        for ov in sym.overloads:
+            how = _cover(ov, py.symbols[name].overloads)
+            if how is None:
+                gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
+                ok = False
+            elif how != "exact":
+                accepted.append(Accepted(name, how, ov.location))
+        covered += ok
+
+    deviations: list[Deviation] = []
+    for name, ps in py.symbols.items():
+        where = f"{stub_rel}:{ps.line}"
+        rule = ACCEPTED_SYMBOLS.get((module, name))
+        leaf = name.rpartition(".")[2]
+        if ps.kind is Kind.PROTOCOL:
+            found = None
+        elif leaf == "__init__":
+            found = "ctor"
+        else:
+            found = DUNDER_OPERATORS.get(leaf, leaf) in tu_names or None
+        if found is None:
+            if rule:
+                accepted.append(Accepted(name, rule, where))
+            else:
+                deviations.append(Deviation(name, ps.kind, where))
+            continue
+        if name in cpp and cpp[name].overloads:
+            for p in ps.overloads:
+                if not any(_cover(ov, [p]) for ov in cpp[name].overloads):
+                    deviations.append(
+                        Deviation(name, Kind.OVERLOAD, f"{stub_rel}:{p.line}", str(p.arity))
+                    )
+        elif rule:
+            accepted.append(Accepted(name, rule, where))
+
+    return ModuleReport(
+        module, covered, sorted(gaps), sorted(deviations), sorted(accepted), py.quoted
+    )
+
+
+def audit_tu(
+    module: str,
+    cpp_path: Path,
+    stub_path: Path,
+    init_path: Path,
+    prefix: str,
+    extra_include_dirs: Sequence[Path] = (),
+) -> ModuleReport:
+    """Audit one translation unit against one stub and package `__init__.py`."""
+    tu = parse_tu(cpp_path, extra_include_dirs)
+    headers = audited_headers(tu, prefix, (*extra_include_dirs, *INCLUDE_DIRS))
+    report = match(
+        module,
+        cpp_api(tu, headers),
+        decl_names(tu),
+        py_api(load_stub(stub_path), rel(stub_path)),
+        rel(stub_path),
+    )
+    report.deviations = sorted([*report.deviations, *init_findings(init_path)])
+    return report
+
+
+def audit_module(module: str) -> ModuleReport:
+    """Audit one binding module by short name.
+
+    Raises:
+        UnknownModuleError: see `resolve_module`.
+        StubMissingError: see `resolve_module`.
+        HeaderParseError: see `parse_tu`.
+    """
+    resolve_module(module)
+    return audit_tu(
+        module,
+        binding_source(module),
+        committed_stub(module),
+        STUB_ROOT / module / "__init__.py",
+        AUDITED_HEADER_PREFIX[module],
+    )
