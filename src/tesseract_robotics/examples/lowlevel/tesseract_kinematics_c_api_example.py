@@ -212,7 +212,7 @@ def main():
     # Multiple inputs can be solved simultaneously for multi-chain robots
     ik = KinGroupIKInput()
     ik.pose = tool0_transform2  # Target transform (Isometry3d)
-    ik.tip_link_name = "tool0"  # End effector link
+    ik.tip_link_id = "tool0"  # End effector link
     ik.working_frame = "base_link"  # Reference frame for the pose
 
     # KinGroupIKInputs is a vector - append all IK requests

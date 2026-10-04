@@ -75,7 +75,7 @@ graph TD
     future = executor.run(pipeline, storage)
     future.wait()
 
-    output_key = pipeline.getOutputKeys().get("program")
+    output_key = pipeline.getOutputPortMappings().single("program")
     output = future.context.data_storage.getData(output_key)
     ```
 

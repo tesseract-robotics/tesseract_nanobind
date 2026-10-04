@@ -354,26 +354,10 @@ NB_MODULE(_trajopt_ifopt, m) {
              "target"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with target values")
-        .def("__init__", [](ti::JointPosConstraint* self,
-                            const std::vector<ti::Bounds>& bounds,
-                            const std::shared_ptr<const ti::Var>& position_var,
-                            const Eigen::VectorXd& coeffs,
-                            std::string name,
-                            ti::RangeBoundHandling range_bound_handling) {
-                 // In trajopt 0.35.0 the range split indexes the caller's coeffs argument
-                 // instead of the broadcast member coeffs_, so a length-0/1 coeffs is read
-                 // past its end (fixed by tesseract-robotics/trajopt#592, merged 2026-09-30,
-                 // in no release yet); the binding broadcasts first. Remove the broadcast only
-                 // once a release containing #592 is pinned.
-                 const auto n_dof = static_cast<Eigen::Index>(bounds.size());
-                 Eigen::VectorXd per_joint = coeffs;
-                 if (coeffs.size() == 0)
-                     per_joint = Eigen::VectorXd::Ones(n_dof);
-                 else if (coeffs.size() == 1)
-                     per_joint = Eigen::VectorXd::Constant(n_dof, coeffs(0));
-                 new (self) ti::JointPosConstraint(bounds, position_var, per_joint,
-                                                   std::move(name), range_bound_handling);
-             },
+        // trajopt#592 broadcasts length-0/1 coeffs before the range split; the binding-side
+        // broadcast trajopt 0.35.0 needed (tesseract_nanobind#146) is gone on this branch.
+        .def(nb::init<const std::vector<ti::Bounds>&, const std::shared_ptr<const ti::Var>&,
+                      const Eigen::VectorXd&, std::string, ti::RangeBoundHandling>(),
              "bounds"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with one bound per joint: an equality, a "
@@ -407,15 +391,20 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def(nb::init<double>(), "default_collision_coeff"_a)
         .def("setDefaultCollisionCoeff", &tc::CollisionCoeffData::setDefaultCollisionCoeff)
         .def("getDefaultCollisionCoeff", &tc::CollisionCoeffData::getDefaultCollisionCoeff)
-        .def("setCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
+        .def("setCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&, double>(
+                 &tc::CollisionCoeffData::setCollisionCoeff),
              "obj1"_a, "obj2"_a, "collision_coeff"_a)
-        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
-             "obj1"_a, "obj2"_a)
+        .def("setCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkIdPair&, double>(&tc::CollisionCoeffData::setCollisionCoeff),
+             "pair"_a, "collision_coeff"_a)
+        .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff, "pair"_a)
         // Backwards compatibility aliases
-        .def("setPairCollisionCoeff", &tc::CollisionCoeffData::setCollisionCoeff,
+        .def("setPairCollisionCoeff",
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&, double>(
+                 &tc::CollisionCoeffData::setCollisionCoeff),
              "obj1"_a, "obj2"_a, "collision_coeff"_a)
-        .def("getPairCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff,
-             "obj1"_a, "obj2"_a);
+        .def("getPairCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff, "pair"_a);
 
     // ========== trajopt_common::TrajOptCollisionConfig ==========
     nb::class_<tc::TrajOptCollisionConfig>(m, "TrajOptCollisionConfig")
@@ -516,8 +505,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::class_<ti::CartLineInfo>(m, "CartLineInfo")
         .def(nb::init<>())
         .def_rw("manip", &ti::CartLineInfo::manip, "The joint group")
-        .def_rw("source_frame", &ti::CartLineInfo::source_frame, "TCP frame")
-        .def_rw("target_frame", &ti::CartLineInfo::target_frame, "Reference frame")
+        .def_rw("source_frame", &ti::CartLineInfo::source_frame, "TCP frame", nb::rv_policy::copy)
+        .def_rw("target_frame", &ti::CartLineInfo::target_frame, "Reference frame", nb::rv_policy::copy)
         .def_rw("source_frame_offset", &ti::CartLineInfo::source_frame_offset, "TCP offset")
         .def_rw("target_frame_offset1", &ti::CartLineInfo::target_frame_offset1, "Line start pose")
         .def_rw("target_frame_offset2", &ti::CartLineInfo::target_frame_offset2, "Line end pose")
@@ -557,8 +546,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::class_<ti::InverseKinematicsInfo>(m, "InverseKinematicsInfo")
         .def(nb::init<>())
         .def_rw("manip", &ti::InverseKinematicsInfo::manip, "The kinematic group (with IK solver)")
-        .def_rw("working_frame", &ti::InverseKinematicsInfo::working_frame, "Working frame (not currently used)")
-        .def_rw("tcp_frame", &ti::InverseKinematicsInfo::tcp_frame, "TCP frame (not currently used)")
+        .def_rw("working_frame", &ti::InverseKinematicsInfo::working_frame, "Working frame (not currently used)", nb::rv_policy::copy)
+        .def_rw("tcp_frame", &ti::InverseKinematicsInfo::tcp_frame, "TCP frame (not currently used)", nb::rv_policy::copy)
         .def_rw("tcp_offset", &ti::InverseKinematicsInfo::tcp_offset, "TCP offset (not currently used)");
 
     // ========== InverseKinematicsConstraint ==========

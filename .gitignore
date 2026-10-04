@@ -44,3 +44,9 @@ pixi.lock
 docs/superpowers/
 docs/plans/
 AGENTS.md
+
+# upstream-main feedstock builds (pixi run build-feedstock)
+packaging/output/
+packaging/SDKs/
+packaging/logs/
+upstream/build/

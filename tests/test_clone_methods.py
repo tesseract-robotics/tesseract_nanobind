@@ -55,7 +55,7 @@ class TestEnvironmentClone:
         assert cloned is not abb_environment
 
     def test_clone_preserves_state(self, abb_environment):
-        joint_names = list(abb_environment.getStateSolver().getActiveJointNames())
+        joint_names = list(abb_environment.getStateSolver().getActiveJointIds())
         original_state = abb_environment.getState()
         cloned = abb_environment.clone()
         cloned_state = cloned.getState()
@@ -64,7 +64,7 @@ class TestEnvironmentClone:
 
     def test_clone_is_independent(self, abb_environment):
         cloned = abb_environment.clone()
-        joint_names = list(abb_environment.getStateSolver().getActiveJointNames())
+        joint_names = list(abb_environment.getStateSolver().getActiveJointIds())
         new_values = np.ones(len(joint_names)) * 0.5
         cloned.setState(joint_names, new_values)
         # original should be unaffected
@@ -78,7 +78,7 @@ class TestStateSolverClone:
         solver = abb_environment.getStateSolver()
         cloned = solver.clone()
         assert cloned is not solver
-        assert list(cloned.getJointNames()) == list(solver.getJointNames())
+        assert list(cloned.getJointIds()) == list(solver.getJointIds())
 
 
 class TestMotionPlannerClone:

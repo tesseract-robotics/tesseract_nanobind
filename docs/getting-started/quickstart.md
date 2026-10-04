@@ -61,7 +61,7 @@ from tesseract_robotics.tesseract_collision import (
 robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
 
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 
 contacts = ContactResultMap()

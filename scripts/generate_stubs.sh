@@ -60,12 +60,20 @@ for entry in "${MODULES[@]}"; do
     # objects (not whatever python happens to be first on PATH). A stale
     # conda env on PATH during PR #76 produced stubs missing the new
     # Eigen-geometry types, which silently broke CI pyright on Linux 3.9.
-    TRAJOPT_LOG_THRESH=ERROR pixi run -e default python -m nanobind.stubgen \
-        -m "$MODULE" \
-        $PATTERN_ARG \
-        -o "$OUTPUT_FILE" \
-        -q 2>&1 | grep -v "^You can set logging" || true
+    # The env is the one this script runs in (`pixi run -e upstream bash ...`), else default.
+    # A stubgen failure aborts: swallowing it once left every stub silently stale.
+    if ! out=$(TRAJOPT_LOG_THRESH=ERROR pixi run -e "${PIXI_ENVIRONMENT_NAME:-default}" \
+        python -m nanobind.stubgen -m "$MODULE" $PATTERN_ARG -o "$OUTPUT_FILE" -q 2>&1); then
+        echo "$out" >&2
+        echo "stubgen failed for $MODULE" >&2
+        exit 1
+    fi
+    echo "$out" | grep -v "^You can set logging" || true
 done
+
+# stubgen does not record nanobind's implicit str -> LinkId/JointId conversions
+pixi run -e "${PIXI_ENVIRONMENT_NAME:-default}" python "$SCRIPT_DIR/widen_implicit_id_stubs.py" \
+    $(find "$SRC_DIR" -name "_*.pyi" -type f)
 
 # Create py.typed marker
 touch "$SRC_DIR/py.typed"

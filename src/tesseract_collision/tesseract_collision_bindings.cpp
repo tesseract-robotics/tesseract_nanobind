@@ -5,6 +5,8 @@
 
 #include "tesseract_nb.h"
 #include <nanobind/stl/map.h>
+#include <nanobind/stl/unordered_map.h>
+#include <nanobind/stl/unordered_set.h>
 
 // tesseract_collision core
 #include <tesseract/collision/types.h>
@@ -37,6 +39,9 @@ NB_MAKE_OPAQUE(tc::ContactResultVector);
 
 NB_MODULE(_tesseract_collision, m) {
     m.doc() = "tesseract_collision Python bindings";
+
+    // LinkId / JointId / LinkIdPair are registered in tesseract_common
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
 
     // ========== Enums ==========
     nb::enum_<tc::ContinuousCollisionType>(m, "ContinuousCollisionType")
@@ -94,12 +99,12 @@ NB_MODULE(_tesseract_collision, m) {
             [](tc::ContactResult& self, const std::vector<int>& v) {
                 if (v.size() >= 2) { self.type_id[0] = v[0]; self.type_id[1] = v[1]; }
             })
-        .def_prop_rw("link_names",
+        .def_prop_rw("link_ids",
             [](const tc::ContactResult& self) {
-                return std::vector<std::string>{self.link_names[0], self.link_names[1]};
+                return std::vector<tcommon::LinkId>{self.link_ids[0], self.link_ids[1]};
             },
-            [](tc::ContactResult& self, const std::vector<std::string>& v) {
-                if (v.size() >= 2) { self.link_names[0] = v[0]; self.link_names[1] = v[1]; }
+            [](tc::ContactResult& self, const std::vector<tcommon::LinkId>& v) {
+                if (v.size() >= 2) { self.link_ids[0] = v[0]; self.link_ids[1] = v[1]; }
             })
         .def_prop_rw("shape_id",
             [](const tc::ContactResult& self) {
@@ -220,29 +225,25 @@ NB_MODULE(_tesseract_collision, m) {
         .def("disableCollisionObject", &tc::DiscreteContactManager::disableCollisionObject, "name"_a)
         .def("isCollisionObjectEnabled", &tc::DiscreteContactManager::isCollisionObjectEnabled, "name"_a)
         .def("setCollisionObjectsTransform",
-             [](tc::DiscreteContactManager& self, const std::string& name, const Eigen::Isometry3d& pose) {
-                 self.setCollisionObjectsTransform(name, pose);
-             }, "name"_a, "pose"_a)
+             [](tc::DiscreteContactManager& self, const tcommon::LinkId& id, const Eigen::Isometry3d& pose) {
+                 self.setCollisionObjectsTransform(id, pose);
+             }, "id"_a, "pose"_a)
         .def("setCollisionObjectsTransform",
-             [](tc::DiscreteContactManager& self, const std::vector<std::string>& names,
+             [](tc::DiscreteContactManager& self, const std::vector<tcommon::LinkId>& ids,
                 const tcommon::VectorIsometry3d& poses) {
-                 self.setCollisionObjectsTransform(names, poses);
-             }, "names"_a, "poses"_a)
+                 self.setCollisionObjectsTransform(ids, poses);
+             }, "ids"_a, "poses"_a)
+        // Python dict keyed by LinkId or str (e.g. SceneState.link_transforms)
         .def("setCollisionObjectsTransform",
-             [](tc::DiscreteContactManager& self, const tcommon::TransformMap& transforms) {
-                 self.setCollisionObjectsTransform(transforms);
-             }, "transforms"_a)
-        // Overload accepting std::map (from Python dict / link_transforms property)
-        .def("setCollisionObjectsTransform",
-             [](tc::DiscreteContactManager& self, const std::map<std::string, Eigen::Isometry3d>& transforms) {
-                 tcommon::TransformMap tm;
-                 for (const auto& p : transforms) {
-                     tm[p.first] = p.second;
-                 }
+             [](tc::DiscreteContactManager& self, const std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>& transforms) {
+                 const tcommon::LinkIdTransformMap tm(transforms.begin(), transforms.end());
                  self.setCollisionObjectsTransform(tm);
              }, "transforms"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("getCollisionObjects", &tc::DiscreteContactManager::getCollisionObjects)
-        .def("setActiveCollisionObjects", &tc::DiscreteContactManager::setActiveCollisionObjects, "names"_a)
+        .def("setActiveCollisionObjects",
+             [](tc::DiscreteContactManager& self, const std::vector<tcommon::LinkId>& ids) {
+                 self.setActiveCollisionObjects(ids);
+             }, "ids"_a)
         .def("getActiveCollisionObjects", &tc::DiscreteContactManager::getActiveCollisionObjects)
         // Note: 0.33 renamed setDefaultCollisionMarginData → setDefaultCollisionMargin
         .def("setDefaultCollisionMargin", &tc::DiscreteContactManager::setDefaultCollisionMargin,
@@ -298,41 +299,43 @@ NB_MODULE(_tesseract_collision, m) {
              &tc::ContinuousContactManager::getCollisionObjectGeometriesTransforms, "name"_a)
         // Static (single-pose) object transforms
         .def("setCollisionObjectsTransform",
-             [](tc::ContinuousContactManager& self, const std::string& name, const Eigen::Isometry3d& pose) {
-                 self.setCollisionObjectsTransform(name, pose);
-             }, "name"_a, "pose"_a)
+             [](tc::ContinuousContactManager& self, const tcommon::LinkId& id, const Eigen::Isometry3d& pose) {
+                 self.setCollisionObjectsTransform(id, pose);
+             }, "id"_a, "pose"_a)
         .def("setCollisionObjectsTransform",
-             [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
+             [](tc::ContinuousContactManager& self, const std::vector<tcommon::LinkId>& ids,
                 const tcommon::VectorIsometry3d& poses) {
-                 self.setCollisionObjectsTransform(names, poses);
-             }, "names"_a, "poses"_a)
+                 self.setCollisionObjectsTransform(ids, poses);
+             }, "ids"_a, "poses"_a)
         .def("setCollisionObjectsTransform",
-             [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& transforms) {
-                 tcommon::TransformMap tm;
-                 for (const auto& p : transforms) { tm[p.first] = p.second; }
+             [](tc::ContinuousContactManager& self, const std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>& transforms) {
+                 const tcommon::LinkIdTransformMap tm(transforms.begin(), transforms.end());
                  self.setCollisionObjectsTransform(tm);
              }, "transforms"_a)
         // Cast (moving, start+end pose) object transforms
         .def("setCollisionObjectsTransformCast",
-             [](tc::ContinuousContactManager& self, const std::string& name,
+             [](tc::ContinuousContactManager& self, const tcommon::LinkId& id,
                 const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2) {
-                 self.setCollisionObjectsTransform(name, pose1, pose2);
-             }, "name"_a, "pose1"_a, "pose2"_a)
+                 self.setCollisionObjectsTransform(id, pose1, pose2);
+             }, "id"_a, "pose1"_a, "pose2"_a)
         .def("setCollisionObjectsTransformCast",
-             [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
+             [](tc::ContinuousContactManager& self, const std::vector<tcommon::LinkId>& ids,
                 const tcommon::VectorIsometry3d& pose1, const tcommon::VectorIsometry3d& pose2) {
-                 self.setCollisionObjectsTransform(names, pose1, pose2);
-             }, "names"_a, "pose1"_a, "pose2"_a)
+                 self.setCollisionObjectsTransform(ids, pose1, pose2);
+             }, "ids"_a, "pose1"_a, "pose2"_a)
         .def("setCollisionObjectsTransformCast",
-             [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& pose1,
-                const std::map<std::string, Eigen::Isometry3d>& pose2) {
-                 tcommon::TransformMap tm1, tm2;
-                 for (const auto& p : pose1) { tm1[p.first] = p.second; }
-                 for (const auto& p : pose2) { tm2[p.first] = p.second; }
+             [](tc::ContinuousContactManager& self,
+                const std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>& pose1,
+                const std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>& pose2) {
+                 const tcommon::LinkIdTransformMap tm1(pose1.begin(), pose1.end());
+                 const tcommon::LinkIdTransformMap tm2(pose2.begin(), pose2.end());
                  self.setCollisionObjectsTransform(tm1, tm2);
              }, "pose1"_a, "pose2"_a)
         .def("getCollisionObjects", &tc::ContinuousContactManager::getCollisionObjects)
-        .def("setActiveCollisionObjects", &tc::ContinuousContactManager::setActiveCollisionObjects, "names"_a)
+        .def("setActiveCollisionObjects",
+             [](tc::ContinuousContactManager& self, const std::vector<tcommon::LinkId>& ids) {
+                 self.setActiveCollisionObjects(ids);
+             }, "ids"_a)
         .def("getActiveCollisionObjects", &tc::ContinuousContactManager::getActiveCollisionObjects)
         .def("setCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginData,
              "collision_margin_data"_a)

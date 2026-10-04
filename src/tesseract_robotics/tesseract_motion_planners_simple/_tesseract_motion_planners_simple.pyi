@@ -17,7 +17,7 @@ class SimpleMotionPlanner:
 
     def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...
 
-def generateInterpolatedProgram(instructions: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: "tesseract_environment::Environment", state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.15, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction:
+def generateInterpolatedProgram(instructions: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: "tesseract::environment::Environment", state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.15, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction:
     """Generate an interpolated program from a composite instruction"""
 
 class SimplePlannerMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):

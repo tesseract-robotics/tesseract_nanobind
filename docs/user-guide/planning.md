@@ -557,7 +557,7 @@ if not result.successful:
         ContactRequest, ContactResultMap, ContactTestType_ALL,
     )
     manager = robot.env.getDiscreteContactManager()
-    manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+    manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
     manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
     contacts = ContactResultMap()
     manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))

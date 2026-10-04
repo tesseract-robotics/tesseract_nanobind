@@ -23,6 +23,9 @@ namespace tg = tesseract::geometry;
 NB_MODULE(_tesseract_scene_graph, m) {
     m.doc() = "tesseract_scene_graph Python bindings";
 
+    // LinkId / JointId / LinkIdPair are registered in tesseract_common
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // ==================== Joint-related classes ====================
 
     // JointType enum
@@ -105,24 +108,25 @@ NB_MODULE(_tesseract_scene_graph, m) {
     // JointMimic
     nb::class_<tsg::JointMimic>(m, "JointMimic")
         .def(nb::init<>())
-        .def(nb::init<double, double, std::string>(),
-             "offset"_a, "multiplier"_a, "joint_name"_a)
+        .def(nb::init<double, double, tesseract::common::JointId>(),
+             "offset"_a, "multiplier"_a, "joint_id"_a)
         .def_rw("offset", &tsg::JointMimic::offset)
         .def_rw("multiplier", &tsg::JointMimic::multiplier)
-        .def_rw("joint_name", &tsg::JointMimic::joint_name)
+        .def_rw("joint_id", &tsg::JointMimic::joint_id, nb::rv_policy::copy)
         .def("clear", &tsg::JointMimic::clear)
         .def("__eq__", &tsg::JointMimic::operator==)
         .def("__ne__", &tsg::JointMimic::operator!=);
 
     // Joint (non-copyable)
     nb::class_<tsg::Joint>(m, "Joint")
-        .def(nb::init<std::string>(), "name"_a)
+        .def(nb::init<tesseract::common::JointId>(), "id"_a)
         .def(nb::init<>())
         .def("getName", &tsg::Joint::getName)
+        .def("getId", &tsg::Joint::getId)
         .def_rw("type", &tsg::Joint::type)
         .def_rw("axis", &tsg::Joint::axis)
-        .def_rw("child_link_name", &tsg::Joint::child_link_name)
-        .def_rw("parent_link_name", &tsg::Joint::parent_link_name)
+        .def_rw("child_link_id", &tsg::Joint::child_link_id, nb::rv_policy::copy)
+        .def_rw("parent_link_id", &tsg::Joint::parent_link_id, nb::rv_policy::copy)
         .def_rw("parent_to_joint_origin_transform", &tsg::Joint::parent_to_joint_origin_transform)
         .def_rw("dynamics", &tsg::Joint::dynamics)
         .def_rw("limits", &tsg::Joint::limits)
@@ -131,7 +135,7 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def_rw("mimic", &tsg::Joint::mimic)
         .def("clear", &tsg::Joint::clear)
         .def("clone", nb::overload_cast<>(&tsg::Joint::clone, nb::const_))
-        .def("clone", nb::overload_cast<const std::string&>(&tsg::Joint::clone, nb::const_), "name"_a)
+        .def("clone", nb::overload_cast<tesseract::common::JointId>(&tsg::Joint::clone, nb::const_), "id"_a)
         .def("__eq__", &tsg::Joint::operator==)
         .def("__ne__", &tsg::Joint::operator!=)
         .def("__repr__", [](const tsg::Joint& self) {
@@ -198,9 +202,10 @@ NB_MODULE(_tesseract_scene_graph, m) {
 
     // Link (non-copyable)
     nb::class_<tsg::Link>(m, "Link")
-        .def(nb::init<std::string>(), "name"_a)
+        .def(nb::init<tesseract::common::LinkId>(), "id"_a)
         .def(nb::init<>())
         .def("getName", &tsg::Link::getName)
+        .def("getId", &tsg::Link::getId)
         .def_rw("inertial", &tsg::Link::inertial)
         .def_rw("visual", &tsg::Link::visual)
         .def_rw("collision", &tsg::Link::collision)
@@ -218,7 +223,7 @@ NB_MODULE(_tesseract_scene_graph, m) {
             "Clear all Collision elements from this link")
         .def("clear", &tsg::Link::clear)
         .def("clone", nb::overload_cast<>(&tsg::Link::clone, nb::const_))
-        .def("clone", nb::overload_cast<const std::string&>(&tsg::Link::clone, nb::const_), "name"_a)
+        .def("clone", nb::overload_cast<tesseract::common::LinkId>(&tsg::Link::clone, nb::const_), "id"_a)
         .def("__eq__", &tsg::Link::operator==)
         .def("__ne__", &tsg::Link::operator!=)
         .def("__repr__", [](const tsg::Link& self) {
@@ -276,16 +281,25 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def("getJointLimits", &tsg::SceneGraph::getJointLimits, "name"_a)
 
         // Collision matrix
-        .def("addAllowedCollision", &tsg::SceneGraph::addAllowedCollision,
-             "link_name1"_a, "link_name2"_a, "reason"_a)
+        .def("addAllowedCollision",
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&, const std::string&>(
+                 &tsg::SceneGraph::addAllowedCollision),
+             "link_id1"_a, "link_id2"_a, "reason"_a)
+        .def("addAllowedCollision",
+             nb::overload_cast<const tesseract::common::LinkIdPair&, const std::string&>(&tsg::SceneGraph::addAllowedCollision),
+             "pair"_a, "reason"_a)
         .def("removeAllowedCollision",
-             nb::overload_cast<const std::string&, const std::string&>(&tsg::SceneGraph::removeAllowedCollision),
-             "link_name1"_a, "link_name2"_a)
+             nb::overload_cast<const tesseract::common::LinkId&, const tesseract::common::LinkId&>(
+                 &tsg::SceneGraph::removeAllowedCollision),
+             "link_id1"_a, "link_id2"_a)
         .def("removeAllowedCollision",
-             nb::overload_cast<const std::string&>(&tsg::SceneGraph::removeAllowedCollision),
-             "link_name"_a)
+             nb::overload_cast<const tesseract::common::LinkIdPair&>(&tsg::SceneGraph::removeAllowedCollision),
+             "pair"_a)
+        .def("removeAllowedCollision",
+             nb::overload_cast<const tesseract::common::LinkId&>(&tsg::SceneGraph::removeAllowedCollision),
+             "link_id"_a)
         .def("clearAllowedCollisions", &tsg::SceneGraph::clearAllowedCollisions)
-        .def("isCollisionAllowed", &tsg::SceneGraph::isCollisionAllowed, "link_name1"_a, "link_name2"_a)
+        .def("isCollisionAllowed", &tsg::SceneGraph::isCollisionAllowed, "pair"_a)
         .def("getAllowedCollisionMatrix",
              nb::overload_cast<>(&tsg::SceneGraph::getAllowedCollisionMatrix),
              "Get the allowed collision matrix")
@@ -298,12 +312,15 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def("isAcyclic", &tsg::SceneGraph::isAcyclic)
         .def("isTree", &tsg::SceneGraph::isTree)
         .def("isEmpty", &tsg::SceneGraph::isEmpty)
-        .def("getAdjacentLinkNames", &tsg::SceneGraph::getAdjacentLinkNames, "name"_a)
-        .def("getInvAdjacentLinkNames", &tsg::SceneGraph::getInvAdjacentLinkNames, "name"_a)
-        .def("getLinkChildrenNames", &tsg::SceneGraph::getLinkChildrenNames, "name"_a)
-        .def("getJointChildrenNames",
-             nb::overload_cast<const std::string&>(&tsg::SceneGraph::getJointChildrenNames, nb::const_),
-             "name"_a)
+        .def("getAdjacentLinkIds", &tsg::SceneGraph::getAdjacentLinkIds, "id"_a)
+        .def("getInvAdjacentLinkIds", &tsg::SceneGraph::getInvAdjacentLinkIds, "id"_a)
+        .def("getLinkChildrenIds", &tsg::SceneGraph::getLinkChildrenIds, "id"_a)
+        .def("getJointChildrenIds",
+             nb::overload_cast<const tesseract::common::JointId&>(&tsg::SceneGraph::getJointChildrenIds, nb::const_),
+             "id"_a)
+        .def("getJointChildrenIds",
+             nb::overload_cast<const std::vector<tesseract::common::JointId>&>(&tsg::SceneGraph::getJointChildrenIds, nb::const_),
+             "ids"_a)
         .def("getShortestPath", &tsg::SceneGraph::getShortestPath, "root"_a, "tip"_a)
         .def("saveDOT", &tsg::SceneGraph::saveDOT, "path"_a)
 

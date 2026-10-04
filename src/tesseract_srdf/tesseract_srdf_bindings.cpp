@@ -19,6 +19,9 @@ namespace ts = tesseract::srdf;
 NB_MODULE(_tesseract_srdf, m) {
     m.doc() = "tesseract_srdf Python bindings";
 
+    // LinkId / JointId / LinkIdPair are registered in tesseract_common
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // KinematicsInformation
     nb::class_<ts::KinematicsInformation>(m, "KinematicsInformation")
         .def(nb::init<>())
@@ -31,7 +34,7 @@ NB_MODULE(_tesseract_srdf, m) {
         // group added via AddKinematicsInformationCommand resolves through getKinematicGroup().
         .def_rw("kinematics_plugin_info", &ts::KinematicsInformation::kinematics_plugin_info)
         .def_rw("group_states", &ts::KinematicsInformation::group_states)
-        // group_tcps: the C++ field is nested unordered_map keyed on string with
+        // group_tcps: the C++ field is nested unordered_map (group name -> LinkId -> Isometry3d) with
         // Eigen::aligned_allocator on the inner map (Isometry3d alignment). nanobind's
         // default stl/unordered_map caster does not pattern-match against that allocator
         // template arg, so a raw def_rw exposes a Python attribute whose getter raises
@@ -42,9 +45,9 @@ NB_MODULE(_tesseract_srdf, m) {
             "group_tcps",
             [](const ts::KinematicsInformation& self) {
                 std::unordered_map<std::string,
-                                   std::unordered_map<std::string, Eigen::Isometry3d>> out;
+                                   std::unordered_map<tesseract::common::LinkId, Eigen::Isometry3d>> out;
                 for (const auto& [group_name, tcps] : self.group_tcps) {
-                    std::unordered_map<std::string, Eigen::Isometry3d> inner;
+                    std::unordered_map<tesseract::common::LinkId, Eigen::Isometry3d> inner;
                     for (const auto& [tcp_name, tcp] : tcps) {
                         inner.emplace(tcp_name, tcp);
                     }
@@ -54,7 +57,7 @@ NB_MODULE(_tesseract_srdf, m) {
             },
             [](ts::KinematicsInformation& self,
                const std::unordered_map<std::string,
-                                        std::unordered_map<std::string, Eigen::Isometry3d>>& value) {
+                                        std::unordered_map<tesseract::common::LinkId, Eigen::Isometry3d>>& value) {
                 self.group_tcps.clear();
                 for (const auto& [group_name, tcps] : value) {
                     for (const auto& [tcp_name, tcp] : tcps) {

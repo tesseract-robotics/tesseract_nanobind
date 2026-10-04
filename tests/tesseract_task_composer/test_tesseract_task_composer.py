@@ -447,7 +447,7 @@ class TestPipelineDataStorageExposure:
         assignCurrentStateAsSeed(composite, robot.env)
 
         task = composer.factory.createTaskComposerNode("FreespacePipeline")
-        input_key = task.getInputKeys().get("planning_input")
+        input_key = task.getInputPortMappings().single("planning_input")
 
         task_data = TaskComposerDataStorage()
         task_data.setData(input_key, AnyPoly_wrap_CompositeInstruction(composite))

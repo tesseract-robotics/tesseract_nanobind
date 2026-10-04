@@ -110,7 +110,7 @@ def run_test(checker):
     nptest.assert_almost_equal(result_vector[0].distance, -0.55)
 
     idx = [0, 1, 1]
-    if result_vector[0].link_names[0] != "box_link":
+    if result_vector[0].link_ids[0] != "box_link":
         idx = [1, 0, -1]
 
     if result_vector[0].single_contact_point:

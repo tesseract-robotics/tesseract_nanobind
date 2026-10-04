@@ -14,6 +14,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# VISIBILITY_INLINES_HIDDEN OFF (below) only stops CMake adding the flag; conda's clang
+# activation still injects it through CXXFLAGS. Hidden inlines give this .so its own
+# cereal registry singleton under Mach-O's two-level namespace, so polymorphic types
+# registered inside libtesseract_* (upstream tesseract#1305) read as unregistered here.
+if(APPLE)
+  string(REPLACE "-fvisibility-inlines-hidden" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+endif()
+
 # Find Python and nanobind
 find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
@@ -44,7 +52,7 @@ if(APPLE)
   set(CMAKE_MACOSX_RPATH ON)
 endif()
 
-# Add the C++ prefix for dependencies (tinyxml2, console_bridge, etc.)
+# Add the C++ prefix for dependencies (tinyxml2, etc.)
 if(DEFINED TESSERACT_CPP_PREFIX)
   list(APPEND CMAKE_PREFIX_PATH "${TESSERACT_CPP_PREFIX}")
   link_directories("${TESSERACT_CPP_PREFIX}/lib")
@@ -69,7 +77,6 @@ find_package(tesseract REQUIRED COMPONENTS state_solver)
 find_package(tesseract REQUIRED COMPONENTS kinematics)
 find_package(tesseract REQUIRED COMPONENTS environment)
 find_package(tesseract_planning REQUIRED COMPONENTS command_language)
-find_package(console_bridge REQUIRED)
 
 # Define reusable function for nanobind extensions
 function(add_tesseract_nanobind_extension module_name source_file)
@@ -108,7 +115,6 @@ add_tesseract_nanobind_extension(
   tesseract_common
   src/tesseract_common/tesseract_common_bindings.cpp
   tesseract::common
-  console_bridge::console_bridge
 )
 
 # Add tesseract_geometry module

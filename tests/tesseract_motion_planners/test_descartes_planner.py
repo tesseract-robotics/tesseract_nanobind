@@ -68,7 +68,7 @@ def abb_irb2400_environment():
     manip_info.manipulator_ik_solver = "OPWInvKin"
     manip_info.working_frame = "base_link"
 
-    joint_names = list(t_env.getJointGroup("manipulator").getJointNames())
+    joint_names = list(t_env.getJointGroup("manipulator").getJointIds())
     return t_env, manip_info, joint_names
 
 
@@ -132,7 +132,7 @@ class TestDescartesProfiles:
         profile.vertex_contact_manager_config = vertex_cfg
 
         assert profile.vertex_contact_manager_config.acm_override_type == ACMOverrideType.OR
-        assert profile.vertex_contact_manager_config.acm.isCollisionAllowed("link_1", "link_2")
+        assert profile.vertex_contact_manager_config.acm.isCollisionAllowed(("link_1", "link_2"))
         assert dict(profile.vertex_contact_manager_config.modify_object_enabled) == {
             "link_2": False
         }
@@ -233,7 +233,7 @@ class TestDescartesPlanning:
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
                     state_wp = WaypointPoly_as_StateWaypointPoly(wp)
-                    assert len(state_wp.getNames()) == 6  # ABB IRB2400 has 6 joints
+                    assert len(state_wp.getJointIds()) == 6  # ABB IRB2400 has 6 joints
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 6
                 count += 1

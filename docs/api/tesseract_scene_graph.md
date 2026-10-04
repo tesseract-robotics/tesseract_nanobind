@@ -106,8 +106,8 @@ from tesseract_robotics.tesseract_scene_graph import Joint, JointType
 
 joint = Joint("joint_1")
 joint.type = JointType.REVOLUTE
-joint.parent_link_name = "link_0"
-joint.child_link_name = "link_1"
+joint.parent_link_id = "link_0"
+joint.child_link_id = "link_1"
 joint.parent_to_joint_origin_transform = Isometry3d.Identity()
 joint.axis = np.array([0, 0, 1])  # rotation axis
 ```

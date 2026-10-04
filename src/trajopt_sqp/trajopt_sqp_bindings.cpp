@@ -153,6 +153,14 @@ NB_MODULE(_trajopt_sqp, m) {
 
     // ========== SQPResults ==========
 
+    nb::class_<tsqp::ConstraintViolations>(m, "ConstraintViolations",
+        "Per merit unit constraint violations (non-negative; 0 = satisfied)")
+        .def(nb::init<>())
+        .def_rw("raw", &tsqp::ConstraintViolations::raw,
+                "Unweighted violation per merit unit; its sum is compared against cnt_tolerance")
+        .def_rw("weighted", &tsqp::ConstraintViolations::weighted,
+                "Violation times row weight; the merit charges weighted.dot(merit_error_coeffs)");
+
     nb::class_<tsqp::SQPResults>(m, "SQPResults", "Results and state from SQP optimization")
         .def(nb::init<>())
         .def(nb::init<Eigen::Index, Eigen::Index, Eigen::Index>(),

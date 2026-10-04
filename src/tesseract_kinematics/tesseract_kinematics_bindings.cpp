@@ -4,6 +4,7 @@
  */
 
 #include "tesseract_nb.h"
+#include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/set.h>
@@ -39,6 +40,9 @@ NB_MAKE_OPAQUE(tk::KinGroupIKInputs)
 NB_MODULE(_tesseract_kinematics, m) {
     m.doc() = "tesseract_kinematics Python bindings";
 
+    // LinkId / JointId / LinkIdPair are registered in tesseract_common
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // ========== URParameters ==========
     nb::class_<tk::URParameters>(m, "URParameters")
         .def(nb::init<>())
@@ -62,11 +66,11 @@ NB_MODULE(_tesseract_kinematics, m) {
     // ========== KinGroupIKInput ==========
     nb::class_<tk::KinGroupIKInput>(m, "KinGroupIKInput")
         .def(nb::init<>())
-        .def(nb::init<const Eigen::Isometry3d&, std::string, std::string>(),
-             "pose"_a, "working_frame"_a, "tip_link_name"_a)
+        .def(nb::init<const Eigen::Isometry3d&, tcommon::LinkId, tcommon::LinkId>(),
+             "pose"_a, "working_frame"_a, "tip_link_id"_a)
         .def_rw("pose", &tk::KinGroupIKInput::pose)
-        .def_rw("working_frame", &tk::KinGroupIKInput::working_frame)
-        .def_rw("tip_link_name", &tk::KinGroupIKInput::tip_link_name);
+        .def_rw("working_frame", &tk::KinGroupIKInput::working_frame, nb::rv_policy::copy)
+        .def_rw("tip_link_id", &tk::KinGroupIKInput::tip_link_id, nb::rv_policy::copy);
 
     // ========== KinGroupIKInputs (vector of KinGroupIKInput) ==========
     nb::class_<tk::KinGroupIKInputs>(m, "KinGroupIKInputs")
@@ -83,23 +87,19 @@ NB_MODULE(_tesseract_kinematics, m) {
     nb::class_<tk::ForwardKinematics>(m, "ForwardKinematics")
         .def("calcFwdKin", [](const tk::ForwardKinematics& self,
                               const Eigen::Ref<const Eigen::VectorXd>& joint_angles) {
-            auto result = self.calcFwdKin(joint_angles);
-            // Convert TransformMap to std::map for Python
-            std::map<std::string, Eigen::Isometry3d> py_result;
-            for (const auto& p : result) {
-                py_result[p.first] = p.second;
-            }
-            return py_result;
+            const auto result = self.calcFwdKin(joint_angles);
+            // LinkIdTransformMap -> plain dict keyed by LinkId (indexable by str)
+            return std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>(result.begin(), result.end());
         }, "joint_angles"_a)
         // Note: In 0.33, calcJacobian has a non-virtual wrapper returning MatrixXd
         .def("calcJacobian", [](const tk::ForwardKinematics& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
-                                const std::string& link_name) {
-            return self.calcJacobian(joint_angles, link_name);
-        }, "joint_angles"_a, "link_name"_a)
-        .def("getBaseLinkName", &tk::ForwardKinematics::getBaseLinkName)
-        .def("getJointNames", &tk::ForwardKinematics::getJointNames)
-        .def("getTipLinkNames", &tk::ForwardKinematics::getTipLinkNames)
+                                const tcommon::LinkId& link_id) {
+            return self.calcJacobian(joint_angles, link_id);
+        }, "joint_angles"_a, "link_id"_a)
+        .def("getBaseLinkId", &tk::ForwardKinematics::getBaseLinkId)
+        .def("getJointIds", &tk::ForwardKinematics::getJointIds)
+        .def("getTipLinkIds", &tk::ForwardKinematics::getTipLinkIds)
         .def("numJoints", &tk::ForwardKinematics::numJoints)
         .def("getSolverName", &tk::ForwardKinematics::getSolverName)
         .def("clone", [](const tk::ForwardKinematics& self) { return self.clone(); });
@@ -107,58 +107,51 @@ NB_MODULE(_tesseract_kinematics, m) {
     // ========== InverseKinematics (abstract) ==========
     nb::class_<tk::InverseKinematics>(m, "InverseKinematics")
         .def("calcInvKin", [](const tk::InverseKinematics& self,
-                              const std::map<std::string, Eigen::Isometry3d>& tip_link_poses,
+                              const std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>& tip_link_poses,
                               const Eigen::Ref<const Eigen::VectorXd>& seed) {
-            // Convert std::map to TransformMap
-            tesseract::common::TransformMap poses;
-            for (const auto& p : tip_link_poses) {
-                poses[p.first] = p.second;
-            }
+            const tcommon::LinkIdTransformMap poses(tip_link_poses.begin(), tip_link_poses.end());
             return self.calcInvKin(poses, seed);
         }, "tip_link_poses"_a, "seed"_a)
-        .def("getJointNames", &tk::InverseKinematics::getJointNames)
+        .def("getJointIds", &tk::InverseKinematics::getJointIds)
         .def("numJoints", &tk::InverseKinematics::numJoints)
-        .def("getBaseLinkName", &tk::InverseKinematics::getBaseLinkName)
+        .def("getBaseLinkId", &tk::InverseKinematics::getBaseLinkId)
         .def("getWorkingFrame", &tk::InverseKinematics::getWorkingFrame)
-        .def("getTipLinkNames", &tk::InverseKinematics::getTipLinkNames)
+        .def("getTipLinkIds", &tk::InverseKinematics::getTipLinkIds)
         .def("getSolverName", &tk::InverseKinematics::getSolverName)
         .def("clone", [](const tk::InverseKinematics& self) { return self.clone(); });
 
     // ========== JointGroup ==========
     nb::class_<tk::JointGroup>(m, "JointGroup")
-        .def(nb::init<std::string, std::vector<std::string>, const tsg::SceneGraph&, const tsg::SceneState&>(),
-             "name"_a, "joint_names"_a, "scene_graph"_a, "scene_state"_a)
+        .def(nb::init<std::string, std::vector<tcommon::JointId>, const tsg::SceneGraph&, const tsg::SceneState&>(),
+             "name"_a, "joint_ids"_a, "scene_graph"_a, "scene_state"_a)
         .def("calcFwdKin", [](const tk::JointGroup& self,
                               const Eigen::Ref<const Eigen::VectorXd>& joint_angles) {
-            auto result = self.calcFwdKin(joint_angles);
-            std::map<std::string, Eigen::Isometry3d> py_result;
-            for (const auto& p : result) {
-                py_result[p.first] = p.second;
-            }
-            return py_result;
+            const auto result = self.calcFwdKin(joint_angles);
+            // LinkIdTransformMap -> plain dict keyed by LinkId (indexable by str)
+            return std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>(result.begin(), result.end());
         }, "joint_angles"_a)
         .def("calcJacobian", [](const tk::JointGroup& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
-                                const std::string& link_name) {
-            return self.calcJacobian(joint_angles, link_name);
-        }, "joint_angles"_a, "link_name"_a)
+                                const tcommon::LinkId& link_id) {
+            return self.calcJacobian(joint_angles, link_id);
+        }, "joint_angles"_a, "link_id"_a)
         .def("calcJacobianWithPoint", [](const tk::JointGroup& self,
                                           const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
-                                          const std::string& link_name,
+                                          const tcommon::LinkId& link_id,
                                           const Eigen::Vector3d& link_point) {
-            return self.calcJacobian(joint_angles, link_name, link_point);
-        }, "joint_angles"_a, "link_name"_a, "link_point"_a)
-        .def("getJointNames", &tk::JointGroup::getJointNames)
-        .def("getLinkNames", &tk::JointGroup::getLinkNames)
-        .def("getActiveLinkNames", &tk::JointGroup::getActiveLinkNames)
-        .def("getStaticLinkNames", &tk::JointGroup::getStaticLinkNames)
-        .def("isActiveLinkName", &tk::JointGroup::isActiveLinkName, "link_name"_a)
-        .def("hasLinkName", &tk::JointGroup::hasLinkName, "link_name"_a)
+            return self.calcJacobian(joint_angles, link_id, link_point);
+        }, "joint_angles"_a, "link_id"_a, "link_point"_a)
+        .def("getJointIds", &tk::JointGroup::getJointIds)
+        .def("getLinkIds", &tk::JointGroup::getLinkIds)
+        .def("getActiveLinkIds", &tk::JointGroup::getActiveLinkIds)
+        .def("getStaticLinkIds", &tk::JointGroup::getStaticLinkIds)
+        .def("isActiveLinkId", &tk::JointGroup::isActiveLinkId, "link_id"_a)
+        .def("hasLinkId", &tk::JointGroup::hasLinkId, "link_id"_a)
         .def("getLimits", &tk::JointGroup::getLimits)
         .def("setLimits", &tk::JointGroup::setLimits, "limits"_a)
         .def("getRedundancyCapableJointIndices", &tk::JointGroup::getRedundancyCapableJointIndices)
         .def("numJoints", &tk::JointGroup::numJoints)
-        .def("getBaseLinkName", &tk::JointGroup::getBaseLinkName)
+        .def("getBaseLinkId", &tk::JointGroup::getBaseLinkId)
         .def("getName", &tk::JointGroup::getName)
         .def("checkJoints", &tk::JointGroup::checkJoints, "vec"_a);
 
@@ -187,7 +180,7 @@ NB_MODULE(_tesseract_kinematics, m) {
             return self.calcInvKin(inputs, seed);
         }, "tip_link_poses"_a, "seed"_a)
         .def("getAllValidWorkingFrames", &tk::KinematicGroup::getAllValidWorkingFrames)
-        .def("getAllPossibleTipLinkNames", &tk::KinematicGroup::getAllPossibleTipLinkNames)
+        .def("getAllPossibleTipLinkIds", &tk::KinematicGroup::getAllPossibleTipLinkIds)
         .def("getInverseKinematics", &tk::KinematicGroup::getInverseKinematics,
              nb::rv_policy::reference_internal);
 

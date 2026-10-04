@@ -25,7 +25,7 @@ robot.set_joints(joints, joint_names=joint_names)
 state = robot.env.getState()
 
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(state.link_transforms)
 
 # contactTest() populates the ContactResultMap passed in (returns None)
@@ -39,7 +39,7 @@ results = ContactResultVector()
 contacts.flattenMoveResults(results)
 for i in range(len(results)):
     r = results[i]
-    print(f"{r.link_names[0]} <-> {r.link_names[1]}: distance = {r.distance:.4f} m")
+    print(f"{r.link_ids[0]} <-> {r.link_ids[1]}: distance = {r.distance:.4f} m")
 ```
 
 ## Collision Managers
@@ -88,7 +88,7 @@ request.calculate_distance = True
 request.calculate_penetration = True
 
 # Sync manager with current state
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 manager.setDefaultCollisionMargin(0.05)  # 5cm margin
 
@@ -102,7 +102,7 @@ results = ContactResultVector()
 contacts.flattenMoveResults(results)
 for i in range(len(results)):
     r = results[i]
-    print(f"{r.link_names[0]} <-> {r.link_names[1]}: {r.distance:.4f}m")
+    print(f"{r.link_ids[0]} <-> {r.link_ids[1]}: {r.distance:.4f}m")
 ```
 
 ## Continuous Collision Checking
@@ -123,7 +123,7 @@ end_transforms = robot.env.getState(joint_names, end_joints).link_transforms
 
 # Get continuous manager
 manager = robot.env.getContinuousContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 
 # Set start and end poses per link
 for link_name, pose_start in start_transforms.items():
@@ -208,7 +208,7 @@ Skip collision checks for adjacent or always-safe pairs. The ACM lives on the sc
 acm = robot.env.getAllowedCollisionMatrix()
 
 # Query whether a pair is allowed
-if acm.isCollisionAllowed("link_1", "link_2"):
+if acm.isCollisionAllowed(("link_1", "link_2")):
     print("link_1 and link_2 are whitelisted")
 ```
 
@@ -297,6 +297,7 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
 | **Mesh** | Slow | High |
 | **ConvexMesh** | Medium | High |
 | **Octree** | Medium | Voxel-discrete |
+| **SignedDistanceField** | Medium | Grid-discrete (concave OK) — discrete managers only |
 
 !!! tip "Use Convex Decomposition"
     For complex meshes, use `makeConvexMesh` to build a convex hull:
@@ -363,7 +364,7 @@ defaults work fine — set a single value on the manager:
 
 ```python
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2 cm safety buffer
 ```
 
@@ -384,6 +385,144 @@ For a full collision-aware vs. collision-disabled comparison with a viewer
 walkthrough, see the
 [Point cloud → Octree](../examples/basic.md#point-cloud-octree-example) example.
 
+## Signed Distance Fields as Collision Obstacles
+
+A `tesseract_geometry.SignedDistanceField` stores the distance to a surface —
+negative inside, positive outside — sampled on a regular grid, rather than
+storing the surface itself. Two reasons to reach for one over a mesh or an
+octree:
+
+- **Concave shapes work.** A `ConvexMesh` cannot represent a pocket or a bore,
+  and the full `Mesh` path that can is the slowest option. An SDF handles
+  concavity natively.
+- **It is already your native format.** Fused mapping output (nvblox, VDB
+  ESDFs, TSDF integration) *is* a distance field. Feeding it in directly avoids
+  meshing it first and then throwing the distance information away.
+
+!!! warning "Requires a discrete-only environment"
+    An SDF is concave, so continuous (cast) managers reject it — and an
+    `Environment` populates *every* manager its contact-manager plugin config
+    declares. Against the stock config, which declares a cast manager, merely
+    adding an SDF link fails with `RuntimeError: I can only collision check
+    convex shapes and compound shapes made of convex shapes`.
+
+    The fix is configuration, not code: point the SRDF at a
+    `contact_manager_plugins.yaml` with no `continuous_plugins` block (step 2
+    below). Such an environment then behaves normally for SDFs —
+    `create_obstacle()`, contact tests, margins — at the cost of having no
+    continuous/cast collision checking at all.
+
+The snippets below are loaded directly from
+[`sdf_collision_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/sdf_collision_example.py),
+so they are the code that actually runs — see [Runnable example](#runnable-example)
+at the end of the section.
+
+**1. Build the field.**
+
+Write the distance function and sample it onto a grid with
+`createDiscreteSignedDistanceField`. Pass `batched=True` to receive all `(N, 3)`
+sample points in one call and return `N` distances — one Python call instead of
+`dimensions.prod()`, and the natural shape for a numpy or GPU evaluator. The
+obstacle here is a ball with a cylindrical bore — concave, so no convex hull
+applies:
+
+```python title="sdf_collision_example.py"
+--8<-- "src/tesseract_robotics/examples/sdf_collision_example.py:build_field"
+```
+
+`dimensions` is the sample count per axis, so the voxel size is
+`(domain_max - domain_min) / (dimensions - 1)`. The sampling happens once,
+during this call: the returned geometry holds no reference back to your
+callable, so nothing takes the GIL during collision checking.
+
+A field baked offline loads the same way — `readSignedDistanceFieldVDB`
+(OpenVDB) and `readSignedDistanceFieldNVDB` (NanoVDB) take the raw file bytes:
+
+```python
+from pathlib import Path
+from tesseract_robotics.tesseract_geometry import readSignedDistanceFieldVDB
+
+field = readSignedDistanceFieldVDB(Path("scan.vdb").read_bytes())
+```
+
+**2. Configure the environment with discrete plugins only.**
+
+Write a `contact_manager_plugins.yaml` that omits the `continuous_plugins`
+block. `hasContinuousContactManagerPlugins()` is then false, the `Environment`
+never builds a cast manager, and concave geometry stops being rejected:
+
+```yaml title="contact_manager_plugins.yaml"
+--8<-- "src/tesseract_robotics/examples/sdf_collision_example.py:contact_manager_yaml"
+```
+
+Point the SRDF at it, exactly as the stock scenes do:
+
+```xml
+<contact_managers_plugin_config filename="package://my_cell/config/contact_manager_plugins.yaml"/>
+```
+
+**3. Attach the field.**
+
+Load the robot with that SRDF and add the field. `create_obstacle()` works here
+too, but it always attaches a `Visual` as well — and a field has no surface, so
+the viewer logs an "unsupported visual geometry" warning for it. Splitting the
+components keeps the field collision-only, which is what it actually is:
+
+```python title="sdf_collision_example.py"
+--8<-- "src/tesseract_robotics/examples/sdf_collision_example.py:attach"
+```
+
+**4. Check contacts.**
+
+From here nothing is SDF-specific — same manager, same margin, same
+`contactTest`:
+
+```python title="sdf_collision_example.py"
+--8<-- "src/tesseract_robotics/examples/sdf_collision_example.py:sweep"
+```
+
+SDFs honour the margin band like any other geometry: contacts are reported at
+positive distance up to the margin, which is what TrajOpt's collision cost needs
+to push links apart *before* they touch. Sweeping a 0.05 m probe along `+x`
+against the field above gives `+0.09`, `+0.05`, `+0.02`, `0.0000`, then negative
+once it penetrates, and no contact at all once the gap exceeds the 0.1 m margin —
+matching the analytic surface-to-surface gap to four decimals.
+`BulletDiscreteSimpleManager` and `FCLDiscreteBVHManager` report the same values.
+
+!!! warning "Deep penetration depth is approximate"
+    Reported distance is exact in the margin band and at shallow penetration —
+    the values above match the analytic gap to four decimals — but deep inside
+    the solid it is bounded by the probe sampling. Against a plain sphere field
+    of radius 0.25, a 0.05 probe centred at the origin reports `-0.13` where the
+    true depth is `-0.30`. That is fine for planning, which only needs the
+    gradient near the surface, but do not read deep penetration values as exact.
+
+!!! tip "Choosing a resolution"
+    Same trade as an octree leaf size, and the same 8× scaling: `dimensions` of
+    65 per axis is 275k samples, 129 is 2.1M. Between samples the field is
+    trilinearly interpolated, so resolution bounds the geometric error — size it
+    against the smallest feature you need represented (the bore above needs
+    several samples across its 0.16 m diameter), not against your margin.
+
+!!! note "Not the Gazebo SDF"
+    Unrelated to the "SDF" Simulation Description Format. This geometry also
+    replaces the old `SDFMesh`, which despite the name was a mesh, not a field.
+
+### Runnable example
+
+The snippets above come from
+[`sdf_collision_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/sdf_collision_example.py),
+which runs the whole thing end to end — the concave field, the VDB round trip,
+the discrete-only environment, the swept distance profile, the rejection you get
+without the YAML, and a `TesseractViewer` animation (a field has no surface, so
+it draws the zero level set as a voxel shell):
+
+```bash
+tesseract_sdf_collision_example
+# or
+pixi run python -m tesseract_robotics.examples.sdf_collision_example
+```
+
 ## Debugging Collisions
 
 ```python
@@ -400,7 +539,7 @@ def debug_collision(robot, joints, joint_names):
     state = robot.env.getState()
 
     manager = robot.env.getDiscreteContactManager()
-    manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+    manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
     manager.setCollisionObjectsTransform(state.link_transforms)
 
     contacts = ContactResultMap()
@@ -416,7 +555,7 @@ def debug_collision(robot, joints, joint_names):
     for i in range(len(results)):
         r = results[i]
         print(f"\n  Contact {i + 1}:")
-        print(f"    Links: {r.link_names[0]} <-> {r.link_names[1]}")
+        print(f"    Links: {r.link_ids[0]} <-> {r.link_ids[1]}")
         print(f"    Distance: {r.distance:.4f} m")
         print(f"    Normal: {r.normal}")
         if r.distance < 0:

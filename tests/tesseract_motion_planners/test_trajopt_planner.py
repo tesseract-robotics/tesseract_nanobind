@@ -72,7 +72,7 @@ def lbr_iiwa_environment():
     manip_info.working_frame = "base_link"
     manip_info.manipulator_ik_solver = "KDLInvKinChainLMA"
 
-    joint_names = list(t_env.getJointGroup("manipulator").getJointNames())
+    joint_names = list(t_env.getJointGroup("manipulator").getJointIds())
     return t_env, manip_info, joint_names
 
 
@@ -255,7 +255,7 @@ class TestTrajOptPlanning:
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
                     state_wp = WaypointPoly_as_StateWaypointPoly(wp)
-                    assert len(state_wp.getNames()) == 7  # 7 joints for IIWA
+                    assert len(state_wp.getJointIds()) == 7  # 7 joints for IIWA
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 7
                 count += 1

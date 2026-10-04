@@ -61,7 +61,7 @@ class TestJointWaypoint:
         names = ["joint_1", "joint_2", "joint_3"]
         position = np.array([0.1, 0.2, 0.3])
         wp = JointWaypoint(names, position)
-        assert wp.getNames() == names
+        assert wp.getJointIds() == names
         np.testing.assert_array_almost_equal(wp.getPosition(), position)
 
     def test_constructor_with_constrained_flag(self):
@@ -74,9 +74,9 @@ class TestJointWaypoint:
         wp = JointWaypoint()
         names = ["a", "b"]
         pos = np.array([0.5, 1.5])
-        wp.setNames(names)
+        wp.setJointIds(names)
         wp.setPosition(pos)
-        assert wp.getNames() == names
+        assert wp.getJointIds() == names
         np.testing.assert_array_almost_equal(wp.getPosition(), pos)
 
 
@@ -110,7 +110,7 @@ class TestCartesianWaypoint:
         wp.setSeed(JointState(names, position))
 
         seed = wp.getSeed()
-        assert seed.joint_names == names
+        assert seed.joint_ids == names
         np.testing.assert_array_almost_equal(seed.position, position)
 
 
@@ -125,7 +125,7 @@ class TestStateWaypoint:
         names = ["j1", "j2", "j3", "j4", "j5", "j6"]
         position = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
         wp = StateWaypoint(names, position)
-        assert wp.getNames() == names
+        assert wp.getJointIds() == names
         np.testing.assert_array_almost_equal(wp.getPosition(), position)
 
 
@@ -149,7 +149,7 @@ class TestWaypointPoly:
         assert poly.hasSeed()
 
         seed = poly.getSeed()
-        assert seed.joint_names == names
+        assert seed.joint_ids == names
         np.testing.assert_array_almost_equal(seed.position, position)
 
         poly.clearSeed()

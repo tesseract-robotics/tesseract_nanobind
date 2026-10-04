@@ -111,8 +111,8 @@ obstacle_link.addCollision(collision)
 # Create a fixed joint attaching the obstacle to the world
 obstacle_joint = Joint("obstacle_joint")
 obstacle_joint.type = JointType.FIXED
-obstacle_joint.parent_link_name = "base_link"
-obstacle_joint.child_link_name = "obstacle"
+obstacle_joint.parent_link_id = "base_link"
+obstacle_joint.child_link_id = "obstacle"
 
 origin = np.eye(4)
 origin[:3, 3] = [1.0, 0.0, 0.5]
@@ -199,7 +199,7 @@ from tesseract_robotics.tesseract_collision import (
 )
 
 manager = robot.env.getDiscreteContactManager()
-manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
+manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 
 contacts = ContactResultMap()
@@ -215,7 +215,7 @@ The ACM defines which link pairs should be ignored during collision checking. Th
 
 ```python
 acm = env.getAllowedCollisionMatrix()
-if acm.isCollisionAllowed("link_1", "link_2"):
+if acm.isCollisionAllowed(("link_1", "link_2")):
     print("link_1 <-> link_2 is whitelisted")
 ```
 

@@ -47,6 +47,10 @@ class TransformMap(dict):
 
 
 __all__ = [
+    # Identity types (upstream LinkId / JointId; str converts implicitly)
+    "LinkId",
+    "JointId",
+    "LinkIdPair",
     # Core types
     "ResourceLocator",
     "Resource",
@@ -68,19 +72,14 @@ __all__ = [
     "CollisionMarginOverrideType",
     # Kinematics
     "KinematicLimits",
-    # Console bridge
-    "OutputHandler",
+    # Logging (spdlog)
     "LogLevel",
-    "setLogLevel",
-    "getLogLevel",
-    "useOutputHandler",
-    "restorePreviousOutputHandler",
-    # Logging levels
-    "CONSOLE_BRIDGE_LOG_DEBUG",
-    "CONSOLE_BRIDGE_LOG_INFO",
-    "CONSOLE_BRIDGE_LOG_WARN",
-    "CONSOLE_BRIDGE_LOG_ERROR",
-    "CONSOLE_BRIDGE_LOG_NONE",
+    "Logger",
+    "LogRecord",
+    "getLogger",
+    "isLogLevelEnabled",
+    "addLogRecordHandler",
+    "removeLogRecordHandler",
     # Eigen helper types
     "Isometry3d",
     "Translation3d",

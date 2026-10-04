@@ -161,7 +161,7 @@ def _lower_move(move: MoveInstructionPoly, layout: ExternalAxisLayout | None) ->
         positions = _to_tuple(joint.getPosition())
         if layout is None:
             return JointMove(joints=positions, profile=profile)
-        names = tuple(str(name) for name in joint.getNames())
+        names = tuple(str(name) for name in joint.getJointIds())
         arm, external = _split_external(names, positions, layout)
         return JointMove(joints=arm, profile=profile, external_axes=external)
 

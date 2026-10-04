@@ -5,6 +5,7 @@
 
 #include "tesseract_nb.h"
 #include <nanobind/stl/map.h>
+#include <nanobind/stl/unordered_map.h>
 
 // tesseract_state_solver
 #include <tesseract/state_solver/state_solver.h>
@@ -28,40 +29,33 @@ namespace tc = tesseract::common;
 NB_MODULE(_tesseract_state_solver, m) {
     m.doc() = "tesseract_state_solver Python bindings";
 
+    // LinkId / JointId are registered in tesseract_common
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
+    // Id-keyed transform maps leave C++ as plain dicts keyed by LinkId / JointId; ids hash and
+    // compare like their names, so Python can still index them with a str.
+    using LinkTransforms = std::unordered_map<tc::LinkId, Eigen::Isometry3d>;
+    using JointTransforms = std::unordered_map<tc::JointId, Eigen::Isometry3d>;
+
     // ========== SceneState ==========
     nb::class_<tsg::SceneState>(m, "SceneState")
         .def(nb::init<>())
         .def_rw("joints", &tsg::SceneState::joints)
         .def_prop_rw("link_transforms",
             [](const tsg::SceneState& self) {
-                // Convert AlignedMap to std::map for Python
-                std::map<std::string, Eigen::Isometry3d> result;
-                for (const auto& p : self.link_transforms) {
-                    result[p.first] = p.second;
-                }
-                return result;
+                return LinkTransforms(self.link_transforms.begin(), self.link_transforms.end());
             },
-            [](tsg::SceneState& self, const std::map<std::string, Eigen::Isometry3d>& m) {
-                self.link_transforms.clear();
-                for (const auto& p : m) {
-                    self.link_transforms[p.first] = p.second;
-                }
+            [](tsg::SceneState& self, const LinkTransforms& m) {
+                self.link_transforms = tc::LinkIdTransformMap(m.begin(), m.end());
             })
         .def_prop_rw("joint_transforms",
             [](const tsg::SceneState& self) {
-                std::map<std::string, Eigen::Isometry3d> result;
-                for (const auto& p : self.joint_transforms) {
-                    result[p.first] = p.second;
-                }
-                return result;
+                return JointTransforms(self.joint_transforms.begin(), self.joint_transforms.end());
             },
-            [](tsg::SceneState& self, const std::map<std::string, Eigen::Isometry3d>& m) {
-                self.joint_transforms.clear();
-                for (const auto& p : m) {
-                    self.joint_transforms[p.first] = p.second;
-                }
+            [](tsg::SceneState& self, const JointTransforms& m) {
+                self.joint_transforms = tc::JointIdTransformMap(m.begin(), m.end());
             })
-        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_names"_a);
+        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_ids"_a);
 
     // ========== StateSolver (abstract base) ==========
     nb::class_<tsg::StateSolver>(m, "StateSolver")
@@ -74,49 +68,49 @@ NB_MODULE(_tesseract_state_solver, m) {
             return self.getState(joint_values);
         }, "joint_values"_a)
         .def("getState", [](const tsg::StateSolver& self,
-                            const std::unordered_map<std::string, double>& joint_values) {
+                            const tsg::SceneState::JointValues& joint_values) {
             return self.getState(joint_values);
         }, "joint_values"_a)
         .def("getState", [](const tsg::StateSolver& self,
-                            const std::vector<std::string>& joint_names,
+                            const std::vector<tc::JointId>& joint_ids,
                             const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            return self.getState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
+            return self.getState(joint_ids, joint_values);
+        }, "joint_ids"_a, "joint_values"_a)
         .def("getRandomState", &tsg::StateSolver::getRandomState)
         // setState methods
         .def("setState", [](tsg::StateSolver& self, const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
             self.setState(joint_values);
         }, "joint_values"_a)
-        .def("setStateByMap", [](tsg::StateSolver& self,
-                                  const std::unordered_map<std::string, double>& joint_values) {
+        .def("setStateByMap", [](tsg::StateSolver& self, const tsg::SceneState::JointValues& joint_values) {
             self.setState(joint_values);
         }, "joint_values"_a)
         .def("setStateByNamesAndValues", [](tsg::StateSolver& self,
-                                             const std::vector<std::string>& joint_names,
+                                             const std::vector<tc::JointId>& joint_ids,
                                              const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            self.setState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
+            self.setState(joint_ids, joint_values);
+        }, "joint_ids"_a, "joint_values"_a)
         // Jacobian methods
         .def("getJacobian", [](const tsg::StateSolver& self,
                                const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                               const std::string& link_name) {
-            return self.getJacobian(joint_values, link_name);
-        }, "joint_values"_a, "link_name"_a)
-        // Name getters
-        .def("getJointNames", &tsg::StateSolver::getJointNames)
-        .def("getFloatingJointNames", &tsg::StateSolver::getFloatingJointNames)
-        .def("getActiveJointNames", &tsg::StateSolver::getActiveJointNames)
-        .def("getBaseLinkName", &tsg::StateSolver::getBaseLinkName)
-        .def("getLinkNames", &tsg::StateSolver::getLinkNames)
-        .def("getActiveLinkNames", &tsg::StateSolver::getActiveLinkNames)
-        .def("getStaticLinkNames", &tsg::StateSolver::getStaticLinkNames)
+                               const tc::LinkId& link_id) {
+            return self.getJacobian(joint_values, link_id);
+        }, "joint_values"_a, "link_id"_a)
+        // Id getters
+        .def("getJointIds", &tsg::StateSolver::getJointIds)
+        .def("getFloatingJointIds", &tsg::StateSolver::getFloatingJointIds)
+        .def("getActiveJointIds", &tsg::StateSolver::getActiveJointIds)
+        .def("getBaseLinkId", &tsg::StateSolver::getBaseLinkId)
+        .def("getLinkIds", &tsg::StateSolver::getLinkIds)
+        .def("getActiveLinkIds", &tsg::StateSolver::getActiveLinkIds)
+        .def("getStaticLinkIds", &tsg::StateSolver::getStaticLinkIds)
         // Link queries
-        .def("isActiveLinkName", &tsg::StateSolver::isActiveLinkName, "link_name"_a)
-        .def("hasLinkName", &tsg::StateSolver::hasLinkName, "link_name"_a)
+        .def("isActiveLinkId", &tsg::StateSolver::isActiveLinkId, "link_id"_a)
+        .def("hasLinkId", &tsg::StateSolver::hasLinkId, "link_id"_a)
         // Transform getters
-        .def("getLinkTransform", &tsg::StateSolver::getLinkTransform, "link_name"_a)
+        .def("getLinkTransform", nb::overload_cast<const tc::LinkId&>(&tsg::StateSolver::getLinkTransform, nb::const_),
+             "link_id"_a)
         .def("getRelativeLinkTransform", &tsg::StateSolver::getRelativeLinkTransform,
-             "from_link_name"_a, "to_link_name"_a)
+             "from_link_id"_a, "to_link_id"_a)
         .def("getLimits", &tsg::StateSolver::getLimits)
         .def("clone", [](const tsg::StateSolver& self) { return self.clone(); });
 

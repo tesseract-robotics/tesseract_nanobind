@@ -953,7 +953,7 @@ class TesseractViewerAIO:
             trajectory_frames = trajectory_list_to_frames(
                 t_env, manipulator_info, joint_names, trajectory
             )
-            root_link = t_env.getRootLinkName()
+            root_link = t_env.getRootLinkId().name()
             points = []
             for i in range(len(trajectory_frames)):
                 points.append(trajectory_frames[i][0])

@@ -69,9 +69,8 @@ real cause.
     bundled deps, `delvewheel --analyze-existing`) than case 1 would
     (`__declspec(dllexport)`, symbol visibility flags). Always confirm with
     `dumpbin /EXPORTS plugin.dll` whether the symbol is actually present
-    *before* assuming an export issue. The CI workflow's
-    `verify plugin factory exports` step runs this check automatically and
-    fails fast if the export table is the problem.
+    *before* assuming an export issue. CI does not run this check; run it by
+    hand from a Visual Studio developer prompt on the DLL inside the wheel.
 
 ## Cereal polymorphic registration
 

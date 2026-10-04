@@ -84,7 +84,7 @@ def cart_pos() -> CartPosFixture:
     env = Environment()
     assert env.init(urdf, srdf, locator)
     manip = env.getKinematicGroup("manipulator")
-    joint_names = list(manip.getJointNames())
+    joint_names = [jid.name() for jid in manip.getJointIds()]
     nodes = ti.createNodesVariables(
         "trajectory",
         joint_names,

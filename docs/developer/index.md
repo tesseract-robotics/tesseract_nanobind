@@ -4,6 +4,8 @@
 
 This project uses [pixi](https://pixi.sh) exclusively for package management. Pixi manages all C++ libraries, Python packages, build tools, and platform-specific dependencies through a single lockfile (`pixi.lock`). No pip, conda, poetry, or venv.
 
+The tesseract C++ libraries are not built here: they are prebuilt conda packages from the `tesseract-robotics` channel. [How the binaries are built](binaries.md) traces every binary from the upstream source to the PyPI wheel.
+
 ### Available Tasks
 
 ```bash
@@ -12,10 +14,10 @@ pixi task list
 
 | Task | Description | What it does |
 |------|-------------|--------------|
-| `build` | Full build | C++ libs + nanobind bindings |
-| `build-cpp` | C++ only | Fetches sources via vcstool, builds 28 packages with colcon |
-| `install` | Install bindings | Editable pip install (depends on `build-cpp`) |
+| `build` | Build bindings | alias for `install` |
+| `install` | Install bindings | editable `pip install -e . --no-build-isolation` against the conda tesseract libs |
 | `test` | Run tests | pytest with xdist parallel (depends on `install`) |
+| `build-wheel` | Portable wheel | `scripts/build_linux_wheel.sh` / `build_macos_wheel.sh` (see [binaries](binaries.md)) |
 | `typecheck` | Type check | pyright on `src/tesseract_robotics/` |
 | `lint` | Lint | ruff check |
 | `fmt` | Format | ruff format |
@@ -25,7 +27,7 @@ pixi task list
 ### Daily Workflow
 
 ```bash
-# First time setup (fetches C++ deps, builds everything, ~15-30 min)
+# First time setup (installs the conda C++ libs, compiles the bindings)
 pixi run build
 
 # Run tests
@@ -56,24 +58,20 @@ If you modify a C++ binding file (`src/*_bindings.cpp`):
 pixi run install
 ```
 
-If you modify upstream C++ sources or `dependencies.repos`:
-
-```bash
-# Full C++ rebuild + reinstall
-pixi run build
-```
+To work against unreleased upstream C++, use the `upstream` environment: see
+[Building against upstream main](upstream-main.md).
 
 ### Task Dependency Chain
 
 Tasks use `depends-on` for ordered execution:
 
-```
-build
-  └── install
-        └── build-cpp
+```mermaid
+flowchart LR
+    test --> install
+    build --> install
 ```
 
-Running `pixi run build` executes `build-cpp` → `install` automatically. Running `pixi run test` also triggers the full chain since it depends on `install`.
+Running `pixi run test` reinstalls the bindings first, since it depends on `install`.
 
 ### Environments
 
@@ -92,11 +90,14 @@ Environments defined in `pyproject.toml`:
 
 | Environment | Python | Usage |
 |-------------|--------|-------|
-| `default` | from lockfile | Local development |
-| `py39` | 3.9.x | CI matrix |
-| `py310` | 3.10.x | CI matrix |
-| `py311` | 3.11.x | CI matrix |
-| `py312` | 3.12.x | CI matrix |
+| `default` | 3.14 (unpinned, `>=3.10`) | Local development |
+| `py39` | 3.9.x | CI wheels; C++ from the `py312` env via `TESSERACT_CPP_PREFIX` |
+| `py310` | 3.10.x | CI wheels |
+| `py311` | 3.11.x | CI wheels |
+| `py312` | 3.12.x | CI wheels (abi3) |
+| `upstream` | 3.12.x | 0.36 inner loop, C++ built from `upstream/` |
+
+[How the binaries are built](binaries.md#pixi-environments-where-each-one-gets-its-c) lists where each environment gets its C++.
 
 ### Dependency Management
 
@@ -116,11 +117,7 @@ pixi install
 pixi list
 ```
 
-Critical pins:
-
-- `taskflow>=3.6,<3.8` — 3.8+ requires C++20, we use C++17
-- `cereal>=1.3,<2` — serialization backend (0.34+)
-- `llvm-openmp>=14,<20` — macOS OpenMP (not Homebrew's)
+Critical pins: only `tesseract-robotics ==0.35.0` and `tesseract-robotics-planning ==0.35.0`. Everything else (trajopt, eigen, boost, taskflow, …) follows from those packages' `run_exports`; pinning more deadlocks the solve.
 
 ### CONDA_PREFIX and Worktrees
 
@@ -173,9 +170,8 @@ graph TD
 ```
 tesseract_nanobind/
 ├── pyproject.toml             # pixi workspace + package config
-├── pixi.lock                  # locked deps (~200 packages)
+├── pixi.lock                  # locked deps
 ├── CMakeLists.txt             # nanobind module build
-├── dependencies.repos    # C++ source versions (vcstool)
 ├── src/
 │   ├── tesseract_robotics/    # Python package
 │   │   ├── planning/          # High-level API (pure Python)
@@ -188,13 +184,12 @@ tesseract_nanobind/
 ├── tests/                     # pytest tests
 ├── examples/                  # Usage examples
 ├── scripts/
-│   ├── build_tesseract_cpp.sh # C++ build (colcon + vcstool)
 │   ├── generate_stubs.sh      # Regenerate .pyi stubs
 │   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
-│   └── build_macos_wheel.sh   # Portable macOS wheel (delocate)
-└── ws/                        # C++ workspace
-    ├── src/                   # Fetched C++ sources
-    └── install/               # Built C++ libraries
+│   ├── build_macos_wheel.sh   # Portable macOS wheel (delocate)
+│   └── build_upstream.sh      # 0.36 inner loop: build upstream/ into the env
+├── upstream/                  # tesseract, trajopt, tesseract_planning, bpl submodules (0.36)
+└── packaging/                 # forked feedstock submodules (0.36 outer loop)
 ```
 
 ---
@@ -249,7 +244,7 @@ After modifying C++ bindings, regenerate `.pyi` stubs:
 bash scripts/generate_stubs.sh
 ```
 
-This introspects all 20 nanobind modules and writes stubs to `src/tesseract_robotics/<module>/`. Stubs are committed to the repo for IDE support and type checking.
+This introspects all 23 nanobind modules and writes stubs to `src/tesseract_robotics/<module>/`. Stubs are committed to the repo for IDE support and type checking.
 
 ---
 
@@ -265,8 +260,7 @@ pre-commit install --hook-type pre-push
 | ruff check --fix | pre-commit | Auto-fix lint issues |
 | ruff format | pre-commit | Format code |
 | stage-formatted | pre-commit | Auto-stage ruff changes |
-| pyright | pre-push | Type check |
-| pytest --testmon | pre-push | Run affected tests |
+| typecheck (`pixi run typecheck`, pyright) | pre-push | Type check |
 
 Skip when needed: `git commit --no-verify` / `git push --no-verify`
 
