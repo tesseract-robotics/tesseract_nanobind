@@ -38,6 +38,20 @@
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
 
+// nanobind's std::unordered_map caster (stl/unordered_map.h, nanobind 2.12) names
+// only four template parameters, so it matches default-allocator maps only.
+// Tesseract's Aligned* maps (e.g. tesseract::common::TransformMap) use
+// Eigen::aligned_allocator and would otherwise have no Python conversion.
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+template <typename Key, typename T, typename Hash, typename KeyEqual>
+struct type_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_allocator<std::pair<const Key, T>>>>
+  : dict_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_allocator<std::pair<const Key, T>>>, Key, T>
+{
+};
+NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
 // Namespace aliases
 namespace nb = nanobind;
 using namespace nb::literals;

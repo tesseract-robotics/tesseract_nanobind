@@ -209,7 +209,7 @@ class MeshMaterial:
         """Get emissive factor (RGBA)"""
 
 class MeshTexture:
-    def getTextureImage(self) -> "tesseract_common::Resource":
+    def getTextureImage(self) -> "tesseract::common::Resource":
         """Get the texture image resource"""
 
     def getUVs(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]]:
@@ -241,7 +241,7 @@ class PolygonMesh(Geometry):
     def getTextures(self) -> list[MeshTexture] | None:
         """Get mesh textures (optional)"""
 
-    def getResource(self) -> "tesseract_common::Resource":
+    def getResource(self) -> "tesseract::common::Resource":
         """Get mesh resource"""
 
 class Mesh(PolygonMesh):
@@ -259,7 +259,7 @@ class CompoundMesh(Geometry):
     def getMeshes(self) -> list[PolygonMesh]:
         """Get the vector of meshes"""
 
-    def getResource(self) -> "tesseract_common::Resource":
+    def getResource(self) -> "tesseract::common::Resource":
         """Get the resource used to create this mesh"""
 
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
@@ -377,13 +377,13 @@ def createConvexMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64],
 def createSDFMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
     """Load mesh from file and return vector of SDFMesh geometries"""
 
-def createMeshFromResource(resource: "tesseract_common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
+def createMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[Mesh]:
     """Load Mesh from resource (e.g., package:// URL)"""
 
-def createConvexMeshFromResource(resource: "tesseract_common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
+def createConvexMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[ConvexMesh]:
     """Load ConvexMesh from resource (e.g., package:// URL)"""
 
-def createSDFMeshFromResource(resource: "tesseract_common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
+def createSDFMeshFromResource(resource: "tesseract::common::Resource", scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
     """Load SDFMesh from resource (e.g., package:// URL)"""
 
 def isIdentical(geom1: Geometry, geom2: Geometry) -> bool:

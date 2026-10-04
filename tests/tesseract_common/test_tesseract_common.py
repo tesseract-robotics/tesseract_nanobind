@@ -1,3 +1,4 @@
+import io
 from inspect import currentframe, getframeinfo
 
 import numpy.testing as nptest
@@ -13,6 +14,15 @@ def test_bytes_resource():
     assert len(my_bytes_ret) == len(my_bytes)
     assert my_bytes == bytearray(my_bytes_ret)
     assert my_bytes_url == bytes_resource.getUrl()
+
+
+def test_bytes_resource_content_stream():
+    """getResourceContentStream returns a readable binary stream of the contents."""
+    my_bytes = bytes([10, 57, 92, 56, 92, 46, 92, 127])
+    bytes_resource = tesseract_common.BytesResource("file:///test_bytes.bin", my_bytes)
+    stream = bytes_resource.getResourceContentStream()
+    assert isinstance(stream, io.BytesIO)
+    assert stream.read() == my_bytes
 
 
 class _TestOutputHandler(tesseract_common.OutputHandler):

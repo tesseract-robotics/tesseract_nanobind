@@ -1,3 +1,5 @@
+"""tesseract_scene_graph Python bindings"""
+
 from collections.abc import Sequence
 import enum
 from typing import Annotated, overload
@@ -595,7 +597,7 @@ class SceneGraph:
 
     def isCollisionAllowed(self, link_name1: str, link_name2: str) -> bool: ...
 
-    def getAllowedCollisionMatrix(self) -> "tesseract_common::AllowedCollisionMatrix":
+    def getAllowedCollisionMatrix(self) -> "tesseract::common::AllowedCollisionMatrix":
         """Get the allowed collision matrix"""
 
     def getSourceLink(self, joint_name: str) -> Link: ...

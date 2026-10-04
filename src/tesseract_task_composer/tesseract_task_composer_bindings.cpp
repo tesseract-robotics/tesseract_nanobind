@@ -4,6 +4,7 @@
  */
 
 #include "tesseract_nb.h"
+#include <future>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/chrono.h>
@@ -244,6 +245,11 @@ NB_MODULE(_tesseract_task_composer, m) {
            "Write the DOT graph (with task results annotations) for this task to the given file path");
 
     // ========== TaskComposerFuture ==========
+    nb::enum_<std::future_status>(m, "FutureStatus")
+        .value("ready", std::future_status::ready)
+        .value("timeout", std::future_status::timeout)
+        .value("deferred", std::future_status::deferred);
+
     nb::class_<tp::TaskComposerFuture>(m, "TaskComposerFuture")
         .def_prop_rw("context",
             [](const tp::TaskComposerFuture& self) { return self.context; },

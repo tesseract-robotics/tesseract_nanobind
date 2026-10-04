@@ -1,4 +1,5 @@
 #include "tesseract_nb.h"
+#include <iterator>
 
 // tesseract_common headers (need eigen_types.h before opaque declarations)
 #include <tesseract/common/eigen_types.h>
@@ -752,7 +753,12 @@ NB_MODULE(_tesseract_common, m) {
             std::vector<uint8_t> data = self.getResourceContents();
             return nb::bytes(reinterpret_cast<const char*>(data.data()), data.size());
         })
-        .def("getResourceContentStream", &tesseract::common::Resource::getResourceContentStream);
+        // std::istream has no Python counterpart; hand back the contents as io.BytesIO
+        .def("getResourceContentStream", [](tesseract::common::Resource& self) {
+            std::shared_ptr<std::istream> stream = self.getResourceContentStream();
+            std::string data{std::istreambuf_iterator<char>(*stream), std::istreambuf_iterator<char>()};
+            return nb::module_::import_("io").attr("BytesIO")(nb::bytes(data.data(), data.size()));
+        }, nb::sig("def getResourceContentStream(self) -> io.BytesIO"));
 
     nb::class_<tesseract::common::BytesResource, tesseract::common::Resource>(m, "BytesResource")
         .def(nb::init<const std::string&, const std::vector<uint8_t>&>())
@@ -902,7 +908,8 @@ NB_MODULE(_tesseract_common, m) {
             [](const tesseract::common::PluginInfo& self) { return self.getConfigString(); },
             [](tesseract::common::PluginInfo& self, const std::string& value) {
                 self.config = YAML::Load(value);
-            })
+            },
+            "Plugin config as a YAML document string (a YAML::Node in C++).")
         .def("getConfigString", &tesseract::common::PluginInfo::getConfigString);
 
     // ========== PluginInfoContainer ==========

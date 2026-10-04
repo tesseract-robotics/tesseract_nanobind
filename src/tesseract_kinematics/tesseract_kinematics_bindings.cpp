@@ -39,6 +39,9 @@ NB_MAKE_OPAQUE(tk::KinGroupIKInputs)
 NB_MODULE(_tesseract_kinematics, m) {
     m.doc() = "tesseract_kinematics Python bindings";
 
+    // FilesystemPath, ResourceLocator, Isometry3d live in tesseract_common
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+
     // ========== URParameters ==========
     nb::class_<tk::URParameters>(m, "URParameters")
         .def(nb::init<>())

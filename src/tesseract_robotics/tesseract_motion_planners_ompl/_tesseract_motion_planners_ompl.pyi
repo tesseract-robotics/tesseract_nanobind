@@ -1,3 +1,5 @@
+"""tesseract_motion_planners_ompl Python bindings"""
+
 import enum
 from typing import TypeAlias
 

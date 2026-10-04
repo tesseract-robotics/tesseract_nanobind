@@ -7,6 +7,7 @@ __all__ = [
     "TaskComposerNodeInfoContainer",
     "TaskComposerContext",
     "TaskComposerNode",
+    "FutureStatus",
     "TaskComposerFuture",
     "TaskComposerExecutor",
     "TaskflowTaskComposerExecutor",

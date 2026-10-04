@@ -89,6 +89,11 @@ jobs:
       run: |
         pixi run pip install --force-reinstall --no-deps wheelhouse/tesseract*.whl
         pixi run bash -c 'LD_LIBRARY_PATH="$CONDA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" python -m pytest tests/tesseract_kinematics -x -q'
+    # gh-159: committed .pyi stubs must equal stubgen output of the wheel just built.
+    # Runs per platform + Python so platform- or version-dependent output fails here.
+    - name: stub drift gate
+      working-directory: tesseract_nanobind
+      run: pixi run bash -c 'LD_LIBRARY_PATH="$CONDA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" python scripts/generate_stubs.py --check'
     - name: archive wheels
       uses: actions/upload-artifact@v4
       with:

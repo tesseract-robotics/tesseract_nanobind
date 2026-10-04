@@ -189,7 +189,7 @@ tesseract_nanobind/
 ├── examples/                  # Usage examples
 ├── scripts/
 │   ├── build_tesseract_cpp.sh # C++ build (colcon + vcstool)
-│   ├── generate_stubs.sh      # Regenerate .pyi stubs
+│   ├── generate_stubs.py      # Regenerate / check .pyi stubs
 │   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
 │   └── build_macos_wheel.sh   # Portable macOS wheel (delocate)
 └── ws/                        # C++ workspace
@@ -243,13 +243,38 @@ nb::class_<Derived>(m, "Derived")
 
 ## Stub Generation
 
-After modifying C++ bindings, regenerate `.pyi` stubs:
+After modifying C++ bindings, regenerate the `.pyi` stubs:
 
 ```bash
-bash scripts/generate_stubs.sh
+pixi run stubs
 ```
 
-This introspects all 20 nanobind modules and writes stubs to `src/tesseract_robotics/<module>/`. Stubs are committed to the repo for IDE support and type checking.
+This finds every nanobind extension module in the installed package and writes each
+stub to `src/tesseract_robotics/<module>/`. Each module is rendered by
+`nanobind.stubgen` in a fresh interpreter, because which cross-module types resolve
+depends on what is already imported. Stubs are committed for IDE support and type
+checking.
+
+Stubs are generated, never hand-edited. Edits made by hand are lost at the next
+regeneration. Put documentation in the binding's docstring instead.
+
+**Drift gate (gh-159).** `pixi run stubs-check` exits 1 when a committed stub differs
+from what the build renders. CI runs it in every build job (all platforms, every Python
+except 3.9). Stubgen output depends on the nanobind version, so nanobind is pinned
+exactly in `pyproject.toml`. Bumping nanobind means regenerating the stubs in the same
+commit.
+
+**No `std::` in stubs.** stubgen writes a C++ type it can't map to Python as a quoted
+C++ name. Such a type has no binding or converter, so it also fails at runtime. Spellings
+of `std::` types differ by platform (libc++ `std::__1::`, libstdc++ `std::__cxx11::`),
+so such a leak also makes the stub platform-dependent. `tests/scripts/test_generate_stubs.py`
+rejects them. Quoted `tesseract::…` names are the same kind of gap but
+platform-independent. Each one means the type isn't bound, or the module doesn't
+`nb::module_::import_()` the module that binds it.
+
+nanobind's `std::unordered_map` caster matches default-allocator maps only.
+`src/tesseract_nb.h` adds a caster for Tesseract's `Eigen::aligned_allocator` maps
+(`TransformMap` and friends).
 
 ---
 

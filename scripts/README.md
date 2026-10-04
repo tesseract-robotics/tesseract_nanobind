@@ -55,14 +55,16 @@ Flags:
 - `-f, --failed`: rerun only tests that failed last run (runs serial by default for easier debugging)
 - `-s, --serial`: disable parallel execution (`-n auto`)
 
-### `generate_stubs.sh`
-Regenerates `.pyi` stub files for all nanobind modules using `stubgen`:
+### `generate_stubs.py`
+Regenerates the committed `.pyi` stubs of every nanobind extension module with
+`nanobind.stubgen` (run through pixi tasks):
 
 ```bash
-./scripts/generate_stubs.sh
+pixi run stubs         # rewrite the stubs
+pixi run stubs-check   # exit 1 if any committed stub differs from the build
 ```
 
-Run after any binding changes to keep stubs in sync with actual API.
+Run `pixi run stubs` after any binding change. CI runs the check in every build job.
 
 ### `build_docs.sh`
 Builds documentation using mkdocs:

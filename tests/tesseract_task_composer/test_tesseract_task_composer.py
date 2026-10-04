@@ -99,6 +99,27 @@ class TestTaskComposerPluginFactory:
         del factory
         gc.collect()
 
+    def test_future_wait_for_returns_future_status(self):
+        """waitFor returns a bound FutureStatus, not an unconvertible std::future_status."""
+        from tesseract_robotics.tesseract_task_composer import (
+            FutureStatus,
+            TaskComposerDataStorage,
+        )
+
+        factory = TaskComposerPluginFactory(
+            FilesystemPath(_resolve_task_composer_config()), GeneralResourceLocator()
+        )
+        executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+        task = factory.createTaskComposerNode("TrajOptPipeline")
+        # Empty storage: the pipeline aborts on its missing input, which is enough
+        # to complete the future.
+        future = executor.run(task, TaskComposerDataStorage())
+        future.wait()
+        assert future.waitFor(0.0) == FutureStatus.ready
+
+        del future, task, executor, factory
+        gc.collect()
+
     def test_all_pipelines_loadable(self):
         """Test all 36 expected pipelines are loadable via the factory."""
         # Explicit list of all 36 pipelines that must be loadable

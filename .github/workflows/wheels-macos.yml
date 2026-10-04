@@ -105,6 +105,12 @@ jobs:
       run: |
         pixi run pip install --force-reinstall --no-deps wheelhouse/tesseract*.whl
         pixi run python -m pytest tests/tesseract_kinematics -x -q
+    # gh-159: committed .pyi stubs must equal stubgen output of the wheel just built.
+    # Runs per platform + Python so platform- or version-dependent output fails here.
+    - name: stub drift gate
+      if: matrix.python != '3.9'
+      working-directory: tesseract_nanobind
+      run: pixi run python scripts/generate_stubs.py --check
     - name: save nanobind wheel build cache
       if: steps.nanobind-build-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4

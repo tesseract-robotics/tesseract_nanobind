@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 import datetime
+import enum
 from typing import overload
 
 import tesseract_robotics.tesseract_common._tesseract_common
@@ -140,6 +141,13 @@ class TaskComposerNode:
         Write the DOT graph (with task results annotations) for this task to the given file path
         """
 
+class FutureStatus(enum.Enum):
+    ready = 0
+
+    timeout = 1
+
+    deferred = 2
+
 class TaskComposerFuture:
     @property
     def context(self) -> TaskComposerContext: ...
@@ -153,7 +161,7 @@ class TaskComposerFuture:
 
     def wait(self) -> None: ...
 
-    def waitFor(self, duration: datetime.timedelta | float) -> "std::__1::future_status": ...
+    def waitFor(self, duration: datetime.timedelta | float) -> FutureStatus: ...
 
 class TaskComposerExecutor:
     def getName(self) -> str: ...
@@ -217,25 +225,25 @@ class AnyPoly:
 
     def getTypeName(self) -> str: ...
 
-def AnyPoly_wrap_CompositeInstruction(instruction: "tesseract_planning::CompositeInstruction") -> AnyPoly:
+def AnyPoly_wrap_CompositeInstruction(instruction: "tesseract::command_language::CompositeInstruction") -> AnyPoly:
     """Wrap a CompositeInstruction into an AnyPoly"""
 
-def AnyPoly_wrap_ProfileDictionary(profiles: "tesseract_common::ProfileDictionary") -> AnyPoly:
+def AnyPoly_wrap_ProfileDictionary(profiles: "tesseract::common::ProfileDictionary") -> AnyPoly:
     """Wrap a ProfileDictionary shared_ptr into an AnyPoly"""
 
-def AnyPoly_wrap_EnvironmentConst(environment: "tesseract_environment::Environment") -> AnyPoly:
+def AnyPoly_wrap_EnvironmentConst(environment: "tesseract::environment::Environment") -> AnyPoly:
     """Wrap a const Environment shared_ptr into an AnyPoly"""
 
 def AnyPoly_wrap_TaskComposerDataStorage(data_storage: TaskComposerDataStorage) -> AnyPoly:
     """Wrap a TaskComposerDataStorage shared_ptr into an AnyPoly"""
 
-def AnyPoly_as_CompositeInstruction(any_poly: AnyPoly) -> "tesseract_planning::CompositeInstruction":
+def AnyPoly_as_CompositeInstruction(any_poly: AnyPoly) -> "tesseract::command_language::CompositeInstruction":
     """Extract a CompositeInstruction from an AnyPoly"""
 
 def AnyPoly_as_TaskComposerDataStorage(any_poly: AnyPoly) -> TaskComposerDataStorage:
     """Extract a TaskComposerDataStorage from an AnyPoly"""
 
-def AnyPoly_as_ContactResultMapVector(any_poly: AnyPoly) -> list["tesseract_collision::ContactResultMap"]:
+def AnyPoly_as_ContactResultMapVector(any_poly: AnyPoly) -> list["tesseract::collision::ContactResultMap"]:
     """
     Extract a std::vector<ContactResultMap> from an AnyPoly. DiscreteContactCheckTask saves its per-step contact results under the 'contact_results' key on its node info's data_storage in this form.
     """

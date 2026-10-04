@@ -18,6 +18,14 @@
 - **Docs follow the new problem** — the replanning rates are re-measured on the `TrajOptQPProblem` example: about 70 Hz discrete and 20 Hz LVS continuous, on an Apple M1 Max. The 128 Hz "no collision" row is gone, because the example has no such mode. The `trajopt_ifopt` reference now lists, for each constraint class, its row bounds and the penalty types `TrajOptQPProblem` accepts it with (measured). It also gives the collision check type each evaluator requires; the constructors raise otherwise, and the online-planning page's continuous snippet used to miss it. The developer page on the constraint bindings, last current in 0.33, is rewritten.
 - **`TaskComposerPluginFactory` accepts any `ResourceLocator`** — the constructor and `createTaskComposerPluginFactory` raised `TypeError: locator must be a GeneralResourceLocator` for every other locator, including Python `ResourceLocator` subclasses, so a model locator could not be kept apart from the installation one. Both now bind the `ResourceLocator` base, as the C++ constructor does ([#150]).
 - **`TesseractViewer.close()` shuts the server down** — it called a `_TesseractViewerAIOServer.close()` that did not exist, printed the `AttributeError` and went on, leaving the port bound and the event loop open. The server now closes its websockets and connections and releases the port; `close()` closes the event loop, is idempotent, and raises instead of printing. aiohttp's shutdown only closes connections it has registered, and asyncio drops a connection accepted just before the listener closes (`Server._attach` asserts the server is open; the accepted socket leaks in `CLOSE_WAIT`), so the viewer owns its `asyncio.Server` and force-closes every connection it accepted. `start_serve_background()` now returns once the port is listening, not before, and bind errors reach the caller; `serve_forever()` called a misspelled method and failed at once ([#150]).
+- **Typing stubs match the bindings; CI fails on drift** — the committed `.pyi` stubs had not been regenerated since the 0.35 namespace change: they still spelled `tesseract_common::…`, lacked `ContinuousContactManager.getCollisionObjectGeometries` / `getCollisionObjectGeometriesTransforms` ([#157]), and had no stub at all for `tesseract_serialization`. All stubs are regenerated. `pixi run stubs` regenerates them and `pixi run stubs-check` fails on any difference. Every CI build job runs the check, so a binding change without a regenerated stub no longer gets in. Stubgen output depends on the nanobind version, so nanobind is now pinned to exactly 2.12.0 ([#159]).
+- **Four bindings that failed from Python now work** — each showed up in the stubs as a quoted `std::` C++ type, which also made the stubs differ between platforms:
+  - `TaskComposerFuture.waitFor` raised `TypeError` on return; it now returns the new `FutureStatus` enum (`ready` / `timeout` / `deferred`).
+  - `Resource.getResourceContentStream` raised `TypeError` too; it now returns the contents as an `io.BytesIO`.
+  - Tesseract maps that use `Eigen::aligned_allocator` (e.g. `TransformMap`) had no Python conversion, because nanobind's `unordered_map` caster matches default-allocator maps only. They now convert to and from `dict`.
+  - `KinematicsPluginFactory` found `FilesystemPath` only if `tesseract_common` had been imported first. Kinematics now imports it itself.
+
+  A test rejects any `std::` type left in a stub ([#159]).
 
 ## [0.35.0.7] — TrajOptIfopt tuning + Cartesian planning fixes
 
@@ -220,6 +228,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#148]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/148
 [#149]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/149
 [#150]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/150
+[#157]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/157
+[#159]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/159
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993
