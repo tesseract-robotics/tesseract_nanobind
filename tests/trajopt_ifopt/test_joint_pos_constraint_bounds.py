@@ -66,7 +66,7 @@ class TestJointPosConstraintBounds:
         assert limits(constraint) == [(-0.1, 0.2), (0.0, 0.0), (-0.3, 0.3)]
 
     def test_one_coefficient_weights_every_row(self):
-        """trajopt 0.35.0's range split read past a length-1 coeffs; the binding broadcasts."""
+        """trajopt broadcasts a length-1 coeffs before the range split (trajopt#592; 0.35.0 read past it)."""
         _, var = joint_var()
         constraint = ti.JointPosConstraint([ti.Bounds(-0.1, 0.2)] * N_DOF, var, np.array([4.0]))
         np.testing.assert_array_equal(constraint.getCoefficients(), np.full(2 * N_DOF, 4.0))
