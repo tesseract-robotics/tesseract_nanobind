@@ -1,9 +1,9 @@
 """Does the Python logging API control tesseract's own output?
 
 Upstream tesseract (dc289659, #1367) logs through spdlog instead of console_bridge, so the
-console_bridge bindings (`setLogLevel`, `useOutputHandler`, ...) no longer reach it. The
-spdlog-backed API mirrors upstream: `getLogger(name)` for the level, `addLogRecordHandler`
-for custom sinks.
+console_bridge bindings (`setLogLevel`, `useOutputHandler`, ...) were removed: they no longer
+reached it. The spdlog-backed API mirrors upstream: `getLogger(name)` for the level,
+`addLogRecordHandler` for custom sinks.
 """
 
 import subprocess
@@ -12,7 +12,7 @@ import sys
 import pytest
 
 from tesseract_robotics import tesseract_common
-from tesseract_robotics.tesseract_common import LoggerLevel
+from tesseract_robotics.tesseract_common import LogLevel
 
 # GeneralResourceLocator logs TESSERACT_LOG_WARN("Resource not handled: ...") for a
 # relative path and returns None.
@@ -32,7 +32,7 @@ def logger():
 
 
 def test_log_level_silences_tesseract(capfd, logger):
-    logger.set_level(LoggerLevel.off)
+    logger.set_level(LogLevel.off)
     _warn_once()
     _, err = capfd.readouterr()
     assert "Resource not handled" not in err
@@ -40,14 +40,14 @@ def test_log_level_silences_tesseract(capfd, logger):
 
 def test_default_logger_is_named_tesseract_and_round_trips_its_level(logger):
     assert logger.name() == "tesseract"
-    logger.set_level(LoggerLevel.err)
-    assert tesseract_common.getLogger().level() == LoggerLevel.err
-    assert not tesseract_common.isLogLevelEnabled(LoggerLevel.warn)
-    assert tesseract_common.isLogLevelEnabled(LoggerLevel.critical)
+    logger.set_level(LogLevel.err)
+    assert tesseract_common.getLogger().level() == LogLevel.err
+    assert not tesseract_common.isLogLevelEnabled(LogLevel.warn)
+    assert tesseract_common.isLogLevelEnabled(LogLevel.critical)
 
 
 def test_record_handler_receives_a_tesseract_warning(logger):
-    logger.set_level(LoggerLevel.warn)
+    logger.set_level(LogLevel.warn)
     records = []
     handler_id = tesseract_common.addLogRecordHandler(records.append)
     try:
@@ -57,7 +57,7 @@ def test_record_handler_receives_a_tesseract_warning(logger):
 
     (record,) = [r for r in records if UNHANDLED in r.message]
     # the record is a copy: still readable after the C++ call returned
-    assert record.level == LoggerLevel.warn
+    assert record.level == LogLevel.warn
     assert record.logger_name == "tesseract"
     assert record.message == f"Resource not handled: {UNHANDLED}"
     assert record.filename.endswith(".cpp")
@@ -65,7 +65,7 @@ def test_record_handler_receives_a_tesseract_warning(logger):
 
 
 def test_removed_handler_receives_nothing(logger):
-    logger.set_level(LoggerLevel.warn)
+    logger.set_level(LogLevel.warn)
     records = []
     handler_id = tesseract_common.addLogRecordHandler(records.append)
     assert tesseract_common.removeLogRecordHandler(handler_id)
@@ -75,7 +75,7 @@ def test_removed_handler_receives_nothing(logger):
 
 
 def test_handler_exception_reaches_unraisablehook(monkeypatch, logger):
-    logger.set_level(LoggerLevel.warn)
+    logger.set_level(LogLevel.warn)
     reported = []
     monkeypatch.setattr(sys, "unraisablehook", reported.append)
 
@@ -103,3 +103,37 @@ def test_a_handler_left_registered_is_released_before_interpreter_exit():
     result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert "leaked" not in result.stderr
+
+
+REMOVED_NAMES = [
+    "setLogLevel",
+    "getLogLevel",
+    "log",
+    "useOutputHandler",
+    "restorePreviousOutputHandler",
+    "OutputHandler",
+    "LoggerLevel",
+    "CONSOLE_BRIDGE_LOG_DEBUG",
+    "CONSOLE_BRIDGE_LOG_INFO",
+    "CONSOLE_BRIDGE_LOG_WARN",
+    "CONSOLE_BRIDGE_LOG_ERROR",
+    "CONSOLE_BRIDGE_LOG_NONE",
+]
+
+
+@pytest.mark.parametrize("name", REMOVED_NAMES)
+def test_console_bridge_api_is_gone(name):
+    # it silently did nothing against upstream; an AttributeError says so
+    assert not hasattr(tesseract_common, name)
+
+
+def test_log_level_is_the_spdlog_enum():
+    assert [v.name for v in LogLevel] == [
+        "trace",
+        "debug",
+        "info",
+        "warn",
+        "err",
+        "critical",
+        "off",
+    ]

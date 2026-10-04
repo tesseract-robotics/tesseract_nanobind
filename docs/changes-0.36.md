@@ -66,13 +66,22 @@ Node ports map to storage keys through `TaskComposerPortMap` (upstream #760):
 
 ## Logging: console_bridge → spdlog
 
-Upstream logs through spdlog (#1367). `setLogLevel(CONSOLE_BRIDGE_LOG_*)` and
-`useOutputHandler` still import but no longer affect tesseract's output. Use:
+Upstream logs through spdlog (#1367). The console_bridge API no longer reached
+tesseract's output and is removed: `setLogLevel`, `getLogLevel`, `log`,
+`useOutputHandler`, `restorePreviousOutputHandler`, `OutputHandler` and the
+`CONSOLE_BRIDGE_LOG_*` constants. `LogLevel` is now spdlog's level enum (`trace`,
+`debug`, `info`, `warn`, `err`, `critical`, `off`).
+
+| 0.35 | 0.36 |
+|---|---|
+| `setLogLevel(CONSOLE_BRIDGE_LOG_ERROR)` | `getLogger().set_level(LogLevel.err)` |
+| `getLogLevel()` | `getLogger().level()` |
+| `useOutputHandler(handler)` / `restorePreviousOutputHandler()` | `addLogRecordHandler(fn)` / `removeLogRecordHandler(id)` |
 
 ```python
-from tesseract_robotics.tesseract_common import LoggerLevel, getLogger, addLogRecordHandler
+from tesseract_robotics.tesseract_common import LogLevel, getLogger, addLogRecordHandler
 
-getLogger().set_level(LoggerLevel.err)
+getLogger().set_level(LogLevel.err)
 handler_id = addLogRecordHandler(lambda record: print(record.level, record.message))
 ```
 

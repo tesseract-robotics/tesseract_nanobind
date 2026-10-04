@@ -321,9 +321,9 @@ ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", o
 Tesseract logs through spdlog. Its default logger, `"tesseract"`, sets the level:
 
 ```python
-from tesseract_robotics.tesseract_common import LoggerLevel, getLogger
+from tesseract_robotics.tesseract_common import LogLevel, getLogger
 
-getLogger().set_level(LoggerLevel.warn)
+getLogger().set_level(LogLevel.warn)
 ```
 
 See [tesseract_common logging](../api/tesseract_common.md#logging) for record handlers.

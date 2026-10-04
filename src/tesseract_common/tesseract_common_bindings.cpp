@@ -54,9 +54,6 @@ static TransformStackOut new_transform_stack(std::size_t m) {
 #include <sstream>
 #include <utility>
 
-// console_bridge
-#include <console_bridge/console.h>
-
 // spdlog-backed tesseract logging (upstream #1367)
 #include <tesseract/common/logging.h>
 #include <nanobind/stl/chrono.h>
@@ -150,8 +147,6 @@ public:
         NB_OVERRIDE_PURE(locateResource, url);
     }
 };
-
-using tesseract_nb_common::PyOutputHandler;
 
 // A Python callable as upstream's LogRecordHandler. Upstream calls handlers from whichever
 // thread logs and swallows their exceptions, so this takes the GIL, hands Python a copy of
@@ -1546,62 +1541,10 @@ NB_MODULE(_tesseract_common, m) {
         .def_ro_static("CONFIG_KEY", &tesseract::common::ProfilesPluginInfo::CONFIG_KEY);
     bind_value_equality(profiles_plugin_info);
 
-    // ========== Console Bridge ==========
-    nb::enum_<console_bridge::LogLevel>(m, "LogLevel")
-        .value("CONSOLE_BRIDGE_LOG_DEBUG", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_DEBUG)
-        .value("CONSOLE_BRIDGE_LOG_INFO", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_INFO)
-        .value("CONSOLE_BRIDGE_LOG_WARN", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_WARN)
-        .value("CONSOLE_BRIDGE_LOG_ERROR", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_ERROR)
-        .value("CONSOLE_BRIDGE_LOG_NONE", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_NONE);
-
-    auto output_handler = nb::class_<console_bridge::OutputHandler, PyOutputHandler>(m, "OutputHandler")
-        .def(nb::init<>())
-        .def("log", &console_bridge::OutputHandler::log);
-    tesseract_nb_common::init_python_handler_api(output_handler);
-
-    m.def("setLogLevel", &console_bridge::setLogLevel, "level"_a);
-    m.def("getLogLevel", &console_bridge::getLogLevel);
-    // Wrapper for console_bridge::log (variadic function)
-    m.def("log", [](const std::string& filename, int line, console_bridge::LogLevel level, const std::string& msg) {
-        console_bridge::log(filename.c_str(), line, level, "%s", msg.c_str());
-    }, "filename"_a, "line"_a, "level"_a, "msg"_a);
-    // A Python handler gets its messages on a delivery thread, in order, through a bounded queue
-    // (python_output_handler.h). Installing a handler keeps it alive until console_bridge can no
-    // longer call it; a swap does not wait for the queue, since each message carries its handler.
-    m.def("useOutputHandler", &tesseract_nb_common::use_python_output_handler, "handler"_a);
-    m.def("restorePreviousOutputHandler", &tesseract_nb_common::restore_previous_python_output_handler);
-    nb::exception<tesseract_nb_common::OutputHandlerFlushForbiddenError>(m, "OutputHandlerFlushForbiddenError",
-                                                                         PyExc_RuntimeError)
-        .attr("__doc__") =
-        "flushOutputHandlers was called where a Python OutputHandler may be waiting for the calling "
-        "thread (inside a TaskComposerServer loadConfig / addTask / addExecutor), so waiting for the "
-        "handlers could never end.";
-    m.def("flushOutputHandlers", &tesseract_nb_common::flush_python_output_handlers,
-          "Wait until the Python OutputHandlers have received every message logged so far. Returns "
-          "at once when called from a handler. A handler waiting for the calling thread blocks it; "
-          "where the bindings know one may (inside a TaskComposerServer reload), it raises "
-          "OutputHandlerFlushForbiddenError instead.");
-    nb::module_::import_("atexit").attr("register")(nb::cpp_function(&tesseract_nb_common::stop_log_delivery));
-    // os.register_at_fork exists exactly where os.fork does: not on Windows, which has no fork.
-    nb::module_ os_module = nb::module_::import_("os");
-    if (nb::hasattr(os_module, "register_at_fork"))
-        os_module.attr("register_at_fork")(
-            "after_in_child"_a = nb::cpp_function(&tesseract_nb_common::reset_log_delivery_after_fork));
-    // The flush barrier's enter / leave (log_flush_barrier.h), for modules that make a Python
-    // handler wait for a thread.
-    m.attr("_log_flush_barrier") =
-        nb::capsule(static_cast<const void*>(&tesseract_nb_common::log_flush_barrier_api()),
-                    tesseract_nb_common::LOG_FLUSH_BARRIER_CAPSULE);
-    // bool (*)(), called with the GIL held: flushOutputHandlers within the exit budget, for the task
-    // composer's exit drain (python_output_handler.h).
-    m.attr("_flush_output_handlers_at_exit") = nb::capsule(
-        reinterpret_cast<void*>(&tesseract_nb_common::flush_python_output_handlers_at_exit),
-        "tesseract_robotics.flush_output_handlers_at_exit");
-
     // ========== Logging (spdlog, upstream #1367) ==========
-    // The console_bridge API above no longer reaches tesseract's output; this mirrors
-    // upstream: getLogger(name) for the level, addLogRecordHandler for custom sinks.
-    nb::enum_<spdlog::level::level_enum>(m, "LoggerLevel")
+    // Mirrors upstream: getLogger(name) for the level, addLogRecordHandler for custom sinks.
+    // Replaces the console_bridge API, which no longer reached tesseract's output.
+    nb::enum_<spdlog::level::level_enum>(m, "LogLevel")
         .value("trace", spdlog::level::trace)
         .value("debug", spdlog::level::debug)
         .value("info", spdlog::level::info)

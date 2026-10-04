@@ -199,15 +199,21 @@ Checked against trajopt `de9e941`:
 ## Logging
 
 Upstream replaced console_bridge with spdlog (#1367). The console_bridge Python API
-still imports but no longer reaches tesseract's output
-(`test_log_level_silences_tesseract` was red through it). The spdlog-backed API
-beside it mirrors upstream: `getLogger(name)` → `Logger.set_level`,
+no longer reached tesseract's output (`test_log_level_silences_tesseract` was red
+through it) and is removed; the binding no longer links console_bridge, and the
+spdlog enum took its `LogLevel` name. The spdlog-backed API mirrors upstream: `getLogger(name)` → `Logger.set_level`,
 `isLogLevelEnabled`, `addLogRecordHandler` / `removeLogRecordHandler` with a
 `LogRecord` copy. Handler exceptions go to `sys.unraisablehook` (upstream swallows
 them), `removeLogRecordHandler` releases the GIL while upstream waits for in-flight
 calls, and handlers still registered at interpreter exit are removed by an `atexit`
 hook. Upstream ships no migration note for #1367; a draft issue asking for one is
 pending.
+
+Two narrow deadlocks remain by construction, both from the handler taking the GIL on
+the logging thread: C++ that joins logging threads while the caller holds the GIL
+(dropping a `TaskflowTaskComposerExecutor` with a run still in flight; the
+`planning` layer always `wait()`s), and a handler added by an `atexit` function that
+runs after ours, then called by a C++ worker during finalization.
 
 ## Ids at the Python boundary
 
