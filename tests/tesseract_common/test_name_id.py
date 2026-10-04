@@ -58,6 +58,17 @@ def test_link_id_pair_is_unordered():
     assert LinkIdPair("b", "a").orderedNameView() == ("a", "b")
 
 
+@pytest.mark.parametrize("pair", [("a", "b"), ("b", "a")])
+def test_link_id_pair_never_equals_a_tuple(pair):
+    # Equal objects must hash equal; a tuple's hash is order-dependent, an
+    # unordered pair's is not, so no tuple may compare equal to a LinkIdPair.
+    p = LinkIdPair("a", "b")
+    assert p != pair
+    assert pair != p
+    assert pair not in {p}
+    assert p not in {pair}
+
+
 def test_ids_pickle_by_name():
     import pickle
 
