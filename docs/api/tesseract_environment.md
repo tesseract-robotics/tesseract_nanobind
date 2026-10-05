@@ -226,6 +226,23 @@ cmd = ChangeCollisionMarginsCommand(pair_data, CollisionMarginPairOverrideType.R
 env.applyCommand(cmd)
 ```
 
+### AddContactManagersPluginInfoCommand
+
+Add contact manager plugin configuration to a live environment.
+
+```python
+from tesseract_robotics.tesseract_common import ContactManagersPluginInfo
+from tesseract_robotics.tesseract_environment import AddContactManagersPluginInfoCommand
+
+info = ContactManagersPluginInfo()
+info.search_paths = ["/opt/my_plugins"]
+cmd = AddContactManagersPluginInfoCommand(info)
+env.applyCommand(cmd)
+```
+
+`getContactManagersPluginInfo()` returns a copy, so editing it does not change a command
+already applied.
+
 ## Events
 
 Subscribe to environment changes.

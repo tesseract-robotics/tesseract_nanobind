@@ -4,10 +4,12 @@ import pytest
 
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
+    ContactManagersPluginInfo,
     GeneralResourceLocator,
     Isometry3d,
 )
 from tesseract_robotics.tesseract_environment import (
+    AddContactManagersPluginInfoCommand,
     AddLinkCommand,
     ChangeCollisionMarginsCommand,
     ChangeJointAccelerationLimitsCommand,
@@ -361,3 +363,43 @@ class TestReplaceJointCommand:
         joint.child_link_name = "link1"
         cmd = ReplaceJointCommand(joint)
         env.applyCommand(cmd)
+
+
+def _contact_managers_plugin_info(search_path: str) -> ContactManagersPluginInfo:
+    info = ContactManagersPluginInfo()
+    info.search_paths = [search_path]
+    return info
+
+
+class TestAddContactManagersPluginInfoCommand:
+    """Tests for AddContactManagersPluginInfoCommand"""
+
+    def test_add_contact_managers_plugin_info_command_roundtrip(self):
+        cmd = AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/opt/plugins"))
+        assert isinstance(cmd, Command)
+
+        info = cmd.getContactManagersPluginInfo()
+        assert info.search_paths == ["/opt/plugins"]
+
+        # The getter returns a copy: editing it leaves the command's own info unchanged.
+        info.search_paths = ["/elsewhere"]
+        assert cmd.getContactManagersPluginInfo().search_paths == ["/opt/plugins"]
+
+    def test_eq(self):
+        a = AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/opt/plugins"))
+        b = AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/opt/plugins"))
+        c = AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/elsewhere"))
+        assert a == b
+        assert not (a != b)
+        assert a != c
+        assert not (a == c)
+
+    def test_unhashable(self):
+        with pytest.raises(TypeError):
+            hash(AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/opt/plugins")))
+
+    def test_apply_add_contact_managers_plugin_info_command(self, env):
+        revision = env.getRevision()
+        cmd = AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/opt/plugins"))
+        assert env.applyCommand(cmd)
+        assert env.getRevision() == revision + 1

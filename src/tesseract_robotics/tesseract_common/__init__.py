@@ -99,6 +99,9 @@ __all__ = [
     "PluginInfo",
     "PluginInfoContainer",
     "KinematicsPluginInfo",
+    "ContactManagersPluginInfo",
+    "ProfilesPluginInfo",
+    "TaskComposerPluginInfo",
     # Container types (SWIG compatibility)
     "VectorVector3d",
     "VectorIsometry3d",

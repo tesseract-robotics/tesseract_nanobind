@@ -193,6 +193,37 @@ info.tcp_frame = "tool0"                # tool center point
 info.tcp_offset = Isometry3d.Identity() # optional TCP offset
 ```
 
+## Plugin Info
+
+Plugin configuration for the four plugin loaders: `KinematicsPluginInfo`,
+`ContactManagersPluginInfo`, `ProfilesPluginInfo` and `TaskComposerPluginInfo`. Each has
+`search_paths`, `search_libraries`, `insert(other)`, `clear()`, `empty()` and a read-only
+`CONFIG_KEY` (its key in a tesseract YAML config, e.g. `"contact_manager_plugins"`).
+
+```python
+from tesseract_robotics.tesseract_common import (
+    ContactManagersPluginInfo, PluginInfo, PluginInfoContainer,
+)
+
+bullet = PluginInfo()
+bullet.class_name = "BulletDiscreteBVHManagerFactory"
+
+info = ContactManagersPluginInfo()
+info.search_libraries = ["tesseract_collision_bullet_factories"]
+info.discrete_plugin_infos.default_plugin = "BulletDiscreteBVHManager"
+info.discrete_plugin_infos.plugins = {"BulletDiscreteBVHManager": bullet}
+```
+
+!!! note
+    A `PluginInfoContainer` field (`discrete_plugin_infos`, `continuous_plugin_infos`,
+    `executor_plugin_infos`, `task_plugin_infos`) is a reference: editing it in place
+    persists. A `dict` field (`PluginInfoContainer.plugins`, `ProfilesPluginInfo.plugin_infos`,
+    `KinematicsPluginInfo.fwd_plugin_infos`) converts to a fresh `dict` on every access:
+    assign the whole field, since `info.plugin_infos["x"] = ...` edits a copy.
+
+`ContactManagersPluginInfo`, `ProfilesPluginInfo` and `TaskComposerPluginInfo` compare by
+value (`==`) and are unhashable.
+
 ## Logging
 
 Control console_bridge logging level.

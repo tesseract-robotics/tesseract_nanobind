@@ -105,6 +105,17 @@ class AddKinematicsInformationCommand(Command):
 
     def getKinematicsInformation(self) -> tesseract_robotics.tesseract_srdf._tesseract_srdf.KinematicsInformation: ...
 
+class AddContactManagersPluginInfoCommand(Command):
+    def __init__(self, contact_managers_plugin_info: tesseract_robotics.tesseract_common._tesseract_common.ContactManagersPluginInfo) -> None: ...
+
+    def getContactManagersPluginInfo(self) -> tesseract_robotics.tesseract_common._tesseract_common.ContactManagersPluginInfo: ...
+
+    def __eq__(self, arg: AddContactManagersPluginInfoCommand, /) -> bool: ...
+
+    def __ne__(self, arg: AddContactManagersPluginInfoCommand, /) -> bool: ...
+
+    __hash__: None = None
+
 class ModifyAllowedCollisionsType(enum.Enum):
     ADD = 0
 
@@ -282,6 +293,9 @@ class Environment:
 
     @overload
     def applyCommand(self, command: AddKinematicsInformationCommand) -> bool: ...
+
+    @overload
+    def applyCommand(self, command: AddContactManagersPluginInfoCommand) -> bool: ...
 
     @overload
     def applyCommand(self, command: ModifyAllowedCollisionsCommand) -> bool: ...

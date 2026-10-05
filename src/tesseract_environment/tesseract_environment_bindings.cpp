@@ -18,6 +18,7 @@
 #include <tesseract/environment/events.h>
 #include <tesseract/environment/utils.h>
 #include <tesseract/environment/command.h>
+#include <tesseract/environment/commands/add_contact_managers_plugin_info_command.h>
 #include <tesseract/environment/commands/add_link_command.h>
 #include <tesseract/environment/commands/add_kinematics_information_command.h>
 #include <tesseract/environment/commands/add_scene_graph_command.h>
@@ -183,6 +184,8 @@ struct PyEventCallbackFn {
 NB_MODULE(_tesseract_environment, m) {
     // Import collision module for DiscreteContactManager/ContinuousContactManager types
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
+    // Import common module for ContactManagersPluginInfo (AddContactManagersPluginInfoCommand)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
     m.doc() = "tesseract_environment Python bindings";
 
     // ========== Events enum ==========
@@ -285,6 +288,16 @@ NB_MODULE(_tesseract_environment, m) {
         .def(nb::init<>())
         .def(nb::init<tesseract::srdf::KinematicsInformation>(), "kinematics_information"_a)
         .def("getKinematicsInformation", &te::AddKinematicsInformationCommand::getKinematicsInformation);
+
+    // ========== AddContactManagersPluginInfoCommand ==========
+    // The arity-0 ctor is a serialization ctor and stays unbound. The getter returns a copy:
+    // the C++ getter is a const& into the command, and a Python edit must not mutate a
+    // command already in an environment's history.
+    auto add_contact_managers_plugin_info_command = nb::class_<te::AddContactManagersPluginInfoCommand, te::Command>(m, "AddContactManagersPluginInfoCommand")
+        .def(nb::init<tesseract::common::ContactManagersPluginInfo>(), "contact_managers_plugin_info"_a)
+        .def("getContactManagersPluginInfo", &te::AddContactManagersPluginInfoCommand::getContactManagersPluginInfo,
+             nb::rv_policy::copy);
+    bind_value_equality(add_contact_managers_plugin_info_command);
 
     // ========== ModifyAllowedCollisionsType enum ==========
     nb::enum_<te::ModifyAllowedCollisionsType>(m, "ModifyAllowedCollisionsType")
@@ -508,6 +521,11 @@ NB_MODULE(_tesseract_environment, m) {
         // Commands - AddKinematicsInformationCommand
         .def("applyCommand", [](te::Environment& self, const te::AddKinematicsInformationCommand& cmd) {
             auto cmd_ptr = std::make_shared<te::AddKinematicsInformationCommand>(cmd.getKinematicsInformation());
+            return self.applyCommand(cmd_ptr);
+        }, "command"_a)
+        // Commands - AddContactManagersPluginInfoCommand
+        .def("applyCommand", [](te::Environment& self, const te::AddContactManagersPluginInfoCommand& cmd) {
+            auto cmd_ptr = std::make_shared<te::AddContactManagersPluginInfoCommand>(cmd.getContactManagersPluginInfo());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
         // Commands - ModifyAllowedCollisionsCommand

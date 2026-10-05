@@ -953,7 +953,51 @@ NB_MODULE(_tesseract_common, m) {
         .def_rw("inv_plugin_infos", &tesseract::common::KinematicsPluginInfo::inv_plugin_infos)
         .def("insert", &tesseract::common::KinematicsPluginInfo::insert, "other"_a)
         .def("clear", &tesseract::common::KinematicsPluginInfo::clear)
-        .def("empty", &tesseract::common::KinematicsPluginInfo::empty);
+        .def("empty", &tesseract::common::KinematicsPluginInfo::empty)
+        .def_ro_static("CONFIG_KEY", &tesseract::common::KinematicsPluginInfo::CONFIG_KEY);
+
+    // ========== ContactManagersPluginInfo ==========
+    // discrete/continuous_plugin_infos are bound PluginInfoContainers: def_rw returns a
+    // reference, so in-place edits persist.
+    auto contact_managers_plugin_info = nb::class_<tesseract::common::ContactManagersPluginInfo>(m, "ContactManagersPluginInfo")
+        .def(nb::init<>())
+        .def_rw("search_paths", &tesseract::common::ContactManagersPluginInfo::search_paths)
+        .def_rw("search_libraries", &tesseract::common::ContactManagersPluginInfo::search_libraries)
+        .def_rw("discrete_plugin_infos", &tesseract::common::ContactManagersPluginInfo::discrete_plugin_infos)
+        .def_rw("continuous_plugin_infos", &tesseract::common::ContactManagersPluginInfo::continuous_plugin_infos)
+        .def("insert", &tesseract::common::ContactManagersPluginInfo::insert, "other"_a)
+        .def("clear", &tesseract::common::ContactManagersPluginInfo::clear)
+        .def("empty", &tesseract::common::ContactManagersPluginInfo::empty)
+        .def_ro_static("CONFIG_KEY", &tesseract::common::ContactManagersPluginInfo::CONFIG_KEY);
+    bind_value_equality(contact_managers_plugin_info);
+
+    // ========== TaskComposerPluginInfo ==========
+    auto task_composer_plugin_info = nb::class_<tesseract::common::TaskComposerPluginInfo>(m, "TaskComposerPluginInfo")
+        .def(nb::init<>())
+        .def_rw("search_paths", &tesseract::common::TaskComposerPluginInfo::search_paths)
+        .def_rw("search_libraries", &tesseract::common::TaskComposerPluginInfo::search_libraries)
+        .def_rw("executor_plugin_infos", &tesseract::common::TaskComposerPluginInfo::executor_plugin_infos)
+        .def_rw("task_plugin_infos", &tesseract::common::TaskComposerPluginInfo::task_plugin_infos)
+        .def("insert", &tesseract::common::TaskComposerPluginInfo::insert, "other"_a)
+        .def("clear", &tesseract::common::TaskComposerPluginInfo::clear)
+        .def("empty", &tesseract::common::TaskComposerPluginInfo::empty)
+        .def_ro_static("CONFIG_KEY", &tesseract::common::TaskComposerPluginInfo::CONFIG_KEY);
+    bind_value_equality(task_composer_plugin_info);
+
+    // ========== ProfilesPluginInfo ==========
+    // plugin_infos is std::map<std::string, PluginInfoMap> -> dict[str, dict[str, PluginInfo]],
+    // converted on every access (like KinematicsPluginInfo.fwd_plugin_infos): assign the
+    // whole field; an in-place edit of the returned dict changes a copy.
+    auto profiles_plugin_info = nb::class_<tesseract::common::ProfilesPluginInfo>(m, "ProfilesPluginInfo")
+        .def(nb::init<>())
+        .def_rw("search_paths", &tesseract::common::ProfilesPluginInfo::search_paths)
+        .def_rw("search_libraries", &tesseract::common::ProfilesPluginInfo::search_libraries)
+        .def_rw("plugin_infos", &tesseract::common::ProfilesPluginInfo::plugin_infos)
+        .def("insert", &tesseract::common::ProfilesPluginInfo::insert, "other"_a)
+        .def("clear", &tesseract::common::ProfilesPluginInfo::clear)
+        .def("empty", &tesseract::common::ProfilesPluginInfo::empty)
+        .def_ro_static("CONFIG_KEY", &tesseract::common::ProfilesPluginInfo::CONFIG_KEY);
+    bind_value_equality(profiles_plugin_info);
 
     // ========== Console Bridge ==========
     nb::enum_<console_bridge::LogLevel>(m, "LogLevel")

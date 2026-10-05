@@ -37,6 +37,7 @@
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
+#include <nanobind/operators.h>
 
 // nanobind's std::unordered_map caster (stl/unordered_map.h, nanobind 2.12) names
 // only four template parameters, so it matches default-allocator maps only.
@@ -55,6 +56,15 @@ NAMESPACE_END(NB_NAMESPACE)
 // Namespace aliases
 namespace nb = nanobind;
 using namespace nb::literals;
+
+// Bind C++ operator==/operator!= as __eq__/__ne__. These types are mutable, so they must
+// not hash: nanobind adds __eq__ after the type exists, which leaves object.__hash__
+// (identity) in place unless it is cleared explicitly.
+template <typename Class>
+void bind_value_equality(Class& cls) {
+    cls.def(nb::self == nb::self).def(nb::self != nb::self);
+    cls.attr("__hash__") = nb::none();
+}
 
 // Note: Eigen::Isometry3d is bound as an explicit class in tesseract_common_bindings.cpp
 // for SWIG API compatibility (tests expect .matrix() method etc.)
