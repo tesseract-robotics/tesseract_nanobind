@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`std::filesystem::path` is `pathlib.Path`; `Environment.init(str, …)` always means content** — `tesseract_common.FilesystemPath` was a `str` subclass, so `Environment.init` could not tell a path from URDF content: `init(str, str, locator)` treated both strings as *paths* (the opposite of the C++ `std::string` overload), `init(str, locator)` guessed from a leading `<`, and the Python-only `initFromUrdf` / `initFromUrdfSrdf` existed to work around the guess. `std::filesystem::path` now converts with nanobind's caster (`str | os.PathLike` in, `pathlib.Path` out), and `Environment.init` binds the four native overloads: a `str` is URDF/SRDF content, a `pathlib.Path` (any `os.PathLike`) is a file. Where a path overload sits beside a content overload (`Environment.init` ×2, the `ContactManagersPluginFactory` and `KinematicsPluginFactory` config constructors), the path parameter accepts `os.PathLike` only, so a `str` never reaches it and a mixed `init(content, Path, locator)` raises `TypeError`. Removed: `FilesystemPath`, `_FilesystemPath`, `TransformMap` (a plain `dict` converts) and `Environment.initFromUrdf` / `initFromUrdfSrdf`. A path left as `str` makes `init` return `False`; it does not raise ([#165]).
+
+  | before | after |
+  | --- | --- |
+  | `env.init(FilesystemPath(u), FilesystemPath(s), loc)` | `env.init(Path(u), Path(s), loc)` |
+  | `env.init(path_str, loc)` (path) | `env.init(Path(path_str), loc)` |
+  | `env.initFromUrdf(xml, loc)` | `env.init(xml, loc)` |
+  | `env.initFromUrdfSrdf(u_xml, s_xml, loc)` | `env.init(u_xml, s_xml, loc)` |
+  | `KinematicsPluginFactory(_FilesystemPath(p), loc)` (also `ContactManagersPluginFactory`) | `KinematicsPluginFactory(Path(p), loc)` |
+  | `TaskComposerPluginFactory(FilesystemPath(p), loc)` | `TaskComposerPluginFactory(str(p), loc)` |
+  | `TransformMap()` | `{}` |
+
+  `TaskComposerPluginFactory` still takes its config path as `str`: tesseract_task_composer is outside the audited modules, so its native path/content pair is not bound yet.
+
 ### Changes
 
 - **The remaining plugin-info structs bound** — `ContactManagersPluginInfo`, `ProfilesPluginInfo` and `TaskComposerPluginInfo` had no binding, so nothing that takes or returns one could be bound either; `KinematicsPluginInfo` lacked `CONFIG_KEY`. All four now carry a read-only `CONFIG_KEY`, and the three new classes compare by value and are unhashable (`__hash__ = None`), through a new shared `bind_value_equality` helper. `AddContactManagersPluginInfoCommand` is bound too, with value equality, and `Environment.applyCommand` accepts it; its getter returns a copy, so editing it cannot change a command already in an environment's history ([#164]).
@@ -243,6 +259,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#158]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/158
 [#159]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/159
 [#164]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/164
+[#165]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/165
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

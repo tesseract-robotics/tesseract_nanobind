@@ -15,13 +15,13 @@ unmangled.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
 )
@@ -71,12 +71,12 @@ class CartPosFixture:
 def cart_pos() -> CartPosFixture:
     """KUKA IIWA kinematic group plus a single-node Var to constrain."""
     locator = GeneralResourceLocator()
-    urdf = FilesystemPath(
+    urdf = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
         ).getFilePath()
     )
-    srdf = FilesystemPath(
+    srdf = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
         ).getFilePath()

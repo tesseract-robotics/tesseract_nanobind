@@ -144,7 +144,7 @@ def make_test_environment():
     assert base is not None, "lbr_iiwa_14_r820 support model not on TESSERACT_RESOURCE_PATH"
 
     env = Environment()
-    assert env.initFromUrdfSrdf(
+    assert env.init(
         (base / "lbr_iiwa_14_r820.urdf").read_text(),
         (base / "lbr_iiwa_14_r820.srdf").read_text(),
         GeneralResourceLocator(),

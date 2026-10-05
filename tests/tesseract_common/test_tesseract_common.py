@@ -262,3 +262,9 @@ def test_plugin_info_config_keys(cls_name, key):
     assert cls.CONFIG_KEY == key
     with pytest.raises(AttributeError):
         cls().CONFIG_KEY = "x"
+
+
+@pytest.mark.parametrize("name", ["FilesystemPath", "_FilesystemPath", "TransformMap"])
+def test_no_filesystem_path_shims(name):
+    """gh-165: `std::filesystem::path` is a caster (`pathlib.Path`), TransformMap a plain dict."""
+    assert not hasattr(tesseract_common, name)

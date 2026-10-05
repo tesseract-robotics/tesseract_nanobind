@@ -13,6 +13,7 @@
 #include <variant>
 #include <optional>
 #include <stdexcept>
+#include <filesystem>
 
 // Eigen
 #include <Eigen/Core>
@@ -34,6 +35,7 @@
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/eigen/sparse.h>
@@ -49,6 +51,45 @@ template <typename Key, typename T, typename Hash, typename KeyEqual>
 struct type_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_allocator<std::pair<const Key, T>>>>
   : dict_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_allocator<std::pair<const Key, T>>>, Key, T>
 {
+};
+NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
+namespace tesseract_nb
+{
+// A std::filesystem::path parameter that refuses `str` and `bytes`.
+//
+// nanobind's std::filesystem::path caster (stl/filesystem.h) accepts anything
+// PyOS_FSPath accepts, `str` included, and ignores the convert flag. Where a
+// native path overload sits beside a std::string *content* overload
+// (Environment::init, the plugin factories' config ctors), a `str` would match
+// both. Binding the path overload with StrictPath makes `str` always mean
+// content and `os.PathLike` (pathlib.Path) always mean a path, whatever the
+// registration order. Use it only for such path/string pairs; every other
+// path parameter takes plain std::filesystem::path (`str | os.PathLike`).
+struct StrictPath
+{
+  std::filesystem::path value;
+};
+}  // namespace tesseract_nb
+
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+template <>
+struct type_caster<tesseract_nb::StrictPath>
+{
+  NB_TYPE_CASTER(tesseract_nb::StrictPath, const_name("os.PathLike"))
+
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
+  {
+    if (PyUnicode_Check(src.ptr()) || PyBytes_Check(src.ptr()))
+      return false;
+    make_caster<std::filesystem::path> path_caster;
+    if (!path_caster.from_python(src, flags, cleanup))
+      return false;
+    value.value = std::move(path_caster.value);
+    return true;
+  }
 };
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

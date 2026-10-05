@@ -70,6 +70,8 @@ namespace tk = tesseract::kinematics;
 namespace tcol = tesseract::collision;
 
 namespace {
+using LocatorPtr = std::shared_ptr<const tc::ResourceLocator>;
+
 // checkTrajectory's `std::vector<ContactResultMap>& contacts` out-param is returned
 // alongside the summary instead: Python gets (ContactTrajectoryResults, list[ContactResultMap]).
 using CheckTrajectoryResult = std::pair<tcol::ContactTrajectoryResults, std::vector<tcol::ContactResultMap>>;
@@ -403,33 +405,23 @@ NB_MODULE(_tesseract_environment, m) {
             auto srdf_ptr = std::make_shared<const tesseract::srdf::SRDFModel>(srdf);
             return self.init(scene_graph, srdf_ptr);
         }, "scene_graph"_a, "srdf"_a)
-        .def("initFromUrdf", [](te::Environment& self, const std::string& urdf_string,
-                                 const std::shared_ptr<const tc::ResourceLocator>& locator) {
-            return self.init(urdf_string, locator);
-        }, "urdf_string"_a, "locator"_a)
-        .def("initFromUrdfSrdf", [](te::Environment& self, const std::string& urdf_string,
-                                     const std::string& srdf_string,
-                                     const std::shared_ptr<const tc::ResourceLocator>& locator) {
-            return self.init(urdf_string, srdf_string, locator);
-        }, "urdf_string"_a, "srdf_string"_a, "locator"_a)
-        // Init from paths (SWIG compatibility - accepts FilesystemPath or string)
-        .def("init", [](te::Environment& self, const std::string& urdf_path,
-                        const std::string& srdf_path,
-                        const std::shared_ptr<const tc::ResourceLocator>& locator) {
-            return self.init(std::filesystem::path(urdf_path), std::filesystem::path(srdf_path), locator);
+        // Native URDF/SRDF overloads. A `str` is always *content* (the std::string
+        // overloads), never a path: the path overloads take StrictPath, which
+        // rejects `str`, so a path must be a pathlib.Path / os.PathLike and a mixed
+        // (content, path) call matches nothing and raises TypeError.
+        .def("init", nb::overload_cast<const std::string&, const LocatorPtr&>(&te::Environment::init),
+             "urdf_string"_a, "locator"_a)
+        .def("init", [](te::Environment& self, const tesseract_nb::StrictPath& urdf_path,
+                        const LocatorPtr& locator) {
+            return self.init(urdf_path.value, locator);
+        }, "urdf_path"_a, "locator"_a)
+        .def("init", nb::overload_cast<const std::string&, const std::string&, const LocatorPtr&>(
+                         &te::Environment::init),
+             "urdf_string"_a, "srdf_string"_a, "locator"_a)
+        .def("init", [](te::Environment& self, const tesseract_nb::StrictPath& urdf_path,
+                        const tesseract_nb::StrictPath& srdf_path, const LocatorPtr& locator) {
+            return self.init(urdf_path.value, srdf_path.value, locator);
         }, "urdf_path"_a, "srdf_path"_a, "locator"_a)
-        // Init from URDF string (for inline URDF content) - SWIG compatibility
-        // Detects if it's content (starts with <) vs file path
-        .def("init", [](te::Environment& self, const std::string& urdf_or_path,
-                        const std::shared_ptr<const tc::ResourceLocator>& locator) {
-            // If it looks like XML content, treat as URDF string; otherwise as path
-            if (!urdf_or_path.empty() && (urdf_or_path[0] == '<' || urdf_or_path.find("<?xml") == 0 ||
-                urdf_or_path.find("<robot") != std::string::npos)) {
-                return self.init(urdf_or_path, locator);  // URDF content
-            } else {
-                return self.init(std::filesystem::path(urdf_or_path), locator);  // File path
-            }
-        }, "urdf_or_path"_a, "locator"_a)
         // State methods
         .def("isInitialized", &te::Environment::isInitialized)
         .def("reset", &te::Environment::reset)

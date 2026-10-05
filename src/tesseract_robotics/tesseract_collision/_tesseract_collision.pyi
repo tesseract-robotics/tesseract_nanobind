@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 import enum
+import os
 from typing import Annotated, overload
 
 import numpy
@@ -581,7 +582,7 @@ class ContactManagersPluginFactory:
     def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, config_path: tesseract_robotics.tesseract_common._tesseract_common.FilesystemPath, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...
+    def __init__(self, config_path: os.PathLike, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...
 
     @overload
     def __init__(self, config: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...

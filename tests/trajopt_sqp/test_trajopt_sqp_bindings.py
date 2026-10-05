@@ -13,6 +13,7 @@ Updated for 0.34 API:
 
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -21,7 +22,6 @@ import scipy.sparse
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
 )
@@ -53,12 +53,12 @@ def _make_problem(nodes_variables, constraints=None, costs=None):
 def kuka_setup():
     """Load KUKA IIWA robot environment."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
         ).getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
         ).getFilePath()

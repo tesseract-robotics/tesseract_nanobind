@@ -214,10 +214,10 @@ def main():
     t_env = Environment()
     if srdf_path.exists():
         srdf_content = srdf_path.read_text()
-        success = t_env.initFromUrdfSrdf(urdf_content, srdf_content, locator)
+        success = t_env.init(urdf_content, srdf_content, locator)
     else:
         print("SRDF not found, loading URDF only")
-        success = t_env.initFromUrdf(urdf_content, locator)
+        success = t_env.init(urdf_content, locator)
 
     if not success:
         print("ERROR: Failed to initialize environment")

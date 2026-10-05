@@ -4,11 +4,6 @@ import numpy as np
 
 from tesseract_robotics.tesseract_common._tesseract_common import *
 
-# FilesystemPath - for SWIG compatibility, we keep it as a str subclass
-# This allows it to be passed directly to functions expecting strings
-# The C++ binding is available as _FilesystemPath for cases that need it
-from tesseract_robotics.tesseract_common._tesseract_common import FilesystemPath as _FilesystemPath
-
 # Standard unit axes — Vector3d-compatible, frozen to guard against accidental
 # in-place mutation when the same constant is reused across call sites.
 X_AXIS: np.ndarray = np.array([1.0, 0.0, 0.0])
@@ -17,33 +12,6 @@ Z_AXIS: np.ndarray = np.array([0.0, 0.0, 1.0])
 X_AXIS.flags.writeable = False
 Y_AXIS.flags.writeable = False
 Z_AXIS.flags.writeable = False
-
-
-class FilesystemPath(str):
-    """A filesystem path wrapper for SWIG compatibility.
-
-    Subclasses str so it can be passed to C++ functions expecting strings.
-    Use _FilesystemPath for the raw C++ binding when needed.
-    """
-
-    def __new__(cls, path):
-        return str.__new__(cls, path)
-
-    def string(self):
-        """Return the path as a string (SWIG compatibility)."""
-        return str(self)
-
-
-# TransformMap is a dict wrapper for SWIG compatibility
-# In nanobind, plain Python dicts with string keys and Isometry3d values work automatically
-class TransformMap(dict):
-    """A dict wrapper for SWIG compatibility with TransformMap.
-
-    In nanobind, Python dicts automatically convert to std::map<string, Isometry3d>.
-    This class provides compatibility with code written for SWIG bindings.
-    """
-
-    pass
 
 
 __all__ = [
@@ -105,9 +73,4 @@ __all__ = [
     # Container types (SWIG compatibility)
     "VectorVector3d",
     "VectorIsometry3d",
-    # Filesystem (SWIG compatibility)
-    "FilesystemPath",
-    "_FilesystemPath",  # Raw C++ binding
-    # Transform map (SWIG compatibility)
-    "TransformMap",
 ]

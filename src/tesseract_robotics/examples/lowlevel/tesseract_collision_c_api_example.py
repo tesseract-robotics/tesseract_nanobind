@@ -88,6 +88,8 @@ Related Examples
 - scene_graph_example.py: Direct scene graph manipulation
 """
 
+from pathlib import Path
+
 import numpy as np
 
 from tesseract_robotics.tesseract_collision import (
@@ -98,7 +100,6 @@ from tesseract_robotics.tesseract_collision import (
 )
 from tesseract_robotics.tesseract_common import (
     CollisionMarginData,
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
@@ -152,9 +153,9 @@ def main():
         "package://tesseract/support/urdf/abb_irb2400.srdf"
     ).getFilePath()
 
-    # FilesystemPath wraps std::filesystem::path for cross-platform compatibility
-    urdf_path = FilesystemPath(urdf_path_str)
-    srdf_path = FilesystemPath(srdf_path_str)
+    # A pathlib.Path selects the file overload of init(); a str would be URDF content
+    urdf_path = Path(urdf_path_str)
+    srdf_path = Path(srdf_path_str)
 
     # init() parses URDF/SRDF and loads configured plugins (collision, kinematics)
     # Returns False if parsing fails - always check return value

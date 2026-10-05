@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import numpy as np
 import numpy.testing as nptest
@@ -21,11 +22,8 @@ def get_scene_graph():
 
 
 def get_plugin_factory():
-    # Use _FilesystemPath (C++ binding) for KinematicsPluginFactory which needs fs::path
-    from tesseract_robotics.tesseract_common import _FilesystemPath
-
     support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
-    kin_config = _FilesystemPath(support_dir + "/urdf/" + "abb_irb2400_plugins.yaml")
+    kin_config = Path(support_dir) / "urdf" / "abb_irb2400_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_kinematics.KinematicsPluginFactory(kin_config, locator), locator
 
@@ -35,7 +33,7 @@ def run_inv_kin_test(inv_kin, fwd_kin):
     pose[2, 3] = 1.306
 
     seed = np.array([-0.785398, 0.785398, -0.785398, 0.785398, -0.785398, 0.785398])
-    tip_pose = tesseract_common.TransformMap()
+    tip_pose = {}
     tip_pose["tool0"] = tesseract_common.Isometry3d(pose)
     solutions = inv_kin.calcInvKin(tip_pose, seed)
     assert len(solutions) > 0

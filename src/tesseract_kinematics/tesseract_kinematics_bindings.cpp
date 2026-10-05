@@ -39,7 +39,7 @@ NB_MAKE_OPAQUE(tk::KinGroupIKInputs)
 NB_MODULE(_tesseract_kinematics, m) {
     m.doc() = "tesseract_kinematics Python bindings";
 
-    // FilesystemPath, ResourceLocator, Isometry3d live in tesseract_common
+    // ResourceLocator, Isometry3d live in tesseract_common
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
 
     // ========== URParameters ==========
@@ -197,11 +197,12 @@ NB_MODULE(_tesseract_kinematics, m) {
     // ========== KinematicsPluginFactory ==========
     nb::class_<tk::KinematicsPluginFactory>(m, "KinematicsPluginFactory")
         .def(nb::init<>())
-        // Constructor with std::filesystem::path and locator
+        // Constructor with config file path and locator. StrictPath (tesseract_nb.h):
+        // a `str` is always YAML content (the overload below), never a path.
         .def("__init__", [](tk::KinematicsPluginFactory* self,
-                            const std::filesystem::path& config_path,
+                            const tesseract_nb::StrictPath& config_path,
                             const tcommon::ResourceLocator& locator) {
-            new (self) tk::KinematicsPluginFactory(config_path, locator);
+            new (self) tk::KinematicsPluginFactory(config_path.value, locator);
         }, "config_path"_a, "locator"_a)
         // Constructor with string and locator
         .def("__init__", [](tk::KinematicsPluginFactory* self,

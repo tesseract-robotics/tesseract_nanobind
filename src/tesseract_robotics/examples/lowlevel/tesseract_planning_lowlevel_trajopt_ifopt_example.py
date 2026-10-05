@@ -13,6 +13,7 @@ Comparison:
 """
 
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -28,7 +29,6 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -80,8 +80,8 @@ def main():
     locator = GeneralResourceLocator()
     urdf_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     srdf_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
-    urdf_path = FilesystemPath(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = FilesystemPath(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = Path(locator.locateResource(urdf_url).getFilePath())
+    srdf_path = Path(locator.locateResource(srdf_url).getFilePath())
 
     t_env = Environment()
     assert t_env.init(urdf_path, srdf_path, locator)

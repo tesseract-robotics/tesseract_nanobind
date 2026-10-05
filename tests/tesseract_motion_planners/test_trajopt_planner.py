@@ -1,5 +1,7 @@
 """Tests for tesseract_motion_planners_trajopt bindings."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -17,7 +19,6 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -52,12 +53,12 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 def lbr_iiwa_environment():
     """Load LBR IIWA robot environment for testing."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
         ).getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
         ).getFilePath()

@@ -9,11 +9,13 @@ matrix that is not in a compressed format"). The binding returns a compressed co
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
 from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
@@ -30,7 +32,7 @@ def test_collision_constraint_with_an_active_contact():
     urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf")
     env = Environment()
-    assert env.init(FilesystemPath(urdf.getFilePath()), FilesystemPath(srdf.getFilePath()), locator)
+    assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)
     manip = env.getKinematicGroup("manipulator")
 
     obstacle = Link("obstacle")

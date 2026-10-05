@@ -1,10 +1,11 @@
 """Tests for clone() bindings across the codebase."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
 )
 from tesseract_robotics.tesseract_environment import Environment
@@ -14,10 +15,10 @@ from tesseract_robotics.tesseract_environment import Environment
 def abb_environment():
     """Load ABB IRB2400 environment."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     )
     env = Environment()

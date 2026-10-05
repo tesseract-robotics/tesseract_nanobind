@@ -35,7 +35,6 @@ from numpy.typing import ArrayLike
 
 from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -179,8 +178,8 @@ class Robot:
         if srdf_resource is None:
             raise RuntimeError(f"Could not locate SRDF resource: {srdf_url}")
 
-        urdf_path = FilesystemPath(urdf_resource.getFilePath())
-        srdf_path = FilesystemPath(srdf_resource.getFilePath())
+        urdf_path = Path(urdf_resource.getFilePath())
+        srdf_path = Path(srdf_resource.getFilePath())
 
         env = Environment()
         if not env.init(urdf_path, srdf_path, locator):
@@ -208,8 +207,8 @@ class Robot:
         """
         locator = locator or GeneralResourceLocator()
 
-        urdf_path = FilesystemPath(str(urdf_path))
-        srdf_path = FilesystemPath(str(srdf_path))
+        urdf_path = Path(urdf_path)
+        srdf_path = Path(srdf_path)
 
         env = Environment()
         if not env.init(urdf_path, srdf_path, locator):

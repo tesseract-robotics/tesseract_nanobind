@@ -1,5 +1,7 @@
 """Tests for tesseract_motion_planners_descartes bindings."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -17,7 +19,6 @@ from tesseract_robotics.tesseract_command_language import (
 )
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -52,10 +53,10 @@ DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 def abb_irb2400_environment():
     """Load ABB IRB2400 robot environment for testing (has OPW kinematics)."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     )
 

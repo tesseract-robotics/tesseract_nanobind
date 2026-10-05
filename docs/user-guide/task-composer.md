@@ -49,7 +49,7 @@ graph TD
 === "Low-Level API"
 
     ```python
-    from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from tesseract_robotics.tesseract_task_composer import (
         AnyPoly_wrap_CompositeInstruction,
         AnyPoly_wrap_EnvironmentConst,
@@ -59,7 +59,8 @@ graph TD
     )
 
     locator = GeneralResourceLocator()  # any ResourceLocator, including a Python subclass
-    factory = TaskComposerPluginFactory(FilesystemPath(str(config_path)), locator)
+    # str = config *path* here; unlike Environment.init, this factory has no content overload bound yet
+    factory = TaskComposerPluginFactory(str(config_path), locator)
 
     # Executor + pipeline node
     executor = factory.createTaskComposerExecutor("TaskflowExecutor")
@@ -176,11 +177,11 @@ result = plan_freespace(robot, program)
 Every `TaskComposerNode` exports its task graph as [Graphviz DOT](https://graphviz.org/) — the same `dump()` mechanism the C++ task composer uses:
 
 ```python
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
 
 locator = GeneralResourceLocator()
-factory = TaskComposerPluginFactory(FilesystemPath(str(config_path)), locator)
+factory = TaskComposerPluginFactory(str(config_path), locator)
 pipeline = factory.createTaskComposerNode("FreespacePipeline")
 
 dot = pipeline.getDotgraph()             # DOT source as a string

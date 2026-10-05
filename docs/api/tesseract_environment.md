@@ -7,16 +7,18 @@ Environment management and scene modification commands.
 Central class containing robot model, collision, and kinematics.
 
 ```python
+from pathlib import Path
+
 from tesseract_robotics.tesseract_environment import Environment
 
 # Create empty environment
 env = Environment()
 
-# From URDF + SRDF paths (+ ResourceLocator for mesh resolution)
-env.init(urdf_path, srdf_path, locator)
+# From URDF + SRDF files (+ ResourceLocator for mesh resolution)
+env.init(Path(urdf_path), Path(srdf_path), locator)
 
 # Or from raw XML strings
-env.initFromUrdfSrdf(urdf_xml, srdf_xml, locator)
+env.init(urdf_xml, srdf_xml, locator)
 
 # Or use the high-level Robot helper (takes BOTH URDF and SRDF)
 from tesseract_robotics.planning import Robot
@@ -26,6 +28,13 @@ robot = Robot.from_urdf(
 )
 env = robot.env
 ```
+
+!!! warning "A `str` is URDF content, never a path"
+    `init` binds the native overloads: `init(str, locator)` and `init(str, str, locator)` parse
+    URDF/SRDF *content*; `init(Path, locator)` and `init(Path, Path, locator)` load *files*.
+    A path passed as `str` is parsed as XML and `init` returns `False`. Mixing one `Path` with
+    one content `str` raises `TypeError`. `initFromUrdf` / `initFromUrdfSrdf` and
+    `tesseract_common.FilesystemPath` were removed (gh-165); see the CHANGELOG for the migration.
 
 ### Scene Graph Access
 

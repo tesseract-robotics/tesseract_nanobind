@@ -1,5 +1,7 @@
 """Tests for tesseract_motion_planners bindings."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -13,7 +15,6 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -38,10 +39,10 @@ OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 def abb_irb2400_environment():
     """Load ABB IRB2400 robot environment for testing."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     )
     t_env = Environment()

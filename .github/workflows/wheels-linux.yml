@@ -176,7 +176,8 @@ jobs:
           fi
           python -u - <<'EOF'
           import numpy as np  # numpy first: pulls the system libstdc++ — the gh-119 trigger
-          from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+          from pathlib import Path
+          from tesseract_robotics.tesseract_common import GeneralResourceLocator
           from tesseract_robotics.tesseract_environment import Environment
           maps = sorted({ln.split()[-1] for ln in open("/proc/self/maps") if "libstdc++" in ln and "r-xp" in ln})
           print("libstdc++ copies:", maps)
@@ -185,7 +186,7 @@ jobs:
           urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
           srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
           env = Environment()
-          assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+          assert env.init(Path(urdf), Path(srdf), locator)
           kg = env.getKinematicGroup("manipulator")
           J = kg.calcJacobian(np.array([0.0, 0.0, 0.5, 0.0, 0.5, 0.0]), "tool0")
           print("OK:", J.shape)

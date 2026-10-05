@@ -430,8 +430,9 @@ NB_MODULE(_tesseract_collision, m) {
         std::shared_ptr<tc::ContactManagersPluginFactory> ptr;
 
         ContactManagersPluginFactoryWrapper() : ptr(std::make_shared<tc::ContactManagersPluginFactory>()) {}
-        ContactManagersPluginFactoryWrapper(const std::filesystem::path& config_path, const tcommon::ResourceLocator& locator)
-            : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config_path, locator)) {}
+        // StrictPath (tesseract_nb.h): a `str` is always YAML content, never a path
+        ContactManagersPluginFactoryWrapper(const tesseract_nb::StrictPath& config_path, const tcommon::ResourceLocator& locator)
+            : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config_path.value, locator)) {}
         ContactManagersPluginFactoryWrapper(const std::string& config, const tcommon::ResourceLocator& locator)
             : ptr(std::make_shared<tc::ContactManagersPluginFactory>(config, locator)) {}
 
@@ -453,7 +454,7 @@ NB_MODULE(_tesseract_collision, m) {
 
     nb::class_<ContactManagersPluginFactoryWrapper>(m, "ContactManagersPluginFactory")
         .def(nb::init<>())
-        .def(nb::init<const std::filesystem::path&, const tcommon::ResourceLocator&>(), "config_path"_a, "locator"_a)
+        .def(nb::init<const tesseract_nb::StrictPath&, const tcommon::ResourceLocator&>(), "config_path"_a, "locator"_a)
         .def(nb::init<const std::string&, const tcommon::ResourceLocator&>(), "config"_a, "locator"_a)
         .def("addSearchPath", &ContactManagersPluginFactoryWrapper::addSearchPath, "path"_a)
         .def("getSearchPaths", &ContactManagersPluginFactoryWrapper::getSearchPaths)

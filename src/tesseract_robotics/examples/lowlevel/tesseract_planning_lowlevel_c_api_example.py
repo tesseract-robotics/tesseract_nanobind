@@ -16,6 +16,7 @@ Use this low-level approach when you need:
 """
 
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -31,7 +32,6 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -71,10 +71,10 @@ def main():
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = FilesystemPath(
+    abb_irb2400_urdf_fname = Path(
         locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
     )
-    abb_irb2400_srdf_fname = FilesystemPath(
+    abb_irb2400_srdf_fname = Path(
         locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
     )
 

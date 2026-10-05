@@ -6,7 +6,6 @@ import pytest
 
 import tesseract_robotics
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     ResourceLocator,
 )
@@ -43,17 +42,13 @@ class TestTaskComposerPluginFactory:
         """Any ResourceLocator is accepted, not only GeneralResourceLocator (gh-150)."""
         config = tmp_path / "task_composer_plugins.yaml"
         config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
-        factory = TaskComposerPluginFactory(
-            FilesystemPath(str(config)), _DelegatingResourceLocator()
-        )
+        factory = TaskComposerPluginFactory(str(config), _DelegatingResourceLocator())
         assert not factory.hasTaskComposerNodePlugins()
 
     def test_python_resource_locator_subclass_builds_pipeline(self):
         """A delegating Python locator loads the real config and yields a pipeline (gh-150)."""
         locator = _DelegatingResourceLocator()
-        factory = TaskComposerPluginFactory(
-            FilesystemPath(_resolve_task_composer_config()), locator
-        )
+        factory = TaskComposerPluginFactory(_resolve_task_composer_config(), locator)
         node = factory.createTaskComposerNode("TrajOptPipeline")
         assert node.getName() == "TrajOptPipeline"
 
@@ -69,14 +64,13 @@ class TestTaskComposerPluginFactory:
         config = tmp_path / "task_composer_plugins.yaml"
         config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
         with pytest.raises(TypeError):
-            TaskComposerPluginFactory(FilesystemPath(str(config)), object())
+            TaskComposerPluginFactory(str(config), object())
 
     def test_create_factory_and_nodes(self):
         """Test factory creation and pipeline node creation."""
         config_file = _resolve_task_composer_config()
-        config_path = FilesystemPath(config_file)
         locator = GeneralResourceLocator()
-        factory = TaskComposerPluginFactory(config_path, locator)
+        factory = TaskComposerPluginFactory(config_file, locator)
         assert factory is not None
 
         # Test pipeline node creation - keep references to avoid GC issues
@@ -107,7 +101,7 @@ class TestTaskComposerPluginFactory:
         )
 
         factory = TaskComposerPluginFactory(
-            FilesystemPath(_resolve_task_composer_config()), GeneralResourceLocator()
+            _resolve_task_composer_config(), GeneralResourceLocator()
         )
         executor = factory.createTaskComposerExecutor("TaskflowExecutor")
         task = factory.createTaskComposerNode("TrajOptPipeline")
@@ -167,7 +161,7 @@ class TestTaskComposerPluginFactory:
 
         config_file = _resolve_task_composer_config()
         locator = GeneralResourceLocator()
-        factory = TaskComposerPluginFactory(FilesystemPath(config_file), locator)
+        factory = TaskComposerPluginFactory(config_file, locator)
 
         # Try to load each pipeline
         loaded = []
@@ -198,7 +192,7 @@ class TestDotgraph:
         config_file = _resolve_task_composer_config()
         assert config_file, "No task composer config found"
         locator = GeneralResourceLocator()
-        factory = TaskComposerPluginFactory(FilesystemPath(config_file), locator)
+        factory = TaskComposerPluginFactory(config_file, locator)
         node = factory.createTaskComposerNode("TrajOptPipeline")
         assert node is not None
         yield node, factory

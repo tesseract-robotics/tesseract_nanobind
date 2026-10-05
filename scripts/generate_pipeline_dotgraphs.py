@@ -32,7 +32,7 @@ from tesseract_robotics.tesseract_collision import (
     CollisionEvaluatorType,
     ContactManagerConfig,
 )
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
 from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_wrap_CompositeInstruction,
@@ -201,7 +201,7 @@ def main() -> None:
 
     config = get_task_composer_config_path()
 
-    factory = TaskComposerPluginFactory(FilesystemPath(str(config)), GeneralResourceLocator())
+    factory = TaskComposerPluginFactory(str(config), GeneralResourceLocator())
 
     for name in DOCUMENTED_PIPELINES:
         node = factory.createTaskComposerNode(name)

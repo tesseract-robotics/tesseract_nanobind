@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 
 import numpy as np
 import numpy.testing as nptest
+import pytest
 
 from tesseract_robotics import (
     tesseract_common,
@@ -21,11 +23,8 @@ def get_scene_graph():
 
 
 def get_plugin_factory():
-    # Use _FilesystemPath (C++ binding) for KinematicsPluginFactory which needs fs::path
-    from tesseract_robotics.tesseract_common import _FilesystemPath
-
     support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
-    kin_config = _FilesystemPath(support_dir + "/urdf/" + "lbr_iiwa_14_r820_plugins.yaml")
+    kin_config = Path(support_dir) / "urdf" / "lbr_iiwa_14_r820_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_kinematics.KinematicsPluginFactory(kin_config, locator), locator
 
@@ -35,7 +34,7 @@ def run_inv_kin_test(inv_kin, fwd_kin):
     pose[2, 3] = 1.306
 
     seed = np.array([-0.785398, 0.785398, -0.785398, 0.785398, -0.785398, 0.785398, -0.785398])
-    tip_pose = tesseract_common.TransformMap()
+    tip_pose = {}
     tip_pose["tool0"] = tesseract_common.Isometry3d(pose)
     solutions = inv_kin.calcInvKin(tip_pose, seed)
     assert len(solutions) > 0
@@ -83,3 +82,13 @@ def test_jacobian():
     assert jacobian.shape == (6, 7)
 
     del fwd_kin
+
+
+@pytest.mark.parametrize("form", ["path", "content"])
+def test_kinematics_factory_from_path_or_content(form):
+    """gh-165: a `pathlib.Path` is the config file; a `str` is YAML content, never a path."""
+    config = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf" / "lbr_iiwa_14_r820_plugins.yaml"
+    arg = config if form == "path" else config.read_text()
+    factory = tesseract_kinematics.KinematicsPluginFactory(arg, TesseractSupportResourceLocator())
+    assert factory.getDefaultFwdKinPlugin("manipulator") == "KDLFwdKinChain"
+    assert factory.getDefaultInvKinPlugin("manipulator") == "KDLInvKinChainLMA"

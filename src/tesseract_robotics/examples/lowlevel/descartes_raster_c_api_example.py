@@ -28,6 +28,7 @@ Related Examples:
 """
 
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -49,7 +50,6 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
@@ -175,10 +175,10 @@ def main():
     # every waypoint, so an analytic solver is what makes the ladder graph fast.
     locator = GeneralResourceLocator()
     env = Environment()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     )
     assert env.init(urdf_path, srdf_path, locator)

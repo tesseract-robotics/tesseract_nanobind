@@ -104,10 +104,11 @@ Related Examples
 - pick_and_place_example.py: FK/IK for grasp pose computation
 """
 
+from pathlib import Path
+
 import numpy as np
 
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     Isometry3d,
     Quaterniond,
@@ -157,9 +158,9 @@ def main():
         "package://tesseract/support/urdf/abb_irb2400.srdf"
     ).getFilePath()
 
-    # FilesystemPath wraps std::filesystem::path for cross-platform compatibility
-    urdf_path = FilesystemPath(urdf_path_str)
-    srdf_path = FilesystemPath(srdf_path_str)
+    # A pathlib.Path selects the file overload of init(); a str would be URDF content
+    urdf_path = Path(urdf_path_str)
+    srdf_path = Path(srdf_path_str)
 
     # init() parses URDF/SRDF and loads configured kinematic plugins
     assert env.init(urdf_path, srdf_path, locator)

@@ -13,11 +13,12 @@ ties every plugin-backed object to its Environment.
 import gc
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 
 from tesseract_robotics import tesseract_kinematics
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
 # Byte-equivalent to the gh-72 forensic reproducer: module globals in this
@@ -25,14 +26,15 @@ from tesseract_robotics.tesseract_environment import Environment
 # dylib) before kg -> EXC_BAD_ACCESS in ~KinematicGroup. Deterministic SIGSEGV
 # (exit 139) before the fix.
 _TEARDOWN_SCRIPT = """\
+from pathlib import Path
 import numpy as np
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 locator = GeneralResourceLocator()
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
 env = Environment()
-assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+assert env.init(Path(urdf), Path(srdf), locator)
 kg = env.getKinematicGroup("manipulator")
 J = kg.calcJacobian(np.array([0.0, 0.0, 0.5, 0.0, 0.5, 0.0]), "tool0")
 print("OK:", J.shape)
@@ -44,7 +46,7 @@ def _make_env():
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     env = Environment()
-    assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+    assert env.init(Path(urdf), Path(srdf), locator)
     return env
 
 
@@ -135,14 +137,15 @@ _ROP_EXPECTED_JOINTS = [
 ]
 
 _ROP_TEARDOWN_SCRIPT = """\
+from pathlib import Path
 from tesseract_robotics import tesseract_kinematics as tk
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 locator = GeneralResourceLocator()
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.srdf").getFilePath()
 env = Environment()
-assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+assert env.init(Path(urdf), Path(srdf), locator)
 factory = tk.KinematicsPluginFactory(__YAML__, locator)
 # Inline scene temporaries + no ordered release: the harshest teardown case.
 solver = factory.createInvKin("full_manipulator", "ROPInvKin", env.getSceneGraph(), env.getState())
@@ -159,7 +162,7 @@ def _make_rop_solver():
         "package://tesseract/support/urdf/abb_irb2400_on_positioner.srdf"
     ).getFilePath()
     env = Environment()
-    assert env.init(FilesystemPath(urdf), FilesystemPath(srdf), locator)
+    assert env.init(Path(urdf), Path(srdf), locator)
     factory = tesseract_kinematics.KinematicsPluginFactory(_ROP_PLUGIN_YAML, locator)
     solver = factory.createInvKin(
         "full_manipulator", "ROPInvKin", env.getSceneGraph(), env.getState()

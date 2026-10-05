@@ -1,5 +1,6 @@
 import os
 import traceback
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -292,3 +293,47 @@ def test_clone_releases_gil():
     assert len(clone.getLinkNames()) == len(env.getLinkNames())
     assert probe.copies_without_gil >= 1, "clone() never copied the probe"
     assert probe.copies_with_gil == 0, "clone() copied the probe with the GIL held"
+
+
+def _iiwa_files():
+    urdf_dir = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
+    return urdf_dir / "lbr_iiwa_14_r820.urdf", urdf_dir / "lbr_iiwa_14_r820.srdf"
+
+
+def test_init_from_paths():
+    """gh-165: a `pathlib.Path` reaches the native `std::filesystem::path` overloads."""
+    urdf, srdf = _iiwa_files()
+    locator = TesseractSupportResourceLocator()
+    assert tesseract_environment.Environment().init(urdf, srdf, locator)
+    assert tesseract_environment.Environment().init(urdf, locator)
+
+
+def test_init_from_strings_is_content():
+    """gh-165: a `str` is URDF/SRDF content, as in the native `std::string` overloads."""
+    urdf, srdf = _iiwa_files()
+    locator = TesseractSupportResourceLocator()
+    assert tesseract_environment.Environment().init(urdf.read_text(), srdf.read_text(), locator)
+    assert tesseract_environment.Environment().init(urdf.read_text(), locator)
+
+
+def test_init_str_path_is_not_a_path():
+    """gh-165 (breaking): a path spelled as `str` is parsed as content, so init fails."""
+    urdf, srdf = _iiwa_files()
+    locator = TesseractSupportResourceLocator()
+    assert not tesseract_environment.Environment().init(str(urdf), str(srdf), locator)
+    assert not tesseract_environment.Environment().init(str(urdf), locator)
+
+
+@pytest.mark.parametrize("mixed", ["content_then_path", "path_then_content"])
+def test_init_mixed_raises(mixed):
+    """gh-165: one path and one content string match no overload."""
+    urdf, srdf = _iiwa_files()
+    args = (urdf.read_text(), srdf) if mixed == "content_then_path" else (urdf, srdf.read_text())
+    with pytest.raises(TypeError):
+        tesseract_environment.Environment().init(*args, TesseractSupportResourceLocator())
+
+
+@pytest.mark.parametrize("name", ["initFromUrdf", "initFromUrdfSrdf"])
+def test_init_from_urdf_removed(name):
+    """gh-165: the Python-only content initialisers are gone; `init(str, ...)` replaces them."""
+    assert not hasattr(tesseract_environment.Environment, name)

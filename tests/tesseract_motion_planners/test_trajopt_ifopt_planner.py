@@ -1,5 +1,7 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -14,7 +16,6 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
-    FilesystemPath,
     GeneralResourceLocator,
     ManipulatorInfo,
 )
@@ -41,12 +42,12 @@ TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 def kuka_iiwa_environment():
     """Load KUKA IIWA robot environment for testing."""
     locator = GeneralResourceLocator()
-    urdf_path = FilesystemPath(
+    urdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
         ).getFilePath()
     )
-    srdf_path = FilesystemPath(
+    srdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
         ).getFilePath()

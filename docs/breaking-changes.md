@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
 | Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `ValueError` on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
 | Unreleased | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
@@ -15,6 +16,39 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### A `str` is content, `pathlib.Path` is a file
+
+`tesseract_common.FilesystemPath` was a `str` subclass, so `Environment.init` had to guess
+whether a string was a path or URDF content, and `init(str, str, locator)` loaded *files* where
+the C++ `std::string` overload parses *content*. `std::filesystem::path` now converts with
+nanobind's caster (`str | os.PathLike` in, `pathlib.Path` out), and `Environment.init` binds the
+four native overloads (#165):
+
+| call | meaning |
+| --- | --- |
+| `init(urdf_xml, locator)`, `init(urdf_xml, srdf_xml, locator)` | parse URDF/SRDF content |
+| `init(Path(urdf), locator)`, `init(Path(urdf), Path(srdf), locator)` | load files |
+| `init(str(urdf_path), …)` | parsed as XML: returns `False` |
+| `init(urdf_xml, Path(srdf), locator)` (either order) | `TypeError` |
+
+The path overloads of `Environment.init` and the `ContactManagersPluginFactory` /
+`KinematicsPluginFactory` config constructors accept `os.PathLike` only, never `str`, because
+each sits beside a `str` content overload. Every other `std::filesystem::path` parameter takes
+`str | os.PathLike`.
+
+| before | after |
+| --- | --- |
+| `env.init(FilesystemPath(u), FilesystemPath(s), loc)` | `env.init(Path(u), Path(s), loc)` |
+| `env.init(path_str, loc)` (path) | `env.init(Path(path_str), loc)` |
+| `env.initFromUrdf(xml, loc)` | `env.init(xml, loc)` |
+| `env.initFromUrdfSrdf(u_xml, s_xml, loc)` | `env.init(u_xml, s_xml, loc)` |
+| `KinematicsPluginFactory(_FilesystemPath(p), loc)` (also `ContactManagersPluginFactory`) | `KinematicsPluginFactory(Path(p), loc)` |
+| `TaskComposerPluginFactory(FilesystemPath(p), loc)` | `TaskComposerPluginFactory(str(p), loc)` |
+| `TransformMap()` | `{}` |
+
+`TaskComposerPluginFactory` still takes its config path as `str`; its path/content pair is not
+bound yet.
 
 ### The convex evaluators take the QP solution vector
 
