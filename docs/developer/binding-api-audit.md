@@ -6,8 +6,8 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `28ed3
 | module | covered | gaps | deviations | accepted | quoted types |
 |---|---|---|---|---|---|
 | tesseract_collision | 180 | 52 | 10 | 3 | 6 |
-| tesseract_common | 131 | 106 | 14 | 21 | 0 |
-| tesseract_environment | 124 | 78 | 15 | 22 | 1 |
+| tesseract_common | 131 | 106 | 11 | 24 | 0 |
+| tesseract_environment | 124 | 78 | 14 | 23 | 1 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
@@ -33,6 +33,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
     - `serialization-default-ctor`: The default constructor of a class that befriends cereal `serialize` and declares another public constructor exists for deserialization only.
     - `stream-insertion`: A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__`.
     - `stringstream`: A `std::stringstream&` parameter the C++ writes into is returned as `str`.
+    - `value-equality-unhashable`: `__hash__ = None` next to a bound `__eq__` makes a mutable value type unhashable, as Python does for any class that defines `__eq__`; it needs no C++ counterpart.
 
 !!! note "Unaudited headers"
     - `test_suite/*`: gtest and Google Benchmark sources installed for plugin authors' tests.
@@ -260,11 +261,8 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `CollisionMarginData.getPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:502 | — |
 | `CollisionMarginData.setPairCollisionMargin` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:504 | — |
 | `CollisionMarginOverrideType` | constant | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:468 | — |
-| `ContactManagersPluginInfo.__hash__` | field | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:644 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/__init__.py:22 | — |
 | `FilesystemPath` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:300 | — |
-| `ProfilesPluginInfo.__hash__` | field | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:722 | — |
-| `TaskComposerPluginInfo.__hash__` | field | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:686 | — |
 | `TransformMap` | class | src/tesseract_robotics/tesseract_common/__init__.py:39 | — |
 
 ### Accepted
@@ -273,6 +271,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 |---|---|---|
 | `AngleAxisd.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:236 |
 | `BytesResource.__init__` | serialization-default-ctor | tesseract/common/resource_locator.h:248 |
+| `ContactManagersPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:644 |
 | `EIGEN_DEFAULT_PREC` | eigen-default-precision | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:12 |
 | `FilesystemPath.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:311 |
 | `FilesystemPath.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:309 |
@@ -282,12 +281,14 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | `ManipulatorInfo.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:379 |
 | `ParametrizedLine3d` | eigen-template-instance | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:270 |
 | `ParametrizedLine3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:298 |
+| `ProfilesPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:722 |
 | `Quaterniond.__init__` | scalar-last-quaternion | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:134 |
 | `Quaterniond.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:212 |
 | `Quaterniond.from_rpy` | quaternion-rpy | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:156 |
 | `Quaterniond.from_xyzw` | scalar-last-quaternion | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:152 |
 | `Quaterniond.to_rpy` | quaternion-rpy | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:208 |
 | `SimpleLocatedResource.__init__` | serialization-default-ctor | tesseract/common/resource_locator.h:205 |
+| `TaskComposerPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:686 |
 | `Translation3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:130 |
 | `VectorIsometry3d.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:776 |
 | `VectorVector3d.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi:763 |
@@ -382,7 +383,6 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 | Python name | kind | stub:line | arity |
 |---|---|---|---|
-| `AddContactManagersPluginInfoCommand.__hash__` | field | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:117 | — |
 | `Environment.getCurrentJointValuesByNames` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:355 | — |
 | `Environment.getStateByMap` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:264 | — |
 | `Environment.getStateByNamesAndValues` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:266 | — |
@@ -402,6 +402,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 
 | symbol | rule | location |
 |---|---|---|
+| `AddContactManagersPluginInfoCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi:117 |
 | `AddContactManagersPluginInfoCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_contact_managers_plugin_info_command.h:47 |
 | `AddLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_link_command.h:47 |
 | `AddSceneGraphCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_scene_graph_command.h:48 |
