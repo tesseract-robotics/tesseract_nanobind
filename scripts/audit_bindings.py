@@ -552,6 +552,7 @@ class PySymbol:
     overloads: list[PyOverload] = field(default_factory=list)
     bases: tuple[str, ...] = ()  # stub base-class expressions, for inherited members
     enum_alias: bool = False  # module constant whose value is a stub enum member (Note 1)
+    none_annotated: bool = False  # `name: None`, how nanobind spells `__hash__ = None`
 
 
 @dataclass(frozen=True, order=True)
@@ -674,7 +675,13 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                         )
                         name = prefix + t.id
                         alias = kind is Kind.CONSTANT and _enum_member(node.value, symbols)
-                        symbols[name] = PySymbol(name, kind, node.lineno, enum_alias=alias)
+                        none = (
+                            isinstance(node, ast.AnnAssign)
+                            and ast.unparse(node.annotation) == "None"
+                        )
+                        symbols[name] = PySymbol(
+                            name, kind, node.lineno, enum_alias=alias, none_annotated=none
+                        )
             else:
                 continue
             for ann in _annotations(node) if not isinstance(node, ast.Assign) else []:
@@ -729,6 +736,9 @@ ACCEPTED = {
     "counterpart.",
     "serialization-default-ctor": "The default constructor of a class that befriends cereal "
     "`serialize` and declares another public constructor exists for deserialization only.",
+    "value-equality-unhashable": "`__hash__ = None` next to a bound `__eq__` makes a mutable "
+    "value type unhashable, as Python does for any class that defines `__eq__`; it needs no "
+    "C++ counterpart.",
     "eigen-template-instance": "`Eigen::Hyperplane<double, 3>` and "
     "`Eigen::ParametrizedLine<double, 3>` have no Eigen typedef; the class takes Eigen's own "
     "`…3d` naming (`Vector3d`, `Quaterniond`).",
@@ -869,9 +879,12 @@ def match(
     for name, ps in py.symbols.items():
         where = f"{stub_rel}:{ps.line}"
         rule = ACCEPTED_SYMBOLS.get((module, name))
-        leaf = name.rpartition(".")[2]
+        owner, _, leaf = name.rpartition(".")
         if ps.enum_alias:
             found = None  # a second name for an enum value, even if C++ has it unscoped
+        elif leaf == "__hash__" and ps.none_annotated and _py_member(f"{owner}.__eq__", py):
+            accepted.append(Accepted(name, "value-equality-unhashable", where))
+            continue
         elif ps.kind is Kind.PROTOCOL and name not in cpp:
             proto = _protocol_rule(name, cpp, tu_names)
             if proto:

@@ -4,6 +4,7 @@ Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 The default env ignores this directory via `addopts`.
 """
 
+import ast
 import importlib.util
 import json
 import re
@@ -311,6 +312,7 @@ def test_fixture_deviations_exact(fixture_report):
         ("Widget.widget_grow", audit.Kind.METHOD, "—"),
         ("Widget.widget_samples", audit.Kind.METHOD, "—"),
         ("Gadget.__len__", audit.Kind.PROTOCOL, "—"),  # C++ Gadget has no size()
+        ("Gadget.__hash__", audit.Kind.FIELD, "—"),  # unhashable without a bound __eq__
         ("Color_RED", audit.Kind.CONSTANT, "—"),
         ("LEVEL_LOW", audit.Kind.CONSTANT, "—"),  # aliases an unscoped enum value (Note 1)
         ("scale_twice", audit.Kind.FUNCTION, "—"),
@@ -331,7 +333,21 @@ def test_fixture_accepted_exact(fixture_report):
         ("Bag.__str__", "stream-insertion"),  # M5
         ("Widget.__repr__", "presentation-dunder"),  # M12
         ("Record.__init__", "serialization-default-ctor"),  # E2
+        ("Widget.__hash__", "value-equality-unhashable"),
     }
+
+
+@pytest.mark.parametrize(
+    ("hash_line", "accepted"),
+    [("__hash__: None = None", True), ("__hash__: int", False)],
+)
+def test_only_a_none_hash_next_to_eq_is_value_equality_unhashable(hash_line, accepted):
+    stub = f"class V:\n    def __eq__(self, other: V) -> bool: ...\n    {hash_line}\n"
+    py = audit.py_api(ast.parse(stub), "v.pyi")
+    report = audit.match("v", {}, frozenset(), py, "v.pyi")
+    rows = {(a.symbol, a.rule) for a in report.accepted}
+    assert (("V.__hash__", "value-equality-unhashable") in rows) is accepted
+    assert ("V.__hash__" in {d.name for d in report.deviations}) is not accepted
 
 
 def test_container_members_covered_by_protocol_dunders(fixture_report):
@@ -358,6 +374,7 @@ def test_new_accepted_rules_rendered_with_reasons(fixture_report):
         "stream-insertion",
         "presentation-dunder",
         "serialization-default-ctor",
+        "value-equality-unhashable",
     ):
         assert audit.ACCEPTED.get(rule), rule  # a non-empty reason
         assert f"`{rule}`: {audit.ACCEPTED[rule]}" in text
@@ -421,6 +438,14 @@ def test_quaternion_scalar_last_accepted(real_reports):
         ("tesseract_common", "Isometry3d.__repr__", "presentation-dunder"),
         ("tesseract_common", "SimpleLocatedResource.__init__", "serialization-default-ctor"),
         ("tesseract_environment", "AddLinkCommand.__init__", "serialization-default-ctor"),
+        ("tesseract_common", "ContactManagersPluginInfo.__hash__", "value-equality-unhashable"),
+        ("tesseract_common", "TaskComposerPluginInfo.__hash__", "value-equality-unhashable"),
+        ("tesseract_common", "ProfilesPluginInfo.__hash__", "value-equality-unhashable"),
+        (
+            "tesseract_environment",
+            "AddContactManagersPluginInfoCommand.__hash__",
+            "value-equality-unhashable",
+        ),
         ("tesseract_common", "Hyperplane3d", "eigen-template-instance"),
         ("tesseract_common", "ParametrizedLine3d", "eigen-template-instance"),
         ("tesseract_common", "Quaterniond.from_rpy", "quaternion-rpy"),
