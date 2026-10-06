@@ -81,3 +81,94 @@ def test_continuous_sweep_populates_cc_time():
         del factory
         del locator
         gc.collect()
+
+
+# --------------------------------------------------------------------------- #
+# gh-174: the cast overloads under the native setCollisionObjectsTransform name
+# --------------------------------------------------------------------------- #
+def _sweep_x(x):
+    m = np.eye(4)
+    m[0][3] = x
+    return Isometry3d(m)
+
+
+def _cast_contact(set_cast):
+    """Sweep moving_box through static_box with `set_cast(checker, start, end)`; return the contact."""
+    factory, locator = _get_discrete_factory()
+    checker = factory.createContinuousContactManager("BulletCastBVHManager")
+    try:
+        shapes_a, poses_a = _box()
+        shapes_b, poses_b = _box()
+        checker.addCollisionObject("static_box", 0, shapes_a, poses_a)
+        checker.addCollisionObject("moving_box", 0, shapes_b, poses_b)
+        checker.setActiveCollisionObjects(["moving_box"])
+        checker.setCollisionMarginData(CollisionMarginData(0.1))
+        checker.setCollisionObjectsTransform("static_box", Isometry3d(np.eye(4)))
+        set_cast(checker, _sweep_x(-5.0), _sweep_x(5.0))
+
+        result = ContactResultMap()
+        checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+        flat = ContactResultVector()
+        result.flattenMoveResults(flat)
+        assert len(flat) == 1
+        cr = flat[0]
+        return list(cr.cc_time), list(cr.cc_type), list(cr.link_names)
+    finally:
+        del checker
+        del factory
+        del locator
+        gc.collect()
+
+
+CAST_SHAPES = {
+    "name": (
+        lambda c, s, e: c.setCollisionObjectsTransform("moving_box", s, e),
+        lambda c, s, e: c.setCollisionObjectsTransformCast("moving_box", s, e),
+    ),
+    "names": (
+        lambda c, s, e: c.setCollisionObjectsTransform(["moving_box"], [s], [e]),
+        lambda c, s, e: c.setCollisionObjectsTransformCast(["moving_box"], [s], [e]),
+    ),
+    # header :199, (TransformMap, TransformMap): arity 2, invisible to the arity-only audit
+    "transform_maps": (
+        lambda c, s, e: c.setCollisionObjectsTransform({"moving_box": s}, {"moving_box": e}),
+        lambda c, s, e: c.setCollisionObjectsTransformCast({"moving_box": s}, {"moving_box": e}),
+    ),
+}
+
+
+@pytest.mark.parametrize("shape", CAST_SHAPES)
+def test_native_cast_overload_matches_cast_alias(shape):
+    native, alias = CAST_SHAPES[shape]
+    expected = _cast_contact(alias)
+    assert _cast_contact(native) == expected
+    assert expected[1] != [ContinuousCollisionType.CCType_None] * 2
+
+
+def _static_names_contacts_at(checker, x):
+    checker.setCollisionObjectsTransform(["moving_box"], [_sweep_x(x)])
+    result = ContactResultMap()
+    checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+    return result.count()
+
+
+def test_arity_two_static_names_overload_still_sets_static_pose():
+    factory, locator = _get_discrete_factory()
+    checker = factory.createContinuousContactManager("BulletCastBVHManager")
+    try:
+        shapes_a, poses_a = _box()
+        shapes_b, poses_b = _box()
+        checker.addCollisionObject("static_box", 0, shapes_a, poses_a)
+        checker.addCollisionObject("moving_box", 0, shapes_b, poses_b)
+        checker.setActiveCollisionObjects(["moving_box"])
+        checker.setCollisionMarginData(CollisionMarginData(0.1))
+        checker.setCollisionObjectsTransform("static_box", Isometry3d(np.eye(4)))
+
+        # unit boxes, margin 0.1: apart at x = 3, overlapping at x = 0.5
+        assert _static_names_contacts_at(checker, 3.0) == 0
+        assert _static_names_contacts_at(checker, 0.5) == 1
+    finally:
+        del checker
+        del factory
+        del locator
+        gc.collect()

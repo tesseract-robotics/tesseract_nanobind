@@ -107,7 +107,7 @@ for i in range(len(results)):
 
 ## Continuous Collision Checking
 
-Check for collisions along a motion segment. Each active link needs a start and end transform via `setCollisionObjectsTransformCast`:
+Check for collisions along a motion segment. Each active link needs a start and end transform, set with the three-argument (or two-mapping) `setCollisionObjectsTransform`:
 
 ```python
 from tesseract_robotics.tesseract_collision import (
@@ -128,7 +128,7 @@ manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
 # Set start and end poses per link
 for link_name, pose_start in start_transforms.items():
     pose_end = end_transforms[link_name]
-    manager.setCollisionObjectsTransformCast(link_name, pose_start, pose_end)
+    manager.setCollisionObjectsTransform(link_name, pose_start, pose_end)
 
 # Check swept volume
 contacts = ContactResultMap()

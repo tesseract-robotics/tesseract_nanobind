@@ -38,7 +38,8 @@ manager = env.getContinuousContactManager()
 # Clone for thread safety
 my_manager = manager.clone()
 
-# Set start and end transforms
+# Moving objects: start and end transforms (dict/dict, name + 2 poses, or names + 2 pose lists).
+# Static objects take the single-pose overloads.
 my_manager.setCollisionObjectsTransform(
     link_transforms_start,
     link_transforms_end

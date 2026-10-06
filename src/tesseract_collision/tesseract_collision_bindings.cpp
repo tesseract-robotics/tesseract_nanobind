@@ -439,6 +439,22 @@ NB_MODULE(_tesseract_collision, m) {
         .def("clone", [](const tc::DiscreteContactManager& self) { return self.clone(); });
 
     // ========== ContinuousContactManager (abstract, expose key methods) ==========
+    // The three cast (start+end pose) overloads, each registered under two names below.
+    auto cast_name = [](tc::ContinuousContactManager& self, const std::string& name,
+                        const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2) {
+        self.setCollisionObjectsTransform(name, pose1, pose2);
+    };
+    auto cast_names = [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
+                         const tcommon::VectorIsometry3d& pose1, const tcommon::VectorIsometry3d& pose2) {
+        self.setCollisionObjectsTransform(names, pose1, pose2);
+    };
+    auto cast_maps = [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& pose1,
+                        const std::map<std::string, Eigen::Isometry3d>& pose2) {
+        tcommon::TransformMap tm1, tm2;
+        for (const auto& p : pose1) { tm1[p.first] = p.second; }
+        for (const auto& p : pose2) { tm2[p.first] = p.second; }
+        self.setCollisionObjectsTransform(tm1, tm2);
+    };
     nb::class_<tc::ContinuousContactManager>(m, "ContinuousContactManager")
         .def("getName", &tc::ContinuousContactManager::getName)
         .def("hasCollisionObject", &tc::ContinuousContactManager::hasCollisionObject, "name"_a)
@@ -471,25 +487,14 @@ NB_MODULE(_tesseract_collision, m) {
                  for (const auto& p : transforms) { tm[p.first] = p.second; }
                  self.setCollisionObjectsTransform(tm);
              }, "transforms"_a)
-        // Cast (moving, start+end pose) object transforms
-        .def("setCollisionObjectsTransformCast",
-             [](tc::ContinuousContactManager& self, const std::string& name,
-                const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2) {
-                 self.setCollisionObjectsTransform(name, pose1, pose2);
-             }, "name"_a, "pose1"_a, "pose2"_a)
-        .def("setCollisionObjectsTransformCast",
-             [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
-                const tcommon::VectorIsometry3d& pose1, const tcommon::VectorIsometry3d& pose2) {
-                 self.setCollisionObjectsTransform(names, pose1, pose2);
-             }, "names"_a, "pose1"_a, "pose2"_a)
-        .def("setCollisionObjectsTransformCast",
-             [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& pose1,
-                const std::map<std::string, Eigen::Isometry3d>& pose2) {
-                 tcommon::TransformMap tm1, tm2;
-                 for (const auto& p : pose1) { tm1[p.first] = p.second; }
-                 for (const auto& p : pose2) { tm2[p.first] = p.second; }
-                 self.setCollisionObjectsTransform(tm1, tm2);
-             }, "pose1"_a, "pose2"_a)
+        // Cast (moving, start+end pose) overloads, under the native name and under the Python-only
+        // setCollisionObjectsTransformCast, which stays until its removal is approved separately.
+        .def("setCollisionObjectsTransform", cast_name, "name"_a, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransform", cast_names, "names"_a, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransform", cast_maps, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransformCast", cast_name, "name"_a, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransformCast", cast_names, "names"_a, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransformCast", cast_maps, "pose1"_a, "pose2"_a)
         .def("getCollisionObjects", &tc::ContinuousContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::ContinuousContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::ContinuousContactManager::getActiveCollisionObjects)
