@@ -29,6 +29,10 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 // console_bridge
 #include <console_bridge/console.h>
 
+// GeneralResourceLocator's default `environment_variables`, copied from resource_locator.h:93/:103
+static const std::vector<std::string> GENERAL_RESOURCE_LOCATOR_DEFAULT_ENV_VARS = {
+    "TESSERACT_RESOURCE_PATH", "ROS_PACKAGE_PATH", "AMENT_PREFIX_PATH"};
+
 // Trampoline class for ResourceLocator
 class PyResourceLocator : public tesseract::common::ResourceLocator {
 public:
@@ -735,9 +739,29 @@ NB_MODULE(_tesseract_common, m) {
     // Note: TransformMap (std::map<string, Isometry3d>) is handled automatically by nanobind's
     // stl/map type caster - Python dict with Isometry3d values will convert automatically
 
+    // ========== ResourceLocator Hierarchy ==========
+    // Registered before Resource, which derives from it (resource_locator.h:146).
+    nb::class_<tesseract::common::ResourceLocator, PyResourceLocator>(m, "ResourceLocator")
+        .def(nb::init<>())
+        // nullptr (None) when the url is not found
+        .def("locateResource", &tesseract::common::ResourceLocator::locateResource, "url"_a,
+             nb::sig("def locateResource(self, url: str) -> Resource | None"));
+
+    // Both non-default ctors are keyword-only: nanobind's std::filesystem::path caster accepts
+    // a plain `str`, so a positional list[str] would match both vector<string> (env-var names)
+    // and vector<path> (directories), and registration order would silently pick one.
+    nb::class_<tesseract::common::GeneralResourceLocator, tesseract::common::ResourceLocator>(m, "GeneralResourceLocator")
+        .def(nb::init<>())
+        .def(nb::init<const std::vector<std::string>&>(), nb::kw_only(), "environment_variables"_a)
+        .def(nb::init<const std::vector<std::filesystem::path>&, const std::vector<std::string>&>(),
+             nb::kw_only(), "paths"_a, "environment_variables"_a = GENERAL_RESOURCE_LOCATOR_DEFAULT_ENV_VARS)
+        .def("addPath", &tesseract::common::GeneralResourceLocator::addPath, "path"_a)
+        .def("loadEnvironmentVariable", &tesseract::common::GeneralResourceLocator::loadEnvironmentVariable,
+             "environment_variable"_a);
+
     // ========== Resource Types ==========
     // Note: In nanobind 2.x, shared_ptr holder is automatic - don't specify it
-    nb::class_<tesseract::common::Resource>(m, "Resource")
+    nb::class_<tesseract::common::Resource, tesseract::common::ResourceLocator>(m, "Resource")
         .def("isFile", &tesseract::common::Resource::isFile)
         .def("getUrl", &tesseract::common::Resource::getUrl)
         .def("getFilePath", &tesseract::common::Resource::getFilePath)
@@ -752,26 +776,23 @@ NB_MODULE(_tesseract_common, m) {
             return nb::module_::import_("io").attr("BytesIO")(nb::bytes(data.data(), data.size()));
         }, nb::sig("def getResourceContentStream(self) -> io.BytesIO"));
 
+    // `parent` resolves relative urls: BytesResource.locateResource asks it for the url as
+    // given, then for the sibling of its own url. The raw-pointer ctor (h:251) stays unbound;
+    // the `bytes` overload covers it.
     nb::class_<tesseract::common::BytesResource, tesseract::common::Resource>(m, "BytesResource")
-        .def(nb::init<const std::string&, const std::vector<uint8_t>&>())
-        .def("__init__", [](tesseract::common::BytesResource* self, const std::string& url, nb::bytes data) {
+        .def(nb::init<std::string, std::vector<uint8_t>, std::shared_ptr<tesseract::common::ResourceLocator>>(),
+             "url"_a, "bytes"_a, "parent"_a.none() = nb::none())
+        .def("__init__", [](tesseract::common::BytesResource* self, std::string url, nb::bytes data,
+                            std::shared_ptr<tesseract::common::ResourceLocator> parent) {
             std::vector<uint8_t> vec(data.size());
             std::memcpy(vec.data(), data.c_str(), data.size());
-            new (self) tesseract::common::BytesResource(url, vec);
-        });
+            new (self) tesseract::common::BytesResource(std::move(url), std::move(vec), std::move(parent));
+        }, "url"_a, "bytes"_a, "parent"_a.none() = nb::none());
 
     nb::class_<tesseract::common::SimpleLocatedResource, tesseract::common::Resource>(m, "SimpleLocatedResource")
         .def(nb::init<const std::string&, const std::string&>(), "url"_a, "filename"_a)
         .def(nb::init<const std::string&, const std::string&, std::shared_ptr<tesseract::common::ResourceLocator>>(),
              "url"_a, "filename"_a, "parent"_a);
-
-    // ========== ResourceLocator Hierarchy ==========
-    nb::class_<tesseract::common::ResourceLocator, PyResourceLocator>(m, "ResourceLocator")
-        .def(nb::init<>())
-        .def("locateResource", &tesseract::common::ResourceLocator::locateResource);
-
-    nb::class_<tesseract::common::GeneralResourceLocator, tesseract::common::ResourceLocator>(m, "GeneralResourceLocator")
-        .def(nb::init<>());
 
     // ========== ManipulatorInfo ==========
     nb::class_<tesseract::common::ManipulatorInfo>(m, "ManipulatorInfo")

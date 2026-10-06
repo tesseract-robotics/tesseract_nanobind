@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 import enum
 import io
+import os
 from typing import Annotated, TypeAlias, overload
 
 import numpy
@@ -297,7 +298,26 @@ class ParametrizedLine3d:
 
     def __repr__(self) -> str: ...
 
-class Resource:
+class ResourceLocator:
+    def __init__(self) -> None: ...
+
+    def locateResource(self, url: str) -> Resource | None: ...
+
+class GeneralResourceLocator(ResourceLocator):
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, *, environment_variables: Sequence[str]) -> None: ...
+
+    @overload
+    def __init__(self, *, paths: Sequence[str | os.PathLike], environment_variables: Sequence[str] = ...) -> None: ...
+
+    def addPath(self, path: str | os.PathLike) -> bool: ...
+
+    def loadEnvironmentVariable(self, environment_variable: str) -> bool: ...
+
+class Resource(ResourceLocator):
     def isFile(self) -> bool: ...
 
     def getUrl(self) -> str: ...
@@ -310,10 +330,10 @@ class Resource:
 
 class BytesResource(Resource):
     @overload
-    def __init__(self, arg0: str, arg1: Sequence[int], /) -> None: ...
+    def __init__(self, url: str, bytes: Sequence[int], parent: ResourceLocator | None = None) -> None: ...
 
     @overload
-    def __init__(self, arg0: str, arg1: bytes, /) -> None: ...
+    def __init__(self, url: str, bytes: bytes, parent: ResourceLocator | None = None) -> None: ...
 
 class SimpleLocatedResource(Resource):
     @overload
@@ -321,14 +341,6 @@ class SimpleLocatedResource(Resource):
 
     @overload
     def __init__(self, url: str, filename: str, parent: ResourceLocator) -> None: ...
-
-class ResourceLocator:
-    def __init__(self) -> None: ...
-
-    def locateResource(self, arg: str, /) -> Resource: ...
-
-class GeneralResourceLocator(ResourceLocator):
-    def __init__(self) -> None: ...
 
 class ManipulatorInfo:
     def __init__(self) -> None: ...

@@ -98,6 +98,24 @@ resource = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.
 path = resource.getFilePath()
 ```
 
+A package is a directory that holds a `package.xml`; its name is the directory name. The
+locator finds packages in the directories it is given and in their subdirectories. Without
+arguments it reads `TESSERACT_RESOURCE_PATH`, `ROS_PACKAGE_PATH` and `AMENT_PREFIX_PATH`.
+Both other constructors take keyword arguments only, because a positional `list[str]` could
+mean either directories or environment variable names:
+
+```python
+from pathlib import Path
+
+locator = GeneralResourceLocator(paths=[Path("~/ws/src").expanduser()])  # + the default env vars
+locator = GeneralResourceLocator(environment_variables=["MY_RESOURCE_PATH"])
+
+locator.addPath(Path("/opt/robots"))         # False if the directory does not exist
+locator.loadEnvironmentVariable("MY_PATHS")  # False if the variable is unset
+```
+
+`locateResource` returns `None` when it cannot resolve the url.
+
 ### BytesResource
 
 In-memory resource from bytes.
@@ -107,6 +125,16 @@ from tesseract_robotics.tesseract_common import BytesResource
 
 data = b"<robot name='test'></robot>"
 resource = BytesResource("robot.urdf", data)
+```
+
+Every `Resource` is also a `ResourceLocator`: `resource.locateResource(url)` resolves a url
+relative to the resource, through the `parent` locator it was built with (`None` without a
+parent). `BytesResource` first asks the parent for the url as given, then for the file next
+to its own url:
+
+```python
+urdf = BytesResource("package://my_robot/urdf/robot.urdf", data, parent=locator)
+mesh = urdf.locateResource("base.stl")  # tries "base.stl", then "package://my_robot/urdf/base.stl"
 ```
 
 ## Collision

@@ -268,3 +268,112 @@ def test_plugin_info_config_keys(cls_name, key):
 def test_no_filesystem_path_shims(name):
     """gh-165: `std::filesystem::path` is a caster (`pathlib.Path`), TransformMap a plain dict."""
     assert not hasattr(tesseract_common, name)
+
+
+# ---------------------------------------------------------------------------
+# gh-166: Resource is a ResourceLocator; BytesResource takes `parent`; GeneralResourceLocator API
+# ---------------------------------------------------------------------------
+
+
+class _RecordingLocator(tesseract_common.ResourceLocator):
+    """Answers only `hits`; records every url it is asked for."""
+
+    def __init__(self, hits):
+        super().__init__()
+        self.hits = hits
+        self.asked = []
+
+    def locateResource(self, url):
+        self.asked.append(url)
+        if url in self.hits:
+            return tesseract_common.BytesResource(url, self.hits[url])
+        return None
+
+
+def test_resource_is_resource_locator():
+    assert issubclass(tesseract_common.Resource, tesseract_common.ResourceLocator)
+    assert isinstance(
+        tesseract_common.BytesResource("file:///a.bin", b"x"), tesseract_common.ResourceLocator
+    )
+
+
+def test_located_resources_without_parent_locate_nothing():
+    """Upstream: no parent -> locateResource returns nullptr (resource_locator.cpp, 0.35.0)."""
+    br = tesseract_common.BytesResource("file:///dir/a.bin", b"x")
+    slr = tesseract_common.SimpleLocatedResource("file:///dir/a.bin", "/dir/a.bin")
+    assert br.locateResource("b.bin") is None
+    assert slr.locateResource("b.bin") is None
+
+
+def test_bytes_resource_parent_resolves_relative_url():
+    """BytesResource asks its parent for the url as given, then for the sibling of its own url."""
+    sibling = "package://pkg/meshes/b.stl"
+    loc = _RecordingLocator({sibling: b"mesh"})
+    br = tesseract_common.BytesResource("package://pkg/meshes/a.urdf", b"<robot/>", parent=loc)
+
+    found = br.locateResource("b.stl")
+
+    assert found is not None
+    assert found.getUrl() == sibling
+    assert found.getResourceContents() == b"mesh"
+    assert loc.asked == ["b.stl", sibling]
+
+
+def test_bytes_resource_list_ctor_takes_parent():
+    loc = _RecordingLocator({"package://pkg/b.bin": b"y"})
+    br = tesseract_common.BytesResource("package://pkg/a.bin", [1, 2, 3], parent=loc)
+    assert br.getResourceContents() == bytes([1, 2, 3])
+    assert br.locateResource("b.bin").getUrl() == "package://pkg/b.bin"
+
+
+def test_simple_located_resource_delegates_to_parent():
+    loc = _RecordingLocator({"package://pkg/meshes/b.stl": b"mesh"})
+    slr = tesseract_common.SimpleLocatedResource("package://pkg/meshes/a.urdf", "/x/a.urdf", loc)
+    assert slr.locateResource("b.stl").getUrl() == "package://pkg/meshes/b.stl"
+
+
+def _make_package(root, name="my_pkg"):
+    """Upstream package rule: a directory holding `package.xml` is a package named after the directory."""
+    pkg = root / name
+    pkg.mkdir()
+    (pkg / "package.xml").write_text("<package/>")
+    (pkg / "data.txt").write_text("hello")
+    return pkg
+
+
+def test_general_resource_locator_paths_ctor(tmp_path):
+    pkg = _make_package(tmp_path)
+    loc = tesseract_common.GeneralResourceLocator(paths=[tmp_path], environment_variables=[])
+    res = loc.locateResource("package://my_pkg/data.txt")
+    assert res is not None
+    assert res.getFilePath() == str(pkg / "data.txt")
+    assert res.getResourceContents() == b"hello"
+
+
+def test_general_resource_locator_add_path(tmp_path):
+    _make_package(tmp_path)
+    loc = tesseract_common.GeneralResourceLocator(environment_variables=[])
+    assert loc.locateResource("package://my_pkg/data.txt") is None
+    assert loc.addPath(tmp_path) is True
+    assert loc.locateResource("package://my_pkg/data.txt") is not None
+    assert loc.addPath(tmp_path / "missing") is False
+
+
+def test_general_resource_locator_environment_variable(tmp_path, monkeypatch):
+    _make_package(tmp_path)
+    monkeypatch.setenv("GH166_RESOURCE_PATH", str(tmp_path))
+    monkeypatch.delenv("GH166_UNSET_VAR", raising=False)
+
+    loc = tesseract_common.GeneralResourceLocator(environment_variables=["GH166_RESOURCE_PATH"])
+    assert loc.locateResource("package://my_pkg/data.txt") is not None
+
+    empty = tesseract_common.GeneralResourceLocator(environment_variables=[])
+    assert empty.loadEnvironmentVariable("GH166_UNSET_VAR") is False
+    assert empty.loadEnvironmentVariable("GH166_RESOURCE_PATH") is True
+    assert empty.locateResource("package://my_pkg/data.txt") is not None
+
+
+def test_general_resource_locator_positional_list_rejected():
+    """A positional list could mean env-var names or paths; both ctors are keyword-only."""
+    with pytest.raises(TypeError):
+        tesseract_common.GeneralResourceLocator(["/some/dir"])
