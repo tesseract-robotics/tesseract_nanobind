@@ -382,6 +382,15 @@ class ContactTrajectoryResults:
     @total_steps.setter
     def total_steps(self, arg: int, /) -> None: ...
 
+class ContactResultValidator:
+    """
+    Approves or rejects contact results: subclass and implement `__call__(result) -> bool`.
+    """
+
+    def __init__(self) -> None: ...
+
+    def __call__(self, result: ContactResult) -> bool: ...
+
 class ContactRequest:
     @overload
     def __init__(self) -> None: ...
@@ -412,6 +421,15 @@ class ContactRequest:
 
     @contact_limit.setter
     def contact_limit(self, arg: int, /) -> None: ...
+
+    @property
+    def is_valid(self) -> ContactResultValidator | None:
+        """
+        Validator called on each contact; return False to reject it. None disables validation.
+        """
+
+    @is_valid.setter
+    def is_valid(self, value: ContactResultValidator | None) -> None: ...
 
 class ContactManagerConfig:
     @overload

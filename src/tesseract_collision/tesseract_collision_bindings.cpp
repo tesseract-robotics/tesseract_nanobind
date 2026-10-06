@@ -11,6 +11,7 @@
 #include <tesseract/collision/discrete_contact_manager.h>
 #include <tesseract/collision/continuous_contact_manager.h>
 #include <tesseract/collision/contact_managers_plugin_factory.h>
+#include <tesseract/collision/contact_result_validator.h>
 
 // tesseract_common for types
 #include <tesseract/common/allowed_collision_matrix.h>
@@ -71,6 +72,18 @@ CRM::FilterFn to_filter_fn(const std::optional<PyFilterFn>& maybe_fn) {
         fn(nb::cast(pair.first), nb::cast(pair.second, nb::rv_policy::reference));
     };
 }
+
+// Python subclasses implement __call__(result) -> bool. The ticket inside NB_OVERRIDE_PURE_NAME
+// takes the GIL, which contactTest releases. The ContactResult argument is copied (nanobind's
+// default for const& arguments), so a validator that keeps a reference cannot dangle.
+class PyContactResultValidator : public tc::ContactResultValidator {
+public:
+    NB_TRAMPOLINE(tc::ContactResultValidator, 1);
+
+    bool operator()(const tc::ContactResult& result) const override {
+        NB_OVERRIDE_PURE_NAME("__call__", operator(), result);
+    }
+};
 
 }  // namespace
 
@@ -294,6 +307,13 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("joint_names", &tc::ContactTrajectoryResults::joint_names)
         .def_rw("total_steps", &tc::ContactTrajectoryResults::total_steps);
 
+    // ========== ContactResultValidator ==========
+    nb::class_<tc::ContactResultValidator, PyContactResultValidator>(
+        m, "ContactResultValidator",
+        "Approves or rejects contact results: subclass and implement `__call__(result) -> bool`.")
+        .def(nb::init<>())
+        .def("__call__", &tc::ContactResultValidator::operator(), "result"_a);
+
     // ========== ContactRequest ==========
     nb::class_<tc::ContactRequest>(m, "ContactRequest")
         .def(nb::init<>())
@@ -301,7 +321,17 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("type", &tc::ContactRequest::type)
         .def_rw("calculate_penetration", &tc::ContactRequest::calculate_penetration)
         .def_rw("calculate_distance", &tc::ContactRequest::calculate_distance)
-        .def_rw("contact_limit", &tc::ContactRequest::contact_limit);
+        .def_rw("contact_limit", &tc::ContactRequest::contact_limit)
+        .def_prop_rw("is_valid",
+            [](const tc::ContactRequest& self) -> std::optional<std::shared_ptr<const tc::ContactResultValidator>> {
+                if (!self.is_valid) return std::nullopt;
+                return self.is_valid;
+            },
+            [](tc::ContactRequest& self, std::shared_ptr<const tc::ContactResultValidator> v) {
+                self.is_valid = std::move(v);
+            },
+            nb::for_setter(nb::arg("value").none()),
+            "Validator called on each contact; return False to reject it. None disables validation.");
 
     // ========== ContactManagerConfig ==========
     // Note: 0.33 renamed margin_data_override_type → pair_margin_override_type

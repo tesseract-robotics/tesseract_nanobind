@@ -24,6 +24,7 @@ __all__ = [
     "UnorderedLinkPairError",
     "EmptyContactResultsError",
     "ContactRequest",
+    "ContactResultValidator",
     "ContactTrajectorySubstepResults",
     "ContactTrajectoryStepResults",
     "ContactTrajectoryResults",

@@ -74,6 +74,30 @@ request.type = ContactTestType.LIMITED  # up to max contacts
 | `ALL` | Return all contacts |
 | `LIMITED` | Return up to N contacts |
 
+### Validating contacts
+
+`ContactRequest.is_valid` takes a `ContactResultValidator`: each contact the
+manager finds is passed to it, and a `False` return drops that contact. Subclass
+it and implement `__call__`. `None` (the default) disables validation.
+
+```python
+from tesseract_robotics.tesseract_collision import ContactResultValidator
+
+
+class IgnoreGripper(ContactResultValidator):
+    def __call__(self, result):
+        return "gripper" not in result.link_names
+
+
+request.is_valid = IgnoreGripper()   # the request keeps the validator alive
+manager.contactTest(result_map, request)
+```
+
+`contactTest` releases the GIL; the validator takes it again for each call, so a
+contact test with a Python validator also runs from a worker thread. An exception
+raised in `__call__` propagates out of `contactTest`. The `result` argument is a
+copy, so keeping it beyond the call is safe.
+
 ## Contact Results
 
 ### ContactResult
