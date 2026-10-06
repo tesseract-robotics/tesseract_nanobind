@@ -215,6 +215,34 @@ state.position = np.array([0.0, 0.5, -0.5])
 state.velocity = np.array([0.0, 0.0, 0.0])
 ```
 
+### JointTrajectory
+
+A sequence of `JointState`s with a `description` and a `uuid` (its canonical string; a
+malformed string raises `ValueError`). It behaves like a list of states: `len`, indexing
+(negative indices count from the end; out of range raises `IndexError`), assignment and
+iteration, plus `push_back`, `pop_back`, `front`, `back`, `at`, `clear` and `empty`.
+
+```python
+from tesseract_robotics.tesseract_common import JointState, JointTrajectory
+
+names = ["j1", "j2", "j3"]
+traj = JointTrajectory([JointState(names, np.zeros(3))], "approach")
+traj.push_back(JointState(names, np.array([0.0, 0.5, -0.5])))
+
+js = traj[-1]
+js.time = 1.0
+traj[-1] = js  # write back: element access returns a copy
+```
+
+!!! warning "Element access returns a copy"
+    `traj[i]`, `front()`, `back()`, `at(i)`, iteration and the `states` list are copies,
+    so `traj[0].time = 1.0` changes nothing. Assign the edited state back with
+    `traj[0] = js`, or assign a whole new list to `traj.states`. A reference into the
+    underlying vector would dangle as soon as `push_back` reallocated it.
+
+Trajectories compare by value (`==` compares `uuid`, `description` and `states`) and are
+unhashable.
+
 ### KinematicLimits
 
 Joint position, velocity, acceleration limits.

@@ -98,6 +98,34 @@ class AddSceneGraphCommand(Command):
 
     def getPrefix(self) -> str: ...
 
+class AddTrajectoryLinkCommand(Command):
+    def __init__(self, link_name: str, parent_link_name: str, trajectory: tesseract_robotics.tesseract_common._tesseract_common.JointTrajectory, replace_allowed: bool = False, method: AddTrajectoryLinkCommand.Method = AddTrajectoryLinkCommand.Method.PER_STATE_OBJECTS) -> None: ...
+
+    class Method(enum.Enum):
+        PER_STATE_OBJECTS = 0
+
+        PER_STATE_CONVEX_HULL = 1
+
+        GLOBAL_PER_LINK_CONVEX_HULL = 2
+
+        GLOBAL_CONVEX_HULL = 3
+
+    def getLinkName(self) -> str: ...
+
+    def getParentLinkName(self) -> str: ...
+
+    def getTrajectory(self) -> tesseract_robotics.tesseract_common._tesseract_common.JointTrajectory: ...
+
+    def replaceAllowed(self) -> bool: ...
+
+    def getMethod(self) -> AddTrajectoryLinkCommand.Method: ...
+
+    def __eq__(self, arg: AddTrajectoryLinkCommand, /) -> bool: ...
+
+    def __ne__(self, arg: AddTrajectoryLinkCommand, /) -> bool: ...
+
+    __hash__: None = None
+
 class AddKinematicsInformationCommand(Command):
     @overload
     def __init__(self) -> None: ...
@@ -306,6 +334,9 @@ class Environment:
 
     @overload
     def applyCommand(self, command: AddSceneGraphCommand) -> bool: ...
+
+    @overload
+    def applyCommand(self, command: AddTrajectoryLinkCommand) -> bool: ...
 
     @overload
     def applyCommand(self, command: AddKinematicsInformationCommand) -> bool: ...

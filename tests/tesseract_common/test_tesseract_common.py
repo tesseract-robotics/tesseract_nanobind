@@ -377,3 +377,139 @@ def test_general_resource_locator_positional_list_rejected():
     """A positional list could mean env-var names or paths; both ctors are keyword-only."""
     with pytest.raises(TypeError):
         tesseract_common.GeneralResourceLocator(["/some/dir"])
+
+
+# ---------------------------------------------------------------------------
+# gh-167: JointTrajectory
+# ---------------------------------------------------------------------------
+
+_NIL_UUID = "00000000-0000-0000-0000-000000000000"
+_SOME_UUID = "123e4567-e89b-12d3-a456-426614174000"
+
+
+def _joint_state(t, q=(0.0, 0.0)):
+    js = tesseract_common.JointState(["j1", "j2"], np.array(q))
+    js.time = t
+    return js
+
+
+def _trajectory(n=3):
+    return tesseract_common.JointTrajectory([_joint_state(float(i)) for i in range(n)], "traj")
+
+
+def test_joint_trajectory_construct():
+    empty = tesseract_common.JointTrajectory()
+    assert empty.description == ""
+    assert len(empty) == 0
+    assert tesseract_common.JointTrajectory("d").description == "d"
+
+    traj = _trajectory()
+    assert traj.description == "traj"
+    assert [s.time for s in traj.states] == [0.0, 1.0, 2.0]
+    assert traj.states[1].joint_names == ["j1", "j2"]
+
+    traj.states = [_joint_state(9.0)]
+    traj.description = "other"
+    assert [s.time for s in traj.states] == [9.0]
+    assert traj.description == "other"
+
+
+def test_joint_trajectory_container_protocol():
+    traj = _trajectory()
+    assert len(traj) == 3
+    assert traj[0].time == 0.0
+    assert traj[-1].time == 2.0
+    assert [s.time for s in traj] == [0.0, 1.0, 2.0]
+
+    traj[1] = _joint_state(5.0)
+    assert traj[1].time == 5.0
+    assert traj.states[1].time == 5.0  # __setitem__ writes through to `states`
+    traj[-1] = _joint_state(6.0)
+    assert traj[2].time == 6.0
+
+    traj.push_back(_joint_state(7.0))
+    assert len(traj) == 4
+    assert traj.back().time == 7.0
+    assert traj.front().time == 0.0
+    assert traj.at(3).time == 7.0
+    traj.pop_back()
+    assert len(traj) == 3
+    assert not traj.empty()
+
+    traj.reserve(10)
+    assert traj.capacity() >= 10
+    traj.shrink_to_fit()
+    assert traj.max_size() >= len(traj)
+
+    traj.clear()
+    assert traj.empty()
+    assert len(traj) == 0
+
+
+def test_joint_trajectory_index_out_of_range_raises():
+    traj = _trajectory()
+    with pytest.raises(IndexError):
+        traj[len(traj)]
+    with pytest.raises(IndexError):
+        traj[-len(traj) - 1]
+    with pytest.raises(IndexError):
+        traj[len(traj)] = _joint_state(0.0)
+    with pytest.raises(IndexError):
+        traj.at(99)
+    with pytest.raises(IndexError):
+        tesseract_common.JointTrajectory().front()
+    with pytest.raises(IndexError):
+        tesseract_common.JointTrajectory().back()
+    with pytest.raises(IndexError):
+        tesseract_common.JointTrajectory().pop_back()
+
+
+def test_joint_trajectory_getitem_is_copy():
+    """Element access returns a copy: an edit needs a write-back (`traj[i] = js`)."""
+    traj = _trajectory()
+    traj[0].time = 5.0
+    assert traj[0].time == 0.0
+    traj.front().time = 5.0
+    traj.at(0).time = 5.0
+    for js in traj:
+        js.time = 5.0
+    assert traj[0].time == 0.0
+
+    js = traj[0]
+    js.time = 5.0
+    traj[0] = js
+    assert traj[0].time == 5.0
+
+
+def test_joint_trajectory_eq():
+    """C++ operator== compares uuid, description and states (joint_state.cpp, 0.35.0)."""
+    a, b = _trajectory(), _trajectory()
+    assert a == b
+    assert not (a != b)
+
+    b[0] = _joint_state(0.0, (1.0, 0.0))
+    assert a != b
+    assert not (a == b)
+
+    c = _trajectory()
+    c.description = "other"
+    assert a != c
+
+    d = _trajectory()
+    d.uuid = _SOME_UUID
+    assert a != d
+
+
+def test_joint_trajectory_unhashable():
+    with pytest.raises(TypeError):
+        hash(tesseract_common.JointTrajectory())
+
+
+def test_joint_trajectory_uuid_roundtrip():
+    traj = tesseract_common.JointTrajectory()
+    assert traj.uuid == _NIL_UUID
+    traj.uuid = _SOME_UUID
+    assert traj.uuid == _SOME_UUID
+    with pytest.raises(ValueError):
+        traj.uuid = "not-a-uuid"
+    assert traj.uuid == _SOME_UUID

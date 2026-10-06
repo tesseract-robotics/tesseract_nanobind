@@ -289,6 +289,37 @@ env.applyCommand(cmd)
 `getContactManagersPluginInfo()` returns a copy, so editing it does not change a command
 already applied.
 
+### AddTrajectoryLinkCommand
+
+Add a link, attached to `parent_link_name`, whose collision geometry covers the robot's
+links over a `JointTrajectory` (for example to keep a planned motion clear of other
+moving objects). Each state names the joints it sets.
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_common import JointState, JointTrajectory
+from tesseract_robotics.tesseract_environment import AddTrajectoryLinkCommand
+
+names = ["joint_1", "joint_2"]
+traj = JointTrajectory([JointState(names, np.array([0.0, 0.0])),
+                        JointState(names, np.array([0.5, -0.5]))])
+
+Method = AddTrajectoryLinkCommand.Method
+cmd = AddTrajectoryLinkCommand("swept_volume", "world", traj, method=Method.GLOBAL_CONVEX_HULL)
+env.applyCommand(cmd)
+```
+
+| `AddTrajectoryLinkCommand.Method` | Collision geometry |
+| --- | --- |
+| `PER_STATE_OBJECTS` (default) | every active link's collision objects, for every state |
+| `PER_STATE_CONVEX_HULL` | one convex hull per state |
+| `GLOBAL_PER_LINK_CONVEX_HULL` | one convex hull per active link, over all states |
+| `GLOBAL_CONVEX_HULL` | one convex hull over all active links and all states |
+
+The table follows the enum's comments in `add_trajectory_link_command.h`; the tests check
+only that each method adds the link. `getTrajectory()` returns a copy. Commands compare by
+value (`==`) and are unhashable.
+
 ## Events
 
 Subscribe to environment changes.

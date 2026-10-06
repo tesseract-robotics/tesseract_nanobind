@@ -24,6 +24,7 @@ __all__ = [
     # Manipulator
     "ManipulatorInfo",
     "JointState",
+    "JointTrajectory",
     # Collision
     "AllowedCollisionMatrix",
     "ContactAllowedValidator",

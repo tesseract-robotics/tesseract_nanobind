@@ -24,6 +24,7 @@ __all__ = [
     "AddSceneGraphCommand",
     "AddKinematicsInformationCommand",
     "AddContactManagersPluginInfoCommand",
+    "AddTrajectoryLinkCommand",
     "RemoveJointCommand",
     "ReplaceJointCommand",
     "MoveJointCommand",

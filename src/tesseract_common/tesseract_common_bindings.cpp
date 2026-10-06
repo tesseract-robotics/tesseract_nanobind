@@ -29,9 +29,22 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 // console_bridge
 #include <console_bridge/console.h>
 
+// boost::uuids::uuid <-> str, the spelling TaskComposerNodeInfo.uuid uses
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/string_generator.hpp>
+
 // GeneralResourceLocator's default `environment_variables`, copied from resource_locator.h:93/:103
 static const std::vector<std::string> GENERAL_RESOURCE_LOCATOR_DEFAULT_ENV_VARS = {
     "TESSERACT_RESOURCE_PATH", "ROS_PACKAGE_PATH", "AMENT_PREFIX_PATH"};
+
+// Python index (negative counts from the end) -> container index; std::out_of_range -> IndexError.
+static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
+    const auto n = static_cast<Py_ssize_t>(size);
+    const Py_ssize_t j = i < 0 ? i + n : i;
+    if (j < 0 || j >= n)
+        throw std::out_of_range("index " + std::to_string(i) + " out of range for size " + std::to_string(size));
+    return static_cast<std::size_t>(j);
+}
 
 // Trampoline class for ResourceLocator
 class PyResourceLocator : public tesseract::common::ResourceLocator {
@@ -830,6 +843,63 @@ NB_MODULE(_tesseract_common, m) {
         .def_rw("acceleration", &tesseract::common::JointState::acceleration)
         .def_rw("effort", &tesseract::common::JointState::effort)
         .def_rw("time", &tesseract::common::JointState::time);
+
+    // ========== JointTrajectory ==========
+    // Element access returns a copy: a reference into `states` would dangle once push_back
+    // reallocates. Edit an element with a write-back, `traj[i] = js`. The iterator-taking
+    // vector members (insert/emplace/erase, the range ctor, reverse iterators, data, swap)
+    // have no natural Python signature and stay unbound.
+    using tesseract::common::JointState;
+    using tesseract::common::JointTrajectory;
+    auto joint_trajectory = nb::class_<JointTrajectory>(m, "JointTrajectory")
+        .def(nb::init<std::string>(), "description"_a = "")
+        .def(nb::init<std::vector<JointState>, std::string>(), "states"_a, "description"_a = "")
+        .def_rw("states", &JointTrajectory::states)
+        .def_rw("description", &JointTrajectory::description)
+        .def_prop_rw("uuid",
+            [](const JointTrajectory& self) { return boost::uuids::to_string(self.uuid); },
+            [](JointTrajectory& self, const std::string& s) {
+                try {
+                    self.uuid = boost::uuids::string_generator()(s);
+                } catch (const std::runtime_error&) {
+                    throw std::invalid_argument("JointTrajectory.uuid: not a UUID string: '" + s + "'");
+                }
+            },
+            "UUID as its canonical string; a malformed string raises ValueError.")
+        .def("__len__", &JointTrajectory::size)
+        .def("__getitem__", [](const JointTrajectory& self, Py_ssize_t i) {
+            return self[normalize_index(i, self.size())];
+        }, "index"_a, nb::rv_policy::copy, "A copy of the state at `index`; write back with `traj[index] = js`.")
+        .def("__setitem__", [](JointTrajectory& self, Py_ssize_t i, const JointState& state) {
+            self[normalize_index(i, self.size())] = state;
+        }, "index"_a, "state"_a)
+        .def("__iter__", [](const JointTrajectory& self) {
+            return nb::make_iterator<nb::rv_policy::copy>(nb::type<JointTrajectory>(), "JointTrajectoryIterator",
+                                                          self.begin(), self.end());
+        }, nb::keep_alive<0, 1>(), "Iterate over copies of the states.")
+        .def("empty", &JointTrajectory::empty)
+        .def("max_size", &JointTrajectory::max_size)
+        .def("reserve", &JointTrajectory::reserve, "n"_a)
+        .def("capacity", &JointTrajectory::capacity)
+        .def("shrink_to_fit", &JointTrajectory::shrink_to_fit)
+        // front/back/pop_back on an empty std::vector are undefined behaviour: check first.
+        .def("front", [](const JointTrajectory& self) {
+            if (self.empty()) throw std::out_of_range("JointTrajectory.front: empty trajectory");
+            return self.front();
+        }, nb::rv_policy::copy)
+        .def("back", [](const JointTrajectory& self) {
+            if (self.empty()) throw std::out_of_range("JointTrajectory.back: empty trajectory");
+            return self.back();
+        }, nb::rv_policy::copy)
+        .def("at", nb::overload_cast<JointTrajectory::size_type>(&JointTrajectory::at, nb::const_), "n"_a,
+             nb::rv_policy::copy)
+        .def("clear", &JointTrajectory::clear)
+        .def("push_back", nb::overload_cast<const JointState&>(&JointTrajectory::push_back), "x"_a)
+        .def("pop_back", [](JointTrajectory& self) {
+            if (self.empty()) throw std::out_of_range("JointTrajectory.pop_back: empty trajectory");
+            self.pop_back();
+        });
+    bind_value_equality(joint_trajectory);
 
     // ========== AllowedCollisionMatrix ==========
     nb::class_<tesseract::common::AllowedCollisionMatrix>(m, "AllowedCollisionMatrix")

@@ -1,16 +1,21 @@
 """Tests for Environment Command bindings"""
 
+import numpy as np
 import pytest
 
+from tesseract_robotics import tesseract_environment
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
     ContactManagersPluginInfo,
     GeneralResourceLocator,
     Isometry3d,
+    JointState,
+    JointTrajectory,
 )
 from tesseract_robotics.tesseract_environment import (
     AddContactManagersPluginInfoCommand,
     AddLinkCommand,
+    AddTrajectoryLinkCommand,
     ChangeCollisionMarginsCommand,
     ChangeJointAccelerationLimitsCommand,
     ChangeJointOriginCommand,
@@ -403,3 +408,86 @@ class TestAddContactManagersPluginInfoCommand:
         cmd = AddContactManagersPluginInfoCommand(_contact_managers_plugin_info("/opt/plugins"))
         assert env.applyCommand(cmd)
         assert env.getRevision() == revision + 1
+
+
+def _two_state_trajectory():
+    names = ["joint1", "joint2"]
+    return JointTrajectory(
+        [JointState(names, np.array([0.0, 0.0])), JointState(names, np.array([0.5, -0.5]))]
+    )
+
+
+class TestAddTrajectoryLinkCommand:
+    """Tests for AddTrajectoryLinkCommand (gh-167)"""
+
+    def test_method_enum(self):
+        """Exactly the four members of add_trajectory_link_command.h:50-73, nested, no SWIG constants."""
+        Method = AddTrajectoryLinkCommand.Method
+        assert {m.name for m in Method} == {
+            "PER_STATE_OBJECTS",
+            "PER_STATE_CONVEX_HULL",
+            "GLOBAL_PER_LINK_CONVEX_HULL",
+            "GLOBAL_CONVEX_HULL",
+        }
+        assert not [name for name in dir(tesseract_environment) if name.startswith("Method_")]
+
+    def test_getters(self):
+        cmd = AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory())
+        assert isinstance(cmd, Command)
+        assert cmd.getLinkName() == "traj_link"
+        assert cmd.getParentLinkName() == "world"
+        assert len(cmd.getTrajectory()) == 2
+        assert cmd.replaceAllowed() is False
+        assert cmd.getMethod() == AddTrajectoryLinkCommand.Method.PER_STATE_OBJECTS
+
+        cmd = AddTrajectoryLinkCommand(
+            "traj_link",
+            "world",
+            _two_state_trajectory(),
+            replace_allowed=True,
+            method=AddTrajectoryLinkCommand.Method.GLOBAL_CONVEX_HULL,
+        )
+        assert cmd.replaceAllowed() is True
+        assert cmd.getMethod() == AddTrajectoryLinkCommand.Method.GLOBAL_CONVEX_HULL
+
+    def test_get_trajectory_is_copy(self):
+        cmd = AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory())
+        traj = cmd.getTrajectory()
+        traj.push_back(JointState(["joint1", "joint2"], np.array([1.0, 1.0])))
+        traj.description = "edited"
+        assert len(cmd.getTrajectory()) == 2
+        assert cmd.getTrajectory().description == ""
+
+    def test_eq(self):
+        a = AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory())
+        b = AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory())
+        c = AddTrajectoryLinkCommand("other_link", "world", _two_state_trajectory())
+        assert a == b
+        assert not (a != b)
+        assert a != c
+        assert not (a == c)
+
+    def test_unhashable(self):
+        with pytest.raises(TypeError):
+            hash(AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory()))
+
+    @pytest.mark.parametrize(
+        "method",
+        [
+            "PER_STATE_OBJECTS",
+            "PER_STATE_CONVEX_HULL",
+            "GLOBAL_PER_LINK_CONVEX_HULL",
+            "GLOBAL_CONVEX_HULL",
+        ],
+    )
+    def test_apply(self, env, method):
+        revision = env.getRevision()
+        cmd = AddTrajectoryLinkCommand(
+            "traj_link",
+            "world",
+            _two_state_trajectory(),
+            method=AddTrajectoryLinkCommand.Method[method],
+        )
+        assert env.applyCommand(cmd)
+        assert env.getRevision() == revision + 1
+        assert "traj_link" in env.getLinkNames()

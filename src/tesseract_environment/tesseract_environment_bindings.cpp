@@ -23,6 +23,7 @@
 #include <tesseract/environment/commands/add_link_command.h>
 #include <tesseract/environment/commands/add_kinematics_information_command.h>
 #include <tesseract/environment/commands/add_scene_graph_command.h>
+#include <tesseract/environment/commands/add_trajectory_link_command.h>
 #include <tesseract/environment/commands/change_collision_margins_command.h>
 #include <tesseract/environment/commands/change_joint_acceleration_limits_command.h>
 #include <tesseract/environment/commands/change_joint_origin_command.h>
@@ -312,6 +313,30 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getJoint", &te::AddSceneGraphCommand::getJoint)
         .def("getPrefix", &te::AddSceneGraphCommand::getPrefix);
 
+    // ========== AddTrajectoryLinkCommand ==========
+    // Adds a link whose collision geometry sweeps the given trajectory. `Method` is nested
+    // (AddTrajectoryLinkCommand.Method.PER_STATE_OBJECTS), without SWIG-style Method_* module
+    // constants. It is registered before the ctor so the `method` default renders in the stub.
+    // The arity-0 ctor is a serialization ctor and stays unbound. getTrajectory returns a copy:
+    // a Python edit must not reach a command already in an environment's history.
+    using TrajectoryLinkMethod = te::AddTrajectoryLinkCommand::Method;
+    auto add_trajectory_link_command = nb::class_<te::AddTrajectoryLinkCommand, te::Command>(m, "AddTrajectoryLinkCommand");
+    nb::enum_<TrajectoryLinkMethod>(add_trajectory_link_command, "Method")
+        .value("PER_STATE_OBJECTS", TrajectoryLinkMethod::PER_STATE_OBJECTS)
+        .value("PER_STATE_CONVEX_HULL", TrajectoryLinkMethod::PER_STATE_CONVEX_HULL)
+        .value("GLOBAL_PER_LINK_CONVEX_HULL", TrajectoryLinkMethod::GLOBAL_PER_LINK_CONVEX_HULL)
+        .value("GLOBAL_CONVEX_HULL", TrajectoryLinkMethod::GLOBAL_CONVEX_HULL);
+    add_trajectory_link_command
+        .def(nb::init<std::string, std::string, tc::JointTrajectory, bool, TrajectoryLinkMethod>(),
+             "link_name"_a, "parent_link_name"_a, "trajectory"_a, "replace_allowed"_a = false,
+             "method"_a = TrajectoryLinkMethod::PER_STATE_OBJECTS)
+        .def("getLinkName", &te::AddTrajectoryLinkCommand::getLinkName)
+        .def("getParentLinkName", &te::AddTrajectoryLinkCommand::getParentLinkName)
+        .def("getTrajectory", &te::AddTrajectoryLinkCommand::getTrajectory, nb::rv_policy::copy)
+        .def("replaceAllowed", &te::AddTrajectoryLinkCommand::replaceAllowed)
+        .def("getMethod", &te::AddTrajectoryLinkCommand::getMethod);
+    bind_value_equality(add_trajectory_link_command);
+
     // ========== AddKinematicsInformationCommand ==========
     // Registers a KinematicsInformation (group defs + IK plugin config) into a live env.
     // insert-merges with existing kinematics info, so pre-existing groups keep resolving.
@@ -542,6 +567,13 @@ NB_MODULE(_tesseract_environment, m) {
             } else {
                 cmd_ptr = std::make_shared<te::AddSceneGraphCommand>(*cmd.getSceneGraph(), cmd.getPrefix());
             }
+            nb::gil_scoped_release nogil;  // see AddLinkCommand above
+            return self.applyCommand(cmd_ptr);
+        }, "command"_a)
+        // Commands - AddTrajectoryLinkCommand
+        .def("applyCommand", [](te::Environment& self, const te::AddTrajectoryLinkCommand& cmd) {
+            auto cmd_ptr = std::make_shared<te::AddTrajectoryLinkCommand>(cmd);
+            // The convex-hull methods build collision geometry for every state.
             nb::gil_scoped_release nogil;  // see AddLinkCommand above
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
