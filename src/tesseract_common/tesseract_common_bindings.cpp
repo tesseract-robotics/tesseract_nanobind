@@ -38,6 +38,19 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 static const std::vector<std::string> GENERAL_RESOURCE_LOCATOR_DEFAULT_ENV_VARS = {
     "TESSERACT_RESOURCE_PATH", "ROS_PACKAGE_PATH", "AMENT_PREFIX_PATH"};
 
+// isWithinLimits / enforceLimits never check values.size() == limits.rows(), and the release
+// build compiles out Eigen's size assertion, so a mismatch reads past the shorter operand.
+struct LimitsSizeMismatchError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+static void check_limits_size(const Eigen::Ref<const Eigen::VectorXd>& values,
+                              const Eigen::Ref<const Eigen::Matrix<double, Eigen::Dynamic, 2>>& limits) {
+    if (values.size() != limits.rows())
+        throw LimitsSizeMismatchError("values has size " + std::to_string(values.size()) + " but limits has " +
+                                      std::to_string(limits.rows()) + " rows");
+}
+
 // Python index (negative counts from the end) -> container index; std::out_of_range -> IndexError.
 static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
     const auto n = static_cast<Py_ssize_t>(size);
@@ -1022,7 +1035,10 @@ NB_MODULE(_tesseract_common, m) {
         .def(nb::init<>())
         .def_rw("joint_limits", &tesseract::common::KinematicLimits::joint_limits)
         .def_rw("velocity_limits", &tesseract::common::KinematicLimits::velocity_limits)
-        .def_rw("acceleration_limits", &tesseract::common::KinematicLimits::acceleration_limits);
+        .def_rw("acceleration_limits", &tesseract::common::KinematicLimits::acceleration_limits)
+        .def_rw("jerk_limits", &tesseract::common::KinematicLimits::jerk_limits)
+        // Resizes all four limit matrices to (size, 2) (Eigen resize: values unset after a size change).
+        .def("resize", &tesseract::common::KinematicLimits::resize, "size"_a);
 
     // satisfiesLimits<double>: scalar-tolerance overload (with upstream's defaults) and
     // per-axis-tolerance overload. Defaults mirror kinematic_limits.h.
@@ -1041,6 +1057,25 @@ NB_MODULE(_tesseract_common, m) {
             return tesseract::common::satisfiesLimits<double>(values, limits, max_diff, max_rel_diff);
         },
         "values"_a, "limits"_a, "max_diff"_a, "max_rel_diff"_a);
+
+    // isWithinLimits<double> / enforceLimits<double>: sizes checked first (LimitsSizeMismatchError).
+    nb::exception<LimitsSizeMismatchError>(m, "LimitsSizeMismatchError", PyExc_ValueError)
+        .attr("__doc__") = "isWithinLimits / enforceLimits got `values` and `limits` of different lengths.";
+    m.def("isWithinLimits",
+        [](const RefVectorXd& values, const RefLimits& limits) {
+            check_limits_size(values, limits);
+            return tesseract::common::isWithinLimits<double>(values, limits);
+        },
+        "values"_a, "limits"_a, "True if every value lies in its [lower, upper] row; no tolerance.");
+    // Out-param rule: C++ clamps `values` in place; Python gets the clamped copy back.
+    m.def("enforceLimits",
+        [](const RefVectorXd& values, const RefLimits& limits) -> Eigen::VectorXd {
+            check_limits_size(values, limits);
+            Eigen::VectorXd clamped = values;
+            tesseract::common::enforceLimits<double>(clamped, limits);
+            return clamped;
+        },
+        "values"_a, "limits"_a, "`values` clamped into `limits`, as a new array; the input is unchanged.");
 
     // ========== PluginInfo ==========
     // `config` is a YAML::Node in C++, which nanobind has no caster for. Expose it as a

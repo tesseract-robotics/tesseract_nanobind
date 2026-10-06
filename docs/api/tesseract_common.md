@@ -273,11 +273,31 @@ Joint position, velocity, acceleration limits.
 from tesseract_robotics.tesseract_common import KinematicLimits
 
 limits = kin_group.getLimits()
-print(f"Position min: {limits.joint_limits.col(0)}")
-print(f"Position max: {limits.joint_limits.col(1)}")
+print(f"Position min: {limits.joint_limits[:, 0]}")
+print(f"Position max: {limits.joint_limits[:, 1]}")
 print(f"Velocity: {limits.velocity_limits}")
 print(f"Acceleration: {limits.acceleration_limits}")
+print(f"Jerk: {limits.jerk_limits}")
 ```
+
+Each field is an `(n, 2)` array of `[lower, upper]` rows. `limits.resize(n)` resizes all
+four to `(n, 2)`; their values are unset afterwards, so assign them before use.
+
+Three free functions check or clamp joint values against an `(n, 2)` limit array:
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_common import enforceLimits, isWithinLimits, satisfiesLimits
+
+limits = np.array([[-1.0, 1.0], [-2.0, 2.0]])
+isWithinLimits(np.array([0.5, -1.5]), limits)   # True: inside or on the bounds, no tolerance
+satisfiesLimits(np.array([1.0 + 1e-7, 0.0]), limits)  # True: within the 1e-6 default max_diff
+enforceLimits(np.array([1.5, -3.0]), limits)    # array([ 1., -2.]): a clamped copy
+```
+
+`enforceLimits` returns a new array and leaves its input unchanged (C++ clamps in place).
+`isWithinLimits` and `enforceLimits` raise `LimitsSizeMismatchError` (a `ValueError`) when
+the number of values differs from the number of limit rows.
 
 ## Manipulator Info
 

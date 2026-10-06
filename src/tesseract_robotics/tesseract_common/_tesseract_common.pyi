@@ -652,11 +652,32 @@ class KinematicLimits:
     @acceleration_limits.setter
     def acceleration_limits(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')], /) -> None: ...
 
+    @property
+    def jerk_limits(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')]: ...
+
+    @jerk_limits.setter
+    def jerk_limits(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')], /) -> None: ...
+
+    def resize(self, size: int) -> None: ...
+
 @overload
 def satisfiesLimits(values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)], max_diff: float = 1e-06, max_rel_diff: float = 2.220446049250313e-16) -> bool: ...
 
 @overload
 def satisfiesLimits(values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)], max_diff: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], max_rel_diff: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+
+class LimitsSizeMismatchError(ValueError):
+    """
+    isWithinLimits / enforceLimits got `values` and `limits` of different lengths.
+    """
+
+def isWithinLimits(values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)]) -> bool:
+    """True if every value lies in its [lower, upper] row; no tolerance."""
+
+def enforceLimits(values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """
+    `values` clamped into `limits`, as a new array; the input is unchanged.
+    """
 
 class PluginInfo:
     def __init__(self) -> None: ...

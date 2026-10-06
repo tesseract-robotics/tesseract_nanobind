@@ -40,6 +40,9 @@ __all__ = [
     # Kinematics
     "KinematicLimits",
     "satisfiesLimits",
+    "isWithinLimits",
+    "enforceLimits",
+    "LimitsSizeMismatchError",
     # Console bridge
     "OutputHandler",
     "LogLevel",

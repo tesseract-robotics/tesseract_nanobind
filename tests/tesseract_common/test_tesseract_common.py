@@ -673,3 +673,55 @@ def test_manipulator_info_get_combined():
     assert combined.working_frame == "world"
     assert combined.tcp_frame == "tool0"
     nptest.assert_array_equal(combined.tcp_offset.matrix, offset.matrix)
+
+
+# ---------------------------------------------------------------------------
+# gh-182: KinematicLimits.jerk_limits / resize, isWithinLimits, enforceLimits
+# ---------------------------------------------------------------------------
+
+
+def test_is_within_limits():
+    assert tesseract_common.isWithinLimits(np.array([0.5, -1.5]), _LIMITS)
+    assert tesseract_common.isWithinLimits(np.array([1.0, -2.0]), _LIMITS)  # bounds are inclusive
+    assert not tesseract_common.isWithinLimits(np.array([1.1, 0.0]), _LIMITS)
+
+
+def test_is_within_limits_has_no_tolerance():
+    """Unlike satisfiesLimits, isWithinLimits admits no overshoot at all."""
+    near = np.array([1.0 + SATISFIES_LIMITS_INSIDE_DEFAULT_TOL, 0.0])
+    assert not tesseract_common.isWithinLimits(near, _LIMITS)
+    assert tesseract_common.satisfiesLimits(near, _LIMITS)
+
+
+def test_enforce_limits_returns_clamped_copy():
+    values = np.array([1.5, -3.0])
+    clamped = tesseract_common.enforceLimits(values, _LIMITS)
+    nptest.assert_array_equal(clamped, [1.0, -2.0])
+    nptest.assert_array_equal(values, [1.5, -3.0])  # the caller's array is unchanged
+    inside = np.array([0.5, -1.5])
+    nptest.assert_array_equal(tesseract_common.enforceLimits(inside, _LIMITS), inside)
+
+
+@pytest.mark.parametrize("fn", ["isWithinLimits", "enforceLimits"])
+@pytest.mark.parametrize("n", [1, 3])
+def test_limits_size_mismatch_raises(fn, n):
+    with pytest.raises(tesseract_common.LimitsSizeMismatchError) as exc:
+        getattr(tesseract_common, fn)(np.zeros(n), _LIMITS)
+    assert issubclass(tesseract_common.LimitsSizeMismatchError, ValueError)
+    assert str(n) in str(exc.value)
+    assert str(len(_LIMITS)) in str(exc.value)
+
+
+def test_kinematic_limits_jerk_limits_roundtrip():
+    limits = tesseract_common.KinematicLimits()
+    jerk = np.array([[-10.0, 10.0], [-20.0, 20.0], [-30.0, 30.0]])
+    limits.jerk_limits = jerk
+    nptest.assert_array_equal(limits.jerk_limits, jerk)
+
+
+def test_kinematic_limits_resize():
+    """Upstream resize touches all four limit matrices (kinematic_limits.cpp, 0.35.0)."""
+    limits = tesseract_common.KinematicLimits()
+    limits.resize(3)
+    for field in ("joint_limits", "velocity_limits", "acceleration_limits", "jerk_limits"):
+        assert getattr(limits, field).shape == (3, 2), field
