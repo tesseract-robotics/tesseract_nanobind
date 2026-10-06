@@ -51,6 +51,26 @@ static void check_limits_size(const Eigen::Ref<const Eigen::VectorXd>& values,
                                       std::to_string(limits.rows()) + " rows");
 }
 
+// [components] a twist / transform error: 3 linear + 3 angular
+constexpr Eigen::Index TWIST_SIZE = 6;
+
+// applyTolerances throws a bare std::runtime_error on a size mismatch; the tolerance overloads
+// of calcJacobianTransformErrorDiff state a size-6 contract (utils.h:150) without saying what a
+// breach does. The bindings pre-check both, so each fails the same, named way.
+struct ToleranceSizeMismatchError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// Passes when both tolerances are empty, or both have size n.
+static void check_tolerance_size(Eigen::Index n, const Eigen::Ref<const Eigen::VectorXd>& lower,
+                                 const Eigen::Ref<const Eigen::VectorXd>& upper) {
+    const bool both_empty = lower.size() == 0 && upper.size() == 0;
+    if (!both_empty && (lower.size() != n || upper.size() != n))
+        throw ToleranceSizeMismatchError("lower_tolerance and upper_tolerance must both be empty or both have size " +
+                                         std::to_string(n) + "; got " + std::to_string(lower.size()) + " and " +
+                                         std::to_string(upper.size()));
+}
+
 // Python index (negative counts from the end) -> container index; std::out_of_range -> IndexError.
 static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
     const auto n = static_cast<Py_ssize_t>(size);
@@ -1076,6 +1096,84 @@ NB_MODULE(_tesseract_common, m) {
             return clamped;
         },
         "values"_a, "limits"_a, "`values` clamped into `limits`, as a new array; the input is unchanged.");
+
+    // ========== Frame and error math (utils.h) ==========
+    // In place, not out-param: like C++, the twist/jacobian/applyTolerances bindings write into
+    // the array passed in and return None. They take writable refs, so nanobind refuses any array
+    // it would have to convert (float32, read-only, non-contiguous, C-order (6, n > 1)) with
+    // TypeError, instead of writing into a temporary copy. The 6-row shapes live in the type, so
+    // a wrong-length twist fails at the call boundary; upstream does not check sizes and the
+    // release build compiles out Eigen's assertions.
+    using RefTwist = Eigen::Ref<Eigen::Matrix<double, 6, 1>>;
+    using RefJacobian = Eigen::Ref<Eigen::Matrix<double, 6, Eigen::Dynamic>>;  // column-major
+    using RefPoint = Eigen::Ref<const Eigen::Vector3d>;
+    nb::exception<ToleranceSizeMismatchError>(m, "ToleranceSizeMismatchError", PyExc_ValueError)
+        .attr("__doc__") = "lower_tolerance / upper_tolerance are not both empty or both the expected size.";
+
+    m.def("twistChangeRefPoint",
+        [](RefTwist twist, const RefPoint& ref_point) { tesseract::common::twistChangeRefPoint(twist, ref_point); },
+        "twist"_a, "ref_point"_a,
+        "Move the twist's reference point by `ref_point` (v += ω × ref_point), in place.");
+    m.def("twistChangeBase",
+        [](RefTwist twist, const Eigen::Isometry3d& change_base) {
+            tesseract::common::twistChangeBase(twist, change_base);
+        },
+        "twist"_a, "change_base"_a, "Rotate the twist into the frame `change_base`, in place.");
+    m.def("jacobianChangeBase",
+        [](RefJacobian jacobian, const Eigen::Isometry3d& change_base) {
+            tesseract::common::jacobianChangeBase(jacobian, change_base);
+        },
+        "jacobian"_a, "change_base"_a,
+        "Rotate every column of a (6, n) Fortran-order jacobian into `change_base`, in place.");
+    m.def("jacobianChangeRefPoint",
+        [](RefJacobian jacobian, const RefPoint& ref_point) {
+            tesseract::common::jacobianChangeRefPoint(jacobian, ref_point);
+        },
+        "jacobian"_a, "ref_point"_a,
+        "Move the reference point of a (6, n) Fortran-order jacobian by `ref_point`, in place.");
+    m.def("calcRotationalError", &tesseract::common::calcRotationalError, "R"_a,
+          "Angle-axis vector θ·a of the rotation `R`, with θ in [-π, π].");
+    m.def("calcTransformError", &tesseract::common::calcTransformError, "t1"_a, "t2"_a,
+          "Error of `t1.inverse() * t2` as [translation, angle-axis rotation].");
+
+    // calcJacobianTransformErrorDiff: four overloads of arities 3/4/5/6, so the order does not
+    // matter. All handle the angle-axis ±π discontinuity that subtracting two
+    // calcTransformError results does not.
+    using tesseract::common::calcJacobianTransformErrorDiff;
+    using RefTolerance = Eigen::Ref<const Eigen::VectorXd>;
+    m.def("calcJacobianTransformErrorDiff",
+          nb::overload_cast<const Eigen::Isometry3d&, const Eigen::Isometry3d&, const Eigen::Isometry3d&>(
+              &calcJacobianTransformErrorDiff),
+          "target"_a, "source"_a, "source_perturbed"_a);
+    m.def("calcJacobianTransformErrorDiff",
+          nb::overload_cast<const Eigen::Isometry3d&, const Eigen::Isometry3d&, const Eigen::Isometry3d&,
+                            const Eigen::Isometry3d&>(&calcJacobianTransformErrorDiff),
+          "target"_a, "target_perturbed"_a, "source"_a, "source_perturbed"_a);
+    m.def("calcJacobianTransformErrorDiff",
+        [](const Eigen::Isometry3d& target, const Eigen::Isometry3d& source, const Eigen::Isometry3d& source_perturbed,
+           const RefTolerance& lower_tolerance, const RefTolerance& upper_tolerance) {
+            check_tolerance_size(TWIST_SIZE, lower_tolerance, upper_tolerance);
+            return calcJacobianTransformErrorDiff(target, source, source_perturbed, lower_tolerance, upper_tolerance);
+        },
+        "target"_a, "source"_a, "source_perturbed"_a, "lower_tolerance"_a, "upper_tolerance"_a);
+    m.def("calcJacobianTransformErrorDiff",
+        [](const Eigen::Isometry3d& target, const Eigen::Isometry3d& target_perturbed, const Eigen::Isometry3d& source,
+           const Eigen::Isometry3d& source_perturbed, const RefTolerance& lower_tolerance,
+           const RefTolerance& upper_tolerance) {
+            check_tolerance_size(TWIST_SIZE, lower_tolerance, upper_tolerance);
+            return calcJacobianTransformErrorDiff(target, target_perturbed, source, source_perturbed, lower_tolerance,
+                                                  upper_tolerance);
+        },
+        "target"_a, "target_perturbed"_a, "source"_a, "source_perturbed"_a, "lower_tolerance"_a,
+        "upper_tolerance"_a);
+
+    m.def("applyTolerances",
+        [](Eigen::Ref<Eigen::VectorXd> v, const RefTolerance& lower_tolerance, const RefTolerance& upper_tolerance) {
+            check_tolerance_size(v.size(), lower_tolerance, upper_tolerance);
+            tesseract::common::applyTolerances(v, lower_tolerance, upper_tolerance);
+        },
+        "v"_a, "lower_tolerance"_a, "upper_tolerance"_a,
+        "In place: 0 inside [lower, upper], v - lower below it, v - upper above it; no-op when both are empty.");
 
     // ========== PluginInfo ==========
     // `config` is a YAML::Node in C++, which nanobind has no caster for. Expose it as a

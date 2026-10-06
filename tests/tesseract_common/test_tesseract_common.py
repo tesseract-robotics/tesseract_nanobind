@@ -725,3 +725,189 @@ def test_kinematic_limits_resize():
     limits.resize(3)
     for field in ("joint_limits", "velocity_limits", "acceleration_limits", "jerk_limits"):
         assert getattr(limits, field).shape == (3, 2), field
+
+
+# ---------------------------------------------------------------------------
+# gh-184: frame and error math (tesseract/common/utils.h)
+# ---------------------------------------------------------------------------
+
+# [rad] distance of the two test rotations from the angle-axis ±π boundary; small enough
+# that both sit on opposite sides of it, large enough to stay far above float64 roundoff.
+PI_CROSSING_EPS = 1e-3
+# [m, rad] float64 roundoff budget for O(1) twist / error components (~1e3 ulp at 1.0).
+FRAME_MATH_ATOL = 1e-12
+# [m, rad] tolerance band wide enough to swallow every error component in the test poses.
+WIDE_TOLERANCE = 1e3
+
+_UNIT_AXIS = np.array([1.0, 2.0, 3.0]) / np.linalg.norm([1.0, 2.0, 3.0])
+
+
+def _rot_z(angle):
+    return tesseract_common.Isometry3d(
+        tesseract_common.AngleAxisd(angle, np.array([0.0, 0.0, 1.0]))
+    )
+
+
+def test_twist_change_ref_point_in_place():
+    """v' = v + ω × p, ω unchanged; the twist is written in place and None returned."""
+    twist = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    p = np.array([1.0, -2.0, 0.5])
+    expected = twist.copy()
+    expected[:3] += np.cross(twist[3:], p)
+
+    assert tesseract_common.twistChangeRefPoint(twist, p) is None
+    nptest.assert_allclose(twist, expected, rtol=0, atol=FRAME_MATH_ATOL)
+
+
+def test_twist_change_base_in_place():
+    twist = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    before = twist.copy()
+    T = _rot_z(0.7) * tesseract_common.Translation3d(1.0, 2.0, 3.0)
+    R = T.rotation
+
+    assert tesseract_common.twistChangeBase(twist, T) is None
+    nptest.assert_allclose(
+        twist, np.concatenate([R @ before[:3], R @ before[3:]]), rtol=0, atol=FRAME_MATH_ATOL
+    )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        np.zeros(6, dtype=np.float32),  # would need a converted copy
+        np.zeros(3),  # wrong length: shape (6,) is in the type
+        np.zeros(12)[::2],  # non-contiguous
+    ],
+    ids=["float32", "len3", "strided"],
+)
+def test_twist_change_rejects_unwritable_inputs(bad):
+    before = bad.copy()
+    with pytest.raises(TypeError):
+        tesseract_common.twistChangeBase(bad, tesseract_common.Isometry3d.Identity())
+    with pytest.raises(TypeError):
+        tesseract_common.twistChangeRefPoint(bad, np.zeros(3))
+    nptest.assert_array_equal(bad, before)
+
+
+def test_twist_change_rejects_read_only():
+    twist = np.zeros(6)
+    twist.flags.writeable = False
+    with pytest.raises(TypeError):
+        tesseract_common.twistChangeBase(twist, tesseract_common.Isometry3d.Identity())
+
+
+def test_jacobian_change_shape_in_type():
+    with pytest.raises(TypeError):
+        tesseract_common.jacobianChangeBase(
+            np.zeros((5, 3), order="F"), tesseract_common.Isometry3d.Identity()
+        )
+    with pytest.raises(TypeError):
+        tesseract_common.jacobianChangeRefPoint(np.zeros((5, 3), order="F"), np.zeros(3))
+
+
+def test_calc_rotational_error():
+    """θ·a for a rotation of θ about the unit axis a, θ in (−π, π)."""
+    for theta in (0.7, -2.5, 3.0):
+        R = tesseract_common.AngleAxisd(theta, _UNIT_AXIS).toRotationMatrix()
+        nptest.assert_allclose(
+            tesseract_common.calcRotationalError(R),
+            theta * _UNIT_AXIS,
+            rtol=0,
+            atol=FRAME_MATH_ATOL,
+        )
+
+
+def test_calc_transform_error():
+    t1 = tesseract_common.Isometry3d.Identity()
+    t2 = tesseract_common.Isometry3d(tesseract_common.Translation3d(1.0, 2.0, 3.0)) * _rot_z(0.5)
+    nptest.assert_allclose(
+        tesseract_common.calcTransformError(t1, t2),
+        [1.0, 2.0, 3.0, 0.0, 0.0, 0.5],
+        rtol=0,
+        atol=FRAME_MATH_ATOL,
+    )
+
+
+def test_calc_jacobian_transform_error_diff_across_pi():
+    """The diff stays 2ε across the ±π boundary, where subtracting calcTransformError jumps by ~2π."""
+    target = tesseract_common.Isometry3d.Identity()
+    source = _rot_z(np.pi - PI_CROSSING_EPS)
+    source_perturbed = _rot_z(np.pi + PI_CROSSING_EPS)
+    exact = [0.0, 0.0, 0.0, 0.0, 0.0, 2 * PI_CROSSING_EPS]
+
+    naive = tesseract_common.calcTransformError(
+        target, source_perturbed
+    ) - tesseract_common.calcTransformError(target, source)
+    nptest.assert_allclose(naive[5], 2 * PI_CROSSING_EPS - 2 * np.pi, rtol=0, atol=FRAME_MATH_ATOL)
+
+    diff3 = tesseract_common.calcJacobianTransformErrorDiff(target, source, source_perturbed)
+    nptest.assert_allclose(diff3, exact, rtol=0, atol=FRAME_MATH_ATOL)
+    diff4 = tesseract_common.calcJacobianTransformErrorDiff(
+        target, target, source, source_perturbed
+    )
+    nptest.assert_allclose(diff4, exact, rtol=0, atol=FRAME_MATH_ATOL)
+
+
+def test_calc_jacobian_transform_error_diff_tolerances():
+    target = tesseract_common.Isometry3d.Identity()
+    source = _rot_z(0.3)
+    perturbed = _rot_z(0.3 + PI_CROSSING_EPS)
+    plain3 = tesseract_common.calcJacobianTransformErrorDiff(target, source, perturbed)
+    plain4 = tesseract_common.calcJacobianTransformErrorDiff(target, target, source, perturbed)
+    empty = np.zeros(0)
+
+    nptest.assert_array_equal(
+        tesseract_common.calcJacobianTransformErrorDiff(target, source, perturbed, empty, empty),
+        plain3,
+    )
+    nptest.assert_array_equal(
+        tesseract_common.calcJacobianTransformErrorDiff(
+            target, target, source, perturbed, empty, empty
+        ),
+        plain4,
+    )
+    # Both errors fall inside a wide band, so both clamp to 0 and so does their difference.
+    lower, upper = np.full(6, -WIDE_TOLERANCE), np.full(6, WIDE_TOLERANCE)
+    nptest.assert_array_equal(
+        tesseract_common.calcJacobianTransformErrorDiff(target, source, perturbed, lower, upper),
+        np.zeros(6),
+    )
+
+
+@pytest.mark.parametrize(("n_lower", "n_upper"), [(5, 5), (6, 0), (0, 6), (6, 5)])
+def test_calc_jacobian_transform_error_diff_tolerance_size_mismatch(n_lower, n_upper):
+    target = tesseract_common.Isometry3d.Identity()
+    lower, upper = np.zeros(n_lower), np.zeros(n_upper)
+    with pytest.raises(tesseract_common.ToleranceSizeMismatchError):
+        tesseract_common.calcJacobianTransformErrorDiff(target, target, target, lower, upper)
+    with pytest.raises(tesseract_common.ToleranceSizeMismatchError):
+        tesseract_common.calcJacobianTransformErrorDiff(
+            target, target, target, target, lower, upper
+        )
+
+
+def test_apply_tolerances_in_place():
+    """Inside the band -> 0; below -> v - lower; above -> v - upper (utils.h:202-203)."""
+    v = np.array([-2.0, 0.5, 3.0])
+    lower, upper = np.full(3, -1.0), np.full(3, 1.0)
+    assert tesseract_common.applyTolerances(v, lower, upper) is None
+    nptest.assert_array_equal(v, [-1.0, 0.0, 2.0])
+
+    unchanged = np.array([-2.0, 0.5, 3.0])
+    tesseract_common.applyTolerances(unchanged, np.zeros(0), np.zeros(0))
+    nptest.assert_array_equal(unchanged, [-2.0, 0.5, 3.0])
+
+
+@pytest.mark.parametrize(("n_lower", "n_upper"), [(3, 2), (3, 0), (0, 3), (2, 2)])
+def test_apply_tolerances_size_mismatch(n_lower, n_upper):
+    v = np.zeros(3)
+    with pytest.raises(tesseract_common.ToleranceSizeMismatchError) as exc:
+        tesseract_common.applyTolerances(v, np.zeros(n_lower), np.zeros(n_upper))
+    assert issubclass(tesseract_common.ToleranceSizeMismatchError, ValueError)
+    for size in (3, n_lower, n_upper):
+        assert str(size) in str(exc.value)
+
+
+def test_apply_tolerances_rejects_float32():
+    with pytest.raises(TypeError):
+        tesseract_common.applyTolerances(np.zeros(3, dtype=np.float32), np.zeros(0), np.zeros(0))

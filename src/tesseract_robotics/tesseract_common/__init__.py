@@ -43,6 +43,16 @@ __all__ = [
     "isWithinLimits",
     "enforceLimits",
     "LimitsSizeMismatchError",
+    # Frame and error math
+    "twistChangeRefPoint",
+    "twistChangeBase",
+    "jacobianChangeBase",
+    "jacobianChangeRefPoint",
+    "calcRotationalError",
+    "calcTransformError",
+    "calcJacobianTransformErrorDiff",
+    "applyTolerances",
+    "ToleranceSizeMismatchError",
     # Console bridge
     "OutputHandler",
     "LogLevel",

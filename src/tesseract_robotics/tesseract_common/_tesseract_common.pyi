@@ -679,6 +679,52 @@ def enforceLimits(values: Annotated[NDArray[numpy.float64], dict(shape=(None,), 
     `values` clamped into `limits`, as a new array; the input is unchanged.
     """
 
+class ToleranceSizeMismatchError(ValueError):
+    """
+    lower_tolerance / upper_tolerance are not both empty or both the expected size.
+    """
+
+def twistChangeRefPoint(twist: Annotated[NDArray[numpy.float64], dict(shape=(6), order='C')], ref_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)]) -> None:
+    """
+    Move the twist's reference point by `ref_point` (v += ω × ref_point), in place.
+    """
+
+def twistChangeBase(twist: Annotated[NDArray[numpy.float64], dict(shape=(6), order='C')], change_base: Isometry3d) -> None:
+    """Rotate the twist into the frame `change_base`, in place."""
+
+def jacobianChangeBase(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None))], change_base: Isometry3d) -> None:
+    """
+    Rotate every column of a (6, n) Fortran-order jacobian into `change_base`, in place.
+    """
+
+def jacobianChangeRefPoint(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None))], ref_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)]) -> None:
+    """
+    Move the reference point of a (6, n) Fortran-order jacobian by `ref_point`, in place.
+    """
+
+def calcRotationalError(R: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+    """Angle-axis vector θ·a of the rotation `R`, with θ in [-π, π]."""
+
+def calcTransformError(t1: Isometry3d, t2: Isometry3d) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """Error of `t1.inverse() * t2` as [translation, angle-axis rotation]."""
+
+@overload
+def calcJacobianTransformErrorDiff(target: Isometry3d, source: Isometry3d, source_perturbed: Isometry3d) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+@overload
+def calcJacobianTransformErrorDiff(target: Isometry3d, target_perturbed: Isometry3d, source: Isometry3d, source_perturbed: Isometry3d) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+@overload
+def calcJacobianTransformErrorDiff(target: Isometry3d, source: Isometry3d, source_perturbed: Isometry3d, lower_tolerance: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], upper_tolerance: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+@overload
+def calcJacobianTransformErrorDiff(target: Isometry3d, target_perturbed: Isometry3d, source: Isometry3d, source_perturbed: Isometry3d, lower_tolerance: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], upper_tolerance: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+def applyTolerances(v: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], lower_tolerance: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], upper_tolerance: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> None:
+    """
+    In place: 0 inside [lower, upper], v - lower below it, v - upper above it; no-op when both are empty.
+    """
+
 class PluginInfo:
     def __init__(self) -> None: ...
 

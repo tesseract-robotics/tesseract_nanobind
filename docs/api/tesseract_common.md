@@ -82,6 +82,57 @@ aa = AngleAxisd(np.pi/2, np.array([0, 0, 1]))
 rotation_matrix = aa.toRotationMatrix()
 ```
 
+## Frame and error math
+
+Re-base twists and jacobians, and compute pose errors, with tesseract's own math. A twist
+is a `(6,)` array `[vx, vy, vz, wx, wy, wz]`; a jacobian is `(6, n)`.
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_common import jacobianChangeBase, jacobianChangeRefPoint
+
+J = joint_group.calcJacobian(q, "tool0")    # (6, n), Fortran order, in the group base frame
+jacobianChangeBase(J, T_new_base)           # rotate every column into T_new_base, in place
+jacobianChangeRefPoint(J, np.array([0.0, 0.0, 0.1]))  # v += ω × p, in place
+```
+
+!!! warning "In place: these functions write into the array you pass"
+    `twistChangeRefPoint`, `twistChangeBase`, `jacobianChangeBase`, `jacobianChangeRefPoint`
+    and `applyTolerances` return `None` and change their first argument, as in C++. They
+    raise `TypeError` for any array they would have to convert first, since the result
+    would be written into a temporary copy and lost: `float32`, read-only or non-contiguous
+    arrays, and C-order `(6, n > 1)` jacobians. `calcJacobian` returns Fortran order;
+    convert others with `np.asfortranarray`.
+
+`jacobianChangeRefPoint` takes the point in the jacobian's base frame. To match
+`calcJacobianWithPoint(q, link, p)`, whose `p` is in the link frame, rotate it first:
+`jacobianChangeRefPoint(J, joint_group.calcFwdKin(q)[link].rotation @ p)`.
+
+Pose errors are `[translation, angle-axis rotation]` 6-vectors:
+
+```python
+from tesseract_robotics.tesseract_common import (
+    applyTolerances, calcJacobianTransformErrorDiff, calcRotationalError, calcTransformError,
+)
+
+calcRotationalError(R)               # θ·axis, θ in [-π, π]
+calcTransformError(t1, t2)           # error of t1.inverse() * t2
+
+# Finite-difference column of a pose-error jacobian. Subtracting two calcTransformError
+# results jumps by ~2π near the angle-axis ±π boundary; this does not.
+d = calcJacobianTransformErrorDiff(target, source, source_perturbed)
+d = calcJacobianTransformErrorDiff(target, target_perturbed, source, source_perturbed)
+d = calcJacobianTransformErrorDiff(target, source, source_perturbed, lower_tol, upper_tol)
+
+v = np.array([-2.0, 0.5, 3.0])
+applyTolerances(v, np.full(3, -1.0), np.full(3, 1.0))  # v is now [-1., 0., 2.]
+```
+
+The tolerance pair of `applyTolerances` and of the tolerance overloads of
+`calcJacobianTransformErrorDiff` must be both empty (no tolerance) or both of the value's
+size (6 for the error diff); anything else raises `ToleranceSizeMismatchError`, a
+`ValueError`.
+
 ## Resource Locators
 
 ### GeneralResourceLocator
