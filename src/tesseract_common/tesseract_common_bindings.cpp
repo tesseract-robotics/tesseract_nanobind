@@ -809,27 +809,29 @@ NB_MODULE(_tesseract_common, m) {
              "url"_a, "filename"_a, "parent"_a);
 
     // ========== ManipulatorInfo ==========
+    // tcp_offset is std::variant<std::string, Eigen::Isometry3d>: a link name or a pose. The ctor
+    // and the property share nanobind's variant caster, so any other type raises TypeError. The
+    // getter returns a copy, not def_rw's reference_internal: a Python Isometry3d pointing into
+    // the variant would dangle once the field is set to a str.
+    using TcpOffset = std::variant<std::string, Eigen::Isometry3d>;
     nb::class_<tesseract::common::ManipulatorInfo>(m, "ManipulatorInfo")
         .def(nb::init<>())
+        .def(nb::init<std::string, std::string, std::string, TcpOffset>(),
+             "manipulator"_a, "working_frame"_a, "tcp_frame"_a,
+             "tcp_offset"_a = Eigen::Isometry3d::Identity())
         .def_rw("manipulator", &tesseract::common::ManipulatorInfo::manipulator)
         .def_rw("manipulator_ik_solver", &tesseract::common::ManipulatorInfo::manipulator_ik_solver)
         .def_rw("working_frame", &tesseract::common::ManipulatorInfo::working_frame)
         .def_rw("tcp_frame", &tesseract::common::ManipulatorInfo::tcp_frame)
         .def_prop_rw("tcp_offset",
-            [](const tesseract::common::ManipulatorInfo& self) -> nb::object {
-                if (self.tcp_offset.index() == 0) {
-                    return nb::cast(std::get<std::string>(self.tcp_offset));
-                } else {
-                    return nb::cast(std::get<Eigen::Isometry3d>(self.tcp_offset));
-                }
-            },
-            [](tesseract::common::ManipulatorInfo& self, nb::object value) {
-                if (nb::isinstance<nb::str>(value)) {
-                    self.tcp_offset = nb::cast<std::string>(value);
-                } else {
-                    self.tcp_offset = nb::cast<Eigen::Isometry3d>(value);
-                }
-            })
+            [](const tesseract::common::ManipulatorInfo& self) -> TcpOffset { return self.tcp_offset; },
+            [](tesseract::common::ManipulatorInfo& self, TcpOffset value) { self.tcp_offset = std::move(value); },
+            "TCP offset: a link name (str) or a pose (Isometry3d). Reading returns a copy.")
+        // Copy of self with every non-empty field of the override; an overriding tcp_frame
+        // brings its tcp_offset along (manipulator_info.cpp).
+        .def("getCombined", &tesseract::common::ManipulatorInfo::getCombined, "manip_info_override"_a)
+        // True unless manipulator, working_frame and tcp_frame are all set.
+        .def("empty", &tesseract::common::ManipulatorInfo::empty)
         .def("__repr__", [](const tesseract::common::ManipulatorInfo& self) {
             return "<ManipulatorInfo manipulator='" + self.manipulator + "'>";
         });

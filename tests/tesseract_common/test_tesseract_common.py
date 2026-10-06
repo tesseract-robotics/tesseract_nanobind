@@ -586,3 +586,90 @@ def test_get_allowed_collisions():
         ["link_b", "link_c"], entries, remove_duplicates=False
     )
     assert sorted(dup) == ["link_a", "link_a", "link_d", "link_d"]
+
+
+# ---------------------------------------------------------------------------
+# gh-181: ManipulatorInfo full ctor, empty, getCombined
+# ---------------------------------------------------------------------------
+
+
+def _assert_identity(iso):
+    nptest.assert_array_equal(iso.matrix, np.eye(4))
+
+
+def test_manipulator_info_ctor_three_args():
+    info = tesseract_common.ManipulatorInfo("manipulator", "base_link", "tool0")
+    assert info.manipulator == "manipulator"
+    assert info.working_frame == "base_link"
+    assert info.tcp_frame == "tool0"
+    assert info.manipulator_ik_solver == ""
+    _assert_identity(info.tcp_offset)
+
+
+def test_manipulator_info_ctor_tcp_offset():
+    by_name = tesseract_common.ManipulatorInfo("manip", "base_link", "tool0", "tcp_link")
+    assert by_name.tcp_offset == "tcp_link"
+
+    offset = tesseract_common.Isometry3d() * tesseract_common.Translation3d(0.0, 0.0, 0.1)
+    by_pose = tesseract_common.ManipulatorInfo("manip", "base_link", "tool0", offset)
+    nptest.assert_array_equal(by_pose.tcp_offset.matrix, offset.matrix)
+
+
+def test_manipulator_info_tcp_offset_wrong_type_raises():
+    with pytest.raises(TypeError):
+        tesseract_common.ManipulatorInfo("manip", "base_link", "tool0", 5)
+    info = tesseract_common.ManipulatorInfo()
+    with pytest.raises(TypeError):
+        info.tcp_offset = 5
+
+
+def test_manipulator_info_tcp_offset_is_copy():
+    """The getter returns a copy: a reference into the variant would dangle once it holds a str."""
+    info = tesseract_common.ManipulatorInfo("manip", "base_link", "tool0")
+    held = info.tcp_offset
+    held.translate(np.array([1.0, 2.0, 3.0]))
+    _assert_identity(info.tcp_offset)  # in-place edit does not reach the struct
+
+    info.tcp_offset = "a_link_name_long_enough_to_overwrite_the_variant_storage_" + "x" * 64
+    nptest.assert_array_equal(held.translation, [1.0, 2.0, 3.0])
+
+
+def test_manipulator_info_empty():
+    """Upstream (manipulator_info.cpp, 0.35.0): empty unless manipulator, working_frame and tcp_frame are all set."""
+    info = tesseract_common.ManipulatorInfo()
+    assert info.empty()
+    info.manipulator = "manip"
+    assert info.empty()
+    info.working_frame = "base_link"
+    assert info.empty()
+    info.tcp_frame = "tool0"
+    assert not info.empty()
+    info.manipulator_ik_solver = ""  # optional; does not count
+    assert not info.empty()
+
+
+def test_manipulator_info_get_combined():
+    offset = tesseract_common.Isometry3d() * tesseract_common.Translation3d(0.0, 0.0, 0.1)
+    base = tesseract_common.ManipulatorInfo("manip", "base_link", "tool0", offset)
+    base.manipulator_ik_solver = "KDL"
+
+    override = tesseract_common.ManipulatorInfo()
+    override.tcp_frame = "tool1"
+
+    combined = base.getCombined(override)
+    assert combined.manipulator == "manip"
+    assert combined.manipulator_ik_solver == "KDL"
+    assert combined.working_frame == "base_link"
+    assert combined.tcp_frame == "tool1"
+    # An overriding tcp_frame brings its tcp_offset along (here the default identity).
+    _assert_identity(combined.tcp_offset)
+    # base is unchanged
+    assert base.tcp_frame == "tool0"
+    nptest.assert_array_equal(base.tcp_offset.matrix, offset.matrix)
+
+    working = tesseract_common.ManipulatorInfo()
+    working.working_frame = "world"
+    combined = base.getCombined(working)
+    assert combined.working_frame == "world"
+    assert combined.tcp_frame == "tool0"
+    nptest.assert_array_equal(combined.tcp_offset.matrix, offset.matrix)

@@ -293,6 +293,23 @@ info.manipulator = "manipulator"        # group name
 info.working_frame = "base_link"        # reference frame
 info.tcp_frame = "tool0"                # tool center point
 info.tcp_offset = Isometry3d.Identity() # optional TCP offset
+
+# or all at once; tcp_offset (a link name or an Isometry3d) defaults to the identity
+info = ManipulatorInfo("manipulator", "base_link", "tool0")
+```
+
+`tcp_offset` holds a `str` (a link name) or an `Isometry3d`; any other type raises
+`TypeError`. Reading it returns a copy, so assign a new value instead of editing it in
+place.
+
+`info.empty()` is `True` unless `manipulator`, `working_frame` and `tcp_frame` are all set.
+`base.getCombined(override)` returns a copy of `base` with every non-empty field of
+`override`; an overriding `tcp_frame` brings `override.tcp_offset` along with it:
+
+```python
+override = ManipulatorInfo()
+override.tcp_frame = "tool1"
+combined = info.getCombined(override)  # tcp_frame "tool1", tcp_offset from override
 ```
 
 ## Plugin Info
