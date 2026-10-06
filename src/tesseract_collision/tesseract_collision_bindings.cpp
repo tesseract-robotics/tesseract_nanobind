@@ -84,54 +84,22 @@ NB_MODULE(_tesseract_collision, m) {
         .value("ALL", tc::CollisionCheckExitType::ALL);
 
     // ========== ContactResult ==========
+    // Pair fields are std::array<T, 2>: nanobind's array caster raises TypeError on any other length.
     nb::class_<tc::ContactResult>(m, "ContactResult")
         .def(nb::init<>())
         .def_rw("distance", &tc::ContactResult::distance)
-        .def_prop_rw("type_id",
-            [](const tc::ContactResult& self) {
-                return std::vector<int>{self.type_id[0], self.type_id[1]};
-            },
-            [](tc::ContactResult& self, const std::vector<int>& v) {
-                if (v.size() >= 2) { self.type_id[0] = v[0]; self.type_id[1] = v[1]; }
-            })
-        .def_prop_rw("link_names",
-            [](const tc::ContactResult& self) {
-                return std::vector<std::string>{self.link_names[0], self.link_names[1]};
-            },
-            [](tc::ContactResult& self, const std::vector<std::string>& v) {
-                if (v.size() >= 2) { self.link_names[0] = v[0]; self.link_names[1] = v[1]; }
-            })
-        .def_prop_rw("shape_id",
-            [](const tc::ContactResult& self) {
-                return std::vector<int>{self.shape_id[0], self.shape_id[1]};
-            },
-            [](tc::ContactResult& self, const std::vector<int>& v) {
-                if (v.size() >= 2) { self.shape_id[0] = v[0]; self.shape_id[1] = v[1]; }
-            })
-        .def_prop_rw("nearest_points",
-            [](const tc::ContactResult& self) {
-                std::vector<Eigen::Vector3d> pts;
-                pts.push_back(self.nearest_points[0]);
-                pts.push_back(self.nearest_points[1]);
-                return pts;
-            },
-            [](tc::ContactResult& self, const std::vector<Eigen::Vector3d>& v) {
-                if (v.size() >= 2) { self.nearest_points[0] = v[0]; self.nearest_points[1] = v[1]; }
-            })
-        .def_prop_rw("transform",
-            [](const tc::ContactResult& self) {
-                std::vector<Eigen::Isometry3d> tfs;
-                tfs.push_back(self.transform[0]);
-                tfs.push_back(self.transform[1]);
-                return tfs;
-            },
-            [](tc::ContactResult& self, const std::vector<Eigen::Isometry3d>& v) {
-                if (v.size() >= 2) { self.transform[0] = v[0]; self.transform[1] = v[1]; }
-            })
+        .def_rw("type_id", &tc::ContactResult::type_id)
+        .def_rw("link_names", &tc::ContactResult::link_names)
+        .def_rw("shape_id", &tc::ContactResult::shape_id)
+        .def_rw("subshape_id", &tc::ContactResult::subshape_id)
+        .def_rw("nearest_points", &tc::ContactResult::nearest_points)
+        .def_rw("nearest_points_local", &tc::ContactResult::nearest_points_local)
+        .def_rw("transform", &tc::ContactResult::transform)
         .def_rw("normal", &tc::ContactResult::normal)
         .def_rw("cc_time", &tc::ContactResult::cc_time)
         .def_rw("cc_type", &tc::ContactResult::cc_type)
-        .def_rw("single_contact_point",&tc::ContactResult::single_contact_point)
+        .def_rw("cc_transform", &tc::ContactResult::cc_transform)
+        .def_rw("single_contact_point", &tc::ContactResult::single_contact_point)
         .def("clear", &tc::ContactResult::clear);
 
     // ========== ContactResultVector ==========

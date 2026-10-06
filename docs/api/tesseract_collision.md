@@ -98,11 +98,22 @@ for contact in result_vector:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `link_names` | `tuple[str, str]` | Colliding link names |
 | `distance` | `float` | Signed distance (negative = penetration) |
-| `nearest_points` | `tuple[np.array, np.array]` | Contact points |
-| `normal` | `np.array` | Contact normal (A to B) |
-| `cc_time` | `tuple[float, float]` | Continuous collision times |
+| `link_names` | `list[str]` (2) | Colliding link names |
+| `type_id` | `list[int]` (2) | Collision object type ids |
+| `shape_id` | `list[int]` (2) | Shape index within each link (`-1` if unset) |
+| `subshape_id` | `list[int]` (2) | Sub-shape index within each shape (`-1` if unset) |
+| `nearest_points` | `list[np.ndarray]` (2) | Nearest points, world frame |
+| `nearest_points_local` | `list[np.ndarray]` (2) | Nearest points, each link's frame |
+| `transform` | `list[Isometry3d]` (2) | Link transforms at the contact |
+| `normal` | `np.ndarray` | Contact normal (A to B) |
+| `cc_time` | `list[float]` (2) | Continuous collision times (`-1` if not continuous) |
+| `cc_type` | `list[ContinuousCollisionType]` (2) | Continuous collision type per link |
+| `cc_transform` | `list[Isometry3d]` (2) | Cast object's end transform, per link |
+
+The pair fields hold exactly two items, one per link. Assigning a list of any
+other length raises `TypeError`. Every read returns a new list, so
+`contact.link_names[0] = "x"` changes only that copy; assign the whole list instead.
 
 ### ContactResultMap
 

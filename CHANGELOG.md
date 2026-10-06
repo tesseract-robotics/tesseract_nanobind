@@ -22,6 +22,7 @@
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
 - **The remaining plugin-info structs bound** — `ContactManagersPluginInfo`, `ProfilesPluginInfo` and `TaskComposerPluginInfo` had no binding, so nothing that takes or returns one could be bound either; `KinematicsPluginInfo` lacked `CONFIG_KEY`. All four now carry a read-only `CONFIG_KEY`, and the three new classes compare by value and are unhashable (`__hash__ = None`), through a new shared `bind_value_equality` helper. `AddContactManagersPluginInfoCommand` is bound too, with value equality, and `Environment.applyCommand` accepts it; its getter returns a copy, so editing it cannot change a command already in an environment's history ([#164]).
+- **Every `ContactResult` pair field raises on a wrong-length list** — assigning `type_id`, `link_names`, `shape_id`, `nearest_points` or `transform` a list shorter than 2 kept the old value, and a longer list was cut to its first two items; neither raised. All pair fields are now bound directly on their native two-element arrays, so any other length raises `TypeError`, as `cc_time` and `cc_type` already did. The three pair fields that had no binding are added: `subshape_id` (default `[-1, -1]`), `nearest_points_local` and `cc_transform`, which a continuous contact test fills with the cast object's end pose ([#172]).
 
 ## [0.35.0.9] - 2026-10-04 — TrajOptQPProblem + checkTrajectory + stub drift gate
 
@@ -261,6 +262,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#159]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/159
 [#164]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/164
 [#165]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/165
+[#172]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/172
 [#188]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/188
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
