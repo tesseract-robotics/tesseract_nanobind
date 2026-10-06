@@ -27,6 +27,7 @@
 - **Python can approve or reject contacts during a contact test** — `ContactResultValidator` is bound as a subclassable class whose `__call__(result) -> bool` the managers call for each contact, and `ContactRequest.is_valid` takes one (`None` disables it). `contactTest` keeps releasing the GIL; the validator re-acquires it per call, so it works from worker threads, and an exception it raises propagates out of `contactTest`. The request keeps the validator object alive ([#171]).
 - **`ContinuousContactManager.setCollisionObjectsTransform` takes start and end poses** — the three cast (moving-object) overloads, `(name, pose1, pose2)`, `(names, poses1, poses2)` and `(transforms1, transforms2)`, were reachable only under the Python-only name `setCollisionObjectsTransformCast`. They are now overloads of the native name too, next to the three single-pose ones, as in C++. `setCollisionObjectsTransformCast` still works ([#174]).
 - **`ContactManagersPluginFactory` binds its full API; managers keep the factory alive** — Python can now list, add, remove and set the default discrete and continuous plugins, clear the search paths and libraries, create a manager from an explicit `PluginInfo`, and read (`getConfig()`, a YAML string) or save (`saveConfig(path)`) the config. Unknown names in `remove…` / `setDefault…` raise `KeyError` (upstream throws a generic runtime error), and `saveConfig` raises `OSError` when the file cannot be written (upstream ignores the failed write). Every `create…ContactManager` overload now ties the manager to the factory, since the manager's code lives in a plugin library the factory's loader owns (the gh-72 rule); before, dropping the factory first relied on the library staying mapped ([#170]).
+- **`tesseract_collision` stubs name the geometry types** — the collision extension never imported `tesseract_geometry`, so its stub spelled `Geometry`, `Mesh` and `ConvexMesh` as quoted C++ names (`"tesseract::geometry::Geometry"`) in `addCollisionObject`, `getCollisionObjectGeometries` and `makeConvexMesh`, which type checkers cannot resolve. The extension now imports `tesseract_geometry` itself, and the stubs name the Python classes ([#168]).
 
 ## [0.35.0.9] - 2026-10-04 — TrajOptQPProblem + checkTrajectory + stub drift gate
 
@@ -266,6 +267,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#159]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/159
 [#164]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/164
 [#165]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/165
+[#168]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/168
 [#170]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/170
 [#171]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/171
 [#172]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/172

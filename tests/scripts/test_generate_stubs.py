@@ -31,6 +31,10 @@ MODULES = _mod.discover_modules()
 # template names too: MSVC drops the spaces (`Transform<double,3,1,0>`).
 PLATFORM_TYPE_LEAK = re.compile(r'"[^"\n]*\b(?:std|Eigen)::[^"\n]*"')
 
+# A tesseract type quoted by its C++ name: the module defining it was not imported
+# before stub generation (gh-168).
+QUOTED_TESSERACT_TYPE = re.compile(r'"[^"\n]*\btesseract::[^"\n]*"')
+
 
 def test_modules_discovered():
     assert "tesseract_robotics.tesseract_collision._tesseract_collision" in MODULES
@@ -62,6 +66,16 @@ def test_continuous_manager_geometry_getters_declared():
     body = text.split("class ContinuousContactManager:", 1)[1].split("\nclass ", 1)[0]
     assert "def getCollisionObjectGeometries(" in body
     assert "def getCollisionObjectGeometriesTransforms(" in body
+
+
+def test_collision_stub_has_no_quoted_tesseract_types():
+    """gh-168. Scoped to tesseract_collision: other modules still quote `tesseract::`
+    names, which belong to other findings."""
+    text = _mod.stub_path("tesseract_robotics.tesseract_collision._tesseract_collision").read_text(
+        encoding="utf-8"
+    )
+    leaks = QUOTED_TESSERACT_TYPE.findall(text)
+    assert not leaks, f"quoted tesseract:: types in tesseract_collision: {leaks}"
 
 
 def test_executor_thread_default_is_machine_independent():

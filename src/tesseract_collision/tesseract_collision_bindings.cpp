@@ -92,6 +92,9 @@ public:
 }  // namespace
 
 NB_MODULE(_tesseract_collision, m) {
+    // Import geometry module for tesseract::geometry::{Geometry,Mesh,ConvexMesh} (else stubs quote the
+    // C++ name). It imports tesseract_common in turn, which covers Isometry3d, ACM and CollisionMarginData.
+    nb::module_::import_("tesseract_robotics.tesseract_geometry._tesseract_geometry");
     m.doc() = "tesseract_collision Python bindings";
 
     // ========== Enums ==========
