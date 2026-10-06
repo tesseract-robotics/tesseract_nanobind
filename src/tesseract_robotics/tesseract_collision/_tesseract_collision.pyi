@@ -1,6 +1,6 @@
 """tesseract_collision Python bindings"""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 import enum
 import os
 from typing import Annotated, overload
@@ -171,6 +171,14 @@ class ContactResultVector:
 
     def clear(self) -> None: ...
 
+class UnorderedLinkPairError(ValueError):
+    """
+    A ContactResultMap key is not ordered: the first link name must not sort after the second.
+    """
+
+class EmptyContactResultsError(ValueError):
+    """A ContactResultMap vector overload got an empty ContactResultVector."""
+
 class ContactResultMap:
     def __init__(self) -> None: ...
 
@@ -191,6 +199,40 @@ class ContactResultMap:
     def flattenMoveResults(self, results: ContactResultVector) -> None: ...
 
     def __len__(self) -> int: ...
+
+    def at(self, key: tuple[str, str]) -> ContactResultVector:
+        """
+        Copy of the results stored under `key`; raises KeyError when it is absent.
+        """
+
+    def getContainer(self) -> dict[tuple[str, str], ContactResultVector]:
+        """Copy of the underlying map, keyed by (link_name1, link_name2)."""
+
+    def __iter__(self) -> Iterator[tuple[tuple[str, str], ContactResultVector]]:
+        """
+        Iterate over (key, ContactResultVector) pairs, like C++ begin()/end(); a dict iterates keys only. Keys kept by clear() are included with empty vectors.
+        """
+
+    @overload
+    def addContactResult(self, key: tuple[str, str], result: ContactResult) -> ContactResult: ...
+
+    @overload
+    def addContactResult(self, key: tuple[str, str], results: ContactResultVector) -> ContactResult: ...
+
+    @overload
+    def setContactResult(self, key: tuple[str, str], result: ContactResult) -> ContactResult: ...
+
+    @overload
+    def setContactResult(self, key: tuple[str, str], results: ContactResultVector) -> ContactResult: ...
+
+    def shrinkToFit(self) -> None: ...
+
+    def filter(self, fn: Callable[[tuple[str, str], ContactResultVector], None]) -> None:
+        """
+        Call `fn(key, results)` for every pair; clearing or appending to `results` edits the map. `results` is valid only during the call.
+        """
+
+    def addInterpolatedCollisionResults(self, sub_segment_results: ContactResultMap, sub_segment_index: int, sub_segment_last_index: int, active_link_names: Sequence[str], segment_dt: float, discrete: bool, filter: Callable[[tuple[str, str], ContactResultVector], None] | None = None) -> None: ...
 
 class ContactTrajectorySubstepResults:
     @overload

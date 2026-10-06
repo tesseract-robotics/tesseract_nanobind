@@ -35,6 +35,45 @@ namespace tg = tesseract::geometry;
 // Disable type caster for ContactResultVector so we can bind it as a class
 NB_MAKE_OPAQUE(tc::ContactResultVector);
 
+namespace {
+
+using CRM = tc::ContactResultMap;
+
+// ContactResultMap mutator preconditions that upstream only assert()s (types.cpp), so a
+// release build would store an unreachable key or call back() on an empty vector.
+struct UnorderedLinkPairError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+struct EmptyContactResultsError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+void check_ordered_key(const CRM::KeyType& key) {
+    if (tcommon::makeOrderedLinkPair(key.first, key.second) != key)
+        throw UnorderedLinkPairError("ContactResultMap key ('" + key.first + "', '" + key.second +
+                                     "') is not ordered: use ('" + key.second + "', '" + key.first + "')");
+}
+
+void check_nonempty(const CRM::MappedType& results) {
+    if (results.empty())
+        throw EmptyContactResultsError("ContactResultMap: results must hold at least one ContactResult");
+}
+
+// Wrap a Python callable as FilterFn. The vector is passed by reference so the callback can
+// clear or append; it is valid only for the duration of the call (same contract as
+// PySQPCallback's problem argument, src/trajopt_sqp/trajopt_sqp_bindings.cpp).
+using PyFilterFn = nb::typed<nb::callable, void(CRM::KeyType, tc::ContactResultVector)>;
+
+CRM::FilterFn to_filter_fn(const std::optional<PyFilterFn>& maybe_fn) {
+    if (!maybe_fn) return nullptr;
+    nb::callable fn = *maybe_fn;
+    return [fn](CRM::PairType& pair) {
+        fn(nb::cast(pair.first), nb::cast(pair.second, nb::rv_policy::reference));
+    };
+}
+
+}  // namespace
+
 NB_MODULE(_tesseract_collision, m) {
     m.doc() = "tesseract_collision Python bindings";
 
@@ -117,23 +156,80 @@ NB_MODULE(_tesseract_collision, m) {
         .def("clear", [](tc::ContactResultVector& v) { v.clear(); });
 
     // ========== ContactResultMap ==========
-    nb::class_<tc::ContactResultMap>(m, "ContactResultMap")
+    nb::exception<UnorderedLinkPairError>(m, "UnorderedLinkPairError", PyExc_ValueError)
+        .attr("__doc__") = "A ContactResultMap key is not ordered: the first link name must not sort after the second.";
+    nb::exception<EmptyContactResultsError>(m, "EmptyContactResultsError", PyExc_ValueError)
+        .attr("__doc__") = "A ContactResultMap vector overload got an empty ContactResultVector.";
+
+    // Every value handed to Python is a copy (the filter callback's vector excepted), so Python
+    // never holds a reference into the map that a later insert or shrinkToFit invalidates.
+    nb::class_<CRM>(m, "ContactResultMap")
         .def(nb::init<>())
-        .def("count", &tc::ContactResultMap::count)
-        .def("size", &tc::ContactResultMap::size)
-        .def("empty", &tc::ContactResultMap::empty)
-        .def("clear", &tc::ContactResultMap::clear)
-        .def("release", &tc::ContactResultMap::release)
-        .def("getSummary", &tc::ContactResultMap::getSummary)
-        .def("flattenCopyResults", [](const tc::ContactResultMap& self) {
+        .def("count", &CRM::count)
+        .def("size", &CRM::size)
+        .def("empty", &CRM::empty)
+        .def("clear", &CRM::clear)
+        .def("release", &CRM::release)
+        .def("getSummary", &CRM::getSummary)
+        .def("flattenCopyResults", [](const CRM& self) {
             tc::ContactResultVector v;
             self.flattenCopyResults(v);
             return v;
         })
-        .def("flattenMoveResults", [](tc::ContactResultMap& self, tc::ContactResultVector& v) {
+        .def("flattenMoveResults", [](CRM& self, tc::ContactResultVector& v) {
             self.flattenMoveResults(v);
         }, "results"_a)
-        .def("__len__", &tc::ContactResultMap::size);
+        .def("__len__", &CRM::size)
+        .def("at", [](const CRM& self, const CRM::KeyType& key) -> tc::ContactResultVector {
+            const auto& container = self.getContainer();
+            auto it = container.find(key);
+            if (it == container.end())
+                throw nb::key_error(("ContactResultMap has no key ('" + key.first + "', '" + key.second + "')").c_str());
+            return it->second;
+        }, "key"_a, "Copy of the results stored under `key`; raises KeyError when it is absent.")
+        .def("getContainer", [](const CRM& self) { return self.getContainer(); },
+             "Copy of the underlying map, keyed by (link_name1, link_name2).")
+        .def("__iter__", [](const CRM& self) {
+            // Snapshot: iterating a copy keeps a shrinkToFit()/release() inside the loop safe.
+            nb::list items;
+            for (const auto& pair : self)
+                items.append(nb::make_tuple(pair.first, nb::cast(pair.second, nb::rv_policy::copy)));
+            return nb::typed<nb::iterator, std::pair<CRM::KeyType, tc::ContactResultVector>>(nb::iter(items));
+        }, "Iterate over (key, ContactResultVector) pairs, like C++ begin()/end(); a dict iterates keys only. "
+           "Keys kept by clear() are included with empty vectors.")
+        // Mutators. The returned ContactResult is a copy: the C++ reference points into a vector
+        // that the next insert may reallocate.
+        .def("addContactResult", [](CRM& self, const CRM::KeyType& key, tc::ContactResult result) {
+            check_ordered_key(key);
+            return tc::ContactResult(self.addContactResult(key, std::move(result)));
+        }, "key"_a, "result"_a)
+        .def("addContactResult", [](CRM& self, const CRM::KeyType& key, const CRM::MappedType& results) {
+            check_ordered_key(key);
+            check_nonempty(results);
+            return tc::ContactResult(self.addContactResult(key, results));
+        }, "key"_a, "results"_a)
+        .def("setContactResult", [](CRM& self, const CRM::KeyType& key, tc::ContactResult result) {
+            check_ordered_key(key);
+            return tc::ContactResult(self.setContactResult(key, std::move(result)));
+        }, "key"_a, "result"_a)
+        .def("setContactResult", [](CRM& self, const CRM::KeyType& key, const CRM::MappedType& results) {
+            check_ordered_key(key);
+            check_nonempty(results);
+            return tc::ContactResult(self.setContactResult(key, results));
+        }, "key"_a, "results"_a)
+        .def("shrinkToFit", &CRM::shrinkToFit)
+        .def("filter", [](CRM& self, const PyFilterFn& fn) { self.filter(to_filter_fn(fn)); }, "fn"_a,
+             "Call `fn(key, results)` for every pair; clearing or appending to `results` edits the map. "
+             "`results` is valid only during the call.")
+        .def("addInterpolatedCollisionResults",
+             [](CRM& self, CRM& sub_segment_results, long sub_segment_index, long sub_segment_last_index,
+                const std::vector<std::string>& active_link_names, double segment_dt, bool discrete,
+                const std::optional<PyFilterFn>& filter) {
+                 self.addInterpolatedCollisionResults(sub_segment_results, sub_segment_index, sub_segment_last_index,
+                                                      active_link_names, segment_dt, discrete, to_filter_fn(filter));
+             },
+             "sub_segment_results"_a, "sub_segment_index"_a, "sub_segment_last_index"_a, "active_link_names"_a,
+             "segment_dt"_a, "discrete"_a, "filter"_a = nb::none());
 
     // ========== ContactTrajectory{Substep,Step,}Results ==========
     // Returned by tesseract_environment.checkTrajectory. The std::stringstream summaries are

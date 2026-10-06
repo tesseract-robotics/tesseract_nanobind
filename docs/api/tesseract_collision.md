@@ -83,7 +83,7 @@ Single contact between two objects.
 ```python
 from tesseract_robotics.tesseract_collision import ContactResult, ContactResultVector
 
-# ContactResultMap is a nested map (link_a → link_b → list[ContactResult]).
+# ContactResultMap maps a link pair to its contacts.
 # Flatten it to iterate individual contacts.
 result_vector = ContactResultVector()
 result_map.flattenMoveResults(result_vector)   # or flattenCopyResults()
@@ -117,9 +117,9 @@ other length raises `TypeError`. Every read returns a new list, so
 
 ### ContactResultMap
 
-Nested map: `link_a → link_b → list[ContactResult]`. Exposes `size()`,
-`empty()`, `count()`, `clear()`, `getSummary()`, and
-`flattenCopyResults()` / `flattenMoveResults()` for iteration.
+Map from an ordered link pair `(link_a, link_b)` (`link_a` does not sort after
+`link_b`) to a `ContactResultVector`. `count()` is the number of contacts,
+`size()` / `len()` the number of pairs that have at least one.
 
 ```python
 from tesseract_robotics.tesseract_collision import ContactResultMap
@@ -127,9 +127,33 @@ from tesseract_robotics.tesseract_collision import ContactResultMap
 result_map = ContactResultMap()
 manager.contactTest(result_map, request)
 
-print(f"{result_map.size()} contact pairs")
+print(f"{result_map.size()} contact pairs, {result_map.count()} contacts")
 print(result_map.getSummary())
+
+# Read: every value is a copy, never a view into the map
+for (link_a, link_b), contacts in result_map:      # (key, ContactResultVector) pairs
+    print(link_a, link_b, len(contacts))
+contacts = result_map.at(("base_link", "link_1"))  # KeyError if absent
+as_dict = result_map.getContainer()                # dict[tuple[str, str], ContactResultVector]
+
+# Drop every contact that involves the gripper (the vector is live only during the call)
+def drop_gripper(key, contacts):
+    if "gripper" in key:
+        contacts.clear()
+
+result_map.filter(drop_gripper)
 ```
+
+Building a map: `addContactResult(key, result)` appends, `setContactResult(key, result)`
+replaces the pair's results; both also take a `ContactResultVector`, and both return
+a copy of the last result stored. A key whose names are out of order raises
+`UnorderedLinkPairError`, and an empty vector raises `EmptyContactResultsError`
+(both subclass `ValueError`; upstream only asserts these).
+`clear()` empties every vector but keeps the keys, so iteration still yields them
+with empty vectors until `shrinkToFit()` removes them. Iteration walks a snapshot,
+so changing the map inside the loop is safe. `addInterpolatedCollisionResults`
+merges a sub-segment's results, setting `cc_time` / `cc_type` for the active
+links, with an optional `filter` callback.
 
 ### ContactResultVector
 
