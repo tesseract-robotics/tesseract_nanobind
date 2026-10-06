@@ -8,6 +8,7 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/set.h>
+#include <nanobind/stl/chrono.h>  // getTimestamp / getCurrentStateTimestamp -> datetime.datetime
 
 #include <atomic>
 #include <algorithm>  // std::find (setState validation, GH #43)
@@ -108,7 +109,9 @@ CheckTrajectoryResult check_trajectory(Manager& manager,
 // traceback. The binding owns the Python boundary, so validate here and fail
 // loud (std::invalid_argument -> ValueError). Valid targets are the ACTIVE
 // joints: fixed/mimic joints aren't in the solver's map and crash identically.
-void validate_set_state_joint_names(const te::Environment& env, const std::vector<std::string>& names)
+void validate_set_state_joint_names(const te::Environment& env,
+                                    const std::vector<std::string>& names,
+                                    const std::string& caller = "setState")
 {
     const std::vector<std::string> active = env.getActiveJointNames();
     std::string unknown;
@@ -119,17 +122,41 @@ void validate_set_state_joint_names(const te::Environment& env, const std::vecto
         }
     }
     if (!unknown.empty())
-        throw std::invalid_argument("setState: unknown or non-active joint names: " + unknown);
+        throw std::invalid_argument(caller + ": unknown or non-active joint names: " + unknown);
 }
 
 void validate_set_state(const te::Environment& env,
                         const std::vector<std::string>& names,
-                        const Eigen::Ref<const Eigen::VectorXd>& values)
+                        const Eigen::Ref<const Eigen::VectorXd>& values,
+                        const std::string& caller = "setState")
 {
     if (static_cast<Eigen::Index>(names.size()) != values.size())
-        throw std::invalid_argument("setState: joint_names length (" + std::to_string(names.size()) +
+        throw std::invalid_argument(caller + ": joint_names length (" + std::to_string(names.size()) +
                                     ") != joint_values length (" + std::to_string(values.size()) + ")");
-    validate_set_state_joint_names(env, names);
+    validate_set_state_joint_names(env, names, caller);
+}
+
+// gh-188: Environment has no floating-joint name accessor; the keys of
+// getCurrentFloatingJointValues() are every floating joint. Returns the names that are not
+// floating joints, comma-separated, or "" when all are.
+std::string unknown_floating_joint_names(const te::Environment& env, const std::vector<std::string>& names)
+{
+    const tc::TransformMap floating = env.getCurrentFloatingJointValues();
+    std::string unknown;
+    for (const auto& name : names) {
+        if (floating.find(name) == floating.end()) {
+            if (!unknown.empty()) unknown += ", ";
+            unknown += name;
+        }
+    }
+    return unknown;
+}
+
+// gh-188: the link-keyed getters do not document a miss; raise KeyError before C++ sees one.
+void require_link(const te::Environment& env, const std::string& name)
+{
+    if (!env.getLink(name))
+        throw nb::key_error(("Link not found: " + name).c_str());
 }
 
 // Test oracle for the GIL guards (gh-134): counts its copies by whether the copying thread holds
@@ -188,6 +215,8 @@ NB_MODULE(_tesseract_environment, m) {
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
     // Import common module for ContactManagersPluginInfo (AddContactManagersPluginInfoCommand)
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    // Import scene_graph module for JointLimits (getJointLimits)
+    nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
     m.doc() = "tesseract_environment Python bindings";
 
     // ========== Events enum ==========
@@ -427,6 +456,12 @@ NB_MODULE(_tesseract_environment, m) {
         .def("reset", &te::Environment::reset)
         .def("clear", &te::Environment::clear)
         .def("getRevision", &te::Environment::getRevision)
+        .def("getInitRevision", &te::Environment::getInitRevision)
+        // system_clock::time_point -> naive datetime.datetime in local time (nanobind stl/chrono.h)
+        .def("getTimestamp", &te::Environment::getTimestamp,
+             "Last update time (any change to the environment), as a naive local `datetime.datetime`.")
+        .def("getCurrentStateTimestamp", &te::Environment::getCurrentStateTimestamp,
+             "Last update time of the current state, as a naive local `datetime.datetime`.")
         .def("getName", &te::Environment::getName)
         .def("setName", &te::Environment::setName, "name"_a)
         // Scene graph
@@ -621,6 +656,61 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getLinkTransform", &te::Environment::getLinkTransform, "link_name"_a)
         .def("getRelativeLinkTransform", &te::Environment::getRelativeLinkTransform,
              "from_link_name"_a, "to_link_name"_a)
+        // gh-188: getLinkTransforms. The (names, values[, floating_joints]) overloads return the
+        // C++ out-param (accepted out-param rule) and validate like setState (GH #43): they feed
+        // the same state-solver path.
+        .def("getLinkTransforms", [](const te::Environment& self) {
+            return self.getLinkTransforms();
+        })
+        .def("getLinkTransforms", [](const te::Environment& self,
+                                     const std::vector<std::string>& joint_names,
+                                     const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
+            validate_set_state(self, joint_names, joint_values, "getLinkTransforms");
+            tc::TransformMap link_transforms;
+            self.getLinkTransforms(link_transforms, joint_names, joint_values);
+            return link_transforms;
+        }, "joint_names"_a, "joint_values"_a)
+        .def("getLinkTransforms", [](const te::Environment& self,
+                                     const std::vector<std::string>& joint_names,
+                                     const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                     const tc::TransformMap& floating_joints) {
+            validate_set_state(self, joint_names, joint_values, "getLinkTransforms");
+            std::vector<std::string> floating_names;
+            floating_names.reserve(floating_joints.size());
+            for (const auto& kv : floating_joints) floating_names.push_back(kv.first);
+            const std::string unknown = unknown_floating_joint_names(self, floating_names);
+            if (!unknown.empty())
+                throw std::invalid_argument("getLinkTransforms: unknown floating joint names: " + unknown);
+            tc::TransformMap link_transforms;
+            self.getLinkTransforms(link_transforms, joint_names, joint_values, floating_joints);
+            return link_transforms;
+        }, "joint_names"_a, "joint_values"_a, "floating_joints"_a)
+        .def("getCurrentFloatingJointValues", [](const te::Environment& self) {
+            return self.getCurrentFloatingJointValues();
+        })
+        .def("getCurrentFloatingJointValues", [](const te::Environment& self,
+                                                 const std::vector<std::string>& joint_names) {
+            const std::string unknown = unknown_floating_joint_names(self, joint_names);
+            if (!unknown.empty())
+                throw nb::key_error(("Floating joint not found: " + unknown).c_str());
+            return self.getCurrentFloatingJointValues(joint_names);
+        }, "joint_names"_a)
+        // gh-188: name-keyed getters raise KeyError on a miss instead of None / an unasked-for bool.
+        // getJointLimits copies: the C++ getter hands out a pointer into the scene graph.
+        .def("getJointLimits", [](const te::Environment& self, const std::string& joint_name) {
+            auto ptr = self.getJointLimits(joint_name);
+            if (!ptr) throw nb::key_error(("Joint not found: " + joint_name).c_str());
+            return tsg::JointLimits(*ptr);
+        }, "joint_name"_a)
+        .def("getLinkCollisionEnabled", [](const te::Environment& self, const std::string& name) {
+            require_link(self, name);
+            return self.getLinkCollisionEnabled(name);
+        }, "name"_a)
+        .def("getLinkVisibility", [](const te::Environment& self, const std::string& name) {
+            require_link(self, name);
+            return self.getLinkVisibility(name);
+        }, "name"_a)
+        .def("getContactManagersPluginInfo", &te::Environment::getContactManagersPluginInfo)
         // Link/Joint access - dereference shared_ptr for cross-module compatibility
         .def("getLink", [](const te::Environment& self, const std::string& name) -> const tsg::Link& {
             auto ptr = self.getLink(name);

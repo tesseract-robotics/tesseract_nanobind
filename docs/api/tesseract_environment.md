@@ -62,7 +62,30 @@ env.setState(["joint_1", "joint_2"], np.array([0.5, -0.3]))  # names + values
 
 # Get link transform
 tcp = env.getLinkTransform("tool0")
+
+# All link transforms: current state (list), or for given joint values (dict, state unchanged)
+current = env.getLinkTransforms()
+at_values = env.getLinkTransforms(["joint_1", "joint_2"], np.array([0.5, -0.3]))
+tcp_at_values = at_values["tool0"]
+
+# Floating joints: current joint-origin transforms, keyed by joint name
+floating = env.getCurrentFloatingJointValues()
 ```
+
+`getLinkTransforms(names, values)` validates its input like `setState`: an unknown or
+non-active joint name, or a length mismatch, raises `ValueError`. So does a
+`floating_joints` key that is not a floating joint.
+
+### Per-link and per-joint lookups
+
+```python
+limits = env.getJointLimits("joint_1")          # JointLimits copy: lower, upper, velocity, ...
+enabled = env.getLinkCollisionEnabled("link_1")  # bool
+visible = env.getLinkVisibility("link_1")        # bool
+```
+
+A name that is not in the scene graph raises `KeyError`, also for
+`getCurrentFloatingJointValues(names)`.
 
 ### Kinematics
 
@@ -95,7 +118,21 @@ acm = env.getAllowedCollisionMatrix()
 if env.isInitialized():
     print(f"Root link: {env.getRootLinkName()}")
     print(f"Revision: {env.getRevision()}")
+    print(f"Revision after init: {env.getInitRevision()}")
+
+# Last change to anything / to the current state, as naive local datetime.datetime
+changed = env.getTimestamp()
+state_changed = env.getCurrentStateTimestamp()
+
+# Contact-manager plugin config loaded from the SRDF
+info = env.getContactManagersPluginInfo()
+print(info.discrete_plugin_infos.default_plugin)
 ```
+
+!!! note "Timestamps are naive local time"
+    nanobind converts `std::chrono::system_clock::time_point` to a `datetime.datetime`
+    without `tzinfo`, in local time. Compare against `datetime.datetime.now()`, not
+    `datetime.datetime.now(datetime.timezone.utc)`.
 
 ## Commands
 

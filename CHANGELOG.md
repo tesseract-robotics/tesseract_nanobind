@@ -20,6 +20,7 @@
 
 ### Changes
 
+- **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
 - **The remaining plugin-info structs bound** — `ContactManagersPluginInfo`, `ProfilesPluginInfo` and `TaskComposerPluginInfo` had no binding, so nothing that takes or returns one could be bound either; `KinematicsPluginInfo` lacked `CONFIG_KEY`. All four now carry a read-only `CONFIG_KEY`, and the three new classes compare by value and are unhashable (`__hash__ = None`), through a new shared `bind_value_equality` helper. `AddContactManagersPluginInfoCommand` is bound too, with value equality, and `Environment.applyCommand` accepts it; its getter returns a copy, so editing it cannot change a command already in an environment's history ([#164]).
 
 ## [0.35.0.9] - 2026-10-04 — TrajOptQPProblem + checkTrajectory + stub drift gate
@@ -260,6 +261,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#159]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/159
 [#164]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/164
 [#165]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/165
+[#188]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/188
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

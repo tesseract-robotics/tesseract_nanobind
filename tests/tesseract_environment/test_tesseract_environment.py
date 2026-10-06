@@ -1,3 +1,4 @@
+import datetime
 import os
 import traceback
 from pathlib import Path
@@ -337,3 +338,123 @@ def test_init_mixed_raises(mixed):
 def test_init_from_urdf_removed(name):
     """gh-165: the Python-only content initialisers are gone; `init(str, ...)` replaces them."""
     assert not hasattr(tesseract_environment.Environment, name)
+
+
+# gh-188: the read-only Environment getters.
+
+# Both transforms come out of the same state solver for the same joint values, so they
+# agree to floating-point roundoff (m for translation, unitless for rotation entries).
+FK_ATOL = 1e-12
+
+_IIWA_JOINTS = [f"joint_a{i + 1}" for i in range(7)]
+
+_FLOATING_URDF = """<robot name="floater" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
+  <link name="world"/>
+  <link name="body"/>
+  <joint name="float_joint" type="floating">
+    <origin xyz="1 2 3" rpy="0 0 0"/>
+    <parent link="world"/>
+    <child link="body"/>
+  </joint>
+</robot>"""
+
+
+def test_get_init_revision():
+    env = _fresh_env()
+    init_revision = env.getInitRevision()
+    assert init_revision == env.getRevision()
+    assert env.applyCommand(tesseract_environment.ChangeLinkVisibilityCommand("link_1", False))
+    assert env.getRevision() == init_revision + 1
+    assert env.getInitRevision() == init_revision
+
+
+def test_timestamps_are_datetime():
+    env = _fresh_env()
+    assert isinstance(env.getTimestamp(), datetime.datetime)
+    assert isinstance(env.getCurrentStateTimestamp(), datetime.datetime)
+
+    before = datetime.datetime.now()  # naive local time, like the caster's result
+    env.setState(_IIWA_JOINTS, np.full(7, 0.1))
+    assert env.getCurrentStateTimestamp() >= before
+
+    stamp = env.getTimestamp()
+    assert env.applyCommand(tesseract_environment.ChangeLinkVisibilityCommand("link_1", False))
+    assert env.getTimestamp() > stamp
+
+
+def test_get_joint_limits():
+    env = _fresh_env()
+    limits = env.getJointLimits("joint_a1")
+    assert limits.lower == -2.9668
+    assert limits.upper == 2.9668
+    with pytest.raises(KeyError, match="not_a_joint"):
+        env.getJointLimits("not_a_joint")
+
+
+def test_link_collision_enabled_and_visibility():
+    env = _fresh_env()
+    assert env.getLinkCollisionEnabled("link_1") is True
+    assert env.getLinkVisibility("link_1") is True
+    assert env.applyCommand(
+        tesseract_environment.ChangeLinkCollisionEnabledCommand("link_1", False)
+    )
+    assert env.applyCommand(tesseract_environment.ChangeLinkVisibilityCommand("link_1", False))
+    assert env.getLinkCollisionEnabled("link_1") is False
+    assert env.getLinkVisibility("link_1") is False
+    with pytest.raises(KeyError, match="not_a_link"):
+        env.getLinkCollisionEnabled("not_a_link")
+    with pytest.raises(KeyError, match="not_a_link"):
+        env.getLinkVisibility("not_a_link")
+
+
+def test_get_link_transforms_overloads():
+    env = _fresh_env()
+    assert len(env.getLinkTransforms()) == len(env.getLinkNames())
+
+    values = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+    transforms = env.getLinkTransforms(_IIWA_JOINTS, values)
+    assert isinstance(transforms, dict)
+    assert set(transforms) == set(env.getLinkNames())
+
+    with_floating = env.getLinkTransforms(_IIWA_JOINTS, values, {})
+    np.testing.assert_allclose(
+        with_floating["tool0"].matrix, transforms["tool0"].matrix, atol=FK_ATOL
+    )
+
+    env.setState(_IIWA_JOINTS, values)
+    np.testing.assert_allclose(
+        transforms["tool0"].matrix, env.getLinkTransform("tool0").matrix, atol=FK_ATOL
+    )
+
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.getLinkTransforms(["not_a_joint"], np.array([1.0]))
+    with pytest.raises(ValueError, match="length"):
+        env.getLinkTransforms(_IIWA_JOINTS, np.array([1.0]))
+    with pytest.raises(ValueError, match="not_a_floating_joint"):
+        env.getLinkTransforms(
+            _IIWA_JOINTS, values, {"not_a_floating_joint": env.getLinkTransform("tool0")}
+        )
+
+
+def test_get_current_floating_joint_values():
+    env = _fresh_env()
+    assert env.getCurrentFloatingJointValues() == {}
+    assert env.getCurrentFloatingJointValues([]) == {}
+
+    floater = tesseract_environment.Environment()
+    scene_graph = tesseract_urdf.parseURDFString(_FLOATING_URDF, TesseractSupportResourceLocator())
+    assert floater.init(scene_graph)
+    for values in (
+        floater.getCurrentFloatingJointValues(),
+        floater.getCurrentFloatingJointValues(["float_joint"]),
+    ):
+        assert set(values) == {"float_joint"}
+        np.testing.assert_allclose(values["float_joint"].translation, [1.0, 2.0, 3.0], atol=FK_ATOL)
+    with pytest.raises(KeyError, match="not_a_joint"):
+        floater.getCurrentFloatingJointValues(["not_a_joint"])
+
+
+def test_get_contact_managers_plugin_info():
+    info = _fresh_env().getContactManagersPluginInfo()
+    assert info.discrete_plugin_infos.default_plugin == "BulletDiscreteBVHManager"
+    assert info.continuous_plugin_infos.default_plugin == "BulletCastBVHManager"

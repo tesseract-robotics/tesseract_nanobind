@@ -1,6 +1,7 @@
 """tesseract_environment Python bindings"""
 
 from collections.abc import Callable, Mapping, Sequence
+import datetime
 import enum
 import os
 from typing import Annotated, overload
@@ -256,6 +257,18 @@ class Environment:
 
     def getRevision(self) -> int: ...
 
+    def getInitRevision(self) -> int: ...
+
+    def getTimestamp(self) -> datetime.datetime:
+        """
+        Last update time (any change to the environment), as a naive local `datetime.datetime`.
+        """
+
+    def getCurrentStateTimestamp(self) -> datetime.datetime:
+        """
+        Last update time of the current state, as a naive local `datetime.datetime`.
+        """
+
     def getName(self) -> str: ...
 
     def setName(self, name: str) -> None: ...
@@ -360,6 +373,29 @@ class Environment:
     def getLinkTransform(self, link_name: str) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
 
     def getRelativeLinkTransform(self, from_link_name: str, to_link_name: str) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
+
+    @overload
+    def getLinkTransforms(self) -> list[tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+
+    @overload
+    def getLinkTransforms(self, joint_names: Sequence[str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+
+    @overload
+    def getLinkTransforms(self, joint_names: Sequence[str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], floating_joints: Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+
+    @overload
+    def getCurrentFloatingJointValues(self) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+
+    @overload
+    def getCurrentFloatingJointValues(self, joint_names: Sequence[str]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+
+    def getJointLimits(self, joint_name: str) -> tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.JointLimits: ...
+
+    def getLinkCollisionEnabled(self, name: str) -> bool: ...
+
+    def getLinkVisibility(self, name: str) -> bool: ...
+
+    def getContactManagersPluginInfo(self) -> tesseract_robotics.tesseract_common._tesseract_common.ContactManagersPluginInfo: ...
 
     def getLink(self, name: str) -> tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.Link: ...
 
