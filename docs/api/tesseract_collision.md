@@ -269,6 +269,28 @@ n_faces, vertices, faces = createConvexHull(points, shrink=0.1)
 A shrink that cannot be applied (larger than the hull, unclamped) raises `ConvexHullError`
 (a `RuntimeError`). An empty point set is not an error: it gives 0 faces.
 
+### Convex decomposition (V-HACD)
+
+`ConvexDecompositionVHACD` splits a triangle mesh into convex hulls, for meshes too concave
+for a single hull. `ConvexDecomposition` is its abstract base (no constructor).
+
+```python
+from tesseract_robotics.tesseract_collision import ConvexDecompositionVHACD, FillMode, VHACDParameters
+
+params = VHACDParameters()           # header defaults: 64 hulls, 400000 voxels, FLOOD_FILL
+params.max_convex_hulls = 16
+params.fill_mode = FillMode.SURFACE_ONLY
+
+# vertices: list of 3-vectors; faces: flat int32 array of [3, i0, i1, i2] per triangle
+hulls = ConvexDecompositionVHACD(params).compute(vertices, faces, verbose=False)  # list[ConvexMesh]
+```
+
+`compute` releases the GIL, so it can run in a worker thread. `faces` is checked first:
+a face that is not a triangle raises `NonTriangleFaceError`, and a count running past the end
+or an index outside `vertices` raises `MalformedFacesError` (both `ValueError`). Upstream reads
+`faces` unchecked. `verbose=True` (the default, as upstream) prints the parameters and progress
+to stdout.
+
 ## Collision Evaluator Types
 
 Used with trajectory optimization.

@@ -39,4 +39,11 @@ __all__ = [
     "makeConvexMesh",
     "createConvexHull",
     "ConvexHullError",
+    # Convex decomposition
+    "FillMode",
+    "VHACDParameters",
+    "ConvexDecomposition",
+    "ConvexDecompositionVHACD",
+    "MalformedFacesError",
+    "NonTriangleFaceError",
 ]

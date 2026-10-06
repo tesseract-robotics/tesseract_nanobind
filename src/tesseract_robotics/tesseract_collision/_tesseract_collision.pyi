@@ -738,3 +738,99 @@ def createConvexHull(input: Sequence[Annotated[NDArray[numpy.float64], dict(shap
     """
     Convex hull of a point set (Bullet). Returns (n_faces, vertices, faces); faces is a flat array of [count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink cannot be applied.
     """
+
+class MalformedFacesError(ValueError):
+    """
+    A faces array has a count running past its end or an index outside the vertices.
+    """
+
+class NonTriangleFaceError(ValueError):
+    """
+    ConvexDecomposition.compute got a face that is not a triangle (count != 3).
+    """
+
+class FillMode(enum.Enum):
+    FLOOD_FILL = 0
+
+    SURFACE_ONLY = 1
+
+    RAYCAST_FILL = 2
+
+class VHACDParameters:
+    def __init__(self) -> None: ...
+
+    @property
+    def max_convex_hulls(self) -> int: ...
+
+    @max_convex_hulls.setter
+    def max_convex_hulls(self, arg: int, /) -> None: ...
+
+    @property
+    def resolution(self) -> int: ...
+
+    @resolution.setter
+    def resolution(self, arg: int, /) -> None: ...
+
+    @property
+    def minimum_volume_percent_error_allowed(self) -> float: ...
+
+    @minimum_volume_percent_error_allowed.setter
+    def minimum_volume_percent_error_allowed(self, arg: float, /) -> None: ...
+
+    @property
+    def max_recursion_depth(self) -> int: ...
+
+    @max_recursion_depth.setter
+    def max_recursion_depth(self, arg: int, /) -> None: ...
+
+    @property
+    def shrinkwrap(self) -> bool: ...
+
+    @shrinkwrap.setter
+    def shrinkwrap(self, arg: bool, /) -> None: ...
+
+    @property
+    def fill_mode(self) -> FillMode: ...
+
+    @fill_mode.setter
+    def fill_mode(self, arg: FillMode, /) -> None: ...
+
+    @property
+    def max_num_vertices_per_ch(self) -> int: ...
+
+    @max_num_vertices_per_ch.setter
+    def max_num_vertices_per_ch(self, arg: int, /) -> None: ...
+
+    @property
+    def async_ACD(self) -> bool: ...
+
+    @async_ACD.setter
+    def async_ACD(self, arg: bool, /) -> None: ...
+
+    @property
+    def min_edge_length(self) -> int: ...
+
+    @min_edge_length.setter
+    def min_edge_length(self, arg: int, /) -> None: ...
+
+    @property
+    def find_best_plane(self) -> bool: ...
+
+    @find_best_plane.setter
+    def find_best_plane(self, arg: bool, /) -> None: ...
+
+    def print(self) -> None:
+        """Print the parameters to stdout."""
+
+class ConvexDecomposition:
+    def compute(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], verbose: bool = True) -> list[tesseract_robotics.tesseract_geometry._tesseract_geometry.ConvexMesh]:
+        """
+        Split a triangle mesh into convex hulls. faces is a flat array of [3, i0, i1, i2] per triangle. Raises NonTriangleFaceError for any other count, MalformedFacesError for a count running past the end or an index outside vertices.
+        """
+
+class ConvexDecompositionVHACD(ConvexDecomposition):
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, params: VHACDParameters) -> None: ...

@@ -34,6 +34,20 @@
 // bullet convex hull utils
 #include <tesseract/collision/bullet/convex_hull_utils.h>
 
+// V-HACD convex decomposition. convex_decomposition_vhacd.h defines ENABLE_VHACD_IMPLEMENTATION
+// before including VHACD.h, which compiles the whole single-header V-HACD implementation into this
+// TU. Including VHACD.h first (implementation disabled) makes the guarded second include a no-op, so
+// VHACD:: resolves to the one copy in libtesseract_collision_vhacd_convex_decomposition.
+#include <tesseract/collision/vhacd/VHACD.h>
+#include <tesseract/collision/convex_decomposition.h>
+#include <tesseract/collision/vhacd/convex_decomposition_vhacd.h>
+// VHACD_GOOGOL_SIZE is defined only inside VHACD.h's implementation section: if it is set here, this
+// TU compiled a second V-HACD copy (an ODR and size hazard, not a link error). Fails the build on
+// every platform, Windows included, where the nm test cannot look.
+#ifdef VHACD_GOOGOL_SIZE
+#error "V-HACD implementation compiled into the binding: include VHACD.h before convex_decomposition_vhacd.h"
+#endif
+
 namespace tc = tesseract::collision;
 namespace tcommon = tesseract::common;
 namespace tg = tesseract::geometry;
@@ -59,6 +73,35 @@ struct EmptyContactResultsError : std::invalid_argument {
 struct ConvexHullError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
+
+// ConvexDecompositionVHACD::compute walks `faces` without bounds checks (an out-of-bounds read on a
+// count that runs past the end or an index past `vertices`) and throws a bare runtime_error for a
+// non-triangle face. The binding checks both before calling it.
+struct MalformedFacesError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+struct NonTriangleFaceError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+void check_triangle_faces(const tcommon::VectorVector3d& vertices, const Eigen::VectorXi& faces) {
+    const Eigen::Index n = faces.size();
+    const auto n_vertices = static_cast<long long>(vertices.size());
+    for (Eigen::Index i = 0; i < n;) {
+        const int count = faces(i);
+        if (count != 3)
+            throw NonTriangleFaceError("faces[" + std::to_string(i) + "] = " + std::to_string(count) +
+                                       ": V-HACD decomposes triangle meshes only (count 3)");
+        if (i + count >= n)
+            throw MalformedFacesError("faces[" + std::to_string(i) + "] = " + std::to_string(count) +
+                                      " runs past the end of faces (size " + std::to_string(n) + ")");
+        for (Eigen::Index k = i + 1; k <= i + count; ++k)
+            if (faces(k) < 0 || faces(k) >= n_vertices)
+                throw MalformedFacesError("faces[" + std::to_string(k) + "] = " + std::to_string(faces(k)) +
+                                          " is not a vertex index (" + std::to_string(n_vertices) + " vertices)");
+        i += count + 1;
+    }
+}
 
 void check_ordered_key(const CRM::KeyType& key) {
     if (tcommon::makeOrderedLinkPair(key.first, key.second) != key)
@@ -696,4 +739,50 @@ NB_MODULE(_tesseract_collision, m) {
         "[count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 "
         "caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink "
         "cannot be applied.");
+
+    // ========== Convex decomposition (V-HACD) ==========
+    nb::exception<MalformedFacesError>(m, "MalformedFacesError", PyExc_ValueError)
+        .attr("__doc__") = "A faces array has a count running past its end or an index outside the vertices.";
+    nb::exception<NonTriangleFaceError>(m, "NonTriangleFaceError", PyExc_ValueError)
+        .attr("__doc__") = "ConvexDecomposition.compute got a face that is not a triangle (count != 3).";
+
+    nb::enum_<VHACD::FillMode>(m, "FillMode")
+        .value("FLOOD_FILL", VHACD::FillMode::FLOOD_FILL)
+        .value("SURFACE_ONLY", VHACD::FillMode::SURFACE_ONLY)
+        .value("RAYCAST_FILL", VHACD::FillMode::RAYCAST_FILL);
+
+    nb::class_<tc::VHACDParameters>(m, "VHACDParameters")
+        .def(nb::init<>())
+        .def_rw("max_convex_hulls", &tc::VHACDParameters::max_convex_hulls)
+        .def_rw("resolution", &tc::VHACDParameters::resolution)
+        .def_rw("minimum_volume_percent_error_allowed", &tc::VHACDParameters::minimum_volume_percent_error_allowed)
+        .def_rw("max_recursion_depth", &tc::VHACDParameters::max_recursion_depth)
+        .def_rw("shrinkwrap", &tc::VHACDParameters::shrinkwrap)
+        .def_rw("fill_mode", &tc::VHACDParameters::fill_mode)
+        .def_rw("max_num_vertices_per_ch", &tc::VHACDParameters::max_num_vertices_per_ch)
+        .def_rw("async_ACD", &tc::VHACDParameters::async_ACD)
+        .def_rw("min_edge_length", &tc::VHACDParameters::min_edge_length)
+        .def_rw("find_best_plane", &tc::VHACDParameters::find_best_plane)
+        .def("print", &tc::VHACDParameters::print, "Print the parameters to stdout.");
+
+    // Abstract: no constructor. compute dispatches virtually to the concrete class. The GIL is
+    // released only around the native call: arguments are converted and checked before it, the
+    // ConvexMesh results converted after it.
+    nb::class_<tc::ConvexDecomposition>(m, "ConvexDecomposition")
+        .def(
+            "compute",
+            [](const tc::ConvexDecomposition& self, const tcommon::VectorVector3d& vertices,
+               const Eigen::VectorXi& faces, bool verbose) {
+                check_triangle_faces(vertices, faces);
+                nb::gil_scoped_release release;
+                return self.compute(vertices, faces, verbose);
+            },
+            "vertices"_a, "faces"_a, "verbose"_a = true,
+            "Split a triangle mesh into convex hulls. faces is a flat array of [3, i0, i1, i2] per triangle. "
+            "Raises NonTriangleFaceError for any other count, MalformedFacesError for a count running past "
+            "the end or an index outside vertices.");
+
+    nb::class_<tc::ConvexDecompositionVHACD, tc::ConvexDecomposition>(m, "ConvexDecompositionVHACD")
+        .def(nb::init<>())
+        .def(nb::init<const tc::VHACDParameters&>(), "params"_a);
 }

@@ -65,6 +65,7 @@ find_package(tesseract REQUIRED COMPONENTS scene_graph)
 find_package(tesseract REQUIRED COMPONENTS srdf)
 find_package(tesseract REQUIRED COMPONENTS urdf)
 find_package(tesseract REQUIRED COMPONENTS collision)
+find_package(tesseract REQUIRED COMPONENTS collision_vhacd)
 find_package(tesseract REQUIRED COMPONENTS state_solver)
 find_package(tesseract REQUIRED COMPONENTS kinematics)
 find_package(tesseract REQUIRED COMPONENTS environment)
@@ -152,6 +153,7 @@ add_tesseract_nanobind_extension(
   src/tesseract_collision/tesseract_collision_bindings.cpp
   tesseract::collision
   tesseract::collision_bullet
+  tesseract::collision_vhacd_convex_decomposition
   tesseract::geometry
   tesseract::common
 )
