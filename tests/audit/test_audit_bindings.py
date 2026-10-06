@@ -290,6 +290,19 @@ def test_yaml_only_header_has_no_row(fixture_report):
     assert not [g for g in fixture_report.gaps if "yaml_convert" in g.symbol]
 
 
+def test_third_party_header_never_audited_even_when_included_directly(fixture_report):
+    """#179: the binding #includes vhacd/VHACD.h directly to switch its implementation off;
+    the vendored library is still not module API."""
+    assert not [g for g in fixture_report.gaps if "VHACD" in g.symbol]
+
+
+def test_third_party_header_patterns_rendered_with_reasons(fixture_report):
+    text = audit.render_markdown([fixture_report], PROV)
+    assert audit.THIRD_PARTY_HEADERS
+    for pattern, reason in audit.THIRD_PARTY_HEADERS.items():
+        assert f"`{pattern}`: {reason}" in text
+
+
 def test_hacd_header_has_its_own_reason():
     """Q1: declared but not built in 0.35.0, stated apart from the Bullet internals."""
     assert "not built" in audit.UNAUDITED_HEADERS.get("bullet/convex_decomposition_hacd.h", "")

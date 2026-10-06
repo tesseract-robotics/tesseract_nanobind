@@ -125,7 +125,6 @@ UNAUDITED_HEADERS = {
     "them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.",
     "fcl/*": "FCL backend internals, loaded as a contact manager plugin; Python reaches them "
     "through the `DiscreteContactManager` interface.",
-    "vhacd/VHACD.h": "Vendored third-party V-HACD library (namespace `VHACD`).",
     "bullet/convex_decomposition_hacd.h": "Declared but not built in 0.35.0: no HACD symbol in any collision library and no CMake target.",
     # Patterns match below every module prefix; these four exist only under tesseract/common.
     "cereal_make_array.h": "cereal text-I/O helper for serialization, not API.",
@@ -135,6 +134,14 @@ UNAUDITED_HEADERS = {
     "environment_cache.h": "No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.",
     "environment_monitor.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
     "environment_monitor_interface.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
+}
+# Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
+# UNAUDITED_HEADERS. Never audited, not even when the binding #includes one directly: such an
+# include is build plumbing, not a statement that the library is module API.
+THIRD_PARTY_HEADERS = {
+    "vhacd/VHACD.h": "Vendored third-party V-HACD library (namespace `VHACD`). The collision "
+    "binding #includes it directly only so that `convex_decomposition_vhacd.h` does not compile "
+    "a second copy of its implementation (#179).",
 }
 # A header another binding TU #includes directly (`<…>` form) is audited with that module.
 INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
@@ -319,7 +326,8 @@ def location(cursor: ci.Cursor) -> str:
 def audited_headers(
     tu: ci.TranslationUnit, prefix: str, include_dirs: Sequence[Path]
 ) -> frozenset[Path]:
-    """Headers the TU's main file `#include`s itself and that live under `prefix`.
+    """Headers the TU's main file `#include`s itself and that live under `prefix`,
+    except `THIRD_PARTY_HEADERS`.
 
     Read from the main file's inclusion directives, not `get_includes()` depth: a header
     that an earlier include already pulled in is reported there only at that depth.
@@ -332,7 +340,12 @@ def audited_headers(
         if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
         and Path(c.location.file.name).resolve() == main
     )
-    return frozenset(h for h in direct if any(h.is_relative_to(r) for r in roots))
+    return frozenset(
+        h
+        for h in direct
+        for r in roots
+        if h.is_relative_to(r) and not is_third_party(h.relative_to(r).as_posix())
+    )
 
 
 def prefix_headers(prefix: str, include_dirs: Sequence[Path]) -> dict[Path, str]:
@@ -355,9 +368,16 @@ def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
     )
 
 
+def is_third_party(below: str) -> bool:
+    """`below`: a header path relative to its module prefix."""
+    return any(fnmatch.fnmatchcase(below, pattern) for pattern in THIRD_PARTY_HEADERS)
+
+
 def is_unaudited(spelling: str, prefix: str) -> bool:
     below = spelling.removeprefix(prefix)
-    return any(fnmatch.fnmatchcase(below, pattern) for pattern in UNAUDITED_HEADERS)
+    return is_third_party(below) or any(
+        fnmatch.fnmatchcase(below, pattern) for pattern in UNAUDITED_HEADERS
+    )
 
 
 def _is_out_param(parm: ci.Cursor) -> bool:
@@ -1084,6 +1104,9 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
         '!!! note "Unaudited headers"',
         *(f"    - `{k}`: {v}" for k, v in UNAUDITED_HEADERS.items()),
         "    - Headers another binding #includes directly are audited with that module.",
+        "",
+        '!!! note "Third-party headers (never audited, even when #included directly)"',
+        *(f"    - `{k}`: {v}" for k, v in THIRD_PARTY_HEADERS.items()),
         "",
         f'!!! warning "Limitations"\n    {LIMITATION}',
         "",
