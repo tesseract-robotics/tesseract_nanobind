@@ -148,6 +148,30 @@ default = margins.getDefaultCollisionMargin()
 pair_margin = margins.getPairCollisionMargin("link_a", "link_b")
 ```
 
+`CollisionMarginPairData` holds the pair margins alone. Both types build from pair data,
+shift and scale every margin, and merge another set of pair margins:
+
+```python
+from tesseract_robotics.tesseract_common import (
+    CollisionMarginData,
+    CollisionMarginPairData,
+    CollisionMarginPairOverrideType,
+)
+
+pairs = CollisionMarginPairData({("link_a", "link_b"): 0.05, ("link_a", "link_c"): 0.02})
+margins = CollisionMarginData(0.025, pairs)  # or CollisionMarginData(pairs): default 0.0
+
+margins.incrementMargins(0.01)  # default and every pair margin +0.01 m
+margins.scaleMargins(2.0)       # then x2
+
+# MODIFY sets the given pairs and keeps the rest; REPLACE keeps only the given pairs.
+margins.apply(CollisionMarginPairData({("link_b", "link_d"): 0.07}), CollisionMarginPairOverrideType.MODIFY)
+
+margins.getMaxCollisionMargin()          # largest margin overall
+margins.getMaxCollisionMargin("link_a")  # largest margin involving link_a (at least the default)
+pairs.getMaxCollisionMargin("link_z")    # None: no pair margin involves link_z
+```
+
 ## State
 
 ### JointState

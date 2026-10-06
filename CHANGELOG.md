@@ -28,6 +28,7 @@
 - **`ContinuousContactManager.setCollisionObjectsTransform` takes start and end poses** — the three cast (moving-object) overloads, `(name, pose1, pose2)`, `(names, poses1, poses2)` and `(transforms1, transforms2)`, were reachable only under the Python-only name `setCollisionObjectsTransformCast`. They are now overloads of the native name too, next to the three single-pose ones, as in C++. `setCollisionObjectsTransformCast` still works ([#174]).
 - **`ContactManagersPluginFactory` binds its full API; managers keep the factory alive** — Python can now list, add, remove and set the default discrete and continuous plugins, clear the search paths and libraries, create a manager from an explicit `PluginInfo`, and read (`getConfig()`, a YAML string) or save (`saveConfig(path)`) the config. Unknown names in `remove…` / `setDefault…` raise `KeyError` (upstream throws a generic runtime error), and `saveConfig` raises `OSError` when the file cannot be written (upstream ignores the failed write). Every `create…ContactManager` overload now ties the manager to the factory, since the manager's code lives in a plugin library the factory's loader owns (the gh-72 rule); before, dropping the factory first relied on the library staying mapped ([#170]).
 - **`tesseract_collision` stubs name the geometry types** — the collision extension never imported `tesseract_geometry`, so its stub spelled `Geometry`, `Mesh` and `ConvexMesh` as quoted C++ names (`"tesseract::geometry::Geometry"`) in `addCollisionObject`, `getCollisionObjectGeometries` and `makeConvexMesh`, which type checkers cannot resolve. The extension now imports `tesseract_geometry` itself, and the stubs name the Python classes ([#168]).
+- **Collision margin arithmetic on the margin types** — `CollisionMarginPairData` and `CollisionMarginData` gain `incrementMargins`, `scaleMargins`, `apply(pair_data, override_type)` and the per-object `getMaxCollisionMargin(obj)`; `CollisionMarginPairData` also gains `getMaxCollisionMargin()`. New constructors: `CollisionMarginPairData({(a, b): margin, ...})`, `CollisionMarginData(default, pair_data)` and `CollisionMarginData(pair_data)` (default margin 0). As upstream: the pair-data getters return `None` when no pair margin applies, while `CollisionMarginData.getMaxCollisionMargin(obj)` falls back to the default margin ([#178]).
 
 ## [0.35.0.9] - 2026-10-04 — TrajOptQPProblem + checkTrajectory + stub drift gate
 
@@ -273,6 +274,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#172]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/172
 [#173]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/173
 [#174]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/174
+[#178]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/178
 [#188]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/188
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593

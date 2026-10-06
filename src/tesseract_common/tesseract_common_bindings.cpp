@@ -861,21 +861,42 @@ NB_MODULE(_tesseract_common, m) {
     // CollisionMarginPairData - new in 0.33
     nb::class_<tesseract::common::CollisionMarginPairData>(m, "CollisionMarginPairData")
         .def(nb::init<>())
+        .def(nb::init<const tesseract::common::PairsCollisionMarginData&>(), "pair_margins"_a)
         .def("setCollisionMargin", &tesseract::common::CollisionMarginPairData::setCollisionMargin)
         .def("getCollisionMargin", &tesseract::common::CollisionMarginPairData::getCollisionMargin)
         .def("getCollisionMargins", &tesseract::common::CollisionMarginPairData::getCollisionMargins)
+        .def("getMaxCollisionMargin",
+             nb::overload_cast<>(&tesseract::common::CollisionMarginPairData::getMaxCollisionMargin, nb::const_),
+             "Largest pair margin, or None when no pair margin is set.")
+        .def("getMaxCollisionMargin",
+             nb::overload_cast<const std::string&>(&tesseract::common::CollisionMarginPairData::getMaxCollisionMargin,
+                                                   nb::const_),
+             "obj"_a, "Largest pair margin involving `obj`, or None when no pair involves it.")
+        .def("incrementMargins", &tesseract::common::CollisionMarginPairData::incrementMargins, "increment"_a)
+        .def("scaleMargins", &tesseract::common::CollisionMarginPairData::scaleMargins, "scale"_a)
+        .def("apply", &tesseract::common::CollisionMarginPairData::apply, "pair_margin_data"_a, "override_type"_a)
         .def("empty", &tesseract::common::CollisionMarginPairData::empty)
         .def("clear", &tesseract::common::CollisionMarginPairData::clear);
 
     nb::class_<tesseract::common::CollisionMarginData>(m, "CollisionMarginData")
         .def(nb::init<>())
         .def(nb::init<double>())
+        .def(nb::init<double, tesseract::common::CollisionMarginPairData>(), "default_collision_margin"_a,
+             "pair_collision_margins"_a)
+        .def(nb::init<tesseract::common::CollisionMarginPairData>(), "pair_collision_margins"_a)
         .def("getDefaultCollisionMargin", &tesseract::common::CollisionMarginData::getDefaultCollisionMargin)
         .def("setDefaultCollisionMargin", &tesseract::common::CollisionMarginData::setDefaultCollisionMargin)
         .def("getCollisionMargin", &tesseract::common::CollisionMarginData::getCollisionMargin)
         .def("setCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin)
         .def("getCollisionMarginPairData", &tesseract::common::CollisionMarginData::getCollisionMarginPairData)
         .def("getMaxCollisionMargin", nb::overload_cast<>(&tesseract::common::CollisionMarginData::getMaxCollisionMargin, nb::const_))
+        .def("getMaxCollisionMargin",
+             nb::overload_cast<const std::string&>(&tesseract::common::CollisionMarginData::getMaxCollisionMargin,
+                                                   nb::const_),
+             "obj"_a, "Largest margin involving `obj`: its largest pair margin or the default, whichever is larger.")
+        .def("incrementMargins", &tesseract::common::CollisionMarginData::incrementMargins, "increment"_a)
+        .def("scaleMargins", &tesseract::common::CollisionMarginData::scaleMargins, "scale"_a)
+        .def("apply", &tesseract::common::CollisionMarginData::apply, "pair_margin_data"_a, "override_type"_a)
         // Backwards compatibility aliases
         .def("getPairCollisionMargin", &tesseract::common::CollisionMarginData::getCollisionMargin)
         .def("setPairCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin);
