@@ -18,8 +18,12 @@
 #include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/collision_margin_data.h>
 #include <tesseract/common/resource_locator.h>
+#include <cerrno>
 #include <filesystem>
+#include <fstream>
 #include <tesseract/common/types.h>
+#include <tesseract/common/plugin_info.h>
+#include <yaml-cpp/yaml.h>
 
 // tesseract_geometry for collision objects
 #include <tesseract/geometry/geometry.h>
@@ -537,34 +541,124 @@ NB_MODULE(_tesseract_collision, m) {
 
         void addSearchPath(const std::string& path) { ptr->addSearchPath(path); }
         std::vector<std::string> getSearchPaths() const { return ptr->getSearchPaths(); }
+        void clearSearchPaths() { ptr->clearSearchPaths(); }
         void addSearchLibrary(const std::string& lib) { ptr->addSearchLibrary(lib); }
         std::vector<std::string> getSearchLibraries() const { return ptr->getSearchLibraries(); }
+        void clearSearchLibraries() { ptr->clearSearchLibraries(); }
+
+        void addDiscreteContactManagerPlugin(const std::string& name, tcommon::PluginInfo info) {
+            ptr->addDiscreteContactManagerPlugin(name, std::move(info));
+        }
+        tcommon::PluginInfoMap getDiscreteContactManagerPlugins() const { return ptr->getDiscreteContactManagerPlugins(); }
+        // Upstream throws std::runtime_error for an unknown name; a name lookup that misses is a KeyError here.
+        void removeDiscreteContactManagerPlugin(const std::string& name) {
+            require_plugin(ptr->getDiscreteContactManagerPlugins(), "discrete", name);
+            ptr->removeDiscreteContactManagerPlugin(name);
+        }
+        void setDefaultDiscreteContactManagerPlugin(const std::string& name) {
+            require_plugin(ptr->getDiscreteContactManagerPlugins(), "discrete", name);
+            ptr->setDefaultDiscreteContactManagerPlugin(name);
+        }
         bool hasDiscreteContactManagerPlugins() const { return ptr->hasDiscreteContactManagerPlugins(); }
         std::string getDefaultDiscreteContactManagerPlugin() const { return ptr->getDefaultDiscreteContactManagerPlugin(); }
+
+        void addContinuousContactManagerPlugin(const std::string& name, tcommon::PluginInfo info) {
+            ptr->addContinuousContactManagerPlugin(name, std::move(info));
+        }
+        tcommon::PluginInfoMap getContinuousContactManagerPlugins() const { return ptr->getContinuousContactManagerPlugins(); }
+        void removeContinuousContactManagerPlugin(const std::string& name) {
+            require_plugin(ptr->getContinuousContactManagerPlugins(), "continuous", name);
+            ptr->removeContinuousContactManagerPlugin(name);
+        }
+        void setDefaultContinuousContactManagerPlugin(const std::string& name) {
+            require_plugin(ptr->getContinuousContactManagerPlugins(), "continuous", name);
+            ptr->setDefaultContinuousContactManagerPlugin(name);
+        }
         bool hasContinuousContactManagerPlugins() const { return ptr->hasContinuousContactManagerPlugins(); }
         std::string getDefaultContinuousContactManagerPlugin() const { return ptr->getDefaultContinuousContactManagerPlugin(); }
+
         std::unique_ptr<tc::DiscreteContactManager> createDiscreteContactManager(const std::string& name) const {
             return ptr->createDiscreteContactManager(name);
+        }
+        std::unique_ptr<tc::DiscreteContactManager>
+        createDiscreteContactManager(const std::string& name, const tcommon::PluginInfo& info) const {
+            return ptr->createDiscreteContactManager(name, info);
         }
         std::unique_ptr<tc::ContinuousContactManager> createContinuousContactManager(const std::string& name) const {
             return ptr->createContinuousContactManager(name);
         }
+        std::unique_ptr<tc::ContinuousContactManager>
+        createContinuousContactManager(const std::string& name, const tcommon::PluginInfo& info) const {
+            return ptr->createContinuousContactManager(name, info);
+        }
+
+        // Same YAML as upstream saveConfig, which ignores a failed ofstream; here a failed open or
+        // write raises OSError (FileNotFoundError for a missing directory).
+        void saveConfig(const std::filesystem::path& file_path) const {
+            errno = 0;
+            std::ofstream fout(file_path);
+            if (fout) fout << ptr->getConfig();
+            if (fout) fout.close();
+            if (!fout) {
+                PyErr_SetFromErrnoWithFilename(PyExc_OSError, file_path.string().c_str());
+                throw nb::python_error();
+            }
+        }
+        // YAML::Node has no caster: the YAML document as str, like PluginInfo.config.
+        std::string getConfig() const {
+            YAML::Emitter out;
+            out << ptr->getConfig();
+            return out.c_str();
+        }
+
+    private:
+        static void require_plugin(const tcommon::PluginInfoMap& plugins, const char* kind, const std::string& name) {
+            if (plugins.find(name) == plugins.end())
+                throw nb::key_error(("no " + std::string(kind) + " contact manager plugin '" + name + "'").c_str());
+        }
     };
 
+    using W = ContactManagersPluginFactoryWrapper;
     nb::class_<ContactManagersPluginFactoryWrapper>(m, "ContactManagersPluginFactory")
         .def(nb::init<>())
         .def(nb::init<const tesseract_nb::StrictPath&, const tcommon::ResourceLocator&>(), "config_path"_a, "locator"_a)
         .def(nb::init<const std::string&, const tcommon::ResourceLocator&>(), "config"_a, "locator"_a)
-        .def("addSearchPath", &ContactManagersPluginFactoryWrapper::addSearchPath, "path"_a)
-        .def("getSearchPaths", &ContactManagersPluginFactoryWrapper::getSearchPaths)
-        .def("addSearchLibrary", &ContactManagersPluginFactoryWrapper::addSearchLibrary, "library_name"_a)
-        .def("getSearchLibraries", &ContactManagersPluginFactoryWrapper::getSearchLibraries)
-        .def("hasDiscreteContactManagerPlugins", &ContactManagersPluginFactoryWrapper::hasDiscreteContactManagerPlugins)
-        .def("getDefaultDiscreteContactManagerPlugin", &ContactManagersPluginFactoryWrapper::getDefaultDiscreteContactManagerPlugin)
-        .def("hasContinuousContactManagerPlugins", &ContactManagersPluginFactoryWrapper::hasContinuousContactManagerPlugins)
-        .def("getDefaultContinuousContactManagerPlugin", &ContactManagersPluginFactoryWrapper::getDefaultContinuousContactManagerPlugin)
-        .def("createDiscreteContactManager", &ContactManagersPluginFactoryWrapper::createDiscreteContactManager, "name"_a)
-        .def("createContinuousContactManager", &ContactManagersPluginFactoryWrapper::createContinuousContactManager, "name"_a);
+        .def("addSearchPath", &W::addSearchPath, "path"_a)
+        .def("getSearchPaths", &W::getSearchPaths)
+        .def("clearSearchPaths", &W::clearSearchPaths)
+        .def("addSearchLibrary", &W::addSearchLibrary, "library_name"_a)
+        .def("getSearchLibraries", &W::getSearchLibraries)
+        .def("clearSearchLibraries", &W::clearSearchLibraries)
+        .def("addDiscreteContactManagerPlugin", &W::addDiscreteContactManagerPlugin, "name"_a, "plugin_info"_a)
+        .def("getDiscreteContactManagerPlugins", &W::getDiscreteContactManagerPlugins)
+        .def("removeDiscreteContactManagerPlugin", &W::removeDiscreteContactManagerPlugin, "name"_a)
+        .def("setDefaultDiscreteContactManagerPlugin", &W::setDefaultDiscreteContactManagerPlugin, "name"_a)
+        .def("hasDiscreteContactManagerPlugins", &W::hasDiscreteContactManagerPlugins)
+        .def("getDefaultDiscreteContactManagerPlugin", &W::getDefaultDiscreteContactManagerPlugin)
+        .def("addContinuousContactManagerPlugin", &W::addContinuousContactManagerPlugin, "name"_a, "plugin_info"_a)
+        .def("getContinuousContactManagerPlugins", &W::getContinuousContactManagerPlugins)
+        .def("removeContinuousContactManagerPlugin", &W::removeContinuousContactManagerPlugin, "name"_a)
+        .def("setDefaultContinuousContactManagerPlugin", &W::setDefaultContinuousContactManagerPlugin, "name"_a)
+        .def("hasContinuousContactManagerPlugins", &W::hasContinuousContactManagerPlugins)
+        .def("getDefaultContinuousContactManagerPlugin", &W::getDefaultContinuousContactManagerPlugin)
+        // Managers run code from plugin libraries the factory's PluginLoader owns: keep the
+        // factory alive as long as a manager lives (gh-72).
+        .def("createDiscreteContactManager",
+             nb::overload_cast<const std::string&>(&W::createDiscreteContactManager, nb::const_),
+             "name"_a, nb::keep_alive<0, 1>())
+        .def("createDiscreteContactManager",
+             nb::overload_cast<const std::string&, const tcommon::PluginInfo&>(&W::createDiscreteContactManager,
+                                                                              nb::const_),
+             "name"_a, "plugin_info"_a, nb::keep_alive<0, 1>())
+        .def("createContinuousContactManager",
+             nb::overload_cast<const std::string&>(&W::createContinuousContactManager, nb::const_),
+             "name"_a, nb::keep_alive<0, 1>())
+        .def("createContinuousContactManager",
+             nb::overload_cast<const std::string&, const tcommon::PluginInfo&>(&W::createContinuousContactManager,
+                                                                              nb::const_),
+             "name"_a, "plugin_info"_a, nb::keep_alive<0, 1>())
+        .def("saveConfig", &W::saveConfig, "file_path"_a)
+        .def("getConfig", &W::getConfig, "The factory configuration as a YAML document string.");
 
     // Convex hull utilities
     m.def("makeConvexMesh", &tc::makeConvexMesh, "mesh"_a,

@@ -50,6 +50,32 @@ result_map = ContactResultMap()
 my_manager.contactTest(result_map, request)
 ```
 
+### ContactManagersPluginFactory
+
+Loads contact manager plugins (Bullet, FCL) from a YAML config and creates managers.
+
+```python
+from pathlib import Path
+
+from tesseract_robotics.tesseract_collision import ContactManagersPluginFactory
+
+factory = ContactManagersPluginFactory(Path("contact_manager_plugins.yaml"), locator)
+
+plugins = factory.getDiscreteContactManagerPlugins()  # dict[str, PluginInfo]
+factory.addDiscreteContactManagerPlugin("MyBullet", plugins["BulletDiscreteBVHManager"])
+factory.setDefaultDiscreteContactManagerPlugin("MyBullet")
+manager = factory.createDiscreteContactManager("MyBullet")   # by registered name
+manager = factory.createDiscreteContactManager("adhoc", plugins["BulletDiscreteBVHManager"])
+
+print(factory.getConfig())                 # the config as a YAML string
+factory.saveConfig(Path("cm.yaml"))        # OSError if the file cannot be written
+```
+
+The continuous methods mirror the discrete ones. `remove…Plugin` and
+`setDefault…Plugin` raise `KeyError` for an unknown name; `create…ContactManager(name)`
+returns `None` for one. A manager keeps its factory alive: its code lives in a
+plugin library the factory loaded, so dropping the factory first is safe.
+
 ## Contact Request
 
 Configure what contacts to find.
