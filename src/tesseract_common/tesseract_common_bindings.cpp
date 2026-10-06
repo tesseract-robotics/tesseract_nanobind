@@ -21,6 +21,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/plugin_info.h>
+#include <tesseract/common/utils.h>
 #include <yaml-cpp/yaml.h>  // YAML::Load / YAML::Node for PluginInfo.config <-> str
 #include <cmath>
 #include <filesystem>
@@ -902,18 +903,40 @@ NB_MODULE(_tesseract_common, m) {
     bind_value_equality(joint_trajectory);
 
     // ========== AllowedCollisionMatrix ==========
+    // The entries ctor orders each key (allowed_collision_matrix.cpp), so ("b", "a") is stored as ("a", "b").
     nb::class_<tesseract::common::AllowedCollisionMatrix>(m, "AllowedCollisionMatrix")
         .def(nb::init<>())
+        .def(nb::init<const tesseract::common::AllowedCollisionEntries&>(), "entries"_a)
         .def("addAllowedCollision",
              nb::overload_cast<const std::string&, const std::string&, const std::string&>(
                  &tesseract::common::AllowedCollisionMatrix::addAllowedCollision))
         .def("removeAllowedCollision",
              nb::overload_cast<const std::string&, const std::string&>(
                  &tesseract::common::AllowedCollisionMatrix::removeAllowedCollision))
+        // Removes every entry that involves `link_name`.
+        .def("removeAllowedCollision",
+             nb::overload_cast<const std::string&>(&tesseract::common::AllowedCollisionMatrix::removeAllowedCollision),
+             "link_name"_a)
         .def("isCollisionAllowed", &tesseract::common::AllowedCollisionMatrix::isCollisionAllowed)
         .def("clearAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::clearAllowedCollisions)
         .def("getAllAllowedCollisions", &tesseract::common::AllowedCollisionMatrix::getAllAllowedCollisions)
-        .def("insertAllowedCollisionMatrix", &tesseract::common::AllowedCollisionMatrix::insertAllowedCollisionMatrix);
+        .def("insertAllowedCollisionMatrix", &tesseract::common::AllowedCollisionMatrix::insertAllowedCollisionMatrix)
+        .def("reserveAllowedCollisionMatrix", &tesseract::common::AllowedCollisionMatrix::reserveAllowedCollisionMatrix,
+             "size"_a)
+        // operator<< (h:108): one "link=<a> link=<b> reason=<r>" line per entry
+        .def("__str__", [](const tesseract::common::AllowedCollisionMatrix& self) {
+            std::ostringstream os;
+            os << self;
+            return os.str();
+        });
+
+    // The void out-param overload (types.h:59) has the same Python signature; this covers both.
+    m.def("makeOrderedLinkPair",
+          nb::overload_cast<const std::string&, const std::string&>(&tesseract::common::makeOrderedLinkPair),
+          "link_name1"_a, "link_name2"_a, "The pair with the lexicographically smaller link name first.");
+    // Links allowed to collide with any of `link_names`, in acm_entries' (unordered) iteration order.
+    m.def("getAllowedCollisions", &tesseract::common::getAllowedCollisions,
+          "link_names"_a, "acm_entries"_a, "remove_duplicates"_a = true);
 
     // ========== ContactAllowedValidator ==========
     // Abstract base. Determines whether two links are allowed to be in collision.

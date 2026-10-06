@@ -27,6 +27,8 @@ __all__ = [
     "JointTrajectory",
     # Collision
     "AllowedCollisionMatrix",
+    "makeOrderedLinkPair",
+    "getAllowedCollisions",
     "ContactAllowedValidator",
     "ACMContactAllowedValidator",
     "CombinedContactAllowedValidator",

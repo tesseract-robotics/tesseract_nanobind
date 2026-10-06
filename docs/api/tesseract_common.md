@@ -161,6 +161,28 @@ acm.removeAllowedCollision("link_1", "link_2")
 acm.clearAllowedCollisions()
 ```
 
+An ACM converts to and from its entries, a `dict` keyed on ordered link pairs. The
+constructor orders each key, so `("link_b", "link_a")` is stored as `("link_a", "link_b")`:
+
+```python
+from tesseract_robotics.tesseract_common import (
+    AllowedCollisionMatrix, getAllowedCollisions, makeOrderedLinkPair,
+)
+
+acm = AllowedCollisionMatrix({("link_b", "link_a"): "Adjacent links"})
+entries = acm.getAllAllowedCollisions()  # {("link_a", "link_b"): "Adjacent links"}
+
+acm.removeAllowedCollision("link_a")     # drop every entry involving link_a
+acm.reserveAllowedCollisionMatrix(100)   # pre-size; entries unchanged
+print(acm)                               # one "link=<a> link=<b> reason=<r>" line per entry
+
+makeOrderedLinkPair("link_b", "link_a")  # ("link_a", "link_b")
+
+# Links allowed to collide with any of the given links; each partner once unless
+# remove_duplicates=False. The order follows the dict's, so treat it as a set.
+getAllowedCollisions(["link_a"], entries)
+```
+
 ### CollisionMarginData
 
 Configure collision margins per link pair.

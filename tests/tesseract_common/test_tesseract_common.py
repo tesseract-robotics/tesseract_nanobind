@@ -513,3 +513,76 @@ def test_joint_trajectory_uuid_roundtrip():
     with pytest.raises(ValueError):
         traj.uuid = "not-a-uuid"
     assert traj.uuid == _SOME_UUID
+
+
+# ---------------------------------------------------------------------------
+# gh-180: AllowedCollisionMatrix entries ctor, single-link remove, reserve, __str__;
+# makeOrderedLinkPair, getAllowedCollisions
+# ---------------------------------------------------------------------------
+
+
+def _acm():
+    acm = tesseract_common.AllowedCollisionMatrix()
+    acm.addAllowedCollision("link_a", "link_b", "adjacent")
+    acm.addAllowedCollision("link_a", "link_c", "never")
+    acm.addAllowedCollision("link_b", "link_d", "adjacent")
+    acm.addAllowedCollision("link_c", "link_d", "never")
+    return acm
+
+
+def test_acm_entries_ctor_roundtrip():
+    acm = _acm()
+    copy = tesseract_common.AllowedCollisionMatrix(acm.getAllAllowedCollisions())
+    assert copy.getAllAllowedCollisions() == acm.getAllAllowedCollisions()
+    assert copy.isCollisionAllowed("link_b", "link_a")
+
+
+def test_acm_entries_ctor_orders_keys():
+    """Upstream orders each key (allowed_collision_matrix.cpp, 0.35.0), so ("b", "a") is stored as ("a", "b")."""
+    acm = tesseract_common.AllowedCollisionMatrix({("link_b", "link_a"): "adjacent"})
+    assert acm.getAllAllowedCollisions() == {("link_a", "link_b"): "adjacent"}
+    assert acm.isCollisionAllowed("link_a", "link_b")
+
+
+def test_acm_remove_allowed_collision_single_link():
+    acm = _acm()
+    acm.removeAllowedCollision("link_a")
+    assert not acm.isCollisionAllowed("link_a", "link_b")
+    assert not acm.isCollisionAllowed("link_a", "link_c")
+    assert acm.getAllAllowedCollisions() == {
+        ("link_b", "link_d"): "adjacent",
+        ("link_c", "link_d"): "never",
+    }
+
+
+def test_acm_reserve_keeps_entries():
+    acm = _acm()
+    before = acm.getAllAllowedCollisions()
+    acm.reserveAllowedCollisionMatrix(100)
+    assert acm.getAllAllowedCollisions() == before
+
+
+def test_acm_str():
+    text = str(_acm())
+    for (link1, link2), reason in _acm().getAllAllowedCollisions().items():
+        assert f"link={link1} link={link2} reason={reason}" in text
+
+
+def test_make_ordered_link_pair():
+    assert tesseract_common.makeOrderedLinkPair("b", "a") == ("a", "b")
+    assert tesseract_common.makeOrderedLinkPair("a", "b") == ("a", "b")
+
+
+def test_get_allowed_collisions():
+    entries = _acm().getAllAllowedCollisions()
+    assert sorted(tesseract_common.getAllowedCollisions(["link_a"], entries)) == [
+        "link_b",
+        "link_c",
+    ]
+    # link_b and link_c share the partner link_d (and link_a): once by default, twice without dedup
+    shared = tesseract_common.getAllowedCollisions(["link_b", "link_c"], entries)
+    assert sorted(shared) == ["link_a", "link_d"]
+    dup = tesseract_common.getAllowedCollisions(
+        ["link_b", "link_c"], entries, remove_duplicates=False
+    )
+    assert sorted(dup) == ["link_a", "link_a", "link_d", "link_d"]
