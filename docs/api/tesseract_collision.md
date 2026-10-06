@@ -248,15 +248,26 @@ config.margin_data.setPairCollisionMargin("link_a", "link_b", 0.05)
 
 ## Convex Mesh Generation
 
-Generate convex hulls for collision.
+Generate convex hulls for collision. `makeConvexMesh` turns a `Mesh` into a `ConvexMesh`;
+`createConvexHull` works on a raw point set (Bullet's convex hull computer).
 
 ```python
-from tesseract_robotics.tesseract_collision import makeConvexMesh
+import numpy as np
+from tesseract_robotics.tesseract_collision import ConvexHullError, createConvexHull, makeConvexMesh
 
-# From vertices
-vertices = [np.array([x, y, z]) for ...]
-convex = makeConvexMesh(vertices)
+convex = makeConvexMesh(mesh)  # mesh: tesseract_geometry.Mesh
+
+points = [np.array([x, y, z]) for x in (0.0, 1.0) for y in (0.0, 1.0) for z in (0.0, 1.0)]
+n_faces, vertices, faces = createConvexHull(points)
+# faces is flat: [count, i0, ..., i{count-1}] per face, indexing into vertices.
+
+# shrink > 0 moves every face inwards by that many metres; shrink_clamp > 0 caps it at
+# shrink_clamp * (smallest face distance from the hull centre).
+n_faces, vertices, faces = createConvexHull(points, shrink=0.1)
 ```
+
+A shrink that cannot be applied (larger than the hull, unclamped) raises `ConvexHullError`
+(a `RuntimeError`). An empty point set is not an error: it gives 0 faces.
 
 ## Collision Evaluator Types
 

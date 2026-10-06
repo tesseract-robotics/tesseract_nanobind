@@ -730,3 +730,11 @@ class ContactManagersPluginFactory:
 
 def makeConvexMesh(mesh: tesseract_robotics.tesseract_geometry._tesseract_geometry.Mesh) -> tesseract_robotics.tesseract_geometry._tesseract_geometry.ConvexMesh:
     """Create a ConvexMesh from a Mesh using bullet's convex hull algorithm"""
+
+class ConvexHullError(RuntimeError):
+    """createConvexHull failed: Bullet could not apply the requested shrink."""
+
+def createConvexHull(input: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], shrink: float = -1.0, shrink_clamp: float = -1.0) -> tuple[int, list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')]]:
+    """
+    Convex hull of a point set (Bullet). Returns (n_faces, vertices, faces); faces is a flat array of [count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink cannot be applied.
+    """

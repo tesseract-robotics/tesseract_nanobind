@@ -35,4 +35,8 @@ __all__ = [
     "DiscreteContactManager",
     "ContinuousContactManager",
     "ContactManagersPluginFactory",
+    # Convex hulls
+    "makeConvexMesh",
+    "createConvexHull",
+    "ConvexHullError",
 ]

@@ -5,6 +5,7 @@
 
 #include "tesseract_nb.h"
 #include <nanobind/stl/map.h>
+#include <nanobind/stl/tuple.h>
 
 // tesseract_collision core
 #include <tesseract/collision/types.h>
@@ -51,6 +52,12 @@ struct UnorderedLinkPairError : std::invalid_argument {
 };
 struct EmptyContactResultsError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
+};
+
+// createConvexHull returns n < 0 when Bullet cannot apply the requested shrink
+// (btConvexHullInternal::shrink -> shiftFace); upstream only logs it.
+struct ConvexHullError : std::runtime_error {
+    using std::runtime_error::runtime_error;
 };
 
 void check_ordered_key(const CRM::KeyType& key) {
@@ -663,7 +670,30 @@ NB_MODULE(_tesseract_collision, m) {
         .def("saveConfig", &W::saveConfig, "file_path"_a)
         .def("getConfig", &W::getConfig, "The factory configuration as a YAML document string.");
 
-    // Convex hull utilities
+    // ========== Convex hulls ==========
     m.def("makeConvexMesh", &tc::makeConvexMesh, "mesh"_a,
           "Create a ConvexMesh from a Mesh using bullet's convex hull algorithm");
+
+    nb::exception<ConvexHullError>(m, "ConvexHullError", PyExc_RuntimeError)
+        .attr("__doc__") = "createConvexHull failed: Bullet could not apply the requested shrink.";
+
+    // Out-param rule: (vertices, faces) are returned with the result n (face count).
+    m.def(
+        "createConvexHull",
+        [](const tcommon::VectorVector3d& input, double shrink, double shrink_clamp) {
+            tcommon::VectorVector3d vertices;
+            Eigen::VectorXi faces;
+            const int n = tc::createConvexHull(vertices, faces, input, shrink, shrink_clamp);
+            if (n < 0)
+                throw ConvexHullError("createConvexHull: Bullet convex hull computation failed (returned " +
+                                      std::to_string(n) + ") for " + std::to_string(input.size()) +
+                                      " input points with shrink=" + std::to_string(shrink) +
+                                      ", shrink_clamp=" + std::to_string(shrink_clamp));
+            return std::make_tuple(n, std::move(vertices), std::move(faces));
+        },
+        "input"_a, "shrink"_a = -1.0, "shrink_clamp"_a = -1.0,
+        "Convex hull of a point set (Bullet). Returns (n_faces, vertices, faces); faces is a flat array of "
+        "[count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 "
+        "caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink "
+        "cannot be applied.");
 }
