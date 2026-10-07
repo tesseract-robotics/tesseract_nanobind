@@ -527,36 +527,43 @@ NB_MODULE(_tesseract_environment, m) {
     // ========== Command base class ==========
     // Command has a virtual destructor, so a shared_ptr<const Command> returned to Python (command
     // history, CommandAppliedEvent.commands) arrives as its most-derived bound class.
-    nb::class_<te::Command>(m, "Command")
+    // operator== compares only the command type. Every derived command binds its own __eq__,
+    // and Python dispatches on the most-derived class, so derived commands compare their state.
+    auto command = nb::class_<te::Command>(m, "Command")
         .def("getType", &te::Command::getType);
+    bind_value_equality(command);
 
     // ========== RemoveJointCommand ==========
-    nb::class_<te::RemoveJointCommand, te::Command>(m, "RemoveJointCommand")
+    auto remove_joint_command = nb::class_<te::RemoveJointCommand, te::Command>(m, "RemoveJointCommand")
         .def(nb::init<std::string>(), "joint_name"_a)
         .def("getJointName", &te::RemoveJointCommand::getJointName);
+    bind_value_equality(remove_joint_command);
 
     // ========== AddLinkCommand ==========
-    nb::class_<te::AddLinkCommand, te::Command>(m, "AddLinkCommand")
+    auto add_link_command = nb::class_<te::AddLinkCommand, te::Command>(m, "AddLinkCommand")
         .def(nb::init<const tsg::Link&, bool>(), "link"_a, "replace_allowed"_a = false)
         .def(nb::init<const tsg::Link&, const tsg::Joint&, bool>(),
              "link"_a, "joint"_a, "replace_allowed"_a = false)
         .def("getLink", &te::AddLinkCommand::getLink)
         .def("getJoint", &te::AddLinkCommand::getJoint)
         .def("replaceAllowed", &te::AddLinkCommand::replaceAllowed);
+    bind_value_equality(add_link_command);
 
     // ========== RemoveLinkCommand ==========
-    nb::class_<te::RemoveLinkCommand, te::Command>(m, "RemoveLinkCommand")
+    auto remove_link_command = nb::class_<te::RemoveLinkCommand, te::Command>(m, "RemoveLinkCommand")
         .def(nb::init<std::string>(), "link_name"_a)
         .def("getLinkName", &te::RemoveLinkCommand::getLinkName);
+    bind_value_equality(remove_link_command);
 
     // ========== AddSceneGraphCommand ==========
-    nb::class_<te::AddSceneGraphCommand, te::Command>(m, "AddSceneGraphCommand")
+    auto add_scene_graph_command = nb::class_<te::AddSceneGraphCommand, te::Command>(m, "AddSceneGraphCommand")
         .def(nb::init<const tsg::SceneGraph&, std::string>(), "scene_graph"_a, "prefix"_a = "")
         .def(nb::init<const tsg::SceneGraph&, const tsg::Joint&, std::string>(),
              "scene_graph"_a, "joint"_a, "prefix"_a = "")
         .def("getSceneGraph", &te::AddSceneGraphCommand::getSceneGraph)
         .def("getJoint", &te::AddSceneGraphCommand::getJoint)
         .def("getPrefix", &te::AddSceneGraphCommand::getPrefix);
+    bind_value_equality(add_scene_graph_command);
 
     // ========== AddTrajectoryLinkCommand ==========
     // Adds a link whose collision geometry sweeps the given trajectory. `Method` is nested
@@ -585,10 +592,11 @@ NB_MODULE(_tesseract_environment, m) {
     // ========== AddKinematicsInformationCommand ==========
     // Registers a KinematicsInformation (group defs + IK plugin config) into a live env.
     // insert-merges with existing kinematics info, so pre-existing groups keep resolving.
-    nb::class_<te::AddKinematicsInformationCommand, te::Command>(m, "AddKinematicsInformationCommand")
+    auto add_kinematics_information_command = nb::class_<te::AddKinematicsInformationCommand, te::Command>(m, "AddKinematicsInformationCommand")
         .def(nb::init<>())
         .def(nb::init<tesseract::srdf::KinematicsInformation>(), "kinematics_information"_a)
         .def("getKinematicsInformation", &te::AddKinematicsInformationCommand::getKinematicsInformation);
+    bind_value_equality(add_kinematics_information_command);
 
     // ========== AddContactManagersPluginInfoCommand ==========
     // The arity-0 ctor is a serialization ctor and stays unbound. The getter returns a copy:
@@ -607,84 +615,97 @@ NB_MODULE(_tesseract_environment, m) {
         .value("REPLACE", te::ModifyAllowedCollisionsType::REPLACE);
 
     // ========== ModifyAllowedCollisionsCommand ==========
-    nb::class_<te::ModifyAllowedCollisionsCommand, te::Command>(m, "ModifyAllowedCollisionsCommand")
+    auto modify_allowed_collisions_command = nb::class_<te::ModifyAllowedCollisionsCommand, te::Command>(m, "ModifyAllowedCollisionsCommand")
         .def(nb::init<tc::AllowedCollisionMatrix, te::ModifyAllowedCollisionsType>(),
              "acm"_a, "type"_a)
         .def("getModifyType", &te::ModifyAllowedCollisionsCommand::getModifyType)
         .def("getAllowedCollisionMatrix", &te::ModifyAllowedCollisionsCommand::getAllowedCollisionMatrix);
+    bind_value_equality(modify_allowed_collisions_command);
 
     // ========== RemoveAllowedCollisionLinkCommand ==========
-    nb::class_<te::RemoveAllowedCollisionLinkCommand, te::Command>(m, "RemoveAllowedCollisionLinkCommand")
+    auto remove_allowed_collision_link_command = nb::class_<te::RemoveAllowedCollisionLinkCommand, te::Command>(m, "RemoveAllowedCollisionLinkCommand")
         .def(nb::init<std::string>(), "link_name"_a)
         .def("getLinkName", &te::RemoveAllowedCollisionLinkCommand::getLinkName);
+    bind_value_equality(remove_allowed_collision_link_command);
 
     // ========== ChangeJointPositionLimitsCommand ==========
-    nb::class_<te::ChangeJointPositionLimitsCommand, te::Command>(m, "ChangeJointPositionLimitsCommand")
+    auto change_joint_position_limits_command = nb::class_<te::ChangeJointPositionLimitsCommand, te::Command>(m, "ChangeJointPositionLimitsCommand")
         .def(nb::init<std::string, double, double>(), "joint_name"_a, "lower"_a, "upper"_a)
         .def(nb::init<std::unordered_map<std::string, std::pair<double, double>>>(), "limits"_a)
         .def("getLimits", &te::ChangeJointPositionLimitsCommand::getLimits);
+    bind_value_equality(change_joint_position_limits_command);
 
     // ========== ChangeJointVelocityLimitsCommand ==========
-    nb::class_<te::ChangeJointVelocityLimitsCommand, te::Command>(m, "ChangeJointVelocityLimitsCommand")
+    auto change_joint_velocity_limits_command = nb::class_<te::ChangeJointVelocityLimitsCommand, te::Command>(m, "ChangeJointVelocityLimitsCommand")
         .def(nb::init<std::string, double>(), "joint_name"_a, "limit"_a)
         .def(nb::init<std::unordered_map<std::string, double>>(), "limits"_a)
         .def("getLimits", &te::ChangeJointVelocityLimitsCommand::getLimits);
+    bind_value_equality(change_joint_velocity_limits_command);
 
     // ========== ChangeJointAccelerationLimitsCommand ==========
-    nb::class_<te::ChangeJointAccelerationLimitsCommand, te::Command>(m, "ChangeJointAccelerationLimitsCommand")
+    auto change_joint_acceleration_limits_command = nb::class_<te::ChangeJointAccelerationLimitsCommand, te::Command>(m, "ChangeJointAccelerationLimitsCommand")
         .def(nb::init<std::string, double>(), "joint_name"_a, "limit"_a)
         .def(nb::init<std::unordered_map<std::string, double>>(), "limits"_a)
         .def("getLimits", &te::ChangeJointAccelerationLimitsCommand::getLimits);
+    bind_value_equality(change_joint_acceleration_limits_command);
 
     // ========== ChangeCollisionMarginsCommand ==========
     // Note: 0.33 API change - uses CollisionMarginPairData and CollisionMarginPairOverrideType
-    nb::class_<te::ChangeCollisionMarginsCommand, te::Command>(m, "ChangeCollisionMarginsCommand")
+    auto change_collision_margins_command = nb::class_<te::ChangeCollisionMarginsCommand, te::Command>(m, "ChangeCollisionMarginsCommand")
         .def(nb::init<double>(), "default_margin"_a)
         .def(nb::init<tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
              "pair_margin_data"_a, "override_type"_a = tc::CollisionMarginPairOverrideType::REPLACE)
         .def("getDefaultCollisionMargin", &te::ChangeCollisionMarginsCommand::getDefaultCollisionMargin)
         .def("getCollisionMarginPairData", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairData)
         .def("getCollisionMarginPairOverrideType", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairOverrideType);
+    bind_value_equality(change_collision_margins_command);
 
     // ========== ChangeLinkCollisionEnabledCommand ==========
-    nb::class_<te::ChangeLinkCollisionEnabledCommand, te::Command>(m, "ChangeLinkCollisionEnabledCommand")
+    auto change_link_collision_enabled_command = nb::class_<te::ChangeLinkCollisionEnabledCommand, te::Command>(m, "ChangeLinkCollisionEnabledCommand")
         .def(nb::init<std::string, bool>(), "link_name"_a, "enabled"_a)
         .def("getLinkName", &te::ChangeLinkCollisionEnabledCommand::getLinkName)
         .def("getEnabled", &te::ChangeLinkCollisionEnabledCommand::getEnabled);
+    bind_value_equality(change_link_collision_enabled_command);
 
     // ========== ChangeLinkVisibilityCommand ==========
-    nb::class_<te::ChangeLinkVisibilityCommand, te::Command>(m, "ChangeLinkVisibilityCommand")
+    auto change_link_visibility_command = nb::class_<te::ChangeLinkVisibilityCommand, te::Command>(m, "ChangeLinkVisibilityCommand")
         .def(nb::init<std::string, bool>(), "link_name"_a, "visible"_a)
         .def("getLinkName", &te::ChangeLinkVisibilityCommand::getLinkName)
         .def("getEnabled", &te::ChangeLinkVisibilityCommand::getEnabled);
+    bind_value_equality(change_link_visibility_command);
 
     // ========== ChangeJointOriginCommand ==========
-    nb::class_<te::ChangeJointOriginCommand, te::Command>(m, "ChangeJointOriginCommand")
+    auto change_joint_origin_command = nb::class_<te::ChangeJointOriginCommand, te::Command>(m, "ChangeJointOriginCommand")
         .def(nb::init<std::string, const Eigen::Isometry3d&>(), "joint_name"_a, "origin"_a)
         .def("getJointName", &te::ChangeJointOriginCommand::getJointName)
         .def("getOrigin", &te::ChangeJointOriginCommand::getOrigin);
+    bind_value_equality(change_joint_origin_command);
 
     // ========== ChangeLinkOriginCommand ==========
-    nb::class_<te::ChangeLinkOriginCommand, te::Command>(m, "ChangeLinkOriginCommand")
+    auto change_link_origin_command = nb::class_<te::ChangeLinkOriginCommand, te::Command>(m, "ChangeLinkOriginCommand")
         .def(nb::init<std::string, const Eigen::Isometry3d&>(), "link_name"_a, "origin"_a)
         .def("getLinkName", &te::ChangeLinkOriginCommand::getLinkName)
         .def("getOrigin", &te::ChangeLinkOriginCommand::getOrigin);
+    bind_value_equality(change_link_origin_command);
 
     // ========== MoveJointCommand ==========
-    nb::class_<te::MoveJointCommand, te::Command>(m, "MoveJointCommand")
+    auto move_joint_command = nb::class_<te::MoveJointCommand, te::Command>(m, "MoveJointCommand")
         .def(nb::init<std::string, std::string>(), "joint_name"_a, "parent_link"_a)
         .def("getJointName", &te::MoveJointCommand::getJointName)
         .def("getParentLink", &te::MoveJointCommand::getParentLink);
+    bind_value_equality(move_joint_command);
 
     // ========== MoveLinkCommand ==========
-    nb::class_<te::MoveLinkCommand, te::Command>(m, "MoveLinkCommand")
+    auto move_link_command = nb::class_<te::MoveLinkCommand, te::Command>(m, "MoveLinkCommand")
         .def(nb::init<const tsg::Joint&>(), "joint"_a)
         .def("getJoint", &te::MoveLinkCommand::getJoint);
+    bind_value_equality(move_link_command);
 
     // ========== ReplaceJointCommand ==========
-    nb::class_<te::ReplaceJointCommand, te::Command>(m, "ReplaceJointCommand")
+    auto replace_joint_command = nb::class_<te::ReplaceJointCommand, te::Command>(m, "ReplaceJointCommand")
         .def(nb::init<const tsg::Joint&>(), "joint"_a)
         .def("getJoint", &te::ReplaceJointCommand::getJoint);
+    bind_value_equality(replace_joint_command);
 
     // ========== SetActive{Discrete,Continuous}ContactManagerCommand ==========
     // The arity-0 ctors are serialization ctors and stay unbound.
@@ -752,7 +773,11 @@ NB_MODULE(_tesseract_environment, m) {
         .def(nb::init<std::shared_ptr<const tsg::SceneGraph>>(), "scene_graph"_a);
 
     // ========== Environment ==========
-    nb::class_<te::Environment>(m, "Environment")
+    // operator== (environment.cpp) holds a shared lock on the left operand's mutex, so the GIL is
+    // released as for clone(). It compares initialized, the revisions, the command types (through
+    // the non-virtual Command::operator==), the current state and both timestamps: two
+    // environments built separately differ by their timestamps; a clone() compares equal.
+    auto environment = nb::class_<te::Environment>(m, "Environment")
         .def(nb::init<>())
         // Init methods
         .def("init", [](te::Environment& self, const tsg::SceneGraph& scene_graph) {
@@ -1176,6 +1201,7 @@ NB_MODULE(_tesseract_environment, m) {
         // UI thread — the collision scan clones off-thread for a responsive sweep.
         .def("clone", [](const te::Environment& self) { return self.clone(); },
              nb::call_guard<nb::gil_scoped_release>());
+    bind_value_equality(environment, nb::call_guard<nb::gil_scoped_release>());
 
     // Private test oracle; see GilProbeFn.
     nb::class_<GilProbe>(m, "_GilProbe")

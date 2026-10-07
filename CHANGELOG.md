@@ -53,6 +53,15 @@
   | `node = factory.createTaskComposerNode(name)`<br>`if node is None: …` | `try: node = factory.createTaskComposerNode(name)`<br>`except TaskComposerPluginError: …` |
   | `executor = factory.createTaskComposerExecutor(name)`<br>`if executor is None: …` | `try: executor = factory.createTaskComposerExecutor(name)`<br>`except TaskComposerPluginError: …` |
 
+- **Value types compare by value and are unhashable** — the collision, common and environment classes that declare `operator==` were bound without it, so `==` compared identity: two equal objects compared unequal and nothing raised. 37 classes now bind `__eq__`/`__ne__` and set `__hash__ = None`: `ContactResult`, `ContactResultMap`, `ContactRequest`, `ContactManagerConfig`, `CollisionCheckConfig`; `AllowedCollisionMatrix`, `BytesResource`, `CollisionMarginData`, `CollisionMarginPairData`, `GeneralResourceLocator`, `JointState`, `KinematicLimits`, `KinematicsPluginInfo`, `ManipulatorInfo`, `PluginInfo`, `PluginInfoContainer`, `SimpleLocatedResource`; `Environment`, `Command` and all 18 remaining commands. `hash()` on them, and using one as a `set` member or `dict` key, now raises `TypeError`. Equality is upstream's: floating-point fields compare within the C++ tolerance (`JointState` positions with `isApprox(1e-5)`, for example), `ContactRequest.is_valid` compares the validator object, `BytesResource` and `SimpleLocatedResource` check only whether a parent is set, geometry compares by its per-instance uuid (so the same URDF parsed twice gives unequal `AddSceneGraphCommand`s), and `Environment` compares its timestamps, so two environments initialised separately are unequal while `env == env.clone()` holds. `Environment.__eq__` releases the GIL, since the C++ operator takes the environment's lock. An operand of another class (`MoveLinkCommand(j) == RemoveLinkCommand(l)`, `cfg == 5`) compares unequal without raising. `ResourceLocator` and `Resource` keep identity equality, because their C++ `operator==` returns `true` for any two objects. `KinematicLimits` checks the four matrix shapes before calling the C++ operator, which does not and would read out of bounds ([#169]).
+
+  | before | after |
+  | --- | --- |
+  | `ContactRequest() == ContactRequest()` → `False` | `True` |
+  | `env.clone() == env` → `False` | `True` (separately initialised: `False`, the timestamps differ) |
+  | `seen = {cmd}`, `cache[env] = x` | `TypeError: unhashable type`; key on a stable field, e.g. `{cmd.getType(): cmd}`, `cache[env.getName()]`, or `id(env)` for identity |
+  | `cmd in history` (identity) | `cmd in history` (value); `any(c is cmd for c in history)` for identity |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -347,6 +356,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#203]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/203
 [#185]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/185
 [#201]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/201
+[#169]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/169
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

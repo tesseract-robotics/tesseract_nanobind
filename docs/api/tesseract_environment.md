@@ -462,8 +462,11 @@ env.applyCommand(cmd)
 | `GLOBAL_CONVEX_HULL` | one convex hull over all active links and all states |
 
 The table follows the enum's comments in `add_trajectory_link_command.h`; the tests check
-only that each method adds the link. `getTrajectory()` returns a copy. Commands compare by
-value (`==`) and are unhashable.
+only that each method adds the link. `getTrajectory()` returns a copy.
+
+All commands, and `Environment`, compare by value (`==`) and are unhashable. `env ==
+env.clone()`; two environments built separately differ (their timestamps), and commands holding
+geometry from two separate parses differ (geometry compares by uuid).
 
 ### SetActiveDiscreteContactManagerCommand / SetActiveContinuousContactManagerCommand
 
@@ -481,8 +484,7 @@ env.applyCommand(SetActiveContinuousContactManagerCommand("BulletCastBVHManager"
 
 `Environment.setActiveDiscreteContactManager(name)` (and its continuous twin) switches the
 manager without recording a command, as upstream does, so `init(env.getCommandHistory())`
-does not replay it. Use the command when the switch must survive a replay. Both commands
-compare by value and are unhashable.
+does not replay it. Use the command when the switch must survive a replay.
 
 ### Command history
 

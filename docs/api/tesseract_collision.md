@@ -127,6 +127,10 @@ copy, so keeping it beyond the call is safe.
 
 ## Contact Results
 
+`ContactResult`, `ContactResultMap`, `ContactRequest`, `ContactManagerConfig` and
+`CollisionCheckConfig` compare by value (`==`, with the C++ tolerances) and are unhashable.
+Two `ContactRequest`s are equal only while they hold the same `is_valid` validator object.
+
 ### ContactResult
 
 Single contact between two objects.

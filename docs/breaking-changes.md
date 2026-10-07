@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
 | Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
 | Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
@@ -20,6 +21,69 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### Value types compare by value and are unhashable
+
+Every collision, common and environment class whose C++ header declares `operator==` was bound
+without it, so `==` compared identity: `ContactRequest() == ContactRequest()` was `False`, and so
+was `env == env.clone()`. These classes now bind `__eq__`/`__ne__` from the C++ operators and set
+`__hash__ = None` (#169):
+
+| module | classes |
+| --- | --- |
+| `tesseract_collision` | `ContactResult`, `ContactResultMap`, `ContactRequest`, `ContactManagerConfig`, `CollisionCheckConfig` |
+| `tesseract_common` | `AllowedCollisionMatrix`, `BytesResource`, `CollisionMarginData`, `CollisionMarginPairData`, `GeneralResourceLocator`, `JointState`, `KinematicLimits`, `KinematicsPluginInfo`, `ManipulatorInfo`, `PluginInfo`, `PluginInfoContainer`, `SimpleLocatedResource` |
+| `tesseract_environment` | `Environment`, `Command`, `AddKinematicsInformationCommand`, `AddLinkCommand`, `AddSceneGraphCommand`, `ChangeCollisionMarginsCommand`, `ChangeJointAccelerationLimitsCommand`, `ChangeJointOriginCommand`, `ChangeJointPositionLimitsCommand`, `ChangeJointVelocityLimitsCommand`, `ChangeLinkCollisionEnabledCommand`, `ChangeLinkOriginCommand`, `ChangeLinkVisibilityCommand`, `ModifyAllowedCollisionsCommand`, `MoveJointCommand`, `MoveLinkCommand`, `RemoveAllowedCollisionLinkCommand`, `RemoveJointCommand`, `RemoveLinkCommand`, `ReplaceJointCommand` |
+
+They join the classes that already compared by value (`JointTrajectory`, the plugin-info structs,
+`AddTrajectoryLinkCommand`, `AddContactManagersPluginInfoCommand` and the two
+`SetActive*ContactManagerCommand`s).
+
+What breaks is hashing. These objects are mutable, and an object that compares by value must not
+hash by identity, or two equal objects land in different `set` buckets. So `hash(obj)`, `{obj}`
+and `d[obj] = …` now raise `TypeError: unhashable type`. Key on a field that identifies the
+object, or on `id(obj)` where identity is what you mean:
+
+| before | after |
+| --- | --- |
+| `seen = {cmd}` | `seen = {(cmd.getType(), cmd.getLinkName())}` (whatever names the command) |
+| `cache[env] = result` | `cache[env.getName()] = result`, or `cache[id(env)]` (keep `env` alive) |
+| `cmd in history` meant identity | `any(c is cmd for c in history)`; `in` now compares values |
+
+The equality is the C++ one, unchanged, so it inherits upstream's choices:
+
+- Floating-point fields compare within a tolerance, not exactly: `JointState` vectors with
+  `isApprox(1e-5)` after an exact size check ([joint_state.cpp][js35]), `ContactResult` and
+  `CollisionCheckConfig` with `almostEqualRelativeAndAbs`, the command origins with
+  `isApprox(1e-5)`.
+- `ContactRequest.is_valid` compares the validator object: two requests are equal only while they
+  hold the same validator ([types.cpp][ty90]).
+- `BytesResource` and `SimpleLocatedResource` compare their parent locators only for presence:
+  `ResourceLocator::operator==` returns `true` ([resource_locator.cpp][rl46]).
+- A geometry compares by type and its per-instance uuid ([geometry.cpp][ge40]), so commands
+  holding geometry are equal only when they share it: the same URDF parsed twice gives unequal
+  `AddSceneGraphCommand`s.
+- `Environment` compares its revisions, the types of its commands, its current state and both
+  timestamps ([environment.cpp][en412]). `env == env.clone()` holds, because `clone()` copies the
+  timestamps ([L442–L444][en442]); two environments initialised separately from the same URDF are
+  unequal. Its `__eq__` releases the GIL, because the C++ operator takes the environment's lock.
+
+Two classes keep identity equality: `ResourceLocator` and `Resource`. Their C++ `operator==`
+returns `true` for any pair ([L46][rl46], [L206][rl206]), so binding it would make every two
+Python locators equal. A Python locator subclass stays hashable.
+
+`KinematicLimits` compares the shapes of its four limit matrices before calling the C++ operator,
+which calls `isApprox` without checking them and reads out of bounds when they differ
+([kinematic_limits.cpp][kl37]). Limits of different shapes are unequal.
+
+[js35]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/common/src/joint_state.cpp#L35-L45
+[ty90]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/collision/core/src/types.cpp#L90-L99
+[rl46]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/common/src/resource_locator.cpp#L46
+[rl206]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/common/src/resource_locator.cpp#L206
+[ge40]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/geometry/src/geometry.cpp#L40
+[en412]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/environment/src/environment.cpp#L393-L422
+[en442]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/environment/src/environment.cpp#L442-L444
+[kl37]: https://github.com/tesseract-robotics/tesseract/blob/0.35.0/common/src/kinematic_limits.cpp#L37-L45
 
 ### `createTaskComposerNode` and `createTaskComposerExecutor` raise
 

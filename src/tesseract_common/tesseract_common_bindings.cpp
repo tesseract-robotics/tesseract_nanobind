@@ -797,7 +797,8 @@ NB_MODULE(_tesseract_common, m) {
     // Both non-default ctors are keyword-only: nanobind's std::filesystem::path caster accepts
     // a plain `str`, so a positional list[str] would match both vector<string> (env-var names)
     // and vector<path> (directories), and registration order would silently pick one.
-    nb::class_<tesseract::common::GeneralResourceLocator, tesseract::common::ResourceLocator>(m, "GeneralResourceLocator")
+    // operator== compares the package paths found so far.
+    auto general_resource_locator = nb::class_<tesseract::common::GeneralResourceLocator, tesseract::common::ResourceLocator>(m, "GeneralResourceLocator")
         .def(nb::init<>())
         .def(nb::init<const std::vector<std::string>&>(), nb::kw_only(), "environment_variables"_a)
         .def(nb::init<const std::vector<std::filesystem::path>&, const std::vector<std::string>&>(),
@@ -805,6 +806,7 @@ NB_MODULE(_tesseract_common, m) {
         .def("addPath", &tesseract::common::GeneralResourceLocator::addPath, "path"_a)
         .def("loadEnvironmentVariable", &tesseract::common::GeneralResourceLocator::loadEnvironmentVariable,
              "environment_variable"_a);
+    bind_value_equality(general_resource_locator);
 
     // ========== Resource Types ==========
     // Note: In nanobind 2.x, shared_ptr holder is automatic - don't specify it
@@ -826,7 +828,9 @@ NB_MODULE(_tesseract_common, m) {
     // `parent` resolves relative urls: BytesResource.locateResource asks it for the url as
     // given, then for the sibling of its own url. The raw-pointer ctor (h:251) stays unbound;
     // the `bytes` overload covers it.
-    nb::class_<tesseract::common::BytesResource, tesseract::common::Resource>(m, "BytesResource")
+    // operator== (resource_locator.cpp): url, bytes, and whether a parent is set. Two parents
+    // always compare equal, because ResourceLocator::operator== is `return true`.
+    auto bytes_resource = nb::class_<tesseract::common::BytesResource, tesseract::common::Resource>(m, "BytesResource")
         .def(nb::init<std::string, std::vector<uint8_t>, std::shared_ptr<tesseract::common::ResourceLocator>>(),
              "url"_a, "bytes"_a, "parent"_a.none() = nb::none())
         .def("__init__", [](tesseract::common::BytesResource* self, std::string url, nb::bytes data,
@@ -835,11 +839,14 @@ NB_MODULE(_tesseract_common, m) {
             std::memcpy(vec.data(), data.c_str(), data.size());
             new (self) tesseract::common::BytesResource(std::move(url), std::move(vec), std::move(parent));
         }, "url"_a, "bytes"_a, "parent"_a.none() = nb::none());
+    bind_value_equality(bytes_resource);
 
-    nb::class_<tesseract::common::SimpleLocatedResource, tesseract::common::Resource>(m, "SimpleLocatedResource")
+    // operator==: url, filename, and whether a parent is set (see BytesResource).
+    auto simple_located_resource = nb::class_<tesseract::common::SimpleLocatedResource, tesseract::common::Resource>(m, "SimpleLocatedResource")
         .def(nb::init<const std::string&, const std::string&>(), "url"_a, "filename"_a)
         .def(nb::init<const std::string&, const std::string&, std::shared_ptr<tesseract::common::ResourceLocator>>(),
              "url"_a, "filename"_a, "parent"_a);
+    bind_value_equality(simple_located_resource);
 
     // ========== ManipulatorInfo ==========
     // tcp_offset is std::variant<std::string, Eigen::Isometry3d>: a link name or a pose. The ctor
@@ -847,7 +854,7 @@ NB_MODULE(_tesseract_common, m) {
     // getter returns a copy, not def_rw's reference_internal: a Python Isometry3d pointing into
     // the variant would dangle once the field is set to a str.
     using TcpOffset = std::variant<std::string, Eigen::Isometry3d>;
-    nb::class_<tesseract::common::ManipulatorInfo>(m, "ManipulatorInfo")
+    auto manipulator_info = nb::class_<tesseract::common::ManipulatorInfo>(m, "ManipulatorInfo")
         .def(nb::init<>())
         .def(nb::init<std::string, std::string, std::string, TcpOffset>(),
              "manipulator"_a, "working_frame"_a, "tcp_frame"_a,
@@ -868,9 +875,12 @@ NB_MODULE(_tesseract_common, m) {
         .def("__repr__", [](const tesseract::common::ManipulatorInfo& self) {
             return "<ManipulatorInfo manipulator='" + self.manipulator + "'>";
         });
+    bind_value_equality(manipulator_info);
 
     // ========== JointState ==========
-    nb::class_<tesseract::common::JointState>(m, "JointState")
+    // operator== (joint_state.cpp): names exactly, vectors by size then isApprox(1e-5), time
+    // with almostEqualRelativeAndAbs(1e-5).
+    auto joint_state = nb::class_<tesseract::common::JointState>(m, "JointState")
         .def(nb::init<>())
         .def(nb::init<const std::vector<std::string>&, const Eigen::VectorXd&>())
         .def_rw("joint_names", &tesseract::common::JointState::joint_names)
@@ -879,6 +889,7 @@ NB_MODULE(_tesseract_common, m) {
         .def_rw("acceleration", &tesseract::common::JointState::acceleration)
         .def_rw("effort", &tesseract::common::JointState::effort)
         .def_rw("time", &tesseract::common::JointState::time);
+    bind_value_equality(joint_state);
 
     // ========== JointTrajectory ==========
     // Element access returns a copy: a reference into `states` would dangle once push_back
@@ -940,7 +951,7 @@ NB_MODULE(_tesseract_common, m) {
 
     // ========== AllowedCollisionMatrix ==========
     // The entries ctor orders each key (allowed_collision_matrix.cpp), so ("b", "a") is stored as ("a", "b").
-    nb::class_<tesseract::common::AllowedCollisionMatrix>(m, "AllowedCollisionMatrix")
+    auto allowed_collision_matrix = nb::class_<tesseract::common::AllowedCollisionMatrix>(m, "AllowedCollisionMatrix")
         .def(nb::init<>())
         .def(nb::init<const tesseract::common::AllowedCollisionEntries&>(), "entries"_a)
         .def("addAllowedCollision",
@@ -965,6 +976,7 @@ NB_MODULE(_tesseract_common, m) {
             os << self;
             return os.str();
         });
+    bind_value_equality(allowed_collision_matrix);
 
     // The void out-param overload (types.h:59) has the same Python signature; this covers both.
     m.def("makeOrderedLinkPair",
@@ -1011,7 +1023,8 @@ NB_MODULE(_tesseract_common, m) {
         .value("MODIFY", tesseract::common::CollisionMarginPairOverrideType::MODIFY);
 
     // CollisionMarginPairData - new in 0.33
-    nb::class_<tesseract::common::CollisionMarginPairData>(m, "CollisionMarginPairData")
+    // operator==: margins with almostEqualRelativeAndAbs(1e-5).
+    auto collision_margin_pair_data = nb::class_<tesseract::common::CollisionMarginPairData>(m, "CollisionMarginPairData")
         .def(nb::init<>())
         .def(nb::init<const tesseract::common::PairsCollisionMarginData&>(), "pair_margins"_a)
         .def("setCollisionMargin", &tesseract::common::CollisionMarginPairData::setCollisionMargin)
@@ -1029,8 +1042,9 @@ NB_MODULE(_tesseract_common, m) {
         .def("apply", &tesseract::common::CollisionMarginPairData::apply, "pair_margin_data"_a, "override_type"_a)
         .def("empty", &tesseract::common::CollisionMarginPairData::empty)
         .def("clear", &tesseract::common::CollisionMarginPairData::clear);
+    bind_value_equality(collision_margin_pair_data);
 
-    nb::class_<tesseract::common::CollisionMarginData>(m, "CollisionMarginData")
+    auto collision_margin_data = nb::class_<tesseract::common::CollisionMarginData>(m, "CollisionMarginData")
         .def(nb::init<>())
         .def(nb::init<double>())
         .def(nb::init<double, tesseract::common::CollisionMarginPairData>(), "default_collision_margin"_a,
@@ -1049,9 +1063,11 @@ NB_MODULE(_tesseract_common, m) {
         .def("incrementMargins", &tesseract::common::CollisionMarginData::incrementMargins, "increment"_a)
         .def("scaleMargins", &tesseract::common::CollisionMarginData::scaleMargins, "scale"_a)
         .def("apply", &tesseract::common::CollisionMarginData::apply, "pair_margin_data"_a, "override_type"_a);
+    bind_value_equality(collision_margin_data);
 
     // ========== KinematicLimits ==========
-    nb::class_<tesseract::common::KinematicLimits>(m, "KinematicLimits")
+    using tesseract::common::KinematicLimits;
+    auto kinematic_limits = nb::class_<KinematicLimits>(m, "KinematicLimits")
         .def(nb::init<>())
         .def_rw("joint_limits", &tesseract::common::KinematicLimits::joint_limits)
         .def_rw("velocity_limits", &tesseract::common::KinematicLimits::velocity_limits)
@@ -1059,6 +1075,24 @@ NB_MODULE(_tesseract_common, m) {
         .def_rw("jerk_limits", &tesseract::common::KinematicLimits::jerk_limits)
         // Resizes all four limit matrices to (size, 2) (Eigen resize: values unset after a size change).
         .def("resize", &tesseract::common::KinematicLimits::resize, "size"_a);
+    // operator== (kinematic_limits.cpp) calls isApprox on the four limit matrices without comparing
+    // their shapes, and Eigen's isApprox on mismatched shapes reads out of bounds when eigen_assert
+    // is compiled out. Limits of different shapes are unequal, so compare the shapes first.
+    // Otherwise as bind_value_equality: NotImplemented for a non-KinematicLimits operand, unhashable.
+    const auto kinematic_limits_equal = [](const KinematicLimits& a, const KinematicLimits& b) {
+        const auto same_shape = [](const auto& x, const auto& y) {
+            return x.rows() == y.rows() && x.cols() == y.cols();
+        };
+        return same_shape(a.joint_limits, b.joint_limits) && same_shape(a.velocity_limits, b.velocity_limits) &&
+               same_shape(a.acceleration_limits, b.acceleration_limits) &&
+               same_shape(a.jerk_limits, b.jerk_limits) && a == b;
+    };
+    kinematic_limits
+        .def("__eq__", kinematic_limits_equal, nb::is_operator())
+        .def("__ne__", [kinematic_limits_equal](const KinematicLimits& a, const KinematicLimits& b) {
+            return !kinematic_limits_equal(a, b);
+        }, nb::is_operator());
+    kinematic_limits.attr("__hash__") = nb::none();
 
     // satisfiesLimits<double>: scalar-tolerance overload (with upstream's defaults) and
     // per-axis-tolerance overload. Defaults mirror kinematic_limits.h.
@@ -1180,7 +1214,8 @@ NB_MODULE(_tesseract_common, m) {
     // Python `str`: the getter serialises via getConfigString(); the setter parses the
     // string with YAML::Load. Callers pass a YAML document string (e.g.
     // "base_link: base_link\ntip_link: tool0").
-    nb::class_<tesseract::common::PluginInfo>(m, "PluginInfo")
+    // operator== compares class_name and the config YAML trees (compareYAML).
+    auto plugin_info = nb::class_<tesseract::common::PluginInfo>(m, "PluginInfo")
         .def(nb::init<>())
         .def_rw("class_name", &tesseract::common::PluginInfo::class_name)
         .def_prop_rw(
@@ -1191,20 +1226,22 @@ NB_MODULE(_tesseract_common, m) {
             },
             "Plugin config as a YAML document string (a YAML::Node in C++).")
         .def("getConfigString", &tesseract::common::PluginInfo::getConfigString);
+    bind_value_equality(plugin_info);
 
     // ========== PluginInfoContainer ==========
     // plugins is PluginInfoMap = std::map<std::string, PluginInfo> -> dict[str, PluginInfo].
-    nb::class_<tesseract::common::PluginInfoContainer>(m, "PluginInfoContainer")
+    auto plugin_info_container = nb::class_<tesseract::common::PluginInfoContainer>(m, "PluginInfoContainer")
         .def(nb::init<>())
         .def_rw("default_plugin", &tesseract::common::PluginInfoContainer::default_plugin)
         .def_rw("plugins", &tesseract::common::PluginInfoContainer::plugins)
         .def("clear", &tesseract::common::PluginInfoContainer::clear);
+    bind_value_equality(plugin_info_container);
 
     // ========== KinematicsPluginInfo ==========
     // fwd/inv_plugin_infos are std::map<std::string, PluginInfoContainer> keyed on group
     // name -> dict[str, PluginInfoContainer]. search_paths / search_libraries are
     // std::vector<std::string> -> list[str].
-    nb::class_<tesseract::common::KinematicsPluginInfo>(m, "KinematicsPluginInfo")
+    auto kinematics_plugin_info = nb::class_<tesseract::common::KinematicsPluginInfo>(m, "KinematicsPluginInfo")
         .def(nb::init<>())
         .def_rw("search_paths", &tesseract::common::KinematicsPluginInfo::search_paths)
         .def_rw("search_libraries", &tesseract::common::KinematicsPluginInfo::search_libraries)
@@ -1214,6 +1251,7 @@ NB_MODULE(_tesseract_common, m) {
         .def("clear", &tesseract::common::KinematicsPluginInfo::clear)
         .def("empty", &tesseract::common::KinematicsPluginInfo::empty)
         .def_ro_static("CONFIG_KEY", &tesseract::common::KinematicsPluginInfo::CONFIG_KEY);
+    bind_value_equality(kinematics_plugin_info);
 
     // ========== ContactManagersPluginInfo ==========
     // discrete/continuous_plugin_infos are bound PluginInfoContainers: def_rw returns a

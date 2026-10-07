@@ -153,6 +153,12 @@ class ContactResult:
 
     def clear(self) -> None: ...
 
+    def __eq__(self, arg: ContactResult, /) -> bool: ...
+
+    def __ne__(self, arg: ContactResult, /) -> bool: ...
+
+    __hash__: None = None
+
 class ContactResultVector:
     def __init__(self) -> None: ...
 
@@ -226,6 +232,12 @@ class ContactResultMap:
         """
 
     def addInterpolatedCollisionResults(self, sub_segment_results: ContactResultMap, sub_segment_index: int, sub_segment_last_index: int, active_link_names: Sequence[str], segment_dt: float, discrete: bool, filter: Callable[[tuple[str, str], ContactResultVector], None] | None = None) -> None: ...
+
+    def __eq__(self, arg: ContactResultMap, /) -> bool: ...
+
+    def __ne__(self, arg: ContactResultMap, /) -> bool: ...
+
+    __hash__: None = None
 
 class ContactTrajectorySubstepResults:
     @overload
@@ -424,6 +436,12 @@ class ContactRequest:
     @is_valid.setter
     def is_valid(self, value: ContactResultValidator | None) -> None: ...
 
+    def __eq__(self, arg: ContactRequest, /) -> bool: ...
+
+    def __ne__(self, arg: ContactRequest, /) -> bool: ...
+
+    __hash__: None = None
+
 class ContactManagerConfig:
     @overload
     def __init__(self) -> None: ...
@@ -473,6 +491,12 @@ class ContactManagerConfig:
 
     def validate(self) -> None: ...
 
+    def __eq__(self, arg: ContactManagerConfig, /) -> bool: ...
+
+    def __ne__(self, arg: ContactManagerConfig, /) -> bool: ...
+
+    __hash__: None = None
+
 class CollisionCheckConfig:
     @overload
     def __init__(self) -> None: ...
@@ -509,6 +533,12 @@ class CollisionCheckConfig:
 
     @exit_condition.setter
     def exit_condition(self, arg: CollisionCheckExitType, /) -> None: ...
+
+    def __eq__(self, arg: CollisionCheckConfig, /) -> bool: ...
+
+    def __ne__(self, arg: CollisionCheckConfig, /) -> bool: ...
+
+    __hash__: None = None
 
 class DiscreteContactManager:
     def getName(self) -> str: ...

@@ -411,8 +411,10 @@ info.discrete_plugin_infos.plugins = {"BulletDiscreteBVHManager": bullet}
     `KinematicsPluginInfo.fwd_plugin_infos`) converts to a fresh `dict` on every access:
     assign the whole field, since `info.plugin_infos["x"] = ...` edits a copy.
 
-`ContactManagersPluginInfo`, `ProfilesPluginInfo` and `TaskComposerPluginInfo` compare by
-value (`==`) and are unhashable.
+Every class on this page whose C++ type declares `operator==` compares by value (`==`, with
+the C++ tolerances) and is unhashable, except `ResourceLocator` and `Resource`, which compare by
+identity (their C++ `operator==` is always true). `KinematicLimits` of different shapes are
+unequal.
 
 ## Logging
 

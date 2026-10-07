@@ -188,7 +188,9 @@ NB_MODULE(_tesseract_collision, m) {
 
     // ========== ContactResult ==========
     // Pair fields are std::array<T, 2>: nanobind's array caster raises TypeError on any other length.
-    nb::class_<tc::ContactResult>(m, "ContactResult")
+    // operator== (types.cpp): almostEqualRelativeAndAbs on the scalars and points, isApprox on
+    // the transforms; the binding inherits those tolerances.
+    auto contact_result = nb::class_<tc::ContactResult>(m, "ContactResult")
         .def(nb::init<>())
         .def_rw("distance", &tc::ContactResult::distance)
         .def_rw("type_id", &tc::ContactResult::type_id)
@@ -204,6 +206,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("cc_transform", &tc::ContactResult::cc_transform)
         .def_rw("single_contact_point", &tc::ContactResult::single_contact_point)
         .def("clear", &tc::ContactResult::clear);
+    bind_value_equality(contact_result);
 
     // ========== ContactResultVector ==========
     // ContactResultVector uses Eigen aligned_allocator, so we need to bind manually
@@ -227,7 +230,7 @@ NB_MODULE(_tesseract_collision, m) {
 
     // Every value handed to Python is a copy (the filter callback's vector excepted), so Python
     // never holds a reference into the map that a later insert or shrinkToFit invalidates.
-    nb::class_<CRM>(m, "ContactResultMap")
+    auto contact_result_map = nb::class_<CRM>(m, "ContactResultMap")
         .def(nb::init<>())
         .def("count", &CRM::count)
         .def("size", &CRM::size)
@@ -294,6 +297,7 @@ NB_MODULE(_tesseract_collision, m) {
              },
              "sub_segment_results"_a, "sub_segment_index"_a, "sub_segment_last_index"_a, "active_link_names"_a,
              "segment_dt"_a, "discrete"_a, "filter"_a = nb::none());
+    bind_value_equality(contact_result_map);
 
     // ========== ContactTrajectory{Substep,Step,}Results ==========
     // Returned by tesseract_environment.checkTrajectory. The std::stringstream summaries are
@@ -366,7 +370,8 @@ NB_MODULE(_tesseract_collision, m) {
         .def("__call__", &tc::ContactResultValidator::operator(), "result"_a);
 
     // ========== ContactRequest ==========
-    nb::class_<tc::ContactRequest>(m, "ContactRequest")
+    // operator== compares is_valid by pointer: equal only while both hold the same validator.
+    auto contact_request = nb::class_<tc::ContactRequest>(m, "ContactRequest")
         .def(nb::init<>())
         .def(nb::init<tc::ContactTestType>(), "type"_a)
         .def_rw("type", &tc::ContactRequest::type)
@@ -383,9 +388,10 @@ NB_MODULE(_tesseract_collision, m) {
             },
             nb::for_setter(nb::arg("value").none()),
             "Validator called on each contact; return False to reject it. None disables validation.");
+    bind_value_equality(contact_request);
 
     // ========== ContactManagerConfig ==========
-    nb::class_<tc::ContactManagerConfig>(m, "ContactManagerConfig")
+    auto contact_manager_config = nb::class_<tc::ContactManagerConfig>(m, "ContactManagerConfig")
         .def(nb::init<>())
         .def(nb::init<double>(), "default_margin"_a)
         .def_prop_rw("default_margin",
@@ -399,9 +405,10 @@ NB_MODULE(_tesseract_collision, m) {
         .def("incrementMargins", &tc::ContactManagerConfig::incrementMargins, "increment"_a)
         .def("scaleMargins", &tc::ContactManagerConfig::scaleMargins, "scale"_a)
         .def("validate", &tc::ContactManagerConfig::validate);
+    bind_value_equality(contact_manager_config);
 
     // ========== CollisionCheckConfig ==========
-    nb::class_<tc::CollisionCheckConfig>(m, "CollisionCheckConfig")
+    auto collision_check_config = nb::class_<tc::CollisionCheckConfig>(m, "CollisionCheckConfig")
         .def(nb::init<>())
         .def(nb::init<tc::ContactRequest, tc::CollisionEvaluatorType, double, tc::CollisionCheckProgramType,
                       tc::CollisionCheckExitType>(),
@@ -415,6 +422,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("longest_valid_segment_length", &tc::CollisionCheckConfig::longest_valid_segment_length)
         .def_rw("check_program_mode", &tc::CollisionCheckConfig::check_program_mode)
         .def_rw("exit_condition", &tc::CollisionCheckConfig::exit_condition);
+    bind_value_equality(collision_check_config);
 
     // ========== DiscreteContactManager (abstract, expose key methods) ==========
     nb::class_<tc::DiscreteContactManager>(m, "DiscreteContactManager")

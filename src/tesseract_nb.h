@@ -100,10 +100,11 @@ using namespace nb::literals;
 
 // Bind C++ operator==/operator!= as __eq__/__ne__. These types are mutable, so they must
 // not hash: nanobind adds __eq__ after the type exists, which leaves object.__hash__
-// (identity) in place unless it is cleared explicitly.
-template <typename Class>
-void bind_value_equality(Class& cls) {
-    cls.def(nb::self == nb::self).def(nb::self != nb::self);
+// (identity) in place unless it is cleared explicitly. `extra` goes to both operators
+// (e.g. nb::call_guard<nb::gil_scoped_release>() for a comparison that takes a C++ lock).
+template <typename Class, typename... Extra>
+void bind_value_equality(Class& cls, const Extra&... extra) {
+    cls.def(nb::self == nb::self, extra...).def(nb::self != nb::self, extra...);
     cls.attr("__hash__") = nb::none();
 }
 
