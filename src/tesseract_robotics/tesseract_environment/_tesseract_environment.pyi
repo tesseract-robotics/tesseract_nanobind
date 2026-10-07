@@ -576,6 +576,20 @@ class Environment:
 
     def findTCPOffset(self, manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
 
+    def addFindTCPOffsetCallback(self, fn: Callable[[tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo], tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Register `fn(manip_info) -> Isometry3d` as a source of TCP offsets for `findTCPOffset`.
+
+        `findTCPOffset` asks the callbacks, in registration order, only for a `tcp_offset` name that is neither an `Isometry3d`, a link, nor a group TCP of `manip_info.manipulator`. `clone()` copies the callbacks, and the environment keeps `fn` alive.
+
+        A callback that raises, or returns anything but an `Isometry3d` (`None` included), counts as "not located": `findTCPOffset` tries the next one and raises `RuntimeError` ("Could not find tcp by name ...") when none returns a transform. The callback's own exception is not reported (upstream catches it with `catch (...)`).
+
+        `fn` may run on any thread, under this environment's lock: it must not call into this environment, and must not keep it alive itself (a closure over it, or an attribute holding it): the environment keeps `fn` alive from C++, so the garbage collector cannot see that cycle.
+
+        Args:
+            fn: Callable taking the `ManipulatorInfo` and returning the TCP offset.
+        """
+
     @overload
     def getDiscreteContactManager(self) -> tesseract_robotics.tesseract_collision._tesseract_collision.DiscreteContactManager: ...
 

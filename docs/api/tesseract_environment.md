@@ -131,6 +131,47 @@ groups = env.getGroupNames()
 These three take joints of any type and raise `ValueError` for a name that is not in the scene
 graph. `getJointGroup` also needs every joint to move: a fixed joint raises `RuntimeError`.
 
+### TCP offsets
+
+`findTCPOffset(manip_info)` resolves `manip_info.tcp_offset`: an `Isometry3d` is returned as is,
+a name is looked up in the SRDF group TCPs of `manip_info.manipulator`, and any other name is
+passed to the find-TCP callbacks, in registration order. A name that is a link raises
+`RuntimeError`: use it as `tcp_frame` instead.
+
+```python
+import numpy as np
+
+from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
+
+def tool_offsets(manip_info):
+    if manip_info.tcp_offset != "nozzle":
+        raise LookupError(manip_info.tcp_offset)  # "not located": the next callback is asked
+    matrix = np.eye(4)
+    matrix[:3, 3] = [0.0, 0.0, 0.12]
+    return Isometry3d(matrix)
+
+env.addFindTCPOffsetCallback(tool_offsets)
+tcp = env.findTCPOffset(ManipulatorInfo("manipulator", "base_link", "tool0", "nozzle"))
+```
+
+!!! warning "A raising callback means \"not located\""
+    `findTCPOffset` catches every exception a callback raises, including a bug in it, and asks
+    the next callback. Returning anything but an `Isometry3d` (`None` included) counts the same.
+    When no callback returns a transform, it raises
+    `RuntimeError: Could not find tcp by name <name>'!`, and the callback's own traceback is not
+    shown. Test a callback by calling it directly.
+
+`clone()` copies the callbacks, and the environment keeps them alive, so the Python function may
+go out of scope. A callback can run on any thread (task-composer workers call `findTCPOffset`)
+and takes the GIL itself. It runs under the environment's lock, so it must not call into the
+same environment, and it must not keep that environment alive itself (a closure over it, or
+an object attribute holding it): the environment keeps the callback alive from C++, so the
+garbage collector cannot see that cycle and neither is ever freed. A module-level function that
+reaches the environment only as a global is fine.
+
+Callbacks cannot be listed or removed: `getFindTCPOffsetCallbacks` is not bound, since a C++
+`std::function` has nothing Python could inspect.
+
 ### Collision
 
 ```python

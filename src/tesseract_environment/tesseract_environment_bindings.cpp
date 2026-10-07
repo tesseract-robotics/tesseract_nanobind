@@ -12,8 +12,10 @@
 
 #include <atomic>
 #include <algorithm>  // std::find (setState validation, GH #43)
+#include <exception>  // std::exception_ptr (_find_tcp_offset_on_native_thread)
 #include <stdexcept>  // std::invalid_argument, std::runtime_error (EventTypeError), std::logic_error
 #include <string>     // std::to_string (event_type_name)
+#include <thread>     // std::thread (_find_tcp_offset_on_native_thread)
 
 // tesseract_environment
 #include <tesseract/environment/environment.h>
@@ -355,6 +357,51 @@ struct PyEventCallbackFn {
         // threads such as the ROS 2 monitor), so re-enter the interpreter explicitly.
         nb::gil_scoped_acquire gil;
         callback(nb::cast(evt, nb::rv_policy::reference));
+    }
+};
+
+// gh-183: Python-backed FindTCPOffsetCallbackFn. Environment::clone copies every find-TCP callback
+// with the GIL released (gh-134), and planners call findTCPOffset from task-composer worker threads,
+// so neither a copy nor a call may assume the GIL. A copy only bumps the shared_ptr's atomic count;
+// the call and the last release take the GIL themselves.
+using PyFindTCPOffsetCallable = nb::typed<nb::callable, Eigen::Isometry3d(tc::ManipulatorInfo)>;
+
+struct PyFindTCPOffsetFn {
+    std::shared_ptr<nb::object> fn;
+
+    explicit PyFindTCPOffsetFn(nb::callable f)
+        : fn(new nb::object(std::move(f)), [](nb::object* p) {
+              // The last owner may be a C++ thread or static that outlives the interpreter; skip the
+              // decref then, as nanobind's own shared_ptr deleter does (nanobind/stl/shared_ptr.h).
+              // Module globals are cleared before nanobind marks itself dead, so they still decref.
+              if (!nb::is_alive()) {
+                  (void)p->release();
+                  delete p;
+                  return;
+              }
+              nb::gil_scoped_acquire gil;
+              delete p;
+          }) {}
+
+    // Every throw below counts as "not located": upstream's findTCPOffset wraps each callback in
+    // catch (...) and tries the next one (environment.cpp, Implementation::findTCPOffset).
+    Eigen::Isometry3d operator()(const tc::ManipulatorInfo& manip_info) const {
+        if (!nb::is_alive())
+            throw std::runtime_error("find-TCP callback: the Python interpreter has shut down");
+        nb::gil_scoped_acquire gil;  // declared first, so it is released after every Python object below
+        nb::object ret;
+        try {
+            ret = (*fn)(manip_info);
+        } catch (nb::python_error& e) {
+            // Converted while the GIL is held: the Python exception is released here, not in
+            // upstream's catch (...) under the environment's lock.
+            throw std::runtime_error(std::string("find-TCP callback raised: ") + e.what());
+        }
+        Eigen::Isometry3d tcp;
+        if (!nb::try_cast<Eigen::Isometry3d>(ret, tcp))
+            throw std::runtime_error(std::string("find-TCP callback returned ") +
+                                     nb::type_name(ret.type()).c_str() + ", not Isometry3d");
+        return tcp;
     }
 };
 
@@ -1082,6 +1129,26 @@ NB_MODULE(_tesseract_environment, m) {
         }, "group_name"_a, "ik_solver_name"_a = "", nb::keep_alive<0, 1>())
         // TCP
         .def("findTCPOffset", &te::Environment::findTCPOffset, "manip_info"_a)
+        // gh-183. findTCPOffset keeps the GIL: it holds the env's shared lock while it calls the
+        // callback, which takes the GIL, so releasing it would let a writer that holds the GIL
+        // (setState) deadlock against it.
+        .def("addFindTCPOffsetCallback", [](te::Environment& self, PyFindTCPOffsetCallable fn) {
+            self.addFindTCPOffsetCallback(PyFindTCPOffsetFn(std::move(fn)));
+        }, "fn"_a,
+        "Register `fn(manip_info) -> Isometry3d` as a source of TCP offsets for `findTCPOffset`.\n\n"
+        "`findTCPOffset` asks the callbacks, in registration order, only for a `tcp_offset` name that "
+        "is neither an `Isometry3d`, a link, nor a group TCP of `manip_info.manipulator`. `clone()` "
+        "copies the callbacks, and the environment keeps `fn` alive.\n\n"
+        "A callback that raises, or returns anything but an `Isometry3d` (`None` included), counts "
+        "as \"not located\": `findTCPOffset` tries the next one and raises `RuntimeError` "
+        "(\"Could not find tcp by name ...\") when none returns a transform. The callback's own "
+        "exception is not reported (upstream catches it with `catch (...)`).\n\n"
+        "`fn` may run on any thread, under this environment's lock: it must not call into this "
+        "environment, and must not keep it alive itself (a closure over it, or an attribute holding "
+        "it): the environment keeps `fn` alive from C++, so the garbage collector cannot see that "
+        "cycle.\n\n"
+        "Args:\n"
+        "    fn: Callable taking the `ManipulatorInfo` and returning the TCP offset.")
         // Contact managers
         // GIL released for the same reason as applyCommand: on the first call these build every
         // collision shape in the scene, which is where an SDF- or mesh-heavy environment spends its
@@ -1136,4 +1203,30 @@ NB_MODULE(_tesseract_environment, m) {
         })
         .def_prop_ro("copies_with_gil", [](const GilProbe& self) { return self.counts->with_gil.load(); })
         .def_prop_ro("copies_without_gil", [](const GilProbe& self) { return self.counts->without_gil.load(); });
+
+    // Private test oracle (gh-183): takes ownership of env (a clone returned to Python), then on a
+    // std::thread that never had a Python thread state calls findTCPOffset and destroys env. Once the
+    // test has dropped the original, that thread holds the last reference to every Python find-TCP
+    // callback, so both PyFindTCPOffsetFn's call and its deleter must take the GIL themselves.
+    // threading.Thread cannot test this: a Python thread already holds the GIL when it calls in.
+    m.def("_find_tcp_offset_on_native_thread",
+        [](std::unique_ptr<te::Environment> env, tc::ManipulatorInfo manip_info) {
+            Eigen::Isometry3d tcp;
+            std::exception_ptr error;
+            {
+                nb::gil_scoped_release nogil;
+                std::thread worker([&] {
+                    try {
+                        tcp = env->findTCPOffset(manip_info);
+                    } catch (...) {
+                        error = std::current_exception();
+                    }
+                    env.reset();
+                });
+                worker.join();
+            }
+            if (error) std::rethrow_exception(error);
+            return tcp;
+        }, "env"_a, "manip_info"_a,
+        "Call env.findTCPOffset and destroy env on a native thread; env is unusable afterwards");
 }

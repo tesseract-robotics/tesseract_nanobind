@@ -4,7 +4,9 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import traceback
+import weakref
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +18,7 @@ from tesseract_robotics import (
     tesseract_srdf,
     tesseract_urdf,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -889,3 +891,185 @@ def test_cast_event_wrong_type_raises():
         assert r["message"] == _WRONG_CAST_MESSAGES[r["cast"]], r
 
     assert issubclass(tesseract_environment.EventTypeError, TypeError)
+
+
+# gh-183: Python find-TCP callbacks.
+
+# A tcp_offset name that is neither a link of the iiwa scene nor a group TCP in its SRDF, so
+# findTCPOffset can only resolve it through a registered callback.
+_PY_TCP_NAME = "py_tcp"
+# Translation of the callback's TCP offset, in m; differs from both SRDF group TCPs.
+_PY_TCP_XYZ = (0.1, 0.2, 0.3)
+
+_FIND_TCP_TEARDOWN_SCRIPT = """\
+from pathlib import Path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
+from tesseract_robotics.tesseract_environment import Environment
+locator = GeneralResourceLocator()
+urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
+srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
+env = Environment()
+assert env.init(Path(urdf), Path(srdf), locator)
+# The default argument is a nanobind instance owned by the callback: if the binding never releases
+# the callback, nanobind reports it as a leaked instance at exit. The callback gets its own globals:
+# a function defined here would hold this module's globals, and so env, which holds the callback
+# in C++, a cycle the garbage collector cannot see (the documented "must not hold a reference to
+# it" rule), which leaks at exit whatever the binding does.
+find_tcp = eval(
+    "lambda manip_info, offset=Isometry3d.Identity(): offset", {"Isometry3d": Isometry3d}
+)
+env.addFindTCPOffsetCallback(find_tcp)
+clone = env.clone()
+tcp = clone.findTCPOffset(ManipulatorInfo("manipulator", "base_link", "tool0", "py_tcp"))
+print("OK:", tcp.translation.tolist())
+"""
+
+
+def _py_tcp_offset():
+    matrix = np.eye(4)
+    matrix[:3, 3] = _PY_TCP_XYZ
+    return Isometry3d(matrix)
+
+
+def _manip_info(tcp_offset=_PY_TCP_NAME):
+    return ManipulatorInfo("manipulator", "base_link", "tool0", tcp_offset)
+
+
+class _TcpSource:
+    """Find-TCP callback that records the tcp_offset names it is asked for; weakref-able."""
+
+    def __init__(self):
+        self.names = []
+
+    def __call__(self, manip_info):
+        self.names.append(manip_info.tcp_offset)
+        return _py_tcp_offset()
+
+
+def test_find_tcp_offset_callback():
+    env = _fresh_env()
+    source = _TcpSource()
+    env.addFindTCPOffsetCallback(source)
+
+    tcp = env.findTCPOffset(_manip_info())
+
+    np.testing.assert_array_equal(tcp.matrix, _py_tcp_offset().matrix)
+    assert source.names == [_PY_TCP_NAME]
+    # an SRDF group TCP resolves before any callback is asked
+    env.findTCPOffset(_manip_info("laser"))
+    assert source.names == [_PY_TCP_NAME]
+
+
+def test_find_tcp_offset_callback_survives_clone():
+    """clone() copies the callback with the GIL released; the copy outlives the original."""
+    env = _fresh_env()
+    env.addFindTCPOffsetCallback(_TcpSource())
+    clone = env.clone()
+    del env
+    gc.collect()
+
+    tcp = clone.findTCPOffset(_manip_info())
+    np.testing.assert_array_equal(tcp.matrix, _py_tcp_offset().matrix)
+
+    results, errors = [], []
+
+    def worker():
+        try:
+            results.append(clone.findTCPOffset(_manip_info()))
+        except BaseException as exc:  # re-raised in the main thread below
+            errors.append(exc)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join()
+    assert not errors, errors
+    np.testing.assert_array_equal(results[0].matrix, _py_tcp_offset().matrix)
+
+
+def test_find_tcp_offset_callback_on_native_thread():
+    """A thread without a Python thread state calls the callback and drops its last owner."""
+    from tesseract_robotics.tesseract_environment._tesseract_environment import (
+        _find_tcp_offset_on_native_thread,
+    )
+
+    env = _fresh_env()
+    source = _TcpSource()
+    source_ref = weakref.ref(source)
+    names = source.names  # outlives source, which the oracle's thread releases
+    env.addFindTCPOffsetCallback(source)
+    del source
+    clone = env.clone()  # C++-constructed, so its ownership can move to the oracle
+    del env
+    gc.collect()
+    assert source_ref() is not None, "the clone's copy keeps the callback alive"
+
+    tcp = _find_tcp_offset_on_native_thread(clone, _manip_info())
+
+    np.testing.assert_array_equal(tcp.matrix, _py_tcp_offset().matrix)
+    assert names == [_PY_TCP_NAME]
+    gc.collect()
+    assert source_ref() is None, "the native thread did not release the callback"
+
+
+def _raises(manip_info):
+    raise ValueError("not my tcp")
+
+
+@pytest.mark.parametrize(
+    "callback",
+    [_raises, lambda manip_info: None, lambda manip_info: "not a transform"],
+    ids=["raises", "returns-none", "returns-str"],
+)
+def test_find_tcp_offset_callback_failure_is_not_found(callback):
+    """Upstream catches every callback exception and reports the name as not found."""
+    env = _fresh_env()
+    env.addFindTCPOffsetCallback(callback)
+    with pytest.raises(RuntimeError, match=f"Could not find tcp by name {_PY_TCP_NAME}"):
+        env.findTCPOffset(_manip_info())
+
+
+def test_find_tcp_offset_callbacks_tried_in_order():
+    """A failing callback is skipped and the next one asked."""
+    env = _fresh_env()
+    source = _TcpSource()
+    env.addFindTCPOffsetCallback(_raises)
+    env.addFindTCPOffsetCallback(source)
+
+    np.testing.assert_array_equal(env.findTCPOffset(_manip_info()).matrix, _py_tcp_offset().matrix)
+    assert source.names == [_PY_TCP_NAME]
+
+
+def test_find_tcp_offset_callback_lifetime():
+    """The environment keeps the callback alive, and releases it with its last copy."""
+    env = _fresh_env()
+    source = _TcpSource()
+    source_ref = weakref.ref(source)
+    env.addFindTCPOffsetCallback(source)
+    del source
+    gc.collect()
+
+    np.testing.assert_array_equal(env.findTCPOffset(_manip_info()).matrix, _py_tcp_offset().matrix)
+
+    clone = env.clone()
+    del env
+    gc.collect()
+    assert source_ref() is not None, "the clone's copy keeps the callback alive"
+    del clone
+    gc.collect()
+    assert source_ref() is None, "the callback leaked"
+
+
+def test_find_tcp_offset_callback_interpreter_teardown():
+    """Clean exit with env, clone and callback as module globals; the callback is released."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _FIND_TCP_TEARDOWN_SCRIPT],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        f"interpreter teardown died (rc={proc.returncode}, SIGSEGV is -11/139): "
+        f"{proc.stderr[-500:]}"
+    )
+    assert "OK: [0.0, 0.0, 0.0]" in proc.stdout
+    assert "leaked" not in proc.stderr, proc.stderr[-500:]
