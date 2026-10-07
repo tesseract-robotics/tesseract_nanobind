@@ -930,7 +930,8 @@ NB_MODULE(_tesseract_common, m) {
         .def("at", nb::overload_cast<JointTrajectory::size_type>(&JointTrajectory::at, nb::const_), "n"_a,
              nb::rv_policy::copy)
         .def("clear", &JointTrajectory::clear)
-        .def("push_back", nb::overload_cast<const JointState&>(&JointTrajectory::push_back), "x"_a)
+        // A lambda, not overload_cast: GCC cannot pick the const& overload beside push_back(const T&&).
+        .def("push_back", [](JointTrajectory& self, const JointState& x) { self.push_back(x); }, "x"_a)
         .def("pop_back", [](JointTrajectory& self) {
             if (self.empty()) throw std::out_of_range("JointTrajectory.pop_back: empty trajectory");
             self.pop_back();
