@@ -197,7 +197,7 @@ jobs:
         # on macOS — fork+OpenMP threads don't mix. Linux handles it fine.
         run: |
           source test_env/bin/activate
-          pip install pytest scipy
+          pip install pytest scipy pyyaml
           cd tesseract_nanobind
           pytest tests \
             --ignore=tests/benchmarks \

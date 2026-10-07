@@ -1,12 +1,17 @@
 """Tests for tesseract_task_composer bindings."""
 
 import gc
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
+import yaml
 
 import tesseract_robotics
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
+    PluginInfo,
     ResourceLocator,
 )
 from tesseract_robotics.tesseract_task_composer import (
@@ -20,6 +25,12 @@ from tesseract_robotics.tesseract_task_composer import (
 def _resolve_task_composer_config():
     """Resolved task composer plugin config via the package helper (gh-110)."""
     return str(tesseract_robotics.get_task_composer_config_path())
+
+
+def _shipped_task_plugins() -> dict:
+    """The `task_composer_plugins.tasks.plugins` mapping of the shipped config."""
+    config = yaml.safe_load(Path(_resolve_task_composer_config()).read_text())
+    return config["task_composer_plugins"]["tasks"]["plugins"]
 
 
 class _DelegatingResourceLocator(ResourceLocator):
@@ -183,6 +194,115 @@ class TestTaskComposerPluginFactory:
         del factory
         gc.collect()
 
+    def test_get_task_composer_node_plugins_matches_config(self):
+        """Keys are the configured node names (36 today); values carry the class (gh-185)."""
+        factory = TaskComposerPluginFactory(
+            _resolve_task_composer_config(), GeneralResourceLocator()
+        )
+        plugins = factory.getTaskComposerNodePlugins()
+        expected = _shipped_task_plugins()
+
+        assert isinstance(plugins, dict)
+        assert set(plugins) == set(expected)
+        assert len(plugins) == 36
+        for name, info in plugins.items():
+            assert isinstance(info, PluginInfo)
+            assert info.class_name == expected[name]["class"]
+
+    def test_get_task_composer_node_plugins_expands_include(self, tmp_path):
+        """The C++ factory expands `!include` when it loads a config from a path (gh-185).
+
+        tesseract 0.35.0: loadConfig(path, locator) -> common::loadYamlFile, which
+        runs processYamlIncludeDirective (common/src/yaml_utils.cpp:108-114).
+        """
+        root = yaml.safe_load(Path(_resolve_task_composer_config()).read_text())[
+            "task_composer_plugins"
+        ]
+        tasks = {"plugins": {"OMPLTask": root["tasks"]["plugins"]["OMPLTask"]}}
+        (tmp_path / "tasks.yaml").write_text(yaml.safe_dump(tasks, sort_keys=False))
+        head = {key: value for key, value in root.items() if key != "tasks"}
+        main = tmp_path / "main.yaml"
+        main.write_text(
+            yaml.safe_dump({"task_composer_plugins": head}, sort_keys=False)
+            + "  tasks: !include tasks.yaml\n"
+        )
+
+        factory = TaskComposerPluginFactory(str(main), GeneralResourceLocator())
+
+        assert set(factory.getTaskComposerNodePlugins()) == {"OMPLTask"}
+
+    def test_get_task_composer_node_plugins_returns_copy(self):
+        """Editing the returned map does not change the factory (gh-185)."""
+        factory = TaskComposerPluginFactory(
+            _resolve_task_composer_config(), GeneralResourceLocator()
+        )
+        plugins = factory.getTaskComposerNodePlugins()
+        plugins.pop("TrajOptTask")
+        plugins["TrajOptTask"] = PluginInfo()
+
+        assert factory.getTaskComposerNodePlugins()["TrajOptTask"].class_name != ""
+
+    def test_get_available_task_composer_node_plugins_lists_factory_classes(self):
+        """Upstream: plugin_loader.getAvailablePlugins(node factory section) (gh-185).
+
+        Class names, not node names: every top-level `class` in the shipped config
+        builds (test_all_pipelines_loadable), so each is exported in that section;
+        no configured node name (`...Pipeline` / `...Task`) is a class name.
+        """
+        factory = TaskComposerPluginFactory(
+            _resolve_task_composer_config(), GeneralResourceLocator()
+        )
+        classes = factory.getAvailableTaskComposerNodePlugins()
+        configured = factory.getTaskComposerNodePlugins()
+
+        assert isinstance(classes, list)
+        assert all(isinstance(c, str) for c in classes)
+        assert {info.class_name for info in configured.values()} <= set(classes)
+        assert not set(configured) & set(classes)
+
+        del factory
+        gc.collect()
+
+
+_NODE_OUTLIVES_FACTORY_SCRIPT = """
+import gc
+import tesseract_robotics
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.tesseract_task_composer import (
+    TaskComposerDataStorage, TaskComposerPluginFactory,
+)
+config = str(tesseract_robotics.get_task_composer_config_path())
+factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+factory.getAvailableTaskComposerNodePlugins()  # maps the plugin libraries first
+node = factory.createTaskComposerNode("TrajOptPipeline")
+del factory
+gc.collect()
+other = TaskComposerPluginFactory(config, GeneralResourceLocator())
+executor = other.createTaskComposerExecutor("TaskflowExecutor")
+future = executor.run(node, TaskComposerDataStorage())
+future.wait()
+print("OK:", node.getName())
+"""
+
+
+def test_node_outlives_factory_after_get_available_plugins():
+    """GH #48: getAvailableTaskComposerNodePlugins maps the plugin libraries (gh-185).
+
+    In a fresh process, a later createTaskComposerNode on the same factory then
+    loads nothing new, so the pin must happen in getAvailable...; otherwise the
+    factory's dlclose unmaps the code the node runs. Subprocess, so a segfault
+    fails this test, not the run. As with test_manager_outlives_factory, whether
+    an unpinned dlclose actually unmaps is platform-dependent.
+    """
+    proc = subprocess.run(
+        [sys.executable, "-c", _NODE_OUTLIVES_FACTORY_SCRIPT],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, f"rc={proc.returncode} (SIGSEGV is -11): {proc.stderr[-800:]}"
+    assert "OK: TrajOptPipeline" in proc.stdout
+
 
 class TestDotgraph:
     """Test dotgraph generation on TaskComposerNode."""
@@ -321,9 +441,7 @@ class TestAnyPolyDataStorage:
 
 def _config_with_only(tmp_path, *task_names):
     """The shipped config with its node plugins cut down to `task_names`."""
-    import yaml
-
-    root = yaml.safe_load(open(_resolve_task_composer_config()))
+    root = yaml.safe_load(Path(_resolve_task_composer_config()).read_text())
     plugins = root["task_composer_plugins"]["tasks"]["plugins"]
     root["task_composer_plugins"]["tasks"]["plugins"] = {n: plugins[n] for n in task_names}
     config = tmp_path / "task_composer_plugins.yaml"

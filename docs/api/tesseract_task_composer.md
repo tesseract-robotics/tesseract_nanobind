@@ -70,6 +70,10 @@ factory = TaskComposerPluginFactory(config_path)
 # Get available pipelines
 # Common pipelines: TrajOptPipeline, OMPLPipeline, FreespacePipeline
 task = factory.createTaskComposerNode("TrajOptPipeline")
+
+# Inspect the loaded config (after `!include` expansion)
+factory.getTaskComposerNodePlugins()           # {node name: PluginInfo}, a copy
+factory.getAvailableTaskComposerNodePlugins()  # node factory class names; loads the plugin libraries
 ```
 
 `createTaskComposerNode` and `createTaskComposerExecutor` raise `TaskComposerPluginError` (a

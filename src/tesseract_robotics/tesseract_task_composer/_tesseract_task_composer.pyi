@@ -222,6 +222,16 @@ class TaskComposerPluginFactory:
 
     def getDefaultTaskComposerNodePlugin(self) -> str: ...
 
+    def getTaskComposerNodePlugins(self) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.PluginInfo]:
+        """
+        Configured task composer node plugins, name -> PluginInfo (a copy). The keys are the names createTaskComposerNode accepts.
+        """
+
+    def getAvailableTaskComposerNodePlugins(self) -> list[str]:
+        """
+        Node factory class names exported by the plugin search libraries (valid PluginInfo.class_name values), not the configured node names; see getTaskComposerNodePlugins. Loads the plugin libraries.
+        """
+
 def createTaskComposerPluginFactory(config: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> TaskComposerPluginFactory:
     """
     Create a TaskComposerPluginFactory from a config file path (string) and a ResourceLocator

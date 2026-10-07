@@ -1,7 +1,10 @@
 """Tests for the Pythonic planning API."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
+import yaml
 
 from tesseract_robotics.planning import (
     CartesianTarget,
@@ -937,8 +940,72 @@ class TestPlanningIntegration:
         assign_current_state_as_seed(composite, robot)
 
 
+def _write_split_config(directory: Path, task_names: list[str], include: bool) -> Path:
+    """Write a task composer config holding only `task_names` from the shipped config.
+
+    With `include`, the `tasks:` block lives in `tasks.yaml` and `main.yaml` pulls
+    it in with a relative `!include` (resolved against main.yaml's directory by
+    tesseract::common::loadYamlFile).
+    """
+    import tesseract_robotics
+
+    shipped = Path(tesseract_robotics.get_task_composer_config_path())
+    root = yaml.safe_load(shipped.read_text())["task_composer_plugins"]
+    tasks = {"plugins": {name: root["tasks"]["plugins"][name] for name in task_names}}
+    head = {key: value for key, value in root.items() if key != "tasks"}
+    main = directory / "main.yaml"
+    if include:
+        (directory / "tasks.yaml").write_text(yaml.safe_dump(tasks, sort_keys=False))
+        text = yaml.safe_dump({"task_composer_plugins": head}, sort_keys=False)
+        main.write_text(text + "  tasks: !include tasks.yaml\n")
+    else:
+        main.write_text(
+            yaml.safe_dump({"task_composer_plugins": {**head, "tasks": tasks}}, sort_keys=False)
+        )
+    return main
+
+
 class TestTaskComposer:
     """Tests for TaskComposer methods."""
+
+    def test_get_available_pipelines_reads_include_config(self, tmp_path):
+        """A config whose tasks come in through `!include` lists its pipeline (gh-185)."""
+        from tesseract_robotics.planning import TaskComposer
+
+        main = _write_split_config(tmp_path, ["TrajOptTask"], include=True)
+        composer = TaskComposer.from_config(main)
+
+        assert composer.get_available_pipelines() == ["TrajOptTask"]
+
+    def test_get_available_pipelines_without_config_path(self):
+        """A composer built from a bare factory lists the factory's pipelines (gh-185)."""
+        import tesseract_robotics
+        from tesseract_robotics.planning import TaskComposer
+        from tesseract_robotics.tesseract_common import GeneralResourceLocator
+        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
+
+        config = str(tesseract_robotics.get_task_composer_config_path())
+        factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+
+        assert TaskComposer(factory).get_available_pipelines() == (
+            TaskComposer.from_config(config).get_available_pipelines()
+        )
+
+    def test_get_available_pipelines_excludes_node_that_fails_to_build(self, tmp_path):
+        """A configured name whose node cannot be built is not listed (gh-185, gh-203).
+
+        `TrajOptPipeline` alone: its `MotionPlanningTask` refers to `TrajOptTask`,
+        which this config lacks, so createTaskComposerNode raises.
+        """
+        from tesseract_robotics.planning import TaskComposer
+        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+
+        main = _write_split_config(tmp_path, ["TrajOptPipeline"], include=False)
+        composer = TaskComposer.from_config(main)
+
+        with pytest.raises(TaskComposerPluginError):
+            composer.factory.createTaskComposerNode("TrajOptPipeline")
+        assert composer.get_available_pipelines() == []
 
     @pytest.fixture
     def robot(self):

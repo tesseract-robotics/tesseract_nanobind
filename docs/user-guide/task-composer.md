@@ -127,7 +127,7 @@ composer = TaskComposer.from_config(
 
 ## Available Pipelines
 
-`TaskComposer.get_available_pipelines()` introspects the factory and returns every pipeline that actually loaded from the config. As of the current `task_composer_plugins.yaml` this is **36 pipelines**:
+`TaskComposer.get_available_pipelines()` takes the configured node names from the factory (`TaskComposerPluginFactory.getTaskComposerNodePlugins()`), builds each one once, and returns those that built. The config is read as the C++ factory loaded it, so `!include` works, and a `TaskComposer` built from a factory without `config_path` lists its pipelines too. As of the current `task_composer_plugins.yaml` this is **36 pipelines**:
 
 ```python
 composer = TaskComposer.from_config()
@@ -153,6 +153,35 @@ See `TaskComposer.get_available_pipelines()` at runtime for the full 36.
     packaged `tesseract_task_composer` data. It may grow or shrink in
     future versions. Treat `get_available_pipelines()` as the source of
     truth, not the literal "36".
+
+### Splitting a config with `!include`
+
+The factory expands `!include` when it loads a config from a path. A relative
+path resolves against the including file's directory:
+
+```yaml
+# main.yaml
+task_composer_plugins:
+  search_paths: [...]
+  search_libraries: [...]
+  executors: {...}
+  tasks: !include tasks.yaml
+```
+
+`TaskComposer.from_config("main.yaml")` and `get_available_pipelines()` see the
+included tasks. To inspect the config the factory loaded:
+
+```python
+factory = composer.factory
+factory.getTaskComposerNodePlugins()           # {node name: PluginInfo}
+factory.getAvailableTaskComposerNodePlugins()  # node factory class names
+```
+
+The two differ: `getTaskComposerNodePlugins()` is keyed by the names you pass
+to `plan(pipeline=...)` (`TrajOptPipeline`), while
+`getAvailableTaskComposerNodePlugins()` lists the factory classes the plugin
+libraries export (`PipelineTaskFactory`), the values a `PluginInfo.class_name`
+may take. The second call loads the plugin libraries.
 
 ### Convenience methods
 
@@ -300,6 +329,11 @@ if not result.successful:
 | `TrajOpt failed to converge` | Bad initial trajectory | Feed it an OMPL seed first |
 | `Contact check failed` | Trajectory has collisions | Increase collision margin |
 | `IK failed` | Cartesian target unreachable | Verify workspace + TCP offset |
+| `createTaskComposerNode: 'X' not found among the configured plugins: […]` | `pipeline=` names no configured node | Pick a name from the list in the message |
+
+On the raw factory, `createTaskComposerNode` and `createTaskComposerExecutor` raise
+`TaskComposerPluginError` (a `RuntimeError`) instead of returning `None`; `plan` turns it into
+a failed `PlanningResult`.
 
 ## Parallel Execution
 

@@ -388,7 +388,32 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("hasTaskComposerExecutorPlugins", &tp::TaskComposerPluginFactory::hasTaskComposerExecutorPlugins)
         .def("hasTaskComposerNodePlugins", &tp::TaskComposerPluginFactory::hasTaskComposerNodePlugins)
         .def("getDefaultTaskComposerExecutorPlugin", &tp::TaskComposerPluginFactory::getDefaultTaskComposerExecutorPlugin)
-        .def("getDefaultTaskComposerNodePlugin", &tp::TaskComposerPluginFactory::getDefaultTaskComposerNodePlugin);
+        .def("getDefaultTaskComposerNodePlugin", &tp::TaskComposerPluginFactory::getDefaultTaskComposerNodePlugin)
+        // Returns a copy of the factory's node plugin map, after `!include` expansion
+        // (upstream loadConfig(path, locator) -> tesseract::common::loadYamlFile). A value,
+        // not a plugin-backed object: no keep_alive, no dylib loading.
+        .def("getTaskComposerNodePlugins", &tp::TaskComposerPluginFactory::getTaskComposerNodePlugins,
+             "Configured task composer node plugins, name -> PluginInfo (a copy). The keys are "
+             "the names createTaskComposerNode accepts.")
+        // Upstream returns plugin_loader.getAvailablePlugins(TaskComposerNodeFactory section):
+        // the factory *class* names exported by the search libraries (the values
+        // PluginInfo.class_name may take), not the configured node names. It dlopens the
+        // search libraries into the factory's loader cache. A later createTaskComposerNode
+        // then finds them already mapped, so its own snapshot/pin sees nothing new and the
+        // libraries would stay unpinned, to be dlclose'd with the factory under a live node
+        // (GH #48). Pin here too.
+        .def("getAvailableTaskComposerNodePlugins", [](const tp::TaskComposerPluginFactory& self) {
+#ifdef __APPLE__
+            auto before = snapshot_loaded_dylibs();
+#endif
+            auto names = self.getAvailableTaskComposerNodePlugins();
+#ifdef __APPLE__
+            pin_newly_loaded_dylibs(before);
+#endif
+            return names;
+        }, "Node factory class names exported by the plugin search libraries (valid "
+           "PluginInfo.class_name values), not the configured node names; see "
+           "getTaskComposerNodePlugins. Loads the plugin libraries.");
 
     // Keep factory functions for backwards compatibility
     m.def("createTaskComposerPluginFactory", [](const std::string& config_str, const tc::ResourceLocator& locator) {

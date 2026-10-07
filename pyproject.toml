@@ -20,7 +20,6 @@ requires-python = ">=3.9"
 dependencies = [
     "numpy>=1.21.0",
     "loguru>=0.7.0",
-    "pyyaml>=6.0",
     "scipy>=1.7.0",          # Required for Eigen sparse matrix conversion in nanobind
     "aiohttp",               # Required for tesseract_robotics.viewer
     "importlib-resources",   # Required for tesseract_robotics.viewer
@@ -186,6 +185,7 @@ nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this 
 pytest = ">=7.0"
 pytest-xdist = ">=3.0"
 pytest-benchmark = "*"
+pyyaml = ">=6.0"  # tests only: task composer config fixtures
 ruff = ">=0.8.0"
 pre-commit = ">=3.0"
 

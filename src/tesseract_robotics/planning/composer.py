@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-import yaml
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -240,7 +239,8 @@ class TaskComposer:
             locator: Resource locator
             num_threads: Number of threads for executor (overrides YAML config)
             executor: Pre-configured executor (overrides num_threads and YAML)
-            config_path: Path to config YAML (for get_available_pipelines)
+            config_path: Path to the config YAML the factory was built from
+                (informational; get_available_pipelines reads the factory)
 
         Raises:
             TypeError: If factory is not a TaskComposerPluginFactory
@@ -697,13 +697,18 @@ class TaskComposer:
 
     def get_available_pipelines(self) -> list[str]:
         """
-        Get list of available pipeline names by introspecting the factory.
+        Get the pipeline names this composer can run.
 
-        Actually attempts to create each node from the config to verify
-        the C++ plugin can be loaded.
+        Takes the configured node names from the factory
+        (`TaskComposerPluginFactory.getTaskComposerNodePlugins`), so a config
+        that uses `!include` is read as the C++ factory expanded it, and a
+        composer built from a factory without `config_path` lists its
+        pipelines too. Each name is then created once to check that its C++
+        plugin loads; names that raise `TaskComposerPluginError` are logged
+        and left out.
 
         Returns:
-            List of pipeline names that can be used with plan().
+            Sorted list of pipeline names that can be used with plan().
             Common pipelines include:
                 - FreespacePipeline: OMPL + TrajOpt smoothing + time param
                 - CartesianPipeline: Cartesian path with TrajOpt
@@ -711,21 +716,9 @@ class TaskComposer:
                 - TrajOptPipeline: TrajOpt optimization only
                 - DescartesFPipeline: Descartes graph search
         """
-        if self._config_path is None or not self._config_path.is_file():
-            return []
-
-        with open(self._config_path) as f:
-            config = yaml.safe_load(f)
-
-        candidates = []
-        if "task_composer_plugins" in config:
-            tasks = config["task_composer_plugins"].get("tasks", {}).get("plugins", {})
-            candidates = list(tasks.keys())
-
-        # Actually try to create each node to verify it's loadable
         available = []
         failed = []
-        for name in candidates:
+        for name in sorted(self.factory.getTaskComposerNodePlugins()):
             try:
                 self.factory.createTaskComposerNode(name)
                 available.append(name)
@@ -740,4 +733,4 @@ class TaskComposer:
             for name, err in failed:
                 logger.debug(f"  {name}: {err}")
 
-        return sorted(available)
+        return available
