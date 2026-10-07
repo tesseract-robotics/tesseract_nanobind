@@ -18,6 +18,14 @@
 
   `TaskComposerPluginFactory` still takes its config path as `str`: tesseract_task_composer is outside the audited modules, so its native path/content pair is not bound yet.
 
+- **`tesseract_environment` and `tesseract_command_language` no longer re-export task-composer functions** — `tesseract_environment/__init__.py` imported `AnyPoly_wrap_EnvironmentConst` from `tesseract_task_composer` inside `try: … except ImportError: pass`, and `tesseract_command_language/__init__.py` did the same for `AnyPoly_wrap_CompositeInstruction`, `AnyPoly_wrap_ProfileDictionary` and `AnyPoly_as_CompositeInstruction`, behind a `_HAS_TASK_COMPOSER` flag. A broken task-composer extension (a missing dylib, say) made the names vanish silently, and `from tesseract_robotics.tesseract_environment import *` then raised `AttributeError` for a name in `__all__`, far from the cause. Both imports also loaded the task composer as a side effect. The re-exports, their `__all__` entries and `_HAS_TASK_COMPOSER` are removed; import the functions from `tesseract_task_composer`, where they are defined. Importing either package no longer imports `tesseract_task_composer` ([#192]).
+
+  | before | after |
+  | --- | --- |
+  | `from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst` | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst` |
+  | `from tesseract_robotics.tesseract_command_language import AnyPoly_wrap_CompositeInstruction` (also `AnyPoly_wrap_ProfileDictionary`, `AnyPoly_as_CompositeInstruction`) | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_CompositeInstruction` (…) |
+  | `tesseract_command_language._HAS_TASK_COMPOSER` | removed: the task composer is a hard dependency |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -304,6 +312,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#190]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/190
 [#191]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/191
 [#188]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/188
+[#192]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/192
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

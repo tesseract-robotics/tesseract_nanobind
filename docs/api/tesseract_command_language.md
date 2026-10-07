@@ -297,7 +297,7 @@ JointWaypointPoly_wrap_JointWaypoint(wp)
 # Instructions
 MoveInstructionPoly_wrap_MoveInstruction(instr)
 
-# AnyPoly (for data storage)
+# AnyPoly (for data storage; import from tesseract_task_composer)
 AnyPoly_wrap_CompositeInstruction(program)
 AnyPoly_wrap_ProfileDictionary(profiles)
 ```
@@ -324,7 +324,7 @@ InstructionPoly_as_SetAnalogInstruction(instr_poly)
 InstructionPoly_as_SetDigitalInstruction(instr_poly)
 InstructionPoly_as_SetToolInstruction(instr_poly)
 
-# AnyPoly
+# AnyPoly (import from tesseract_task_composer)
 AnyPoly_as_CompositeInstruction(any_poly)
 ```
 

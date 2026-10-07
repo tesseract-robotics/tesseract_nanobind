@@ -458,11 +458,6 @@ def test_satisfies_limits_all_overloads_covered(real_reports):
     assert [d for d in report.deviations if d.name == "satisfiesLimits"] == []
 
 
-def test_environment_init_try_import_reported(real_reports):
-    kinds = {d.kind for d in real_reports["tesseract_environment"].deviations}
-    assert audit.Kind.FAIL_LOUD in kinds
-
-
 def test_quaternion_scalar_last_accepted(real_reports):
     accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
     assert ("Quaterniond.from_xyzw", "scalar-last-quaternion") in accepted

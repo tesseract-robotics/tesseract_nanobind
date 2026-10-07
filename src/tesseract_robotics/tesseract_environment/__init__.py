@@ -7,12 +7,6 @@ import tesseract_robotics.tesseract_scene_graph  # noqa: F401
 import tesseract_robotics.tesseract_srdf  # noqa: F401 - needed for getKinematicsInformation
 from tesseract_robotics.tesseract_environment._tesseract_environment import *
 
-# Re-export AnyPoly_wrap_EnvironmentConst from tesseract_task_composer for convenience
-try:
-    from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst
-except ImportError:
-    pass  # task_composer may not be available
-
 __all__ = [
     # Environment
     "Environment",
@@ -62,6 +56,4 @@ __all__ = [
     "checkTrajectory",
     "checkTrajectorySegment",
     "checkTrajectoryState",
-    # AnyPoly wrapper (re-exported from task_composer for SWIG compatibility)
-    "AnyPoly_wrap_EnvironmentConst",
 ]

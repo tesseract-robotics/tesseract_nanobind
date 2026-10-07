@@ -147,16 +147,31 @@ def test_env():
     get_environment()
 
 
-def test_anypoly_wrap_environment_const():
-    """Test wrapping Environment in AnyPoly for TaskComposerDataStorage."""
-    from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst
+def test_environment_package_has_no_task_composer_reexport():
+    """AnyPoly_wrap_EnvironmentConst lives in tesseract_task_composer only (gh-192)."""
+    assert not hasattr(tesseract_environment, "AnyPoly_wrap_EnvironmentConst")
 
-    env = get_environment()
-    # AnyPoly_wrap_EnvironmentConst expects shared_ptr<const Environment>
-    # The environment is already a shared_ptr from Python's perspective
-    any_poly = AnyPoly_wrap_EnvironmentConst(env)
-    assert any_poly is not None
-    assert not any_poly.isNull()
+
+def test_all_names_resolve():
+    """Every name in tesseract_environment.__all__ is an attribute of the package (gh-192)."""
+    missing = [
+        name for name in tesseract_environment.__all__ if not hasattr(tesseract_environment, name)
+    ]
+    assert missing == []
+
+
+def test_import_does_not_load_task_composer():
+    """Importing tesseract_environment does not import tesseract_task_composer (gh-192).
+
+    Runs in a fresh interpreter: this process may already hold the task composer.
+    """
+    code = (
+        "import sys\n"
+        "import tesseract_robotics.tesseract_environment\n"
+        "loaded = sorted(m for m in sys.modules if m.startswith('tesseract_robotics.tesseract_task_composer'))\n"
+        "assert loaded == [], loaded\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
 
 
 def test_get_discrete_contact_manager():

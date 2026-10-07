@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
 | Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
 | Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `ValueError` on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
 | Unreleased | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
@@ -16,6 +17,22 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### `AnyPoly` helpers only in `tesseract_task_composer`
+
+`tesseract_environment` re-exported `AnyPoly_wrap_EnvironmentConst`, and
+`tesseract_command_language` re-exported `AnyPoly_wrap_CompositeInstruction`,
+`AnyPoly_wrap_ProfileDictionary` and `AnyPoly_as_CompositeInstruction`, from
+`tesseract_task_composer` inside a `try: … except ImportError: pass`. An install whose
+task-composer extension failed to load lost the names without an error, and importing either
+package loaded the task composer. The re-exports and `tesseract_command_language._HAS_TASK_COMPOSER`
+are removed (#192); the functions are defined in, and imported from, `tesseract_task_composer`.
+Code that imports them from the old place now fails with `ImportError: cannot import name …`.
+
+| before | after |
+| --- | --- |
+| `from tesseract_robotics.tesseract_environment import AnyPoly_wrap_EnvironmentConst` | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst` |
+| `from tesseract_robotics.tesseract_command_language import AnyPoly_wrap_CompositeInstruction` (also `AnyPoly_wrap_ProfileDictionary`, `AnyPoly_as_CompositeInstruction`) | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_CompositeInstruction` (…) |
 
 ### A `str` is content, `pathlib.Path` is a file
 

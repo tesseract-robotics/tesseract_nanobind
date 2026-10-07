@@ -4,8 +4,12 @@ These tests cover the command language types used in motion planning examples,
 including waypoints, instructions, and composite instructions.
 """
 
+import subprocess
+import sys
+
 import numpy as np
 
+from tesseract_robotics import tesseract_command_language
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     # Poly wrappers
@@ -466,12 +470,44 @@ class TestMoveInstructionDescription:
         assert mi_poly.getDescription() == "poly_description"
 
 
+class TestNoTaskComposerReexport:
+    """The AnyPoly helpers live in tesseract_task_composer only (gh-192)."""
+
+    def test_package_has_no_task_composer_reexport(self):
+        for name in (
+            "AnyPoly_as_CompositeInstruction",
+            "AnyPoly_wrap_CompositeInstruction",
+            "AnyPoly_wrap_ProfileDictionary",
+            "_HAS_TASK_COMPOSER",
+        ):
+            assert not hasattr(tesseract_command_language, name), name
+
+    def test_all_names_resolve(self):
+        """Every name in __all__ is an attribute of the package."""
+        missing = [
+            name
+            for name in tesseract_command_language.__all__
+            if not hasattr(tesseract_command_language, name)
+        ]
+        assert missing == []
+
+    def test_import_does_not_load_task_composer(self):
+        """Runs in a fresh interpreter: this process may already hold the task composer."""
+        code = (
+            "import sys\n"
+            "import tesseract_robotics.tesseract_command_language\n"
+            "loaded = sorted(m for m in sys.modules if m.startswith('tesseract_robotics.tesseract_task_composer'))\n"
+            "assert loaded == [], loaded\n"
+        )
+        subprocess.run([sys.executable, "-c", code], check=True)
+
+
 class TestAnyPolyWrappers:
     """Test AnyPoly wrapper functions for TaskComposerDataStorage."""
 
     def test_anypoly_wrap_composite_instruction(self):
         """Test wrapping CompositeInstruction in AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_CompositeInstruction,
         )
 
@@ -492,7 +528,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_profile_dictionary(self):
         """Test wrapping ProfileDictionary in AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_ProfileDictionary,
         )
 
@@ -503,7 +539,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_roundtrip_composite_instruction(self):
         """Test wrapping and unwrapping CompositeInstruction via AnyPoly."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_as_CompositeInstruction,
             AnyPoly_wrap_CompositeInstruction,
         )

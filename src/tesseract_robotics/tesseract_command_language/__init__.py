@@ -2,20 +2,6 @@
 
 from tesseract_robotics.tesseract_command_language._tesseract_command_language import *
 
-# Re-export AnyPoly wrappers from tesseract_task_composer for convenience
-# (examples import these from command_language for SWIG compatibility)
-_HAS_TASK_COMPOSER = False
-try:
-    from tesseract_robotics.tesseract_task_composer import (
-        AnyPoly_as_CompositeInstruction,
-        AnyPoly_wrap_CompositeInstruction,
-        AnyPoly_wrap_ProfileDictionary,
-    )
-
-    _HAS_TASK_COMPOSER = True
-except ImportError:
-    pass  # task_composer may not be available
-
 __all__ = [
     # Concrete Waypoints
     "JointWaypoint",
@@ -67,10 +53,3 @@ __all__ = [
     # Constants
     "DEFAULT_PROFILE_KEY",
 ]
-
-if _HAS_TASK_COMPOSER:
-    __all__ += [
-        "AnyPoly_wrap_CompositeInstruction",
-        "AnyPoly_wrap_ProfileDictionary",
-        "AnyPoly_as_CompositeInstruction",
-    ]

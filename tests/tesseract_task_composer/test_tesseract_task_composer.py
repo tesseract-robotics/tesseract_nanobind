@@ -319,6 +319,19 @@ class TestAnyPolyDataStorage:
             AnyPoly_as_TaskComposerDataStorage(AnyPoly())
 
 
+class TestAnyPolyEnvironment:
+    """AnyPoly_wrap_EnvironmentConst, moved from the environment tests (gh-192)."""
+
+    def test_anypoly_wrap_environment_const(self):
+        """Wrap an Environment in AnyPoly for TaskComposerDataStorage."""
+        from tesseract_robotics.planning import Robot
+        from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst
+
+        robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+        any_poly = AnyPoly_wrap_EnvironmentConst(robot.env)
+        assert not any_poly.isNull()
+
+
 class TestGetAllData:
     """TaskComposerDataStorage.getAllData() — no-arg overload returning the full
     {key: AnyPoly} map of stored entries."""
