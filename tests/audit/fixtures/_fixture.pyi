@@ -4,6 +4,9 @@ from typing import Annotated, overload
 
 from numpy.typing import NDArray
 
+import fixture_missing._fixture_missing
+import fixture_remote._fixture_remote
+
 class Plain:
     def __init__(self) -> None: ...
     @property
@@ -55,6 +58,12 @@ class Runner:
     def __call__(self, n: int) -> bool: ...
 
 class FastRunner(Runner):
+    def __init__(self) -> None: ...
+
+class RemoteRunner(fixture_remote._fixture_remote.Runner):
+    def __init__(self) -> None: ...
+
+class LostRunner(fixture_missing._fixture_missing.Runner):
     def __init__(self) -> None: ...
 
 class Color(enum.Enum):

@@ -104,6 +104,14 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "FastRunner.__init__",
         "FastRunner.go",
         "FastRunner.__call__",
+        "RemoteRunner",
+        "RemoteRunner.__init__",
+        "RemoteRunner.go",
+        "RemoteRunner.__call__",
+        "LostRunner",
+        "LostRunner.__init__",
+        "LostRunner.go",
+        "LostRunner.__call__",
         "Owner",
         "Owner.__init__",
         "Plain",
@@ -251,6 +259,7 @@ def fixture_report():
         FIXTURE_PREFIX,
         (FIXTURE_INCLUDE,),
         other_bindings=(FIXTURES / "other_bindings.cpp",),
+        stub_roots=(FIXTURES,),
     )
 
 
@@ -267,6 +276,9 @@ def test_fixture_gaps_exact(fixture_report):
         (ORPHAN_HEADER, audit.Kind.HEADER, "—"),  # never included: one row (E0)
         # raw-buffer ctor: the bound arity-2-3 ctor overlaps it but cannot cover it (#166)
         ("Buffer.__init__", audit.Kind.CONSTRUCTOR, "3-4"),
+        # stub base in a module without a stub: inherited members cannot be checked (I7)
+        ("LostRunner.go", audit.Kind.METHOD, "—"),
+        ("LostRunner.__call__", audit.Kind.OPERATOR, "—"),
     }
 
 
@@ -560,6 +572,8 @@ def test_json_roundtrip(fixture_report):
         "Widget.operator+",
         ORPHAN_HEADER,
         "Buffer.__init__",
+        "LostRunner.go",
+        "LostRunner.__call__",
     }
     assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted"}
 
@@ -572,6 +586,14 @@ def test_cli_rejects_unknown_module():
 def test_inherited_bound_members_are_not_gaps(fixture_report):
     """I4: FastRunner.go/__call__ are covered by the stub's base class Runner."""
     assert not {g.symbol for g in fixture_report.gaps} & {"FastRunner.go", "FastRunner.__call__"}
+
+
+def test_members_inherited_from_another_module_stub_are_not_gaps(fixture_report):
+    """I7: RemoteRunner's stub base is `fixture_remote._fixture_remote.Runner`, another
+    module's stub; nanobind subclasses inherit across modules, so go/__call__ are covered."""
+    gaps = {g.symbol for g in fixture_report.gaps}
+    assert not gaps & {"RemoteRunner.go", "RemoteRunner.__call__"}
+    assert {"LostRunner.go", "LostRunner.__call__"} <= gaps
 
 
 def test_call_operator_is_neither_gap_nor_deviation(fixture_report):

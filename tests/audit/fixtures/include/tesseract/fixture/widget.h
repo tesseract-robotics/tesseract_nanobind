@@ -81,6 +81,18 @@ struct FastRunner : Runner  // Python inherits go/__call__ from the bound Runner
   bool operator()(int n) const override;
 };
 
+struct RemoteRunner : Runner  // stub base lives in another module's stub: it still resolves (I7)
+{
+  void go() override;
+  bool operator()(int n) const override;
+};
+
+struct LostRunner : Runner  // stub base names a module with no stub: members stay gaps (I7)
+{
+  void go() override;
+  bool operator()(int n) const override;
+};
+
 template <class Archive>
 void serialize(Archive& ar, Owner& owner);  // excluded: free cereal hook (I2)
 

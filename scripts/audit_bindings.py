@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
+import functools
 import json
 import os
 import re
@@ -879,11 +880,35 @@ def _protocol_rule(name: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str
     return rule if ok else None
 
 
-def _py_member(name: str, py: PyApi) -> PySymbol | None:
+@functools.cache
+def _stub_py_api(stub: Path) -> PyApi:
+    """A committed stub's API, parsed once per audit run."""
+    return py_api(load_stub(stub), rel(stub))
+
+
+def _base_stub(base: str, py: PyApi, stub_roots: Sequence[Path]) -> tuple[PyApi, str] | None:
+    """The stub declaring `base` and the class name in it, or None if no stub declares it.
+
+    A plain name is a class of the same stub. nanobind spells a base bound in another
+    extension by its module path (`tesseract_robotics.tesseract_common._tesseract_common.X`),
+    which maps to `<root>/tesseract_robotics/tesseract_common/_tesseract_common.pyi`.
+    """
+    module, _, cls = base.rpartition(".")
+    if not module:
+        return py, cls
+    stub = Path(*module.split(".")).with_suffix(".pyi")
+    for root in stub_roots:
+        if (root / stub).is_file():
+            return _stub_py_api(root / stub), cls
+    return None
+
+
+def _py_member(name: str, py: PyApi, stub_roots: Sequence[Path] = (SRC,)) -> PySymbol | None:
     """The stub symbol for `Class.member`, looked up through the stub's base classes.
 
-    nanobind subclasses inherit bound members, so a C++ override needs no own binding.
-    Only bases declared in the same stub resolve; others cannot be checked here.
+    nanobind subclasses inherit bound members, also from a base bound in another
+    extension, so a C++ override needs no own binding. A base whose stub is not under
+    `stub_roots` cannot be checked, and its members stay gaps.
     """
     if name in py.symbols:
         return py.symbols[name]
@@ -892,7 +917,11 @@ def _py_member(name: str, py: PyApi) -> PySymbol | None:
     if cls is None:
         return None
     for base in cls.bases:
-        found = _py_member(f"{base}.{member}", py)
+        resolved = _base_stub(base, py, stub_roots)
+        if resolved is None:
+            continue
+        base_py, base_cls = resolved
+        found = _py_member(f"{base_cls}.{member}", base_py, stub_roots)
         if found is not None:
             return found
     return None
@@ -905,20 +934,25 @@ def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
 
 
 def match(
-    module: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str], py: PyApi, stub_rel: str
+    module: str,
+    cpp: dict[str, CppSymbol],
+    tu_names: frozenset[str],
+    py: PyApi,
+    stub_rel: str,
+    stub_roots: Sequence[Path] = (SRC,),
 ) -> ModuleReport:
-    """Diff the audited C++ API against the stub."""
+    """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`."""
     gaps: list[Gap] = []
     accepted: list[Accepted] = []
     covered = 0
     for name, sym in cpp.items():
         if _ancestor_missing(name, cpp, py):
             continue  # the missing class is the one row
-        ps = _py_member(name, py)
+        ps = _py_member(name, py, stub_roots)
         if ps is None:
             owner, _, leaf = name.rpartition(".")
             dunder = PROTOCOL_MEMBERS.get(leaf)
-            if dunder and _py_member(f"{owner}.{dunder}", py):
+            if dunder and _py_member(f"{owner}.{dunder}", py, stub_roots):
                 covered += 1  # the dunder's own row names the rule
             else:
                 gaps.append(Gap(name, sym.kind, sym.location))
@@ -942,7 +976,11 @@ def match(
         owner, _, leaf = name.rpartition(".")
         if ps.enum_alias:
             found = None  # a second name for an enum value, even if C++ has it unscoped
-        elif leaf == "__hash__" and ps.none_annotated and _py_member(f"{owner}.__eq__", py):
+        elif (
+            leaf == "__hash__"
+            and ps.none_annotated
+            and _py_member(f"{owner}.__eq__", py, stub_roots)
+        ):
             accepted.append(Accepted(name, "value-equality-unhashable", where))
             continue
         elif ps.kind is Kind.PROTOCOL and name not in cpp:
@@ -1013,11 +1051,13 @@ def audit_tu(
     prefix: str,
     extra_include_dirs: Sequence[Path] = (),
     other_bindings: Sequence[Path] = (),
+    stub_roots: Sequence[Path] = (SRC,),
 ) -> ModuleReport:
     """Audit one translation unit against one stub and package `__init__.py`.
 
     Audits every header under `prefix`, except `UNAUDITED_HEADERS` and headers that one of
     `other_bindings` #includes directly; the binding's own direct includes always count.
+    Stub base classes bound in other extensions resolve through stubs under `stub_roots`.
     """
     include_dirs = (*extra_include_dirs, *INCLUDE_DIRS)
     tu = parse_tu(cpp_path, extra_include_dirs)
@@ -1035,6 +1075,7 @@ def audit_tu(
         decl_names(tu),
         py_api(load_stub(stub_path), rel(stub_path)),
         rel(stub_path),
+        stub_roots,
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}
     report.gaps = sorted(
