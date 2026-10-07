@@ -1,5 +1,7 @@
 import io
+import os
 from inspect import currentframe, getframeinfo
+from pathlib import Path
 
 import numpy as np
 import numpy.testing as nptest
@@ -327,9 +329,13 @@ def test_bytes_resource_list_ctor_takes_parent():
 
 
 def test_simple_located_resource_delegates_to_parent():
-    loc = _RecordingLocator({"package://pkg/meshes/b.stl": b"mesh"})
+    """SimpleLocatedResource joins the sibling url with the platform separator
+    (std::filesystem::path::preferred_separator, resource_locator.cpp, 0.35.0): `\\` on Windows."""
+    sibling = f"package://pkg/meshes{os.sep}b.stl"
+    loc = _RecordingLocator({sibling: b"mesh"})
     slr = tesseract_common.SimpleLocatedResource("package://pkg/meshes/a.urdf", "/x/a.urdf", loc)
-    assert slr.locateResource("b.stl").getUrl() == "package://pkg/meshes/b.stl"
+    assert slr.locateResource("b.stl").getUrl() == sibling
+    assert loc.asked == [sibling]
 
 
 def _make_package(root, name="my_pkg"):
@@ -346,7 +352,9 @@ def test_general_resource_locator_paths_ctor(tmp_path):
     loc = tesseract_common.GeneralResourceLocator(paths=[tmp_path], environment_variables=[])
     res = loc.locateResource("package://my_pkg/data.txt")
     assert res is not None
-    assert res.getFilePath() == str(pkg / "data.txt")
+    # Upstream concatenates the package dir and the url remainder as strings, so on Windows the
+    # separators are mixed (`C:\...\my_pkg/data.txt`): compare as paths.
+    assert Path(res.getFilePath()) == pkg / "data.txt"
     assert res.getResourceContents() == b"hello"
 
 
