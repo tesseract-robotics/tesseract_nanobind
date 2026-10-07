@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import tesseract_environment, tesseract_srdf, tesseract_urdf
+from tesseract_robotics.tesseract_common import Isometry3d
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -458,3 +459,223 @@ def test_get_contact_managers_plugin_info():
     info = _fresh_env().getContactManagersPluginInfo()
     assert info.discrete_plugin_infos.default_plugin == "BulletDiscreteBVHManager"
     assert info.continuous_plugin_infos.default_plugin == "BulletCastBVHManager"
+
+
+# gh-187: native Environment overloads (getState/setState with floating joints, the name-taking
+# joint/link getters, getJointGroup(name, joint_names), contact managers by name).
+
+# A floating base carrying one prismatic joint: "arm_joint" is the only active joint and
+# "float_joint" the only floating joint, so every getState/setState form has a target.
+_FLOATING_ARM_URDF = """<robot name="floating_arm" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
+  <link name="world"/>
+  <link name="body"/>
+  <link name="arm"/>
+  <joint name="float_joint" type="floating">
+    <origin xyz="1 2 3" rpy="0 0 0"/>
+    <parent link="world"/>
+    <child link="body"/>
+  </joint>
+  <joint name="arm_joint" type="prismatic">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="body"/>
+    <child link="arm"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+</robot>"""
+
+_IIWA_VALUES = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+
+def _floating_arm_env():
+    env = tesseract_environment.Environment()
+    scene_graph = tesseract_urdf.parseURDFString(
+        _FLOATING_ARM_URDF, TesseractSupportResourceLocator()
+    )
+    assert env.init(scene_graph)
+    return env
+
+
+def _translation(x, y, z):
+    matrix = np.eye(4)
+    matrix[:3, 3] = [x, y, z]
+    return Isometry3d(matrix)
+
+
+def test_get_state_native_overloads():
+    env = _fresh_env()
+    joints = dict(zip(_IIWA_JOINTS, _IIWA_VALUES))
+    by_names = env.getState(_IIWA_JOINTS, _IIWA_VALUES)
+    by_map = env.getState(joints)
+    alias_names = env.getStateByNamesAndValues(_IIWA_JOINTS, _IIWA_VALUES)
+    alias_map = env.getStateByMap(joints)
+
+    expected_tool0 = env.getLinkTransforms(_IIWA_JOINTS, _IIWA_VALUES)["tool0"].matrix
+    for state in (by_names, by_map, alias_names, alias_map):
+        assert state.joints == joints
+        np.testing.assert_allclose(
+            state.link_transforms["tool0"].matrix, expected_tool0, atol=FK_ATOL
+        )
+
+    # getState computes a state; it never moves the environment.
+    np.testing.assert_array_equal(env.getCurrentJointValues(), np.zeros(len(_IIWA_JOINTS)))
+
+
+def test_get_state_unknown_joint_raises():
+    # Before #187 these returned a state with the bogus key inserted, and a names/values length
+    # mismatch read joint_values out of bounds.
+    env = _fresh_env()
+    for get_state in (env.getState, env.getStateByMap):
+        with pytest.raises(ValueError, match="not_a_joint"):
+            get_state({"not_a_joint": 1.0})
+        with pytest.raises(ValueError, match="joint_a7-tool0"):
+            get_state({"joint_a7-tool0": 1.0})  # fixed joint: not in the state solver
+    for get_state in (env.getState, env.getStateByNamesAndValues):
+        with pytest.raises(ValueError, match="not_a_joint"):
+            get_state(["not_a_joint"], np.array([1.0]))
+        with pytest.raises(ValueError, match="length"):
+            get_state(_IIWA_JOINTS, np.array([1.0]))
+
+
+def test_get_state_floating_joints():
+    env = _floating_arm_env()
+    pose = _translation(4.0, 5.0, 6.0)
+
+    state = env.getState({"float_joint": pose})
+    np.testing.assert_allclose(
+        state.link_transforms["body"].translation, [4.0, 5.0, 6.0], atol=FK_ATOL
+    )
+    for state in (
+        env.getState({"arm_joint": 0.5}, {"float_joint": pose}),
+        env.getState(["arm_joint"], np.array([0.5]), {"float_joint": pose}),
+        env.getStateByMap({"arm_joint": 0.5}, {"float_joint": pose}),
+        env.getStateByNamesAndValues(["arm_joint"], np.array([0.5]), {"float_joint": pose}),
+    ):
+        np.testing.assert_allclose(
+            state.link_transforms["arm"].translation, [4.5, 5.0, 6.0], atol=FK_ATOL
+        )
+
+    # The URDF origin is still the current floating-joint value.
+    np.testing.assert_allclose(
+        env.getCurrentFloatingJointValues()["float_joint"].translation,
+        [1.0, 2.0, 3.0],
+        atol=FK_ATOL,
+    )
+
+
+def test_set_state_floating_joints():
+    env = _floating_arm_env()
+
+    env.setState({"float_joint": _translation(4.0, 5.0, 6.0)})
+    np.testing.assert_allclose(
+        env.getCurrentFloatingJointValues()["float_joint"].translation,
+        [4.0, 5.0, 6.0],
+        atol=FK_ATOL,
+    )
+
+    env.setState({"arm_joint": 0.25}, {"float_joint": _translation(7.0, 8.0, 9.0)})
+    np.testing.assert_array_equal(env.getCurrentJointValues(), [0.25])
+    np.testing.assert_allclose(
+        env.getLinkTransform("arm").translation, [7.25, 8.0, 9.0], atol=FK_ATOL
+    )
+
+    for set_state in (env.setState, env.setStateByNamesAndValues):
+        set_state(["arm_joint"], np.array([-0.5]), {"float_joint": _translation(0.0, 0.0, 1.0)})
+        np.testing.assert_array_equal(env.getCurrentJointValues(), [-0.5])
+        np.testing.assert_allclose(
+            env.getLinkTransform("arm").translation, [-0.5, 0.0, 1.0], atol=FK_ATOL
+        )
+
+
+def test_floating_joints_unknown_raises():
+    env = _floating_arm_env()
+    pose = _translation(4.0, 5.0, 6.0)
+    with pytest.raises(ValueError, match="not_a_floating_joint"):
+        env.getState({"not_a_floating_joint": pose})
+    with pytest.raises(ValueError, match="arm_joint"):
+        env.getState({"arm_joint": pose})  # active, not floating
+    with pytest.raises(ValueError, match="not_a_floating_joint"):
+        env.getState(["arm_joint"], np.array([0.5]), {"not_a_floating_joint": pose})
+    with pytest.raises(ValueError, match="not_a_floating_joint"):
+        env.setState({"not_a_floating_joint": pose})
+
+    # Validated before any value is stored: a rejected call leaves the joint values untouched
+    # (upstream throws from the floating-joint lookup after storing them).
+    with pytest.raises(ValueError, match="not_a_floating_joint"):
+        env.setState({"arm_joint": 0.5}, {"not_a_floating_joint": pose})
+    with pytest.raises(ValueError, match="not_a_floating_joint"):
+        env.setState(["arm_joint"], np.array([0.5]), {"not_a_floating_joint": pose})
+    np.testing.assert_array_equal(env.getCurrentJointValues(), [0.0])
+
+
+def test_get_current_joint_values_by_names():
+    env = _fresh_env()
+    env.setState(_IIWA_JOINTS, _IIWA_VALUES)
+    np.testing.assert_array_equal(
+        env.getCurrentJointValues(_IIWA_JOINTS), env.getCurrentJointValues()
+    )
+    for get_values in (env.getCurrentJointValues, env.getCurrentJointValuesByNames):
+        np.testing.assert_array_equal(get_values(["joint_a3", "joint_a1"]), [0.3, 0.1])
+        with pytest.raises(KeyError, match="not_a_joint"):
+            get_values(["not_a_joint"])
+        with pytest.raises(KeyError, match="joint_a7-tool0"):
+            get_values(["joint_a7-tool0"])  # fixed joint: no value in the state
+
+
+def test_link_names_by_joint_names():
+    env = _fresh_env()
+    active_joints = env.getActiveJointNames()
+    assert set(env.getActiveLinkNames(active_joints)) == set(env.getActiveLinkNames())
+    assert set(env.getStaticLinkNames(active_joints)) == set(env.getStaticLinkNames())
+
+    downstream = {"link_7", "tool0"}
+    assert set(env.getActiveLinkNames(["joint_a7"])) == downstream
+    assert set(env.getStaticLinkNames(["joint_a7"])) == set(env.getLinkNames()) - downstream
+    # Any joint type: the fixed tool joint moves only tool0.
+    assert env.getActiveLinkNames(["joint_a7-tool0"]) == ["tool0"]
+
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.getActiveLinkNames(["not_a_joint"])
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.getStaticLinkNames(["not_a_joint"])
+
+
+def test_get_joint_group_from_joint_names():
+    env = _fresh_env()
+    names = env.getGroupJointNames("manipulator")
+    group = env.getJointGroup("from_names", names)
+    assert group.getName() == "from_names"
+    assert group.getJointNames() == names
+    np.testing.assert_allclose(
+        group.calcFwdKin(_IIWA_VALUES)["tool0"].matrix,
+        env.getJointGroup("manipulator").calcFwdKin(_IIWA_VALUES)["tool0"].matrix,
+        atol=FK_ATOL,
+    )
+
+    with pytest.raises(ValueError, match="not_a_joint"):
+        env.getJointGroup("bad", ["joint_a1", "not_a_joint"])
+    # A fixed joint exists but has no degree of freedom; upstream's KDL sub-tree check rejects it.
+    with pytest.raises(RuntimeError, match="sub-tree"):
+        env.getJointGroup("bad", ["joint_a7-tool0"])
+
+
+def test_get_contact_manager_by_name():
+    env = _fresh_env()
+    discrete = env.getDiscreteContactManager("BulletDiscreteSimpleManager")
+    continuous = env.getContinuousContactManager("BulletCastSimpleManager")
+    assert discrete.getName() == "BulletDiscreteSimpleManager"
+    assert continuous.getName() == "BulletCastSimpleManager"
+    assert set(discrete.getActiveCollisionObjects()) == set(env.getActiveLinkNames())
+    assert set(continuous.getActiveCollisionObjects()) == set(env.getActiveLinkNames())
+
+    # A copy by name: the active managers stay the defaults.
+    assert env.getDiscreteContactManager().getName() == "BulletDiscreteBVHManager"
+    assert env.getContinuousContactManager().getName() == "BulletCastBVHManager"
+
+    with pytest.raises(KeyError, match="not_a_manager"):
+        env.getDiscreteContactManager("not_a_manager")
+    with pytest.raises(KeyError, match="not_a_manager"):
+        env.getContinuousContactManager("not_a_manager")
+    # Registered names are per kind: a continuous plugin is not a discrete manager.
+    with pytest.raises(KeyError, match="BulletCastBVHManager"):
+        env.getDiscreteContactManager("BulletCastBVHManager")

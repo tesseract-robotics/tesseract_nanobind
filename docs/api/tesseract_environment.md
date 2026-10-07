@@ -52,13 +52,26 @@ joint = env.getJoint("joint_1")
 ### State Management
 
 ```python
-# Get current state
+# Current state
 state = env.getState()
 joint_positions = state.joints
 
-# Set joint state — two overloads
-env.setState({"joint_1": 0.5, "joint_2": -0.3})          # dict form
-env.setState(["joint_1", "joint_2"], np.array([0.5, -0.3]))  # names + values
+# State at other joint values, without changing the environment
+at_dict = env.getState({"joint_1": 0.5, "joint_2": -0.3})
+at_values = env.getState(["joint_1", "joint_2"], np.array([0.5, -0.3]))
+
+# Set joint state: dict, or names + values
+env.setState({"joint_1": 0.5, "joint_2": -0.3})
+env.setState(["joint_1", "joint_2"], np.array([0.5, -0.3]))
+
+# Floating joints: every getState / setState form takes a {joint_name: Isometry3d} dict,
+# either as the trailing floating_joints argument or on its own
+env.setState({"base_joint": base_pose})
+env.setState({"joint_1": 0.5}, {"base_joint": base_pose})
+moved = env.getState(["joint_1"], np.array([0.5]), {"base_joint": base_pose})
+
+# Current values of chosen joints, in the order given
+q = env.getCurrentJointValues(["joint_2", "joint_1"])
 
 # Get link transform
 tcp = env.getLinkTransform("tool0")
@@ -72,9 +85,19 @@ tcp_at_values = at_values["tool0"]
 floating = env.getCurrentFloatingJointValues()
 ```
 
-`getLinkTransforms(names, values)` validates its input like `setState`: an unknown or
-non-active joint name, or a length mismatch, raises `ValueError`. So does a
-`floating_joints` key that is not a floating joint.
+`getState`, `setState` and `getLinkTransforms` validate their input before the state solver
+sees it: an unknown or non-active joint name, or a names/values length mismatch, raises
+`ValueError`. So does a `floating_joints` key that is not a floating joint; a rejected
+`setState` leaves the state unchanged. `getCurrentJointValues(names)` raises `KeyError` for a
+name that is not an active joint.
+
+!!! note "An empty dict"
+    `{}` converts to both a joint-value dict and a floating-joint dict, so `getState({})` and
+    `setState({})` take the joint-value form. Both forms do the same thing for an empty dict.
+
+`getStateByMap`, `getStateByNamesAndValues`, `setStateByNamesAndValues` and
+`getCurrentJointValuesByNames` are the older Python-only names for the same overloads. They
+still work, with the same validation.
 
 ### Per-link and per-joint lookups
 
@@ -93,23 +116,39 @@ A name that is not in the scene graph raises `KeyError`, also for
 # Get kinematic group (for FK/IK)
 manip = env.getKinematicGroup("manipulator")
 
-# Get joint group (FK only, no IK)
+# Get joint group (FK only, no IK): an SRDF group, or any joints under a name of your choice
 group = env.getJointGroup("manipulator")
+wrist = env.getJointGroup("wrist", ["joint_5", "joint_6"])
+
+# Links moved by the given joints, and the links they leave fixed
+moving = env.getActiveLinkNames(["joint_5", "joint_6"])
+fixed = env.getStaticLinkNames(["joint_5", "joint_6"])
 
 # Available groups
 groups = env.getGroupNames()
 ```
 
+These three take joints of any type and raise `ValueError` for a name that is not in the scene
+graph. `getJointGroup` also needs every joint to move: a fixed joint raises `RuntimeError`.
+
 ### Collision
 
 ```python
-# Get collision managers
+# Get a copy of the active collision managers
 discrete = env.getDiscreteContactManager()
 continuous = env.getContinuousContactManager()
+
+# Or a copy built from any registered plugin; the active manager is unchanged
+simple = env.getDiscreteContactManager("BulletDiscreteSimpleManager")
 
 # Allowed collision matrix
 acm = env.getAllowedCollisionMatrix()
 ```
+
+The registered names are the keys of
+`env.getContactManagersPluginInfo().discrete_plugin_infos.plugins` (and
+`continuous_plugin_infos.plugins`). Any other name raises `KeyError`. A manager keeps its
+`Environment` alive, because its code lives in a plugin library the environment loaded.
 
 ### Environment Info
 

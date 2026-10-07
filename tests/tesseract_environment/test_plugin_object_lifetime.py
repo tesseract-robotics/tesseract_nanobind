@@ -191,3 +191,48 @@ def test_rop_solver_usable_after_factory_and_env_release():
     gc.collect()
     assert solver.numJoints() == 7
     assert list(solver.getJointNames()) == _ROP_EXPECTED_JOINTS
+
+
+# gh-187: contact managers by name. Same plugin-built objects as the active-manager getters,
+# so the same keep_alive<0, 1> contract. The default plugin names come from the env's own
+# plugin info, so the test does not hard-code the support SRDF's plugin list.
+_NAMED_MANAGER_TEARDOWN_SCRIPT = """\
+from pathlib import Path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.tesseract_environment import Environment
+locator = GeneralResourceLocator()
+urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
+srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
+env = Environment()
+assert env.init(Path(urdf), Path(srdf), locator)
+info = env.getContactManagersPluginInfo()
+dm = env.getDiscreteContactManager(info.discrete_plugin_infos.default_plugin)
+cm = env.getContinuousContactManager(info.continuous_plugin_infos.default_plugin)
+print("OK:", len(dm.getActiveCollisionObjects()) > 0, len(cm.getActiveCollisionObjects()) > 0)
+"""
+
+
+def test_interpreter_teardown_survives_named_contact_managers():
+    """gh-72 teardown with env plus by-name contact managers as module globals."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _NAMED_MANAGER_TEARDOWN_SCRIPT],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        f"interpreter teardown died (rc={proc.returncode}, SIGSEGV is -11/139): {proc.stderr[-500:]}"
+    )
+    assert "OK: True True" in proc.stdout
+
+
+def test_named_contact_managers_usable_after_env_release():
+    """keep_alive contract: a by-name manager keeps the Environment (and plugin libs) alive."""
+    env = _make_env()
+    info = env.getContactManagersPluginInfo()
+    discrete = env.getDiscreteContactManager(info.discrete_plugin_infos.default_plugin)
+    continuous = env.getContinuousContactManager(info.continuous_plugin_infos.default_plugin)
+    del env
+    gc.collect()
+    assert len(discrete.getActiveCollisionObjects()) > 0
+    assert len(continuous.getActiveCollisionObjects()) > 0

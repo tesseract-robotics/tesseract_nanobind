@@ -155,6 +155,63 @@ std::string unknown_floating_joint_names(const te::Environment& env, const std::
     return unknown;
 }
 
+// Map keys as a name list, for the validators that take names.
+template <typename Map>
+std::vector<std::string> keys_of(const Map& map)
+{
+    std::vector<std::string> keys;
+    keys.reserve(map.size());
+    for (const auto& kv : map) keys.push_back(kv.first);
+    return keys;
+}
+
+// gh-187: the floating_joints argument of getState/setState/getLinkTransforms reaches an unchecked
+// floating_joints.at() in the state solver (std::out_of_range -> IndexError). In setState that
+// throw lands after the joint values were stored, leaving the solver half-updated. Validate first.
+void validate_floating_joints(const te::Environment& env,
+                              const tc::TransformMap& floating_joints,
+                              const std::string& caller)
+{
+    if (floating_joints.empty()) return;  // the common call: skip copying the floating-joint map
+    const std::string unknown = unknown_floating_joint_names(env, keys_of(floating_joints));
+    if (!unknown.empty())
+        throw std::invalid_argument(caller + ": unknown floating joint names: " + unknown);
+}
+
+// gh-187: getActiveLinkNames/getStaticLinkNames/getJointGroup(name, joint_names) accept any joint
+// type, so they check scene-graph membership, not the active set (GH #43 validators).
+void validate_joint_names_exist(const te::Environment& env,
+                                const std::vector<std::string>& names,
+                                const std::string& caller)
+{
+    std::string unknown;
+    for (const auto& name : names) {
+        if (!env.getJoint(name)) {
+            if (!unknown.empty()) unknown += ", ";
+            unknown += name;
+        }
+    }
+    if (!unknown.empty())
+        throw std::invalid_argument(caller + ": unknown joint names: " + unknown);
+}
+
+// gh-187: the by-name contact-manager getters return nullptr for a name the factory does not
+// know (upstream logs and returns). A miss is a KeyError (gh-188); a registered plugin that
+// still fails to build is a RuntimeError. Pure C++, safe under the getters' GIL release.
+void require_discrete_contact_manager(const te::Environment& env, const std::string& name)
+{
+    const auto plugins = env.getContactManagersPluginInfo().discrete_plugin_infos.plugins;
+    if (plugins.find(name) == plugins.end())
+        throw nb::key_error(("Discrete contact manager not found: " + name).c_str());
+}
+
+void require_continuous_contact_manager(const te::Environment& env, const std::string& name)
+{
+    const auto plugins = env.getContactManagersPluginInfo().continuous_plugin_infos.plugins;
+    if (plugins.find(name) == plugins.end())
+        throw nb::key_error(("Continuous contact manager not found: " + name).c_str());
+}
+
 // gh-188: the link-keyed getters do not document a miss; raise KeyError before C++ sees one.
 void require_link(const te::Environment& env, const std::string& name)
 {
@@ -507,6 +564,49 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getName", &te::SetActiveContinuousContactManagerCommand::getName);
     bind_value_equality(set_active_continuous_contact_manager_command);
 
+    // gh-187: getState validates like setState (GH #43). Unvalidated, the state solver inserts
+    // unknown or fixed joint names into the returned state without complaint and, on a
+    // names/values length mismatch, reads joint_values out of bounds.
+    const auto get_state_map = [](const te::Environment& self,
+                                  const std::unordered_map<std::string, double>& joints,
+                                  const tc::TransformMap& floating_joints) {
+        validate_set_state_joint_names(self, keys_of(joints), "getState");
+        validate_floating_joints(self, floating_joints, "getState");
+        return self.getState(joints, floating_joints);
+    };
+    const auto get_state_names_values = [](const te::Environment& self,
+                                           const std::vector<std::string>& joint_names,
+                                           const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                           const tc::TransformMap& floating_joints) {
+        validate_set_state(self, joint_names, joint_values, "getState");
+        validate_floating_joints(self, floating_joints, "getState");
+        return self.getState(joint_names, joint_values, floating_joints);
+    };
+    const auto set_state_names_values = [](te::Environment& self,
+                                           const std::vector<std::string>& joint_names,
+                                           const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                           const tc::TransformMap& floating_joints) {
+        validate_set_state(self, joint_names, joint_values);  // GH #43
+        validate_floating_joints(self, floating_joints, "setState");
+        self.setState(joint_names, joint_values, floating_joints);
+    };
+    // current_state.joints is keyed by exactly the active joints; a miss is std::out_of_range
+    // (IndexError) upstream. Raise KeyError like getCurrentFloatingJointValues(joint_names).
+    const auto get_current_joint_values_by_names = [](const te::Environment& self,
+                                                      const std::vector<std::string>& joint_names) {
+        std::string unknown;
+        const std::vector<std::string> active = self.getActiveJointNames();
+        for (const auto& name : joint_names) {
+            if (std::find(active.begin(), active.end(), name) == active.end()) {
+                if (!unknown.empty()) unknown += ", ";
+                unknown += name;
+            }
+        }
+        if (!unknown.empty())
+            throw nb::key_error(("Active joint not found: " + unknown).c_str());
+        return self.getCurrentJointValues(joint_names);
+    };
+
     // ========== Environment ==========
     nb::class_<te::Environment>(m, "Environment")
         .def(nb::init<>())
@@ -560,36 +660,36 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getState", [](const te::Environment& self) {
             return self.getState();
         })
-        .def("getStateByMap", [](const te::Environment& self,
-                                  const std::unordered_map<std::string, double>& joints) {
-            return self.getState(joints);
-        }, "joints"_a)
-        .def("getStateByNamesAndValues", [](const te::Environment& self,
-                                             const std::vector<std::string>& joint_names,
-                                             const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            return self.getState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a, nb::call_guard<nb::gil_scoped_release>())
+        .def("getState", get_state_map, "joints"_a, "floating_joints"_a = tc::TransformMap{},
+             nb::call_guard<nb::gil_scoped_release>())
+        .def("getState", get_state_names_values,
+             "joint_names"_a, "joint_values"_a, "floating_joints"_a = tc::TransformMap{},
+             nb::call_guard<nb::gil_scoped_release>())
+        .def("getState", [](const te::Environment& self, const tc::TransformMap& floating_joints) {
+            validate_floating_joints(self, floating_joints, "getState");
+            return self.getState(floating_joints);
+        }, "floating_joints"_a, nb::call_guard<nb::gil_scoped_release>())
+        // Python-only aliases of the native overloads above (kept until a separate removal).
+        .def("getStateByMap", get_state_map, "joints"_a, "floating_joints"_a = tc::TransformMap{},
+             nb::call_guard<nb::gil_scoped_release>())
+        .def("getStateByNamesAndValues", get_state_names_values,
+             "joint_names"_a, "joint_values"_a, "floating_joints"_a = tc::TransformMap{},
+             nb::call_guard<nb::gil_scoped_release>())
         .def("setState", [](te::Environment& self,
-                            const std::unordered_map<std::string, double>& joints) {
-            std::vector<std::string> names;
-            names.reserve(joints.size());
-            for (const auto& kv : joints) names.push_back(kv.first);
-            validate_set_state_joint_names(self, names);  // GH #43
-            self.setState(joints);
-        }, "joints"_a)
-        .def("setStateByNamesAndValues", [](te::Environment& self,
-                                             const std::vector<std::string>& joint_names,
-                                             const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            validate_set_state(self, joint_names, joint_values);  // GH #43
-            self.setState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
-        // setState with (names, values) - SWIG compatibility
-        .def("setState", [](te::Environment& self,
-                            const std::vector<std::string>& joint_names,
-                            const Eigen::Ref<const Eigen::VectorXd>& joint_values) {
-            validate_set_state(self, joint_names, joint_values);  // GH #43
-            self.setState(joint_names, joint_values);
-        }, "joint_names"_a, "joint_values"_a)
+                            const std::unordered_map<std::string, double>& joints,
+                            const tc::TransformMap& floating_joints) {
+            validate_set_state_joint_names(self, keys_of(joints));  // GH #43
+            validate_floating_joints(self, floating_joints, "setState");
+            self.setState(joints, floating_joints);
+        }, "joints"_a, "floating_joints"_a = tc::TransformMap{})
+        .def("setState", set_state_names_values,
+             "joint_names"_a, "joint_values"_a, "floating_joints"_a = tc::TransformMap{})
+        .def("setState", [](te::Environment& self, const tc::TransformMap& floating_joints) {
+            validate_floating_joints(self, floating_joints, "setState");
+            self.setState(floating_joints);
+        }, "floating_joints"_a)
+        .def("setStateByNamesAndValues", set_state_names_values,
+             "joint_names"_a, "joint_values"_a, "floating_joints"_a = tc::TransformMap{})
         // Event callbacks
         .def("addEventCallback", [](te::Environment& self, std::size_t hash, const PyEventCallbackFn& fn) {
             self.addEventCallback(hash, fn);
@@ -757,17 +857,25 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getActiveLinkNames", [](const te::Environment& self) {
             return self.getActiveLinkNames();
         })
+        // gh-187: the joint_names forms walk the scene graph, which throws a bare runtime_error
+        // on an unknown joint; validate for a ValueError naming every unknown joint.
+        .def("getActiveLinkNames", [](const te::Environment& self, const std::vector<std::string>& joint_names) {
+            validate_joint_names_exist(self, joint_names, "getActiveLinkNames");
+            return self.getActiveLinkNames(joint_names);
+        }, "joint_names"_a)
         .def("getStaticLinkNames", [](const te::Environment& self) {
             return self.getStaticLinkNames();
         })
+        .def("getStaticLinkNames", [](const te::Environment& self, const std::vector<std::string>& joint_names) {
+            validate_joint_names_exist(self, joint_names, "getStaticLinkNames");
+            return self.getStaticLinkNames(joint_names);
+        }, "joint_names"_a)
         .def("getRootLinkName", &te::Environment::getRootLinkName)
         .def("getCurrentJointValues", [](const te::Environment& self) {
             return self.getCurrentJointValues();
         })
-        .def("getCurrentJointValuesByNames", [](const te::Environment& self,
-                                                 const std::vector<std::string>& joint_names) {
-            return self.getCurrentJointValues(joint_names);
-        }, "joint_names"_a)
+        .def("getCurrentJointValues", get_current_joint_values_by_names, "joint_names"_a)
+        .def("getCurrentJointValuesByNames", get_current_joint_values_by_names, "joint_names"_a)
         // Transforms
         .def("getLinkTransform", &te::Environment::getLinkTransform, "link_name"_a)
         .def("getRelativeLinkTransform", &te::Environment::getRelativeLinkTransform,
@@ -791,12 +899,7 @@ NB_MODULE(_tesseract_environment, m) {
                                      const Eigen::Ref<const Eigen::VectorXd>& joint_values,
                                      const tc::TransformMap& floating_joints) {
             validate_set_state(self, joint_names, joint_values, "getLinkTransforms");
-            std::vector<std::string> floating_names;
-            floating_names.reserve(floating_joints.size());
-            for (const auto& kv : floating_joints) floating_names.push_back(kv.first);
-            const std::string unknown = unknown_floating_joint_names(self, floating_names);
-            if (!unknown.empty())
-                throw std::invalid_argument("getLinkTransforms: unknown floating joint names: " + unknown);
+            validate_floating_joints(self, floating_joints, "getLinkTransforms");
             tc::TransformMap link_transforms;
             self.getLinkTransforms(link_transforms, joint_names, joint_values, floating_joints);
             return link_transforms;
@@ -855,6 +958,11 @@ NB_MODULE(_tesseract_environment, m) {
             if (!ptr) throw std::runtime_error("Failed to get joint group: " + group_name);
             return ptr;
         }, "group_name"_a, nb::keep_alive<0, 1>())
+        .def("getJointGroup", [](const te::Environment& self, const std::string& name,
+                                 const std::vector<std::string>& joint_names) {
+            validate_joint_names_exist(self, joint_names, "getJointGroup");
+            return self.getJointGroup(name, joint_names);
+        }, "name"_a, "joint_names"_a, nb::keep_alive<0, 1>())
         .def("getKinematicGroup", [](const te::Environment& self, const std::string& group_name,
                                       const std::string& ik_solver_name) {
             auto ptr = self.getKinematicGroup(group_name, ik_solver_name);
@@ -874,6 +982,18 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getContinuousContactManager", [](const te::Environment& self) {
             return self.getContinuousContactManager();
         }, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
+        .def("getDiscreteContactManager", [](const te::Environment& self, const std::string& name) {
+            require_discrete_contact_manager(self, name);
+            auto manager = self.getDiscreteContactManager(name);
+            if (!manager) throw std::runtime_error("Failed to create discrete contact manager: " + name);
+            return manager;
+        }, "name"_a, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
+        .def("getContinuousContactManager", [](const te::Environment& self, const std::string& name) {
+            require_continuous_contact_manager(self, name);
+            auto manager = self.getContinuousContactManager(name);
+            if (!manager) throw std::runtime_error("Failed to create continuous contact manager: " + name);
+            return manager;
+        }, "name"_a, nb::keep_alive<0, 1>(), nb::call_guard<nb::gil_scoped_release>())
         .def("setActiveDiscreteContactManager", &te::Environment::setActiveDiscreteContactManager, "name"_a)
         .def("setActiveContinuousContactManager", &te::Environment::setActiveContinuousContactManager, "name"_a)
         .def("clearCachedDiscreteContactManager", &te::Environment::clearCachedDiscreteContactManager)
