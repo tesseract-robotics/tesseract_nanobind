@@ -139,7 +139,19 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "Bag.__str__",  # free operator<<(std::ostream&, const Bag&) (M5)
         "Record",
         "Record.__init__",
+        "Buffer",
+        "Buffer.__init__",  # incl. the constructor template, not a "Buffer.Buffer" method
     }  # fmt: skip  (no std::hash (I1), no free serialize (I2), no Detail (C1))
+
+
+def test_constructor_template_is_a_constructor(fixture_cpp):
+    arities = sorted(str(o.arity) for o in fixture_cpp["Buffer.__init__"].overloads)
+    assert arities == ["2", "2-3", "3-4"]
+
+
+def test_raw_buffer_overload_recorded(fixture_cpp):
+    raw = [o for o in fixture_cpp["Buffer.__init__"].overloads if o.raw_buffer]
+    assert [str(o.arity) for o in raw] == ["3-4"]
 
 
 def test_constructor_overloads_exclude_copy(fixture_cpp):
@@ -253,6 +265,8 @@ def test_fixture_gaps_exact(fixture_report):
         ("Widget.resize", audit.Kind.METHOD, "—"),
         ("Widget.operator+", audit.Kind.OPERATOR, "—"),
         (ORPHAN_HEADER, audit.Kind.HEADER, "—"),  # never included: one row (E0)
+        # raw-buffer ctor: the bound arity-2-3 ctor overlaps it but cannot cover it (#166)
+        ("Buffer.__init__", audit.Kind.CONSTRUCTOR, "3-4"),
     }
 
 
@@ -525,7 +539,7 @@ def test_render_is_deterministic_and_sorted(fixture_report):
     assert "abc1234" in a and "==0.35.0" in a
     gaps = a[a.index("### Gaps") : a.index("### Deviations")]
     gap_rows = [line for line in gaps.splitlines() if line.startswith("| `")]
-    assert len(gap_rows) == 6
+    assert len(gap_rows) == len(fixture_report.gaps)
     assert gap_rows == sorted(gap_rows)
 
 
@@ -545,6 +559,7 @@ def test_json_roundtrip(fixture_report):
         "Widget.resize",
         "Widget.operator+",
         ORPHAN_HEADER,
+        "Buffer.__init__",
     }
     assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted"}
 

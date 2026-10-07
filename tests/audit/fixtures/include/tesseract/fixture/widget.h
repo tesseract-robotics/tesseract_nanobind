@@ -1,8 +1,11 @@
 // Audit contract fixture: every declaration exercises one matching rule.
 #pragma once
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <ostream>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include <tesseract/fixture/gadget.h>  // first inclusion of gadget.h: the TU's own #include must still count (C1)
@@ -110,6 +113,16 @@ private:
   int id_ = 0;
   template <class Archive>
   friend void ::tesseract::fixture::serialize(Archive& ar, Record& obj);
+};
+
+class Buffer  // mirrors BytesResource (#166)
+{
+public:
+  Buffer(std::string url, std::vector<std::uint8_t> bytes, int parent = 0);  // bound: arity 2-3
+  // raw buffer: no Python positional form, so the arity-overlapping bound ctor cannot cover it
+  Buffer(std::string url, const std::uint8_t* bytes, std::size_t n, int parent = 0);
+  template <class InputIt>
+  Buffer(InputIt first, InputIt last);  // constructor template: keyed as __init__, not a method
 };
 
 int scale(int value, double factor = 1.0);  // defaulted: arity 1-2

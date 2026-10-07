@@ -251,6 +251,27 @@ METHOD_KINDS = frozenset(
     {ci.CursorKind.CXX_METHOD, ci.CursorKind.FUNCTION_TEMPLATE, ci.CursorKind.CONVERSION_FUNCTION}
 )
 FIELD_KINDS = frozenset({ci.CursorKind.FIELD_DECL, ci.CursorKind.VAR_DECL})
+# Pointees of a raw-buffer parameter: every scalar except plain `char` (CHAR_S / CHAR_U by
+# platform), whose `const char*` nanobind binds as `str`.
+RAW_BUFFER_POINTEES = frozenset(
+    {
+        ci.TypeKind.VOID,
+        ci.TypeKind.BOOL,
+        ci.TypeKind.UCHAR,
+        ci.TypeKind.SCHAR,
+        ci.TypeKind.SHORT,
+        ci.TypeKind.USHORT,
+        ci.TypeKind.INT,
+        ci.TypeKind.UINT,
+        ci.TypeKind.LONG,
+        ci.TypeKind.ULONG,
+        ci.TypeKind.LONGLONG,
+        ci.TypeKind.ULONGLONG,
+        ci.TypeKind.FLOAT,
+        ci.TypeKind.DOUBLE,
+        ci.TypeKind.LONGDOUBLE,
+    }
+)
 
 
 class Kind(str, Enum):
@@ -301,6 +322,7 @@ class CppOverload:
     returns_void: bool = False
     mapped: str | None = None  # ACCEPTED rule when bound under its mapped Python name
     absent_ok: str | None = None  # ACCEPTED rule under which leaving it unbound is accepted
+    raw_buffer: bool = False  # takes a pointer to a non-char scalar: never covered by arity alone
 
 
 @dataclass
@@ -389,6 +411,16 @@ def _is_out_param(parm: ci.Cursor) -> bool:
     return not (decl.kind in RECORD_KINDS and decl.is_abstract_record())
 
 
+def _is_raw_buffer(parm: ci.Cursor) -> bool:
+    """A pointer to a scalar other than plain `char` (`const uint8_t*`, `double*`, `void*`).
+
+    Such a parameter has no positional Python form (nanobind maps only `const char*`, to
+    `str`), so a Python overload that merely takes as many arguments cannot be binding it.
+    """
+    t = parm.type.get_canonical()
+    return t.kind == ci.TypeKind.POINTER and t.get_pointee().kind in RAW_BUFFER_POINTEES
+
+
 def _has_default(parm: ci.Cursor) -> bool:
     return any(c.kind.is_expression() for c in parm.get_children())
 
@@ -455,7 +487,8 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         arity = Arity(len(params) - n_default, len(params))
         void = c.result_type.kind == ci.TypeKind.VOID
         absent_ok = nullary_absent_ok if arity.hi == 0 else None
-        ov = CppOverload(arity, out, location(c), void, absent_ok=absent_ok)
+        raw = any(_is_raw_buffer(p) for p in params)
+        ov = CppOverload(arity, out, location(c), void, absent_ok=absent_ok, raw_buffer=raw)
         add(name, kind, c).overloads.append(ov)
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
@@ -474,7 +507,12 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         befriends_cereal = False
         ctors: list[ci.Cursor] = []
         for m in c.get_children():
-            if m.kind == ci.CursorKind.CONSTRUCTOR:
+            # A constructor template (`template <class It> T(It, It)`) is a FUNCTION_TEMPLATE
+            # spelled like the class; it is a constructor, not a method named after the class.
+            is_ctor = m.kind == ci.CursorKind.CONSTRUCTOR or (
+                m.kind == ci.CursorKind.FUNCTION_TEMPLATE and m.spelling == c.spelling
+            )
+            if is_ctor:
                 declares_ctor = True
             if m.kind == ci.CursorKind.FRIEND_DECL:
                 befriends_cereal |= any(f.spelling in CEREAL_HOOKS for f in m.get_children())
@@ -482,7 +520,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 continue
             if m.availability == ci.AvailabilityKind.DEPRECATED:
                 continue
-            if m.kind == ci.CursorKind.CONSTRUCTOR:
+            if is_ctor:
                 if not (
                     abstract
                     or m.is_copy_constructor()
@@ -821,6 +859,8 @@ def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
             return "out-param"
         if ov.returns_void and len(ov.out_params) == 1 and fits:
             return "out-param"  # nothing else to return: the out-param is the result
+    if ov.raw_buffer:
+        return None  # no Python overload binds a raw pointer; matching arity proves nothing
     if any(p.arity.overlaps(ov.arity) for p in pys):
         return ov.mapped or "exact"
     return None
@@ -1030,7 +1070,8 @@ LIMITATION = (
     "Parameter types are not compared beyond quoted C++ names. "
     "Overloads are matched by arity only: a C++ overload is never reported while a bound "
     "overload takes the same number of arguments (e.g. `Environment::init(commands)` hidden "
-    "by `init(scene_graph)`)."
+    "by `init(scene_graph)`). The exception is an overload taking a raw buffer (a pointer "
+    "to a non-`char` scalar), which has no Python form and is reported whatever the arity."
 )
 
 
