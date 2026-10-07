@@ -1,5 +1,11 @@
 """Tests for Environment Command bindings"""
 
+import gc
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -40,6 +46,8 @@ from tesseract_robotics.tesseract_environment import (
 )
 from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_scene_graph import Joint, JointType, Link, Visual
+
+from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
 SIMPLE_URDF = """
 <robot name="test_robot" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
@@ -491,3 +499,225 @@ class TestAddTrajectoryLinkCommand:
         assert env.applyCommand(cmd)
         assert env.getRevision() == revision + 1
         assert "traj_link" in env.getLinkNames()
+
+
+# gh-186: CommandType, the command history, applyCommands, init(commands) and the
+# SetActive*ContactManagerCommands.
+
+# command.h:41-65 (tesseract 0.35.0), name -> value
+_COMMAND_TYPE_VALUES = {
+    "UNINITIALIZED": -1,
+    "ADD_LINK": 0,
+    "MOVE_LINK": 1,
+    "MOVE_JOINT": 2,
+    "REMOVE_LINK": 3,
+    "REMOVE_JOINT": 4,
+    "CHANGE_LINK_ORIGIN": 5,
+    "CHANGE_JOINT_ORIGIN": 6,
+    "CHANGE_LINK_COLLISION_ENABLED": 7,
+    "CHANGE_LINK_VISIBILITY": 8,
+    "MODIFY_ALLOWED_COLLISIONS": 9,
+    "REMOVE_ALLOWED_COLLISION_LINK": 10,
+    "ADD_SCENE_GRAPH": 11,
+    "CHANGE_JOINT_POSITION_LIMITS": 12,
+    "CHANGE_JOINT_VELOCITY_LIMITS": 13,
+    "CHANGE_JOINT_ACCELERATION_LIMITS": 14,
+    "ADD_KINEMATICS_INFORMATION": 15,
+    "REPLACE_JOINT": 16,
+    "CHANGE_COLLISION_MARGINS": 17,
+    "ADD_CONTACT_MANAGERS_PLUGIN_INFO": 18,
+    "SET_ACTIVE_DISCRETE_CONTACT_MANAGER": 19,
+    "SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER": 20,
+    "ADD_TRAJECTORY_LINK": 21,
+}
+
+
+@pytest.fixture
+def iiwa_env():
+    """URDF + SRDF environment: the SRDF brings the contact-manager plugins SIMPLE_URDF lacks."""
+    urdf_dir = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
+    environment = Environment()
+    assert environment.init(
+        urdf_dir / "lbr_iiwa_14_r820.urdf",
+        urdf_dir / "lbr_iiwa_14_r820.srdf",
+        TesseractSupportResourceLocator(),
+    )
+    return environment
+
+
+def _set_active_commands(env):
+    """(command class, CommandType name, active manager name, Environment setter) per manager kind."""
+    return [
+        (
+            tesseract_environment.SetActiveDiscreteContactManagerCommand,
+            "SET_ACTIVE_DISCRETE_CONTACT_MANAGER",
+            env.getDiscreteContactManager().getName(),
+            env.setActiveDiscreteContactManager,
+        ),
+        (
+            tesseract_environment.SetActiveContinuousContactManagerCommand,
+            "SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER",
+            env.getContinuousContactManager().getName(),
+            env.setActiveContinuousContactManager,
+        ),
+    ]
+
+
+class TestCommandHistory:
+    """Tests for CommandType, getCommandHistory, applyCommands and init(commands) (gh-186)"""
+
+    def test_command_get_type(self):
+        CommandType = tesseract_environment.CommandType
+        assert RemoveLinkCommand("x").getType() == CommandType.REMOVE_LINK
+        assert (
+            ChangeLinkVisibilityCommand("x", False).getType() == CommandType.CHANGE_LINK_VISIBILITY
+        )
+
+    def test_command_type_values(self):
+        CommandType = tesseract_environment.CommandType
+        assert {m.name: int(m.value) for m in CommandType} == _COMMAND_TYPE_VALUES
+
+    def test_get_command_history_is_polymorphic(self, env):
+        assert env.applyCommand(ChangeLinkVisibilityCommand("link1", False))
+        history = env.getCommandHistory()
+        assert history
+        assert all(isinstance(cmd, Command) for cmd in history)
+        # init's own commands come back as their classes too, not as the base
+        assert type(history[0]) is tesseract_environment.AddSceneGraphCommand
+        assert type(history[-1]) is ChangeLinkVisibilityCommand
+        assert history[-1].getType() == tesseract_environment.CommandType.CHANGE_LINK_VISIBILITY
+        assert history[-1].getLinkName() == "link1"
+
+    def test_get_command_history_add_trajectory_link(self, env):
+        """ADD_TRAJECTORY_LINK maps to AddTrajectoryLinkCommand (gh-167 left it to this issue)."""
+        assert env.applyCommand(
+            AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory())
+        )
+        last = env.getCommandHistory()[-1]
+        assert type(last) is AddTrajectoryLinkCommand
+        assert last.getType() == tesseract_environment.CommandType.ADD_TRAJECTORY_LINK
+        assert last.getLinkName() == "traj_link"
+
+    def test_apply_commands_list(self, env):
+        revision = env.getRevision()
+        assert env.applyCommands(
+            [RemoveLinkCommand("link2"), ChangeLinkVisibilityCommand("link1", False)]
+        )
+        assert env.getRevision() == revision + 2
+        assert "link2" not in env.getLinkNames()
+        assert env.getLinkVisibility("link1") is False
+        assert [type(cmd) for cmd in env.getCommandHistory()[-2:]] == [
+            RemoveLinkCommand,
+            ChangeLinkVisibilityCommand,
+        ]
+
+    def test_apply_commands_outlives_python_refs(self, env):
+        commands = [RemoveLinkCommand("link2"), ChangeLinkVisibilityCommand("link1", False)]
+        assert env.applyCommands(commands)
+        del commands
+        gc.collect()
+        last_two = env.getCommandHistory()[-2:]
+        assert last_two[0].getLinkName() == "link2"
+        assert last_two[1].getLinkName() == "link1"
+        assert last_two[1].getEnabled() is False
+
+    def test_command_applied_event_commands_copy(self, env):
+        stored = []
+
+        def on_event(evt):
+            if evt.type == tesseract_environment.Events.COMMAND_APPLIED:
+                stored.append((evt.commands, evt.revision))
+
+        env.addEventCallback(1, tesseract_environment.EventCallbackFn(on_event))
+        assert env.applyCommand(ChangeLinkVisibilityCommand("link1", False))
+        assert env.applyCommand(ChangeLinkVisibilityCommand("link2", False))
+        env.clearEventCallbacks()
+
+        assert len(stored) == 2
+        (first, first_revision), (second, second_revision) = stored
+        # Each list is the history as it was when its event fired, still readable afterwards.
+        assert len(second) == len(first) + 1
+        assert second_revision == first_revision + 1
+        assert type(first[-1]) is ChangeLinkVisibilityCommand
+        assert first[-1].getLinkName() == "link1"
+        assert second[-1].getLinkName() == "link2"
+
+    def test_init_from_command_history_roundtrip(self, iiwa_env):
+        env = iiwa_env
+        assert env.applyCommand(ChangeLinkVisibilityCommand("link_1", False))
+        name = env.getDiscreteContactManager().getName()
+        assert env.applyCommand(tesseract_environment.SetActiveDiscreteContactManagerCommand(name))
+
+        env2 = Environment()
+        assert env2.init(env.getCommandHistory())
+        assert env2.isInitialized()
+        assert env2.getLinkNames() == env.getLinkNames()
+        assert env2.getJointNames() == env.getJointNames()
+        assert env2.getRevision() == env.getRevision()
+        assert [c.getType() for c in env2.getCommandHistory()] == [
+            c.getType() for c in env.getCommandHistory()
+        ]
+        assert env2.getLinkVisibility("link_1") is False
+
+    def test_init_commands_requires_add_scene_graph_first(self):
+        """environment.cpp initHelper: an empty list, or one not led by ADD_SCENE_GRAPH, fails."""
+        assert not Environment().init([])
+        assert not Environment().init([RemoveLinkCommand("link1")])
+
+    @pytest.mark.parametrize("call", ["applyCommands", "init"])
+    def test_none_in_command_list_raises(self, call):
+        """nanobind passes a None element of list[Command] as a null shared_ptr; C++ would
+        dereference it. A subprocess, so the unguarded segfault fails the test, not the run."""
+        code = (
+            "from tesseract_robotics.tesseract_environment import Environment, RemoveLinkCommand\n"
+            "try:\n"
+            f"    Environment().{call}([RemoveLinkCommand('a'), None])\n"
+            "except TypeError as e:\n"
+            "    print('TypeError:', e)\n"
+        )
+        proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
+        assert "TypeError:" in proc.stdout
+        assert "commands[1] is None" in proc.stdout
+
+    def test_init_commands_keeps_scene_graph_overload(self, env):
+        env2 = Environment()
+        assert env2.init(env.getSceneGraph())
+        assert env2.getLinkNames() == env.getLinkNames()
+
+
+class TestSetActiveContactManagerCommands:
+    """Tests for SetActive{Discrete,Continuous}ContactManagerCommand (gh-186)"""
+
+    def test_set_active_contact_manager_commands(self, iiwa_env):
+        env = iiwa_env
+        for cls, type_name, name, _ in _set_active_commands(env):
+            cmd = cls(name)
+            assert isinstance(cmd, Command)
+            assert cmd.getName() == name
+            assert cmd.getType() == tesseract_environment.CommandType[type_name]
+            revision = env.getRevision()
+            assert env.applyCommand(cmd)
+            assert env.getRevision() == revision + 1
+            last = env.getCommandHistory()[-1]
+            assert type(last) is cls
+            assert last.getName() == name
+
+    def test_set_active_contact_manager_command_eq(self, iiwa_env):
+        for cls, _, name, _ in _set_active_commands(iiwa_env):
+            assert cls(name) == cls(name)
+            assert not (cls(name) != cls(name))
+            assert cls(name) != cls("other")
+            assert not (cls(name) == cls("other"))
+            with pytest.raises(TypeError):
+                hash(cls(name))
+
+    def test_set_active_contact_manager_method_not_in_history(self, iiwa_env):
+        """Upstream (environment.cpp 0.35.0): only the command is recorded, not the setter."""
+        env = iiwa_env
+        for _, _, name, setter in _set_active_commands(env):
+            revision = env.getRevision()
+            history_length = len(env.getCommandHistory())
+            assert setter(name)
+            assert env.getRevision() == revision
+            assert len(env.getCommandHistory()) == history_length

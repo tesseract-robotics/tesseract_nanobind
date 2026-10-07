@@ -32,6 +32,9 @@ class Event:
 
 class CommandAppliedEvent(Event):
     @property
+    def commands(self) -> list[Command]: ...
+
+    @property
     def revision(self) -> int: ...
 
 class SceneStateChangedEvent(Event):
@@ -59,8 +62,55 @@ def checkTrajectory(manager: tesseract_robotics.tesseract_collision._tesseract_c
 class EventCallbackFn:
     def __init__(self, callback: Callable) -> None: ...
 
+class CommandType(enum.Enum):
+    UNINITIALIZED = -1
+
+    ADD_LINK = 0
+
+    MOVE_LINK = 1
+
+    MOVE_JOINT = 2
+
+    REMOVE_LINK = 3
+
+    REMOVE_JOINT = 4
+
+    CHANGE_LINK_ORIGIN = 5
+
+    CHANGE_JOINT_ORIGIN = 6
+
+    CHANGE_LINK_COLLISION_ENABLED = 7
+
+    CHANGE_LINK_VISIBILITY = 8
+
+    MODIFY_ALLOWED_COLLISIONS = 9
+
+    REMOVE_ALLOWED_COLLISION_LINK = 10
+
+    ADD_SCENE_GRAPH = 11
+
+    CHANGE_JOINT_POSITION_LIMITS = 12
+
+    CHANGE_JOINT_VELOCITY_LIMITS = 13
+
+    CHANGE_JOINT_ACCELERATION_LIMITS = 14
+
+    ADD_KINEMATICS_INFORMATION = 15
+
+    REPLACE_JOINT = 16
+
+    CHANGE_COLLISION_MARGINS = 17
+
+    ADD_CONTACT_MANAGERS_PLUGIN_INFO = 18
+
+    SET_ACTIVE_DISCRETE_CONTACT_MANAGER = 19
+
+    SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER = 20
+
+    ADD_TRAJECTORY_LINK = 21
+
 class Command:
-    def getType(self) -> "tesseract::environment::CommandType": ...
+    def getType(self) -> CommandType: ...
 
 class RemoveJointCommand(Command):
     def __init__(self, joint_name: str) -> None: ...
@@ -256,6 +306,28 @@ class ReplaceJointCommand(Command):
 
     def getJoint(self) -> tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.Joint: ...
 
+class SetActiveDiscreteContactManagerCommand(Command):
+    def __init__(self, active_contact_manager: str) -> None: ...
+
+    def getName(self) -> str: ...
+
+    def __eq__(self, arg: SetActiveDiscreteContactManagerCommand, /) -> bool: ...
+
+    def __ne__(self, arg: SetActiveDiscreteContactManagerCommand, /) -> bool: ...
+
+    __hash__: None = None
+
+class SetActiveContinuousContactManagerCommand(Command):
+    def __init__(self, active_contact_manager: str) -> None: ...
+
+    def getName(self) -> str: ...
+
+    def __eq__(self, arg: SetActiveContinuousContactManagerCommand, /) -> bool: ...
+
+    def __ne__(self, arg: SetActiveContinuousContactManagerCommand, /) -> bool: ...
+
+    __hash__: None = None
+
 class Environment:
     def __init__(self) -> None: ...
 
@@ -276,6 +348,9 @@ class Environment:
 
     @overload
     def init(self, urdf_path: os.PathLike, srdf_path: os.PathLike, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> bool: ...
+
+    @overload
+    def init(self, commands: Sequence[Command]) -> bool: ...
 
     def isInitialized(self) -> bool: ...
 
@@ -382,6 +457,16 @@ class Environment:
 
     @overload
     def applyCommand(self, command: ReplaceJointCommand) -> bool: ...
+
+    @overload
+    def applyCommand(self, command: SetActiveDiscreteContactManagerCommand) -> bool: ...
+
+    @overload
+    def applyCommand(self, command: SetActiveContinuousContactManagerCommand) -> bool: ...
+
+    def applyCommands(self, commands: Sequence[Command]) -> bool: ...
+
+    def getCommandHistory(self) -> list[Command]: ...
 
     def getStateSolver(self) -> tesseract_robotics.tesseract_state_solver._tesseract_state_solver.StateSolver: ...
 

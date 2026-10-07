@@ -18,6 +18,7 @@ __all__ = [
     "Environment",
     # Base command class
     "Command",
+    "CommandType",
     # Link/Joint manipulation commands
     "AddLinkCommand",
     "RemoveLinkCommand",
@@ -45,6 +46,9 @@ __all__ = [
     "RemoveAllowedCollisionLinkCommand",
     "ChangeCollisionMarginsCommand",
     "ChangeLinkCollisionEnabledCommand",
+    # Contact manager commands
+    "SetActiveDiscreteContactManagerCommand",
+    "SetActiveContinuousContactManagerCommand",
     # Visibility commands
     "ChangeLinkVisibilityCommand",
     # Events

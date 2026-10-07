@@ -39,6 +39,8 @@
 #include <tesseract/environment/commands/remove_joint_command.h>
 #include <tesseract/environment/commands/remove_link_command.h>
 #include <tesseract/environment/commands/replace_joint_command.h>
+#include <tesseract/environment/commands/set_active_continuous_contact_manager_command.h>
+#include <tesseract/environment/commands/set_active_discrete_contact_manager_command.h>
 
 // tesseract_scene_graph
 #include <tesseract/scene_graph/graph.h>
@@ -160,6 +162,20 @@ void require_link(const te::Environment& env, const std::string& name)
         throw nb::key_error(("Link not found: " + name).c_str());
 }
 
+// gh-186: nanobind's None check covers a direct shared_ptr argument but not the elements of a
+// list, so `[cmd, None]` arrives with a null element, which upstream dereferences (SIGSEGV).
+using CommandList = std::vector<std::shared_ptr<const te::Command>>;
+
+const CommandList& require_commands(const CommandList& commands, const char* caller)
+{
+    for (std::size_t i = 0; i < commands.size(); ++i)
+        if (!commands[i])
+            throw nb::type_error((std::string(caller) + ": commands[" + std::to_string(i) +
+                                  "] is None, expected a Command")
+                                     .c_str());
+    return commands;
+}
+
 // Test oracle for the GIL guards (gh-134): counts its copies by whether the copying thread holds
 // the GIL. Environment::clone copies every find-TCP callback, so a probe attached as one reports
 // exactly whether clone's native work ran with the GIL, independent of threads and timing.
@@ -234,7 +250,12 @@ NB_MODULE(_tesseract_environment, m) {
         .def_ro("type", &te::Event::type);
 
     // ========== CommandAppliedEvent ==========
+    // `commands` is the environment's whole history at the event. The C++ member is a reference
+    // that dies with the event, so the property copies the list (polymorphic, see getCommandHistory).
     nb::class_<te::CommandAppliedEvent, te::Event>(m, "CommandAppliedEvent")
+        .def_prop_ro("commands", [](const te::CommandAppliedEvent& self) {
+            return CommandList(self.commands);
+        })
         .def_ro("revision", &te::CommandAppliedEvent::revision);
 
     // ========== SceneStateChangedEvent ==========
@@ -281,7 +302,35 @@ NB_MODULE(_tesseract_environment, m) {
     nb::class_<PyEventCallbackFn>(m, "EventCallbackFn")
         .def(nb::init<nb::callable>(), "callback"_a);
 
+    // ========== CommandType enum ==========
+    nb::enum_<te::CommandType>(m, "CommandType")
+        .value("UNINITIALIZED", te::CommandType::UNINITIALIZED)
+        .value("ADD_LINK", te::CommandType::ADD_LINK)
+        .value("MOVE_LINK", te::CommandType::MOVE_LINK)
+        .value("MOVE_JOINT", te::CommandType::MOVE_JOINT)
+        .value("REMOVE_LINK", te::CommandType::REMOVE_LINK)
+        .value("REMOVE_JOINT", te::CommandType::REMOVE_JOINT)
+        .value("CHANGE_LINK_ORIGIN", te::CommandType::CHANGE_LINK_ORIGIN)
+        .value("CHANGE_JOINT_ORIGIN", te::CommandType::CHANGE_JOINT_ORIGIN)
+        .value("CHANGE_LINK_COLLISION_ENABLED", te::CommandType::CHANGE_LINK_COLLISION_ENABLED)
+        .value("CHANGE_LINK_VISIBILITY", te::CommandType::CHANGE_LINK_VISIBILITY)
+        .value("MODIFY_ALLOWED_COLLISIONS", te::CommandType::MODIFY_ALLOWED_COLLISIONS)
+        .value("REMOVE_ALLOWED_COLLISION_LINK", te::CommandType::REMOVE_ALLOWED_COLLISION_LINK)
+        .value("ADD_SCENE_GRAPH", te::CommandType::ADD_SCENE_GRAPH)
+        .value("CHANGE_JOINT_POSITION_LIMITS", te::CommandType::CHANGE_JOINT_POSITION_LIMITS)
+        .value("CHANGE_JOINT_VELOCITY_LIMITS", te::CommandType::CHANGE_JOINT_VELOCITY_LIMITS)
+        .value("CHANGE_JOINT_ACCELERATION_LIMITS", te::CommandType::CHANGE_JOINT_ACCELERATION_LIMITS)
+        .value("ADD_KINEMATICS_INFORMATION", te::CommandType::ADD_KINEMATICS_INFORMATION)
+        .value("REPLACE_JOINT", te::CommandType::REPLACE_JOINT)
+        .value("CHANGE_COLLISION_MARGINS", te::CommandType::CHANGE_COLLISION_MARGINS)
+        .value("ADD_CONTACT_MANAGERS_PLUGIN_INFO", te::CommandType::ADD_CONTACT_MANAGERS_PLUGIN_INFO)
+        .value("SET_ACTIVE_DISCRETE_CONTACT_MANAGER", te::CommandType::SET_ACTIVE_DISCRETE_CONTACT_MANAGER)
+        .value("SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER", te::CommandType::SET_ACTIVE_CONTINUOUS_CONTACT_MANAGER)
+        .value("ADD_TRAJECTORY_LINK", te::CommandType::ADD_TRAJECTORY_LINK);
+
     // ========== Command base class ==========
+    // Command has a virtual destructor, so a shared_ptr<const Command> returned to Python (command
+    // history, CommandAppliedEvent.commands) arrives as its most-derived bound class.
     nb::class_<te::Command>(m, "Command")
         .def("getType", &te::Command::getType);
 
@@ -446,6 +495,18 @@ NB_MODULE(_tesseract_environment, m) {
         .def(nb::init<const tsg::Joint&>(), "joint"_a)
         .def("getJoint", &te::ReplaceJointCommand::getJoint);
 
+    // ========== SetActive{Discrete,Continuous}ContactManagerCommand ==========
+    // The arity-0 ctors are serialization ctors and stay unbound.
+    auto set_active_discrete_contact_manager_command = nb::class_<te::SetActiveDiscreteContactManagerCommand, te::Command>(m, "SetActiveDiscreteContactManagerCommand")
+        .def(nb::init<std::string>(), "active_contact_manager"_a)
+        .def("getName", &te::SetActiveDiscreteContactManagerCommand::getName);
+    bind_value_equality(set_active_discrete_contact_manager_command);
+
+    auto set_active_continuous_contact_manager_command = nb::class_<te::SetActiveContinuousContactManagerCommand, te::Command>(m, "SetActiveContinuousContactManagerCommand")
+        .def(nb::init<std::string>(), "active_contact_manager"_a)
+        .def("getName", &te::SetActiveContinuousContactManagerCommand::getName);
+    bind_value_equality(set_active_continuous_contact_manager_command);
+
     // ========== Environment ==========
     nb::class_<te::Environment>(m, "Environment")
         .def(nb::init<>())
@@ -476,6 +537,10 @@ NB_MODULE(_tesseract_environment, m) {
                         const tesseract_nb::StrictPath& srdf_path, const LocatorPtr& locator) {
             return self.init(urdf_path.value, srdf_path.value, locator);
         }, "urdf_path"_a, "srdf_path"_a, "locator"_a)
+        // The inverse of getCommandHistory: the list must start with an AddSceneGraphCommand.
+        .def("init", [](te::Environment& self, const CommandList& commands) {
+            return self.init(require_commands(commands, "init"));
+        }, "commands"_a)
         // State methods
         .def("isInitialized", &te::Environment::isInitialized)
         .def("reset", &te::Environment::reset)
@@ -662,6 +727,25 @@ NB_MODULE(_tesseract_environment, m) {
             auto cmd_ptr = std::make_shared<te::ReplaceJointCommand>(*cmd.getJoint());
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
+        // Commands - SetActive{Discrete,Continuous}ContactManagerCommand
+        .def("applyCommand", [](te::Environment& self, const te::SetActiveDiscreteContactManagerCommand& cmd) {
+            auto cmd_ptr = std::make_shared<te::SetActiveDiscreteContactManagerCommand>(cmd.getName());
+            return self.applyCommand(cmd_ptr);
+        }, "command"_a)
+        .def("applyCommand", [](te::Environment& self, const te::SetActiveContinuousContactManagerCommand& cmd) {
+            auto cmd_ptr = std::make_shared<te::SetActiveContinuousContactManagerCommand>(cmd.getName());
+            return self.applyCommand(cmd_ptr);
+        }, "command"_a)
+        // The list form takes the Python objects as they are: nanobind's shared_ptr caster keeps each
+        // one alive while C++ holds it and drops it under the GIL, so no per-type copy is needed.
+        .def("applyCommands", [](te::Environment& self, const CommandList& commands) {
+            require_commands(commands, "applyCommands");
+            nb::gil_scoped_release nogil;  // see AddLinkCommand above
+            return self.applyCommands(commands);
+        }, "commands"_a)
+        // Every command applied since construction, init's own included; each element arrives as
+        // its bound derived class.
+        .def("getCommandHistory", &te::Environment::getCommandHistory)
         // State solver
         .def("getStateSolver", [](const te::Environment& self) {
             return self.getStateSolver();

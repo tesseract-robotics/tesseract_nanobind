@@ -320,6 +320,51 @@ The table follows the enum's comments in `add_trajectory_link_command.h`; the te
 only that each method adds the link. `getTrajectory()` returns a copy. Commands compare by
 value (`==`) and are unhashable.
 
+### SetActiveDiscreteContactManagerCommand / SetActiveContinuousContactManagerCommand
+
+Switch the active contact manager plugin, as a command that the history records.
+
+```python
+from tesseract_robotics.tesseract_environment import (
+    SetActiveContinuousContactManagerCommand,
+    SetActiveDiscreteContactManagerCommand,
+)
+
+env.applyCommand(SetActiveDiscreteContactManagerCommand("BulletDiscreteBVHManager"))
+env.applyCommand(SetActiveContinuousContactManagerCommand("BulletCastBVHManager"))
+```
+
+`Environment.setActiveDiscreteContactManager(name)` (and its continuous twin) switches the
+manager without recording a command, as upstream does, so `init(env.getCommandHistory())`
+does not replay it. Use the command when the switch must survive a replay. Both commands
+compare by value and are unhashable.
+
+### Command history
+
+Every command an environment applied, its own initialisation included, is in
+`getCommandHistory()`. Each element comes back as its own class, and `getType()` returns a
+`CommandType`. `applyCommands` applies a list in one call, and `init(commands)` rebuilds an
+environment from a history.
+
+```python
+from tesseract_robotics.tesseract_environment import (
+    ChangeLinkVisibilityCommand, CommandType, Environment, RemoveLinkCommand
+)
+
+env.applyCommands([RemoveLinkCommand("obstacle"), ChangeLinkVisibilityCommand("link_1", False)])
+
+history = env.getCommandHistory()
+assert history[0].getType() == CommandType.ADD_SCENE_GRAPH
+assert isinstance(history[-1], ChangeLinkVisibilityCommand)
+
+replay = Environment()
+assert replay.init(history)  # the list must start with an AddSceneGraphCommand
+assert replay.getRevision() == env.getRevision()
+```
+
+`applyCommands` and `init(commands)` keep the Python command objects themselves, without
+copying them.
+
 ## Events
 
 Subscribe to environment changes.
@@ -333,7 +378,8 @@ from tesseract_robotics.tesseract_environment import (
 def on_event(event):
     if event.type == Events_COMMAND_APPLIED:
         cmd_event = cast_CommandAppliedEvent(event)
-        print(f"Command applied: revision {cmd_event.revision}")
+        print(f"Command applied: revision {cmd_event.revision}, "
+              f"last command {type(cmd_event.commands[-1]).__name__}")
     elif event.type == Events_SCENE_STATE_CHANGED:
         state_event = cast_SceneStateChangedEvent(event)
         print("State changed")
