@@ -12,7 +12,8 @@
 
 #include <atomic>
 #include <algorithm>  // std::find (setState validation, GH #43)
-#include <stdexcept>  // std::invalid_argument
+#include <stdexcept>  // std::invalid_argument, std::runtime_error (EventTypeError), std::logic_error
+#include <string>     // std::to_string (event_type_name)
 
 // tesseract_environment
 #include <tesseract/environment/environment.h>
@@ -320,6 +321,30 @@ struct GilProbeFn {
 struct GilProbe {
     std::shared_ptr<GilProbeCounts> counts = std::make_shared<GilProbeCounts>();
 };
+
+// cast_*Event used an unchecked static_cast: a mismatched event was undefined behaviour.
+// The casts now check the Events tag first and raise EventTypeError (a TypeError).
+struct EventTypeError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// Enumerator name as Python prints it (Events.<NAME>). Every Events value has a case, so
+// -Wswitch flags a value added upstream.
+const char* event_type_name(te::Events type) {
+    switch (type) {
+        case te::Events::COMMAND_APPLIED: return "COMMAND_APPLIED";
+        case te::Events::SCENE_STATE_CHANGED: return "SCENE_STATE_CHANGED";
+    }
+    throw std::logic_error("event_type_name: unhandled Events value " + std::to_string(static_cast<int>(type)));
+}
+
+template <typename Derived, te::Events Expected>
+const Derived& checked_event_cast(const te::Event& evt, const char* name) {
+    if (evt.type != Expected)
+        throw EventTypeError(std::string(name) + ": event type is Events." + event_type_name(evt.type) +
+                             ", expected Events." + event_type_name(Expected));
+    return static_cast<const Derived&>(evt);
+}
 }  // namespace
 
 // Wrapper for Python event callbacks
@@ -373,13 +398,22 @@ NB_MODULE(_tesseract_environment, m) {
         });
 
     // ========== Event cast functions (for Python to downcast Event to specific type) ==========
+    // Callbacks already receive the most-derived class (Event is polymorphic), so these only
+    // check the type. The result is the argument's own Python object (nanobind finds the
+    // registered wrapper for the same pointer), so rv_policy::reference adds no lifetime of
+    // its own; like the argument, it is valid only inside the callback.
+    nb::exception<EventTypeError>(m, "EventTypeError", PyExc_TypeError)
+        .attr("__doc__") = "cast_CommandAppliedEvent / cast_SceneStateChangedEvent got an event of the other type.";
     m.def("cast_CommandAppliedEvent", [](const te::Event& evt) -> const te::CommandAppliedEvent& {
-        return static_cast<const te::CommandAppliedEvent&>(evt);
-    }, nb::rv_policy::reference, "Cast Event to CommandAppliedEvent");
+        return checked_event_cast<te::CommandAppliedEvent, te::Events::COMMAND_APPLIED>(evt, "cast_CommandAppliedEvent");
+    }, "evt"_a, nb::rv_policy::reference,
+       "Downcast an Event to CommandAppliedEvent. Raises EventTypeError if evt.type is not COMMAND_APPLIED.");
 
     m.def("cast_SceneStateChangedEvent", [](const te::Event& evt) -> const te::SceneStateChangedEvent& {
-        return static_cast<const te::SceneStateChangedEvent&>(evt);
-    }, nb::rv_policy::reference, "Cast Event to SceneStateChangedEvent");
+        return checked_event_cast<te::SceneStateChangedEvent, te::Events::SCENE_STATE_CHANGED>(
+            evt, "cast_SceneStateChangedEvent");
+    }, "evt"_a, nb::rv_policy::reference,
+       "Downcast an Event to SceneStateChangedEvent. Raises EventTypeError if evt.type is not SCENE_STATE_CHANGED.");
 
     // ========== checkTrajectory (utils.h) ==========
     // {discrete, continuous} manager x {StateSolver + joint_names, JointGroup}

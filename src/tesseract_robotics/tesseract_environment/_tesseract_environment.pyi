@@ -41,11 +41,20 @@ class SceneStateChangedEvent(Event):
     @property
     def state(self) -> tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState: ...
 
-def cast_CommandAppliedEvent(arg: Event, /) -> CommandAppliedEvent:
-    """Cast Event to CommandAppliedEvent"""
+class EventTypeError(TypeError):
+    """
+    cast_CommandAppliedEvent / cast_SceneStateChangedEvent got an event of the other type.
+    """
 
-def cast_SceneStateChangedEvent(arg: Event, /) -> SceneStateChangedEvent:
-    """Cast Event to SceneStateChangedEvent"""
+def cast_CommandAppliedEvent(evt: Event) -> CommandAppliedEvent:
+    """
+    Downcast an Event to CommandAppliedEvent. Raises EventTypeError if evt.type is not COMMAND_APPLIED.
+    """
+
+def cast_SceneStateChangedEvent(evt: Event) -> SceneStateChangedEvent:
+    """
+    Downcast an Event to SceneStateChangedEvent. Raises EventTypeError if evt.type is not SCENE_STATE_CHANGED.
+    """
 
 @overload
 def checkTrajectory(manager: tesseract_robotics.tesseract_collision._tesseract_collision.DiscreteContactManager, state_solver: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.StateSolver, joint_names: Sequence[str], traj: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')], config: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig) -> tuple[tesseract_robotics.tesseract_collision._tesseract_collision.ContactTrajectoryResults, list[tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap]]: ...

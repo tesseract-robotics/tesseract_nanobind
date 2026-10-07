@@ -57,6 +57,7 @@ __all__ = [
     "Event",
     "CommandAppliedEvent",
     "SceneStateChangedEvent",
+    "EventTypeError",
     # Utils
     "checkTrajectory",
     "checkTrajectorySegment",

@@ -1,6 +1,9 @@
 import datetime
 import gc
+import json
 import os
+import subprocess
+import sys
 import traceback
 from pathlib import Path
 
@@ -762,3 +765,127 @@ def test_env_contact_allowed_validator_on_contact_manager():
     )
     assert combined(*_ACM_ALLOWED_PAIR) is True
     assert combined(*_ACM_DISALLOWED_PAIR) is False
+
+
+# gh-191: events reach Python callbacks as C++ stack references that dangle once the
+# callback returns. The tests below keep only classes, booleans, numbers and strings
+# from a callback, never an event object (nor an exception, whose traceback frame would
+# hold one).
+
+
+def test_event_callback_receives_derived_type():
+    """Callbacks get the most-derived event class, so they need no cast_*Event."""
+    env = _fresh_env()
+    received = []
+
+    env.addEventCallback(
+        1, tesseract_environment.EventCallbackFn(lambda evt: received.append(type(evt)))
+    )
+    env.setState(_IIWA_JOINTS, np.zeros(7))
+    assert env.applyCommand(tesseract_environment.RemoveJointCommand("joint_a7-tool0"))
+
+    assert tesseract_environment.SceneStateChangedEvent in received
+    assert tesseract_environment.CommandAppliedEvent in received
+    assert tesseract_environment.Event not in received
+
+
+def test_cast_event_matching_type_roundtrips():
+    """A matching cast returns the event object itself, with its fields readable."""
+    env = _fresh_env()
+    values = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+    command_applied = []
+    state_changed = []
+
+    def on_event(evt):
+        if evt.type == tesseract_environment.Events.COMMAND_APPLIED:
+            cast = tesseract_environment.cast_CommandAppliedEvent(evt)
+            command_applied.append((type(cast), cast is evt, cast.revision))
+        else:
+            cast = tesseract_environment.cast_SceneStateChangedEvent(evt)
+            state_changed.append(
+                (type(cast), cast is evt, {name: cast.state.joints[name] for name in _IIWA_JOINTS})
+            )
+
+    env.addEventCallback(1, tesseract_environment.EventCallbackFn(on_event))
+    env.setState(_IIWA_JOINTS, values)
+    revision = env.getRevision()
+    assert env.applyCommand(tesseract_environment.RemoveJointCommand("joint_a7-tool0"))
+
+    assert command_applied == [(tesseract_environment.CommandAppliedEvent, True, revision + 1)]
+    assert state_changed, "no SCENE_STATE_CHANGED event"
+    first_type, first_is_evt, first_joints = state_changed[0]
+    assert first_type is tesseract_environment.SceneStateChangedEvent
+    assert first_is_evt
+    assert first_joints == dict(zip(_IIWA_JOINTS, values.tolist()))
+
+
+# Before the fix the mismatched cast was an unchecked static_cast (undefined behaviour),
+# so it runs in a child interpreter: a crash fails this test instead of the test runner.
+_WRONG_CAST_SCRIPT = """\
+import json
+from pathlib import Path
+import numpy as np
+from tesseract_robotics import tesseract_environment as te
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+locator = GeneralResourceLocator()
+urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
+srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
+env = te.Environment()
+assert env.init(Path(urdf), Path(srdf), locator)
+wrong_cast = {
+    te.Events.SCENE_STATE_CHANGED: te.cast_CommandAppliedEvent,
+    te.Events.COMMAND_APPLIED: te.cast_SceneStateChangedEvent,
+}
+results = []
+def on_event(evt):
+    cast = wrong_cast[evt.type]
+    try:
+        cast(evt)
+    except Exception as exc:
+        results.append({
+            "cast": cast.__name__,
+            "raised": type(exc).__name__,
+            "is_event_type_error": type(exc) is te.EventTypeError,
+            "is_type_error": isinstance(exc, TypeError),
+            "message": str(exc),
+        })
+    else:
+        results.append({"cast": cast.__name__, "raised": None})
+env.addEventCallback(1, te.EventCallbackFn(on_event))
+env.setState([f"joint_a{i + 1}" for i in range(7)], np.zeros(7))
+assert env.applyCommand(te.RemoveJointCommand("joint_a7-tool0"))
+print("RESULTS " + json.dumps(results))
+"""
+
+_WRONG_CAST_MESSAGES = {
+    "cast_CommandAppliedEvent": (
+        "cast_CommandAppliedEvent: event type is Events.SCENE_STATE_CHANGED, "
+        "expected Events.COMMAND_APPLIED"
+    ),
+    "cast_SceneStateChangedEvent": (
+        "cast_SceneStateChangedEvent: event type is Events.COMMAND_APPLIED, "
+        "expected Events.SCENE_STATE_CHANGED"
+    ),
+}
+
+
+def test_cast_event_wrong_type_raises():
+    """Casting an event to the other event class raises EventTypeError, in both directions."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _WRONG_CAST_SCRIPT], capture_output=True, text=True, check=False
+    )
+    assert proc.returncode == 0, (
+        f"child died (rc={proc.returncode}, SIGSEGV is -11/139): {proc.stderr[-1000:]}"
+    )
+    lines = [line for line in proc.stdout.splitlines() if line.startswith("RESULTS ")]
+    assert len(lines) == 1, proc.stdout[-1000:]
+    results = json.loads(lines[0].removeprefix("RESULTS "))
+
+    assert {r["cast"] for r in results} == set(_WRONG_CAST_MESSAGES), results
+    for r in results:
+        assert r["raised"] == "EventTypeError", r
+        assert r["is_event_type_error"], r
+        assert r["is_type_error"], r
+        assert r["message"] == _WRONG_CAST_MESSAGES[r["cast"]], r
+
+    assert issubclass(tesseract_environment.EventTypeError, TypeError)

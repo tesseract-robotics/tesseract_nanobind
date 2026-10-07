@@ -471,24 +471,39 @@ copying them.
 
 ## Events
 
-Subscribe to environment changes.
+Subscribe to environment changes. A callback receives each event as its own class,
+`CommandAppliedEvent` or `SceneStateChangedEvent`, so it can read `revision` or `state`
+directly; `event.type` says which one it is.
 
 ```python
-from tesseract_robotics.tesseract_environment import (
-    Events, Events_COMMAND_APPLIED, Events_SCENE_STATE_CHANGED,
-    cast_CommandAppliedEvent, cast_SceneStateChangedEvent
-)
+from tesseract_robotics.tesseract_environment import EventCallbackFn, Events
 
 def on_event(event):
-    if event.type == Events_COMMAND_APPLIED:
-        cmd_event = cast_CommandAppliedEvent(event)
-        print(f"Command applied: revision {cmd_event.revision}, "
-              f"last command {type(cmd_event.commands[-1]).__name__}")
-    elif event.type == Events_SCENE_STATE_CHANGED:
-        state_event = cast_SceneStateChangedEvent(event)
-        print("State changed")
+    if event.type == Events.COMMAND_APPLIED:
+        print(f"Command applied: revision {event.revision}, "
+              f"last command {type(event.commands[-1]).__name__}")
+    elif event.type == Events.SCENE_STATE_CHANGED:
+        print(f"State changed: {len(event.state.joints)} joints")
 
-env.addEventCallback(Events_COMMAND_APPLIED, on_event)
+env.addEventCallback(1, EventCallbackFn(on_event))  # 1: any int key, for removeEventCallback(1)
+```
+
+!!! warning "An event is valid only inside its callback"
+    The event refers to C++ data that is gone once the callback returns. Copy what you
+    need (`event.revision`, `dict(event.state.joints)`); never store the event itself.
+    `event.commands` is already a copy, so the list stays valid.
+
+`cast_CommandAppliedEvent(event)` and `cast_SceneStateChangedEvent(event)` remain for
+existing code. They return the same object they are given, and raise `EventTypeError`
+(a `TypeError`) when `event.type` is the other kind:
+
+```python
+from tesseract_robotics.tesseract_environment import EventTypeError, cast_CommandAppliedEvent
+
+try:
+    cast_CommandAppliedEvent(state_event)
+except EventTypeError as e:
+    print(e)  # cast_CommandAppliedEvent: event type is Events.SCENE_STATE_CHANGED, expected Events.COMMAND_APPLIED
 ```
 
 ## Auto-generated API Reference
