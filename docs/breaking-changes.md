@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
 | Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
 | Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
 | Unreleased | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
@@ -19,6 +20,22 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### `createTaskComposerNode` and `createTaskComposerExecutor` raise
+
+Upstream's `TaskComposerPluginFactory` returns null when it cannot create a node or executor:
+the name is not configured, the plugin symbol fails to load, or the plugin factory throws. It
+only logs a console_bridge warning. Python got `None`, against a stub that promised the object.
+Both methods now raise `TaskComposerPluginError`, a `RuntimeError` (#203). For a name that is
+not configured, the message lists the configured names.
+
+| before | after |
+| --- | --- |
+| `node = factory.createTaskComposerNode(name)`<br>`if node is None: …` | `try: node = factory.createTaskComposerNode(name)`<br>`except TaskComposerPluginError: …` |
+| `executor = factory.createTaskComposerExecutor(name)`<br>`if executor is None: …` | `try: executor = factory.createTaskComposerExecutor(name)`<br>`except TaskComposerPluginError: …` |
+
+`TaskComposer.plan` still returns a failed `PlanningResult` for an unknown pipeline; its message
+is now the factory's error.
 
 ### Pre-0.33 collision-margin aliases removed
 

@@ -12,6 +12,7 @@ __all__ = [
     "TaskComposerExecutor",
     "TaskflowTaskComposerExecutor",
     "TaskComposerPluginFactory",
+    "TaskComposerPluginError",
     # Factory function (backwards compat)
     "createTaskComposerPluginFactory",
     # AnyPoly and wrapper functions

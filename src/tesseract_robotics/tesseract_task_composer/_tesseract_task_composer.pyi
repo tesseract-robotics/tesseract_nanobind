@@ -195,15 +195,24 @@ class TaskflowTaskComposerExecutor(TaskComposerExecutor):
 
     def getTaskCount(self) -> int: ...
 
+class TaskComposerPluginError(RuntimeError):
+    """
+    createTaskComposerNode / createTaskComposerExecutor could not create the named plugin: the name is not configured, or its plugin failed to load or build.
+    """
+
 class TaskComposerPluginFactory:
     def __init__(self, config: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None:
         """Create from config file path (string) and a ResourceLocator"""
 
     def createTaskComposerExecutor(self, name: str) -> TaskComposerExecutor:
-        """Create a task composer executor by name"""
+        """
+        Create a task composer executor by name. Raises TaskComposerPluginError if it cannot be created.
+        """
 
     def createTaskComposerNode(self, name: str) -> TaskComposerNode:
-        """Create a task composer node by name"""
+        """
+        Create a task composer node by name. Raises TaskComposerPluginError if it cannot be created.
+        """
 
     def hasTaskComposerExecutorPlugins(self) -> bool: ...
 

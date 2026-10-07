@@ -46,6 +46,13 @@
   | `margins.getPairCollisionMargin(a, b)` | `margins.getCollisionMargin(a, b)` |
   | `margins.setPairCollisionMargin(a, b, m)` | `margins.setCollisionMargin(a, b, m)` |
 
+- **`createTaskComposerNode` / `createTaskComposerExecutor` raise `TaskComposerPluginError` instead of returning `None`** — upstream returns null for an unknown name, a plugin symbol that fails to load and a plugin factory that throws, with only a console_bridge warning on stderr, and the binding passed that on as `None` although the stub promised a `TaskComposerNode` / `TaskComposerExecutor`. Callers got an `AttributeError` later, far from the cause, and `TaskComposer.warmup` / `get_available_pipelines` counted an unknown or unbuildable name as loaded, since their `except` never fired. Both methods now raise the new `TaskComposerPluginError` (a `RuntimeError`): for a name that is not configured, the message lists the configured names; for a configured plugin that cannot load or build, it points at the warning. `TaskComposer.warmup` and `get_available_pipelines` catch it, and `TaskComposer.plan` returns its message in the failed `PlanningResult` ([#203]).
+
+  | before | after |
+  | --- | --- |
+  | `node = factory.createTaskComposerNode(name)`<br>`if node is None: …` | `try: node = factory.createTaskComposerNode(name)`<br>`except TaskComposerPluginError: …` |
+  | `executor = factory.createTaskComposerExecutor(name)`<br>`if executor is None: …` | `try: executor = factory.createTaskComposerExecutor(name)`<br>`except TaskComposerPluginError: …` |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -335,6 +342,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#192]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/192
 [#176]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/176
 [#177]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/177
+[#203]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/203
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

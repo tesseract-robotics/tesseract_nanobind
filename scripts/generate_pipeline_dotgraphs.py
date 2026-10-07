@@ -204,9 +204,7 @@ def main() -> None:
     factory = TaskComposerPluginFactory(str(config), GeneralResourceLocator())
 
     for name in DOCUMENTED_PIPELINES:
-        node = factory.createTaskComposerNode(name)
-        if node is None:
-            raise RuntimeError(f"pipeline {name!r} failed to load from {config}")
+        node = factory.createTaskComposerNode(name)  # raises TaskComposerPluginError
         out_svg = args.out_dir / f"{name}.svg"
         render_svg(node.getDotgraph(), out_svg)
         logger.info("rendered {} -> {}", name, out_svg)

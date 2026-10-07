@@ -72,6 +72,11 @@ factory = TaskComposerPluginFactory(config_path)
 task = factory.createTaskComposerNode("TrajOptPipeline")
 ```
 
+`createTaskComposerNode` and `createTaskComposerExecutor` raise `TaskComposerPluginError` (a
+`RuntimeError`) when the name is not configured, listing the configured names, or when its plugin
+fails to load or build; they never return `None`. Upstream only logs a console_bridge warning
+and returns null, so the warning on stderr carries the build failure's cause.
+
 ### TaskflowTaskComposerExecutor
 
 Executes tasks with parallel support.

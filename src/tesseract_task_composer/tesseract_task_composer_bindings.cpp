@@ -14,6 +14,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <stdexcept>  // std::runtime_error (TaskComposerPluginError)
 
 // tesseract_task_composer core
 #include <tesseract/task_composer/task_composer_context.h>
@@ -31,6 +32,7 @@
 
 // tesseract_common
 #include <tesseract/common/any_poly.h>
+#include <tesseract/common/plugin_info.h>
 #include <tesseract/common/resource_locator.h>
 #include <filesystem>
 
@@ -117,6 +119,37 @@ void pin_newly_loaded_dylibs(const std::unordered_set<std::string>& before) {
 
 }  // anonymous namespace
 #endif  // __APPLE__
+
+namespace {
+
+// createTaskComposer{Node,Executor} never throw: an unknown name, a plugin symbol that fails to
+// load and a plugin factory that throws all log a console_bridge warning and return nullptr
+// (task_composer_plugin_factory.cpp, 0.35.0). The binding raises this instead of returning None.
+struct TaskComposerPluginError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// Throw TaskComposerPluginError for a null result, naming `name` and the configured plugins.
+template <typename T>
+std::unique_ptr<T> require_created(std::unique_ptr<T> created, const char* caller, const std::string& name,
+                                   const tp::TaskComposerPluginFactory::PluginInfoMap& configured) {
+    if (created) {
+        return created;
+    }
+    std::string names;
+    for (const auto& [configured_name, info] : configured) {
+        names += (names.empty() ? "" : ", ") + configured_name;
+    }
+    if (configured.count(name) == 0) {
+        throw TaskComposerPluginError(std::string(caller) + ": '" + name +
+                                      "' not found among the configured plugins: [" + names + "]");
+    }
+    throw TaskComposerPluginError(std::string(caller) + ": plugin '" + name +
+                                  "' is configured but failed to load or build; the console_bridge "
+                                  "warning above gives the cause");
+}
+
+}  // anonymous namespace
 
 NB_MODULE(_tesseract_task_composer, m) {
     m.doc() = "tesseract_task_composer Python bindings";
@@ -316,6 +349,13 @@ NB_MODULE(_tesseract_task_composer, m) {
     // executor dispatches through vtables that live in the factory's plugin
     // dylibs, so it logically depends on the factory even though the pinning
     // already makes that safe.
+    //
+    // Upstream returns nullptr on every failure; both create* raise TaskComposerPluginError (gh-203).
+    nb::exception<TaskComposerPluginError>(m, "TaskComposerPluginError", PyExc_RuntimeError)
+        .attr("__doc__") =
+        "createTaskComposerNode / createTaskComposerExecutor could not create the named plugin: the "
+        "name is not configured, or its plugin failed to load or build.";
+
     nb::class_<tp::TaskComposerPluginFactory>(m, "TaskComposerPluginFactory")
         .def("__init__", [](tp::TaskComposerPluginFactory* self, const std::string& config_str, const tc::ResourceLocator& locator) {
             new (self) tp::TaskComposerPluginFactory(std::filesystem::path(config_str), locator);
@@ -329,9 +369,10 @@ NB_MODULE(_tesseract_task_composer, m) {
 #ifdef __APPLE__
             pin_newly_loaded_dylibs(before);
 #endif
-            return executor;
+            return require_created(std::move(executor), "createTaskComposerExecutor", name,
+                                   self.getTaskComposerExecutorPlugins());
         }, "name"_a, nb::rv_policy::move, nb::keep_alive<0, 1>(),
-           "Create a task composer executor by name")
+           "Create a task composer executor by name. Raises TaskComposerPluginError if it cannot be created.")
         .def("createTaskComposerNode", [](tp::TaskComposerPluginFactory& self, const std::string& name) {
 #ifdef __APPLE__
             auto before = snapshot_loaded_dylibs();
@@ -340,9 +381,10 @@ NB_MODULE(_tesseract_task_composer, m) {
 #ifdef __APPLE__
             pin_newly_loaded_dylibs(before);
 #endif
-            return node;
+            return require_created(std::move(node), "createTaskComposerNode", name,
+                                   self.getTaskComposerNodePlugins());
         }, "name"_a, nb::rv_policy::move, nb::keep_alive<0, 1>(),
-           "Create a task composer node by name")
+           "Create a task composer node by name. Raises TaskComposerPluginError if it cannot be created.")
         .def("hasTaskComposerExecutorPlugins", &tp::TaskComposerPluginFactory::hasTaskComposerExecutorPlugins)
         .def("hasTaskComposerNodePlugins", &tp::TaskComposerPluginFactory::hasTaskComposerNodePlugins)
         .def("getDefaultTaskComposerExecutorPlugin", &tp::TaskComposerPluginFactory::getDefaultTaskComposerExecutorPlugin)

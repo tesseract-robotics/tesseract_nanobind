@@ -319,6 +319,73 @@ class TestAnyPolyDataStorage:
             AnyPoly_as_TaskComposerDataStorage(AnyPoly())
 
 
+def _config_with_only(tmp_path, *task_names):
+    """The shipped config with its node plugins cut down to `task_names`."""
+    import yaml
+
+    root = yaml.safe_load(open(_resolve_task_composer_config()))
+    plugins = root["task_composer_plugins"]["tasks"]["plugins"]
+    root["task_composer_plugins"]["tasks"]["plugins"] = {n: plugins[n] for n in task_names}
+    config = tmp_path / "task_composer_plugins.yaml"
+    config.write_text(yaml.safe_dump(root, sort_keys=False), encoding="utf-8")
+    return str(config)
+
+
+class TestCreateRaisesOnFailure:
+    """createTaskComposerNode / createTaskComposerExecutor raise instead of returning None (gh-203)."""
+
+    def test_error_is_a_runtime_error(self):
+        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+
+        assert issubclass(TaskComposerPluginError, RuntimeError)
+        assert TaskComposerPluginError.__doc__
+
+    def test_unknown_node_raises_naming_configured_plugins(self):
+        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+
+        factory = TaskComposerPluginFactory(
+            _resolve_task_composer_config(), GeneralResourceLocator()
+        )
+        with pytest.raises(TaskComposerPluginError, match="NoSuchTask") as exc:
+            factory.createTaskComposerNode("NoSuchTask")
+        assert "TrajOptPipeline" in str(exc.value)
+
+    def test_unknown_executor_raises_naming_configured_plugins(self):
+        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+
+        factory = TaskComposerPluginFactory(
+            _resolve_task_composer_config(), GeneralResourceLocator()
+        )
+        with pytest.raises(TaskComposerPluginError, match="NoSuchExecutor") as exc:
+            factory.createTaskComposerExecutor("NoSuchExecutor")
+        assert "TaskflowExecutor" in str(exc.value)
+
+    def test_known_names_still_return_objects(self):
+        factory = TaskComposerPluginFactory(
+            _resolve_task_composer_config(), GeneralResourceLocator()
+        )
+        node = factory.createTaskComposerNode("TrajOptTask")
+        executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+        assert node.getName() == "TrajOptTask"
+        assert executor is not None
+        del node, executor
+        gc.collect()
+
+    def test_configured_node_that_cannot_build_raises(self, tmp_path):
+        """TrajOptPipeline without its TrajOptTask sibling is configured but cannot build."""
+        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+
+        config = _config_with_only(tmp_path, "TrajOptPipeline")
+        factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+        with pytest.raises(TaskComposerPluginError, match="TrajOptPipeline"):
+            factory.createTaskComposerNode("TrajOptPipeline")
+
+    def test_exported_from_package(self):
+        from tesseract_robotics import tesseract_task_composer
+
+        assert "TaskComposerPluginError" in tesseract_task_composer.__all__
+
+
 class TestAnyPolyEnvironment:
     """AnyPoly_wrap_EnvironmentConst, moved from the environment tests (gh-192)."""
 

@@ -1005,6 +1005,28 @@ class TestTaskComposer:
         unexpected = set(pipelines) - set(EXPECTED_PIPELINES)
         assert not unexpected, f"Unexpected pipelines: {unexpected}"
 
+    def test_warmup_skips_unknown_pipeline(self):
+        """An unknown name is not reported as loaded (gh-203: create* used to return None)."""
+        from tesseract_robotics.planning import TaskComposer
+
+        composer = TaskComposer.from_config()
+        assert composer.warmup(["NoSuchPipeline", "TrajOptTask"]) == ["TrajOptTask"]
+
+    def test_plan_invalid_pipeline_names_configured_pipelines(self, robot):
+        """The failure message carries the factory's error, listing the configured names (gh-203)."""
+        from tesseract_robotics.planning import TaskComposer
+
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0")
+            .set_joint_names(robot.get_joint_names("manipulator"))
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
+        )
+        result = TaskComposer.from_config().plan(robot, program, pipeline="NonexistentPipeline")
+        assert not result.successful
+        assert "NonexistentPipeline" in result.message
+        assert "TrajOptPipeline" in result.message
+
     def test_plan_invalid_pipeline(self, robot):
         """Test plan returns failure for invalid pipeline."""
         from tesseract_robotics.planning import TaskComposer

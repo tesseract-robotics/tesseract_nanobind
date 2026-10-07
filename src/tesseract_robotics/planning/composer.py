@@ -51,6 +51,7 @@ from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_wrap_ProfileDictionary,
     TaskComposerDataStorage,
     TaskComposerExecutor,
+    TaskComposerPluginError,
     TaskComposerPluginFactory,
     TaskflowTaskComposerExecutor,
 )
@@ -415,7 +416,7 @@ class TaskComposer:
             try:
                 self.factory.createTaskComposerNode(name)
                 loaded.append(name)
-            except Exception as e:
+            except TaskComposerPluginError as e:
                 logger.debug(f"Failed to load pipeline {name}: {e}")
 
         return loaded
@@ -507,12 +508,10 @@ class TaskComposer:
                 profiles = ProfileDictionary()
 
         # Create task
-        task = self.factory.createTaskComposerNode(pipeline)
-        if task is None:
-            return PlanningResult(
-                successful=False,
-                message=f"Pipeline '{pipeline}' not found",
-            )
+        try:
+            task = self.factory.createTaskComposerNode(pipeline)
+        except TaskComposerPluginError as e:
+            return PlanningResult(successful=False, message=str(e))
 
         output_key = task.getOutputKeys().get("program")
         if output_key is None:
@@ -730,7 +729,7 @@ class TaskComposer:
             try:
                 self.factory.createTaskComposerNode(name)
                 available.append(name)
-            except Exception as e:
+            except TaskComposerPluginError as e:
                 failed.append((name, str(e)))
 
         if failed:
