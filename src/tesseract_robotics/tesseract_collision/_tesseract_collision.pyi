@@ -30,14 +30,6 @@ class ContactTestType(enum.Enum):
 
     LIMITED = 3
 
-ContactTestType_FIRST: ContactTestType = ContactTestType.FIRST
-
-ContactTestType_CLOSEST: ContactTestType = ContactTestType.CLOSEST
-
-ContactTestType_ALL: ContactTestType = ContactTestType.ALL
-
-ContactTestType_LIMITED: ContactTestType = ContactTestType.LIMITED
-
 class CollisionEvaluatorType(enum.Enum):
     NONE = 0
 

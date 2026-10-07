@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
 | Unreleased | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
 | Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
 | Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `ValueError` on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
@@ -17,6 +18,41 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### SWIG-era enum constants removed
+
+`tesseract_collision`, `tesseract_environment` and `tesseract_common` no longer export a module
+constant per enum value. The 14 constants were copies kept from the SWIG bindings; C++ has
+none of them, and every enum is bound as a class whose members are the same objects (#176).
+Importing one now raises
+`ImportError: cannot import name 'ContactTestType_ALL' from 'tesseract_robotics.tesseract_collision'`;
+reading one as an attribute raises `AttributeError`.
+
+| before | after |
+| --- | --- |
+| `ContactTestType_ALL` (also `_FIRST`, `_CLOSEST`, `_LIMITED`) | `ContactTestType.ALL` (`.FIRST`, `.CLOSEST`, `.LIMITED`) |
+| `Events_COMMAND_APPLIED`, `Events_SCENE_STATE_CHANGED` | `Events.COMMAND_APPLIED`, `Events.SCENE_STATE_CHANGED` |
+| `ModifyAllowedCollisionsType_ADD` (also `_REMOVE`, `_REPLACE`) | `ModifyAllowedCollisionsType.ADD` (`.REMOVE`, `.REPLACE`) |
+| `CONSOLE_BRIDGE_LOG_DEBUG` (also `_INFO`, `_WARN`, `_ERROR`, `_NONE`) | `LogLevel.CONSOLE_BRIDGE_LOG_DEBUG` (…) |
+
+```python
+# before
+from tesseract_robotics.tesseract_collision import ContactRequest, ContactTestType_ALL
+from tesseract_robotics.tesseract_common import CONSOLE_BRIDGE_LOG_WARN, setLogLevel
+
+request = ContactRequest(ContactTestType_ALL)
+setLogLevel(CONSOLE_BRIDGE_LOG_WARN)
+
+# after
+from tesseract_robotics.tesseract_collision import ContactRequest, ContactTestType
+from tesseract_robotics.tesseract_common import LogLevel, setLogLevel
+
+request = ContactRequest(ContactTestType.ALL)
+setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_WARN)
+```
+
+The `CONSOLE_BRIDGE_LOG_*` names keep their prefix because they are the C++ enumerator names of
+console_bridge's unscoped `LogLevel`; only the module-level copies are gone.
 
 ### `AnyPoly` helpers only in `tesseract_task_composer`
 

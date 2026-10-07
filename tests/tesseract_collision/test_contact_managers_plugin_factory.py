@@ -15,7 +15,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactManagersPluginFactory,
     ContactRequest,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 from tesseract_robotics.tesseract_common import Isometry3d
 
@@ -76,7 +76,7 @@ def test_create_discrete_from_plugin_info(factory):
     checker = factory.createDiscreteContactManager("from_info", info)
     _two_overlapping_boxes(checker)
     result = ContactResultMap()
-    checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+    checker.contactTest(result, ContactRequest(ContactTestType.ALL))
     assert result.count() == 1
 
 
@@ -87,7 +87,7 @@ def test_create_continuous_from_plugin_info(factory):
     for name in ("box_a", "box_b"):
         checker.setCollisionObjectsTransform(name, Isometry3d())
     result = ContactResultMap()
-    checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+    checker.contactTest(result, ContactRequest(ContactTestType.ALL))
     assert result.count() == 1
 
 
@@ -133,7 +133,7 @@ import numpy as np
 
 import tesseract_robotics  # noqa: F401 - sets TESSERACT_SUPPORT_DIR
 from tesseract_robotics.tesseract_collision import (
-    ContactManagersPluginFactory, ContactRequest, ContactResultMap, ContactTestType_ALL,
+    ContactManagersPluginFactory, ContactRequest, ContactResultMap, ContactTestType,
 )
 from tesseract_robotics.tesseract_common import (
     CollisionMarginData, GeneralResourceLocator, Isometry3d, VectorIsometry3d,
@@ -155,7 +155,7 @@ for name in ("box_a", "box_b"):
 checker.setActiveCollisionObjects(["box_a", "box_b"])
 checker.setCollisionMarginData(CollisionMarginData(0.1))
 result = ContactResultMap()
-checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+checker.contactTest(result, ContactRequest(ContactTestType.ALL))
 print(f"OK: {{result.count()}}")
 """
 

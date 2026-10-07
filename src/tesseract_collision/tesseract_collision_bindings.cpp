@@ -160,12 +160,6 @@ NB_MODULE(_tesseract_collision, m) {
         .value("ALL", tc::ContactTestType::ALL)
         .value("LIMITED", tc::ContactTestType::LIMITED);
 
-    // SWIG-compatible module-level constants
-    m.attr("ContactTestType_FIRST") = tc::ContactTestType::FIRST;
-    m.attr("ContactTestType_CLOSEST") = tc::ContactTestType::CLOSEST;
-    m.attr("ContactTestType_ALL") = tc::ContactTestType::ALL;
-    m.attr("ContactTestType_LIMITED") = tc::ContactTestType::LIMITED;
-
     nb::enum_<tc::CollisionEvaluatorType>(m, "CollisionEvaluatorType")
         .value("NONE", tc::CollisionEvaluatorType::NONE)
         .value("DISCRETE", tc::CollisionEvaluatorType::DISCRETE)

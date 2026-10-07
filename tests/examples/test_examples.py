@@ -261,7 +261,7 @@ def _min_distance_to(obstacle, env, joint_names, positions):
         ContactRequest,
         ContactResultMap,
         ContactResultVector,
-        ContactTestType_ALL,
+        ContactTestType,
     )
     from tesseract_robotics.tesseract_common import CollisionMarginData
     from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
@@ -277,7 +277,7 @@ def _min_distance_to(obstacle, env, joint_names, positions):
             solver.setStateByNamesAndValues(joint_names, start + fraction * (end - start))
             manager.setCollisionObjectsTransform(solver.getState().link_transforms)
             contacts = ContactResultMap()
-            manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+            manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
             flat = ContactResultVector()
             contacts.flattenMoveResults(flat)
             for index in range(len(flat)):

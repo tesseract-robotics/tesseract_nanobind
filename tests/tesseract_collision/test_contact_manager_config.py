@@ -22,7 +22,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactManagersPluginFactory,
     ContactRequest,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 from tesseract_robotics.tesseract_common import (
     ACMContactAllowedValidator,
@@ -139,7 +139,7 @@ def _get_discrete_factory():
 
 def _num_contacts(checker):
     result = ContactResultMap()
-    checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+    checker.contactTest(result, ContactRequest(ContactTestType.ALL))
     return result.count()
 
 
@@ -287,7 +287,7 @@ def test_continuous_manager_add_object_and_cast_transform():
         )
 
         result = ContactResultMap()
-        checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+        checker.contactTest(result, ContactRequest(ContactTestType.ALL))
         assert result.count() > 0
     finally:
         del checker
@@ -314,7 +314,7 @@ def test_continuous_manager_apply_config_acm():
         checker.setCollisionObjectsTransformCast("moving_box", Isometry3d(start), Isometry3d(end))
 
         result = ContactResultMap()
-        checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+        checker.contactTest(result, ContactRequest(ContactTestType.ALL))
         assert result.count() > 0
 
         cfg = ContactManagerConfig()
@@ -325,7 +325,7 @@ def test_continuous_manager_apply_config_acm():
         checker.applyContactManagerConfig(cfg)
 
         result2 = ContactResultMap()
-        checker.contactTest(result2, ContactRequest(ContactTestType_ALL))
+        checker.contactTest(result2, ContactRequest(ContactTestType.ALL))
         assert result2.count() == 0
     finally:
         del checker

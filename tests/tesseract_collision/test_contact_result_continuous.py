@@ -10,7 +10,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactResult,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_ALL,
+    ContactTestType,
     ContinuousCollisionType,
 )
 from tesseract_robotics.tesseract_common import CollisionMarginData, Isometry3d
@@ -65,7 +65,7 @@ def test_continuous_sweep_populates_cc_time():
         checker.setCollisionObjectsTransformCast("moving_box", Isometry3d(start), Isometry3d(end))
 
         result = ContactResultMap()
-        checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+        checker.contactTest(result, ContactRequest(ContactTestType.ALL))
         flat = ContactResultVector()
         result.flattenMoveResults(flat)
         assert len(flat) > 0
@@ -107,7 +107,7 @@ def _cast_contact(set_cast):
         set_cast(checker, _sweep_x(-5.0), _sweep_x(5.0))
 
         result = ContactResultMap()
-        checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+        checker.contactTest(result, ContactRequest(ContactTestType.ALL))
         flat = ContactResultVector()
         result.flattenMoveResults(flat)
         assert len(flat) == 1
@@ -148,7 +148,7 @@ def test_native_cast_overload_matches_cast_alias(shape):
 def _static_names_contacts_at(checker, x):
     checker.setCollisionObjectsTransform(["moving_box"], [_sweep_x(x)])
     result = ContactResultMap()
-    checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+    checker.contactTest(result, ContactRequest(ContactTestType.ALL))
     return result.count()
 
 

@@ -60,12 +60,6 @@ __all__ = [
     "getLogLevel",
     "useOutputHandler",
     "restorePreviousOutputHandler",
-    # Logging levels
-    "CONSOLE_BRIDGE_LOG_DEBUG",
-    "CONSOLE_BRIDGE_LOG_INFO",
-    "CONSOLE_BRIDGE_LOG_WARN",
-    "CONSOLE_BRIDGE_LOG_ERROR",
-    "CONSOLE_BRIDGE_LOG_NONE",
     # Eigen helper types
     "Isometry3d",
     "Translation3d",

@@ -35,9 +35,6 @@ __all__ = [
     # Collision commands
     "ModifyAllowedCollisionsCommand",
     "ModifyAllowedCollisionsType",
-    "ModifyAllowedCollisionsType_ADD",
-    "ModifyAllowedCollisionsType_REMOVE",
-    "ModifyAllowedCollisionsType_REPLACE",
     "RemoveAllowedCollisionLinkCommand",
     "ChangeCollisionMarginsCommand",
     "ChangeLinkCollisionEnabledCommand",

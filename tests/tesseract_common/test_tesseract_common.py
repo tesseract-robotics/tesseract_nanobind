@@ -39,13 +39,13 @@ class _TestOutputHandler(tesseract_common.OutputHandler):
 
 
 def test_console_bridge():
-    tesseract_common.setLogLevel(tesseract_common.CONSOLE_BRIDGE_LOG_DEBUG)
+    tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
 
     frameinfo = getframeinfo(currentframe())
     tesseract_common.log(
         frameinfo.filename,
         frameinfo.lineno,
-        tesseract_common.CONSOLE_BRIDGE_LOG_DEBUG,
+        tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG,
         "This is a test message",
     )
 
@@ -55,14 +55,14 @@ def test_console_bridge():
     tesseract_common.log(
         frameinfo.filename,
         frameinfo.lineno,
-        tesseract_common.CONSOLE_BRIDGE_LOG_DEBUG,
+        tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG,
         "This is a test message 2",
     )
     tesseract_common.restorePreviousOutputHandler()
 
     assert output_handler.last_text == "This is a test message 2"
 
-    tesseract_common.setLogLevel(tesseract_common.CONSOLE_BRIDGE_LOG_ERROR)
+    tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
 
 
 def test_manipulator_info():

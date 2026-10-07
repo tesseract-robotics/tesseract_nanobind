@@ -15,7 +15,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResult,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 
 from .test_contact_manager_config import _box, _get_discrete_factory, _two_overlapping_boxes
@@ -59,10 +59,10 @@ def _contacts(checker, request):
 
 def test_reject_all_leaves_no_contacts(discrete_checker):
     _two_overlapping_boxes(discrete_checker)
-    assert _contacts(discrete_checker, ContactRequest(ContactTestType_ALL)).count() == 1
+    assert _contacts(discrete_checker, ContactRequest(ContactTestType.ALL)).count() == 1
 
     validator = _validator_class()(lambda r: False)
-    request = ContactRequest(ContactTestType_ALL)
+    request = ContactRequest(ContactTestType.ALL)
     request.is_valid = validator
     assert _contacts(discrete_checker, request).count() == 0
     assert validator.seen == [("box_a", "box_b")]
@@ -73,10 +73,10 @@ def test_reject_by_link_names_keeps_allowed_pairs(discrete_checker):
     shapes_c, poses_c = _box()
     discrete_checker.addCollisionObject("box_c", 0, shapes_c, poses_c)
     discrete_checker.setActiveCollisionObjects(["box_a", "box_b", "box_c"])
-    assert _contacts(discrete_checker, ContactRequest(ContactTestType_ALL)).count() == 3
+    assert _contacts(discrete_checker, ContactRequest(ContactTestType.ALL)).count() == 3
 
     validator = _validator_class()(lambda r: "box_c" not in r.link_names)
-    request = ContactRequest(ContactTestType_ALL)
+    request = ContactRequest(ContactTestType.ALL)
     request.is_valid = validator
     result = _contacts(discrete_checker, request)
     assert [key for key, v in result.getContainer().items() if len(v)] == [("box_a", "box_b")]
@@ -104,7 +104,7 @@ def test_validator_is_directly_callable():
 def test_validator_survives_caller_reference(discrete_checker):
     _two_overlapping_boxes(discrete_checker)
     calls = []
-    request = ContactRequest(ContactTestType_ALL)
+    request = ContactRequest(ContactTestType.ALL)
     request.is_valid = _validator_class()(lambda r: calls.append(r) or False)
     gc.collect()
     assert _contacts(discrete_checker, request).count() == 0
@@ -114,7 +114,7 @@ def test_validator_survives_caller_reference(discrete_checker):
 def test_contact_test_in_thread_takes_gil_for_validator(discrete_checker):
     _two_overlapping_boxes(discrete_checker)
     validator = _validator_class()(lambda r: True)
-    request = ContactRequest(ContactTestType_ALL)
+    request = ContactRequest(ContactTestType.ALL)
     request.is_valid = validator
     counts = []
 
@@ -137,7 +137,7 @@ import numpy as np
 import tesseract_robotics  # noqa: F401 - sets TESSERACT_SUPPORT_DIR
 from tesseract_robotics.tesseract_collision import (
     ContactManagersPluginFactory, ContactRequest, ContactResultMap, ContactResultValidator,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 from tesseract_robotics.tesseract_common import (
     CollisionMarginData, GeneralResourceLocator, Isometry3d, VectorIsometry3d,
@@ -162,7 +162,7 @@ for name in ("box_a", "box_b"):
 checker.setActiveCollisionObjects(["box_a", "box_b"])
 checker.setCollisionMarginData(CollisionMarginData(0.1))
 
-request = ContactRequest(ContactTestType_ALL)
+request = ContactRequest(ContactTestType.ALL)
 request.is_valid = Raising()
 try:
     checker.contactTest(ContactResultMap(), request)

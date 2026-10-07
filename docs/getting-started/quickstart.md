@@ -55,7 +55,7 @@ Use the environment's discrete contact manager directly:
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 
 robot.set_joints({"joint_1": 0.5, "joint_2": -0.3})
@@ -65,7 +65,7 @@ manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 
 contacts = ContactResultMap()
-manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
 print(f"Collision-free: {contacts.size() == 0}")
 ```
 

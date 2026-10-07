@@ -421,18 +421,14 @@ Control console_bridge logging level.
 ```python
 from tesseract_robotics.tesseract_common import (
     getLogLevel, setLogLevel,
-    CONSOLE_BRIDGE_LOG_NONE,
-    CONSOLE_BRIDGE_LOG_ERROR,
-    CONSOLE_BRIDGE_LOG_WARN,
-    CONSOLE_BRIDGE_LOG_INFO,
-    CONSOLE_BRIDGE_LOG_DEBUG,
+    LogLevel,
 )
 
 # Suppress warnings
-setLogLevel(CONSOLE_BRIDGE_LOG_ERROR)
+setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
 
 # Enable debug output
-setLogLevel(CONSOLE_BRIDGE_LOG_DEBUG)
+setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
 ```
 
 ## Container Types

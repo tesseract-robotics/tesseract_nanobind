@@ -55,7 +55,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 from tesseract_robotics.tesseract_common import CollisionMarginData
 from tesseract_robotics.tesseract_geometry import (
@@ -116,7 +116,7 @@ PIECE_ORIGIN = (1.3, 0.3, 0.0)
 # to bend the arc up and over, which is what makes the avoidance visually
 # obvious in the viewer.
 START_JOINTS = np.array([+0.7, 1.45, -0.52, 0.0, 0.0, 0.0])
-GOAL_JOINTS  = np.array([-0.2, 1.45, -0.52, 0.0, 0.0, 0.0])
+GOAL_JOINTS = np.array([-0.2, 1.45, -0.52, 0.0, 0.0, 0.0])
 
 
 def _count_contacts(robot, manager, joint_names, joint_pos):
@@ -125,7 +125,7 @@ def _count_contacts(robot, manager, joint_names, joint_pos):
     state = robot.env.getState()
     manager.setCollisionObjectsTransform(state.link_transforms)
     contacts = ContactResultMap()
-    manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+    manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
     results = ContactResultVector()
     contacts.flattenMoveResults(results)
     return len(results), results
@@ -173,9 +173,7 @@ def _trajopt_profiles_without_collision():
         ProfileDictionary_addTrajOptCompositeProfile(
             profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
         )
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan
-        )
+        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
     # The TrajOptPipeline task graph runs a DiscreteContactCheckTask AFTER the
     # planner, and that task aborts the pipeline if any waypoint is in contact.
@@ -280,9 +278,7 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     result = plan_freespace(robot, program, profiles=create_trajopt_default_profiles())
     aware_contacts = _count_traj_contacts(robot, manager, joint_names, result)
     if result.successful:
-        print(
-            f"Collision-aware trajectory: {aware_contacts}/{len(result)} waypoints collide"
-        )
+        print(f"Collision-aware trajectory: {aware_contacts}/{len(result)} waypoints collide")
     else:
         print(f"plan_freespace failed: {result.message}")
     # --8<-- [end:aware]
@@ -317,11 +313,19 @@ def main() -> int:
     import argparse
 
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--cloud", type=Path, default=None,
-                   help="path to a point-cloud file Assimp can read — PLY / STL "
-                        "/ OBJ / DAE (default: docs/assets/sample.ply)")
-    p.add_argument("--resolution", type=float, default=0.02,
-                   help="octree leaf resolution in metres (default: 0.02)")
+    p.add_argument(
+        "--cloud",
+        type=Path,
+        default=None,
+        help="path to a point-cloud file Assimp can read — PLY / STL "
+        "/ OBJ / DAE (default: docs/assets/sample.ply)",
+    )
+    p.add_argument(
+        "--resolution",
+        type=float,
+        default=0.02,
+        help="octree leaf resolution in metres (default: 0.02)",
+    )
     args = p.parse_args()
 
     results = run(args.cloud, resolution=args.resolution)
@@ -334,14 +338,12 @@ def main() -> int:
         # Tint every robot link visual so the colour reflects which path
         # the viewer is currently animating. The octree link has no
         # Visual.material set, so it stays at the gltf-default grey.
-        red   = np.array([0.85, 0.15, 0.15, 1.0])
+        red = np.array([0.85, 0.15, 0.15, 1.0])
         green = np.array([0.15, 0.75, 0.25, 1.0])
 
         colliding_result = results["colliding_result"]
         have_aware = result.successful and result.raw_results is not None
-        have_colliding = (
-            colliding_result.successful and colliding_result.raw_results is not None
-        )
+        have_colliding = colliding_result.successful and colliding_result.raw_results is not None
 
         # The viewer prefers Visual.material.color over the mesh's intrinsic
         # material when both are set. Mutating link.visual[i].material.color
@@ -380,10 +382,7 @@ def main() -> int:
         viewer.start_serve_background()
         print(f"Viewer at http://localhost:8000 — showing {showing}")
         if have_aware and have_colliding:
-            print(
-                "Press 't' + Enter to toggle colliding / collision-aware; "
-                "Enter alone to exit."
-            )
+            print("Press 't' + Enter to toggle colliding / collision-aware; Enter alone to exit.")
             while True:
                 cmd = input("> ").strip().lower()
                 if not cmd:

@@ -64,7 +64,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 from tesseract_robotics.tesseract_common import CollisionMarginData
 from tesseract_robotics.tesseract_scene_graph import Collision, Link, Visual
@@ -145,9 +145,9 @@ def main():
         print(f"Sphere Link Pose:\n{scene_state.link_transforms['sphere_link'].matrix}")
 
         # Execute collision query
-        # ContactTestType_ALL finds all collision pairs (vs FIRST for early-out)
+        # ContactTestType.ALL finds all collision pairs (vs FIRST for early-out)
         contact_result_map = ContactResultMap()
-        manager.contactTest(contact_result_map, ContactRequest(ContactTestType_ALL))
+        manager.contactTest(contact_result_map, ContactRequest(ContactTestType.ALL))
 
         # Flatten nested map structure into simple vector for iteration
         result_vector = ContactResultVector()

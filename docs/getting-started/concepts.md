@@ -171,7 +171,7 @@ Checks collision at a single configuration:
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 
 robot.set_joints(joint_values_dict)
@@ -180,7 +180,7 @@ manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
 manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 
 contacts = ContactResultMap()
-manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
 is_safe = contacts.size() == 0
 ```
 
@@ -309,14 +309,10 @@ Tesseract uses `console_bridge` for logging. Control logging level via:
 ```python
 from tesseract_robotics.tesseract_common import (
     getLogLevel, setLogLevel,
-    CONSOLE_BRIDGE_LOG_NONE,
-    CONSOLE_BRIDGE_LOG_ERROR,
-    CONSOLE_BRIDGE_LOG_WARN,
-    CONSOLE_BRIDGE_LOG_INFO,
-    CONSOLE_BRIDGE_LOG_DEBUG,
+    LogLevel,
 )
 
-setLogLevel(CONSOLE_BRIDGE_LOG_WARN)
+setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_WARN)
 ```
 
 ## Next Steps

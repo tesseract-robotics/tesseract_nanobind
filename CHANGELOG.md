@@ -26,6 +26,15 @@
   | `from tesseract_robotics.tesseract_command_language import AnyPoly_wrap_CompositeInstruction` (also `AnyPoly_wrap_ProfileDictionary`, `AnyPoly_as_CompositeInstruction`) | `from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_CompositeInstruction` (…) |
   | `tesseract_command_language._HAS_TASK_COMPOSER` | removed: the task composer is a hard dependency |
 
+- **SWIG-era enum constants removed** — `tesseract_collision`, `tesseract_environment` and `tesseract_common` exported a module constant for each value of four bound enums, kept from the SWIG bindings: `ContactTestType_FIRST` / `_CLOSEST` / `_ALL` / `_LIMITED`, `Events_COMMAND_APPLIED` / `_SCENE_STATE_CHANGED`, `ModifyAllowedCollisionsType_ADD` / `_REMOVE` / `_REPLACE` and the module-level `CONSOLE_BRIDGE_LOG_DEBUG` / `_INFO` / `_WARN` / `_ERROR` / `_NONE`. C++ has no such constants (the `CONSOLE_BRIDGE_LOG_*` names are `LogLevel` enumerators, not module names), and each enum is bound as a class. All 14 constants and their `__all__` entries are gone: importing one raises `ImportError`, reading one as a module attribute raises `AttributeError`. Use the enum member; the values are the same objects ([#176]).
+
+  | before | after |
+  | --- | --- |
+  | `ContactTestType_ALL` (also `_FIRST`, `_CLOSEST`, `_LIMITED`) | `ContactTestType.ALL` (`.FIRST`, `.CLOSEST`, `.LIMITED`) |
+  | `Events_COMMAND_APPLIED`, `Events_SCENE_STATE_CHANGED` | `Events.COMMAND_APPLIED`, `Events.SCENE_STATE_CHANGED` |
+  | `ModifyAllowedCollisionsType_ADD` (also `_REMOVE`, `_REPLACE`) | `ModifyAllowedCollisionsType.ADD` (`.REMOVE`, `.REPLACE`) |
+  | `CONSOLE_BRIDGE_LOG_DEBUG` (also `_INFO`, `_WARN`, `_ERROR`, `_NONE`) | `LogLevel.CONSOLE_BRIDGE_LOG_DEBUG` (`…_INFO`, `…_WARN`, `…_ERROR`, `…_NONE`) |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -313,6 +322,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#191]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/191
 [#188]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/188
 [#192]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/192
+[#176]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/176
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

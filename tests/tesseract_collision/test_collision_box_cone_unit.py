@@ -102,7 +102,7 @@ def run_test(checker):
     # Perform collision check
     result = tesseract_collision.ContactResultMap()
     checker.contactTest(
-        result, tesseract_collision.ContactRequest(tesseract_collision.ContactTestType_CLOSEST)
+        result, tesseract_collision.ContactRequest(tesseract_collision.ContactTestType.CLOSEST)
     )
     result_vector = tesseract_collision.ContactResultVector()
     result.flattenMoveResults(result_vector)

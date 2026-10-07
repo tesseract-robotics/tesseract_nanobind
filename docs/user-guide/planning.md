@@ -554,13 +554,13 @@ if not result.successful:
 
     # 1. Check if start/goal are collision-free
     from tesseract_robotics.tesseract_collision import (
-        ContactRequest, ContactResultMap, ContactTestType_ALL,
+        ContactRequest, ContactResultMap, ContactTestType,
     )
     manager = robot.env.getDiscreteContactManager()
     manager.setActiveCollisionObjects(robot.env.getActiveLinkNames())
     manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
     contacts = ContactResultMap()
-    manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+    manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
     print(f"Collision-free: {contacts.size() == 0}")
 
     # 2. Try a different backend

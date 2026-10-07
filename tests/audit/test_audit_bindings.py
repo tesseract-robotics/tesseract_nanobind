@@ -501,13 +501,6 @@ def test_eigen_templated_mul_is_not_a_deviation(real_reports, symbol):
     assert symbol not in {d.name for d in real_reports["tesseract_common"].deviations}
 
 
-@pytest.mark.parametrize("level", ["DEBUG", "INFO", "WARN", "ERROR", "NONE"])
-def test_console_bridge_log_constants_are_deviations(real_reports, level):
-    """Note 1: module constants aliasing `LogLevel` values, though C++ has the same name."""
-    deviations = {(d.name, d.kind) for d in real_reports["tesseract_common"].deviations}
-    assert (f"CONSOLE_BRIDGE_LOG_{level}", audit.Kind.CONSTANT) in deviations
-
-
 @pytest.mark.parametrize(
     ("module", "header"),
     [

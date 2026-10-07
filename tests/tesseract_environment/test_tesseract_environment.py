@@ -64,7 +64,7 @@ def get_environment():
 
     def event_cb_py(evt):
         try:
-            if evt.type == tesseract_environment.Events_SCENE_STATE_CHANGED:
+            if evt.type == tesseract_environment.Events.SCENE_STATE_CHANGED:
                 evt2 = tesseract_environment.cast_SceneStateChangedEvent(evt)
                 if len(evt2.state.joints) != 7:
                     print("joint state length error")
@@ -74,7 +74,7 @@ def get_environment():
                         print("joint value mismatch")
                         return
                 scene_state_changed[0] = True
-            if evt.type == tesseract_environment.Events_COMMAND_APPLIED:
+            if evt.type == tesseract_environment.Events.COMMAND_APPLIED:
                 evt2 = tesseract_environment.cast_CommandAppliedEvent(evt)
                 print(evt2.revision)
                 if evt2.revision == 4:
@@ -740,7 +740,7 @@ def test_env_contact_allowed_validator_tracks_scene_graph():
     acm.addAllowedCollision(*_ACM_DISALLOWED_PAIR, "test")
     assert env.applyCommand(
         tesseract_environment.ModifyAllowedCollisionsCommand(
-            acm, tesseract_environment.ModifyAllowedCollisionsType_ADD
+            acm, tesseract_environment.ModifyAllowedCollisionsType.ADD
         )
     )
     assert validator(*_ACM_DISALLOWED_PAIR) is True

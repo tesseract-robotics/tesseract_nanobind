@@ -421,10 +421,6 @@ NB_MODULE(_tesseract_environment, m) {
         .value("COMMAND_APPLIED", te::Events::COMMAND_APPLIED)
         .value("SCENE_STATE_CHANGED", te::Events::SCENE_STATE_CHANGED);
 
-    // Export enum values with SWIG-compatible naming
-    m.attr("Events_COMMAND_APPLIED") = te::Events::COMMAND_APPLIED;
-    m.attr("Events_SCENE_STATE_CHANGED") = te::Events::SCENE_STATE_CHANGED;
-
     // ========== Event base class ==========
     nb::class_<te::Event>(m, "Event")
         .def_ro("type", &te::Event::type);
@@ -614,11 +610,6 @@ NB_MODULE(_tesseract_environment, m) {
         .value("ADD", te::ModifyAllowedCollisionsType::ADD)
         .value("REMOVE", te::ModifyAllowedCollisionsType::REMOVE)
         .value("REPLACE", te::ModifyAllowedCollisionsType::REPLACE);
-
-    // SWIG-compatible enum values
-    m.attr("ModifyAllowedCollisionsType_ADD") = te::ModifyAllowedCollisionsType::ADD;
-    m.attr("ModifyAllowedCollisionsType_REMOVE") = te::ModifyAllowedCollisionsType::REMOVE;
-    m.attr("ModifyAllowedCollisionsType_REPLACE") = te::ModifyAllowedCollisionsType::REPLACE;
 
     // ========== ModifyAllowedCollisionsCommand ==========
     nb::class_<te::ModifyAllowedCollisionsCommand, te::Command>(m, "ModifyAllowedCollisionsCommand")

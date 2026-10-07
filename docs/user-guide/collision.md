@@ -12,7 +12,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 import numpy as np
 
@@ -30,7 +30,7 @@ manager.setCollisionObjectsTransform(state.link_transforms)
 
 # contactTest() populates the ContactResultMap passed in (returns None)
 contacts = ContactResultMap()
-manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
 
 print(f"Collision-free: {contacts.size() == 0}")
 
@@ -76,14 +76,14 @@ graph LR
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 
 # Get discrete manager
 manager = robot.env.getDiscreteContactManager()
 
 # Configure request
-request = ContactRequest(ContactTestType_ALL)  # or _FIRST, _CLOSEST, _LIMITED
+request = ContactRequest(ContactTestType.ALL)  # or .FIRST, .CLOSEST, .LIMITED
 request.calculate_distance = True
 request.calculate_penetration = True
 
@@ -113,7 +113,7 @@ Check for collisions along a motion segment. Each active link needs a start and 
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 
 # Resolve link transforms at the two endpoints
@@ -132,7 +132,7 @@ for link_name, pose_start in start_transforms.items():
 
 # Check swept volume
 contacts = ContactResultMap()
-manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
 ```
 
 Each continuous `ContactResult` says where along the sweep the contact happened. `cc_time[i]` is in `[0, 1]` for a cast link `i` and `-1` for a static one. `cc_type[i]` is a `ContinuousCollisionType`: `CCType_Time0`, `CCType_Time1`, `CCType_Between`, or `CCType_None` for a link that was not cast.
@@ -285,15 +285,14 @@ Adjacent links already defined in the SRDF are added automatically when the envi
 !!! tip "Choose the Right Test Type"
     ```python
     from tesseract_robotics.tesseract_collision import (
-        ContactTestType_FIRST,
-        ContactTestType_ALL,
+        ContactTestType,
     )
 
     # Stop at first collision (fastest)
-    request = ContactRequest(ContactTestType_FIRST)
+    request = ContactRequest(ContactTestType.FIRST)
 
     # Get all collisions (for debugging)
-    request = ContactRequest(ContactTestType_ALL)
+    request = ContactRequest(ContactTestType.ALL)
     ```
 
 ## Integration with Planning
@@ -426,7 +425,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_ALL,
+    ContactTestType,
 )
 
 def debug_collision(robot, joints, joint_names):
@@ -439,7 +438,7 @@ def debug_collision(robot, joints, joint_names):
     manager.setCollisionObjectsTransform(state.link_transforms)
 
     contacts = ContactResultMap()
-    manager.contactTest(contacts, ContactRequest(ContactTestType_ALL))
+    manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
 
     if contacts.size() == 0:
         print("No collisions detected")

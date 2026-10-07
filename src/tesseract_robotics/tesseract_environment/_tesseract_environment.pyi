@@ -22,10 +22,6 @@ class Events(enum.Enum):
 
     SCENE_STATE_CHANGED = 1
 
-Events_COMMAND_APPLIED: Events = Events.COMMAND_APPLIED
-
-Events_SCENE_STATE_CHANGED: Events = Events.SCENE_STATE_CHANGED
-
 class Event:
     @property
     def type(self) -> Events: ...
@@ -219,12 +215,6 @@ class ModifyAllowedCollisionsType(enum.Enum):
     REMOVE = 1
 
     REPLACE = 2
-
-ModifyAllowedCollisionsType_ADD: ModifyAllowedCollisionsType = ModifyAllowedCollisionsType.ADD
-
-ModifyAllowedCollisionsType_REMOVE: ModifyAllowedCollisionsType = ModifyAllowedCollisionsType.REMOVE
-
-ModifyAllowedCollisionsType_REPLACE: ModifyAllowedCollisionsType = ModifyAllowedCollisionsType.REPLACE
 
 class ModifyAllowedCollisionsCommand(Command):
     def __init__(self, acm: tesseract_robotics.tesseract_common._tesseract_common.AllowedCollisionMatrix, type: ModifyAllowedCollisionsType) -> None: ...

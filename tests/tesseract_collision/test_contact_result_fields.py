@@ -14,7 +14,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactResult,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_ALL,
+    ContactTestType,
     ContinuousCollisionType,
 )
 from tesseract_robotics.tesseract_common import CollisionMarginData, Isometry3d
@@ -107,7 +107,7 @@ def test_continuous_contact_cc_transform_is_cast_end_pose():
         checker.setCollisionObjectsTransformCast("moving_box", Isometry3d(start), Isometry3d(end))
 
         result = ContactResultMap()
-        checker.contactTest(result, ContactRequest(ContactTestType_ALL))
+        checker.contactTest(result, ContactRequest(ContactTestType.ALL))
         flat = ContactResultVector()
         result.flattenMoveResults(flat)
         assert len(flat) > 0

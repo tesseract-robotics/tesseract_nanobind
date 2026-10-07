@@ -34,9 +34,6 @@ from tesseract_robotics.tesseract_environment import (
     Environment,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
-    ModifyAllowedCollisionsType_ADD,
-    ModifyAllowedCollisionsType_REMOVE,
-    ModifyAllowedCollisionsType_REPLACE,
     MoveJointCommand,
     MoveLinkCommand,
     RemoveAllowedCollisionLinkCommand,
@@ -90,11 +87,6 @@ class TestCommandImports:
 
     def test_command_base_class(self):
         assert Command is not None
-
-    def test_modify_allowed_collisions_type_enum(self):
-        assert ModifyAllowedCollisionsType.ADD == ModifyAllowedCollisionsType_ADD
-        assert ModifyAllowedCollisionsType.REMOVE == ModifyAllowedCollisionsType_REMOVE
-        assert ModifyAllowedCollisionsType.REPLACE == ModifyAllowedCollisionsType_REPLACE
 
 
 class TestAddLinkCommand:
