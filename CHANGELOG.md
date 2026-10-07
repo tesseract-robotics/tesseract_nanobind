@@ -35,6 +35,17 @@
   | `ModifyAllowedCollisionsType_ADD` (also `_REMOVE`, `_REPLACE`) | `ModifyAllowedCollisionsType.ADD` (`.REMOVE`, `.REPLACE`) |
   | `CONSOLE_BRIDGE_LOG_DEBUG` (also `_INFO`, `_WARN`, `_ERROR`, `_NONE`) | `LogLevel.CONSOLE_BRIDGE_LOG_DEBUG` (`…_INFO`, `…_WARN`, `…_ERROR`, `…_NONE`) |
 
+- **Pre-0.33 collision-margin aliases removed** — eight Python names that forwarded to members tesseract 0.33 renamed, each bound next to the native member: `ContactManagerConfig.margin_data_override_type`, `DiscreteContactManager` / `ContinuousContactManager` `.setDefaultCollisionMarginData` and `.setPairCollisionMarginData`, `tesseract_common.CollisionMarginOverrideType`, and `CollisionMarginData.getPairCollisionMargin` / `.setPairCollisionMargin`. Using one raises `AttributeError` (`ImportError` for `from tesseract_robotics.tesseract_common import CollisionMarginOverrideType`). The `ContactManagerConfig` example in the collision API page used a `config.margin_data` member that never existed; it now sets `default_margin`, `pair_margin_data` and `pair_margin_override_type` ([#177]).
+
+  | before | after |
+  | --- | --- |
+  | `config.margin_data_override_type` | `config.pair_margin_override_type` |
+  | `manager.setDefaultCollisionMarginData(m)` | `manager.setDefaultCollisionMargin(m)` |
+  | `manager.setPairCollisionMarginData(a, b, m)` | `manager.setCollisionMarginPair(a, b, m)` |
+  | `CollisionMarginOverrideType` | `CollisionMarginPairOverrideType` |
+  | `margins.getPairCollisionMargin(a, b)` | `margins.getCollisionMargin(a, b)` |
+  | `margins.setPairCollisionMargin(a, b, m)` | `margins.setCollisionMargin(a, b, m)` |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -323,6 +334,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#188]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/188
 [#192]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/192
 [#176]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/176
+[#177]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/177
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
 [361c60e]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/361c60e263f0768e1b23d3a9919f700d06b15993

@@ -385,7 +385,6 @@ NB_MODULE(_tesseract_collision, m) {
             "Validator called on each contact; return False to reject it. None disables validation.");
 
     // ========== ContactManagerConfig ==========
-    // Note: 0.33 renamed margin_data_override_type → pair_margin_override_type
     nb::class_<tc::ContactManagerConfig>(m, "ContactManagerConfig")
         .def(nb::init<>())
         .def(nb::init<double>(), "default_margin"_a)
@@ -399,11 +398,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("modify_object_enabled", &tc::ContactManagerConfig::modify_object_enabled)
         .def("incrementMargins", &tc::ContactManagerConfig::incrementMargins, "increment"_a)
         .def("scaleMargins", &tc::ContactManagerConfig::scaleMargins, "scale"_a)
-        .def("validate", &tc::ContactManagerConfig::validate)
-        // Backwards compatibility alias
-        .def_prop_rw("margin_data_override_type",
-            [](const tc::ContactManagerConfig& c) { return c.pair_margin_override_type; },
-            [](tc::ContactManagerConfig& c, tcommon::CollisionMarginPairOverrideType v) { c.pair_margin_override_type = v; });
+        .def("validate", &tc::ContactManagerConfig::validate);
 
     // ========== CollisionCheckConfig ==========
     nb::class_<tc::CollisionCheckConfig>(m, "CollisionCheckConfig")
@@ -454,10 +449,8 @@ NB_MODULE(_tesseract_collision, m) {
         .def("getCollisionObjects", &tc::DiscreteContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::DiscreteContactManager::setActiveCollisionObjects, "names"_a)
         .def("getActiveCollisionObjects", &tc::DiscreteContactManager::getActiveCollisionObjects)
-        // Note: 0.33 renamed setDefaultCollisionMarginData → setDefaultCollisionMargin
         .def("setDefaultCollisionMargin", &tc::DiscreteContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
-        // Note: 0.33 renamed setPairCollisionMarginData → setCollisionMarginPair
         .def("setCollisionMarginPair", &tc::DiscreteContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
         .def("setCollisionMarginData", &tc::DiscreteContactManager::setCollisionMarginData,
@@ -469,11 +462,6 @@ NB_MODULE(_tesseract_collision, m) {
         .def("setContactAllowedValidator", &tc::DiscreteContactManager::setContactAllowedValidator, "validator"_a)
         .def("getContactAllowedValidator", &tc::DiscreteContactManager::getContactAllowedValidator)
         .def("applyContactManagerConfig", &tc::DiscreteContactManager::applyContactManagerConfig, "config"_a)
-        // Backwards compatibility aliases
-        .def("setDefaultCollisionMarginData", &tc::DiscreteContactManager::setDefaultCollisionMargin,
-             "default_collision_margin"_a)
-        .def("setPairCollisionMarginData", &tc::DiscreteContactManager::setCollisionMarginPair,
-             "name1"_a, "name2"_a, "collision_margin"_a)
         .def("getCollisionMarginData", &tc::DiscreteContactManager::getCollisionMarginData)
         .def("addCollisionObject",
              [](tc::DiscreteContactManager& self, const std::string& name, int mask_id,
@@ -552,10 +540,8 @@ NB_MODULE(_tesseract_collision, m) {
         .def("setCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginData,
              "collision_margin_data"_a)
         .def("getCollisionMarginData", &tc::ContinuousContactManager::getCollisionMarginData)
-        // Note: 0.33 renamed setDefaultCollisionMarginData → setDefaultCollisionMargin
         .def("setDefaultCollisionMargin", &tc::ContinuousContactManager::setDefaultCollisionMargin,
              "default_collision_margin"_a)
-        // Note: 0.33 renamed setPairCollisionMarginData → setCollisionMarginPair
         .def("setCollisionMarginPair", &tc::ContinuousContactManager::setCollisionMarginPair,
              "name1"_a, "name2"_a, "collision_margin"_a)
         .def("setCollisionMarginPairData", &tc::ContinuousContactManager::setCollisionMarginPairData,
@@ -565,11 +551,6 @@ NB_MODULE(_tesseract_collision, m) {
         .def("setContactAllowedValidator", &tc::ContinuousContactManager::setContactAllowedValidator, "validator"_a)
         .def("getContactAllowedValidator", &tc::ContinuousContactManager::getContactAllowedValidator)
         .def("applyContactManagerConfig", &tc::ContinuousContactManager::applyContactManagerConfig, "config"_a)
-        // Backwards compatibility aliases
-        .def("setDefaultCollisionMarginData", &tc::ContinuousContactManager::setDefaultCollisionMargin,
-             "default_collision_margin"_a)
-        .def("setPairCollisionMarginData", &tc::ContinuousContactManager::setCollisionMarginPair,
-             "name1"_a, "name2"_a, "collision_margin"_a)
         .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())  // GIL released (see discrete contactTest above)
         .def("clone", [](const tc::ContinuousContactManager& self) { return self.clone(); });
 

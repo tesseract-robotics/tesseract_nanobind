@@ -998,15 +998,10 @@ NB_MODULE(_tesseract_common, m) {
              "validators"_a, "type"_a);
 
     // ========== CollisionMarginData ==========
-    // Note: CollisionMarginOverrideType was renamed to CollisionMarginPairOverrideType in 0.33
-    // and reduced to 3 values (NONE, REPLACE, MODIFY)
     nb::enum_<tesseract::common::CollisionMarginPairOverrideType>(m, "CollisionMarginPairOverrideType")
         .value("NONE", tesseract::common::CollisionMarginPairOverrideType::NONE)
         .value("REPLACE", tesseract::common::CollisionMarginPairOverrideType::REPLACE)
         .value("MODIFY", tesseract::common::CollisionMarginPairOverrideType::MODIFY);
-
-    // Backwards-compatible alias (old name)
-    m.attr("CollisionMarginOverrideType") = m.attr("CollisionMarginPairOverrideType");
 
     // CollisionMarginPairData - new in 0.33
     nb::class_<tesseract::common::CollisionMarginPairData>(m, "CollisionMarginPairData")
@@ -1046,10 +1041,7 @@ NB_MODULE(_tesseract_common, m) {
              "obj"_a, "Largest margin involving `obj`: its largest pair margin or the default, whichever is larger.")
         .def("incrementMargins", &tesseract::common::CollisionMarginData::incrementMargins, "increment"_a)
         .def("scaleMargins", &tesseract::common::CollisionMarginData::scaleMargins, "scale"_a)
-        .def("apply", &tesseract::common::CollisionMarginData::apply, "pair_margin_data"_a, "override_type"_a)
-        // Backwards compatibility aliases
-        .def("getPairCollisionMargin", &tesseract::common::CollisionMarginData::getCollisionMargin)
-        .def("setPairCollisionMargin", &tesseract::common::CollisionMarginData::setCollisionMargin);
+        .def("apply", &tesseract::common::CollisionMarginData::apply, "pair_margin_data"_a, "override_type"_a);
 
     // ========== KinematicLimits ==========
     nb::class_<tesseract::common::KinematicLimits>(m, "KinematicLimits")

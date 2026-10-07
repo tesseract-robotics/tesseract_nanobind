@@ -23,6 +23,8 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType,
+    ContinuousContactManager,
+    DiscreteContactManager,
 )
 from tesseract_robotics.tesseract_common import (
     ACMContactAllowedValidator,
@@ -342,3 +344,41 @@ def test_contact_managers_factory_from_path_or_content(form):
     factory = ContactManagersPluginFactory(arg, TesseractSupportResourceLocator())
     assert factory.getDefaultDiscreteContactManagerPlugin() == "BulletDiscreteBVHManager"
     assert factory.getDefaultContinuousContactManagerPlugin() == "BulletCastBVHManager"
+
+
+@pytest.mark.parametrize(
+    ("cls", "alias", "native"),
+    [
+        (ContactManagerConfig, "margin_data_override_type", "pair_margin_override_type"),
+        (DiscreteContactManager, "setDefaultCollisionMarginData", "setDefaultCollisionMargin"),
+        (DiscreteContactManager, "setPairCollisionMarginData", "setCollisionMarginPair"),
+        (ContinuousContactManager, "setDefaultCollisionMarginData", "setDefaultCollisionMargin"),
+        (ContinuousContactManager, "setPairCollisionMarginData", "setCollisionMarginPair"),
+    ],
+)
+def test_no_pre_033_margin_aliases(cls, alias, native):
+    """gh-177: the pre-0.33 alias is gone; the tesseract name it forwarded to stays."""
+    assert not hasattr(cls, alias)
+    assert hasattr(cls, native)
+
+
+def test_contact_manager_config_pair_margin_reaches_manager():
+    """gh-177: the docs/api/tesseract_collision.md ContactManagerConfig snippet, on a manager."""
+    factory, locator = _get_discrete_factory()
+    manager = factory.createDiscreteContactManager("BulletDiscreteBVHManager")
+    try:
+        config = ContactManagerConfig()
+        config.default_margin = 0.025
+        config.pair_margin_data.setCollisionMargin("link_a", "link_b", 0.05)
+        config.pair_margin_override_type = CollisionMarginPairOverrideType.REPLACE
+        manager.applyContactManagerConfig(config)
+
+        margins = manager.getCollisionMarginData()
+        assert margins.getDefaultCollisionMargin() == pytest.approx(0.025)
+        pair_data = margins.getCollisionMarginPairData()
+        assert pair_data.getCollisionMargin("link_a", "link_b") == pytest.approx(0.05)
+    finally:
+        del manager
+        del factory
+        del locator
+        gc.collect()

@@ -36,7 +36,6 @@ __all__ = [
     "CollisionMarginData",
     "CollisionMarginPairData",
     "CollisionMarginPairOverrideType",
-    "CollisionMarginOverrideType",
     # Kinematics
     "KinematicLimits",
     "satisfiesLimits",

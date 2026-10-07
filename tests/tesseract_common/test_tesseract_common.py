@@ -919,3 +919,22 @@ def test_apply_tolerances_size_mismatch(n_lower, n_upper):
 def test_apply_tolerances_rejects_float32():
     with pytest.raises(TypeError):
         tesseract_common.applyTolerances(np.zeros(3, dtype=np.float32), np.zeros(0), np.zeros(0))
+
+
+def test_no_collision_margin_override_type_alias():
+    """gh-177: the pre-0.33 enum name is gone; CollisionMarginPairOverrideType stays."""
+    assert not hasattr(tesseract_common, "CollisionMarginOverrideType")
+    assert hasattr(tesseract_common, "CollisionMarginPairOverrideType")
+
+
+@pytest.mark.parametrize(
+    ("alias", "native"),
+    [
+        ("getPairCollisionMargin", "getCollisionMargin"),
+        ("setPairCollisionMargin", "setCollisionMargin"),
+    ],
+)
+def test_no_pair_collision_margin_aliases(alias, native):
+    """gh-177: CollisionMarginData keeps only the tesseract names."""
+    assert not hasattr(tesseract_common.CollisionMarginData, alias)
+    assert hasattr(tesseract_common.CollisionMarginData, native)

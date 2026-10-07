@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
 | Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
 | Unreleased | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
 | Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
@@ -18,6 +19,27 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### Pre-0.33 collision-margin aliases removed
+
+tesseract 0.33 renamed the collision-margin members; the bindings kept the old names as aliases
+of the new ones. The eight aliases are gone (#177); each replacement takes the same arguments
+and does the same thing.
+
+| before | after |
+| --- | --- |
+| `config.margin_data_override_type` | `config.pair_margin_override_type` |
+| `manager.setDefaultCollisionMarginData(m)` | `manager.setDefaultCollisionMargin(m)` |
+| `manager.setPairCollisionMarginData(a, b, m)` | `manager.setCollisionMarginPair(a, b, m)` |
+| `CollisionMarginOverrideType` | `CollisionMarginPairOverrideType` |
+| `margins.getPairCollisionMargin(a, b)` | `margins.getCollisionMargin(a, b)` |
+| `margins.setPairCollisionMargin(a, b, m)` | `margins.setCollisionMargin(a, b, m)` |
+
+`manager` is a `DiscreteContactManager` or `ContinuousContactManager`, `config` a
+`ContactManagerConfig`, `margins` a `CollisionMarginData`. A `ContactManagerConfig` has no
+`margin_data` member (the collision API page used one; that snippet never ran): set its
+`default_margin`, `pair_margin_data` and `pair_margin_override_type`, then pass it to
+`manager.applyContactManagerConfig(config)`.
 
 ### SWIG-era enum constants removed
 

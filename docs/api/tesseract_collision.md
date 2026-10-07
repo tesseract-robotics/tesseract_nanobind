@@ -240,10 +240,14 @@ Configure contact manager settings.
 
 ```python
 from tesseract_robotics.tesseract_collision import ContactManagerConfig
+from tesseract_robotics.tesseract_common import CollisionMarginPairOverrideType
 
 config = ContactManagerConfig()
-config.margin_data.setDefaultCollisionMargin(0.025)
-config.margin_data.setPairCollisionMargin("link_a", "link_b", 0.05)
+config.default_margin = 0.025
+config.pair_margin_data.setCollisionMargin("link_a", "link_b", 0.05)
+config.pair_margin_override_type = CollisionMarginPairOverrideType.REPLACE
+
+manager.applyContactManagerConfig(config)  # manager: a discrete or continuous contact manager
 ```
 
 ## Convex Mesh Generation

@@ -243,10 +243,10 @@ from tesseract_robotics.tesseract_common import CollisionMarginData
 
 margins = CollisionMarginData()
 margins.setDefaultCollisionMargin(0.025)
-margins.setPairCollisionMargin("link_a", "link_b", 0.05)
+margins.setCollisionMargin("link_a", "link_b", 0.05)
 
 default = margins.getDefaultCollisionMargin()
-pair_margin = margins.getPairCollisionMargin("link_a", "link_b")
+pair_margin = margins.getCollisionMargin("link_a", "link_b")
 ```
 
 `CollisionMarginPairData` holds the pair margins alone. Both types build from pair data,

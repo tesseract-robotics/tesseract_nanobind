@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping, Sequence
 import enum
 import io
 import os
-from typing import Annotated, TypeAlias, overload
+from typing import Annotated, overload
 
 import numpy
 from numpy.typing import NDArray
@@ -556,8 +556,6 @@ class CollisionMarginPairOverrideType(enum.Enum):
 
     MODIFY = 2
 
-CollisionMarginOverrideType: TypeAlias = CollisionMarginPairOverrideType
-
 class CollisionMarginPairData:
     @overload
     def __init__(self) -> None: ...
@@ -626,10 +624,6 @@ class CollisionMarginData:
     def scaleMargins(self, scale: float) -> None: ...
 
     def apply(self, pair_margin_data: CollisionMarginPairData, override_type: CollisionMarginPairOverrideType) -> None: ...
-
-    def getPairCollisionMargin(self, arg0: str, arg1: str, /) -> float: ...
-
-    def setPairCollisionMargin(self, arg0: str, arg1: str, arg2: float, /) -> None: ...
 
 class KinematicLimits:
     def __init__(self) -> None: ...
