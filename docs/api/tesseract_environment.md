@@ -182,6 +182,39 @@ env.getDiscreteContactManager().setContactAllowedValidator(combined)
     `EnvironmentContactAllowedValidator(None)` raise `TypeError`: the C++ default constructor
     exists for serialization and leaves the scene graph null.
 
+### Single-state collision checks
+
+`checkTrajectoryState` places every active collision object of a manager at one set of link
+transforms and runs a contact test; `checkTrajectorySegment` casts each object from `state0` to
+`state1` (continuous manager only). Both are the C++ functions from
+`tesseract/environment/utils.h`, except that C++ fills a `ContactResultMap&` out-parameter and
+Python gets the map back as the return value. Each call returns a new map, so results never
+carry over from an earlier call; C++ appends to the map it is given.
+
+```python
+from tesseract_robotics.tesseract_collision import ContactRequest
+from tesseract_robotics.tesseract_environment import checkTrajectorySegment, checkTrajectoryState
+
+names = env.getGroupJointNames("manipulator")
+start = env.getState(names, start_joints).link_transforms  # dict[str, Isometry3d]
+end = env.getState(names, end_joints).link_transforms
+
+# One state, either manager
+contacts = checkTrajectoryState(env.getDiscreteContactManager(), end, ContactRequest())
+contacts = checkTrajectoryState(env.getContinuousContactManager(), end, ContactRequest())
+
+# One swept segment, continuous manager
+contacts = checkTrajectorySegment(env.getContinuousContactManager(), start, end, ContactRequest())
+
+if contacts.count() > 0:
+    print(contacts.getSummary())
+```
+
+The state maps must hold a transform for every name in `manager.getActiveCollisionObjects()`;
+extra keys are ignored. A missing one raises `KeyError` naming every missing link, before the
+manager is moved. (C++ throws `std::out_of_range` partway through, after it has already moved the
+links before the missing one.) The GIL is released during the contact test.
+
 ### Environment Info
 
 ```python

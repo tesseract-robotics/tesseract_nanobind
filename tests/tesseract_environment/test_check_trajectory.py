@@ -10,10 +10,16 @@ import pytest
 from tesseract_robotics.tesseract_collision import (
     CollisionCheckConfig,
     CollisionEvaluatorType,
+    ContactRequest,
+    ContactResultMap,
     ContactTrajectoryResults,
     ContinuousCollisionType,
 )
-from tesseract_robotics.tesseract_environment import checkTrajectory
+from tesseract_robotics.tesseract_environment import (
+    checkTrajectory,
+    checkTrajectorySegment,
+    checkTrajectoryState,
+)
 
 from .test_tesseract_environment import _fresh_env
 
@@ -114,3 +120,99 @@ def test_results_structure_and_summaries():
     ):
         assert isinstance(text, str)
         assert text
+
+
+# ---------- checkTrajectoryState / checkTrajectorySegment (gh-190) ----------
+
+
+def _link_transforms(env, joint_values):
+    names = env.getGroupJointNames(GROUP)
+    return env.getState(names, joint_values).link_transforms
+
+
+@EVALUATORS
+def test_check_trajectory_state_colliding_reports_contacts(evaluator):
+    env = _fresh_env()
+    manager = _manager(env, evaluator)
+    contacts = checkTrajectoryState(
+        manager, _link_transforms(env, COLLIDING_STATE), ContactRequest()
+    )
+    assert isinstance(contacts, ContactResultMap)
+    assert contacts.count() > 0
+
+
+@EVALUATORS
+def test_check_trajectory_state_free_reports_nothing(evaluator):
+    env = _fresh_env()
+    manager = _manager(env, evaluator)
+    contacts = checkTrajectoryState(manager, _link_transforms(env, FREE_STATE), ContactRequest())
+    assert isinstance(contacts, ContactResultMap)
+    assert contacts.count() == 0
+
+
+def test_check_trajectory_segment_free_to_colliding_reports_contacts():
+    env = _fresh_env()
+    manager = env.getContinuousContactManager()
+    free = _link_transforms(env, FREE_STATE)
+    colliding = _link_transforms(env, COLLIDING_STATE)
+    contacts = checkTrajectorySegment(manager, free, colliding, ContactRequest())
+    assert isinstance(contacts, ContactResultMap)
+    assert contacts.count() > 0
+
+
+def test_check_trajectory_segment_free_to_free_reports_nothing():
+    env = _fresh_env()
+    manager = env.getContinuousContactManager()
+    free = _link_transforms(env, FREE_STATE)
+    contacts = checkTrajectorySegment(manager, free, free, ContactRequest())
+    assert contacts.count() == 0
+
+
+@EVALUATORS
+def test_check_trajectory_state_returns_a_fresh_map_per_call(evaluator):
+    # C++ appends to the caller's map ("It does not get cleared"); the binding hands out a new
+    # one each call, so a free check after a colliding one is empty and the maps are independent.
+    env = _fresh_env()
+    manager = _manager(env, evaluator)
+    colliding = _link_transforms(env, COLLIDING_STATE)
+    first = checkTrajectoryState(manager, colliding, ContactRequest())
+    second = checkTrajectoryState(manager, colliding, ContactRequest())
+    free = checkTrajectoryState(manager, _link_transforms(env, FREE_STATE), ContactRequest())
+    assert first is not second
+    assert first.count() == second.count() > 0
+    assert free.count() == 0
+    first.clear()
+    assert first.count() == 0
+    assert second.count() > 0
+
+
+@EVALUATORS
+def test_check_trajectory_state_missing_active_link_raises_key_error(evaluator):
+    # Upstream does state.at(link) per active object (std::out_of_range -> IndexError, after
+    # moving the links before it). The binding raises KeyError naming every missing link and
+    # leaves the manager as it was: here link_1..link_6 at the colliding pose would touch base_link.
+    env = _fresh_env()
+    manager = _manager(env, evaluator)
+    free = _link_transforms(env, FREE_STATE)
+    assert checkTrajectoryState(manager, free, ContactRequest()).count() == 0
+    partial = _link_transforms(env, COLLIDING_STATE)
+    del partial["link_7"]
+    del partial["tool0"]
+    with pytest.raises(KeyError, match=r"checkTrajectoryState: state .*link_7, tool0"):
+        checkTrajectoryState(manager, partial, ContactRequest())
+    untouched = ContactResultMap()
+    manager.contactTest(untouched, ContactRequest())
+    assert untouched.count() == 0
+
+
+@pytest.mark.parametrize("missing_arg", ["state0", "state1"])
+def test_check_trajectory_segment_missing_active_link_raises_key_error(missing_arg):
+    env = _fresh_env()
+    manager = env.getContinuousContactManager()
+    states = {
+        "state0": _link_transforms(env, FREE_STATE),
+        "state1": _link_transforms(env, COLLIDING_STATE),
+    }
+    del states[missing_arg]["link_7"]
+    with pytest.raises(KeyError, match=rf"checkTrajectorySegment: {missing_arg} .*link_7"):
+        checkTrajectorySegment(manager, states["state0"], states["state1"], ContactRequest())

@@ -107,6 +107,55 @@ CheckTrajectoryResult check_trajectory(Manager& manager,
     return out;
 }
 
+// gh-190: checkTrajectorySegment / checkTrajectoryState do `state.at(link)` for every active
+// collision object, so a map missing one throws std::out_of_range mid-loop, after some objects
+// were already moved. Check up front, with the GIL held, and name every missing link.
+template <typename Manager>
+void require_active_link_transforms(const Manager& manager,
+                                    const tc::TransformMap& state,
+                                    const char* caller,
+                                    const char* arg)
+{
+    std::string missing;
+    for (const auto& name : manager.getActiveCollisionObjects()) {
+        if (state.find(name) == state.end()) {
+            if (!missing.empty()) missing += ", ";
+            missing += name;
+        }
+    }
+    if (!missing.empty())
+        throw nb::key_error((std::string(caller) + ": " + arg + " has no transform for active links: " +
+                             missing).c_str());
+}
+
+// Both write into a `ContactResultMap&` and return void; the map is returned instead (out-param
+// rule). A fresh map per call: C++ callers that accumulated across calls merge in Python.
+// GIL released in-body, as in check_trajectory, so the map is cast back with the GIL held.
+template <typename Manager>
+tcol::ContactResultMap check_trajectory_state(Manager& manager,
+                                              const tc::TransformMap& state,
+                                              const tcol::ContactRequest& contact_request)
+{
+    require_active_link_transforms(manager, state, "checkTrajectoryState", "state");
+    tcol::ContactResultMap contact_results;
+    nb::gil_scoped_release release;
+    te::checkTrajectoryState(contact_results, manager, state, contact_request);
+    return contact_results;
+}
+
+tcol::ContactResultMap check_trajectory_segment(tcol::ContinuousContactManager& manager,
+                                                const tc::TransformMap& state0,
+                                                const tc::TransformMap& state1,
+                                                const tcol::ContactRequest& contact_request)
+{
+    require_active_link_transforms(manager, state0, "checkTrajectorySegment", "state0");
+    require_active_link_transforms(manager, state1, "checkTrajectorySegment", "state1");
+    tcol::ContactResultMap contact_results;
+    nb::gil_scoped_release release;
+    te::checkTrajectorySegment(contact_results, manager, state0, state1, contact_request);
+    return contact_results;
+}
+
 // GH #43: Environment::setState forwards joint names straight into the state
 // solver, which dereferences unknown names unchecked -> SIGSEGV with no Python
 // traceback. The binding owns the Python boundary, so validate here and fail
@@ -356,6 +405,22 @@ NB_MODULE(_tesseract_environment, m) {
            const tc::TrajArray& traj, const tcol::CollisionCheckConfig& config) {
             return check_trajectory(manager, manip, traj, config);
         }, "manager"_a, "manip"_a, "traj"_a, "config"_a);
+
+    // ========== checkTrajectorySegment / checkTrajectoryState (utils.h) ==========
+    // Single-step checks; the ContactResultMap out-param is the return value. A state map missing
+    // an active collision link raises KeyError before the manager is touched (gh-190).
+    m.def("checkTrajectorySegment", &check_trajectory_segment,
+          "manager"_a, "state0"_a, "state1"_a, "contact_request"_a);
+    m.def("checkTrajectoryState",
+        [](tcol::DiscreteContactManager& manager, const tc::TransformMap& state,
+           const tcol::ContactRequest& contact_request) {
+            return check_trajectory_state(manager, state, contact_request);
+        }, "manager"_a, "state"_a, "contact_request"_a);
+    m.def("checkTrajectoryState",
+        [](tcol::ContinuousContactManager& manager, const tc::TransformMap& state,
+           const tcol::ContactRequest& contact_request) {
+            return check_trajectory_state(manager, state, contact_request);
+        }, "manager"_a, "state"_a, "contact_request"_a);
 
     // EventCallbackFn wrapper for Python callbacks
     nb::class_<PyEventCallbackFn>(m, "EventCallbackFn")

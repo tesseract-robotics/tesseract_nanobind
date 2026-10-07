@@ -166,6 +166,10 @@ if results:  # ContactTrajectoryResults is truthy when any step collided
 
 Every overload accepts either a `DiscreteContactManager` or a `ContinuousContactManager`. The GIL is released while the trajectory is checked.
 
+To check one state or one segment instead of a whole trajectory, use `checkTrajectoryState` or
+`checkTrajectorySegment`; both return a `ContactResultMap`. See
+[Single-state collision checks](../api/tesseract_environment.md#single-state-collision-checks).
+
 ## LVS (Longest Valid Segment)
 
 LVS interpolates between waypoints and checks at discrete points:

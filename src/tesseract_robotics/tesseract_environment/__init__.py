@@ -59,6 +59,8 @@ __all__ = [
     "SceneStateChangedEvent",
     # Utils
     "checkTrajectory",
+    "checkTrajectorySegment",
+    "checkTrajectoryState",
     # AnyPoly wrapper (re-exported from task_composer for SWIG compatibility)
     "AnyPoly_wrap_EnvironmentConst",
 ]
