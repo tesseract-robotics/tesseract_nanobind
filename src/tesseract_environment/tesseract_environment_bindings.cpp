@@ -277,12 +277,7 @@ using CommandList = std::vector<std::shared_ptr<const te::Command>>;
 
 const CommandList& require_commands(const CommandList& commands, const char* caller)
 {
-    for (std::size_t i = 0; i < commands.size(); ++i)
-        if (!commands[i])
-            throw nb::type_error((std::string(caller) + ": commands[" + std::to_string(i) +
-                                  "] is None, expected a Command")
-                                     .c_str());
-    return commands;
+    return require_non_null(commands, caller, "commands", "a Command");  // gh-201 shared helper
 }
 
 // Test oracle for the GIL guards (gh-134): counts its copies by whether the copying thread holds

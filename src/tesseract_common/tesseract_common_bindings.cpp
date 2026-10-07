@@ -993,8 +993,15 @@ NB_MODULE(_tesseract_common, m) {
     nb::class_<tesseract::common::CombinedContactAllowedValidator, tesseract::common::ContactAllowedValidator>(
         m, "CombinedContactAllowedValidator")
         .def(nb::init<>())
-        .def(nb::init<std::vector<std::shared_ptr<const tesseract::common::ContactAllowedValidator>>,
-                      tesseract::common::CombinedContactAllowedValidatorType>(),
+        .def("__init__",
+             [](tesseract::common::CombinedContactAllowedValidator* self,
+                const std::vector<std::shared_ptr<const tesseract::common::ContactAllowedValidator>>& validators,
+                tesseract::common::CombinedContactAllowedValidatorType type) {
+                 new (self) tesseract::common::CombinedContactAllowedValidator(
+                     require_non_null(validators, "CombinedContactAllowedValidator", "validators",
+                                      "a ContactAllowedValidator"),
+                     type);
+             },
              "validators"_a, "type"_a);
 
     // ========== CollisionMarginData ==========

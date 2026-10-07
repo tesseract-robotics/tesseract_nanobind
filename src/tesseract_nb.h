@@ -107,6 +107,22 @@ void bind_value_equality(Class& cls) {
     cls.attr("__hash__") = nb::none();
 }
 
+// nanobind rejects None for a direct std::shared_ptr<T> argument, but converts a None *element*
+// of a list to a null std::shared_ptr<T>, which upstream later dereferences (gh-201). Every
+// binding that takes a std::vector<std::shared_ptr<T>> passes it through this check first:
+// TypeError "<caller>: <arg>[i] is None, expected <expected>".
+template <typename T>
+const std::vector<std::shared_ptr<T>>& require_non_null(const std::vector<std::shared_ptr<T>>& items,
+                                                        const char* caller, const char* arg,
+                                                        const char* expected) {
+    for (std::size_t i = 0; i < items.size(); ++i)
+        if (!items[i])
+            throw nb::type_error((std::string(caller) + ": " + arg + "[" + std::to_string(i) +
+                                  "] is None, expected " + expected)
+                                     .c_str());
+    return items;
+}
+
 // Note: Eigen::Isometry3d is bound as an explicit class in tesseract_common_bindings.cpp
 // for SWIG API compatibility (tests expect .matrix() method etc.)
 // No type caster is needed since we have explicit bindings.

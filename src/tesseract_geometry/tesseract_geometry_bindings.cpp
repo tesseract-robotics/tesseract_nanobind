@@ -248,7 +248,9 @@ NB_MODULE(_tesseract_geometry, m) {
 
     // CompoundMesh - container for multiple meshes from a single resource (e.g., .dae file)
     nb::class_<tg::CompoundMesh, tg::Geometry>(m, "CompoundMesh")
-        .def(nb::init<std::vector<std::shared_ptr<tg::PolygonMesh>>>(), "meshes"_a)
+        .def("__init__", [](tg::CompoundMesh* self, const std::vector<std::shared_ptr<tg::PolygonMesh>>& meshes) {
+            new (self) tg::CompoundMesh(require_non_null(meshes, "CompoundMesh", "meshes", "a PolygonMesh"));
+        }, "meshes"_a)
         .def("getMeshes", &tg::CompoundMesh::getMeshes, nb::rv_policy::reference_internal,
              "Get the vector of meshes")
         .def("getResource", &tg::CompoundMesh::getResource, "Get the resource used to create this mesh")

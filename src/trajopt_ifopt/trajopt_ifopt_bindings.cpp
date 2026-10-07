@@ -385,8 +385,14 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // ========== JointVelConstraint ==========
     nb::class_<ti::JointVelConstraint, ti::ConstraintSet>(m, "JointVelConstraint")
-        .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::Var>>&,
-                      const Eigen::VectorXd&, std::string>(),
+        .def("__init__",
+             [](ti::JointVelConstraint* self, const Eigen::VectorXd& targets,
+                const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
+                const Eigen::VectorXd& coeffs, std::string name) {
+                 new (self) ti::JointVelConstraint(
+                     targets, require_non_null(position_vars, "JointVelConstraint", "position_vars", "a Var"),
+                     coeffs, std::move(name));
+             },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointVel",
              "Create joint velocity constraint with target values")
         .def("getValues", &ti::JointVelConstraint::getValues,
@@ -394,8 +400,14 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // ========== JointAccelConstraint ==========
     nb::class_<ti::JointAccelConstraint, ti::ConstraintSet>(m, "JointAccelConstraint")
-        .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::Var>>&,
-                      const Eigen::VectorXd&, std::string>(),
+        .def("__init__",
+             [](ti::JointAccelConstraint* self, const Eigen::VectorXd& targets,
+                const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
+                const Eigen::VectorXd& coeffs, std::string name) {
+                 new (self) ti::JointAccelConstraint(
+                     targets, require_non_null(position_vars, "JointAccelConstraint", "position_vars", "a Var"),
+                     coeffs, std::move(name));
+             },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointAccel",
              "Create joint acceleration constraint with target values")
         .def("getValues", &ti::JointAccelConstraint::getValues,
@@ -505,8 +517,14 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // ========== JointJerkConstraint ==========
     nb::class_<ti::JointJerkConstraint, ti::ConstraintSet>(m, "JointJerkConstraint")
-        .def(nb::init<const Eigen::VectorXd&, const std::vector<std::shared_ptr<const ti::Var>>&,
-                      const Eigen::VectorXd&, std::string>(),
+        .def("__init__",
+             [](ti::JointJerkConstraint* self, const Eigen::VectorXd& targets,
+                const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
+                const Eigen::VectorXd& coeffs, std::string name) {
+                 new (self) ti::JointJerkConstraint(
+                     targets, require_non_null(position_vars, "JointJerkConstraint", "position_vars", "a Var"),
+                     coeffs, std::move(name));
+             },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointJerk",
              "Create joint jerk constraint (requires 4+ consecutive waypoints)")
         .def("getValues", &ti::JointJerkConstraint::getValues,

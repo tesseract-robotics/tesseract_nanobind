@@ -467,7 +467,9 @@ NB_MODULE(_tesseract_collision, m) {
              [](tc::DiscreteContactManager& self, const std::string& name, int mask_id,
                 const std::vector<std::shared_ptr<const tg::Geometry>>& shapes,
                 const tcommon::VectorIsometry3d& shape_poses, bool enabled) {
-                 return self.addCollisionObject(name, mask_id, shapes, shape_poses, enabled);
+                 return self.addCollisionObject(
+                     name, mask_id, require_non_null(shapes, "addCollisionObject", "shapes", "a Geometry"),
+                     shape_poses, enabled);
              }, "name"_a, "mask_id"_a, "shapes"_a, "shape_poses"_a, "enabled"_a = true)
         .def("getCollisionObjectGeometries", &tc::DiscreteContactManager::getCollisionObjectGeometries, "name"_a)
         .def("getCollisionObjectGeometriesTransforms", &tc::DiscreteContactManager::getCollisionObjectGeometriesTransforms, "name"_a)
@@ -505,7 +507,9 @@ NB_MODULE(_tesseract_collision, m) {
              [](tc::ContinuousContactManager& self, const std::string& name, int mask_id,
                 const std::vector<std::shared_ptr<const tg::Geometry>>& shapes,
                 const tcommon::VectorIsometry3d& shape_poses, bool enabled) {
-                 return self.addCollisionObject(name, mask_id, shapes, shape_poses, enabled);
+                 return self.addCollisionObject(
+                     name, mask_id, require_non_null(shapes, "addCollisionObject", "shapes", "a Geometry"),
+                     shape_poses, enabled);
              }, "name"_a, "mask_id"_a, "shapes"_a, "shape_poses"_a, "enabled"_a = true)
         .def("getCollisionObjectGeometries", &tc::ContinuousContactManager::getCollisionObjectGeometries, "name"_a)
         .def("getCollisionObjectGeometriesTransforms",
