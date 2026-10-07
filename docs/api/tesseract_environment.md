@@ -150,6 +150,38 @@ The registered names are the keys of
 `continuous_plugin_infos.plugins`). Any other name raises `KeyError`. A manager keeps its
 `Environment` alive, because its code lives in a plugin library the environment loaded.
 
+#### Contact allowed validator
+
+Every contact manager the environment creates or clones gets the same
+`EnvironmentContactAllowedValidator`. It allows a link pair to collide only if the scene graph's
+allowed collision matrix allows it. It holds the scene graph by shared pointer, so it follows later
+ACM changes (`ModifyAllowedCollisionsCommand`, `RemoveAllowedCollisionLinkCommand`) and keeps the
+graph alive after the environment is gone.
+
+```python
+from tesseract_robotics.tesseract_common import (
+    ACMContactAllowedValidator,
+    CombinedContactAllowedValidator,
+    CombinedContactAllowedValidatorType,
+)
+from tesseract_robotics.tesseract_environment import EnvironmentContactAllowedValidator
+
+validator = env.getDiscreteContactManager().getContactAllowedValidator()
+assert isinstance(validator, EnvironmentContactAllowedValidator)
+validator("link_1", "link_2")  # True: the SRDF disables this pair
+
+# Build one for any scene graph, e.g. to combine it with an extra ACM
+own = EnvironmentContactAllowedValidator(env.getSceneGraph())
+extra = ACMContactAllowedValidator(extra_acm)
+combined = CombinedContactAllowedValidator([own, extra], CombinedContactAllowedValidatorType.OR)
+env.getDiscreteContactManager().setContactAllowedValidator(combined)
+```
+
+!!! note "A scene graph is required"
+    The only constructor takes a `SceneGraph`. `EnvironmentContactAllowedValidator()` and
+    `EnvironmentContactAllowedValidator(None)` raise `TypeError`: the C++ default constructor
+    exists for serialization and leaves the scene graph null.
+
 ### Environment Info
 
 ```python

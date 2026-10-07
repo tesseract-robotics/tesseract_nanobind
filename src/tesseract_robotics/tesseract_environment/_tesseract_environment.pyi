@@ -328,6 +328,9 @@ class SetActiveContinuousContactManagerCommand(Command):
 
     __hash__: None = None
 
+class EnvironmentContactAllowedValidator(tesseract_robotics.tesseract_common._tesseract_common.ContactAllowedValidator):
+    def __init__(self, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph) -> None: ...
+
 class Environment:
     def __init__(self) -> None: ...
 

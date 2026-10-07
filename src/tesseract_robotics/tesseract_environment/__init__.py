@@ -16,6 +16,7 @@ except ImportError:
 __all__ = [
     # Environment
     "Environment",
+    "EnvironmentContactAllowedValidator",
     # Base command class
     "Command",
     "CommandType",

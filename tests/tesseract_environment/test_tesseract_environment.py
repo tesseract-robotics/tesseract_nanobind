@@ -1,4 +1,5 @@
 import datetime
+import gc
 import os
 import traceback
 from pathlib import Path
@@ -6,7 +7,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tesseract_robotics import tesseract_environment, tesseract_srdf, tesseract_urdf
+from tesseract_robotics import (
+    tesseract_common,
+    tesseract_environment,
+    tesseract_srdf,
+    tesseract_urdf,
+)
 from tesseract_robotics.tesseract_common import Isometry3d
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
@@ -679,3 +685,80 @@ def test_get_contact_manager_by_name():
     # Registered names are per kind: a continuous plugin is not a discrete manager.
     with pytest.raises(KeyError, match="BulletCastBVHManager"):
         env.getDiscreteContactManager("BulletCastBVHManager")
+
+
+# Allowed pair: SRDF disable_collisions entry (Adjacent). Disallowed pair: no SRDF entry.
+_ACM_ALLOWED_PAIR = ("link_1", "link_2")
+_ACM_DISALLOWED_PAIR = ("base_link", "link_5")
+
+
+# gh-189: Environment installs an EnvironmentContactAllowedValidator on every contact manager
+# it creates; unbound, it came back as the bare ContactAllowedValidator base.
+def test_env_contact_manager_validator_type():
+    env = _fresh_env()
+    for manager in (env.getDiscreteContactManager(), env.getContinuousContactManager()):
+        validator = manager.getContactAllowedValidator()
+        assert isinstance(validator, tesseract_environment.EnvironmentContactAllowedValidator)
+        assert isinstance(validator, tesseract_common.ContactAllowedValidator)
+
+
+def test_env_contact_allowed_validator_matches_acm():
+    env = _fresh_env()
+    validator = tesseract_environment.EnvironmentContactAllowedValidator(env.getSceneGraph())
+    acm = env.getAllowedCollisionMatrix()
+    assert validator(*_ACM_ALLOWED_PAIR) is True
+    assert validator(*_ACM_DISALLOWED_PAIR) is False
+    for pair in (_ACM_ALLOWED_PAIR, _ACM_DISALLOWED_PAIR):
+        assert validator(*pair) == acm.isCollisionAllowed(*pair)
+
+
+def test_env_contact_allowed_validator_tracks_scene_graph():
+    # The validator holds the environment's live scene graph, not a snapshot of its ACM.
+    env = _fresh_env()
+    validator = tesseract_environment.EnvironmentContactAllowedValidator(env.getSceneGraph())
+    acm = tesseract_common.AllowedCollisionMatrix()
+    acm.addAllowedCollision(*_ACM_DISALLOWED_PAIR, "test")
+    assert env.applyCommand(
+        tesseract_environment.ModifyAllowedCollisionsCommand(
+            acm, tesseract_environment.ModifyAllowedCollisionsType_ADD
+        )
+    )
+    assert validator(*_ACM_DISALLOWED_PAIR) is True
+
+
+def test_env_contact_allowed_validator_keeps_scene_graph_alive():
+    scene_graph = get_scene_graph()
+    scene_graph.addAllowedCollision(*_ACM_ALLOWED_PAIR, "Adjacent")
+    validator = tesseract_environment.EnvironmentContactAllowedValidator(scene_graph)
+    del scene_graph
+    gc.collect()
+    assert validator(*_ACM_ALLOWED_PAIR) is True
+    assert validator(*_ACM_DISALLOWED_PAIR) is False
+
+    env = _fresh_env()
+    installed = env.getDiscreteContactManager().getContactAllowedValidator()
+    del env
+    gc.collect()
+    assert installed(*_ACM_ALLOWED_PAIR) is True
+
+
+def test_env_contact_allowed_validator_rejects_none():
+    # A null scene graph would be dereferenced by operator(); neither path may build one.
+    with pytest.raises(TypeError):
+        tesseract_environment.EnvironmentContactAllowedValidator(None)
+    with pytest.raises(TypeError):
+        tesseract_environment.EnvironmentContactAllowedValidator()
+
+
+def test_env_contact_allowed_validator_on_contact_manager():
+    env = _fresh_env()
+    validator = tesseract_environment.EnvironmentContactAllowedValidator(env.getSceneGraph())
+    manager = env.getDiscreteContactManager()
+    manager.setContactAllowedValidator(validator)
+    assert manager.getContactAllowedValidator() is validator
+    combined = tesseract_common.CombinedContactAllowedValidator(
+        [validator, tesseract_common.ACMContactAllowedValidator()],
+        tesseract_common.CombinedContactAllowedValidatorType.OR,
+    )
+    assert combined(*_ACM_ALLOWED_PAIR) is True
+    assert combined(*_ACM_DISALLOWED_PAIR) is False

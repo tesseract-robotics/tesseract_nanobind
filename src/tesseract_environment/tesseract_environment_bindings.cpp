@@ -288,8 +288,10 @@ NB_MODULE(_tesseract_environment, m) {
     // Import collision module for DiscreteContactManager/ContinuousContactManager types
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
     // Import common module for ContactManagersPluginInfo (AddContactManagersPluginInfoCommand)
+    // and the ContactAllowedValidator base of EnvironmentContactAllowedValidator
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
-    // Import scene_graph module for JointLimits (getJointLimits)
+    // Import scene_graph module for JointLimits (getJointLimits) and SceneGraph
+    // (EnvironmentContactAllowedValidator constructor)
     nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
     m.doc() = "tesseract_environment Python bindings";
 
@@ -606,6 +608,16 @@ NB_MODULE(_tesseract_environment, m) {
             throw nb::key_error(("Active joint not found: " + unknown).c_str());
         return self.getCurrentJointValues(joint_names);
     };
+
+    // ========== EnvironmentContactAllowedValidator ==========
+    // Validator Environment installs on every contact manager it creates or clones: a link pair
+    // may collide unless the scene graph's ACM allows it. Holds the scene graph by shared_ptr, so
+    // it reflects later ACM changes to that graph and keeps it alive. No default constructor: it
+    // exists for cereal and leaves scene_graph_ null, which operator() dereferences. __call__ is
+    // inherited from the tesseract_common base binding and dispatches virtually.
+    nb::class_<te::EnvironmentContactAllowedValidator, tc::ContactAllowedValidator>(
+        m, "EnvironmentContactAllowedValidator")
+        .def(nb::init<std::shared_ptr<const tsg::SceneGraph>>(), "scene_graph"_a);
 
     // ========== Environment ==========
     nb::class_<te::Environment>(m, "Environment")
