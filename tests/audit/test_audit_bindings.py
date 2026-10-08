@@ -34,6 +34,39 @@ def test_real_binding_tu_parses_clean(module):
     assert tu.cursor is not None
 
 
+# Phase C: the tesseract core modules and their header prefixes.
+CORE_PREFIX = {
+    "tesseract_geometry": "tesseract/geometry/",
+    "tesseract_scene_graph": "tesseract/scene_graph/",
+    "tesseract_state_solver": "tesseract/state_solver/",
+    "tesseract_srdf": "tesseract/srdf/",
+    "tesseract_urdf": "tesseract/urdf/",
+    "tesseract_kinematics": "tesseract/kinematics/",
+}
+
+
+@pytest.mark.parametrize("module", sorted(CORE_PREFIX))
+def test_core_binding_tu_parses_clean(module):
+    """No error diagnostics in the binding TU itself."""
+    tu = audit.parse_tu(REPO_ROOT / "src" / module / f"{module}_bindings.cpp")
+    assert tu.cursor is not None
+
+
+@pytest.mark.parametrize("module", sorted(CORE_PREFIX))
+def test_core_unincluded_headers_parse_clean(module):
+    """E0's synthetic TU (every unincluded, non-unaudited header) parses: one error aborts the module."""
+    prefix = CORE_PREFIX[module]
+    cpp = REPO_ROOT / "src" / module / f"{module}_bindings.cpp"
+    tu = audit.parse_tu(cpp)
+    included = {Path(i.include.name).resolve() for i in tu.get_includes()}
+    headers = {
+        h: s
+        for h, s in audit.prefix_headers(prefix, audit.INCLUDE_DIRS).items()
+        if h not in included and not audit.is_unaudited(s, prefix)
+    }
+    audit.unincluded_header_gaps(cpp, headers)  # raises HeaderParseError on any error
+
+
 def test_syntax_error_raises_header_parse_error():
     with pytest.raises(audit.HeaderParseError, match="broken_bindings.cpp"):
         audit.parse_tu(FIXTURES / "broken_bindings.cpp")
