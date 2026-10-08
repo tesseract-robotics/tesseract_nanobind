@@ -24,7 +24,7 @@ import re
 import subprocess
 import sys
 import sysconfig
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -144,7 +144,8 @@ THIRD_PARTY_HEADERS = {
     "binding #includes it directly only so that `convex_decomposition_vhacd.h` does not compile "
     "a second copy of its implementation (#179).",
 }
-# A header another binding TU #includes directly (`<…>` form) is audited with that module.
+# Direct `<…>` includes decide header ownership: a header its prefix owner's binding does not
+# #include, but another binding does, is audited with `header_auditor` of those modules.
 INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
 HEADER_SUFFIXES = frozenset({".h", ".hpp"})
 
@@ -389,6 +390,66 @@ def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
     return frozenset(
         m for s in sources for m in INCLUDE_DIRECTIVE.findall(s.read_text(encoding="utf-8"))
     )
+
+
+def binding_module(path: Path) -> str:
+    """`src/tesseract_srdf/tesseract_srdf_bindings.cpp` → `tesseract_srdf`."""
+    return path.stem.removesuffix("_bindings")
+
+
+def header_auditor(includers: Iterable[str]) -> str:
+    """The one module that audits a header its prefix owner's binding does not #include.
+
+    The first of the #including modules by name, mapped or not, so the choice does not move
+    when another module gets an `AUDITED_HEADER_PREFIX` entry.
+    """
+    return min(includers)
+
+
+def header_owner(spelling: str, prefixes: Mapping[str, str]) -> str | None:
+    """The module whose prefix holds the header (longest prefix wins), or None."""
+    owners = [m for m, p in prefixes.items() if spelling.startswith(p)]
+    return max(owners, key=lambda m: len(prefixes[m]), default=None)
+
+
+def owner_prefixes() -> dict[str, str]:
+    """Every binding module's header prefix: `AUDITED_HEADER_PREFIX`, else `tesseract_<x>` →
+    `tesseract/<x>/` where that directory exists. Used only to decide who owns a header."""
+    out: dict[str, str] = {}
+    for m in binding_modules():
+        if m in AUDITED_HEADER_PREFIX:
+            out[m] = AUDITED_HEADER_PREFIX[m]
+        elif m.startswith("tesseract_"):
+            p = f"tesseract/{m.removeprefix('tesseract_')}/"
+            if any((d / p).is_dir() for d in INCLUDE_DIRS):
+                out[m] = p
+    return out
+
+
+def foreign_headers(
+    module: str,
+    own_includes: frozenset[str],
+    other_includes: Mapping[str, frozenset[str]],
+    prefixes: Mapping[str, str],
+    include_dirs: Sequence[Path],
+) -> dict[Path, str]:
+    """Headers under another module's prefix that this binding #includes directly, that the
+    owner's binding does not, and that this module audits (`header_auditor`)."""
+    found: dict[Path, str] = {}
+    for spelling in own_includes:
+        owner = header_owner(spelling, prefixes)
+        if owner is None or owner == module or spelling in other_includes.get(owner, frozenset()):
+            continue
+        if is_unaudited(spelling, prefixes[owner]):
+            continue
+        includers = [module, *(m for m, inc in other_includes.items() if spelling in inc)]
+        if header_auditor(includers) != module:
+            continue
+        for d in include_dirs:
+            if (d / spelling).is_file():
+                found[(d / spelling).resolve()] = spelling
+                break
+    return found
 
 
 def is_third_party(below: str) -> bool:
@@ -843,6 +904,9 @@ class ModuleReport:
     deviations: list[Deviation]
     accepted: list[Accepted]
     quoted: list[QuotedType]
+    # Headers under this module's prefix that its binding does not #include but another does:
+    # header spelling -> the module that audits it (`header_auditor`).
+    delegated: dict[str, str] = field(default_factory=dict)
 
 
 def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
@@ -1052,22 +1116,39 @@ def audit_tu(
     extra_include_dirs: Sequence[Path] = (),
     other_bindings: Sequence[Path] = (),
     stub_roots: Sequence[Path] = (SRC,),
+    prefixes: Mapping[str, str] | None = None,
 ) -> ModuleReport:
     """Audit one translation unit against one stub and package `__init__.py`.
 
-    Audits every header under `prefix`, except `UNAUDITED_HEADERS` and headers that one of
-    `other_bindings` #includes directly; the binding's own direct includes always count.
+    Audits every header under `prefix`, except `UNAUDITED_HEADERS` and headers that the binding
+    does not #include but one of `other_bindings` does: those are audited by `header_auditor`
+    of their includers and listed in `ModuleReport.delegated`. Conversely, a header under
+    another module's prefix (`prefixes`: module → prefix, for ownership) that this binding
+    #includes and its owner's binding does not is audited here when this module is its auditor.
     Stub base classes bound in other extensions resolve through stubs under `stub_roots`.
     """
     include_dirs = (*extra_include_dirs, *INCLUDE_DIRS)
+    prefixes = {module: prefix} if prefixes is None else prefixes
     tu = parse_tu(cpp_path, extra_include_dirs)
     direct = audited_headers(tu, prefix, include_dirs)
-    owned_elsewhere = direct_include_spellings(other_bindings)
-    audited = {
-        h: spelling
-        for h, spelling in prefix_headers(prefix, include_dirs).items()
-        if h in direct or not (is_unaudited(spelling, prefix) or spelling in owned_elsewhere)
-    }
+    other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
+    owned_elsewhere = frozenset().union(*other_includes.values())
+    audited: dict[Path, str] = {}
+    delegated: dict[str, str] = {}
+    for h, spelling in prefix_headers(prefix, include_dirs).items():
+        if h in direct:
+            audited[h] = spelling
+        elif is_unaudited(spelling, prefix):
+            continue
+        elif spelling in owned_elsewhere:
+            delegated[spelling] = header_auditor(
+                m for m, inc in other_includes.items() if spelling in inc
+            )
+        else:
+            audited[h] = spelling
+    audited |= foreign_headers(
+        module, direct_include_spellings([cpp_path]), other_includes, prefixes, include_dirs
+    )
     included = frozenset(Path(i.include.name).resolve() for i in tu.get_includes())
     report = match(
         module,
@@ -1082,6 +1163,7 @@ def audit_tu(
         [*report.gaps, *unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)]
     )
     report.deviations = sorted([*report.deviations, *init_findings(init_path)])
+    report.delegated = dict(sorted(delegated.items()))
     return report
 
 
@@ -1101,6 +1183,7 @@ def audit_module(module: str) -> ModuleReport:
         STUB_ROOT / module / "__init__.py",
         AUDITED_HEADER_PREFIX[module],
         other_bindings=[binding_source(m) for m in binding_modules() if m != module],
+        prefixes=owner_prefixes(),
     )
 
 
@@ -1185,7 +1268,8 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
         "",
         '!!! note "Unaudited headers"',
         *(f"    - `{k}`: {v}" for k, v in UNAUDITED_HEADERS.items()),
-        "    - Headers another binding #includes directly are audited with that module.",
+        "    - A header its prefix owner's binding does not #include, but another binding does, is "
+        "audited with the first such module by name; each module's section lists those headers.",
         "",
         '!!! note "Third-party headers (never audited, even when #included directly)"',
         *(f"    - `{k}`: {v}" for k, v in THIRD_PARTY_HEADERS.items()),
@@ -1209,6 +1293,18 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
             ("symbol", "rule", "location"),
             [(f"`{a.symbol}`", a.rule, a.location) for a in r.accepted],
         )
+        out += ["### Headers audited with another module", ""]
+        out += _table(
+            ("header", "audited with", "status"),
+            [
+                (
+                    f"`{h}`",
+                    m,
+                    "audited" if m in AUDITED_HEADER_PREFIX else "not yet: module unmapped",
+                )
+                for h, m in r.delegated.items()
+            ],
+        )
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -1221,6 +1317,7 @@ def to_json(reports: list[ModuleReport], prov: dict[str, str]) -> str:
             "deviations": [asdict(d) for d in r.deviations],
             "accepted": [asdict(a) for a in r.accepted],
             "quoted": [asdict(q) for q in r.quoted],
+            "delegated": r.delegated,
         }
         for r in reports
     }

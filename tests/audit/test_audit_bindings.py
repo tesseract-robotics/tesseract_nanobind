@@ -339,6 +339,35 @@ def test_header_owned_by_another_binding_has_no_row(fixture_report):
     assert not [g for g in fixture_report.gaps if "Shared" in g.symbol or "shared.h" in g.symbol]
 
 
+def test_header_owned_by_another_binding_is_listed_as_delegated(fixture_report):
+    """Phase C: the prefix owner names the module that audits shared.h, so no header is silent."""
+    assert fixture_report.delegated == {"tesseract/fixture/shared.h": "other"}
+
+
+def test_including_binding_audits_a_foreign_header_its_owner_does_not_include():
+    """Phase C: other_bindings.cpp #includes shared.h, which fixture_bindings.cpp (its prefix
+    owner) does not, so the `other` module audits it: the unbound `Shared` is a gap there."""
+    report = audit.audit_tu(
+        "other",
+        FIXTURES / "other_bindings.cpp",
+        FIXTURES / "_other.pyi",
+        FIXTURES / "package_init.py",
+        "tesseract/other/",
+        (FIXTURE_INCLUDE,),
+        other_bindings=(FIXTURES / "fixture_bindings.cpp",),
+        stub_roots=(FIXTURES,),
+        prefixes={"fixture": FIXTURE_PREFIX, "other": "tesseract/other/"},
+    )
+    assert ("Shared", audit.Kind.CLASS) in {(g.symbol, g.kind) for g in report.gaps}
+
+
+def test_foreign_header_auditor_is_the_first_including_module():
+    """Several bindings include the same foreign header: exactly one audits it."""
+    assert audit.header_auditor(["tesseract_task_composer", "tesseract_command_language"]) == (
+        "tesseract_command_language"
+    )
+
+
 def test_unaudited_header_pattern_is_never_parsed(fixture_report):
     """E0: test_suite/broken_unit.hpp has a syntax error; matching UNAUDITED_HEADERS skips it."""
     assert not [g for g in fixture_report.gaps if "broken_unit" in g.symbol]
@@ -565,6 +594,15 @@ def test_raw_pointer_bytes_resource_ctor_stays_a_gap(real_reports):
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
 
 
+def test_render_lists_delegated_headers(fixture_report):
+    """Phase C: a header audited with another module is named in its owner's section, with
+    whether that module is audited yet, so no header is silently dropped."""
+    text = audit.render_markdown([fixture_report], PROV)
+    assert "| `tesseract/fixture/shared.h` | other | not yet: module unmapped |" in text
+    data = json.loads(audit.to_json([fixture_report], PROV))
+    assert data["modules"]["fixture"]["delegated"] == {"tesseract/fixture/shared.h": "other"}
+
+
 def test_render_is_deterministic_and_sorted(fixture_report):
     a = audit.render_markdown([fixture_report], PROV)
     b = audit.render_markdown([fixture_report], PROV)
@@ -596,7 +634,7 @@ def test_json_roundtrip(fixture_report):
         "LostRunner.go",
         "LostRunner.__call__",
     }
-    assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted"}
+    assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted", "delegated"}
 
 
 def test_cli_rejects_unknown_module():
