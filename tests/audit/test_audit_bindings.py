@@ -67,6 +67,29 @@ def test_core_unincluded_headers_parse_clean(module):
     audit.unincluded_header_gaps(cpp, headers)  # raises HeaderParseError on any error
 
 
+@pytest.mark.parametrize("module", sorted(CORE_PREFIX))
+def test_core_modules_resolve(module):
+    assert audit.resolve_module(module) == module
+    assert audit.AUDITED_HEADER_PREFIX[module] == CORE_PREFIX[module]
+
+
+@pytest.mark.parametrize("module", sorted(CORE_PREFIX))
+def test_core_module_audits(module):
+    """Every mapped core module produces a report (no parse error, stub found)."""
+    assert audit.audit_module(module).covered > 0
+
+
+def test_serialization_audits_the_serialization_headers_it_includes():
+    """tesseract_serialization has no header directory of its own: it audits the foreign
+    headers it is first to #include, and tesseract_common lists serialization.h as audited there."""
+    common = audit.audit_module("tesseract_common")
+    assert common.delegated["tesseract/common/serialization.h"] == "tesseract_serialization"
+    report = audit.audit_module("tesseract_serialization")
+    assert ("Serialization", "tesseract/common/serialization.h") in {
+        (g.symbol, g.location.rsplit(":", 1)[0]) for g in report.gaps
+    }
+
+
 def test_syntax_error_raises_header_parse_error():
     with pytest.raises(audit.HeaderParseError, match="broken_bindings.cpp"):
         audit.parse_tu(FIXTURES / "broken_bindings.cpp")
@@ -86,7 +109,7 @@ def test_unknown_module_raises():
 def test_unmapped_module_raises():
     """A2: a binding module without an AUDITED_HEADER_PREFIX entry is not auditable yet."""
     with pytest.raises(audit.UnknownModuleError, match="AUDITED_HEADER_PREFIX"):
-        audit.resolve_module("tesseract_geometry")
+        audit.resolve_module("ompl_base")
 
 
 @pytest.mark.parametrize("module", FIRST_PASS)

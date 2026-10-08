@@ -116,6 +116,15 @@ AUDITED_HEADER_PREFIX = {
     "tesseract_collision": "tesseract/collision/",
     "tesseract_common": "tesseract/common/",
     "tesseract_environment": "tesseract/environment/",
+    "tesseract_geometry": "tesseract/geometry/",
+    "tesseract_kinematics": "tesseract/kinematics/",
+    "tesseract_scene_graph": "tesseract/scene_graph/",
+    # No such directory: the module wraps templates in other modules' headers, so it audits
+    # only the foreign headers it is the first binding to #include (`header_auditor`).
+    "tesseract_serialization": "tesseract/serialization/",
+    "tesseract_srdf": "tesseract/srdf/",
+    "tesseract_state_solver": "tesseract/state_solver/",
+    "tesseract_urdf": "tesseract/urdf/",
 }
 # Headers under a prefix that are not Python API, as fnmatch patterns on the path below the
 # prefix (`*` also matches `/`). A header the binding #includes directly is audited anyway.
