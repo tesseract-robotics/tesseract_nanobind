@@ -144,6 +144,16 @@ UNAUDITED_HEADERS = {
     "environment_cache.h": "No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.",
     "environment_monitor.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
     "environment_monitor_interface.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
+    # Kinematics solver plugins, loaded by `KinematicsPluginFactory`; Python reaches them
+    # through `ForwardKinematics`/`InverseKinematics`. `kdl/*` also matches
+    # `state_solver/kdl/*`, whose `KDLStateSolver` stays audited: the binding includes it.
+    "ikfast/*": "IKFast solver plugin template, loaded by `KinematicsPluginFactory`.",
+    "kdl/*": "KDL solver plugins, loaded by `KinematicsPluginFactory`.",
+    "opw/*": "OPW solver plugin, loaded by `KinematicsPluginFactory`.",
+    "ur/*": "Universal Robots solver plugin, loaded by `KinematicsPluginFactory`.",
+    "rep_*": "Robot-with-external-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
+    "rop_*": "Robot-on-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
+    "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to `OFKTStateSolver`.",
 }
 # Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
 # UNAUDITED_HEADERS. Never audited, not even when the binding #includes one directly: such an
@@ -519,6 +529,19 @@ def _stream_insertion_owner(c: ci.Cursor) -> str | None:
     return _record_path(value)
 
 
+def _befriends_cereal(record: ci.Cursor) -> bool:
+    """The class, or a base of it, declares a cereal hook (`serialize`, …) as a friend."""
+    for m in record.get_children():
+        if m.kind == ci.CursorKind.FRIEND_DECL and any(
+            f.spelling in CEREAL_HOOKS for f in m.get_children()
+        ):
+            return True
+        if m.kind == ci.CursorKind.CXX_BASE_SPECIFIER and m.referenced is not None:
+            if _befriends_cereal(m.referenced):
+                return True
+    return False
+
+
 def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSymbol]:
     """The audited C++ API: public, non-deprecated declarations in `headers`.
 
@@ -587,6 +610,10 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 declares_ctor = True
             if m.kind == ci.CursorKind.FRIEND_DECL:
                 befriends_cereal |= any(f.spelling in CEREAL_HOOKS for f in m.get_children())
+            if m.kind == ci.CursorKind.CXX_BASE_SPECIFIER and m.referenced is not None:
+                # A subclass serialized through its base (`cereal::base_class`) has no friend
+                # of its own: `Mesh` and `SDFMesh` through `PolygonMesh`.
+                befriends_cereal |= _befriends_cereal(m.referenced)
             if m.access_specifier != ci.AccessSpecifier.PUBLIC:
                 continue
             if m.availability == ci.AvailabilityKind.DEPRECATED:
@@ -877,8 +904,18 @@ ACCEPTED = {
     "eigen-default-precision": "`EIGEN_DEFAULT_PREC` re-exports "
     "`Eigen::NumTraits<double>::dummy_precision()` (1e-12) so Python compares with Eigen's "
     "own default tolerance instead of a duplicated literal.",
+    "template-instance-name": "Python cannot spell a C++ template argument, so each instance of "
+    "a function template gets its own function named after the type (`createMeshFromPath<ConvexMesh>` "
+    "→ `createConvexMeshFromPath`, `Serialization::toArchiveStringXML<Environment>` → "
+    "`environment_to_xml`).",
+    "copied-vector-field-mutator": "A `std::vector` field converts to a fresh Python list on each "
+    "access, so `obj.field.append(x)` edits a copy; `add…`/`clear…` methods mutate the C++ vector.",
+    "boost-graph-property-tag": "Boost Graph property tags (`vertex_link_t`, …) select the "
+    "properties `SceneGraph` stores; Python reaches the properties through `SceneGraph` methods.",
+    "bound-in-other-module": "The class is bound in another extension module, which defines its "
+    "Python type once for every module.",
 }
-# Python names accepted by a named rule: (module, python name) -> ACCEPTED key.
+# Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
     ("tesseract_common", "Quaterniond.__init__"): "scalar-last-quaternion",
     ("tesseract_common", "Quaterniond.from_xyzw"): "scalar-last-quaternion",
@@ -887,6 +924,26 @@ ACCEPTED_SYMBOLS = {
     ("tesseract_common", "Quaterniond.from_rpy"): "quaternion-rpy",
     ("tesseract_common", "Quaterniond.to_rpy"): "quaternion-rpy",
     ("tesseract_common", "EIGEN_DEFAULT_PREC"): "eigen-default-precision",
+    **{
+        ("tesseract_geometry", f"create{t}MeshFrom{s}"): "template-instance-name"
+        for t in ("Convex", "SDF")
+        for s in ("Path", "Resource")
+    },
+    **{
+        ("tesseract_serialization", f"{t}_{d}_{f}"): "template-instance-name"
+        for t in ("composite_instruction", "environment", "scene_state")
+        for d in ("to", "from")
+        for f in ("xml", "file", "binary")
+    },
+    **{
+        ("tesseract_scene_graph", f"Link.{op}{field}"): "copied-vector-field-mutator"
+        for op in ("add", "clear")
+        for field in ("Visual", "Collision")
+    },
+    **{
+        ("tesseract_scene_graph", tag): "boost-graph-property-tag"
+        for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
+    },
 }
 
 
@@ -1000,6 +1057,24 @@ def _py_member(name: str, py: PyApi, stub_roots: Sequence[Path] = (SRC,)) -> PyS
     return None
 
 
+def _bound_elsewhere(name: str, stub_rel: str, stub_roots: Sequence[Path]) -> bool:
+    """A top-level class `name` is declared in another extension's stub under `stub_roots`."""
+    if "." in name:
+        return False
+    return any(
+        name in _stub_py_api(stub).symbols
+        for root in stub_roots
+        for stub in _stubs_under(root)
+        if rel(stub) != stub_rel
+    )
+
+
+@functools.cache
+def _stubs_under(root: Path) -> tuple[Path, ...]:
+    """Every extension stub (`_<module>.pyi`) below `root`, listed once per audit run."""
+    return tuple(sorted(root.rglob("_*.pyi")))
+
+
 def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
     parts = name.split(".")
     owners = (".".join(parts[:i]) for i in range(1, len(parts)))
@@ -1027,6 +1102,10 @@ def match(
             dunder = PROTOCOL_MEMBERS.get(leaf)
             if dunder and _py_member(f"{owner}.{dunder}", py, stub_roots):
                 covered += 1  # the dunder's own row names the rule
+            elif rule := ACCEPTED_SYMBOLS.get((module, name)):
+                accepted.append(Accepted(name, rule, sym.location))
+            elif sym.kind is Kind.CLASS and _bound_elsewhere(name, stub_rel, stub_roots):
+                accepted.append(Accepted(name, "bound-in-other-module", sym.location))
             else:
                 gaps.append(Gap(name, sym.kind, sym.location))
             continue

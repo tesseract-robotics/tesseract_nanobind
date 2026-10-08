@@ -90,6 +90,69 @@ def test_serialization_audits_the_serialization_headers_it_includes():
     }
 
 
+@pytest.fixture(scope="module")
+def core_reports():
+    return {m: audit.audit_module(m) for m in [*CORE_PREFIX, "tesseract_serialization"]}
+
+
+@pytest.mark.parametrize(
+    ("module", "symbol", "rule"),
+    [
+        # G2: Mesh/SDFMesh befriend cereal through their base PolygonMesh.
+        ("tesseract_geometry", "Mesh.__init__", "serialization-default-ctor"),
+        ("tesseract_geometry", "SDFMesh.__init__", "serialization-default-ctor"),
+        # G8 + Z1: one Python function per instance of a C++ template.
+        ("tesseract_geometry", "createConvexMeshFromPath", "template-instance-name"),
+        ("tesseract_geometry", "createSDFMeshFromResource", "template-instance-name"),
+        ("tesseract_serialization", "environment_to_xml", "template-instance-name"),
+        ("tesseract_serialization", "scene_state_from_binary", "template-instance-name"),
+        # S4: the vector fields convert to a fresh list on each access.
+        ("tesseract_scene_graph", "Link.addVisual", "copied-vector-field-mutator"),
+        ("tesseract_scene_graph", "Link.clearCollision", "copied-vector-field-mutator"),
+        # S6: boost graph property tags.
+        ("tesseract_scene_graph", "vertex_link_t", "boost-graph-property-tag"),
+        ("tesseract_scene_graph", "property_kind", "boost-graph-property-tag"),
+        # S7: SceneState is bound in tesseract_state_solver.
+        ("tesseract_scene_graph", "SceneState", "bound-in-other-module"),
+    ],
+)
+def test_core_rows_accepted_by_phase_c_rules(core_reports, module, symbol, rule):
+    report = core_reports[module]
+    assert (symbol, rule) in {(a.symbol, a.rule) for a in report.accepted}
+    if rule == "serialization-default-ctor":
+        # Only the arity-0 overload is accepted; the full constructor stays a gap (G2).
+        assert (symbol, "0") not in {(g.symbol, g.arity) for g in report.gaps}
+        return
+    assert symbol not in {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
+
+
+@pytest.mark.parametrize(
+    ("module", "header"),
+    [
+        ("tesseract_kinematics", "tesseract/kinematics/ikfast/ikfast_inv_kin.h"),
+        ("tesseract_kinematics", "tesseract/kinematics/kdl/kdl_fwd_kin_chain.h"),
+        ("tesseract_kinematics", "tesseract/kinematics/opw/opw_inv_kin.h"),
+        ("tesseract_kinematics", "tesseract/kinematics/ur/ur_inv_kin.h"),
+        ("tesseract_kinematics", "tesseract/kinematics/rep_inv_kin.h"),
+        ("tesseract_kinematics", "tesseract/kinematics/rop_factory.h"),
+        ("tesseract_state_solver", "tesseract/state_solver/ofkt/ofkt_nodes.h"),
+    ],
+)
+def test_core_plugin_and_internal_headers_unaudited(core_reports, module, header):
+    """K7, SS4: solver plugin implementations and OFKT tree internals are not Python API."""
+    assert header not in {g.symbol for g in core_reports[module].gaps}
+
+
+def test_ofkt_node_class_unaudited(core_reports):
+    assert "OFKTNode" not in {g.symbol for g in core_reports["tesseract_state_solver"].gaps}
+
+
+def test_state_solver_kdl_still_audited(core_reports):
+    """K7's `kdl/*` pattern must not hide `KDLStateSolver`, which the binding includes directly."""
+    names = {g.symbol for g in core_reports["tesseract_state_solver"].gaps}
+    assert any(n.startswith("KDLStateSolver.") for n in names)
+
+
 def test_syntax_error_raises_header_parse_error():
     with pytest.raises(audit.HeaderParseError, match="broken_bindings.cpp"):
         audit.parse_tu(FIXTURES / "broken_bindings.cpp")
