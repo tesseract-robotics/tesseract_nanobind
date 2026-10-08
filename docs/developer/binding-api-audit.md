@@ -8,12 +8,12 @@ tesseract-robotics `==0.35.0` · libclang `clang version 22.1.8` · stubs `1b26f
 | tesseract_collision | 241 | 7 | 1 | 11 | 0 |
 | tesseract_common | 215 | 55 | 0 | 40 | 0 |
 | tesseract_environment | 237 | 9 | 6 | 55 | 0 |
-| tesseract_geometry | 130 | 17 | 6 | 10 | 0 |
-| tesseract_kinematics | 62 | 46 | 2 | 7 | 6 |
-| tesseract_scene_graph | 174 | 20 | 11 | 5 | 0 |
-| tesseract_serialization | 0 | 1 | 18 | 0 | 18 |
+| tesseract_geometry | 130 | 15 | 2 | 16 | 0 |
+| tesseract_kinematics | 62 | 29 | 2 | 7 | 6 |
+| tesseract_scene_graph | 174 | 15 | 7 | 14 | 0 |
+| tesseract_serialization | 0 | 1 | 0 | 18 | 18 |
 | tesseract_srdf | 44 | 4 | 0 | 1 | 4 |
-| tesseract_state_solver | 76 | 14 | 2 | 0 | 6 |
+| tesseract_state_solver | 76 | 12 | 2 | 0 | 6 |
 | tesseract_urdf | 3 | 1 | 0 | 0 | 0 |
 
 Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
@@ -56,7 +56,10 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
 | tesseract_state_solver | `OFKTStateSolver.__init__` | `tesseract::scene_graph::SceneGraph` | src/tesseract_robotics/tesseract_state_solver/_tesseract_state_solver.pyi:117 |
 
 !!! note "Accepted deviation rules"
+    - `boost-graph-property-tag`: Boost Graph property tags (`vertex_link_t`, …) select the properties `SceneGraph` stores; Python reaches the properties through `SceneGraph` methods.
+    - `bound-in-other-module`: The class is bound in another extension module, which defines its Python type once for every module.
     - `container-protocol`: `size()` is bound as `__len__` and `operator[]` as `__getitem__`/`__setitem__`, the Python container protocol.
+    - `copied-vector-field-mutator`: A `std::vector` field converts to a fresh Python list on each access, so `obj.field.append(x)` edits a copy; `add…`/`clear…` methods mutate the C++ vector.
     - `eigen-default-precision`: `EIGEN_DEFAULT_PREC` re-exports `Eigen::NumTraits<double>::dummy_precision()` (1e-12) so Python compares with Eigen's own default tolerance instead of a duplicated literal.
     - `eigen-template-instance`: `Eigen::Hyperplane<double, 3>` and `Eigen::ParametrizedLine<double, 3>` have no Eigen typedef; the class takes Eigen's own `…3d` naming (`Vector3d`, `Quaterniond`).
     - `iterator-pair`: A `begin()`/`end()` pair (and `cbegin`/`cend`) is bound as `__iter__`.
@@ -67,6 +70,7 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
     - `serialization-default-ctor`: The default constructor of a class that befriends cereal `serialize` and declares another public constructor exists for deserialization only.
     - `stream-insertion`: A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__`.
     - `stringstream`: A `std::stringstream&` parameter the C++ writes into is returned as `str`.
+    - `template-instance-name`: Python cannot spell a C++ template argument, so each instance of a function template gets its own function named after the type (`createMeshFromPath<ConvexMesh>` → `createConvexMeshFromPath`, `Serialization::toArchiveStringXML<Environment>` → `environment_to_xml`).
     - `value-equality-unhashable`: `__hash__ = None` next to a bound `__eq__` makes a mutable value type unhashable, as Python does for any class that defines `__eq__`; it needs no C++ counterpart.
 
 !!! note "Unaudited headers"
@@ -82,6 +86,13 @@ Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):
     - `environment_cache.h`: No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.
     - `environment_monitor.h`: Abstract ROS-side interface; no implementation in the installed tesseract libraries.
     - `environment_monitor_interface.h`: Abstract ROS-side interface; no implementation in the installed tesseract libraries.
+    - `ikfast/*`: IKFast solver plugin template, loaded by `KinematicsPluginFactory`.
+    - `kdl/*`: KDL solver plugins, loaded by `KinematicsPluginFactory`.
+    - `opw/*`: OPW solver plugin, loaded by `KinematicsPluginFactory`.
+    - `ur/*`: Universal Robots solver plugin, loaded by `KinematicsPluginFactory`.
+    - `rep_*`: Robot-with-external-positioner solver plugin, loaded by `KinematicsPluginFactory`.
+    - `rop_*`: Robot-on-positioner solver plugin, loaded by `KinematicsPluginFactory`.
+    - `ofkt/ofkt_node*.h`: Optimized forward kinematics tree nodes, internal to `OFKTStateSolver`.
     - A header its prefix owner's binding does not #include, but another binding does, is audited with the first such module by name; each module's section lists those headers.
 
 !!! note "Third-party headers (never audited, even when #included directly)"
@@ -357,13 +368,11 @@ None.
 | `Geometry.getUUID` | method | tesseract/geometry/geometry.h:87 | — |
 | `Geometry.setUUID` | method | tesseract/geometry/geometry.h:84 | — |
 | `Mesh.__init__` | constructor | tesseract/geometry/impl/mesh.h:85 | 3-9 |
-| `Mesh.__init__` | constructor | tesseract/geometry/impl/mesh.h:94 | 0 |
 | `MeshTexture.__init__` | constructor | tesseract/geometry/impl/mesh_material.h:147 | — |
 | `Octree.update` | method | tesseract/geometry/impl/octree.h:83 | — |
 | `PointCloud.Point` | class | tesseract/geometry/impl/octree_utils.h:40 | — |
 | `PolygonMesh.__init__` | constructor | tesseract/geometry/impl/polygon_mesh.h:71 | — |
 | `SDFMesh.__init__` | constructor | tesseract/geometry/impl/sdf_mesh.h:85 | 3-9 |
-| `SDFMesh.__init__` | constructor | tesseract/geometry/impl/sdf_mesh.h:94 | 0 |
 | `createMeshFromAsset` | function | tesseract/geometry/mesh_parser.h:301 | — |
 | `createMeshFromBytes` | function | tesseract/geometry/mesh_parser.h:537 | — |
 | `extractMeshData` | function | tesseract/geometry/mesh_parser.h:74 | — |
@@ -374,10 +383,6 @@ None.
 |---|---|---|---|
 | `GeometriesConst` | class | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:51 | — |
 | `PointCloudPoint` | class | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:309 | — |
-| `createConvexMeshFromPath` | function | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:376 | — |
-| `createConvexMeshFromResource` | function | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:385 | — |
-| `createSDFMeshFromPath` | function | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:379 | — |
-| `createSDFMeshFromResource` | function | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:388 | — |
 
 ### Accepted
 
@@ -390,9 +395,15 @@ None.
 | `ConvexMesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/convex_mesh.h:108 |
 | `Cylinder.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:123 |
 | `GeometriesConst.__len__` | container-protocol | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:54 |
+| `Mesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/mesh.h:94 |
 | `Octree.__init__` | serialization-default-ctor | tesseract/geometry/impl/octree.h:65 |
 | `Plane.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:192 |
+| `SDFMesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/sdf_mesh.h:94 |
 | `Sphere.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:102 |
+| `createConvexMeshFromPath` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:376 |
+| `createConvexMeshFromResource` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:385 |
+| `createSDFMeshFromPath` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:379 |
+| `createSDFMeshFromResource` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi:388 |
 
 ### Headers audited with another module
 
@@ -432,23 +443,6 @@ None.
 | `isValid` | function | tesseract/kinematics/utils.h:334 | — |
 | `numericalJacobian` | function | tesseract/kinematics/utils.h:54 | — |
 | `solvePInv` | function | tesseract/kinematics/utils.h:103 | — |
-| `tesseract/kinematics/ikfast/external/ikfast.h` | header | tesseract/kinematics/ikfast/external/ikfast.h:51 | — |
-| `tesseract/kinematics/ikfast/ikfast_factory_boilerplate.h` | header | tesseract/kinematics/ikfast/ikfast_factory_boilerplate.h:33 | — |
-| `tesseract/kinematics/ikfast/ikfast_inv_kin.h` | header | tesseract/kinematics/ikfast/ikfast_inv_kin.h:75 | — |
-| `tesseract/kinematics/kdl/kdl_factories.h` | header | tesseract/kinematics/kdl/kdl_factories.h:32 | — |
-| `tesseract/kinematics/kdl/kdl_fwd_kin_chain.h` | header | tesseract/kinematics/kdl/kdl_fwd_kin_chain.h:47 | — |
-| `tesseract/kinematics/kdl/kdl_inv_kin_chain_lma.h` | header | tesseract/kinematics/kdl/kdl_inv_kin_chain_lma.h:43 | — |
-| `tesseract/kinematics/kdl/kdl_inv_kin_chain_nr.h` | header | tesseract/kinematics/kdl/kdl_inv_kin_chain_nr.h:44 | — |
-| `tesseract/kinematics/kdl/kdl_inv_kin_chain_nr_jl.h` | header | tesseract/kinematics/kdl/kdl_inv_kin_chain_nr_jl.h:44 | — |
-| `tesseract/kinematics/kdl/kdl_utils.h` | header | tesseract/kinematics/kdl/kdl_utils.h:45 | — |
-| `tesseract/kinematics/opw/opw_factory.h` | header | tesseract/kinematics/opw/opw_factory.h:32 | — |
-| `tesseract/kinematics/opw/opw_inv_kin.h` | header | tesseract/kinematics/opw/opw_inv_kin.h:39 | — |
-| `tesseract/kinematics/rep_factory.h` | header | tesseract/kinematics/rep_factory.h:32 | — |
-| `tesseract/kinematics/rep_inv_kin.h` | header | tesseract/kinematics/rep_inv_kin.h:47 | — |
-| `tesseract/kinematics/rop_factory.h` | header | tesseract/kinematics/rop_factory.h:32 | — |
-| `tesseract/kinematics/rop_inv_kin.h` | header | tesseract/kinematics/rop_inv_kin.h:44 | — |
-| `tesseract/kinematics/ur/ur_factory.h` | header | tesseract/kinematics/ur/ur_factory.h:32 | — |
-| `tesseract/kinematics/ur/ur_inv_kin.h` | header | tesseract/kinematics/ur/ur_inv_kin.h:49 | — |
 | `tesseract/kinematics/validate.h` | header | tesseract/kinematics/validate.h:38 | — |
 
 ### Deviations
@@ -492,14 +486,9 @@ None.
 | `SceneGraph.getEdge` | method | tesseract/scene_graph/graph.h:523 | — |
 | `SceneGraph.getVertex` | method | tesseract/scene_graph/graph.h:516 | — |
 | `SceneGraph.setAllowedCollisionMatrix` | method | tesseract/scene_graph/graph.h:352 | — |
-| `SceneState` | class | tesseract/scene_graph/scene_state.h:51 | — |
 | `ShortestPath.__str__` | operator | tesseract/scene_graph/graph.h:596 | — |
-| `edge_joint_t` | enum | tesseract/scene_graph/graph.h:47 | — |
-| `graph_root_t` | enum | tesseract/scene_graph/graph.h:51 | — |
 | `operator<<` | function | tesseract/scene_graph/joint.h:321 | — |
-| `property_kind` | class | tesseract/scene_graph/graph.h:56 | — |
 | `tesseract/scene_graph/kdl_parser.h` | header | tesseract/scene_graph/kdl_parser.h:65 | — |
-| `vertex_link_t` | enum | tesseract/scene_graph/graph.h:43 | — |
 
 ### Deviations
 
@@ -512,10 +501,6 @@ None.
 | `JointType_PRISMATIC` | constant | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:35 | — |
 | `JointType_REVOLUTE` | constant | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:31 | — |
 | `JointType_UNKNOWN` | constant | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:29 | — |
-| `Link.addCollision` | method | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:480 | — |
-| `Link.addVisual` | method | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:477 | — |
-| `Link.clearCollision` | method | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:486 | — |
-| `Link.clearVisual` | method | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:483 | — |
 
 ### Accepted
 
@@ -525,7 +510,16 @@ None.
 | `JointDynamics.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:68 |
 | `JointLimits.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:119 |
 | `Link.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:501 |
+| `Link.addCollision` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:480 |
+| `Link.addVisual` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:477 |
+| `Link.clearCollision` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:486 |
+| `Link.clearVisual` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:483 |
 | `SceneGraph.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi:640 |
+| `SceneState` | bound-in-other-module | tesseract/scene_graph/scene_state.h:51 |
+| `edge_joint_t` | boost-graph-property-tag | tesseract/scene_graph/graph.h:47 |
+| `graph_root_t` | boost-graph-property-tag | tesseract/scene_graph/graph.h:51 |
+| `property_kind` | boost-graph-property-tag | tesseract/scene_graph/graph.h:56 |
+| `vertex_link_t` | boost-graph-property-tag | tesseract/scene_graph/graph.h:43 |
 
 ### Headers audited with another module
 
@@ -543,30 +537,30 @@ None.
 
 ### Deviations
 
-| Python name | kind | stub:line | arity |
-|---|---|---|---|
-| `composite_instruction_from_binary` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:25 | — |
-| `composite_instruction_from_file` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:17 | — |
-| `composite_instruction_from_xml` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:11 | — |
-| `composite_instruction_to_binary` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:20 | — |
-| `composite_instruction_to_file` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:14 | — |
-| `composite_instruction_to_xml` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:6 | — |
-| `environment_from_binary` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:45 | — |
-| `environment_from_file` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:39 | — |
-| `environment_from_xml` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:33 | — |
-| `environment_to_binary` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:42 | — |
-| `environment_to_file` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:36 | — |
-| `environment_to_xml` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:28 | — |
-| `scene_state_from_binary` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:65 | — |
-| `scene_state_from_file` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:59 | — |
-| `scene_state_from_xml` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:53 | — |
-| `scene_state_to_binary` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:62 | — |
-| `scene_state_to_file` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:56 | — |
-| `scene_state_to_xml` | function | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:48 | — |
+None.
 
 ### Accepted
 
-None.
+| symbol | rule | location |
+|---|---|---|
+| `composite_instruction_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:25 |
+| `composite_instruction_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:17 |
+| `composite_instruction_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:11 |
+| `composite_instruction_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:20 |
+| `composite_instruction_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:14 |
+| `composite_instruction_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:6 |
+| `environment_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:45 |
+| `environment_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:39 |
+| `environment_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:33 |
+| `environment_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:42 |
+| `environment_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:36 |
+| `environment_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:28 |
+| `scene_state_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:65 |
+| `scene_state_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:59 |
+| `scene_state_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:53 |
+| `scene_state_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:62 |
+| `scene_state_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:56 |
+| `scene_state_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi:48 |
 
 ### Headers audited with another module
 
@@ -608,7 +602,6 @@ None.
 | `KDLStateSolver.getLinkTransforms` | method | tesseract/state_solver/kdl/kdl_state_solver.h:80 | — |
 | `KDLStateSolver.setState` | method | tesseract/state_solver/kdl/kdl_state_solver.h:64 | 2-3 |
 | `MutableStateSolver.insertSceneGraph` | method | tesseract/state_solver/mutable_state_solver.h:156 | — |
-| `OFKTNode` | class | tesseract/state_solver/ofkt/ofkt_node.h:53 | — |
 | `OFKTStateSolver.getJacobian` | method | tesseract/state_solver/ofkt/ofkt_state_solver.h:116 | 3-4 |
 | `OFKTStateSolver.getLinkTransforms` | method | tesseract/state_solver/ofkt/ofkt_state_solver.h:96 | — |
 | `OFKTStateSolver.insertSceneGraph` | method | tesseract/state_solver/ofkt/ofkt_state_solver.h:170 | — |
@@ -616,7 +609,6 @@ None.
 | `StateSolver.getJacobian` | method | tesseract/state_solver/state_solver.h:185 | 3-4 |
 | `StateSolver.getLinkTransforms` | method | tesseract/state_solver/state_solver.h:134 | — |
 | `StateSolver.setState` | method | tesseract/state_solver/state_solver.h:82 | 2-3 |
-| `tesseract/state_solver/ofkt/ofkt_nodes.h` | header | tesseract/state_solver/ofkt/ofkt_nodes.h:39 | — |
 
 ### Deviations
 
