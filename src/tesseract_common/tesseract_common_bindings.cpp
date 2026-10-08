@@ -18,6 +18,7 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 #include <tesseract/common/joint_state.h>
 #include <tesseract/common/collision_margin_data.h>
 #include <tesseract/common/allowed_collision_matrix.h>
+#include <tesseract/common/calibration_info.h>
 #include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/plugin_info.h>
@@ -1267,6 +1268,20 @@ NB_MODULE(_tesseract_common, m) {
         .def("empty", &tesseract::common::ContactManagersPluginInfo::empty)
         .def_ro_static("CONFIG_KEY", &tesseract::common::ContactManagersPluginInfo::CONFIG_KEY);
     bind_value_equality(contact_managers_plugin_info);
+
+    // ========== CalibrationInfo ==========
+    // joints is a TransformMap -> dict[str, Isometry3d], converted on every access: assign the
+    // whole field or use insert(); an in-place edit of the returned dict changes a copy.
+    auto calibration_info = nb::class_<tesseract::common::CalibrationInfo>(m, "CalibrationInfo")
+        .def(nb::init<>())
+        .def_rw("joints", &tesseract::common::CalibrationInfo::joints,
+                "Joint name -> calibrated joint origin. A copy on read: assign the whole dict, or use insert.")
+        .def("insert", &tesseract::common::CalibrationInfo::insert, "other"_a)
+        .def("clear", &tesseract::common::CalibrationInfo::clear)
+        .def("empty", &tesseract::common::CalibrationInfo::empty)
+        .def_ro_static("CONFIG_KEY", &tesseract::common::CalibrationInfo::CONFIG_KEY);
+    // operator== (calibration_info.cpp:41-50): transforms compared with isApprox(1e-5), upstream's tolerance
+    bind_value_equality(calibration_info);
 
     // ========== TaskComposerPluginInfo ==========
     auto task_composer_plugin_info = nb::class_<tesseract::common::TaskComposerPluginInfo>(m, "TaskComposerPluginInfo")

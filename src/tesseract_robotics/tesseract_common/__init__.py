@@ -79,6 +79,8 @@ __all__ = [
     "ContactManagersPluginInfo",
     "ProfilesPluginInfo",
     "TaskComposerPluginInfo",
+    # Calibration (SRDF calibration_config)
+    "CalibrationInfo",
     # Container types (SWIG compatibility)
     "VectorVector3d",
     "VectorIsometry3d",

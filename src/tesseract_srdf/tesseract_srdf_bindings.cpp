@@ -106,6 +106,7 @@ NB_MODULE(_tesseract_srdf, m) {
         .def_rw("kinematics_information", &ts::SRDFModel::kinematics_information)
         .def_rw("acm", &ts::SRDFModel::acm)
         .def_rw("collision_margin_data", &ts::SRDFModel::collision_margin_data)
+        .def_rw("contact_managers_plugin_info", &ts::SRDFModel::contact_managers_plugin_info)
         .def_rw("calibration_info", &ts::SRDFModel::calibration_info)
         .def("__eq__", &ts::SRDFModel::operator==)
         .def("__ne__", &ts::SRDFModel::operator!=)

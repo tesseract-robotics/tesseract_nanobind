@@ -411,6 +411,27 @@ info.discrete_plugin_infos.plugins = {"BulletDiscreteBVHManager": bullet}
     `KinematicsPluginInfo.fwd_plugin_infos`) converts to a fresh `dict` on every access:
     assign the whole field, since `info.plugin_infos["x"] = ...` edits a copy.
 
+## Calibration Info
+
+`CalibrationInfo` holds calibrated joint origins: for each joint name in `joints`, the
+environment replaces that joint's origin (a `ChangeJointOriginCommand`). An SRDF carries one
+through its `<calibration_config>` file, read into `SRDFModel.calibration_info`.
+
+```python
+from tesseract_robotics.tesseract_common import CalibrationInfo, Isometry3d
+
+info = CalibrationInfo()
+info.joints = {"joint_a1": Isometry3d.Identity()}  # assign the whole dict
+other = CalibrationInfo()
+other.joints = {"joint_a2": Isometry3d.Identity()}
+info.insert(other)  # overwrites by joint name
+assert CalibrationInfo.CONFIG_KEY == "calibration"
+```
+
+!!! note
+    `joints` converts to a fresh `dict` on every access: `info.joints["j"] = t` edits a copy.
+    Equality is upstream's: each transform compares with `isApprox(1e-5)`.
+
 Every class on this page whose C++ type declares `operator==` compares by value (`==`, with
 the C++ tolerances) and is unhashable, except `ResourceLocator` and `Resource`, which compare by
 identity (their C++ `operator==` is always true). `KinematicLimits` of different shapes are

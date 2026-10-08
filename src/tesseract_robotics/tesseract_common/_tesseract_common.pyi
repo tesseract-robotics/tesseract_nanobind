@@ -904,6 +904,33 @@ class ContactManagersPluginInfo:
 
     __hash__: None = None
 
+class CalibrationInfo:
+    def __init__(self) -> None: ...
+
+    @property
+    def joints(self) -> dict[str, Isometry3d]:
+        """
+        Joint name -> calibrated joint origin. A copy on read: assign the whole dict, or use insert.
+        """
+
+    @joints.setter
+    def joints(self, arg: Mapping[str, Isometry3d], /) -> None: ...
+
+    def insert(self, other: CalibrationInfo) -> None: ...
+
+    def clear(self) -> None: ...
+
+    def empty(self) -> bool: ...
+
+    CONFIG_KEY: str = ...
+    """(arg: object, /) -> str"""
+
+    def __eq__(self, arg: CalibrationInfo, /) -> bool: ...
+
+    def __ne__(self, arg: CalibrationInfo, /) -> bool: ...
+
+    __hash__: None = None
+
 class TaskComposerPluginInfo:
     def __init__(self) -> None: ...
 
