@@ -30,6 +30,8 @@ NB_MODULE(_tesseract_state_solver, m) {
 
     // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    // SceneGraph, Joint and Link in the solver constructors and MutableStateSolver (else stubs quote the C++ name)
+    nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
 
     // ========== SceneState ==========
     nb::class_<tsg::SceneState>(m, "SceneState")

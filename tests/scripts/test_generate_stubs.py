@@ -12,6 +12,8 @@ only the committed files and run everywhere.
 import ast
 import importlib.util
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -68,14 +70,58 @@ def test_continuous_manager_geometry_getters_declared():
     assert "def getCollisionObjectGeometriesTransforms(" in body
 
 
-def test_collision_stub_has_no_quoted_tesseract_types():
-    """gh-168. Scoped to tesseract_collision: other modules still quote `tesseract::`
-    names, which belong to other findings."""
-    text = _mod.stub_path("tesseract_robotics.tesseract_collision._tesseract_collision").read_text(
-        encoding="utf-8"
-    )
+# Modules whose stubs must name every tesseract type: gh-168 (collision), gh-218 (the core
+# modules that use types another extension defines). tesseract_srdf's last quoted type was
+# the unbound CalibrationInfo (gh-217).
+QUOTE_FREE_MODULES = [
+    "tesseract_collision",
+    "tesseract_kinematics",
+    "tesseract_serialization",
+    "tesseract_srdf",
+    "tesseract_state_solver",
+]
+
+# gh-218: the defining modules each extension imports itself, so that its stub, rendered in
+# a fresh interpreter, names their types (SceneGraph, Joint, Link: scene_graph; SceneState:
+# state_solver; Environment: environment; CompositeInstruction: command_language).
+DEFINING_MODULE_IMPORTS = {
+    "tesseract_kinematics": ["tesseract_scene_graph", "tesseract_state_solver"],
+    "tesseract_serialization": [
+        "tesseract_command_language",
+        "tesseract_environment",
+        "tesseract_state_solver",
+    ],
+    "tesseract_srdf": ["tesseract_scene_graph"],
+    "tesseract_state_solver": ["tesseract_scene_graph"],
+}
+
+
+def _extension(package: str) -> str:
+    return f"tesseract_robotics.{package}._{package}"
+
+
+@pytest.mark.parametrize("package", QUOTE_FREE_MODULES)
+def test_stub_has_no_quoted_tesseract_types(package):
+    """gh-168, gh-218."""
+    text = _mod.stub_path(_extension(package)).read_text(encoding="utf-8")
     leaks = QUOTED_TESSERACT_TYPE.findall(text)
-    assert not leaks, f"quoted tesseract:: types in tesseract_collision: {leaks}"
+    assert not leaks, f"quoted tesseract:: types in {package}: {leaks}"
+
+
+@pytest.mark.parametrize("package", sorted(DEFINING_MODULE_IMPORTS))
+def test_extension_imports_its_defining_modules(package):
+    """gh-218. A fresh interpreter, as the stub generator uses: importing the extension alone
+    (its package __init__ imports nothing else) must load every module whose types it uses."""
+    expected = [_extension(dep) for dep in DEFINING_MODULE_IMPORTS[package]]
+    code = (
+        "import sys\n"
+        f"import {_extension(package)}\n"
+        f"missing = [m for m in {expected!r} if m not in sys.modules]\n"
+        "print(missing)\n"
+        "sys.exit(1 if missing else 0)\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, f"{package} misses imports: {result.stdout}{result.stderr}"
 
 
 def test_executor_thread_default_is_machine_independent():

@@ -21,6 +21,8 @@ NB_MODULE(_tesseract_srdf, m) {
 
     // Import common module for the Isometry3d type (else stubs quote the C++ name, which is compiler-specific)
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    // SceneGraph in initFile / initString / processSRDFAllowedCollisions (else stubs quote the C++ name)
+    nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
 
     // KinematicsInformation
     nb::class_<ts::KinematicsInformation>(m, "KinematicsInformation")

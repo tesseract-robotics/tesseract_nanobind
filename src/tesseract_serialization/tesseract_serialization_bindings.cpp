@@ -42,6 +42,12 @@ NB_MODULE(_tesseract_serialization, m)
 {
     m.doc() = "Tesseract serialization bindings (XML/binary via Cereal)";
 
+    // The serialized types' defining modules: CompositeInstruction, Environment, SceneState
+    // (else stubs quote the C++ name)
+    nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
+    nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
+    nb::module_::import_("tesseract_robotics.tesseract_state_solver._tesseract_state_solver");
+
     // ============================================================
     // CompositeInstruction - Motion Programs
     // ============================================================

@@ -41,6 +41,9 @@ NB_MODULE(_tesseract_kinematics, m) {
 
     // ResourceLocator, Isometry3d live in tesseract_common
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    // SceneGraph and SceneState in JointGroup / createFwdKin / createInvKin (else stubs quote the C++ name)
+    nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
+    nb::module_::import_("tesseract_robotics.tesseract_state_solver._tesseract_state_solver");
 
     // ========== URParameters ==========
     nb::class_<tk::URParameters>(m, "URParameters")

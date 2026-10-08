@@ -185,7 +185,10 @@ link.inertial = inertial
 
 ## SceneState
 
-Current state of the scene graph.
+Current state of the scene graph. The class is bound in `tesseract_state_solver`;
+`tesseract_scene_graph.SceneState` is the same object, imported on first access (the
+state-solver extension imports this module's extension, so an eager re-export would be an
+import cycle).
 
 ```python
 from tesseract_robotics.tesseract_scene_graph import SceneState

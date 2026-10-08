@@ -8,6 +8,8 @@ import numpy
 from numpy.typing import NDArray
 
 import tesseract_robotics.tesseract_common._tesseract_common
+import tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph
+import tesseract_robotics.tesseract_state_solver._tesseract_state_solver
 
 
 class URParameters:
@@ -136,7 +138,7 @@ class InverseKinematics:
     def clone(self) -> InverseKinematics: ...
 
 class JointGroup:
-    def __init__(self, name: str, joint_names: Sequence[str], scene_graph: "tesseract::scene_graph::SceneGraph", scene_state: "tesseract::scene_graph::SceneState") -> None: ...
+    def __init__(self, name: str, joint_names: Sequence[str], scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> None: ...
 
     def calcFwdKin(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
 
@@ -207,9 +209,9 @@ class KinematicsPluginFactory:
 
     def getDefaultInvKinPlugin(self, group_name: str) -> str: ...
 
-    def createFwdKin(self, group_name: str, solver_name: str, scene_graph: "tesseract::scene_graph::SceneGraph", scene_state: "tesseract::scene_graph::SceneState") -> ForwardKinematics: ...
+    def createFwdKin(self, group_name: str, solver_name: str, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> ForwardKinematics: ...
 
-    def createInvKin(self, group_name: str, solver_name: str, scene_graph: "tesseract::scene_graph::SceneGraph", scene_state: "tesseract::scene_graph::SceneState") -> InverseKinematics: ...
+    def createInvKin(self, group_name: str, solver_name: str, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> InverseKinematics: ...
 
 def getRedundantSolutions(sol: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)], redundancy_capable_joints: Sequence[int]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
     """

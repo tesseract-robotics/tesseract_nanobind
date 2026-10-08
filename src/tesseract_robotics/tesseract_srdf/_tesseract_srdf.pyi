@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence, Set
 
 import tesseract_robotics.tesseract_common._tesseract_common
+import tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph
 
 
 class KinematicsInformation:
@@ -93,9 +94,9 @@ class KinematicsInformation:
 class SRDFModel:
     def __init__(self) -> None: ...
 
-    def initFile(self, scene_graph: "tesseract::scene_graph::SceneGraph", filename: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...
+    def initFile(self, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, filename: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...
 
-    def initString(self, scene_graph: "tesseract::scene_graph::SceneGraph", xmlstring: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...
+    def initString(self, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, xmlstring: str, locator: tesseract_robotics.tesseract_common._tesseract_common.ResourceLocator) -> None: ...
 
     def saveToFile(self, file_path: str) -> bool: ...
 
@@ -149,5 +150,5 @@ class SRDFModel:
 
     def __repr__(self) -> str: ...
 
-def processSRDFAllowedCollisions(scene_graph: "tesseract::scene_graph::SceneGraph", srdf_model: SRDFModel) -> None:
+def processSRDFAllowedCollisions(scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, srdf_model: SRDFModel) -> None:
     """Process SRDF allowed collisions and add to scene graph ACM"""
