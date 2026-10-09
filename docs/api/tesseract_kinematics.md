@@ -145,6 +145,56 @@ redundant = getRedundantSolutions(
 )
 ```
 
+## Kinematics Utilities
+
+From `tesseract/kinematics/utils.h` and `validate.h`. Each one checks its
+inputs first and raises a Python exception where upstream would index or read
+out of bounds.
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_kinematics import (
+    calcManipulability, checkKinematics, harmonizeTowardMedian, harmonizeTowardZero,
+    isNearSingularity, isValid, numericalJacobian,
+)
+
+# Finite-difference Jacobian (forward difference, step 1e-8): an oracle for calcJacobian
+J_num = numericalJacobian(Isometry3d.Identity(), group, q, "tool0", np.zeros(3))
+J_rel = numericalJacobian(group, q, "link_2", Isometry3d.Identity(), "tool0", Isometry3d.Identity())
+
+J = group.calcJacobian(q, "tool0")
+manip = calcManipulability(J)        # 6-row jacobian; manip.m, .m_linear, .f, ...
+manip.m.eigen_values, manip.m.measure, manip.m.condition, manip.m.volume
+isNearSingularity(J)                 # smallest singular value < 0.01 (threshold=...)
+
+qs = np.array([3 * np.pi / 2, -3 * np.pi / 2, 5.0])
+harmonizeTowardZero(qs, [0, 1])      # in place: [-pi/2, pi/2, 5.0]
+harmonizeTowardMedian(qs, [0, 1], limits)  # in place, around each joint's limit midpoint
+
+isValid([0.0] * 6)                   # all six finite
+checkKinematics(kin_group)           # FK -> IK round trip, tol=1e-3 (m and rad)
+```
+
+| function | raises |
+| --- | --- |
+| `numericalJacobian` | `KeyError` for a link the solver or group does not have; `ValueError` when `joint_values` is not `numJoints()` long |
+| `calcManipulability` | `TypeError` for a jacobian without 6 rows |
+| `isNearSingularity` | `ValueError` for an empty matrix |
+| `harmonizeTowardZero`, `harmonizeTowardMedian` | `IndexError` for an index outside `qs` (or `position_limits`), before any write; `TypeError` for an array that would need converting (`float32`, read-only) |
+| `isValid` | `TypeError` for anything but 6 values |
+
+!!! note "Upstream semantics"
+    `calcManipulability` sets `measure` and `condition` to the largest double
+    (`sys.float_info.max`) when an ellipsoid's smallest eigenvalue is about zero.
+    `checkKinematics` returns `True` when IK finds no solution at all: only a
+    solution farther than `tol` from the FK pose makes it `False`.
+    `checkKinematics` releases the GIL while it runs.
+
+`solvePInv` and `dampedPInv` are not bound (use `np.linalg.pinv` / `lstsq`),
+nor is `getRedundantSolutionsHelper` (the recursion behind
+`getRedundantSolutions`).
+
 ## UR Robot Parameters
 
 Analytical IK parameters for Universal Robots.

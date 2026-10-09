@@ -19,6 +19,7 @@
 #include <tesseract/kinematics/types.h>
 #include <tesseract/kinematics/kinematics_plugin_factory.h>
 #include <tesseract/kinematics/utils.h>
+#include <tesseract/kinematics/validate.h>
 
 // tesseract_scene_graph
 #include <tesseract/scene_graph/graph.h>
@@ -29,7 +30,9 @@
 #include <tesseract/common/resource_locator.h>
 #include <tesseract/common/plugin_info.h>
 #include <filesystem>
+#include <algorithm>
 #include <fstream>
+#include <sstream>
 #include <yaml-cpp/yaml.h>
 
 namespace tk = tesseract::kinematics;
@@ -75,6 +78,41 @@ void require_not_last_solver(const tcommon::PluginInfoContainer& group, const st
 void require_link(const tk::JointGroup& group, const std::string& link_name) {
     if (!group.hasLinkName(link_name))
         throw nb::key_error(("no link '" + link_name + "' in joint group '" + group.getName() + "'").c_str());
+}
+
+// Upstream defaults, named: the binding's keyword defaults must not drift from the headers.
+constexpr double SINGULARITY_THRESHOLD_DEFAULT = 0.01;  // [singular value] utils.h:129 default
+constexpr double CHECK_KINEMATICS_TOL_DEFAULT = 1e-3;   // [m and rad] validate.h:38 default, compared to both distances
+
+// numericalJacobian reads poses with operator[] (an unknown link inserts an uninitialized
+// Isometry3d) and writes jacobian(0..5, i) for every joint value without sizing it (utils.cpp:36-104).
+void require_joint_count(Eigen::Index n_values, Eigen::Index n_joints) {
+    if (n_values != n_joints)
+        throw nb::value_error(("got " + std::to_string(n_values) + " joint values, expected " +
+                               std::to_string(n_joints)).c_str());
+}
+
+void require_tip_link(const tk::ForwardKinematics& kin, const std::string& link_name) {
+    const auto tips = kin.getTipLinkNames();
+    if (std::find(tips.begin(), tips.end(), link_name) == tips.end())
+        throw nb::key_error(("no tip link '" + link_name + "' in forward kinematics '" + kin.getSolverName() + "'").c_str());
+}
+
+// The harmonizers index qs (and position_limits' rows) with every redundancy_capable_joints entry
+// unchecked (utils.h:355-359, :375-381); check them all before any write.
+void require_indices(const std::vector<Eigen::Index>& indices, Eigen::Index size, const char* what) {
+    for (Eigen::Index i : indices)
+        if (i < 0 || i >= size)
+            throw nb::index_error(("joint index " + std::to_string(i) + " is outside " + what + " (size " +
+                                   std::to_string(size) + ")").c_str());
+}
+
+std::string repr_ellipsoid(const tk::ManipulabilityEllipsoid& e) {
+    std::ostringstream out;
+    const Eigen::IOFormat row(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", "[", "]");
+    out << "ManipulabilityEllipsoid(eigen_values=" << e.eigen_values.transpose().format(row)
+        << ", measure=" << e.measure << ", condition=" << e.condition << ", volume=" << e.volume << ")";
+    return out.str();
 }
 
 }  // namespace
@@ -415,4 +453,127 @@ NB_MODULE(_tesseract_kinematics, m) {
         return tk::getRedundantSolutions<double>(sol, limits, redundancy_capable_joints);
     }, "sol"_a, "limits"_a, "redundancy_capable_joints"_a,
     "Get redundant solutions for a joint configuration by adding +/- 2*pi to redundancy capable joints");
+
+    // numericalJacobian: the 6 x n out-parameter is returned (out-param rule).
+    m.def("numericalJacobian", [](const Eigen::Isometry3d& change_base,
+                                  const tk::ForwardKinematics& kin,
+                                  const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                  const std::string& link_name,
+                                  const Eigen::Ref<const Eigen::Vector3d>& link_point) {
+        require_joint_count(joint_values.size(), kin.numJoints());
+        require_tip_link(kin, link_name);
+        Eigen::MatrixXd jacobian(6, joint_values.size());
+        tk::numericalJacobian(jacobian, change_base, kin, joint_values, link_name, link_point);
+        return jacobian;
+    }, "change_base"_a, "kin"_a, "joint_values"_a, "link_name"_a, "link_point"_a,
+    "Finite-difference Jacobian of a tip link (step 1e-8 rad per joint, utils.cpp:44).\n\n"
+    "Raises:\n"
+    "    ValueError: joint_values does not have kin.numJoints() entries.\n"
+    "    KeyError: link_name is not a tip link of kin.");
+    m.def("numericalJacobian", [](const Eigen::Isometry3d& change_base,
+                                  const tk::JointGroup& joint_group,
+                                  const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                  const std::string& link_name,
+                                  const Eigen::Ref<const Eigen::Vector3d>& link_point) {
+        require_joint_count(joint_values.size(), joint_group.numJoints());
+        require_link(joint_group, link_name);
+        Eigen::MatrixXd jacobian(6, joint_values.size());
+        tk::numericalJacobian(jacobian, change_base, joint_group, joint_values, link_name, link_point);
+        return jacobian;
+    }, "change_base"_a, "joint_group"_a, "joint_values"_a, "link_name"_a, "link_point"_a,
+    "Finite-difference Jacobian of a link of joint_group (step 1e-8 rad per joint, utils.cpp:80).\n\n"
+    "Raises:\n"
+    "    ValueError: joint_values does not have joint_group.numJoints() entries.\n"
+    "    KeyError: link_name is not a link of joint_group.");
+    m.def("numericalJacobian", [](const tk::JointGroup& joint_group,
+                                  const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                  const std::string& base_link_name,
+                                  const Eigen::Isometry3d& base_link_offset,
+                                  const std::string& link_name,
+                                  const Eigen::Isometry3d& link_offset) {
+        require_joint_count(joint_values.size(), joint_group.numJoints());
+        require_link(joint_group, base_link_name);
+        require_link(joint_group, link_name);
+        Eigen::MatrixXd jacobian(6, joint_values.size());
+        tk::numericalJacobian(jacobian, joint_group, joint_values, base_link_name, base_link_offset, link_name,
+                              link_offset);
+        return jacobian;
+    }, "joint_group"_a, "joint_values"_a, "base_link_name"_a, "base_link_offset"_a, "link_name"_a, "link_offset"_a,
+    "Finite-difference Jacobian of link_name relative to base_link_name, in the base link frame.\n\n"
+    "Raises:\n"
+    "    ValueError: joint_values does not have joint_group.numJoints() entries.\n"
+    "    KeyError: base_link_name or link_name is not a link of joint_group.");
+
+    m.def("isNearSingularity", [](const Eigen::Ref<const Eigen::MatrixXd>& jacobian, double threshold) {
+        // The smallest singular value is svd.singularValues().tail(1) (utils.cpp:218): none for an empty matrix.
+        if (jacobian.rows() == 0 || jacobian.cols() == 0)
+            throw nb::value_error("isNearSingularity: the jacobian is empty");
+        return tk::isNearSingularity(jacobian, threshold);
+    }, "jacobian"_a, "threshold"_a = SINGULARITY_THRESHOLD_DEFAULT,
+    "True when the smallest singular value of jacobian is below threshold.\n\n"
+    "Raises:\n"
+    "    ValueError: jacobian is empty.");
+
+    // Results, not inputs: read-only fields.
+    nb::class_<tk::ManipulabilityEllipsoid>(m, "ManipulabilityEllipsoid")
+        .def(nb::init<>())
+        .def_ro("eigen_values", &tk::ManipulabilityEllipsoid::eigen_values)
+        .def_ro("measure", &tk::ManipulabilityEllipsoid::measure)
+        .def_ro("condition", &tk::ManipulabilityEllipsoid::condition)
+        .def_ro("volume", &tk::ManipulabilityEllipsoid::volume)
+        .def("__repr__", &repr_ellipsoid);
+    nb::class_<tk::Manipulability>(m, "Manipulability")
+        .def(nb::init<>())
+        .def_ro("m", &tk::Manipulability::m)
+        .def_ro("m_linear", &tk::Manipulability::m_linear)
+        .def_ro("m_angular", &tk::Manipulability::m_angular)
+        .def_ro("f", &tk::Manipulability::f)
+        .def_ro("f_linear", &tk::Manipulability::f_linear)
+        .def_ro("f_angular", &tk::Manipulability::f_angular)
+        .def("__repr__", [](const tk::Manipulability& self) {
+            return "Manipulability(m=" + repr_ellipsoid(self.m) + ", m_linear=" + repr_ellipsoid(self.m_linear) +
+                   ", m_angular=" + repr_ellipsoid(self.m_angular) + ", f=" + repr_ellipsoid(self.f) +
+                   ", f_linear=" + repr_ellipsoid(self.f_linear) + ", f_angular=" + repr_ellipsoid(self.f_angular) +
+                   ")";
+        });
+
+    // A fixed 6 rows in the Ref type: calcManipulability splits topRows(3) / bottomRows(3)
+    // (utils.cpp:224-225), so any other row count raises TypeError at the call boundary.
+    m.def("calcManipulability", [](const Eigen::Ref<const Eigen::Matrix<double, 6, Eigen::Dynamic>>& jacobian) {
+        return tk::calcManipulability(jacobian);
+    }, "jacobian"_a,
+    "Manipulability and force ellipsoids of a 6-row jacobian.\n\n"
+    "When an ellipsoid's smallest eigenvalue is ~0 (a singular jacobian), its measure and condition\n"
+    "are the largest double (sys.float_info.max), as upstream returns them (utils.cpp:240-244).");
+
+    // In place, as #184: writable Eigen::Ref, so an array nanobind would have to convert (float32,
+    // read-only, non-contiguous) raises TypeError instead of being written as a lost copy.
+    m.def("harmonizeTowardZero", [](Eigen::Ref<Eigen::VectorXd> qs,
+                                    const std::vector<Eigen::Index>& redundancy_capable_joints) {
+        require_indices(redundancy_capable_joints, qs.size(), "qs");
+        tk::harmonizeTowardZero<double>(qs, redundancy_capable_joints);
+    }, "qs"_a, "redundancy_capable_joints"_a,
+    "Wrap qs[i] into [-pi, pi) in place for each i in redundancy_capable_joints.\n\n"
+    "Raises:\n"
+    "    IndexError: an index is outside qs; qs is left unchanged.");
+    m.def("harmonizeTowardMedian", [](Eigen::Ref<Eigen::VectorXd> qs,
+                                      const std::vector<Eigen::Index>& redundancy_capable_joints,
+                                      const Eigen::Ref<const Eigen::Matrix<double, Eigen::Dynamic, 2>>& position_limits) {
+        require_indices(redundancy_capable_joints, qs.size(), "qs");
+        require_indices(redundancy_capable_joints, position_limits.rows(), "position_limits");
+        tk::harmonizeTowardMedian<double>(qs, redundancy_capable_joints, position_limits);
+    }, "qs"_a, "redundancy_capable_joints"_a, "position_limits"_a,
+    "Wrap qs[i] into [median - pi, median + pi) in place, median the midpoint of row i of position_limits.\n\n"
+    "Raises:\n"
+    "    IndexError: an index is outside qs or position_limits; qs is left unchanged.");
+
+    m.def("isValid", [](const std::array<double, 6>& qs) { return tk::isValid<double>(qs); }, "qs"_a,
+          "True when all six values are finite.");
+
+    m.def("checkKinematics", &tk::checkKinematics, "manip"_a, "tol"_a = CHECK_KINEMATICS_TOL_DEFAULT,
+          nb::call_guard<nb::gil_scoped_release>(),
+          "Round-trip self-check: FK then IK for every working frame and tip link of manip.\n\n"
+          "False when an IK solution's translation or angle distance from the FK pose exceeds tol\n"
+          "(validate.cpp:38-175). True also when IK found no solution at all: only failed solutions\n"
+          "make it False.");
 }

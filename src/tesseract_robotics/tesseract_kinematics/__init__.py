@@ -24,4 +24,13 @@ __all__ = [
     "KinematicsPluginRemovalError",
     # Utility functions
     "getRedundantSolutions",
+    "numericalJacobian",
+    "isNearSingularity",
+    "ManipulabilityEllipsoid",
+    "Manipulability",
+    "calcManipulability",
+    "harmonizeTowardZero",
+    "harmonizeTowardMedian",
+    "isValid",
+    "checkKinematics",
 ]
