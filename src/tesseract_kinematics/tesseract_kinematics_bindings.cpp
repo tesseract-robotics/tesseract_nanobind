@@ -69,6 +69,14 @@ void require_not_last_solver(const tcommon::PluginInfoContainer& group, const st
                                            "' is unsafe in tesseract 0.35.0 (kinematics_plugin_factory.cpp:150-154)");
 }
 
+// The link_point and base_link overloads of JointGroup::calcJacobian read link transforms with
+// operator[] behind an assert (joint_group.cpp:197-198, :234-235 @ 0.35.0): in a release build an
+// unknown name yields an uninitialized Isometry3d. Every overload checks its link names first.
+void require_link(const tk::JointGroup& group, const std::string& link_name) {
+    if (!group.hasLinkName(link_name))
+        throw nb::key_error(("no link '" + link_name + "' in joint group '" + group.getName() + "'").c_str());
+}
+
 }  // namespace
 
 NB_MODULE(_tesseract_kinematics, m) {
@@ -166,6 +174,14 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("clone", [](const tk::InverseKinematics& self) { return self.clone(); });
 
     // ========== JointGroup ==========
+    // One body for calcJacobian(q, link_name, link_point) and its alias calcJacobianWithPoint.
+    auto jacobian_at_point = [](const tk::JointGroup& self,
+                                const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
+                                const std::string& link_name,
+                                const Eigen::Vector3d& link_point) {
+        require_link(self, link_name);
+        return self.calcJacobian(joint_angles, link_name, link_point);
+    };
     nb::class_<tk::JointGroup>(m, "JointGroup")
         .def(nb::init<std::string, std::vector<std::string>, const tsg::SceneGraph&, const tsg::SceneState&>(),
              "name"_a, "joint_names"_a, "scene_graph"_a, "scene_state"_a)
@@ -178,17 +194,35 @@ NB_MODULE(_tesseract_kinematics, m) {
             }
             return py_result;
         }, "joint_angles"_a)
+        // The four C++ overloads in header order (joint_group.h:96, :106, :117, :129). nanobind
+        // tells (q, link_name, link_point) from (q, base_link_name, link_name) by the third
+        // argument's type. Unknown link names raise KeyError (require_link).
         .def("calcJacobian", [](const tk::JointGroup& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
                                 const std::string& link_name) {
+            require_link(self, link_name);
             return self.calcJacobian(joint_angles, link_name);
         }, "joint_angles"_a, "link_name"_a)
-        .def("calcJacobianWithPoint", [](const tk::JointGroup& self,
-                                          const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
-                                          const std::string& link_name,
-                                          const Eigen::Vector3d& link_point) {
-            return self.calcJacobian(joint_angles, link_name, link_point);
-        }, "joint_angles"_a, "link_name"_a, "link_point"_a)
+        .def("calcJacobian", jacobian_at_point, "joint_angles"_a, "link_name"_a, "link_point"_a)
+        .def("calcJacobian", [](const tk::JointGroup& self,
+                                const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
+                                const std::string& base_link_name,
+                                const std::string& link_name) {
+            require_link(self, base_link_name);
+            require_link(self, link_name);
+            return self.calcJacobian(joint_angles, base_link_name, link_name);
+        }, "joint_angles"_a, "base_link_name"_a, "link_name"_a)
+        .def("calcJacobian", [](const tk::JointGroup& self,
+                                const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
+                                const std::string& base_link_name,
+                                const std::string& link_name,
+                                const Eigen::Vector3d& link_point) {
+            require_link(self, base_link_name);
+            require_link(self, link_name);
+            return self.calcJacobian(joint_angles, base_link_name, link_name, link_point);
+        }, "joint_angles"_a, "base_link_name"_a, "link_name"_a, "link_point"_a)
+        .def("calcJacobianWithPoint", jacobian_at_point, "joint_angles"_a, "link_name"_a, "link_point"_a,
+             "Alias of `calcJacobian(joint_angles, link_name, link_point)`, the native form.")
         .def("getJointNames", &tk::JointGroup::getJointNames)
         .def("getLinkNames", &tk::JointGroup::getLinkNames)
         .def("getActiveLinkNames", &tk::JointGroup::getActiveLinkNames)
@@ -204,29 +238,41 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("checkJoints", &tk::JointGroup::checkJoints, "vec"_a);
 
     // ========== KinematicGroup (extends JointGroup) ==========
+    // One body for calcInvKin(list[KinGroupIKInput], seed) and its alias calcInvKinMultiple:
+    // KinGroupIKInputs is opaque (NB_MAKE_OPAQUE above), so a list does not convert to it.
+    auto inv_kin_from_list = [](const tk::KinematicGroup& self,
+                                const std::vector<tk::KinGroupIKInput>& tip_link_poses,
+                                const Eigen::Ref<const Eigen::VectorXd>& seed) {
+        tk::KinGroupIKInputs inputs(tip_link_poses.begin(), tip_link_poses.end());
+        return self.calcInvKin(inputs, seed);
+    };
     nb::class_<tk::KinematicGroup, tk::JointGroup>(m, "KinematicGroup")
-        // calcInvKin with single input
-        .def("calcInvKin", [](const tk::KinematicGroup& self,
-                              const tk::KinGroupIKInput& tip_link_pose,
-                              const Eigen::Ref<const Eigen::VectorXd>& seed) {
-            return self.calcInvKin(tip_link_pose, seed);
-        }, "tip_link_pose"_a, "seed"_a)
-        // calcInvKin with KinGroupIKInputs (SWIG compatibility)
+        // Python has no move: the group takes a clone of inv_kin, so the caller's solver stays
+        // usable. The clone runs code from the plugin library of the factory that made inv_kin;
+        // keep_alive<1, 4> keeps inv_kin, and through createInvKin's keep_alive<0, 1> that
+        // factory, alive as long as the group (gh-72).
+        .def("__init__", [](tk::KinematicGroup* self,
+                            std::string name,
+                            std::vector<std::string> joint_names,
+                            const tk::InverseKinematics& inv_kin,
+                            const tsg::SceneGraph& scene_graph,
+                            const tsg::SceneState& scene_state) {
+            new (self) tk::KinematicGroup(std::move(name), std::move(joint_names), inv_kin.clone(),
+                                          scene_graph, scene_state);
+        }, "name"_a, "joint_names"_a, "inv_kin"_a, "scene_graph"_a, "scene_state"_a, nb::keep_alive<1, 4>())
         .def("calcInvKin", [](const tk::KinematicGroup& self,
                               const tk::KinGroupIKInputs& tip_link_poses,
                               const Eigen::Ref<const Eigen::VectorXd>& seed) {
             return self.calcInvKin(tip_link_poses, seed);
         }, "tip_link_poses"_a, "seed"_a)
-        // calcInvKin with vector (python list compatibility)
-        .def("calcInvKinMultiple", [](const tk::KinematicGroup& self,
-                                       const std::vector<tk::KinGroupIKInput>& tip_link_poses,
-                                       const Eigen::Ref<const Eigen::VectorXd>& seed) {
-            tk::KinGroupIKInputs inputs;
-            for (const auto& p : tip_link_poses) {
-                inputs.push_back(p);
-            }
-            return self.calcInvKin(inputs, seed);
-        }, "tip_link_poses"_a, "seed"_a)
+        .def("calcInvKin", [](const tk::KinematicGroup& self,
+                              const tk::KinGroupIKInput& tip_link_pose,
+                              const Eigen::Ref<const Eigen::VectorXd>& seed) {
+            return self.calcInvKin(tip_link_pose, seed);
+        }, "tip_link_pose"_a, "seed"_a)
+        .def("calcInvKin", inv_kin_from_list, "tip_link_poses"_a, "seed"_a)
+        .def("calcInvKinMultiple", inv_kin_from_list, "tip_link_poses"_a, "seed"_a,
+             "Alias of `calcInvKin(tip_link_poses, seed)` with a list, the native form.")
         .def("getAllValidWorkingFrames", &tk::KinematicGroup::getAllValidWorkingFrames)
         .def("getAllPossibleTipLinkNames", &tk::KinematicGroup::getAllPossibleTipLinkNames)
         .def("getInverseKinematics", &tk::KinematicGroup::getInverseKinematics,

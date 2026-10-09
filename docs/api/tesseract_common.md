@@ -105,7 +105,7 @@ jacobianChangeRefPoint(J, np.array([0.0, 0.0, 0.1]))  # v += ω × p, in place
     convert others with `np.asfortranarray`.
 
 `jacobianChangeRefPoint` takes the point in the jacobian's base frame. To match
-`calcJacobianWithPoint(q, link, p)`, whose `p` is in the link frame, rotate it first:
+`calcJacobian(q, link, p)`, whose `p` is in the link frame, rotate it first:
 `jacobianChangeRefPoint(J, joint_group.calcFwdKin(q)[link].rotation @ p)`.
 
 Pose errors are `[translation, angle-axis rotation]` 6-vectors:
