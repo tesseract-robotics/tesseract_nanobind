@@ -256,6 +256,10 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "collect",
         "describe",
         "flatten",
+        "fill",
+        "shift",
+        "norm",
+        "trace",
         "Bag",
         "Bag.__init__",
         "Bag.size",
@@ -300,6 +304,15 @@ def test_out_param_excludes_abstract_reference(fixture_cpp):
     [ov] = fixture_cpp["collect"].overloads
     assert (str(ov.arity), len(ov.out_params)) == ("3", 1)
     assert str(ov.arity.reduced(len(ov.out_params))) == "2"
+
+
+@pytest.mark.parametrize(
+    ("symbol", "n_out"), [("fill", 1), ("shift", 1), ("norm", 0), ("trace", 0)]
+)
+def test_eigen_ref_of_non_const_is_an_out_param(fixture_cpp, symbol, n_out):
+    """gh-213: a by-value `Eigen::Ref<T>` with non-const T is writable, like a non-const `T&`."""
+    [ov] = fixture_cpp[symbol].overloads
+    assert len(ov.out_params) == n_out
 
 
 def test_stringstream_out_param_recorded(fixture_cpp):
@@ -528,6 +541,7 @@ def test_fixture_accepted_exact(fixture_report):
         ("collect", "out-param"),
         ("describe", "stringstream"),
         ("flatten", "out-param"),  # void + one out-param returned directly (I6)
+        ("fill", "out-param"),  # Eigen::Ref<MatrixXd> out-param returned (gh-213)
         ("Bag.__len__", "container-protocol"),  # C14
         ("Bag.__setitem__", "container-protocol"),  # M18
         ("Bag.__iter__", "iterator-pair"),  # C6
@@ -613,6 +627,21 @@ def test_check_trajectory_covered_via_out_param(real_reports):
     assert [d for d in report.deviations if d.name == "checkTrajectory"] == []
     rules = [a.rule for a in report.accepted if a.symbol == "checkTrajectory"]
     assert rules == ["out-param"] * 4
+
+
+def test_eigen_ref_out_params_covered_in_kinematics():
+    """gh-213: numericalJacobian's three overloads and ForwardKinematics.calcJacobian :104 return
+    their `Eigen::Ref<Eigen::MatrixXd>` out-param, so none is a gap or a deviation."""
+    report = audit.audit_module("tesseract_kinematics")
+    names = {"numericalJacobian", "ForwardKinematics.calcJacobian"}
+    assert [g for g in report.gaps if g.symbol in names] == []
+    assert [d for d in report.deviations if d.name in names] == []
+    rules = sorted((a.symbol, a.rule) for a in report.accepted if a.symbol in names)
+    assert (
+        rules
+        == [("ForwardKinematics.calcJacobian", "out-param")]
+        + [("numericalJacobian", "out-param")] * 3
+    )
 
 
 def test_satisfies_limits_all_overloads_covered(real_reports):

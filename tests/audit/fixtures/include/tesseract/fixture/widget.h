@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include <Eigen/Core>  // third-party: never audited
+
 #include <tesseract/fixture/gadget.h>  // first inclusion of gadget.h: the TU's own #include must still count (C1)
 
 namespace tesseract::fixture
@@ -142,6 +144,10 @@ int scale(int value, double factor);        // redeclaration: must not add an ov
 int area(int w);                            // Python adds an arity-2 overload: deviation
 bool collect(std::vector<int>& out, Base& runner, int n);  // out-param: out only; arity 3 -> 2
 void describe(std::stringstream& ss, int n);               // stringstream -> str; arity 2 -> 1
+void fill(Eigen::Ref<Eigen::MatrixXd> out, int n);  // Eigen::Ref out-param, void: returned; arity 2 -> 1 (gh-213)
+void shift(Eigen::Ref<Eigen::VectorXd> qs, int n);  // the same shape bound in place at arity 2: exact
+double norm(const Eigen::Ref<const Eigen::MatrixXd>& m);  // const Ref: an input, not an out-param
+double trace(Eigen::Ref<const Eigen::MatrixXd> m);        // by-value Ref of const: an input
 }  // namespace tesseract::fixture
 
 namespace std

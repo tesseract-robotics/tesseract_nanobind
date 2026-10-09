@@ -483,13 +483,35 @@ def is_unaudited(spelling: str, prefix: str) -> bool:
     )
 
 
+def _is_eigen_ref_of_non_const(t: ci.Type) -> bool:
+    """A by-value `Eigen::Ref<T>` with non-const T: a writable view, like a non-const `T&`."""
+    canonical = t.get_canonical()
+    decl = canonical.get_declaration()
+    if (
+        decl.spelling != "Ref"
+        or decl.semantic_parent is None
+        or decl.semantic_parent.spelling != "Eigen"
+    ):
+        return False
+    return not canonical.get_template_argument_type(0).is_const_qualified()
+
+
 def _is_out_param(parm: ci.Cursor) -> bool:
-    """Non-const lvalue reference to a non-abstract type (spec amendment A3)."""
+    """Non-const lvalue reference to a non-abstract type (spec amendment A3), or a by-value
+    `Eigen::Ref` of a non-const matrix (gh-213: `numericalJacobian`'s `jacobian`)."""
     t = parm.type
-    if t.kind != ci.TypeKind.LVALUEREFERENCE or t.get_pointee().is_const_qualified():
+    if t.kind != ci.TypeKind.LVALUEREFERENCE:
+        return _is_eigen_ref_of_non_const(t)
+    if t.get_pointee().is_const_qualified():
         return False
     decl = t.get_pointee().get_canonical().get_declaration()
     return not (decl.kind in RECORD_KINDS and decl.is_abstract_record())
+
+
+def _out_param_type(parm: ci.Cursor) -> str:
+    """The written type: the pointee of a reference, the `Eigen::Ref` itself otherwise."""
+    t = parm.type
+    return t.get_pointee().spelling if t.kind == ci.TypeKind.LVALUEREFERENCE else t.spelling
 
 
 def _is_raw_buffer(parm: ci.Cursor) -> bool:
@@ -577,7 +599,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             return
         params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
         n_default = sum(_has_default(p) for p in params)
-        out = tuple(p.type.get_pointee().spelling for p in params if _is_out_param(p))
+        out = tuple(_out_param_type(p) for p in params if _is_out_param(p))
         arity = Arity(len(params) - n_default, len(params))
         void = c.result_type.kind == ci.TypeKind.VOID
         absent_ok = nullary_absent_ok if arity.hi == 0 else None
@@ -894,8 +916,9 @@ def init_accepted(path: Path) -> list[Accepted]:
 
 # Deviations accepted by rule; each is printed with its reason in the report.
 ACCEPTED = {
-    "out-param": "A non-const lvalue-reference out-param is returned in a tuple with the result "
-    "(Phase A precedent: checkTrajectory), or alone when the C++ returns `void`.",
+    "out-param": "A non-const lvalue-reference out-param (or a by-value `Eigen::Ref` of a "
+    "non-const matrix) is returned in a tuple with the result (Phase A precedent: "
+    "checkTrajectory), or alone when the C++ returns `void`.",
     "stringstream": "A `std::stringstream&` parameter the C++ writes into is returned as `str`.",
     "scalar-last-quaternion": "Quaterniond takes (x, y, z, w), the project-wide scalar-last "
     "order; Eigen's constructor is (w, x, y, z).",
