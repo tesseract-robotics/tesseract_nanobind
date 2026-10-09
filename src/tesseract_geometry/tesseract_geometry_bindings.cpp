@@ -110,6 +110,9 @@ Class bind_mesh_ctors(Class cls, const char* name, TailArgs... tail_args) {
             "scale"_a = Eigen::Vector3d::Ones(), nb::arg("normals").none() = nb::none(),
             nb::arg("vertex_colors").none() = nb::none(), nb::arg("mesh_material").none() = nb::none(),
             nb::arg("mesh_textures").none() = nb::none(), tail_args...);
+    // The class's own operator== (Geometry's compares only type and UUID): polygon_mesh.cpp:111,
+    // mesh.cpp:106, convex_mesh.cpp:80 (adds the creation method), sdf_mesh.cpp:80 @ 0.35.0.
+    cls.def("__eq__", &T::operator==).def("__ne__", &T::operator!=);
     return cls;
 }
 
@@ -319,12 +322,17 @@ NB_MODULE(_tesseract_geometry, m) {
     bind_mesh_ctors<tg::Mesh>(nb::class_<tg::Mesh, tg::PolygonMesh>(m, "Mesh"), "Mesh");
 
     // ConvexMesh
-    nb::class_<tg::ConvexMesh, tg::PolygonMesh>(m, "ConvexMesh")
-        .def("__init__", [](tg::ConvexMesh* self, const tc::VectorVector3d& vertices, const Eigen::VectorXi& faces) {
-            auto verts = std::make_shared<const tc::VectorVector3d>(vertices);
-            auto face_data = std::make_shared<const Eigen::VectorXi>(faces);
-            new (self) tg::ConvexMesh(verts, face_data);
-        }, "vertices"_a, "faces"_a);
+    // CreationMethod is bound before the constructors and methods that use it, nested as upstream
+    // nests it (ConvexMesh.CreationMethod.CONVERTED), with no module-level constants (#176).
+    auto convex_mesh = nb::class_<tg::ConvexMesh, tg::PolygonMesh>(m, "ConvexMesh");
+    nb::enum_<tg::ConvexMesh::CreationMethod>(convex_mesh, "CreationMethod")
+        .value("DEFAULT", tg::ConvexMesh::DEFAULT)
+        .value("MESH", tg::ConvexMesh::MESH)
+        .value("CONVERTED", tg::ConvexMesh::CONVERTED);
+    bind_mesh_ctors<tg::ConvexMesh>(convex_mesh, "ConvexMesh")
+        .def("getCreationMethod", &tg::ConvexMesh::getCreationMethod,
+             "How the mesh was made; the URDF parser sets CONVERTED for tesseract:make_convex")
+        .def("setCreationMethod", &tg::ConvexMesh::setCreationMethod, "method"_a, "Set how the mesh was made");
 
     // SDFMesh
     bind_mesh_ctors<tg::SDFMesh>(nb::class_<tg::SDFMesh, tg::PolygonMesh>(m, "SDFMesh"), "SDFMesh");
