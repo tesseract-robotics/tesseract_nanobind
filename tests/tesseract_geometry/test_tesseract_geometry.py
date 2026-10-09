@@ -1,3 +1,4 @@
+import gc
 import os
 import uuid
 from pathlib import Path
@@ -472,3 +473,50 @@ def test_mesh_equality_is_the_class_operator(cls):
     c = cls(SQUARE_VERTICES, SQUARE_FACES, scale=np.array([2.0, 2.0, 2.0]))
     c.setUUID(a.getUUID())
     assert (a != c) is COMPARES_SCALE[cls]
+
+
+SPHERE_STL = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/sphere_p25m.stl"
+
+
+@pytest.mark.parametrize("triangulate", [True, False])
+def test_create_mesh_from_bytes_matches_path(triangulate):
+    data = SPHERE_STL.read_bytes()
+    from_bytes = tesseract_geometry.createMeshFromBytes(
+        "sphere_p25m.stl", data, triangulate=triangulate
+    )
+    from_path = tesseract_geometry.createMeshFromPath(str(SPHERE_STL), triangulate=triangulate)
+    assert [(m.getVertexCount(), m.getFaceCount()) for m in from_bytes] == [
+        (m.getVertexCount(), m.getFaceCount()) for m in from_path
+    ]
+
+
+def test_create_mesh_from_bytes_defaults_match_path():
+    """triangulate defaults to True like the Path / Resource siblings (plan Q5b), not the header's false."""
+    data = SPHERE_STL.read_bytes()
+    from_bytes = tesseract_geometry.createMeshFromBytes("sphere_p25m.stl", data)
+    from_path = tesseract_geometry.createMeshFromPath(str(SPHERE_STL))
+    assert [m.getFaceCount() for m in from_bytes] == [m.getFaceCount() for m in from_path]
+
+
+@pytest.mark.parametrize(
+    ("fn", "cls"),
+    [
+        ("createMeshFromBytes", tesseract_geometry.Mesh),
+        ("createConvexMeshFromBytes", tesseract_geometry.ConvexMesh),
+        ("createSDFMeshFromBytes", tesseract_geometry.SDFMesh),
+    ],
+)
+def test_create_mesh_from_bytes_instance_types(fn, cls):
+    meshes = getattr(tesseract_geometry, fn)("sphere_p25m.stl", SPHERE_STL.read_bytes())
+    assert len(meshes) == 1
+    assert type(meshes[0]) is cls
+    assert fn in tesseract_geometry.__all__
+
+
+def test_create_mesh_from_bytes_outlives_the_buffer():
+    data = SPHERE_STL.read_bytes()
+    meshes = tesseract_geometry.createMeshFromBytes("sphere_p25m.stl", data)
+    expected = np.array(meshes[0].getVertices())
+    del data
+    gc.collect()
+    nptest.assert_array_equal(np.array(meshes[0].getVertices()), expected)

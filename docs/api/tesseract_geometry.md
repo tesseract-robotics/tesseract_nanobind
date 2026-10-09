@@ -327,7 +327,26 @@ a == b               # True
 | `createConvexMeshFromResource(resource, scale)` | Convex from Resource |
 | `createSDFMeshFromPath(path, scale)` | Load as SDF mesh |
 | `createSDFMeshFromResource(resource, scale)` | SDF from Resource |
+| `createMeshFromBytes(url, data, scale)` | Load mesh from an in-memory file |
+| `createConvexMeshFromBytes(url, data, scale)` | Convex from an in-memory file |
+| `createSDFMeshFromBytes(url, data, scale)` | SDF from an in-memory file |
 | `createOctree(point_cloud, resolution, prune, binary)` | Build an octomap OcTree from a `PointCloud` |
+
+Every mesh loader defaults to `triangulate=True`, where the C++ header says `false`. The URDF
+parser always triangulates (urdf/src/mesh.cpp:84–88), and `Mesh` expects triangles.
+
+The `…FromBytes` loaders take bytes you already hold. The extension of `url` selects the format,
+so `url` must end in `.stl`, `.dae`, and so on. The bytes are copied, so the returned meshes do not
+depend on `data` afterwards. `createMeshFromAsset` and `extractMeshData` are not bound: they take
+assimp's `aiScene`, which Python never sees.
+
+```python
+from pathlib import Path
+from tesseract_robotics.tesseract_geometry import createMeshFromBytes
+
+data = Path("model.stl").read_bytes()
+meshes = createMeshFromBytes("model.stl", data)
+```
 
 ## Auto-generated API Reference
 

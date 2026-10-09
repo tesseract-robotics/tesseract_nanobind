@@ -453,6 +453,21 @@ def createConvexMeshFromResource(resource: tesseract_robotics.tesseract_common._
 def createSDFMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False) -> list[SDFMesh]:
     """Load SDFMesh from resource (e.g., package:// URL)"""
 
+def createMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
+    """
+    Load Mesh geometries from an in-memory mesh file; url's extension (.stl, .dae, ...) selects the format
+    """
+
+def createConvexMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
+    """
+    Load ConvexMesh geometries from an in-memory mesh file; url's extension selects the format
+    """
+
+def createSDFMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
+    """
+    Load SDFMesh geometries from an in-memory mesh file; url's extension selects the format
+    """
+
 def isIdentical(geom1: Geometry, geom2: Geometry) -> bool:
     """Check if two geometries are identical"""
 
