@@ -227,6 +227,21 @@ if geom_type == GeometryType.BOX:
 copy = geom.clone()
 ```
 
+`==` compares the geometry type and its UUID, not its content: every constructor and `clone()` draws a
+new random UUID, so `Box(1, 1, 1) == Box(1, 1, 1)` and `geom == geom.clone()` are `False`. Use
+`isIdentical` to compare content. `getUUID()` returns the UUID as its canonical string; `setUUID(str)`
+sets it and raises `ValueError` for a malformed string, leaving the UUID unchanged.
+
+```python
+from tesseract_robotics.tesseract_geometry import Box, isIdentical
+
+a, b = Box(1, 1, 1), Box(1, 1, 1)
+a == b               # False: different UUIDs
+isIdentical(a, b)    # True: same content
+b.setUUID(a.getUUID())
+a == b               # True
+```
+
 | GeometryType | Description |
 |--------------|-------------|
 | `BOX` | Rectangular box |

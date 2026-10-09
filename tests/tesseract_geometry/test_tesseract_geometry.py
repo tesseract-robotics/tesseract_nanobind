@@ -1,7 +1,9 @@
 import os
+import uuid
 
 import numpy as np
 import numpy.testing as nptest
+import pytest
 
 from tesseract_robotics import tesseract_common, tesseract_geometry
 
@@ -189,9 +191,7 @@ def test_octree():
     nptest.assert_almost_equal(ot.getResolution(), 0.05)
     assert ot.getNumLeafNodes() == 3
 
-    geom = tesseract_geometry.Octree(
-        ot, tesseract_geometry.OctreeSubType.BOX, True, True
-    )
+    geom = tesseract_geometry.Octree(ot, tesseract_geometry.OctreeSubType.BOX, True, True)
     assert geom.getType() == tesseract_geometry.GeometryType.OCTREE
     assert geom.getSubType() == tesseract_geometry.OctreeSubType.BOX
     assert geom.getPruned() is True
@@ -229,9 +229,7 @@ def test_octree_direct_construction():
     ot.toMaxLikelihood()
     assert ot.size() > 0
 
-    geom = tesseract_geometry.Octree(
-        ot, tesseract_geometry.OctreeSubType.SPHERE_INSIDE
-    )
+    geom = tesseract_geometry.Octree(ot, tesseract_geometry.OctreeSubType.SPHERE_INSIDE)
     assert geom.getSubType() == tesseract_geometry.OctreeSubType.SPHERE_INSIDE
     assert geom.getPruned() is False
 
@@ -256,3 +254,31 @@ def test_sdf_mesh():
     assert len(geom_clone.getFaces()) > 0
     assert geom_clone.getVertexCount() == 4
     assert geom_clone.getFaceCount() == 2
+
+
+def test_geometry_uuid_is_canonical_string():
+    s = tesseract_geometry.Box(1, 1, 1).getUUID()
+    assert isinstance(s, str)
+    assert str(uuid.UUID(s)) == s
+
+
+def test_geometry_equality_is_type_and_uuid():
+    a = tesseract_geometry.Box(1, 1, 1)
+    b = tesseract_geometry.Box(1, 1, 1)
+    assert a != b
+    b.setUUID(a.getUUID())
+    assert a == b
+    assert b.getUUID() == a.getUUID()
+
+    clone = a.clone()
+    assert a != clone
+    clone.setUUID(a.getUUID())
+    assert a == clone
+
+
+def test_geometry_set_uuid_refuses_malformed_string():
+    geom = tesseract_geometry.Box(1, 1, 1)
+    before = geom.getUUID()
+    with pytest.raises(ValueError, match="not-a-uuid"):
+        geom.setUUID("not-a-uuid")
+    assert geom.getUUID() == before

@@ -44,6 +44,14 @@ class Geometry:
     def clone(self) -> Geometry:
         """Create a copy of this geometry"""
 
+    def getUUID(self) -> str:
+        """UUID as its canonical string"""
+
+    def setUUID(self, uuid: str) -> None:
+        """
+        Set the UUID from its canonical string; a malformed string raises ValueError
+        """
+
     def __eq__(self, arg: Geometry, /) -> bool: ...
 
     def __ne__(self, arg: Geometry, /) -> bool: ...
