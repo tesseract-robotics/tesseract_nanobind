@@ -25,6 +25,20 @@ pos_max = limits.joint_limits[:, 1]
 vel_limits = limits.velocity_limits
 ```
 
+A `KinematicGroup` can also be built without an `Environment`, from an
+inverse kinematics solver the plugin factory created. The group takes a copy
+(`clone()`) of `inv_kin`, so the solver passed in stays usable; the group keeps
+it, and so its factory, alive.
+
+```python
+inv_kin = factory.createInvKin("manipulator", "KDLInvKinChainLMA", scene_graph, scene_state)
+manip = KinematicGroup("manipulator", joint_names, inv_kin, scene_graph, scene_state)
+```
+
+Upstream's checks raise `RuntimeError`: `joint_names` of the wrong size or with
+other names than the solver's, or a working frame or tip link that is not a
+link in `scene_state`.
+
 ### JointGroup
 
 Forward kinematics only (no IK solver).
@@ -36,6 +50,23 @@ group = env.getJointGroup("manipulator")
 
 # Same interface as KinematicGroup for FK
 ```
+
+### Jacobians
+
+`calcJacobian` has the four C++ overloads. `base_link_name` is the frame the
+Jacobian is expressed in; `link_point` is a point in the link frame (the
+Jacobian's reference point moves there), a NumPy array of 3 floats.
+
+```python
+p = np.array([0.0, 0.0, 0.1])
+J = group.calcJacobian(q, "tool0")                  # in the group base frame
+J = group.calcJacobian(q, "tool0", p)               # at a point on tool0
+J = group.calcJacobian(q, "link_2", "tool0")        # expressed in link_2
+J = group.calcJacobian(q, "link_2", "tool0", p)
+```
+
+An unknown link name raises `KeyError`. `calcJacobianWithPoint(q, link, p)` is
+an alias of `calcJacobian(q, link, p)`.
 
 ## Forward Kinematics
 
@@ -86,16 +117,13 @@ else:
     print("No IK solution found")
 ```
 
-### Batch IK — KinGroupIKInputs
+### Batch IK
+
+`calcInvKin` also takes a list of `KinGroupIKInput` (or a `KinGroupIKInputs`),
+one per tip link; `calcInvKinMultiple` is an alias of the list form.
 
 ```python
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInputs
-
-inputs = KinGroupIKInputs()
-inputs.append(ik_input)
-inputs.append(another_input)
-
-solutions = manip.calcInvKin(inputs, seed)
+solutions = manip.calcInvKin([ik_input, another_input], seed)
 ```
 
 ## Redundant Solutions
