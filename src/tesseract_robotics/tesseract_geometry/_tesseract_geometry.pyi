@@ -219,13 +219,27 @@ class MeshMaterial:
         """Get emissive factor (RGBA)"""
 
 class MeshTexture:
+    def __init__(self, texture_image: tesseract_robotics.tesseract_common._tesseract_common.Resource, uvs: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]]) -> None:
+        """Create a texture from a jpg or png image resource and per-vertex UVs"""
+
     def getTextureImage(self) -> tesseract_robotics.tesseract_common._tesseract_common.Resource:
         """Get the texture image resource"""
 
     def getUVs(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]]:
         """Get UV coordinates"""
 
+class MeshFaceCountError(ValueError):
+    """
+    A mesh constructor's face_count disagrees with the number of faces its faces array describes.
+    """
+
 class PolygonMesh(Geometry):
+    @overload
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None, type: GeometryType = GeometryType.POLYGON_MESH) -> None: ...
+
+    @overload
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None, type: GeometryType = GeometryType.POLYGON_MESH) -> None: ...
+
     def getVertexCount(self) -> int:
         """Get number of vertices"""
 
@@ -255,13 +269,21 @@ class PolygonMesh(Geometry):
         """Get mesh resource"""
 
 class Mesh(PolygonMesh):
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')]) -> None: ...
+    @overload
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+
+    @overload
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
 class ConvexMesh(PolygonMesh):
     def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')]) -> None: ...
 
 class SDFMesh(PolygonMesh):
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')]) -> None: ...
+    @overload
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+
+    @overload
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
 class CompoundMesh(Geometry):
     def __init__(self, meshes: Sequence[PolygonMesh]) -> None: ...

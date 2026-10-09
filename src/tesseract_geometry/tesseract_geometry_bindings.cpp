@@ -44,6 +44,77 @@ namespace tc = tesseract::common;
 // Disable type caster for this specific vector type so we can bind it as a class
 NB_MAKE_OPAQUE(std::vector<std::shared_ptr<const tg::Geometry>>);
 
+// The face_count mesh constructors store the count they are given, unchecked
+// (polygon_mesh.cpp:59-81 @ 0.35.0); the binding refuses one that disagrees with the faces.
+struct MeshFaceCountError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+namespace {
+
+using MeshTextures = std::vector<std::shared_ptr<tg::MeshTexture>>;
+
+// Counts faces the way the counting PolygonMesh constructor does (polygon_mesh.cpp:51-56 @ 0.35.0).
+int count_faces(const Eigen::VectorXi& faces) {
+    int count = 0;
+    for (Eigen::Index i = 0; i < faces.size(); ++i) {
+        ++count;
+        i += faces(i);
+    }
+    return count;
+}
+
+void check_face_count(const char* cls, const Eigen::VectorXi& faces, int face_count) {
+    const int counted = count_faces(faces);
+    if (counted != face_count)
+        throw MeshFaceCountError(std::string(cls) + ": face_count " + std::to_string(face_count) +
+                                 " disagrees with faces, which describes " + std::to_string(counted));
+}
+
+template <typename T>
+std::shared_ptr<const T> share(const std::optional<T>& value) {
+    return value ? std::make_shared<const T>(*value) : nullptr;
+}
+
+// Both native constructors of a PolygonMesh subclass, with the C++ defaults: (vertices, faces, ...)
+// and (vertices, faces, face_count, ...). Every optional pointer argument takes None for null.
+// PolygonMesh itself also takes a trailing `type` (polygon_mesh.h:79, :107): Tail names its C++
+// parameter types, tail_args its Python arguments.
+template <typename T, typename... Tail, typename Class, typename... TailArgs>
+Class bind_mesh_ctors(Class cls, const char* name, TailArgs... tail_args) {
+    cls.def("__init__",
+            [](T* self, const tc::VectorVector3d& vertices, const Eigen::VectorXi& faces, tc::Resource::Ptr resource,
+               const Eigen::Vector3d& scale, std::optional<tc::VectorVector3d> normals,
+               std::optional<tc::VectorVector4d> vertex_colors, tg::MeshMaterial::Ptr mesh_material,
+               std::optional<MeshTextures> mesh_textures, Tail... tail) {
+                new (self) T(std::make_shared<const tc::VectorVector3d>(vertices),
+                             std::make_shared<const Eigen::VectorXi>(faces), std::move(resource), scale,
+                             share(normals), share(vertex_colors), std::move(mesh_material), share(mesh_textures),
+                             tail...);
+            },
+            "vertices"_a, "faces"_a, nb::arg("resource").none() = nb::none(), "scale"_a = Eigen::Vector3d::Ones(),
+            nb::arg("normals").none() = nb::none(), nb::arg("vertex_colors").none() = nb::none(),
+            nb::arg("mesh_material").none() = nb::none(), nb::arg("mesh_textures").none() = nb::none(), tail_args...);
+    cls.def("__init__",
+            [name](T* self, const tc::VectorVector3d& vertices, const Eigen::VectorXi& faces, int face_count,
+                   tc::Resource::Ptr resource, const Eigen::Vector3d& scale, std::optional<tc::VectorVector3d> normals,
+                   std::optional<tc::VectorVector4d> vertex_colors, tg::MeshMaterial::Ptr mesh_material,
+                   std::optional<MeshTextures> mesh_textures, Tail... tail) {
+                check_face_count(name, faces, face_count);
+                new (self) T(std::make_shared<const tc::VectorVector3d>(vertices),
+                             std::make_shared<const Eigen::VectorXi>(faces), face_count, std::move(resource), scale,
+                             share(normals), share(vertex_colors), std::move(mesh_material), share(mesh_textures),
+                             tail...);
+            },
+            "vertices"_a, "faces"_a, "face_count"_a, nb::arg("resource").none() = nb::none(),
+            "scale"_a = Eigen::Vector3d::Ones(), nb::arg("normals").none() = nb::none(),
+            nb::arg("vertex_colors").none() = nb::none(), nb::arg("mesh_material").none() = nb::none(),
+            nb::arg("mesh_textures").none() = nb::none(), tail_args...);
+    return cls;
+}
+
+}  // namespace
+
 NB_MODULE(_tesseract_geometry, m) {
     m.doc() = "tesseract_geometry Python bindings";
 
@@ -195,6 +266,11 @@ NB_MODULE(_tesseract_geometry, m) {
 
     // MeshTexture - texture with UV coordinates
     nb::class_<tg::MeshTexture>(m, "MeshTexture")
+        // Neither argument takes None: upstream stores both unchecked (mesh_material.cpp:49-53), but a
+        // texture without an image or UVs is never valid. texture_image must be a jpg or png (mesh_material.h:144).
+        .def("__init__", [](tg::MeshTexture* self, tc::Resource::Ptr texture_image, const tc::VectorVector2d& uvs) {
+            new (self) tg::MeshTexture(std::move(texture_image), std::make_shared<const tc::VectorVector2d>(uvs));
+        }, "texture_image"_a, "uvs"_a, "Create a texture from a jpg or png image resource and per-vertex UVs")
         .def("getTextureImage", &tg::MeshTexture::getTextureImage, "Get the texture image resource")
         .def("getUVs", [](tg::MeshTexture& self) {
             auto uvs = self.getUVs();
@@ -202,8 +278,12 @@ NB_MODULE(_tesseract_geometry, m) {
             return *uvs;
         }, "Get UV coordinates");
 
+    nb::exception<MeshFaceCountError>(m, "MeshFaceCountError", PyExc_ValueError).attr("__doc__") =
+        "A mesh constructor's face_count disagrees with the number of faces its faces array describes.";
+
     // PolygonMesh (base for Mesh, ConvexMesh, SDFMesh) - inherits shared_ptr holder from Geometry
-    nb::class_<tg::PolygonMesh, tg::Geometry>(m, "PolygonMesh")
+    bind_mesh_ctors<tg::PolygonMesh, tg::GeometryType>(nb::class_<tg::PolygonMesh, tg::Geometry>(m, "PolygonMesh"),
+                                                       "PolygonMesh", "type"_a = tg::GeometryType::POLYGON_MESH)
         .def("getVertexCount", &tg::PolygonMesh::getVertexCount, "Get number of vertices")
         .def("getFaceCount", &tg::PolygonMesh::getFaceCount, "Get number of faces")
         .def("getScale", &tg::PolygonMesh::getScale, "Get mesh scale")
@@ -236,12 +316,7 @@ NB_MODULE(_tesseract_geometry, m) {
         .def("getResource", &tg::PolygonMesh::getResource, "Get mesh resource");
 
     // Mesh
-    nb::class_<tg::Mesh, tg::PolygonMesh>(m, "Mesh")
-        .def("__init__", [](tg::Mesh* self, const tc::VectorVector3d& vertices, const Eigen::VectorXi& faces) {
-            auto verts = std::make_shared<const tc::VectorVector3d>(vertices);
-            auto face_data = std::make_shared<const Eigen::VectorXi>(faces);
-            new (self) tg::Mesh(verts, face_data);
-        }, "vertices"_a, "faces"_a);
+    bind_mesh_ctors<tg::Mesh>(nb::class_<tg::Mesh, tg::PolygonMesh>(m, "Mesh"), "Mesh");
 
     // ConvexMesh
     nb::class_<tg::ConvexMesh, tg::PolygonMesh>(m, "ConvexMesh")
@@ -252,12 +327,7 @@ NB_MODULE(_tesseract_geometry, m) {
         }, "vertices"_a, "faces"_a);
 
     // SDFMesh
-    nb::class_<tg::SDFMesh, tg::PolygonMesh>(m, "SDFMesh")
-        .def("__init__", [](tg::SDFMesh* self, const tc::VectorVector3d& vertices, const Eigen::VectorXi& faces) {
-            auto verts = std::make_shared<const tc::VectorVector3d>(vertices);
-            auto face_data = std::make_shared<const Eigen::VectorXi>(faces);
-            new (self) tg::SDFMesh(verts, face_data);
-        }, "vertices"_a, "faces"_a);
+    bind_mesh_ctors<tg::SDFMesh>(nb::class_<tg::SDFMesh, tg::PolygonMesh>(m, "SDFMesh"), "SDFMesh");
 
     // CompoundMesh - container for multiple meshes from a single resource (e.g., .dae file)
     nb::class_<tg::CompoundMesh, tg::Geometry>(m, "CompoundMesh")

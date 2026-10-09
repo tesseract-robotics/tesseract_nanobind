@@ -71,12 +71,48 @@ meshes = createMeshFromPath("model.stl")
 mesh = meshes[0]
 
 # Access data
-vertices = mesh.getVertices()   # VectorVector3d
-triangles = mesh.getTriangles() # face indices
+vertices = mesh.getVertices()   # list of 3-vectors
+faces = mesh.getFaces()         # [count, i0, i1, ..., count, ...]
 
 # With scale
 meshes = createMeshFromPath("model.stl", scale=np.array([0.001, 0.001, 0.001]))
 ```
+
+`Mesh`, `SDFMesh` and `PolygonMesh` bind both native constructors. `faces` is flat:
+each face is its vertex count followed by that many vertex indices. Every argument after `faces` is
+optional and takes the C++ default; the pointer arguments take `None` for "not set".
+
+```python
+from tesseract_robotics.tesseract_common import BytesResource
+from tesseract_robotics.tesseract_geometry import Mesh, MeshFaceCountError, MeshMaterial
+import numpy as np
+
+vertices = [np.array(v, dtype=float) for v in ([0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0])]
+faces = np.array([3, 0, 1, 2, 3, 0, 2, 3], dtype=np.int32)
+
+mesh = Mesh(vertices, faces)  # counts the faces
+mesh = Mesh(
+    vertices, faces,
+    resource=BytesResource("square.stl", b"..."),
+    scale=np.array([1.0, 1.0, 1.0]),
+    normals=[np.array([0.0, 0.0, 1.0])] * 4,
+    vertex_colors=[np.array([1.0, 0.0, 0.0, 1.0])] * 4,
+    mesh_material=MeshMaterial(np.array([1.0, 0.0, 0.0, 1.0]), 0.0, 0.5, np.zeros(4)),
+    mesh_textures=None,
+)
+mesh = Mesh(vertices, faces, 2)  # face_count given
+
+try:
+    Mesh(vertices, faces, 3)
+except MeshFaceCountError:  # a ValueError
+    pass
+```
+
+The `face_count` overload exists in C++ to skip counting. Upstream stores the count without checking
+it; the binding counts the faces anyway and raises `MeshFaceCountError` when the two disagree, so
+`getFaceCount()` always matches `getFaces()`. `PolygonMesh` also takes a trailing
+`type=GeometryType.POLYGON_MESH`. Fixed-size vectors (`scale`, each normal) must be numpy arrays:
+nanobind's Eigen caster refuses a plain list.
 
 ### ConvexMesh
 
@@ -189,23 +225,32 @@ Surface material properties.
 from tesseract_robotics.tesseract_geometry import MeshMaterial
 import numpy as np
 
-material = MeshMaterial()
-material.base_color = np.array([1.0, 0.0, 0.0, 1.0])  # RGBA red
-material.metallic = 0.0
-material.roughness = 0.5
+material = MeshMaterial(
+    np.array([1.0, 0.0, 0.0, 1.0]),  # base_color_factor (RGBA red)
+    0.0,                             # metallic_factor
+    0.5,                             # roughness_factor
+    np.zeros(4),                     # emissive_factor (RGBA)
+)
+material.getBaseColorFactor()
 ```
 
 ### MeshTexture
 
-Texture for mesh surfaces.
+A texture image and its per-vertex UV coordinates.
 
 ```python
+from tesseract_robotics.tesseract_common import BytesResource
 from tesseract_robotics.tesseract_geometry import MeshTexture
+import numpy as np
 
-texture = MeshTexture()
-texture.image = resource  # Resource pointing to image file
-texture.uvs = uv_coords   # UV coordinates per vertex
+png_bytes = open("texture.png", "rb").read()
+uvs = [np.array([0.0, 0.0]), np.array([1.0, 0.0]), np.array([1.0, 1.0]), np.array([0.0, 1.0])]
+texture = MeshTexture(BytesResource("texture.png", png_bytes), uvs)
+texture.getTextureImage().getUrl()  # "texture.png"
 ```
+
+`texture_image` must be a jpg or png resource. Neither argument takes `None` (`TypeError`): upstream
+stores both without checking them, but a texture without an image or UVs is never valid.
 
 ## Geometry Base
 

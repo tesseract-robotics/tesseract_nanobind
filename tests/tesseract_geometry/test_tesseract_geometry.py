@@ -282,3 +282,115 @@ def test_geometry_set_uuid_refuses_malformed_string():
     with pytest.raises(ValueError, match="not-a-uuid"):
         geom.setUUID("not-a-uuid")
     assert geom.getUUID() == before
+
+
+# Two triangles over a unit square: faces is [count, i0, i1, i2] per face.
+SQUARE_VERTICES = [
+    np.array([0.0, 0.0, 0.0]),
+    np.array([1.0, 0.0, 0.0]),
+    np.array([1.0, 1.0, 0.0]),
+    np.array([0.0, 1.0, 0.0]),
+]
+SQUARE_FACES = np.array([3, 0, 1, 2, 3, 0, 2, 3], np.int32)
+SQUARE_FACE_COUNT = 2
+# The 8-byte PNG signature: MeshTexture stores its image resource without decoding it.
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+MESH_CLASSES = [
+    tesseract_geometry.Mesh,
+    tesseract_geometry.SDFMesh,
+    tesseract_geometry.PolygonMesh,
+]
+
+
+def _mesh_texture():
+    uvs = [np.array([0.0, 0.0]), np.array([1.0, 0.0]), np.array([1.0, 1.0]), np.array([0.0, 1.0])]
+    return tesseract_geometry.MeshTexture(
+        tesseract_common.BytesResource("tex.png", PNG_SIGNATURE), uvs
+    )
+
+
+def _full_mesh_kwargs():
+    return dict(
+        resource=tesseract_common.BytesResource("square.stl", b"solid square"),
+        scale=np.array([2.0, 3.0, 4.0]),
+        normals=[np.array([0.0, 0.0, 1.0])] * 4,
+        vertex_colors=[np.array([1.0, 0.0, 0.0, 1.0])] * 4,
+        mesh_material=tesseract_geometry.MeshMaterial(
+            np.array([0.1, 0.2, 0.3, 1.0]), 0.4, 0.5, np.array([0.0, 0.0, 0.0, 1.0])
+        ),
+        mesh_textures=[_mesh_texture()],
+    )
+
+
+def _assert_full_mesh_round_trip(geom, kwargs):
+    assert geom.getResource().getUrl() == "square.stl"
+    nptest.assert_array_equal(geom.getScale(), kwargs["scale"])
+    nptest.assert_array_equal(np.array(geom.getNormals()), np.array(kwargs["normals"]))
+    nptest.assert_array_equal(np.array(geom.getVertexColors()), np.array(kwargs["vertex_colors"]))
+    nptest.assert_array_equal(geom.getMaterial().getBaseColorFactor(), [0.1, 0.2, 0.3, 1.0])
+    assert geom.getMaterial().getMetallicFactor() == 0.4
+    (texture,) = geom.getTextures()
+    assert texture.getTextureImage().getUrl() == "tex.png"
+    assert len(texture.getUVs()) == 4
+
+
+@pytest.mark.parametrize("cls", MESH_CLASSES, ids=lambda c: c.__name__)
+def test_mesh_full_constructor_round_trips(cls):
+    kwargs = _full_mesh_kwargs()
+    geom = cls(SQUARE_VERTICES, SQUARE_FACES, **kwargs)
+    assert geom.getFaceCount() == SQUARE_FACE_COUNT
+    _assert_full_mesh_round_trip(geom, kwargs)
+
+
+@pytest.mark.parametrize("cls", MESH_CLASSES, ids=lambda c: c.__name__)
+def test_mesh_face_count_constructor_round_trips(cls):
+    kwargs = _full_mesh_kwargs()
+    geom = cls(SQUARE_VERTICES, SQUARE_FACES, SQUARE_FACE_COUNT, **kwargs)
+    assert geom.getFaceCount() == cls(SQUARE_VERTICES, SQUARE_FACES).getFaceCount()
+    _assert_full_mesh_round_trip(geom, kwargs)
+
+
+@pytest.mark.parametrize("cls", MESH_CLASSES, ids=lambda c: c.__name__)
+def test_mesh_minimal_constructor_defaults(cls):
+    geom = cls(SQUARE_VERTICES, SQUARE_FACES)
+    assert geom.getResource() is None
+    nptest.assert_array_equal(geom.getScale(), [1.0, 1.0, 1.0])
+    assert geom.getNormals() is None
+    assert geom.getVertexColors() is None
+    assert geom.getMaterial() is None
+    assert geom.getTextures() is None
+
+
+@pytest.mark.parametrize("cls", MESH_CLASSES, ids=lambda c: c.__name__)
+@pytest.mark.parametrize("face_count", [SQUARE_FACE_COUNT - 1, SQUARE_FACE_COUNT + 1])
+def test_mesh_wrong_face_count_raises(cls, face_count):
+    with pytest.raises(tesseract_geometry.MeshFaceCountError, match=f"face_count {face_count}"):
+        cls(SQUARE_VERTICES, SQUARE_FACES, face_count)
+    assert issubclass(tesseract_geometry.MeshFaceCountError, ValueError)
+
+
+def test_polygon_mesh_type_argument():
+    G = tesseract_geometry.GeometryType
+    assert tesseract_geometry.PolygonMesh(SQUARE_VERTICES, SQUARE_FACES).getType() == G.POLYGON_MESH
+    geom = tesseract_geometry.PolygonMesh(SQUARE_VERTICES, SQUARE_FACES, type=G.MESH)
+    assert geom.getType() == G.MESH
+    geom = tesseract_geometry.PolygonMesh(
+        SQUARE_VERTICES, SQUARE_FACES, SQUARE_FACE_COUNT, type=G.MESH
+    )
+    assert geom.getType() == G.MESH
+
+
+def test_mesh_texture_constructor():
+    uvs = [np.array([0.0, 0.0]), np.array([1.0, 0.5])]
+    texture = tesseract_geometry.MeshTexture(
+        tesseract_common.BytesResource("tex.png", PNG_SIGNATURE), uvs
+    )
+    assert texture.getTextureImage().getUrl() == "tex.png"
+    nptest.assert_array_equal(np.array(texture.getUVs()), np.array(uvs))
+    with pytest.raises(TypeError):
+        tesseract_geometry.MeshTexture(None, uvs)
+    with pytest.raises(TypeError):
+        tesseract_geometry.MeshTexture(
+            tesseract_common.BytesResource("tex.png", PNG_SIGNATURE), None
+        )
