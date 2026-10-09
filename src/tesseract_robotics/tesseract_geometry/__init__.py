@@ -38,6 +38,12 @@ __all__ = [
     "createMeshFromPath",
     "createConvexMeshFromPath",
     "createSDFMeshFromPath",
+    "createMeshFromResource",
+    "createConvexMeshFromResource",
+    "createSDFMeshFromResource",
+    "createMeshFromBytes",
+    "createConvexMeshFromBytes",
+    "createSDFMeshFromBytes",
     # Utilities / conversions
     "isIdentical",
     "extractVertices",

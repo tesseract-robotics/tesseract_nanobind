@@ -116,6 +116,20 @@ Class bind_mesh_ctors(Class cls, const char* name, TailArgs... tail_args) {
     return cls;
 }
 
+// One instance of createMeshFromBytes<T> (mesh_parser.h:537). The flags keep upstream's defaults
+// except triangulate, which defaults to true like the bound ...FromPath / ...FromResource siblings:
+// upstream's own URDF parser always triangulates (urdf/src/mesh.cpp:84-88 @ 0.35.0).
+// BytesResource copies the bytes (resource_locator.cpp:299-304), so the meshes outlive `data`.
+template <typename T>
+void def_create_mesh_from_bytes(nb::module_& m, const char* name, const char* doc) {
+    m.def(name, [](const std::string& url, const nb::bytes& data, const Eigen::Vector3d& scale, bool triangulate,
+                   bool flatten, bool normals, bool vertex_colors, bool material_and_texture) {
+        return tg::createMeshFromBytes<T>(url, reinterpret_cast<const uint8_t*>(data.c_str()), data.size(), scale,
+                                          triangulate, flatten, normals, vertex_colors, material_and_texture);
+    }, "url"_a, "data"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
+       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, doc);
+}
+
 }  // namespace
 
 NB_MODULE(_tesseract_geometry, m) {
@@ -469,6 +483,14 @@ NB_MODULE(_tesseract_geometry, m) {
         return tg::createMeshFromResource<tg::SDFMesh>(resource, scale, triangulate, flatten);
     }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
     "Load SDFMesh from resource (e.g., package:// URL)");
+
+    // Mesh loading from an in-memory mesh file: url's extension selects the format
+    def_create_mesh_from_bytes<tg::Mesh>(m, "createMeshFromBytes",
+        "Load Mesh geometries from an in-memory mesh file; url's extension (.stl, .dae, ...) selects the format");
+    def_create_mesh_from_bytes<tg::ConvexMesh>(m, "createConvexMeshFromBytes",
+        "Load ConvexMesh geometries from an in-memory mesh file; url's extension selects the format");
+    def_create_mesh_from_bytes<tg::SDFMesh>(m, "createSDFMeshFromBytes",
+        "Load SDFMesh geometries from an in-memory mesh file; url's extension selects the format");
 
     // Utilities
     m.def("isIdentical", &tg::isIdentical, "geom1"_a, "geom2"_a,
