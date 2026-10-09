@@ -21,6 +21,7 @@ __all__ = [
     "KinematicGroup",
     # Plugin factory
     "KinematicsPluginFactory",
+    "KinematicsPluginRemovalError",
     # Utility functions
     "getRedundantSolutions",
 ]

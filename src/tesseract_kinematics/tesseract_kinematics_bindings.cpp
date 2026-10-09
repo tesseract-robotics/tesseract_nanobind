@@ -27,7 +27,10 @@
 // tesseract_common
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/resource_locator.h>
+#include <tesseract/common/plugin_info.h>
 #include <filesystem>
+#include <fstream>
+#include <yaml-cpp/yaml.h>
 
 namespace tk = tesseract::kinematics;
 namespace tcommon = tesseract::common;
@@ -35,6 +38,38 @@ namespace tsg = tesseract::scene_graph;
 
 // Make KinGroupIKInputs opaque so we can bind it as a class
 NB_MAKE_OPAQUE(tk::KinGroupIKInputs)
+
+// Removing a group's last solver makes upstream read (and, when it is the default, write) through
+// the map iterator it has just erased (kinematics_plugin_factory.cpp:150-154 and :209-214 @ 0.35.0).
+// The binding refuses that call instead of reaching it; drop the guard once a fixed tesseract is
+// the minimum version (tesseract-robotics/tesseract#1381).
+struct KinematicsPluginRemovalError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+namespace {
+
+using PluginGroups = std::map<std::string, tcommon::PluginInfoContainer>;
+
+// Upstream throws std::runtime_error for an unknown group or solver; a name lookup that misses is
+// a KeyError here (the ContactManagersPluginFactory rule, gh-170).
+const tcommon::PluginInfoContainer& require_solver(const PluginGroups& groups, const char* kind,
+                                                   const std::string& group_name,
+                                                   const std::string& solver_name) {
+    auto group_it = groups.find(group_name);
+    if (group_it == groups.end() || group_it->second.plugins.count(solver_name) == 0)
+        throw nb::key_error(("no " + std::string(kind) + " kin solver '" + solver_name + "' for group '" +
+                             group_name + "'").c_str());
+    return group_it->second;
+}
+
+void require_not_last_solver(const tcommon::PluginInfoContainer& group, const std::string& group_name) {
+    if (group.plugins.size() == 1)
+        throw KinematicsPluginRemovalError("removing the last solver of group '" + group_name +
+                                           "' is unsafe in tesseract 0.35.0 (kinematics_plugin_factory.cpp:150-154)");
+}
+
+}  // namespace
 
 NB_MODULE(_tesseract_kinematics, m) {
     m.doc() = "tesseract_kinematics Python bindings";
@@ -217,7 +252,49 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("getSearchPaths", &tk::KinematicsPluginFactory::getSearchPaths)
         .def("addSearchLibrary", &tk::KinematicsPluginFactory::addSearchLibrary, "library_name"_a)
         .def("getSearchLibraries", &tk::KinematicsPluginFactory::getSearchLibraries)
+        .def("addFwdKinPlugin", &tk::KinematicsPluginFactory::addFwdKinPlugin,
+             "group_name"_a, "solver_name"_a, "plugin_info"_a)
+        .def("getFwdKinPlugins", &tk::KinematicsPluginFactory::getFwdKinPlugins)
+        .def("removeFwdKinPlugin", [](tk::KinematicsPluginFactory& self, const std::string& group_name,
+                                      const std::string& solver_name) {
+            const PluginGroups groups = self.getFwdKinPlugins();
+            require_not_last_solver(require_solver(groups, "fwd", group_name, solver_name), group_name);
+            self.removeFwdKinPlugin(group_name, solver_name);
+        }, "group_name"_a, "solver_name"_a,
+           "Remove a forward kinematics solver from a group.\n\n"
+           "Raises:\n"
+           "    KeyError: the group or the solver is unknown.\n"
+           "    KinematicsPluginRemovalError: it is the group's last solver.")
+        .def("setDefaultFwdKinPlugin", [](tk::KinematicsPluginFactory& self, const std::string& group_name,
+                                          const std::string& solver_name) {
+            require_solver(self.getFwdKinPlugins(), "fwd", group_name, solver_name);
+            self.setDefaultFwdKinPlugin(group_name, solver_name);
+        }, "group_name"_a, "solver_name"_a,
+           "Set a group's default forward kinematics solver.\n\n"
+           "Raises:\n"
+           "    KeyError: the group or the solver is unknown.")
         .def("getDefaultFwdKinPlugin", &tk::KinematicsPluginFactory::getDefaultFwdKinPlugin, "group_name"_a)
+        .def("addInvKinPlugin", &tk::KinematicsPluginFactory::addInvKinPlugin,
+             "group_name"_a, "solver_name"_a, "plugin_info"_a)
+        .def("getInvKinPlugins", &tk::KinematicsPluginFactory::getInvKinPlugins)
+        .def("removeInvKinPlugin", [](tk::KinematicsPluginFactory& self, const std::string& group_name,
+                                      const std::string& solver_name) {
+            const PluginGroups groups = self.getInvKinPlugins();
+            require_not_last_solver(require_solver(groups, "inv", group_name, solver_name), group_name);
+            self.removeInvKinPlugin(group_name, solver_name);
+        }, "group_name"_a, "solver_name"_a,
+           "Remove an inverse kinematics solver from a group.\n\n"
+           "Raises:\n"
+           "    KeyError: the group or the solver is unknown.\n"
+           "    KinematicsPluginRemovalError: it is the group's last solver.")
+        .def("setDefaultInvKinPlugin", [](tk::KinematicsPluginFactory& self, const std::string& group_name,
+                                          const std::string& solver_name) {
+            require_solver(self.getInvKinPlugins(), "inv", group_name, solver_name);
+            self.setDefaultInvKinPlugin(group_name, solver_name);
+        }, "group_name"_a, "solver_name"_a,
+           "Set a group's default inverse kinematics solver.\n\n"
+           "Raises:\n"
+           "    KeyError: the group or the solver is unknown.")
         .def("getDefaultInvKinPlugin", &tk::KinematicsPluginFactory::getDefaultInvKinPlugin, "group_name"_a)
         // Create kinematics solvers.
         // keep_alive: the returned solver is instantiated from a plugin whose code
@@ -243,7 +320,47 @@ NB_MODULE(_tesseract_kinematics, m) {
                                 const tsg::SceneState& scene_state) {
             return self.createInvKin(group_name, solver_name, scene_graph, scene_state);
         }, "group_name"_a, "solver_name"_a, "scene_graph"_a, "scene_state"_a,
-           nb::keep_alive<0, 1>(), nb::keep_alive<0, 4>(), nb::keep_alive<0, 5>());
+           nb::keep_alive<0, 1>(), nb::keep_alive<0, 4>(), nb::keep_alive<0, 5>())
+        // From an explicit PluginInfo: the same plugin-library and scene ties as above.
+        .def("createFwdKin", [](const tk::KinematicsPluginFactory& self,
+                                const std::string& solver_name,
+                                const tcommon::PluginInfo& plugin_info,
+                                const tsg::SceneGraph& scene_graph,
+                                const tsg::SceneState& scene_state) {
+            return self.createFwdKin(solver_name, plugin_info, scene_graph, scene_state);
+        }, "solver_name"_a, "plugin_info"_a, "scene_graph"_a, "scene_state"_a,
+           nb::keep_alive<0, 1>(), nb::keep_alive<0, 4>(), nb::keep_alive<0, 5>())
+        .def("createInvKin", [](const tk::KinematicsPluginFactory& self,
+                                const std::string& solver_name,
+                                const tcommon::PluginInfo& plugin_info,
+                                const tsg::SceneGraph& scene_graph,
+                                const tsg::SceneState& scene_state) {
+            return self.createInvKin(solver_name, plugin_info, scene_graph, scene_state);
+        }, "solver_name"_a, "plugin_info"_a, "scene_graph"_a, "scene_state"_a,
+           nb::keep_alive<0, 1>(), nb::keep_alive<0, 4>(), nb::keep_alive<0, 5>())
+        // Same YAML as upstream saveConfig, which ignores a failed ofstream; here a failed open or
+        // write raises OSError (FileNotFoundError for a missing directory).
+        .def("saveConfig", [](const tk::KinematicsPluginFactory& self, const std::filesystem::path& file_path) {
+            errno = 0;
+            std::ofstream fout(file_path);
+            if (fout) fout << self.getConfig();
+            if (fout) fout.close();
+            if (!fout) {
+                PyErr_SetFromErrnoWithFilename(PyExc_OSError, file_path.string().c_str());
+                throw nb::python_error();
+            }
+        }, "file_path"_a)
+        // YAML::Node has no caster: the YAML document as str, like PluginInfo.config.
+        .def("getConfig", [](const tk::KinematicsPluginFactory& self) {
+            YAML::Emitter out;
+            out << self.getConfig();
+            return std::string(out.c_str());
+        }, "The factory configuration as a YAML document string.");
+
+    nb::exception<KinematicsPluginRemovalError>(m, "KinematicsPluginRemovalError", PyExc_RuntimeError)
+        .attr("__doc__") =
+        "Refused to remove a group's last kinematics solver: tesseract 0.35.0 then reads and writes "
+        "through an erased map iterator (kinematics_plugin_factory.cpp:150-154, tesseract-robotics/tesseract#1381).";
 
     // ========== Utility functions ==========
     m.def("getRedundantSolutions", [](const Eigen::Ref<const Eigen::VectorXd>& sol,
