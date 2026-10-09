@@ -368,6 +368,20 @@ def test_init_findings():
     }
 
 
+def test_init_module_getattr_is_accepted():
+    """A PEP 562 module `__getattr__` (a lazy re-export, gh-218) is a lookup hook, not API."""
+    rows = {(a.symbol, a.rule) for a in audit.init_accepted(FIXTURES / "package_init.py")}
+    assert rows == {("__getattr__", "module-getattr")}
+    assert audit.ACCEPTED["module-getattr"]
+
+
+def test_fixture_report_accepts_module_getattr(fixture_report):
+    assert ("__getattr__", "module-getattr") in {
+        (a.symbol, a.rule) for a in fixture_report.accepted
+    }
+    assert "__getattr__" not in {d.name for d in fixture_report.deviations}
+
+
 @pytest.fixture(scope="module")
 def fixture_report():
     return audit.audit_tu(
@@ -521,6 +535,7 @@ def test_fixture_accepted_exact(fixture_report):
         ("Widget.__repr__", "presentation-dunder"),  # M12
         ("Record.__init__", "serialization-default-ctor"),  # E2
         ("Widget.__hash__", "value-equality-unhashable"),
+        ("__getattr__", "module-getattr"),  # package_init.py, gh-218
     }
 
 

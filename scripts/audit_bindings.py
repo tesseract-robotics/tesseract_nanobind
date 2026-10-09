@@ -856,6 +856,10 @@ def _catches_import_error(handler: ast.ExceptHandler) -> bool:
     return any(ast.unparse(n) in {"ImportError", "ModuleNotFoundError"} for n in names)
 
 
+# Module-level hooks a package `__init__.py` may define, accepted by rule: name -> ACCEPTED key.
+INIT_HOOKS = {"__getattr__": "module-getattr"}
+
+
 def init_findings(path: Path) -> list[Deviation]:
     """Classes/functions a package `__init__.py` defines, and fail-loud violations."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -867,7 +871,8 @@ def init_findings(path: Path) -> list[Deviation]:
             f"{where}:{n.lineno}",
         )
         for n in tree.body
-        if isinstance(n, (ast.ClassDef, ast.FunctionDef))
+        if isinstance(n, ast.ClassDef)
+        or (isinstance(n, ast.FunctionDef) and n.name not in INIT_HOOKS)
     ]
     rows += [
         Deviation(TRY_IMPORT, Kind.FAIL_LOUD, f"{where}:{n.lineno}")
@@ -875,6 +880,16 @@ def init_findings(path: Path) -> list[Deviation]:
         if isinstance(n, ast.Try) and any(_catches_import_error(h) for h in n.handlers)
     ]
     return sorted(rows)
+
+
+def init_accepted(path: Path) -> list[Accepted]:
+    """The module-level hooks (`INIT_HOOKS`) a package `__init__.py` defines."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return sorted(
+        Accepted(n.name, INIT_HOOKS[n.name], f"{rel(path)}:{n.lineno}")
+        for n in tree.body
+        if isinstance(n, ast.FunctionDef) and n.name in INIT_HOOKS
+    )
 
 
 # Deviations accepted by rule; each is printed with its reason in the report.
@@ -914,6 +929,9 @@ ACCEPTED = {
     "properties `SceneGraph` stores; Python reaches the properties through `SceneGraph` methods.",
     "bound-in-other-module": "The class is bound in another extension module, which defines its "
     "Python type once for every module.",
+    "module-getattr": "A package `__init__.py` defines a PEP 562 module `__getattr__` to re-export "
+    "a name lazily (an eager import would be an import cycle); it is an attribute-lookup hook, "
+    "not API.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -1251,6 +1269,7 @@ def audit_tu(
         [*report.gaps, *unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)]
     )
     report.deviations = sorted([*report.deviations, *init_findings(init_path)])
+    report.accepted = sorted([*report.accepted, *init_accepted(init_path)])
     report.delegated = dict(sorted(delegated.items()))
     return report
 
