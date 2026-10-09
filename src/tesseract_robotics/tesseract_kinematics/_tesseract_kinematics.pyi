@@ -298,3 +298,117 @@ def getRedundantSolutions(sol: Annotated[NDArray[numpy.float64], dict(shape=(Non
     """
     Get redundant solutions for a joint configuration by adding +/- 2*pi to redundancy capable joints
     """
+
+@overload
+def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, kin: ForwardKinematics, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+    """
+    Finite-difference Jacobian of a tip link (step 1e-8 rad per joint, utils.cpp:44).
+
+    Raises:
+        ValueError: joint_values does not have kin.numJoints() entries.
+        KeyError: link_name is not a tip link of kin.
+    """
+
+@overload
+def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, joint_group: JointGroup, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+    """
+    Finite-difference Jacobian of a link of joint_group (step 1e-8 rad per joint, utils.cpp:80).
+
+    Raises:
+        ValueError: joint_values does not have joint_group.numJoints() entries.
+        KeyError: link_name is not a link of joint_group.
+    """
+
+@overload
+def numericalJacobian(joint_group: JointGroup, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], base_link_name: str, base_link_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, link_name: str, link_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+    """
+    Finite-difference Jacobian of link_name relative to base_link_name, in the base link frame.
+
+    Raises:
+        ValueError: joint_values does not have joint_group.numJoints() entries.
+        KeyError: base_link_name or link_name is not a link of joint_group.
+    """
+
+def isNearSingularity(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(None, None), writable=False)], threshold: float = 0.01) -> bool:
+    """
+    True when the smallest singular value of jacobian is below threshold.
+
+    Raises:
+        ValueError: jacobian is empty.
+    """
+
+class ManipulabilityEllipsoid:
+    def __init__(self) -> None: ...
+
+    @property
+    def eigen_values(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    @property
+    def measure(self) -> float: ...
+
+    @property
+    def condition(self) -> float: ...
+
+    @property
+    def volume(self) -> float: ...
+
+    def __repr__(self) -> str: ...
+
+class Manipulability:
+    def __init__(self) -> None: ...
+
+    @property
+    def m(self) -> ManipulabilityEllipsoid: ...
+
+    @property
+    def m_linear(self) -> ManipulabilityEllipsoid: ...
+
+    @property
+    def m_angular(self) -> ManipulabilityEllipsoid: ...
+
+    @property
+    def f(self) -> ManipulabilityEllipsoid: ...
+
+    @property
+    def f_linear(self) -> ManipulabilityEllipsoid: ...
+
+    @property
+    def f_angular(self) -> ManipulabilityEllipsoid: ...
+
+    def __repr__(self) -> str: ...
+
+def calcManipulability(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None), writable=False)]) -> Manipulability:
+    """
+    Manipulability and force ellipsoids of a 6-row jacobian.
+
+    When an ellipsoid's smallest eigenvalue is ~0 (a singular jacobian), its measure and condition
+    are the largest double (sys.float_info.max), as upstream returns them (utils.cpp:240-244).
+    """
+
+def harmonizeTowardZero(qs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], redundancy_capable_joints: Sequence[int]) -> None:
+    """
+    Wrap qs[i] into [-pi, pi) in place for each i in redundancy_capable_joints.
+
+    Raises:
+        IndexError: an index is outside qs; qs is left unchanged.
+    """
+
+def harmonizeTowardMedian(qs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], redundancy_capable_joints: Sequence[int], position_limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)]) -> None:
+    """
+    Wrap qs[i] into [median - pi, median + pi) in place, median the midpoint of row i of position_limits.
+
+    Raises:
+        IndexError: an index is outside qs or position_limits; qs is left unchanged.
+    """
+
+def isValid(qs: Sequence[float]) -> bool:
+    """True when all six values are finite."""
+
+def checkKinematics(manip: KinematicGroup, tol: float = 0.001) -> bool:
+    """
+    Round-trip self-check: FK then IK for every working frame and tip link of manip.
+
+    False when an IK solution's translation or angle distance from the FK pose exceeds tol
+    (validate.cpp:38-175). True also when IK found no solution at all: only failed solutions
+    make it False.
+    """
