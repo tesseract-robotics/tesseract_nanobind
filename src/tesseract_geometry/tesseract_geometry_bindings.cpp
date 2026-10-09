@@ -34,6 +34,10 @@
 #include <tesseract/common/eigen_types.h>
 #include <tesseract/common/resource_locator.h>
 
+// boost::uuids::uuid <-> str, the spelling JointTrajectory.uuid uses
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/string_generator.hpp>
+
 namespace tg = tesseract::geometry;
 namespace tc = tesseract::common;
 
@@ -66,6 +70,15 @@ NB_MODULE(_tesseract_geometry, m) {
     nb::class_<tg::Geometry>(m, "Geometry")
         .def("getType", &tg::Geometry::getType, "Get the geometry type")
         .def("clone", &tg::Geometry::clone, "Create a copy of this geometry")
+        .def("getUUID", [](const tg::Geometry& self) { return boost::uuids::to_string(self.getUUID()); },
+             "UUID as its canonical string")
+        .def("setUUID", [](tg::Geometry& self, const std::string& s) {
+                 try {
+                     self.setUUID(boost::uuids::string_generator()(s));
+                 } catch (const std::runtime_error&) {
+                     throw std::invalid_argument("Geometry.setUUID: not a UUID string: '" + s + "'");
+                 }
+             }, "uuid"_a, "Set the UUID from its canonical string; a malformed string raises ValueError")
         .def("__eq__", &tg::Geometry::operator==)
         .def("__ne__", &tg::Geometry::operator!=);
 
