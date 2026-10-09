@@ -520,3 +520,89 @@ def test_create_mesh_from_bytes_outlives_the_buffer():
     del data
     gc.collect()
     nptest.assert_array_equal(np.array(meshes[0].getVertices()), expected)
+
+
+MATERIAL_DAE = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/tesseract_material_mesh.dae"
+# The flags the URDF parser passes for a visual mesh (urdf/src/mesh.cpp:84-85 @ 0.35.0).
+URDF_VISUAL_FLAGS = dict(flatten=True, normals=True, vertex_colors=True, material_and_texture=True)
+
+
+def _urdf_visual_meshes(path):
+    urdf = f"""
+<robot name="visual" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
+  <link name="world"/>
+  <joint name="mesh_joint" type="fixed">
+    <parent link="world"/>
+    <child link="mesh_link"/>
+  </joint>
+  <link name="mesh_link">
+    <visual>
+      <geometry>
+        <mesh filename="file://{path}"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>
+"""
+    scene = tesseract_urdf.parseURDFString(urdf, tesseract_common.GeneralResourceLocator())
+    (visual,) = scene.getLink("mesh_link").visual
+    return visual.geometry.getMeshes()
+
+
+def _mesh_summary(meshes):
+    return [
+        (
+            m.getFaceCount(),
+            m.getVertexCount(),
+            len(m.getNormals()),
+            tuple(np.round(m.getMaterial().getBaseColorFactor(), 6)),
+        )
+        for m in meshes
+    ]
+
+
+def test_create_mesh_from_path_flags_match_urdf_visual():
+    meshes = tesseract_geometry.createMeshFromPath(str(MATERIAL_DAE), **URDF_VISUAL_FLAGS)
+    assert _mesh_summary(meshes) == _mesh_summary(_urdf_visual_meshes(MATERIAL_DAE))
+
+
+def test_create_mesh_flags_default_false():
+    for m in tesseract_geometry.createMeshFromPath(str(MATERIAL_DAE)):
+        assert m.getNormals() is None
+        assert m.getVertexColors() is None
+        assert m.getMaterial() is None
+        assert m.getTextures() is None
+
+
+def test_create_mesh_from_resource_and_bytes_flags_match_path():
+    expected = _mesh_summary(
+        tesseract_geometry.createMeshFromPath(str(MATERIAL_DAE), **URDF_VISUAL_FLAGS)
+    )
+    resource = tesseract_common.BytesResource(MATERIAL_DAE.name, MATERIAL_DAE.read_bytes())
+    from_resource = tesseract_geometry.createMeshFromResource(resource, **URDF_VISUAL_FLAGS)
+    assert _mesh_summary(from_resource) == expected
+    from_bytes = tesseract_geometry.createMeshFromBytes(
+        MATERIAL_DAE.name, MATERIAL_DAE.read_bytes(), **URDF_VISUAL_FLAGS
+    )
+    assert _mesh_summary(from_bytes) == expected
+
+
+@pytest.mark.parametrize(
+    "fn",
+    [
+        "createConvexMeshFromPath",
+        "createSDFMeshFromPath",
+        "createConvexMeshFromResource",
+        "createSDFMeshFromResource",
+    ],
+)
+def test_create_mesh_instances_accept_flags(fn):
+    source = (
+        str(SPHERE_STL)
+        if fn.endswith("Path")
+        else tesseract_common.BytesResource(SPHERE_STL.name, SPHERE_STL.read_bytes())
+    )
+    meshes = getattr(tesseract_geometry, fn)(
+        source, normals=True, vertex_colors=False, material_and_texture=False
+    )
+    assert len(meshes) == 1

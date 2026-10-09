@@ -332,8 +332,20 @@ a == b               # True
 | `createSDFMeshFromBytes(url, data, scale)` | SDF from an in-memory file |
 | `createOctree(point_cloud, resolution, prune, binary)` | Build an octomap OcTree from a `PointCloud` |
 
+Every loader also takes `flatten`, `normals`, `vertex_colors` and `material_and_texture`, all
+`False` by default as in C++. Turn the last three on to load a mesh's normals, vertex colors,
+materials and textures. The URDF parser loads visual meshes with `flatten` and all three flags on.
 Every mesh loader defaults to `triangulate=True`, where the C++ header says `false`. The URDF
 parser always triangulates (urdf/src/mesh.cpp:84–88), and `Mesh` expects triangles.
+
+```python
+from tesseract_robotics.tesseract_geometry import createMeshFromPath
+
+meshes = createMeshFromPath(
+    "textured.dae", flatten=True, normals=True, vertex_colors=True, material_and_texture=True
+)
+meshes[0].getMaterial().getBaseColorFactor()
+```
 
 The `…FromBytes` loaders take bytes you already hold. The extension of `url` selects the format,
 so `url` must end in `.stl`, `.dae`, and so on. The bytes are copied, so the returned meshes do not

@@ -116,8 +116,30 @@ Class bind_mesh_ctors(Class cls, const char* name, TailArgs... tail_args) {
     return cls;
 }
 
+// One instance of createMeshFromPath<T> (mesh_parser.h:338) / createMeshFromResource<T>
+// (mesh_parser.h:420). Same defaults as createMeshFromBytes below: triangulate=true, the rest false.
+template <typename T>
+void def_create_mesh_from_path(nb::module_& m, const char* name, const char* doc) {
+    m.def(name, [](const std::string& path, const Eigen::Vector3d& scale, bool triangulate, bool flatten,
+                   bool normals, bool vertex_colors, bool material_and_texture) {
+        return tg::createMeshFromPath<T>(path, scale, triangulate, flatten, normals, vertex_colors,
+                                         material_and_texture);
+    }, "path"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
+       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, doc);
+}
+
+template <typename T>
+void def_create_mesh_from_resource(nb::module_& m, const char* name, const char* doc) {
+    m.def(name, [](tc::Resource::Ptr resource, const Eigen::Vector3d& scale, bool triangulate, bool flatten,
+                   bool normals, bool vertex_colors, bool material_and_texture) {
+        return tg::createMeshFromResource<T>(resource, scale, triangulate, flatten, normals, vertex_colors,
+                                             material_and_texture);
+    }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
+       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, doc);
+}
+
 // One instance of createMeshFromBytes<T> (mesh_parser.h:537). The flags keep upstream's defaults
-// except triangulate, which defaults to true like the bound ...FromPath / ...FromResource siblings:
+// except triangulate, which defaults to true like its ...FromPath / ...FromResource siblings:
 // upstream's own URDF parser always triangulates (urdf/src/mesh.cpp:84-88 @ 0.35.0).
 // BytesResource copies the bytes (resource_locator.cpp:299-304), so the meshes outlive `data`.
 template <typename T>
@@ -435,54 +457,20 @@ NB_MODULE(_tesseract_geometry, m) {
     "Build an octomap OcTree from a PointCloud");
 
     // Mesh loading functions
-    m.def("createMeshFromPath", [](const std::string& path,
-                                   const Eigen::Vector3d& scale,
-                                   bool triangulate,
-                                   bool flatten) {
-        return tg::createMeshFromPath<tg::Mesh>(path, scale, triangulate, flatten);
-    }, "path"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-    "Load mesh from file and return vector of Mesh geometries");
-
-    m.def("createConvexMeshFromPath", [](const std::string& path,
-                                         const Eigen::Vector3d& scale,
-                                         bool triangulate,
-                                         bool flatten) {
-        return tg::createMeshFromPath<tg::ConvexMesh>(path, scale, triangulate, flatten);
-    }, "path"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-    "Load mesh from file and return vector of ConvexMesh geometries");
-
-    m.def("createSDFMeshFromPath", [](const std::string& path,
-                                      const Eigen::Vector3d& scale,
-                                      bool triangulate,
-                                      bool flatten) {
-        return tg::createMeshFromPath<tg::SDFMesh>(path, scale, triangulate, flatten);
-    }, "path"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-    "Load mesh from file and return vector of SDFMesh geometries");
+    def_create_mesh_from_path<tg::Mesh>(m, "createMeshFromPath",
+        "Load mesh from file and return vector of Mesh geometries");
+    def_create_mesh_from_path<tg::ConvexMesh>(m, "createConvexMeshFromPath",
+        "Load mesh from file and return vector of ConvexMesh geometries");
+    def_create_mesh_from_path<tg::SDFMesh>(m, "createSDFMeshFromPath",
+        "Load mesh from file and return vector of SDFMesh geometries");
 
     // Mesh loading from Resource (for package:// URLs)
-    m.def("createMeshFromResource", [](tc::Resource::Ptr resource,
-                                       const Eigen::Vector3d& scale,
-                                       bool triangulate,
-                                       bool flatten) {
-        return tg::createMeshFromResource<tg::Mesh>(resource, scale, triangulate, flatten);
-    }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-    "Load Mesh from resource (e.g., package:// URL)");
-
-    m.def("createConvexMeshFromResource", [](tc::Resource::Ptr resource,
-                                              const Eigen::Vector3d& scale,
-                                              bool triangulate,
-                                              bool flatten) {
-        return tg::createMeshFromResource<tg::ConvexMesh>(resource, scale, triangulate, flatten);
-    }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-    "Load ConvexMesh from resource (e.g., package:// URL)");
-
-    m.def("createSDFMeshFromResource", [](tc::Resource::Ptr resource,
-                                          const Eigen::Vector3d& scale,
-                                          bool triangulate,
-                                          bool flatten) {
-        return tg::createMeshFromResource<tg::SDFMesh>(resource, scale, triangulate, flatten);
-    }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-    "Load SDFMesh from resource (e.g., package:// URL)");
+    def_create_mesh_from_resource<tg::Mesh>(m, "createMeshFromResource",
+        "Load Mesh from resource (e.g., package:// URL)");
+    def_create_mesh_from_resource<tg::ConvexMesh>(m, "createConvexMeshFromResource",
+        "Load ConvexMesh from resource (e.g., package:// URL)");
+    def_create_mesh_from_resource<tg::SDFMesh>(m, "createSDFMeshFromResource",
+        "Load SDFMesh from resource (e.g., package:// URL)");
 
     // Mesh loading from an in-memory mesh file: url's extension selects the format
     def_create_mesh_from_bytes<tg::Mesh>(m, "createMeshFromBytes",
