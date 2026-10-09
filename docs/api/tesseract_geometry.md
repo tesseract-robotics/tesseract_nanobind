@@ -78,7 +78,7 @@ faces = mesh.getFaces()         # [count, i0, i1, ..., count, ...]
 meshes = createMeshFromPath("model.stl", scale=np.array([0.001, 0.001, 0.001]))
 ```
 
-`Mesh`, `SDFMesh` and `PolygonMesh` bind both native constructors. `faces` is flat:
+`Mesh`, `SDFMesh`, `ConvexMesh` and `PolygonMesh` bind both native constructors. `faces` is flat:
 each face is its vertex count followed by that many vertex indices. Every argument after `faces` is
 optional and takes the C++ default; the pointer arguments take `None` for "not set".
 
@@ -123,6 +123,20 @@ from tesseract_robotics.tesseract_geometry import ConvexMesh, createConvexMeshFr
 
 meshes = createConvexMeshFromPath("model.stl")
 convex = meshes[0]
+```
+
+`getCreationMethod()` reports how the mesh was made, as `ConvexMesh.CreationMethod`: `DEFAULT`
+(a new mesh), `MESH`, or `CONVERTED`, which the URDF parser sets when `tesseract:make_convex`
+turned a mesh into its convex hull. `setCreationMethod` sets it, and `ConvexMesh` equality
+compares it. `clone()` returns a `DEFAULT` mesh without normals, colors, material or textures:
+upstream's clone passes only the vertices, faces, face count, resource and scale
+(convex_mesh.cpp:77 @ 0.35.0).
+
+```python
+from tesseract_robotics.tesseract_geometry import ConvexMesh
+
+convex.getCreationMethod() == ConvexMesh.CreationMethod.DEFAULT
+convex.setCreationMethod(ConvexMesh.CreationMethod.MESH)
 ```
 
 ### SDFMesh
@@ -274,7 +288,9 @@ copy = geom.clone()
 
 `==` compares the geometry type and its UUID, not its content: every constructor and `clone()` draws a
 new random UUID, so `Box(1, 1, 1) == Box(1, 1, 1)` and `geom == geom.clone()` are `False`. Use
-`isIdentical` to compare content. `getUUID()` returns the UUID as its canonical string; `setUUID(str)`
+`isIdentical` to compare content. Each class adds its own fields to `==`: the mesh classes compare
+vertex count, face count and scale (`PolygonMesh`, `Mesh`, `ConvexMesh`, which also compares its
+creation method), except `SDFMesh`, whose upstream `operator==` is type and UUID alone. `getUUID()` returns the UUID as its canonical string; `setUUID(str)`
 sets it and raises `ValueError` for a malformed string, leaving the UUID unchanged.
 
 ```python

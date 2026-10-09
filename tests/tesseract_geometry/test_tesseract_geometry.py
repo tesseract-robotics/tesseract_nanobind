@@ -1,11 +1,12 @@
 import os
 import uuid
+from pathlib import Path
 
 import numpy as np
 import numpy.testing as nptest
 import pytest
 
-from tesseract_robotics import tesseract_common, tesseract_geometry
+from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_urdf
 
 
 def test_geometry_instantiation():
@@ -300,6 +301,7 @@ MESH_CLASSES = [
     tesseract_geometry.Mesh,
     tesseract_geometry.SDFMesh,
     tesseract_geometry.PolygonMesh,
+    tesseract_geometry.ConvexMesh,
 ]
 
 
@@ -394,3 +396,79 @@ def test_mesh_texture_constructor():
         tesseract_geometry.MeshTexture(
             tesseract_common.BytesResource("tex.png", PNG_SIGNATURE), None
         )
+
+
+def test_convex_mesh_creation_method():
+    CreationMethod = tesseract_geometry.ConvexMesh.CreationMethod
+    assert {m.name for m in CreationMethod} == {"DEFAULT", "MESH", "CONVERTED"}
+    geom = tesseract_geometry.ConvexMesh(SQUARE_VERTICES, SQUARE_FACES)
+    assert geom.getCreationMethod() == CreationMethod.DEFAULT
+    geom.setCreationMethod(CreationMethod.MESH)
+    assert geom.getCreationMethod() == CreationMethod.MESH
+    assert not hasattr(tesseract_geometry, "CreationMethod_MESH")
+
+
+def test_convex_mesh_equality_compares_creation_method():
+    CreationMethod = tesseract_geometry.ConvexMesh.CreationMethod
+    a = tesseract_geometry.ConvexMesh(SQUARE_VERTICES, SQUARE_FACES)
+    b = tesseract_geometry.ConvexMesh(SQUARE_VERTICES, SQUARE_FACES)
+    b.setUUID(a.getUUID())
+    assert a == b
+    b.setCreationMethod(CreationMethod.CONVERTED)
+    assert a != b
+
+
+def test_convex_mesh_clone_resets_creation_method():
+    """Pins upstream: ConvexMesh::clone() calls a constructor, so the clone is DEFAULT (convex_mesh.cpp:77 @ 0.35.0)."""
+    CreationMethod = tesseract_geometry.ConvexMesh.CreationMethod
+    geom = tesseract_geometry.ConvexMesh(SQUARE_VERTICES, SQUARE_FACES)
+    geom.setCreationMethod(CreationMethod.MESH)
+    assert geom.clone().getCreationMethod() == CreationMethod.DEFAULT
+
+
+def test_urdf_make_convex_reports_converted():
+    stl = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/sphere_p25m.stl"
+    urdf = f"""
+<robot name="convex" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
+  <link name="world"/>
+  <joint name="base_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base"/>
+  </joint>
+  <link name="base">
+    <collision>
+      <geometry>
+        <mesh filename="file://{stl}"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
+"""
+    scene = tesseract_urdf.parseURDFString(urdf, tesseract_common.GeneralResourceLocator())
+    (collision,) = scene.getLink("base").collision
+    geom = collision.geometry
+    assert geom.getType() == tesseract_geometry.GeometryType.CONVEX_MESH
+    assert geom.getCreationMethod() == tesseract_geometry.ConvexMesh.CreationMethod.CONVERTED
+
+
+# Whether the class's own operator== compares scale: PolygonMesh, Mesh and ConvexMesh do through
+# PolygonMesh::operator== (polygon_mesh.cpp:111-120); SDFMesh::operator== is Geometry's alone
+# (sdf_mesh.cpp:80-85 @ 0.35.0).
+COMPARES_SCALE = {
+    tesseract_geometry.Mesh: True,
+    tesseract_geometry.SDFMesh: False,
+    tesseract_geometry.PolygonMesh: True,
+    tesseract_geometry.ConvexMesh: True,
+}
+
+
+@pytest.mark.parametrize("cls", MESH_CLASSES, ids=lambda c: c.__name__)
+def test_mesh_equality_is_the_class_operator(cls):
+    """Each mesh class binds its own operator==, not Geometry's type-and-UUID comparison."""
+    a = cls(SQUARE_VERTICES, SQUARE_FACES)
+    b = cls(SQUARE_VERTICES, SQUARE_FACES)
+    b.setUUID(a.getUUID())
+    assert a == b
+    c = cls(SQUARE_VERTICES, SQUARE_FACES, scale=np.array([2.0, 2.0, 2.0]))
+    c.setUUID(a.getUUID())
+    assert (a != c) is COMPARES_SCALE[cls]
