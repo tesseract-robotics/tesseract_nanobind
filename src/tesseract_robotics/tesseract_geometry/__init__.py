@@ -21,6 +21,7 @@ __all__ = [
     "MeshTexture",
     # Mesh base
     "PolygonMesh",
+    "MeshFaceCountError",
     # Mesh types
     "Mesh",
     "ConvexMesh",
