@@ -139,14 +139,48 @@ print(f"d6: {params.d6}")
 
 ## Kinematics Plugin Factory
 
-Load kinematics solvers from plugins.
+Load kinematics solvers from plugins. `Environment` usually does this from the
+SRDF's kinematics plugin config; a factory can also be built from a config file
+(`pathlib.Path`) or YAML content (`str`).
 
 ```python
+from pathlib import Path
+
 from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
 
-# Usually handled by Environment initialization
-# Plugins: KDLFwdKin, OPWInvKin, etc.
+factory = KinematicsPluginFactory(Path("robot_plugins.yaml"), locator)
+
+# Solvers per group: {group_name: PluginInfoContainer}
+fwd = factory.getFwdKinPlugins()
+info = fwd["manipulator"].plugins["KDLFwdKinChain"]
+
+# Register a second solver for the group and make it the default
+factory.addFwdKinPlugin("manipulator", "MyChain", info)
+factory.setDefaultFwdKinPlugin("manipulator", "MyChain")
+
+# Create by group and solver name, or from an explicit PluginInfo
+fwd_kin = factory.createFwdKin("manipulator", "MyChain", scene_graph, scene_state)
+fwd_kin = factory.createFwdKin("my_chain", info, scene_graph, scene_state)
+
+factory.removeFwdKinPlugin("manipulator", "MyChain")
+factory.saveConfig(Path("saved_plugins.yaml"))  # getConfig() returns the same YAML as str
 ```
+
+The same methods exist for inverse kinematics (`addInvKinPlugin`,
+`getInvKinPlugins`, …, `createInvKin`). A solver keeps its factory alive: its
+code lives in a plugin library the factory loaded.
+
+`setDefault…KinPlugin` and `remove…KinPlugin` raise `KeyError` for an unknown
+group or solver. `saveConfig` raises `OSError` when the file cannot be written.
+
+!!! warning "A group's last solver cannot be removed"
+    `remove…KinPlugin` raises `KinematicsPluginRemovalError` (a `RuntimeError`)
+    when the solver is the last one of its group, and leaves the factory
+    unchanged. tesseract 0.35.0 erases the group in that case and then reads,
+    and for the default solver writes, through the erased map iterator
+    (kinematics_plugin_factory.cpp:150–154; reported upstream as
+    [tesseract#1381](https://github.com/tesseract-robotics/tesseract/issues/1381)).
+    The guard goes once a fixed tesseract is the minimum version.
 
 ## Usage Example
 

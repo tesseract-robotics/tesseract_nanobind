@@ -205,13 +205,73 @@ class KinematicsPluginFactory:
 
     def getSearchLibraries(self) -> list[str]: ...
 
+    def addFwdKinPlugin(self, group_name: str, solver_name: str, plugin_info: tesseract_robotics.tesseract_common._tesseract_common.PluginInfo) -> None: ...
+
+    def getFwdKinPlugins(self) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.PluginInfoContainer]: ...
+
+    def removeFwdKinPlugin(self, group_name: str, solver_name: str) -> None:
+        """
+        Remove a forward kinematics solver from a group.
+
+        Raises:
+            KeyError: the group or the solver is unknown.
+            KinematicsPluginRemovalError: it is the group's last solver.
+        """
+
+    def setDefaultFwdKinPlugin(self, group_name: str, solver_name: str) -> None:
+        """
+        Set a group's default forward kinematics solver.
+
+        Raises:
+            KeyError: the group or the solver is unknown.
+        """
+
     def getDefaultFwdKinPlugin(self, group_name: str) -> str: ...
+
+    def addInvKinPlugin(self, group_name: str, solver_name: str, plugin_info: tesseract_robotics.tesseract_common._tesseract_common.PluginInfo) -> None: ...
+
+    def getInvKinPlugins(self) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.PluginInfoContainer]: ...
+
+    def removeInvKinPlugin(self, group_name: str, solver_name: str) -> None:
+        """
+        Remove an inverse kinematics solver from a group.
+
+        Raises:
+            KeyError: the group or the solver is unknown.
+            KinematicsPluginRemovalError: it is the group's last solver.
+        """
+
+    def setDefaultInvKinPlugin(self, group_name: str, solver_name: str) -> None:
+        """
+        Set a group's default inverse kinematics solver.
+
+        Raises:
+            KeyError: the group or the solver is unknown.
+        """
 
     def getDefaultInvKinPlugin(self, group_name: str) -> str: ...
 
+    @overload
     def createFwdKin(self, group_name: str, solver_name: str, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> ForwardKinematics: ...
 
+    @overload
+    def createFwdKin(self, solver_name: str, plugin_info: tesseract_robotics.tesseract_common._tesseract_common.PluginInfo, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> ForwardKinematics: ...
+
+    @overload
     def createInvKin(self, group_name: str, solver_name: str, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> InverseKinematics: ...
+
+    @overload
+    def createInvKin(self, solver_name: str, plugin_info: tesseract_robotics.tesseract_common._tesseract_common.PluginInfo, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> InverseKinematics: ...
+
+    def saveConfig(self, file_path: str | os.PathLike) -> None: ...
+
+    def getConfig(self) -> str:
+        """The factory configuration as a YAML document string."""
+
+class KinematicsPluginRemovalError(RuntimeError):
+    """
+    Refused to remove a group's last kinematics solver: tesseract 0.35.0 then reads and writes through an erased map iterator (kinematics_plugin_factory.cpp:150-154, tesseract-robotics/tesseract#1381).
+    """
 
 def getRedundantSolutions(sol: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)], redundancy_capable_joints: Sequence[int]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
     """
