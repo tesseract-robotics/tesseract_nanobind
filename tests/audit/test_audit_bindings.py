@@ -90,6 +90,12 @@ def test_serialization_audits_the_serialization_headers_it_includes():
     }
 
 
+@pytest.mark.parametrize("name", ["createConvexMeshFromBytes", "createSDFMeshFromBytes"])
+def test_create_mesh_from_bytes_instances_are_template_instance_names(name):
+    """#210: the Bytes instances of createMeshFromBytes<T> join their Path / Resource siblings."""
+    assert audit.ACCEPTED_SYMBOLS[("tesseract_geometry", name)] == "template-instance-name"
+
+
 @pytest.fixture(scope="module")
 def core_reports():
     return {m: audit.audit_module(m) for m in [*CORE_PREFIX, "tesseract_serialization"]}

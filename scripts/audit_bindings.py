@@ -968,7 +968,7 @@ ACCEPTED_SYMBOLS = {
     **{
         ("tesseract_geometry", f"create{t}MeshFrom{s}"): "template-instance-name"
         for t in ("Convex", "SDF")
-        for s in ("Path", "Resource")
+        for s in ("Path", "Resource", "Bytes")
     },
     **{
         ("tesseract_serialization", f"{t}_{d}_{f}"): "template-instance-name"
