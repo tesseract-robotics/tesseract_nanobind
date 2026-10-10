@@ -14,6 +14,7 @@ instrumentation never touches this process.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,7 @@ DRIVER = FIXTURES / "driver" / "drive_fixture_example.py"
 TRAMPOLINE_SUBCLASS = FIXTURES / "driver" / "trampoline_subclass.py"
 # Inner sessions import the whole extension package set; a generous bound.
 SUBPROCESS_TIMEOUT_S = 300
+XDIST_ENV_PREFIX = "PYTEST_XDIST_"
 
 
 def run_recorded_session(
@@ -53,8 +55,11 @@ def run_recorded_session(
         *extra,
         str(DRIVER),
     ]
+    # Under an outer `pytest -n`, this process is an xdist worker; its PYTEST_XDIST_*
+    # variables would make the inner session believe it is one too.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(XDIST_ENV_PREFIX)}
     proc = subprocess.run(
-        cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_S
+        cmd, cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT_S
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     calls = []
