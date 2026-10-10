@@ -64,6 +64,7 @@ tesseract_freespace_hybrid_example = "tesseract_robotics.examples.freespace_hybr
 tesseract_freespace_ompl_example = "tesseract_robotics.examples.freespace_ompl_example:main"
 tesseract_geometry_showcase_example = "tesseract_robotics.examples.geometry_showcase_example:main"
 tesseract_glass_upright_example = "tesseract_robotics.examples.glass_upright_example:main"
+tesseract_kinematics_analysis_example = "tesseract_robotics.examples.kinematics_analysis_example:main"
 tesseract_kinematics_plugins_example = "tesseract_robotics.examples.kinematics_plugins_example:main"
 tesseract_online_planning_example = "tesseract_robotics.examples.online_planning_example:main"
 tesseract_online_planning_sqp_example = "tesseract_robotics.examples.online_planning_sqp_example:main"

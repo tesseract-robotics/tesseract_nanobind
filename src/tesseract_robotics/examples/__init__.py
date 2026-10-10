@@ -8,6 +8,7 @@ from .freespace_ompl_example import run as freespace_ompl_example
 from .geometry_showcase_example import run as geometry_showcase_example
 from .kinematics_plugins_example import run as kinematics_plugins_example
 from .glass_upright_example import run as glass_upright_example
+from .kinematics_analysis_example import run as kinematics_analysis_example
 from .online_planning_example import run as online_planning_example
 from .online_planning_sqp_example import run as online_planning_sqp_example
 from .pointcloud_octree_collision_example import run as pointcloud_octree_collision_example
