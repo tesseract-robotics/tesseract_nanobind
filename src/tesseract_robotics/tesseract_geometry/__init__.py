@@ -31,7 +31,6 @@ __all__ = [
     "OcTree",
     "OctreeSubType",
     "PointCloud",
-    "PointCloudPoint",
     "Octree",
     "createOctree",
     # Mesh loading functions

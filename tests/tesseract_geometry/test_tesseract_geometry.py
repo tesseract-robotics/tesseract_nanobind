@@ -607,3 +607,31 @@ def test_create_mesh_instances_accept_flags(fn):
         source, normals=True, vertex_colors=False, material_and_texture=False
     )
     assert len(meshes) == 1
+
+
+def test_point_cloud_point_is_nested():
+    """#209: the point type is bound where C++ declares it, PointCloud::Point (octree_utils.h:40)."""
+    Point = tesseract_geometry.PointCloud.Point
+    p = Point(1.0, 2.0, 3.0)
+    assert (p.x, p.y, p.z) == (1.0, 2.0, 3.0)
+    assert not hasattr(tesseract_geometry, "PointCloudPoint")
+    assert "PointCloudPoint" not in tesseract_geometry.__all__
+
+
+def test_point_cloud_points_round_trip_through_create_octree():
+    Point = tesseract_geometry.PointCloud.Point
+    pc = tesseract_geometry.PointCloud()
+    pc.points = [Point(0.0, 0.0, 0.0), Point(0.1, 0.0, 0.0), Point(0.0, 0.1, 0.0)]
+    assert [(p.x, p.y, p.z) for p in pc.points] == [
+        (0.0, 0.0, 0.0),
+        (0.1, 0.0, 0.0),
+        (0.0, 0.1, 0.0),
+    ]
+    ot = tesseract_geometry.createOctree(pc, 0.05, True, True)
+    assert ot.getNumLeafNodes() == 3
+
+
+def test_point_cloud_add_point_makes_a_nested_point():
+    pc = tesseract_geometry.PointCloud()
+    pc.addPoint(1.0, 2.0, 3.0)
+    assert type(pc.points[0]) is tesseract_geometry.PointCloud.Point
