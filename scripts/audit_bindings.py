@@ -344,6 +344,8 @@ class CppOverload:
     mapped: str | None = None  # ACCEPTED rule when bound under its mapped Python name
     absent_ok: str | None = None  # ACCEPTED rule under which leaving it unbound is accepted
     raw_buffer: bool = False  # takes a pointer to a non-char scalar: never covered by arity alone
+    # Python positions of (const uint8_t*, size_t) pairs, each counted as one `bytes` parameter
+    byte_buffers: tuple[int, ...] = ()
 
 
 @dataclass
@@ -524,6 +526,37 @@ def _is_raw_buffer(parm: ci.Cursor) -> bool:
     return t.kind == ci.TypeKind.POINTER and t.get_pointee().kind in RAW_BUFFER_POINTEES
 
 
+# The spellings of a byte count that follows a byte pointer (`createMeshFromBytes(url, bytes,
+# bytes_len)`, `BytesResource(url, bytes, bytes_len)`).
+SIZE_SPELLINGS = frozenset({"size_t", "std::size_t"})
+
+
+def _is_byte_pointer(parm: ci.Cursor) -> bool:
+    """`const uint8_t*` (any spelling of a pointer to `const unsigned char`)."""
+    t = parm.type.get_canonical()
+    if t.kind != ci.TypeKind.POINTER:
+        return False
+    pointee = t.get_pointee()
+    return pointee.kind == ci.TypeKind.UCHAR and pointee.is_const_qualified()
+
+
+def _byte_buffer_pairs(params: list[ci.Cursor]) -> tuple[int, ...]:
+    """Python positions of each `(const uint8_t* bytes, size_t len)` pair: one `bytes` argument."""
+    positions: list[int] = []
+    i = 0
+    while i < len(params):
+        if (
+            _is_byte_pointer(params[i])
+            and i + 1 < len(params)
+            and params[i + 1].type.spelling in SIZE_SPELLINGS
+        ):
+            positions.append(i - len(positions))
+            i += 2
+        else:
+            i += 1
+    return tuple(positions)
+
+
 def _has_default(parm: ci.Cursor) -> bool:
     return any(c.kind.is_expression() for c in parm.get_children())
 
@@ -600,11 +633,16 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
         n_default = sum(_has_default(p) for p in params)
         out = tuple(_out_param_type(p) for p in params if _is_out_param(p))
-        arity = Arity(len(params) - n_default, len(params))
+        pairs = _byte_buffer_pairs(params)
+        paired = {pos + k + d for k, pos in enumerate(pairs) for d in (0, 1)}
+        n = len(params) - len(pairs)
+        arity = Arity(n - n_default, n)
         void = c.result_type.kind == ci.TypeKind.VOID
         absent_ok = nullary_absent_ok if arity.hi == 0 else None
-        raw = any(_is_raw_buffer(p) for p in params)
-        ov = CppOverload(arity, out, location(c), void, absent_ok=absent_ok, raw_buffer=raw)
+        raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
+        ov = CppOverload(
+            arity, out, location(c), void, absent_ok=absent_ok, raw_buffer=raw, byte_buffers=pairs
+        )
         add(name, kind, c).overloads.append(ov)
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
@@ -720,6 +758,7 @@ class PyOverload:
     arity: Arity
     returns: str
     line: int
+    params: tuple[str, ...] = ()  # positional parameter annotations, `self` excluded
 
 
 @dataclass
@@ -773,6 +812,12 @@ def _py_arity(node: ast.FunctionDef, bound: bool) -> Arity:
     lo = len(positional) - len(a.defaults) + required_kw
     hi = None if a.vararg else len(positional) + len(a.kwonlyargs)
     return Arity(lo, hi)
+
+
+def _py_params(node: ast.FunctionDef, bound: bool) -> tuple[str, ...]:
+    a = node.args
+    positional = [*a.posonlyargs, *a.args][1 if bound else 0 :]
+    return tuple(ast.unparse(p.annotation) if p.annotation else "" for p in positional)
 
 
 def _function_kind(node: ast.FunctionDef, in_class: bool) -> Kind:
@@ -843,7 +888,11 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                 if kind is not Kind.FIELD:
                     bound = bool(prefix) and "staticmethod" not in _decorators(node)
                     returns = ast.unparse(node.returns) if node.returns else ""
-                    sym.overloads.append(PyOverload(_py_arity(node, bound), returns, node.lineno))
+                    sym.overloads.append(
+                        PyOverload(
+                            _py_arity(node, bound), returns, node.lineno, _py_params(node, bound)
+                        )
+                    )
             elif isinstance(node, (ast.Assign, ast.AnnAssign)):
                 targets = node.targets if isinstance(node, ast.Assign) else [node.target]
                 for t in targets:
@@ -920,6 +969,8 @@ ACCEPTED = {
     "non-const matrix) is returned in a tuple with the result (Phase A precedent: "
     "checkTrajectory), or alone when the C++ returns `void`.",
     "stringstream": "A `std::stringstream&` parameter the C++ writes into is returned as `str`.",
+    "byte-buffer": "A `(const uint8_t* bytes, size_t len)` pair is one Python `bytes` argument: "
+    "the binding passes the buffer and its size (`createMeshFromBytes`, `BytesResource`).",
     "scalar-last-quaternion": "Quaterniond takes (x, y, z, w), the project-wide scalar-last "
     "order; Eigen's constructor is (w, x, y, z).",
     "container-protocol": "`size()` is bound as `__len__` and `operator[]` as "
@@ -1033,6 +1084,14 @@ def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
             return "out-param"  # nothing else to return: the out-param is the result
     if ov.raw_buffer:
         return None  # no Python overload binds a raw pointer; matching arity proves nothing
+    if ov.byte_buffers:
+        fits = [
+            p
+            for p in pys
+            if p.arity.overlaps(ov.arity)
+            and all(i < len(p.params) and p.params[i] == "bytes" for i in ov.byte_buffers)
+        ]
+        return "byte-buffer" if fits else None
     if any(p.arity.overlaps(ov.arity) for p in pys):
         return ov.mapped or "exact"
     return None
@@ -1325,7 +1384,8 @@ LIMITATION = (
     "Overloads are matched by arity only: a C++ overload is never reported while a bound "
     "overload takes the same number of arguments (e.g. `Environment::init(commands)` hidden "
     "by `init(scene_graph)`). The exception is an overload taking a raw buffer (a pointer "
-    "to a non-`char` scalar), which has no Python form and is reported whatever the arity."
+    "to a non-`char` scalar), which has no Python form and is reported whatever the arity, "
+    "unless it is a `(const uint8_t*, size_t)` pair bound as one `bytes` parameter."
 )
 
 
