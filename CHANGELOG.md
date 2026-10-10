@@ -69,6 +69,13 @@
   | `JointType_FIXED` (also `_UNKNOWN`, `_REVOLUTE`, `_CONTINUOUS`, `_PRISMATIC`, `_FLOATING`, `_PLANAR`) | `JointType.FIXED` (`.UNKNOWN`, `.REVOLUTE`, …) |
   | `from tesseract_robotics.tesseract_scene_graph import JointType_FIXED` | `from tesseract_robotics.tesseract_scene_graph import JointType` |
 
+- **`PointCloudPoint` renamed to `PointCloud.Point`** — the point type of `tesseract_geometry.PointCloud` is the nested struct `PointCloud::Point` in C++, but was bound at module level as `PointCloudPoint`, a name C++ does not have. It is now bound nested, and `PointCloudPoint` and its `__all__` entry are gone: importing it raises `ImportError`, reading it as a module attribute raises `AttributeError`. `PointCloud.points` is typed `list[PointCloud.Point]`. `addPoint` is unchanged and is still the way to grow a cloud (`points` converts to a fresh list on each access). `Octree.update` stays unbound: upstream's body is `assert(false)` ([#209]).
+
+  | before | after |
+  | --- | --- |
+  | `PointCloudPoint()`, `PointCloudPoint(x, y, z)` | `PointCloud.Point()`, `PointCloud.Point(x, y, z)` |
+  | `from tesseract_robotics.tesseract_geometry import PointCloudPoint` | `from tesseract_robotics.tesseract_geometry import PointCloud`, then `PointCloud.Point` |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -393,6 +400,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#216]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/216
 [#220]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/220
 [#214]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/214
+[#209]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/209
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593

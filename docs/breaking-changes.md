@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
 | Unreleased | `tesseract_scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
 | Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
@@ -22,6 +23,18 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### `PointCloudPoint` renamed to `PointCloud.Point`
+
+The point type of `PointCloud` is nested in C++ (`tesseract::geometry::PointCloud::Point`) and is
+now bound nested (#209). The module-level `PointCloudPoint` is gone: importing it raises
+`ImportError`, reading it as an attribute raises `AttributeError`. `addPoint(x, y, z)` is
+unchanged.
+
+| before | after |
+| --- | --- |
+| `PointCloudPoint()`, `PointCloudPoint(x, y, z)` | `PointCloud.Point()`, `PointCloud.Point(x, y, z)` |
+| `from tesseract_robotics.tesseract_geometry import PointCloudPoint` | `from tesseract_robotics.tesseract_geometry import PointCloud`, then `PointCloud.Point` |
 
 ### SWIG-era `JointType_*` constants removed
 

@@ -178,6 +178,9 @@ pc.addPoint(0.0, 0.0, 0.0)
 pc.addPoint(0.1, 0.0, 0.0)
 pc.addPoint(0.0, 0.1, 0.0)
 
+# Or assign whole points: the point type is nested, as in C++ (PointCloud::Point)
+pc.points = [PointCloud.Point(0.0, 0.0, 0.0), PointCloud.Point(0.1, 0.0, 0.0)]
+
 ot = createOctree(pc, resolution=0.05, prune=True, binary=True)
 
 # Wrap in a tesseract Octree geometry

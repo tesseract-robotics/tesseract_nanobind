@@ -411,16 +411,16 @@ NB_MODULE(_tesseract_geometry, m) {
         .value("SPHERE_INSIDE", tg::OctreeSubType::SPHERE_INSIDE)
         .value("SPHERE_OUTSIDE", tg::OctreeSubType::SPHERE_OUTSIDE);
 
-    // PointCloud::Point
-    nb::class_<tg::PointCloud::Point>(m, "PointCloudPoint")
+    // PointCloud, with its point type nested as in C++ (PointCloud::Point, octree_utils.h:40).
+    // The point class is bound before `points` so the stub types it as list[PointCloud.Point].
+    auto point_cloud = nb::class_<tg::PointCloud>(m, "PointCloud");
+    nb::class_<tg::PointCloud::Point>(point_cloud, "Point")
         .def(nb::init<>())
         .def(nb::init<double, double, double>(), "x"_a, "y"_a, "z"_a)
         .def_rw("x", &tg::PointCloud::Point::x)
         .def_rw("y", &tg::PointCloud::Point::y)
         .def_rw("z", &tg::PointCloud::Point::z);
-
-    // PointCloud
-    nb::class_<tg::PointCloud>(m, "PointCloud")
+    point_cloud
         .def(nb::init<>())
         .def_rw("points", &tg::PointCloud::points)
         .def("addPoint", &tg::PointCloud::addPoint, "x"_a, "y"_a, "z"_a,
