@@ -486,6 +486,20 @@ class Link:
     @collision.setter
     def collision(self, arg: Sequence[Collision], /) -> None: ...
 
+    @property
+    def visible(self) -> bool:
+        """Whether the link is visible (link.h:210)"""
+
+    @visible.setter
+    def visible(self, arg: bool, /) -> None: ...
+
+    @property
+    def collision_enabled(self) -> bool:
+        """Whether the link takes part in collision checking (link.h:213)"""
+
+    @collision_enabled.setter
+    def collision_enabled(self, arg: bool, /) -> None: ...
+
     def addVisual(self, visual: Visual) -> None:
         """Add a Visual to this link"""
 
@@ -615,6 +629,11 @@ class SceneGraph:
     def getAllowedCollisionMatrix(self) -> tesseract_robotics.tesseract_common._tesseract_common.AllowedCollisionMatrix:
         """Get the allowed collision matrix"""
 
+    def setAllowedCollisionMatrix(self, acm: tesseract_robotics.tesseract_common._tesseract_common.AllowedCollisionMatrix) -> None:
+        """
+        Replace the allowed collision matrix. The graph keeps this object: later edits to `acm` are edits to the graph's matrix, as with getAllowedCollisionMatrix.
+        """
+
     def getSourceLink(self, joint_name: str) -> Link: ...
 
     def getTargetLink(self, joint_name: str) -> Link: ...
@@ -638,6 +657,11 @@ class SceneGraph:
     def getJointChildrenNames(self, name: str) -> list[str]: ...
 
     def getShortestPath(self, root: str, tip: str) -> ShortestPath: ...
+
+    def getAdjacencyMap(self, link_names: Sequence[str]) -> dict[str, str]:
+        """
+        Map each link that moves with one of `link_names` to that link name (graph.h:486). Each listed link maps itself and every link below it, stopping at another listed link. An unknown name raises KeyError.
+        """
 
     def saveDOT(self, path: str) -> None: ...
 
