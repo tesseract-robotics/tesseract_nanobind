@@ -123,6 +123,31 @@ joint.axis = np.array([0, 0, 1])  # rotation axis
 | `FLOATING` | 6-DOF free motion |
 | `PLANAR` | 2D motion in a plane |
 
+`str()` of a joint type is upstream's `operator<<`, so `str(JointType.REVOLUTE)` is `"Revolute"`
+(`"Unknown"` for `UNKNOWN`). `.name` (`"REVOLUTE"`) and `repr()` (`"JointType.REVOLUTE"`) are
+unchanged.
+
+### Printing joint values and paths
+
+`JointDynamics`, `JointLimits`, `JointSafety`, `JointCalibration`, `JointMimic` and `ShortestPath`
+print with upstream's `operator<<`; the shorter `repr()` of `JointDynamics` and `JointLimits` stays.
+
+```python
+from tesseract_robotics.tesseract_scene_graph import JointLimits
+
+print(JointLimits(-1, 1, 10, 2, 3, 4))
+# lower=-1 upper=1 effort=10 velocity=2 acceleration=3 jerk=4
+
+print(graph.getShortestPath("base_link", "tool0"))
+# Links:
+#   base_link
+#   ...
+# Joints:
+#   ...
+# Active Joints:
+#   ...
+```
+
 ### JointLimits
 
 ```python

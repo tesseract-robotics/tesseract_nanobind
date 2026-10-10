@@ -233,3 +233,80 @@ def test_load_srdf_unit():
 
     g.clearAllowedCollisions()
     assert len(acm.getAllAllowedCollisions()) == 0
+
+
+def _tree_graph():
+    """base_link -fixed- link_1 -fixed- link_2 -planar- link_3 -floating- link_4; link_2 -revolute- link_5."""
+    g = sg.SceneGraph()
+    for name in ("base_link", "link_1", "link_2", "link_3", "link_4", "link_5"):
+        assert g.addLink(sg.Link(name))
+    for name, parent, child, joint_type in (
+        ("base_joint", "base_link", "link_1", sg.JointType.FIXED),
+        ("joint_1", "link_1", "link_2", sg.JointType.FIXED),
+        ("joint_2", "link_2", "link_3", sg.JointType.PLANAR),
+        ("joint_3", "link_3", "link_4", sg.JointType.FLOATING),
+        ("joint_4", "link_2", "link_5", sg.JointType.REVOLUTE),
+    ):
+        joint = sg.Joint(name)
+        joint.parent_link_name = parent
+        joint.child_link_name = child
+        joint.type = joint_type
+        if joint_type in (sg.JointType.PLANAR, sg.JointType.REVOLUTE):
+            joint.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
+        assert g.addJoint(joint)
+    return g
+
+
+def test_joint_value_types_str_is_upstream_operator():
+    """#215: the upstream operator<< formats (scene_graph/src/joint.cpp @ 0.35.0)."""
+    assert str(sg.JointDynamics(0.5, 2)) == "damping=0.5 friction=2"
+    assert (
+        str(sg.JointLimits(-1, 1, 10, 2, 3, 4))
+        == "lower=-1 upper=1 effort=10 velocity=2 acceleration=3 jerk=4"
+    )
+    assert (
+        str(sg.JointSafety(1.5, -1.5, 3, 4))
+        == "soft_upper_limit=1.5 soft_lower_limit=-1.5 k_position=3 k_velocity=4"
+    )
+    assert str(sg.JointCalibration(0.25, 1, 2)) == "reference_position=0.25 rising=1 falling=2"
+    assert str(sg.JointMimic(0.5, 2, "joint_a")) == "joint_name=joint_a offset=0.5 multiplier=2"
+
+
+def test_joint_value_types_repr_unchanged():
+    assert repr(sg.JointDynamics(0.5, 2)) == "JointDynamics(damping=0.500000, friction=2.000000)"
+    assert (
+        repr(sg.JointLimits(-1, 1, 10, 2, 3, 4)) == "JointLimits(lower=-1.000000, upper=1.000000)"
+    )
+
+
+def test_joint_type_str_is_upstream_operator():
+    """#215: str() is upstream's operator<< (joint.cpp:272-312); repr() and .name are Python's."""
+    expected = {
+        sg.JointType.FIXED: "Fixed",
+        sg.JointType.PLANAR: "Planar",
+        sg.JointType.FLOATING: "Floating",
+        sg.JointType.REVOLUTE: "Revolute",
+        sg.JointType.PRISMATIC: "Prismatic",
+        sg.JointType.CONTINUOUS: "Continuous",
+        sg.JointType.UNKNOWN: "Unknown",
+    }
+    assert {t: str(t) for t in sg.JointType} == expected
+    assert sg.JointType.REVOLUTE.name == "REVOLUTE"
+    # nanobind makes every enum's __repr__ Enum.__str__ (nb_enum.cpp:75-76); binding __str__
+    # replaces only __str__, so repr keeps the "JointType.REVOLUTE" form it always had.
+    assert repr(sg.JointType.REVOLUTE) == "JointType.REVOLUTE"
+
+
+def test_shortest_path_str_is_upstream_operator():
+    """#215: graph.cpp:1295-1309, a section per list, one indented name per line."""
+    path = _tree_graph().getShortestPath("link_1", "link_4")
+    expected = (
+        "Links:\n"
+        + "".join(f"  {n}\n" for n in path.links)
+        + "Joints:\n"
+        + "".join(f"  {n}\n" for n in path.joints)
+        + "Active Joints:\n"
+        + "".join(f"  {n}\n" for n in path.active_joints)
+    )
+    assert str(path) == expected
+    assert path.links == ["link_1", "link_2", "link_3", "link_4"]

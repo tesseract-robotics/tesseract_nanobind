@@ -17,8 +17,22 @@
 // tesseract_common for AllowedCollisionMatrix
 #include <tesseract/common/allowed_collision_matrix.h>
 
+#include <sstream>
+
 namespace tsg = tesseract::scene_graph;
 namespace tg = tesseract::geometry;
+
+namespace {
+
+// Upstream's operator<< as a string: the `__str__` of every scene graph type that declares one.
+template <class T>
+std::string stream_str(const T& value) {
+    std::ostringstream os;
+    os << value;
+    return os.str();
+}
+
+}  // namespace
 
 NB_MODULE(_tesseract_scene_graph, m) {
     m.doc() = "tesseract_scene_graph Python bindings";
@@ -36,7 +50,9 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .value("PRISMATIC", tsg::JointType::PRISMATIC)
         .value("FLOATING", tsg::JointType::FLOATING)
         .value("PLANAR", tsg::JointType::PLANAR)
-        .value("FIXED", tsg::JointType::FIXED);
+        .value("FIXED", tsg::JointType::FIXED)
+        // operator<< (joint.h:321): "Revolute", "Fixed", ...; repr() and .name stay Python's
+        .def("__str__", &stream_str<tsg::JointType>);
 
     // Export enum values with SWIG-compatible naming (JointType_*)
     m.attr("JointType_UNKNOWN") = tsg::JointType::UNKNOWN;
@@ -56,6 +72,7 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def("clear", &tsg::JointDynamics::clear)
         .def("__eq__", &tsg::JointDynamics::operator==)
         .def("__ne__", &tsg::JointDynamics::operator!=)
+        .def("__str__", &stream_str<tsg::JointDynamics>)  // operator<< (joint.h:82)
         .def("__repr__", [](const tsg::JointDynamics& self) {
             return "JointDynamics(damping=" + std::to_string(self.damping) +
                    ", friction=" + std::to_string(self.friction) + ")";
@@ -75,6 +92,7 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def("clear", &tsg::JointLimits::clear)
         .def("__eq__", &tsg::JointLimits::operator==)
         .def("__ne__", &tsg::JointLimits::operator!=)
+        .def("__str__", &stream_str<tsg::JointLimits>)  // operator<< (joint.h:112)
         .def("__repr__", [](const tsg::JointLimits& self) {
             return "JointLimits(lower=" + std::to_string(self.lower) +
                    ", upper=" + std::to_string(self.upper) + ")";
@@ -91,7 +109,8 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def_rw("k_velocity", &tsg::JointSafety::k_velocity)
         .def("clear", &tsg::JointSafety::clear)
         .def("__eq__", &tsg::JointSafety::operator==)
-        .def("__ne__", &tsg::JointSafety::operator!=);
+        .def("__ne__", &tsg::JointSafety::operator!=)
+        .def("__str__", &stream_str<tsg::JointSafety>);  // operator<< (joint.h:173)
 
     // JointCalibration
     nb::class_<tsg::JointCalibration>(m, "JointCalibration")
@@ -103,7 +122,8 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def_rw("falling", &tsg::JointCalibration::falling)
         .def("clear", &tsg::JointCalibration::clear)
         .def("__eq__", &tsg::JointCalibration::operator==)
-        .def("__ne__", &tsg::JointCalibration::operator!=);
+        .def("__ne__", &tsg::JointCalibration::operator!=)
+        .def("__str__", &stream_str<tsg::JointCalibration>);  // operator<< (joint.h:200)
 
     // JointMimic
     nb::class_<tsg::JointMimic>(m, "JointMimic")
@@ -115,7 +135,8 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def_rw("joint_name", &tsg::JointMimic::joint_name)
         .def("clear", &tsg::JointMimic::clear)
         .def("__eq__", &tsg::JointMimic::operator==)
-        .def("__ne__", &tsg::JointMimic::operator!=);
+        .def("__ne__", &tsg::JointMimic::operator!=)
+        .def("__str__", &stream_str<tsg::JointMimic>);  // operator<< (joint.h:227)
 
     // Joint (non-copyable)
     nb::class_<tsg::Joint>(m, "Joint")
@@ -235,7 +256,8 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def(nb::init<>())
         .def_rw("links", &tsg::ShortestPath::links)
         .def_rw("joints", &tsg::ShortestPath::joints)
-        .def_rw("active_joints", &tsg::ShortestPath::active_joints);
+        .def_rw("active_joints", &tsg::ShortestPath::active_joints)
+        .def("__str__", &stream_str<tsg::ShortestPath>);  // operator<< (graph.h:596)
 
     // SceneGraph (non-copyable)
     nb::class_<tsg::SceneGraph>(m, "SceneGraph")
