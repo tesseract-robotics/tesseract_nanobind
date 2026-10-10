@@ -301,7 +301,9 @@ class Recorder:
             ]
             while pending:
                 cls = pending.pop()
-                if cls in classes or issubclass(cls, enum.Enum):
+                # Enums too: a nanobind enum is an `enum.Enum` whose bound methods
+                # (e.g. `__str__`, #215) are `nb_method`s; it has no nanobind `__init__`.
+                if cls in classes:
                     continue
                 classes.append(cls)
                 pending += [

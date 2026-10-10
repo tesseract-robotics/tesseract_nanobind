@@ -17,6 +17,7 @@ from tesseract_robotics.tesseract_common import (
     JointTrajectory,
     makeOrderedLinkPair,
 )
+from tesseract_robotics.tesseract_scene_graph import JointType
 
 
 def run():
@@ -34,5 +35,6 @@ def run():
     names = first.joint_names
     identity = Isometry3d.Identity()
     pair = makeOrderedLinkPair("b", "a")
+    label = str(JointType.FIXED)
     clear_from_helper(acm)
-    return same, differ, allowed, names, identity, pair
+    return same, differ, allowed, names, identity, pair, label

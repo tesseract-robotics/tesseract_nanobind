@@ -116,6 +116,11 @@ def test_module_function_bound_by_from_import_is_recorded(calls):
     assert _recorded(calls, "makeOrderedLinkPair") == {("function", 0)}
 
 
+def test_nanobind_method_on_an_enum_is_recorded(calls):
+    """A nanobind enum is a Python `enum.Enum`; its bound `__str__` (#215) is still an `nb_method`."""
+    assert _recorded(calls, "JointType.__str__") == {("method", 0)}
+
+
 def test_call_from_a_non_example_frame_is_not_recorded(calls):
     """Only the immediate caller counts: library code an example calls into is not coverage."""
     assert _recorded(calls, "AllowedCollisionMatrix.clearAllowedCollisions") == set()
