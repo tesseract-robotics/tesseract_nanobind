@@ -151,6 +151,50 @@ def test_kinematics_analysis_example():
 
 
 @pytest.mark.basic
+def test_state_solver_example():
+    result = tesseract_robotics.examples.state_solver_example()
+
+    assert result["floating_joint_names"] == ["joint_a1"]
+    assert result["scene_graph_edits_succeeded"]
+    assert result["active_joint_names"] == [f"joint_a{i}" for i in range(2, 8)]
+
+    # upstream runSetFloatingJointStateTest: x = 1.25, then y = 1.5, then z = 1.5
+    steps = result["floating_steps"]
+    expected = [[1.25, 0.0, 0.0], [1.25, 1.5, 0.0], [1.25, 1.5, 1.5]]
+    assert [step["origin"] for step in steps] == expected
+    for step in steps:
+        assert step["agrees_with_kdl"], step["origin"]
+        assert step["link_1_at_origin"], step["origin"]
+
+    # every native overload, each checked against a KDL solver on the same scene graph
+    assert result["state_overloads"] == {
+        "setState(values, floating)": True,
+        "setState(dict, floating)": True,
+        "setState(names, values, floating)": True,
+        "setState(floating)": True,
+        "getState(values, floating)": True,
+        "getState(dict, floating)": True,
+        "getState(names, values, floating)": True,
+        "getState(floating)": True,
+        "getLinkTransforms()": True,
+        "getLinkTransforms(names, values, floating)": True,
+    }
+    assert result["jacobian"] == {"overloads_identical": True, "agrees_with_kdl": True}
+
+    insert = result["insert_scene_graph"]
+    assert insert["inserted"] == {
+        "attach_subgraph_joint": True,
+        "prefix_attach_subgraph_joint": True,
+    }
+    assert insert["prefixed_links"] == ["prefix_subgraph_base_link", "prefix_subgraph_link_1"]
+    assert insert["floating_joint_names"] == ["joint_a1", "prefix_attach_subgraph_joint"]
+    assert insert["agrees_with_kdl"]
+    assert insert["root_is_parent_times_origin"]
+    assert insert["child_is_root_times_fixed_origin"]
+    assert insert["floating_value_moves_root"]
+
+
+@pytest.mark.basic
 def test_geometry_showcase_example():
     tesseract_robotics.examples.geometry_showcase_example()
 

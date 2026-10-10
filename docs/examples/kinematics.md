@@ -181,3 +181,62 @@ clamped difference 0.15 (upstream's `calcJacobianTransformErrorDiff_Toleranced`)
 ```python title="kinematics_analysis_example.py"
 --8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:tolerances"
 ```
+
+## State Solver
+
+```bash
+tesseract_state_solver_example
+```
+
+A port of upstream's floating-joint and insert-scene-graph state-solver tests
+(`state_solver_test_suite.h`, `runSetFloatingJointStateTest` and
+`runAddSceneGraphTest`). After every change, a `KDLStateSolver` rebuilt from the
+same scene graph is the oracle: KDL treats a FLOATING joint as fixed at its
+origin (`kdl_parser.cpp:133–160`), so moving the origin with
+`changeJointOrigin` and rebuilding gives an independent computation of the
+same link transforms. Link transforms are compared with upstream's
+`isApprox(1e-6)`.
+
+`replaceJoint` turns `joint_a1` into a FLOATING joint at x = 1.25 m. It is no
+longer an active joint, so `joint_a2`…`joint_a7` remain:
+
+```python title="state_solver_example.py"
+--8<-- "src/tesseract_robotics/examples/state_solver_example.py:floating_joint"
+```
+
+Move the floating joint with floating values only, then with joints and
+floating values together (upstream's y = 1.5 m and z = 1.5 m steps):
+
+```python title="state_solver_example.py"
+--8<-- "src/tesseract_robotics/examples/state_solver_example.py:move_floating"
+```
+
+!!! note "Reading floating values back"
+    Upstream's last step reads `state.floating_joints` from the `SceneState`,
+    edits it and passes it back. `SceneState.floating_joints` is not bound in
+    Python, so the example builds the `floating_joint_values` dict itself.
+
+Every native `setState`, `getState` and `getLinkTransforms` overload, each with
+`floating_joint_values`. Each `setState` starts from a different state, so a
+call that changed nothing would disagree with the oracle:
+
+```python title="state_solver_example.py"
+--8<-- "src/tesseract_robotics/examples/state_solver_example.py:overloads"
+```
+
+The three `getJacobian` overloads give the same matrix, which agrees with
+KDL's; the floating joint adds no column.
+
+```python title="state_solver_example.py"
+--8<-- "src/tesseract_robotics/examples/state_solver_example.py:jacobian"
+```
+
+`insertSceneGraph` attaches upstream's two-link sub-graph (a unit box link and
+a link 1.25 m along x, joined by a FIXED joint), first through a FIXED joint,
+then again under the prefix `prefix_` through a FLOATING joint. The inserted
+root sits at parent ∘ joint origin, its child 1.25 m along x from it, and a
+floating value for the attach joint moves the whole sub-graph.
+
+```python title="state_solver_example.py"
+--8<-- "src/tesseract_robotics/examples/state_solver_example.py:insert_scene_graph"
+```
