@@ -72,6 +72,8 @@ class Color(enum.Enum):
 
     GREEN = 1
 
+    def __str__(self) -> str: ...
+
 Color_RED: Color = Color.RED
 
 class Level(enum.Enum):

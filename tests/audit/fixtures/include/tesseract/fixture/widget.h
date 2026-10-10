@@ -112,6 +112,7 @@ public:
 };
 
 std::ostream& operator<<(std::ostream& os, const Bag& bag);  // stream-insertion: Bag.__str__ (M5)
+std::ostream& operator<<(std::ostream& os, const Color& color);  // on an enum: Color.__str__ (#215)
 
 class Record;
 template <class Archive>

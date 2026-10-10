@@ -572,14 +572,16 @@ def _record_path(decl: ci.Cursor) -> str:
 
 
 def _stream_insertion_owner(c: ci.Cursor) -> str | None:
-    """`T` of a free `operator<<(std::ostream&, const T&)` with `T` a class, else None."""
+    """`T` of a free `operator<<(std::ostream&, const T&)` with `T` a class or enum, else None."""
     if c.spelling != "operator<<":
         return None
     params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
     if len(params) != 2:
         return None
     stream, value = (p.type.get_pointee().get_canonical().get_declaration() for p in params)
-    if stream.spelling != OSTREAM_DECL or value.kind not in RECORD_KINDS:
+    if stream.spelling != OSTREAM_DECL or (
+        value.kind not in RECORD_KINDS and value.kind != ci.CursorKind.ENUM_DECL
+    ):
         return None
     return _record_path(value)
 
@@ -976,7 +978,8 @@ ACCEPTED = {
     "container-protocol": "`size()` is bound as `__len__` and `operator[]` as "
     "`__getitem__`/`__setitem__`, the Python container protocol.",
     "iterator-pair": "A `begin()`/`end()` pair (and `cbegin`/`cend`) is bound as `__iter__`.",
-    "stream-insertion": "A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__`.",
+    "stream-insertion": "A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__` "
+    "(`T` a class or an enum).",
     "presentation-dunder": "`__repr__` and `__str__` are Python presentation and need no C++ "
     "counterpart.",
     "serialization-default-ctor": "The default constructor of a class that befriends cereal "
