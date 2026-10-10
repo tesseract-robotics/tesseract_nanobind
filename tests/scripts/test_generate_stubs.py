@@ -79,6 +79,7 @@ QUOTE_FREE_MODULES = [
     "tesseract_serialization",
     "tesseract_srdf",
     "tesseract_state_solver",
+    "tesseract_urdf",  # writeMeshToFile takes a PolygonMesh (gh-220)
 ]
 
 # gh-218: the defining modules each extension imports itself, so that its stub, rendered in
@@ -93,6 +94,7 @@ DEFINING_MODULE_IMPORTS = {
     ],
     "tesseract_srdf": ["tesseract_scene_graph"],
     "tesseract_state_solver": ["tesseract_scene_graph"],
+    "tesseract_urdf": ["tesseract_common", "tesseract_geometry", "tesseract_scene_graph"],
 }
 
 

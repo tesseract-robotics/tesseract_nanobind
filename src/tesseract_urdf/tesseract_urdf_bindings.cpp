@@ -6,6 +6,8 @@
 #include "tesseract_nb.h"
 
 #include <tesseract/urdf/urdf_parser.h>
+#include <tesseract/urdf/utils.h>
+#include <tesseract/geometry/impl/polygon_mesh.h>
 #include <tesseract/scene_graph/graph.h>
 #include <tesseract/common/resource_locator.h>
 
@@ -22,6 +24,8 @@ NB_MODULE(_tesseract_urdf, m) {
     // scene_graph during collection; the minimal-import wheel canary exposed it.
     nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    // writeMeshToFile takes a PolygonMesh: import its defining module so the stub names it (#168).
+    nb::module_::import_("tesseract_robotics.tesseract_geometry._tesseract_geometry");
 
     // parseURDFString - returns unique_ptr, nanobind handles conversion
     m.def("parseURDFString", &tu::parseURDFString,
@@ -37,4 +41,9 @@ NB_MODULE(_tesseract_urdf, m) {
     m.def("writeURDFFile", &tu::writeURDFFile,
           "scene_graph"_a, "package_path"_a, "urdf_name"_a = "",
           "Write a SceneGraph to a URDF file");
+
+    // writeMeshToFile (utils.h:30). `mesh` takes no None: upstream dereferences it unchecked
+    // (urdf/src/utils.cpp:140-155); its "Could not export file" std::runtime_error stays RuntimeError.
+    m.def("writeMeshToFile", &tu::writeMeshToFile, "mesh"_a, "filepath"_a,
+          "Write the mesh as an ASCII PLY file (always PLY, whatever the extension of filepath).");
 }
