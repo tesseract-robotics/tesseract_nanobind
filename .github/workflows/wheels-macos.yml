@@ -195,9 +195,11 @@ jobs:
       - name: run full tests
         # Serial (no xdist): planning tests (OMPL/TrajOpt) segfault under xdist
         # on macOS — fork+OpenMP threads don't mix. Linux handles it fine.
+        # pytest-xdist is installed anyway: tests/scripts/test_api_recorder.py runs
+        # a light inner `pytest -n 2` (fixture example, no OMPL); this run stays serial.
         run: |
           source test_env/bin/activate
-          pip install pytest scipy pyyaml
+          pip install pytest pytest-xdist scipy pyyaml
           cd tesseract_nanobind
           pytest tests \
             --ignore=tests/benchmarks \
