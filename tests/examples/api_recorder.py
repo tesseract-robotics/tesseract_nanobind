@@ -369,6 +369,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     root = config.getoption("--api-record-example-root") or default_example_root()
+    if "PYTEST_XDIST_WORKER" not in os.environ:
+        # The controller (or a serial run) starts before any worker writes: drop an
+        # earlier session's files, or a rerun with fewer workers merges stale ones.
+        for stale in config.getoption("--api-record-dir").glob("*.json"):
+            stale.unlink()
     recorder = Recorder(root)
     recorder.install()
     config.stash[_RECORDER] = recorder

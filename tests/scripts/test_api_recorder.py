@@ -141,6 +141,15 @@ def test_xdist_workers_each_record(tmp_path):
     assert _recorded(calls, "AllowedCollisionMatrix.__init__") == {("method", 0), ("method", 1)}
 
 
+def test_a_new_session_removes_recordings_of_an_earlier_one(tmp_path):
+    """A rerun with fewer xdist workers must not merge a stale `gw*.json` into the report."""
+    stale = tmp_path / "gw7.json"
+    stale.write_text(json.dumps({"calls": [{"qualname": "Stale.call"}], "instrumented": []}))
+    calls = run_recorded_session(tmp_path)
+    assert not stale.exists()
+    assert "Stale.call" not in {c["qualname"] for c in calls}
+
+
 PURE_VIRTUAL = (
     "nanobind::detail::get_trampoline('locateResource()'): tried to call a pure virtual function!"
 )
