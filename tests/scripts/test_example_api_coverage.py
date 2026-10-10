@@ -224,8 +224,8 @@ def test_report_states_covered_over_total_first_and_lists_every_open_entry():
     first = next(ln for ln in text.splitlines() if ln and not ln.startswith(("#", "Generated")))
     assert first.startswith("**1 / 3 non-exempt entries covered**")
     open_section = text.split("## Covered")[0]
-    assert f"`Robot.setState{SET_STATE_ISO}`" in open_section
-    assert "`helper2(Sequence[str])`" in open_section
+    assert f"`fixture_mod.Robot.setState{SET_STATE_ISO}`" in open_section
+    assert "`fixture_mod.helper2(Sequence[str])`" in open_section
 
 
 def test_missing_recordings_raise(tmp_path):

@@ -49,6 +49,7 @@ FULL_BINDING_CHANGES = frozenset({"new_overload", "changed_signature"})
 ISSUE_REF = re.compile(r"\(#(\d+)\)")
 SITES_SHOWN = 3  # call sites listed per entry in the report
 SHORT_SHA = 8
+MODULE_PREFIX = "tesseract_"  # dropped from module names in the tables
 
 
 class RecordingsMissingError(Exception):
@@ -365,7 +366,8 @@ def check_inventory_head(repo: Path, inventory: dict) -> None:
 
 
 def _entry(row: dict) -> str:
-    return f"`{row['qualname']}{row['overload']}`"
+    module = row["module"].removeprefix(MODULE_PREFIX)
+    return f"`{module}.{row['qualname']}{row['overload']}`"
 
 
 def _issue(row: dict) -> str:
@@ -437,10 +439,9 @@ def render(report: Report, base: str, head: str) -> str:
         f"## Uncovered ({uncovered})",
         "",
         *_table(
-            ["module", "entry", "change", "added by", "note"],
+            ["entry", "change", "added by", "note"],
             [
                 [
-                    r.row["module"],
                     _entry(r.row),
                     r.row["change"],
                     _issue(r.row),
@@ -452,9 +453,9 @@ def render(report: Report, base: str, head: str) -> str:
         f"## Ambiguous ({ambiguous})",
         "",
         *_table(
-            ["module", "entry", "change", "added by", "call sites"],
+            ["entry", "change", "added by", "call sites"],
             [
-                [r.row["module"], _entry(r.row), r.row["change"], _issue(r.row), _sites(r)]
+                [_entry(r.row), r.row["change"], _issue(r.row), _sites(r)]
                 for r in by[Verdict.AMBIGUOUS]
             ],
         ),
@@ -474,11 +475,8 @@ def render(report: Report, base: str, head: str) -> str:
         f"## Covered ({covered})",
         "",
         *_table(
-            ["module", "entry", "change", "example"],
-            [
-                [r.row["module"], _entry(r.row), r.row["change"], _sites(r)]
-                for r in by[Verdict.COVERED]
-            ],
+            ["entry", "change", "example"],
+            [[_entry(r.row), r.row["change"], _sites(r)] for r in by[Verdict.COVERED]],
         ),
         f"## Exempt ({exempt})",
         "",
@@ -488,9 +486,7 @@ def render(report: Report, base: str, head: str) -> str:
         out += [f"**{rule.code}** ({len(rows)}): {rule.reason}", ""]
         if rows:
             out += [
-                ", ".join(
-                    f"`{r.row['module']}.{r.row['qualname']}{r.row['overload']}`" for r in rows
-                ),
+                ", ".join(_entry(r.row) for r in rows),
                 "",
             ]
     return "\n".join(out).rstrip() + "\n"
