@@ -282,6 +282,7 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "Bag.end",
         "Bag.__mul__",  # templated operator* (M13)
         "Bag.__str__",  # free operator<<(std::ostream&, const Bag&) (M5)
+        "Color.__str__",  # free operator<<(std::ostream&, const Color&) on an enum (#215)
         "Record",
         "Record.__init__",
         "Buffer",
@@ -570,6 +571,7 @@ def test_fixture_accepted_exact(fixture_report):
         ("Bag.__setitem__", "container-protocol"),  # M18
         ("Bag.__iter__", "iterator-pair"),  # C6
         ("Bag.__str__", "stream-insertion"),  # M5
+        ("Color.__str__", "stream-insertion"),  # on an enum, #215
         ("Widget.__repr__", "presentation-dunder"),  # M12
         ("Record.__init__", "serialization-default-ctor"),  # E2
         ("Buffer.__init__", "byte-buffer"),  # (url, const uint8_t*, size_t, parent), #210
@@ -605,6 +607,16 @@ def test_stream_insertion_operator_keyed_on_its_class(fixture_cpp):
             "Bag.__str__", audit.CppSymbol("", audit.Kind.OPERATOR, "")
         ).overloads
     ] == ["0"]
+
+
+def test_stream_insertion_operator_on_an_enum_keyed_on_the_enum(fixture_cpp):
+    """#215: `operator<<(std::ostream&, const Color&)` with `Color` an enum is Color.__str__."""
+    assert [str(ov.arity) for ov in fixture_cpp["Color.__str__"].overloads] == ["0"]
+
+
+def test_scene_graph_joint_type_operator_is_not_a_free_function(core_reports):
+    """#215: joint.h:321 `operator<<(std::ostream&, const JointType&)` maps to JointType.__str__."""
+    assert "operator<<" not in {g.symbol for g in core_reports["tesseract_scene_graph"].gaps}
 
 
 def test_new_accepted_rules_rendered_with_reasons(fixture_report):
