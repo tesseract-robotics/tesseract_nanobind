@@ -9,6 +9,8 @@ import pytest
 
 from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_urdf
 
+from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
+
 
 def test_geometry_instantiation():
     # Test that all basic geometry types can be instantiated
@@ -428,8 +430,7 @@ def test_convex_mesh_clone_resets_creation_method():
 
 
 def test_urdf_make_convex_reports_converted():
-    stl = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/sphere_p25m.stl"
-    urdf = f"""
+    urdf = """
 <robot name="convex" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
   <link name="world"/>
   <joint name="base_joint" type="fixed">
@@ -439,13 +440,13 @@ def test_urdf_make_convex_reports_converted():
   <link name="base">
     <collision>
       <geometry>
-        <mesh filename="file://{stl}"/>
+        <mesh filename="package://tesseract/support/meshes/sphere_p25m.stl"/>
       </geometry>
     </collision>
   </link>
 </robot>
 """
-    scene = tesseract_urdf.parseURDFString(urdf, tesseract_common.GeneralResourceLocator())
+    scene = tesseract_urdf.parseURDFString(urdf, TesseractSupportResourceLocator())
     (collision,) = scene.getLink("base").collision
     geom = collision.geometry
     assert geom.getType() == tesseract_geometry.GeometryType.CONVEX_MESH
@@ -527,7 +528,7 @@ MATERIAL_DAE = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/tesseract_mat
 URDF_VISUAL_FLAGS = dict(flatten=True, normals=True, vertex_colors=True, material_and_texture=True)
 
 
-def _urdf_visual_meshes(path):
+def _urdf_visual_meshes(name):
     urdf = f"""
 <robot name="visual" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
   <link name="world"/>
@@ -538,13 +539,13 @@ def _urdf_visual_meshes(path):
   <link name="mesh_link">
     <visual>
       <geometry>
-        <mesh filename="file://{path}"/>
+        <mesh filename="package://tesseract/support/meshes/{name}"/>
       </geometry>
     </visual>
   </link>
 </robot>
 """
-    scene = tesseract_urdf.parseURDFString(urdf, tesseract_common.GeneralResourceLocator())
+    scene = tesseract_urdf.parseURDFString(urdf, TesseractSupportResourceLocator())
     (visual,) = scene.getLink("mesh_link").visual
     return visual.geometry.getMeshes()
 
@@ -563,7 +564,7 @@ def _mesh_summary(meshes):
 
 def test_create_mesh_from_path_flags_match_urdf_visual():
     meshes = tesseract_geometry.createMeshFromPath(str(MATERIAL_DAE), **URDF_VISUAL_FLAGS)
-    assert _mesh_summary(meshes) == _mesh_summary(_urdf_visual_meshes(MATERIAL_DAE))
+    assert _mesh_summary(meshes) == _mesh_summary(_urdf_visual_meshes(MATERIAL_DAE.name))
 
 
 def test_create_mesh_flags_default_false():
