@@ -45,6 +45,44 @@ def test_kinematics_example():
 
 
 @pytest.mark.basic
+def test_kinematics_plugins_example():
+    result = tesseract_robotics.examples.kinematics_plugins_example()
+
+    assert result["fwd_kin_plugins"] == {"manipulator": ["KDLFwdKinChain"]}
+    assert result["inv_kin_plugins"] == {"manipulator": ["KDLInvKinChainLMA", "KDLInvKinChainNR"]}
+    assert result["default_inv_kin_plugin"] == "KDLInvKinChainLMA"
+    # upstream runFwdKinIIWATest: tool0 at q = 0 is the identity rotation at z = 1.306 m
+    np.testing.assert_allclose(result["target_translation"], [0.0, 0.0, 1.306])
+
+    # LMA -> NR switch: each solver reproduces the target under FK, by its own convergence test
+    assert list(result["ik"]) == ["KDLInvKinChainLMA", "KDLInvKinChainNR"]
+    for solver_name, ik in result["ik"].items():
+        assert ik["solver_name"] == solver_name
+        assert ik["num_solutions"] == 1
+        assert ik["criterion"] < ik["bound"], solver_name
+
+    assert result["created_by_plugin_info"] == ("KDLFwdKinChain", "KDLInvKinChainNR")
+
+    # upstream PluginFactorAPIUnit: add "default", make it the default, remove it,
+    # and the default falls back to the first remaining solver
+    for kind, original in [
+        ("fwd", ["KDLFwdKinChain"]),
+        ("inv", ["KDLInvKinChainLMA", "KDLInvKinChainNR"]),
+    ]:
+        edits = result[f"{kind}_plugin_edits"]
+        assert edits["after_add"] == sorted([*original, "default"])
+        assert edits["default_after_set"] == "default"
+        assert edits["after_remove"] == original
+        assert edits["default_after_remove"] == original[0]
+
+    assert result["config_round_trip_equal"]
+
+    group = result["kinematic_group"]
+    assert group["num_solutions"] == 1
+    assert group["criterion"] < group["bound"]
+
+
+@pytest.mark.basic
 def test_geometry_showcase_example():
     tesseract_robotics.examples.geometry_showcase_example()
 

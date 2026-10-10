@@ -146,6 +146,7 @@ nav:
   - Examples:
     - examples/index.md
     - Basic Examples: examples/basic.md
+    - Kinematics Examples: examples/kinematics.md
     - Planning Examples: examples/planning.md
     - Online Planning: examples/online-planning.md
   - API Reference:
