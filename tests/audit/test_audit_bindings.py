@@ -90,6 +90,14 @@ def test_serialization_audits_the_serialization_headers_it_includes():
     }
 
 
+def test_create_mesh_from_bytes_is_a_byte_buffer(core_reports):
+    """#210: createMeshFromBytes(url, bytes, bytes_len, ...) is bound as (url, data: bytes, ...)."""
+    report = core_reports["tesseract_geometry"]
+    assert ("createMeshFromBytes", "byte-buffer") in {(a.symbol, a.rule) for a in report.accepted}
+    assert "createMeshFromBytes" not in {g.symbol for g in report.gaps}
+    assert "createMeshFromBytes" not in {d.name for d in report.deviations}
+
+
 @pytest.mark.parametrize("name", ["createConvexMeshFromBytes", "createSDFMeshFromBytes"])
 def test_create_mesh_from_bytes_instances_are_template_instance_names(name):
     """#210: the Bytes instances of createMeshFromBytes<T> join their Path / Resource siblings."""
@@ -278,17 +286,24 @@ def test_cpp_symbols_exact_set(fixture_cpp):
         "Record.__init__",
         "Buffer",
         "Buffer.__init__",  # incl. the constructor template, not a "Buffer.Buffer" method
+        "Buffer.write",
     }  # fmt: skip  (no std::hash (I1), no free serialize (I2), no Detail (C1))
 
 
 def test_constructor_template_is_a_constructor(fixture_cpp):
     arities = sorted(str(o.arity) for o in fixture_cpp["Buffer.__init__"].overloads)
-    assert arities == ["2", "2-3", "3-4"]
+    assert arities == ["2", "2-3", "2-3", "3"]
 
 
 def test_raw_buffer_overload_recorded(fixture_cpp):
     raw = [o for o in fixture_cpp["Buffer.__init__"].overloads if o.raw_buffer]
-    assert [str(o.arity) for o in raw] == ["3-4"]
+    assert [str(o.arity) for o in raw] == ["3"]
+
+
+def test_byte_buffer_pair_recorded(fixture_cpp):
+    """#210: (const uint8_t*, size_t) counts as one parameter, at its Python position."""
+    pairs = [o for o in fixture_cpp["Buffer.__init__"].overloads if o.byte_buffers]
+    assert [(str(o.arity), o.byte_buffers, o.raw_buffer) for o in pairs] == [("2-3", (1,), False)]
 
 
 def test_constructor_overloads_exclude_copy(fixture_cpp):
@@ -427,7 +442,9 @@ def test_fixture_gaps_exact(fixture_report):
         ("Widget.operator+", audit.Kind.OPERATOR, "—"),
         (ORPHAN_HEADER, audit.Kind.HEADER, "—"),  # never included: one row (E0)
         # raw-buffer ctor: the bound arity-2-3 ctor overlaps it but cannot cover it (#166)
-        ("Buffer.__init__", audit.Kind.CONSTRUCTOR, "3-4"),
+        ("Buffer.__init__", audit.Kind.CONSTRUCTOR, "3"),
+        # byte-buffer pair bound as `str`, not `bytes` (#210)
+        ("Buffer.write", audit.Kind.METHOD, "1"),
         # stub base in a module without a stub: inherited members cannot be checked (I7)
         ("LostRunner.go", audit.Kind.METHOD, "—"),
         ("LostRunner.__call__", audit.Kind.OPERATOR, "—"),
@@ -537,6 +554,7 @@ def test_fixture_deviations_exact(fixture_report):
         ("LEVEL_LOW", audit.Kind.CONSTANT, "—"),  # aliases an unscoped enum value (Note 1)
         ("scale_twice", audit.Kind.FUNCTION, "—"),
         ("area", audit.Kind.OVERLOAD, "2"),
+        ("Buffer.write", audit.Kind.OVERLOAD, "1"),  # `data: str` binds no C++ overload (#210)
         ("FilesystemPath", audit.Kind.CLASS, "—"),
         (audit.TRY_IMPORT, audit.Kind.FAIL_LOUD, "—"),
     }
@@ -554,6 +572,7 @@ def test_fixture_accepted_exact(fixture_report):
         ("Bag.__str__", "stream-insertion"),  # M5
         ("Widget.__repr__", "presentation-dunder"),  # M12
         ("Record.__init__", "serialization-default-ctor"),  # E2
+        ("Buffer.__init__", "byte-buffer"),  # (url, const uint8_t*, size_t, parent), #210
         ("Widget.__hash__", "value-equality-unhashable"),
         ("__getattr__", "module-getattr"),  # package_init.py, gh-218
     }
@@ -717,14 +736,13 @@ def test_post_e0_wont_fix_headers_have_no_row(real_reports, module, header):
     assert header not in {g.symbol for g in real_reports[module].gaps}
 
 
-def test_raw_pointer_bytes_resource_ctor_stays_a_gap(real_reports):
-    """E2 covers only the arity-0 ctor; BytesResource(url, ptr, len, parent) is M3 won't fix."""
+def test_bytes_resource_byte_buffer_ctor_accepted(real_reports):
+    """E2 covers the arity-0 ctor; BytesResource(url, ptr, len, parent) is the `bytes` overload
+    (M3, #166: won't fix as its own binding; #210: reported as the byte-buffer rule, not a gap)."""
     accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
     assert ("BytesResource.__init__", "serialization-default-ctor") in accepted
-    rows = [
-        g for g in real_reports["tesseract_common"].gaps if g.symbol == "BytesResource.__init__"
-    ]
-    assert [g.arity for g in rows] == ["3-4"]
+    assert ("BytesResource.__init__", "byte-buffer") in accepted
+    assert "BytesResource.__init__" not in {g.symbol for g in real_reports["tesseract_common"].gaps}
 
 
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
@@ -767,6 +785,7 @@ def test_json_roundtrip(fixture_report):
         "Widget.operator+",
         ORPHAN_HEADER,
         "Buffer.__init__",
+        "Buffer.write",
         "LostRunner.go",
         "LostRunner.__call__",
     }

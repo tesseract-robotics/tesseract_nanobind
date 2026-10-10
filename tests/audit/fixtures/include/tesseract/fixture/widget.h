@@ -133,10 +133,14 @@ class Buffer  // mirrors BytesResource (#166)
 {
 public:
   Buffer(std::string url, std::vector<std::uint8_t> bytes, int parent = 0);  // bound: arity 2-3
-  // raw buffer: no Python positional form, so the arity-overlapping bound ctor cannot cover it
+  // byte-buffer pair: (const uint8_t*, size_t) is one Python `bytes`; the bound ctor covers it (#210)
   Buffer(std::string url, const std::uint8_t* bytes, std::size_t n, int parent = 0);
+  // raw buffer: no Python positional form, so the arity-overlapping bound ctor cannot cover it (#166)
+  Buffer(std::string url, const double* samples, int parent);
   template <class InputIt>
   Buffer(InputIt first, InputIt last);  // constructor template: keyed as __init__, not a method
+  // a byte-buffer pair bound with a non-`bytes` Python parameter is not covered
+  void write(const std::uint8_t* data, std::size_t n);
 };
 
 int scale(int value, double factor = 1.0);  // defaulted: arity 1-2
