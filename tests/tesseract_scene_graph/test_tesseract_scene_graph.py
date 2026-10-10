@@ -27,20 +27,20 @@ def test_tesseract_scene_graph():
     base_joint = sg.Joint("base_joint")
     base_joint.parent_link_name = "base_link"
     base_joint.child_link_name = "link_1"
-    base_joint.type = sg.JointType_FIXED
+    base_joint.type = sg.JointType.FIXED
     assert g.addJoint(base_joint)
 
     joint_1 = sg.Joint("joint_1")
     joint_1.parent_link_name = "link_1"
     joint_1.child_link_name = "link_2"
-    joint_1.type = sg.JointType_FIXED
+    joint_1.type = sg.JointType.FIXED
     assert g.addJoint(joint_1)
 
     joint_2 = sg.Joint("joint_2")
     joint_2.parent_to_joint_origin_transform = _translation([1.25, 0, 0])
     joint_2.parent_link_name = "link_2"
     joint_2.child_link_name = "link_3"
-    joint_2.type = sg.JointType_PLANAR
+    joint_2.type = sg.JointType.PLANAR
     joint_2.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_2)
 
@@ -48,14 +48,14 @@ def test_tesseract_scene_graph():
     joint_3.parent_to_joint_origin_transform = _translation([1.25, 0, 0])
     joint_3.parent_link_name = "link_3"
     joint_3.child_link_name = "link_4"
-    joint_3.type = sg.JointType_FLOATING
+    joint_3.type = sg.JointType.FLOATING
     assert g.addJoint(joint_3)
 
     joint_4 = sg.Joint("joint_4")
     joint_4.parent_to_joint_origin_transform = _translation([0, 1.25, 0])
     joint_4.parent_link_name = "link_2"
     joint_4.child_link_name = "link_5"
-    joint_4.type = sg.JointType_REVOLUTE
+    joint_4.type = sg.JointType.REVOLUTE
     joint_4.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_4)
 
@@ -108,7 +108,7 @@ def test_tesseract_scene_graph():
     joint_5.parent_to_joint_origin_transform = _translation([0, 1.5, 0])
     joint_5.parent_link_name = "link_5"
     joint_5.child_link_name = "link_4"
-    joint_5.type = sg.JointType_CONTINUOUS
+    joint_5.type = sg.JointType.CONTINUOUS
     g.addJoint(joint_5)
 
     assert g.isAcyclic()
@@ -118,7 +118,7 @@ def test_tesseract_scene_graph():
     joint_6.parent_to_joint_origin_transform = _translation([0, 1.25, 0])
     joint_6.parent_link_name = "link_5"
     joint_6.child_link_name = "link_1"
-    joint_6.type = sg.JointType_CONTINUOUS
+    joint_6.type = sg.JointType.CONTINUOUS
     g.addJoint(joint_6)
 
     assert not g.isAcyclic()
@@ -162,13 +162,13 @@ def test_load_srdf_unit():
     joint_1 = sg.Joint("joint_a1")
     joint_1.parent_link_name = "base_link"
     joint_1.child_link_name = "link_1"
-    joint_1.type = sg.JointType_FIXED
+    joint_1.type = sg.JointType.FIXED
     assert g.addJoint(joint_1)
 
     joint_2 = sg.Joint("joint_a2")
     joint_2.parent_link_name = "link_1"
     joint_2.child_link_name = "link_2"
-    joint_2.type = sg.JointType_REVOLUTE
+    joint_2.type = sg.JointType.REVOLUTE
     joint_2.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_2)
 
@@ -176,7 +176,7 @@ def test_load_srdf_unit():
     joint_3.parent_to_joint_origin_transform = _translation([1.25, 0, 0])
     joint_3.parent_link_name = "link_2"
     joint_3.child_link_name = "link_3"
-    joint_3.type = sg.JointType_REVOLUTE
+    joint_3.type = sg.JointType.REVOLUTE
     joint_3.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_3)
 
@@ -184,7 +184,7 @@ def test_load_srdf_unit():
     joint_4.parent_to_joint_origin_transform = _translation([1.25, 0, 0])
     joint_4.parent_link_name = "link_3"
     joint_4.child_link_name = "link_4"
-    joint_4.type = sg.JointType_REVOLUTE
+    joint_4.type = sg.JointType.REVOLUTE
     joint_4.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_4)
 
@@ -192,7 +192,7 @@ def test_load_srdf_unit():
     joint_5.parent_to_joint_origin_transform = _translation([0, 1.25, 0])
     joint_5.parent_link_name = "link_4"
     joint_5.child_link_name = "link_5"
-    joint_5.type = sg.JointType_REVOLUTE
+    joint_5.type = sg.JointType.REVOLUTE
     joint_5.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_5)
 
@@ -200,7 +200,7 @@ def test_load_srdf_unit():
     joint_6.parent_to_joint_origin_transform = _translation([0, 1.25, 0])
     joint_6.parent_link_name = "link_5"
     joint_6.child_link_name = "link_6"
-    joint_6.type = sg.JointType_REVOLUTE
+    joint_6.type = sg.JointType.REVOLUTE
     joint_6.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_6)
 
@@ -208,14 +208,14 @@ def test_load_srdf_unit():
     joint_7.parent_to_joint_origin_transform = _translation([0, 1.25, 0])
     joint_7.parent_link_name = "link_6"
     joint_7.child_link_name = "link_7"
-    joint_7.type = sg.JointType_REVOLUTE
+    joint_7.type = sg.JointType.REVOLUTE
     joint_7.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
     assert g.addJoint(joint_7)
 
     joint_tool0 = sg.Joint("base_joint")
     joint_tool0.parent_link_name = "link_7"
     joint_tool0.child_link_name = "tool0"
-    joint_tool0.type = sg.JointType_FIXED
+    joint_tool0.type = sg.JointType.FIXED
     assert g.addJoint(joint_tool0)
 
     srdf = tesseract_srdf.SRDFModel()

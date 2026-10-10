@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `tesseract_scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
 | Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
 | Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
@@ -21,6 +22,19 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### SWIG-era `JointType_*` constants removed
+
+`tesseract_scene_graph` no longer exports a module constant per `JointType` value. The seven
+constants were copies kept from the SWIG bindings; C++ has none of them, and `JointType` is bound
+as an enum whose members are the same objects (#214, finishing #176). Importing one now raises
+`ImportError: cannot import name 'JointType_FIXED' from 'tesseract_robotics.tesseract_scene_graph'`;
+reading one as an attribute raises `AttributeError`.
+
+| before | after |
+| --- | --- |
+| `JointType_FIXED` (also `_UNKNOWN`, `_REVOLUTE`, `_CONTINUOUS`, `_PRISMATIC`, `_FLOATING`, `_PLANAR`) | `JointType.FIXED` (`.UNKNOWN`, `.REVOLUTE`, …) |
+| `from tesseract_robotics.tesseract_scene_graph import JointType_FIXED` | `from tesseract_robotics.tesseract_scene_graph import JointType` |
 
 ### Value types compare by value and are unhashable
 

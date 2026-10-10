@@ -8,7 +8,12 @@ import importlib
 
 import pytest
 
-AUDITED_MODULES = ("tesseract_common", "tesseract_collision", "tesseract_environment")
+AUDITED_MODULES = (
+    "tesseract_common",
+    "tesseract_collision",
+    "tesseract_environment",
+    "tesseract_scene_graph",
+)
 
 
 @pytest.mark.parametrize(

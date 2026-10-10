@@ -109,7 +109,7 @@ from tesseract_robotics.tesseract_geometry import Sphere
 from tesseract_robotics.tesseract_scene_graph import (
     Collision,
     Joint,
-    JointType_FIXED,
+    JointType,
     Link,
     Visual,
 )
@@ -184,11 +184,11 @@ def main():
     sphere_link.addCollision(sphere_link_collision)
 
     # Joint connects child link to parent link with a transform
-    # JointType_FIXED means no relative motion (obstacle is stationary)
+    # JointType.FIXED means no relative motion (obstacle is stationary)
     sphere_joint = Joint("sphere_joint")
     sphere_joint.parent_link_name = "base_link"
     sphere_joint.child_link_name = sphere_link.getName()
-    sphere_joint.type = JointType_FIXED
+    sphere_joint.type = JointType.FIXED
 
     # Position sphere at (0.7, 0, 1.5)m relative to base_link
     # This is within the robot's workspace to trigger collision during sweep

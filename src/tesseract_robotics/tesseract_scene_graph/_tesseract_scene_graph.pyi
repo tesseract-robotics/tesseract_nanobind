@@ -28,20 +28,6 @@ class JointType(enum.Enum):
 
     FIXED = 6
 
-JointType_UNKNOWN: JointType = JointType.UNKNOWN
-
-JointType_REVOLUTE: JointType = JointType.REVOLUTE
-
-JointType_CONTINUOUS: JointType = JointType.CONTINUOUS
-
-JointType_PRISMATIC: JointType = JointType.PRISMATIC
-
-JointType_FLOATING: JointType = JointType.FLOATING
-
-JointType_PLANAR: JointType = JointType.PLANAR
-
-JointType_FIXED: JointType = JointType.FIXED
-
 class JointDynamics:
     @overload
     def __init__(self) -> None: ...

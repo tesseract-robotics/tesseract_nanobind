@@ -54,15 +54,6 @@ NB_MODULE(_tesseract_scene_graph, m) {
         // operator<< (joint.h:321): "Revolute", "Fixed", ...; repr() and .name stay Python's
         .def("__str__", &stream_str<tsg::JointType>);
 
-    // Export enum values with SWIG-compatible naming (JointType_*)
-    m.attr("JointType_UNKNOWN") = tsg::JointType::UNKNOWN;
-    m.attr("JointType_REVOLUTE") = tsg::JointType::REVOLUTE;
-    m.attr("JointType_CONTINUOUS") = tsg::JointType::CONTINUOUS;
-    m.attr("JointType_PRISMATIC") = tsg::JointType::PRISMATIC;
-    m.attr("JointType_FLOATING") = tsg::JointType::FLOATING;
-    m.attr("JointType_PLANAR") = tsg::JointType::PLANAR;
-    m.attr("JointType_FIXED") = tsg::JointType::FIXED;
-
     // JointDynamics
     nb::class_<tsg::JointDynamics>(m, "JointDynamics")
         .def(nb::init<>())

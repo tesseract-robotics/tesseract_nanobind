@@ -62,6 +62,13 @@
   | `seen = {cmd}`, `cache[env] = x` | `TypeError: unhashable type`; key on a stable field, e.g. `{cmd.getType(): cmd}`, `cache[env.getName()]`, or `id(env)` for identity |
   | `cmd in history` (identity) | `cmd in history` (value); `any(c is cmd for c in history)` for identity |
 
+- **SWIG-era `JointType_*` constants removed** — `tesseract_scene_graph` exported a module constant for each `JointType` value (`JointType_FIXED`, `JointType_REVOLUTE`, `JointType_CONTINUOUS`, `JointType_PRISMATIC`, `JointType_FLOATING`, `JointType_PLANAR`, `JointType_UNKNOWN`), kept from the SWIG bindings. C++ has no such names, and `JointType` is bound as an enum. All seven are gone: importing one raises `ImportError`, reading one as a module attribute raises `AttributeError`. Use the enum member; the values are the same objects. This finishes #176 for the scene graph module, which now joins its no-alias guard ([#214]).
+
+  | before | after |
+  | --- | --- |
+  | `JointType_FIXED` (also `_UNKNOWN`, `_REVOLUTE`, `_CONTINUOUS`, `_PRISMATIC`, `_FLOATING`, `_PLANAR`) | `JointType.FIXED` (`.UNKNOWN`, `.REVOLUTE`, …) |
+  | `from tesseract_robotics.tesseract_scene_graph import JointType_FIXED` | `from tesseract_robotics.tesseract_scene_graph import JointType` |
+
 ### Changes
 
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -385,6 +392,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#215]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/215
 [#216]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/216
 [#220]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/220
+[#214]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/214
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
 [2c62952]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/2c62952fded6cb1253cb45441d7cd6f9b0423593
