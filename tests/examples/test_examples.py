@@ -7,6 +7,9 @@ Markers:
   - @pytest.mark.lowlevel: Low-level API examples
 """
 
+import importlib
+import sys
+
 import numpy as np
 import pytest
 
@@ -80,6 +83,71 @@ def test_kinematics_plugins_example():
     group = result["kinematic_group"]
     assert group["num_solutions"] == 1
     assert group["criterion"] < group["bound"]
+
+
+@pytest.mark.basic
+def test_kinematics_analysis_example():
+    ex = importlib.import_module("tesseract_robotics.examples.kinematics_analysis_example")
+
+    result = tesseract_robotics.examples.kinematics_analysis_example()
+
+    # analytic vs numerical Jacobians, upstream runJacobianIIWATest / runKinGroupJacobianIIWATest cases
+    jac = result["jacobian"]
+    assert jac["fwd_kin_cases"] == 10
+    assert jac["group_cases"] == 594
+    assert jac["max_error"] < ex.JACOBIAN_TOL
+    assert jac["max_error_relative_base"] < 2 * ex.JACOBIAN_TOL
+
+    assert result["twist"]["residual"] <= result["twist"]["bound"]
+
+    upstream, zero = result["singularity"]["upstream"], result["singularity"]["zero"]
+    assert upstream["rank"] == 6
+    assert upstream["sigma_min"] >= ex.SINGULARITY_THRESHOLD
+    assert not upstream["near_singularity"]
+    # joint_a1, a5, a7 collinear on the base z-axis at q = 0: three identical columns
+    assert zero["identical_columns"]
+    assert zero["rank"] == 5
+    assert zero["sigma_min"] < ex.SINGULARITY_THRESHOLD
+    assert zero["near_singularity"]
+
+    for name, ellipsoid in result["manipulability"]["upstream"].items():
+        assert (
+            ellipsoid["condition"] == ellipsoid["max_eigen_value"] / ellipsoid["min_eigen_value"]
+        ), name
+        assert ellipsoid["measure"] == np.sqrt(ellipsoid["condition"]), name
+        assert ellipsoid["volume_residual"] <= ex.VOLUME_RTOL, name
+    singular = result["manipulability"]["zero"]["m"]
+    assert singular["min_eigen_value"] == 0.0
+    assert singular["measure"] == singular["condition"] == sys.float_info.max
+    assert singular["volume"] == 0.0
+    assert result["manipulability"]["repr"].startswith("Manipulability(m=ManipulabilityEllipsoid(")
+    default_manip, default_ellipsoid = result["manipulability"]["default_repr"]
+    assert default_manip.startswith("Manipulability(m=ManipulabilityEllipsoid(")
+    assert default_ellipsoid.startswith("ManipulabilityEllipsoid(eigen_values=")
+
+    for name, error in result["harmonize"].items():
+        assert error <= ex.HARMONIZE_TOL, name
+
+    assert result["is_valid"] == (True, False)
+    assert result["check_kinematics"]
+
+    limits = result["limits"]
+    assert limits["shapes_after_resize"] == [(7, 2)] * 4
+    assert limits["equal_to_group_limits"]
+    assert limits["within"] == (True, False)
+    assert limits["enforced_is_upper_bound"]
+    assert limits["input_unchanged"]
+
+    # upstream TesseractCommonUnit calcTransformError / applyTolerances / *_Toleranced cases
+    assert all(result["transform_error"].values())
+    assert result["apply_tolerances"] == [-1.0, 0.0, 0.0, 1.0]
+    diff = result["error_diff"]
+    assert diff["inside_band"] <= ex.ERROR_DIFF_ATOL
+    assert diff["above_band_vs_raw"] <= ex.ERROR_DIFF_ATOL
+    assert abs(diff["band_edge"] - 0.15) <= ex.ERROR_DIFF_ATOL
+    assert diff["dynamic_inside_band"] <= ex.ERROR_DIFF_ATOL
+    assert diff["dynamic_above_band_vs_raw"] <= ex.ERROR_DIFF_ATOL
+    assert abs(diff["dynamic_band_edge"] - 0.15) <= ex.DYNAMIC_BAND_EDGE_ATOL
 
 
 @pytest.mark.basic

@@ -77,3 +77,107 @@ the list overload.
 ```python title="kinematics_plugins_example.py"
 --8<-- "src/tesseract_robotics/examples/kinematics_plugins_example.py:kinematic_group"
 ```
+
+## Kinematics Analysis
+
+```bash
+tesseract_kinematics_analysis_example
+```
+
+A port of upstream's `runJacobianTest` on the IIWA, followed by the analysis
+functions of `tesseract/kinematics/utils.h` and the pose-error helpers of
+`tesseract/common/utils.h`, each on upstream's own unit-test values.
+
+### Jacobians against finite differences
+
+The `ForwardKinematics` Jacobian, re-based with `jacobianChangeBase` and
+`jacobianChangeRefPoint`, against `numericalJacobian`, at upstream's
+q = (−0.785398, 0.785398, …) with link points e_k and a `change_base` of
+Rz(90°) plus a unit translation:
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:jacobian_fwd_kin"
+```
+
+Every `JointGroup.calcJacobian` overload on a `KinematicGroup`, for every link,
+against the matching `numericalJacobian` overload: a static base link becomes a
+`change_base`, an active one the base-link form of `numericalJacobian`.
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:jacobian_group"
+```
+
+`numericalJacobian` is a forward difference with δ = 1e-8, so its error is
+truncation plus rounding, and the tolerance adds the two:
+
+| term | value | source |
+|---|---|---|
+| truncation, δ/2 · max point norm | 1.7e-8 | δ: `kinematics/core/src/utils.cpp:44, 80`; norm ≤ 1.306 + 1 + 1 m |
+| rounding, 2 · (8 transforms · 3ε) · 3.306 m / δ | 3.5e-6 | FK chain `joint_a1`…`joint_a7-tool0` |
+| `JACOBIAN_TOL` | 3.5e-6 | measured maximum 6.6e-8; upstream's ceiling is 1e-3 |
+
+The form relative to an active base link differences two numerical Jacobians,
+so its bound is twice that.
+
+### Twists
+
+Changing the base and reference point of a twist J·q̇ equals changing them on J
+and then multiplying by q̇; the residual is rounding only.
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:twist"
+```
+
+### Manipulability and singularity
+
+At q = 0 the IIWA is singular: `joint_a1`, `joint_a5` and `joint_a7` all turn
+about the base z-axis (every axis `0 0 1`, and the x offsets ∓0.00043624 of
+`joint_a2` and `joint_a4` cancel), so their Jacobian columns are identical and
+the rank drops to 5. The example checks the columns, the rank and σ_min against
+`isNearSingularity`'s default threshold 0.01 (`utils.h:129`), not only the flag.
+At a singular configuration the ellipsoid's `measure` and `condition` are
+`sys.float_info.max` and its `volume` is 0, as upstream.
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:singularity"
+```
+
+### Harmonizing joint angles
+
+Shifting every redundancy-capable joint by 2π and harmonizing gives q back to
+within 2.7e-15 rad, not bit-exactly: `q + 2π` and the harmonizer's `+ π`
+each round once (`fmod` itself is exact).
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:harmonize"
+```
+
+### Validity and limits
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:validity"
+```
+
+`KinematicLimits.resize` sizes all four limit arrays; `isWithinLimits` has no
+tolerance, and `enforceLimits` returns a clamped copy and leaves its input
+alone.
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:limits"
+```
+
+### Pose errors and tolerance bands
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:transform_error"
+```
+
+`applyTolerances` zeroes the part of an error inside a band and shifts the
+rest by the band edge. `calcJacobianTransformErrorDiff` applies it to both the
+error and the perturbed error, so a band around both gives a zero row, a band
+below both leaves the raw difference, and a band edge between them gives the
+clamped difference 0.15 (upstream's `calcJacobianTransformErrorDiff_Toleranced`):
+
+```python title="kinematics_analysis_example.py"
+--8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:tolerances"
+```
