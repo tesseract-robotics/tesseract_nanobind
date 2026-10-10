@@ -6,6 +6,7 @@ from .chain_example import run as chain_example
 from .freespace_hybrid_example import run as freespace_hybrid_example
 from .freespace_ompl_example import run as freespace_ompl_example
 from .geometry_showcase_example import run as geometry_showcase_example
+from .kinematics_plugins_example import run as kinematics_plugins_example
 from .glass_upright_example import run as glass_upright_example
 from .online_planning_example import run as online_planning_example
 from .online_planning_sqp_example import run as online_planning_sqp_example
@@ -18,5 +19,6 @@ from .shapes_viewer import main as shapes_viewer
 from .tesseract_collision_example import main as tesseract_collision_example
 from .tesseract_kinematics_example import main as tesseract_kinematics_example
 from .tesseract_material_mesh_viewer import main as tesseract_material_mesh_viewer
+
 # from .twc_workcell_positioner_viewer import run as twc_workcell_positioner_viewer
 from .lowlevel import *
