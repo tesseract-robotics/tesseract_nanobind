@@ -228,6 +228,9 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def_rw("inertial", &tsg::Link::inertial)
         .def_rw("visual", &tsg::Link::visual)
         .def_rw("collision", &tsg::Link::collision)
+        .def_rw("visible", &tsg::Link::visible, "Whether the link is visible (link.h:210)")
+        .def_rw("collision_enabled", &tsg::Link::collision_enabled,
+                "Whether the link takes part in collision checking (link.h:213)")
         // Helper methods to avoid the .append() copy issue with vectors
         // Usage: link.addVisual(visual) instead of link.visual.append(visual)
         .def("addVisual", [](tsg::Link& self, const tsg::Visual& v) {
@@ -314,6 +317,11 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def("getAllowedCollisionMatrix",
              nb::overload_cast<>(&tsg::SceneGraph::getAllowedCollisionMatrix),
              "Get the allowed collision matrix")
+        // No .none(): upstream stores the pointer unchecked and every later ACM call dereferences
+        // it (graph.cpp:746-770 @ 0.35.0), so None is a TypeError here.
+        .def("setAllowedCollisionMatrix", &tsg::SceneGraph::setAllowedCollisionMatrix, "acm"_a,
+             "Replace the allowed collision matrix. The graph keeps this object: later edits to `acm` "
+             "are edits to the graph's matrix, as with getAllowedCollisionMatrix.")
 
         // Graph queries
         .def("getSourceLink", &tsg::SceneGraph::getSourceLink, "joint_name"_a)
@@ -330,6 +338,16 @@ NB_MODULE(_tesseract_scene_graph, m) {
              nb::overload_cast<const std::string&>(&tsg::SceneGraph::getJointChildrenNames, nb::const_),
              "name"_a)
         .def("getShortestPath", &tsg::SceneGraph::getShortestPath, "root"_a, "tip"_a)
+        .def("getAdjacencyMap", [](const tsg::SceneGraph& self, const std::vector<std::string>& link_names) {
+            // upstream's getVertex throws std::runtime_error for an unknown name (graph.cpp:1083-1090)
+            for (const auto& name : link_names)
+                if (!self.getLink(name))
+                    throw nb::key_error(("SceneGraph.getAdjacencyMap: no link named '" + name + "'").c_str());
+            return self.getAdjacencyMap(link_names);
+        }, "link_names"_a,
+        "Map each link that moves with one of `link_names` to that link name (graph.h:486). Each listed "
+        "link maps itself and every link below it, stopping at another listed link. An unknown name "
+        "raises KeyError.")
         .def("saveDOT", &tsg::SceneGraph::saveDOT, "path"_a)
 
         // Insert scene graph

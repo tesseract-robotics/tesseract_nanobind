@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import pytest
 
 import tesseract_robotics.tesseract_scene_graph as sg
 from tesseract_robotics import tesseract_common, tesseract_srdf
@@ -310,3 +311,57 @@ def test_shortest_path_str_is_upstream_operator():
     )
     assert str(path) == expected
     assert path.links == ["link_1", "link_2", "link_3", "link_4"]
+
+
+def test_link_visible_and_collision_enabled():
+    """#216: link.h:210, :213; clone() copies both (link.cpp:154-158), == compares both (:190-193)."""
+    link = sg.Link("link_a")
+    assert link.visible is True
+    assert link.collision_enabled is True
+    link.visible = False
+    link.collision_enabled = False
+    clone = link.clone()
+    assert clone.visible is False
+    assert clone.collision_enabled is False
+    assert clone == link
+    clone.visible = True
+    assert clone != link
+
+
+def test_set_allowed_collision_matrix_shares_the_matrix():
+    g = _tree_graph()
+    acm = tesseract_common.AllowedCollisionMatrix()
+    acm.addAllowedCollision("link_1", "link_2", "adjacent")
+    g.setAllowedCollisionMatrix(acm)
+    assert g.isCollisionAllowed("link_1", "link_2")
+    # the graph keeps the Python object's shared_ptr: later edits to acm are edits to the graph's
+    acm.addAllowedCollision("link_2", "link_3", "test")
+    assert g.isCollisionAllowed("link_2", "link_3")
+
+
+def test_set_allowed_collision_matrix_refuses_none():
+    """#216: upstream stores a null and the next ACM call dereferences it (graph.cpp:746-770)."""
+    g = _tree_graph()
+    g.addAllowedCollision("link_1", "link_2", "adjacent")
+    with pytest.raises(TypeError):
+        g.setAllowedCollisionMatrix(None)
+    assert g.isCollisionAllowed("link_1", "link_2")
+    assert not g.isCollisionAllowed("link_1", "link_3")
+
+
+def test_get_adjacency_map():
+    """#216: each listed link maps itself and the links below it, stopping at another listed link.
+
+    _tree_graph: base_link - link_1 - link_2 - {link_3 - link_4, link_5} (graph.cpp:118-151, :921-949).
+    """
+    g = _tree_graph()
+    assert g.getAdjacencyMap(["link_3"]) == {"link_3": "link_3", "link_4": "link_3"}
+    expected = {"link_2": "link_2", "link_5": "link_2", "link_3": "link_3", "link_4": "link_3"}
+    assert g.getAdjacencyMap(["link_2", "link_3"]) == expected
+    assert g.getAdjacencyMap(["link_3", "link_2"]) == expected
+    assert g.getAdjacencyMap(["link_4"]) == {"link_4": "link_4"}
+
+
+def test_get_adjacency_map_unknown_link_raises_key_error():
+    with pytest.raises(KeyError, match="no_such_link"):
+        _tree_graph().getAdjacencyMap(["link_3", "no_such_link"])

@@ -30,6 +30,26 @@ child_joints = graph.getJointChildrenNames("base_link")
 child_links = graph.getLinkChildrenNames("base_link")
 path = graph.getShortestPath("base_link", "tool0")
 root = graph.getRoot()
+
+# Which listed link each link moves with: a listed link maps itself and every link
+# below it, stopping at another listed link; an unknown name raises KeyError
+graph.getAdjacencyMap(["link_2", "link_4"])  # {"link_2": "link_2", "link_3": "link_2", "link_4": "link_4", ...}
+```
+
+### Allowed collision matrix
+
+`getAllowedCollisionMatrix()` returns the graph's own matrix, and `setAllowedCollisionMatrix(acm)`
+makes the graph keep `acm` itself, so later edits to `acm` show up in `isCollisionAllowed`.
+`setAllowedCollisionMatrix(None)` raises `TypeError` and leaves the matrix in place: upstream would
+store a null pointer that the next ACM call dereferences.
+
+```python
+from tesseract_robotics.tesseract_common import AllowedCollisionMatrix
+
+acm = AllowedCollisionMatrix()
+acm.addAllowedCollision("link_1", "link_2", "adjacent")
+graph.setAllowedCollisionMatrix(acm)
+graph.isCollisionAllowed("link_1", "link_2")  # True
 ```
 
 ## Link
@@ -63,7 +83,14 @@ collisions = link.collision # list[Collision]
 # Clear geometries
 link.clearVisual()
 link.clearCollision()
+
+# Hide the link, or take it out of collision checking (both True by default)
+link.visible = False
+link.collision_enabled = False
 ```
+
+`clone()` copies `visible` and `collision_enabled`, and `==` compares them. `Link` stays
+unhashable: `getHash()` hashes only the name, while `==` compares more.
 
 ## Visual
 
