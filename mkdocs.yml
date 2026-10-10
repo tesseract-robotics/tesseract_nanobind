@@ -181,6 +181,7 @@ nav:
   - Developer:
     - developer/index.md
     - Binding API Audit: developer/binding-api-audit.md
+    - Example API Coverage: developer/example-api-coverage.md
     - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md
