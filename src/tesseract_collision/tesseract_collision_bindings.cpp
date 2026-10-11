@@ -107,8 +107,8 @@ void check_triangle_faces(const tcommon::VectorVector3d& vertices, const Eigen::
 // for every face and never shrinks it back to 3, so face i is [a, b, c] + the 4th+ vertices of faces
 // 0..i-1 in order + its own 4th+ vertices. makeConvexMesh and ConvexDecompositionVHACD::compute
 // build their hulls with it. repair_convex_hull_faces strips that prefix. A face without it (a fixed
-// upstream) raises ConvexHullFaceRepairError rather than losing vertices. Remove the repair once a
-// tesseract with the fix is the minimum.
+// upstream) raises ConvexHullFaceRepairError rather than losing vertices. Reported upstream as
+// tesseract-robotics/tesseract#1382; remove the repair once a tesseract with the fix is the minimum (#235).
 struct ConvexHullFaceRepairError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };

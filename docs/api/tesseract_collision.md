@@ -288,7 +288,8 @@ A shrink that cannot be applied (larger than the hull, unclamped) raises `Convex
 
     Hulls that upstream builds in C++ are not repaired: `AddTrajectoryLinkCommand`'s convex
     hull methods and URDF `tesseract:make_convex` meshes keep the corrupted faces until
-    upstream is fixed.
+    upstream is fixed
+    ([tesseract#1382](https://github.com/tesseract-robotics/tesseract/issues/1382)).
 
 ### Convex decomposition (V-HACD)
 
