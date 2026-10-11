@@ -7,6 +7,8 @@ __all__ = [  # noqa: F405
     "Var",
     "Node",
     "NodesVariables",
+    # Exceptions
+    "ConstraintNotLinkedError",
     # Enums
     "BoundsType",
     "RangeBoundHandling",

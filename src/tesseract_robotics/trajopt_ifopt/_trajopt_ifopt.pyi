@@ -14,6 +14,9 @@ import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_common._tesseract_common
 
 
+class ConstraintNotLinkedError(RuntimeError):
+    """getJacobian() on a constraint set that is not linked to variables yet."""
+
 class BoundsType(enum.Enum):
     UNBOUNDED = 0
 

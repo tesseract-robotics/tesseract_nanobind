@@ -71,6 +71,12 @@ and a constraint raises `Unsupported bounds type!` at the first `convexify()`. M
 penalty type, then set up and convexified. That measures acceptance, not how the SQP models the
 cost.
 
+A constraint has a Jacobian only once it is linked to the optimization variables:
+`addConstraintSet` / `addCostSet` link it, or call `linkWithVariables(nodes)` yourself.
+`getJacobian()` on an unlinked set raises `ConstraintNotLinkedError` (a `RuntimeError`); upstream
+would dereference a null pointer. The collision constraints also need `update()` before
+`getValues()` or `getJacobian()`, which `TrajOptQPProblem.setup()` calls for every set.
+
 0.34 constraint constructors take `Var` references directly (not
 `JointPosition` lists). See [changes](../changes.md) for the migration details.
 

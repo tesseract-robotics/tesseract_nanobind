@@ -93,11 +93,22 @@ public:
     }
 };
 
+// Every built-in constraint sizes its Jacobian from the linked variables
+// (`Jacobian jac(rows_, variables_->getRows())`, trajopt 0.35.0) without a null check, so
+// getJacobian() before linkWithVariables() dereferenced a null pointer (#202). No other bound
+// member reads variables_.
+struct ConstraintNotLinkedError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 NB_MODULE(_trajopt_ifopt, m) {
     m.doc() = "trajopt_ifopt Python bindings - variables, constraints, and costs for IFOPT-based trajectory optimization";
 
     // Import tesseract_collision for CollisionCheckConfig type
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
+
+    nb::exception<ConstraintNotLinkedError>(m, "ConstraintNotLinkedError", PyExc_RuntimeError)
+        .attr("__doc__") = "getJacobian() on a constraint set that is not linked to variables yet.";
 
     // ========== BoundsType enum ==========
     nb::enum_<ti::BoundsType>(m, "BoundsType")
@@ -173,6 +184,13 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("getBounds", &ti::ConstraintSet::getBounds,
              "Get the constraint bounds")
         .def("getJacobian", [](const ti::ConstraintSet& self) {
+                 // getVariables() is protected; the trampoline's using-declaration names it,
+                 // and the member pointer is ConstraintSet's, so this is valid for any set.
+                 constexpr auto get_variables = &PyConstraintSet::getVariables;
+                 if (!(self.*get_variables)())
+                     throw ConstraintNotLinkedError("getJacobian: constraint set '" + self.getName() +
+                                                    "' is not linked to variables; call "
+                                                    "linkWithVariables first, or add it to a problem");
                  // The collision constraints (analytic and numerical, discrete and continuous)
                  // assemble their Jacobian with coeffRef while a contact is active, which
                  // leaves it uncompressed; nanobind's Eigen caster only returns compressed
