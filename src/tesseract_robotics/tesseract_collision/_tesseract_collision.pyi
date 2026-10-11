@@ -736,15 +736,22 @@ class ContactManagersPluginFactory:
     def getConfig(self) -> str:
         """The factory configuration as a YAML document string."""
 
+class ConvexHullFaceRepairError(RuntimeError):
+    """
+    A convex hull's faces lack the accumulated prefix the binding strips (gh-233): upstream's face bug may be fixed, so the binding repair must go.
+    """
+
 def makeConvexMesh(mesh: tesseract_robotics.tesseract_geometry._tesseract_geometry.Mesh) -> tesseract_robotics.tesseract_geometry._tesseract_geometry.ConvexMesh:
-    """Create a ConvexMesh from a Mesh using bullet's convex hull algorithm"""
+    """
+    Create a ConvexMesh from a Mesh using bullet's convex hull algorithm. Faces are repaired as in createConvexHull (gh-233).
+    """
 
 class ConvexHullError(RuntimeError):
     """createConvexHull failed: Bullet could not apply the requested shrink."""
 
 def createConvexHull(input: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], shrink: float = -1.0, shrink_clamp: float = -1.0) -> tuple[int, list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')]]:
     """
-    Convex hull of a point set (Bullet). Returns (n_faces, vertices, faces); faces is a flat array of [count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink cannot be applied.
+    Convex hull of a point set (Bullet). Returns (n_faces, vertices, faces); faces is a flat array of [count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink cannot be applied. Each face lists exactly its own polygon: the binding strips the earlier faces' vertices that upstream appends (gh-233) and raises ConvexHullFaceRepairError if they are missing.
     """
 
 class MalformedFacesError(ValueError):
@@ -833,7 +840,7 @@ class VHACDParameters:
 class ConvexDecomposition:
     def compute(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], verbose: bool = True) -> list[tesseract_robotics.tesseract_geometry._tesseract_geometry.ConvexMesh]:
         """
-        Split a triangle mesh into convex hulls. faces is a flat array of [3, i0, i1, i2] per triangle. Raises NonTriangleFaceError for any other count, MalformedFacesError for a count running past the end or an index outside vertices.
+        Split a triangle mesh into convex hulls. faces is a flat array of [3, i0, i1, i2] per triangle. Raises NonTriangleFaceError for any other count, MalformedFacesError for a count running past the end or an index outside vertices. Hull faces are repaired as in createConvexHull (gh-233).
         """
 
 class ConvexDecompositionVHACD(ConvexDecomposition):

@@ -26,6 +26,8 @@ from tesseract_robotics.tesseract_collision import (
 )
 from tesseract_robotics.tesseract_geometry import ConvexMesh
 
+from .test_convex_hull import BOX_SIDES, _assert_box_hull
+
 # m: second cube's offset along x; leaves a 2 m gap, so V-HACD must split the mesh.
 CUBE_GAP_OFFSET = 3.0
 # Voxel count for the tests: a coarse grid keeps compute fast on two cubes.
@@ -104,6 +106,18 @@ def test_two_cubes_decompose_into_at_least_two_hulls():
     voxel = float(extent.max()) / TEST_RESOLUTION ** (1.0 / 3.0)
     np.testing.assert_allclose(points.min(axis=0), expected.min(axis=0), atol=voxel)
     np.testing.assert_allclose(points.max(axis=0), expected.max(axis=0), atol=voxel)
+
+
+def test_hull_faces_are_box_faces():
+    """gh-233: compute builds each hull with upstream createConvexHull, whose faces carry the
+    4th+ vertices of every earlier face (sizes 4, 5, 6, 7, 8, 9 on these boxes). V-HACD of two
+    axis-aligned cubes gives axis-aligned boxes, so every face is checked exactly: four
+    vertices of its own, on one of the box's planes, every hull vertex on or behind it."""
+    vertices, faces = _two_cubes()
+    hulls = ConvexDecompositionVHACD(_params()).compute(vertices, faces, verbose=False)
+    for hull in hulls:
+        _assert_box_hull(hull.getVertices(), hull.getFaces())
+        assert hull.getFaceCount() == len(BOX_SIDES)
 
 
 def test_parameters_header_defaults():

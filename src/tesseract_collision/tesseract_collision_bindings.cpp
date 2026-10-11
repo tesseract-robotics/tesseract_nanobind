@@ -103,6 +103,56 @@ void check_triangle_faces(const tcommon::VectorVector3d& vertices, const Eigen::
     }
 }
 
+// gh-233: upstream createConvexHull (convex_hull_utils.cpp:75-99, 0.35.0) reuses one `face` vector
+// for every face and never shrinks it back to 3, so face i is [a, b, c] + the 4th+ vertices of faces
+// 0..i-1 in order + its own 4th+ vertices. makeConvexMesh and ConvexDecompositionVHACD::compute
+// build their hulls with it. repair_convex_hull_faces strips that prefix. A face without it (a fixed
+// upstream) raises ConvexHullFaceRepairError rather than losing vertices. Remove the repair once a
+// tesseract with the fix is the minimum.
+struct ConvexHullFaceRepairError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+Eigen::VectorXi repair_convex_hull_faces(const Eigen::VectorXi& faces) {
+    const Eigen::Index n = faces.size();
+    std::vector<int> extras;  // 4th+ vertices of the faces so far: the prefix the next face carries
+    std::vector<int> repaired;
+    repaired.reserve(static_cast<size_t>(n));
+    for (Eigen::Index i = 0, face = 0; i < n; ++face) {
+        const Eigen::Index count = faces(i);
+        const auto prefix = static_cast<Eigen::Index>(extras.size());
+        auto fail = [&](const std::string& what) {
+            throw ConvexHullFaceRepairError("createConvexHull face " + std::to_string(face) + " (faces[" +
+                                            std::to_string(i) + "] = " + std::to_string(count) + ") " + what);
+        };
+        if (i + count >= n)
+            fail("runs past the end of faces (size " + std::to_string(n) + ")");
+        if (count < 3 + prefix)
+            fail("is too short for the " + std::to_string(prefix) +
+                 " accumulated vertices upstream's face bug (gh-233) adds");
+        for (Eigen::Index k = 0; k < prefix; ++k)
+            if (faces(i + 4 + k) != extras[static_cast<size_t>(k)])
+                fail("does not carry the vertices of earlier faces after entry 2: upstream's face bug "
+                     "(gh-233) may be fixed; remove the binding repair");
+        repaired.push_back(static_cast<int>(count - prefix));
+        repaired.insert(repaired.end(), faces.data() + i + 1, faces.data() + i + 4);
+        repaired.insert(repaired.end(), faces.data() + i + 4 + prefix, faces.data() + i + 1 + count);
+        extras.insert(extras.end(), faces.data() + i + 4 + prefix, faces.data() + i + 1 + count);
+        i += count + 1;
+    }
+    return Eigen::Map<const Eigen::VectorXi>(repaired.data(), static_cast<Eigen::Index>(repaired.size()));
+}
+
+// A ConvexMesh built from createConvexHull, with repaired faces. Upstream builds these from vertices,
+// faces, face count, resource and scale only (no normals, colours, material or textures).
+tg::ConvexMesh::Ptr repair_convex_mesh(const tg::ConvexMesh& mesh) {
+    auto repaired = std::make_shared<tg::ConvexMesh>(
+        mesh.getVertices(), std::make_shared<const Eigen::VectorXi>(repair_convex_hull_faces(*mesh.getFaces())),
+        mesh.getFaceCount(), mesh.getResource(), mesh.getScale());
+    repaired->setCreationMethod(mesh.getCreationMethod());
+    return repaired;
+}
+
 void check_ordered_key(const CRM::KeyType& key) {
     if (tcommon::makeOrderedLinkPair(key.first, key.second) != key)
         throw UnorderedLinkPairError("ContactResultMap key ('" + key.first + "', '" + key.second +
@@ -701,8 +751,19 @@ NB_MODULE(_tesseract_collision, m) {
         .def("getConfig", &W::getConfig, "The factory configuration as a YAML document string.");
 
     // ========== Convex hulls ==========
-    m.def("makeConvexMesh", &tc::makeConvexMesh, "mesh"_a,
-          "Create a ConvexMesh from a Mesh using bullet's convex hull algorithm");
+    nb::exception<ConvexHullFaceRepairError>(m, "ConvexHullFaceRepairError", PyExc_RuntimeError)
+        .attr("__doc__") = "A convex hull's faces lack the accumulated prefix the binding strips (gh-233): "
+                           "upstream's face bug may be fixed, so the binding repair must go.";
+
+    m.def(
+        "makeConvexMesh",
+        [](const tg::Mesh& mesh) { return repair_convex_mesh(*tc::makeConvexMesh(mesh)); }, "mesh"_a,
+        "Create a ConvexMesh from a Mesh using bullet's convex hull algorithm. Faces are repaired as in "
+        "createConvexHull (gh-233).");
+
+    // Private test oracle (gh-233): upstream output cannot reach the repair's error paths.
+    m.def("_repair_convex_hull_faces", &repair_convex_hull_faces, "faces"_a,
+          "Strip upstream createConvexHull's accumulated face prefix (gh-233)");
 
     nb::exception<ConvexHullError>(m, "ConvexHullError", PyExc_RuntimeError)
         .attr("__doc__") = "createConvexHull failed: Bullet could not apply the requested shrink.";
@@ -719,13 +780,14 @@ NB_MODULE(_tesseract_collision, m) {
                                       std::to_string(n) + ") for " + std::to_string(input.size()) +
                                       " input points with shrink=" + std::to_string(shrink) +
                                       ", shrink_clamp=" + std::to_string(shrink_clamp));
-            return std::make_tuple(n, std::move(vertices), std::move(faces));
+            return std::make_tuple(n, std::move(vertices), repair_convex_hull_faces(faces));
         },
         "input"_a, "shrink"_a = -1.0, "shrink_clamp"_a = -1.0,
         "Convex hull of a point set (Bullet). Returns (n_faces, vertices, faces); faces is a flat array of "
         "[count, i0, i1, ...] per face. shrink > 0 moves each face inwards by that amount; shrink_clamp > 0 "
         "caps it at shrink_clamp times the hull's inner radius. Raises ConvexHullError when the shrink "
-        "cannot be applied.");
+        "cannot be applied. Each face lists exactly its own polygon: the binding strips the earlier faces' "
+        "vertices that upstream appends (gh-233) and raises ConvexHullFaceRepairError if they are missing.");
 
     // ========== Convex decomposition (V-HACD) ==========
     nb::exception<MalformedFacesError>(m, "MalformedFacesError", PyExc_ValueError)
@@ -762,12 +824,15 @@ NB_MODULE(_tesseract_collision, m) {
                const Eigen::VectorXi& faces, bool verbose) {
                 check_triangle_faces(vertices, faces);
                 nb::gil_scoped_release release;
-                return self.compute(vertices, faces, verbose);
+                std::vector<tg::ConvexMesh::Ptr> hulls = self.compute(vertices, faces, verbose);
+                for (auto& hull : hulls)
+                    hull = repair_convex_mesh(*hull);
+                return hulls;
             },
             "vertices"_a, "faces"_a, "verbose"_a = true,
             "Split a triangle mesh into convex hulls. faces is a flat array of [3, i0, i1, i2] per triangle. "
             "Raises NonTriangleFaceError for any other count, MalformedFacesError for a count running past "
-            "the end or an index outside vertices.");
+            "the end or an index outside vertices. Hull faces are repaired as in createConvexHull (gh-233).");
 
     nb::class_<tc::ConvexDecompositionVHACD, tc::ConvexDecomposition>(m, "ConvexDecompositionVHACD")
         .def(nb::init<>())

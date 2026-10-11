@@ -34,6 +34,7 @@ __all__ = [
     "makeConvexMesh",
     "createConvexHull",
     "ConvexHullError",
+    "ConvexHullFaceRepairError",
     # Convex decomposition
     "FillMode",
     "VHACDParameters",

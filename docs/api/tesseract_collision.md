@@ -277,6 +277,19 @@ n_faces, vertices, faces = createConvexHull(points, shrink=0.1)
 A shrink that cannot be applied (larger than the hull, unclamped) raises `ConvexHullError`
 (a `RuntimeError`). An empty point set is not an error: it gives 0 faces.
 
+!!! warning "Face repair for an upstream bug"
+    Upstream `createConvexHull` (0.35.0) appends the 4th and later vertices of every earlier
+    polygon face to each face: the cube above comes back with face sizes 4, 5, 6, 7, 8, 9
+    instead of six quads. The binding strips that prefix from the faces returned by
+    `createConvexHull`, `makeConvexMesh` and `ConvexDecompositionVHACD.compute`, so each face
+    lists exactly its own polygon. If the prefix is not there (a fixed upstream), it raises
+    `ConvexHullFaceRepairError` (a `RuntimeError`) instead of cutting faces
+    ([#233](https://github.com/tesseract-robotics/tesseract_nanobind/issues/233)).
+
+    Hulls that upstream builds in C++ are not repaired: `AddTrajectoryLinkCommand`'s convex
+    hull methods and URDF `tesseract:make_convex` meshes keep the corrupted faces until
+    upstream is fixed.
+
 ### Convex decomposition (V-HACD)
 
 `ConvexDecompositionVHACD` splits a triangle mesh into convex hulls, for meshes too concave
