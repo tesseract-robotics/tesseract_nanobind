@@ -17,6 +17,9 @@ import tesseract_robotics.tesseract_common._tesseract_common
 class ConstraintNotLinkedError(RuntimeError):
     """getJacobian() on a constraint set that is not linked to variables yet."""
 
+class CartLineIndicesUnsupportedError(ValueError):
+    """CartLineConstraint.getJacobian() with fewer than 6 indices (#237)."""
+
 class BoundsType(enum.Enum):
     UNBOUNDED = 0
 
@@ -430,6 +433,11 @@ class CartLineConstraint(ConstraintSet):
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
+
+    def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
+        """
+        Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError unless all 6 indices are set (#237)
+        """
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""

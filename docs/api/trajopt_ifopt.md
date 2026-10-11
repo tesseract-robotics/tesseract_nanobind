@@ -77,6 +77,15 @@ A constraint has a Jacobian only once it is linked to the optimization variables
 would dereference a null pointer. The collision constraints also need `update()` before
 `getValues()` or `getJacobian()`, which `TrajOptQPProblem.setup()` calls for every set.
 
+`CartLineConstraint.getJacobian()` raises `CartLineIndicesUnsupportedError` (a `ValueError`)
+unless `CartLineInfo.indices` holds all 6 twist rows. Upstream sizes the Jacobian by the number
+of indices but fills 6 rows, numeric and analytic alike, so fewer corrupt memory
+([#237](https://github.com/tesseract-robotics/tesseract_nanobind/issues/237)). Construction,
+`getValues()` and `calcValues()` work with 1 to 6 indices. The check covers direct Python calls
+only: `TrajOptQPProblem` calls the C++ Jacobian, so a solve with fewer than 6 indices can still
+crash. Use all 6 indices for a constraint you solve. The check goes once the pinned trajopt
+includes the upstream fix (trajopt#618).
+
 0.34 constraint constructors take `Var` references directly (not
 `JointPosition` lists). See [changes](../changes.md) for the migration details.
 

@@ -9,6 +9,7 @@ __all__ = [  # noqa: F405
     "NodesVariables",
     # Exceptions
     "ConstraintNotLinkedError",
+    "CartLineIndicesUnsupportedError",
     # Enums
     "BoundsType",
     "RangeBoundHandling",

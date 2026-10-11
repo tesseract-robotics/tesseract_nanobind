@@ -101,6 +101,38 @@ struct ConstraintNotLinkedError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+// CartLineConstraint sizes its Jacobian by indices.size() rows but fills six whatever that size,
+// in the numeric and the analytic branch (cartesian_line_constraint.cpp:179-188, :238-247,
+// trajopt 0.35.0), so fewer than six indices write past the matrix (#237, trajopt#618).
+// Remove with the check when the pinned trajopt has the fix (#238).
+struct CartLineIndicesUnsupportedError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// rows of a twist error: 3 linear + 3 angular
+constexpr std::size_t TWIST_SIZE = 6;
+
+void require_linked(const ti::ConstraintSet& self) {
+    // getVariables() is protected; the trampoline's using-declaration names it,
+    // and the member pointer is ConstraintSet's, so this is valid for any set.
+    constexpr auto get_variables = &PyConstraintSet::getVariables;
+    if (!(self.*get_variables)())
+        throw ConstraintNotLinkedError("getJacobian: constraint set '" + self.getName() +
+                                       "' is not linked to variables; call "
+                                       "linkWithVariables first, or add it to a problem");
+}
+
+ti::Jacobian jacobian_checked(const ti::ConstraintSet& self) {
+    require_linked(self);
+    // The collision constraints (analytic and numerical, discrete and continuous)
+    // assemble their Jacobian with coeffRef while a contact is active, which
+    // leaves it uncompressed; nanobind's Eigen caster only returns compressed
+    // sparse matrices.
+    ti::Jacobian jacobian = self.getJacobian();
+    jacobian.makeCompressed();
+    return jacobian;
+}
+
 NB_MODULE(_trajopt_ifopt, m) {
     m.doc() = "trajopt_ifopt Python bindings - variables, constraints, and costs for IFOPT-based trajectory optimization";
 
@@ -109,6 +141,8 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     nb::exception<ConstraintNotLinkedError>(m, "ConstraintNotLinkedError", PyExc_RuntimeError)
         .attr("__doc__") = "getJacobian() on a constraint set that is not linked to variables yet.";
+    nb::exception<CartLineIndicesUnsupportedError>(m, "CartLineIndicesUnsupportedError", PyExc_ValueError)
+        .attr("__doc__") = "CartLineConstraint.getJacobian() with fewer than 6 indices (#237).";
 
     // ========== BoundsType enum ==========
     nb::enum_<ti::BoundsType>(m, "BoundsType")
@@ -183,22 +217,7 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get the current constraint values")
         .def("getBounds", &ti::ConstraintSet::getBounds,
              "Get the constraint bounds")
-        .def("getJacobian", [](const ti::ConstraintSet& self) {
-                 // getVariables() is protected; the trampoline's using-declaration names it,
-                 // and the member pointer is ConstraintSet's, so this is valid for any set.
-                 constexpr auto get_variables = &PyConstraintSet::getVariables;
-                 if (!(self.*get_variables)())
-                     throw ConstraintNotLinkedError("getJacobian: constraint set '" + self.getName() +
-                                                    "' is not linked to variables; call "
-                                                    "linkWithVariables first, or add it to a problem");
-                 // The collision constraints (analytic and numerical, discrete and continuous)
-                 // assemble their Jacobian with coeffRef while a contact is active, which
-                 // leaves it uncompressed; nanobind's Eigen caster only returns compressed
-                 // sparse matrices.
-                 ti::Jacobian jacobian = self.getJacobian();
-                 jacobian.makeCompressed();
-                 return jacobian;
-             },
+        .def("getJacobian", &jacobian_checked,
              "Get the constraint Jacobian (sparse matrix)")
         .def("update", &ti::ConstraintSet::update,
              "Recompute sizing/state for dynamic-sized components")
@@ -568,6 +587,19 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Create Cartesian line constraint")
         .def("getValues", &ti::CartLineConstraint::getValues,
              "Get current constraint values")
+        .def("getJacobian", [](const ti::CartLineConstraint& self) {
+                 require_linked(self);
+                 const auto n_indices = static_cast<std::size_t>(self.getInfo().indices.size());
+                 if (n_indices != TWIST_SIZE)
+                     throw CartLineIndicesUnsupportedError(
+                         "getJacobian: constraint set '" + self.getName() + "' has " +
+                         std::to_string(n_indices) + " indices; trajopt 0.35.0 writes " +
+                         std::to_string(TWIST_SIZE) + " Jacobian rows whatever their number and "
+                         "corrupts memory with fewer (tesseract_nanobind#237)");
+                 return jacobian_checked(self);
+             },
+             "Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError "
+             "unless all 6 indices are set (#237)")
         .def("calcValues", &ti::CartLineConstraint::calcValues, "joint_vals"_a,
              "Calculate error values for given joint values")
         .def("getLinePoint", &ti::CartLineConstraint::getLinePoint,
