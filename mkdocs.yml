@@ -148,6 +148,7 @@ nav:
     - Basic Examples: examples/basic.md
     - Kinematics Examples: examples/kinematics.md
     - Collision Examples: examples/collision.md
+    - Environment Examples: examples/environment.md
     - Planning Examples: examples/planning.md
     - Online Planning: examples/online-planning.md
   - API Reference:

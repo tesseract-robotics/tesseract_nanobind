@@ -441,6 +441,113 @@ def test_convex_decomposition_example():
 
 
 @pytest.mark.basic
+def test_environment_commands_example():
+    ex = importlib.import_module("tesseract_robotics.examples.environment_commands_example")
+
+    result = tesseract_robotics.examples.environment_commands_example()
+
+    # every GeneralResourceLocator constructor resolves the URDF to the same file
+    assert result["locators"] == {
+        "paths_same_file": True,
+        "environment_variables_same_file": True,
+        "unresolved_before_load": True,
+        "load_set_variable": True,
+        "load_unset_variable": False,
+        "resolved_after_load": True,
+        "add_path": True,
+        "fixture_resolved": True,
+    }
+
+    # getInitCommands (environment.cpp:116-133): no calibration and no margins in abb_irb2400.srdf
+    assert result["init_history"] == [
+        "ADD_SCENE_GRAPH",
+        "ADD_CONTACT_MANAGERS_PLUGIN_INFO",
+        "ADD_KINEMATICS_INFORMATION",
+    ]
+    assert result["urdf_only_history"] == ["ADD_SCENE_GRAPH"]
+
+    # upstream's calibration fixture (tesseract_srdf_unit.cpp:672-690): one ChangeJointOrigin per joint
+    calibration = result["calibration"]
+    assert calibration["joints"] == ex.CALIBRATED_POSITIONS
+    assert calibration["rotations_identity"]
+    assert calibration["history"] == result["init_history"] + ["CHANGE_JOINT_ORIGIN"] * 2
+    assert calibration["calibrated_joints"] == ["joint_1", "joint_2"]
+    assert calibration["origins_applied"]
+    assert calibration["empty_before_insert"]
+    assert calibration["insert_copies"]
+    assert calibration["insert_overrides"] == {
+        "joint_1": [1.0, 2.0, 3.0],
+        "joint_2": [1.0, 2.0, 3.0],
+    }
+    assert calibration["empty_after_clear"]
+
+    # SRDFModel.contact_managers_plugin_info read from contact_manager_plugins.yaml
+    assert result["contact_managers_plugin_info"] == {
+        "search_libraries": [
+            "tesseract_collision_bullet_factories",
+            "tesseract_collision_fcl_factories",
+        ],
+        "discrete_default": "BulletDiscreteBVHManager",
+        "discrete_plugins": {
+            "BulletDiscreteBVHManager": "BulletDiscreteBVHManagerFactory",
+            "BulletDiscreteSimpleManager": "BulletDiscreteSimpleManagerFactory",
+            "FCLDiscreteBVHManager": "FCLDiscreteBVHManagerFactory",
+        },
+        "continuous_default": "BulletCastBVHManager",
+        "continuous_plugins": {
+            "BulletCastBVHManager": "BulletCastBVHManagerFactory",
+            "BulletCastSimpleManager": "BulletCastSimpleManagerFactory",
+        },
+        "equals_environment_info": True,
+    }
+
+    commands = result["commands"]
+    assert commands["plugin_info_empty_before"]
+    assert commands["manager_before"] is None
+    assert commands["plugin_info_applied"]
+    assert commands["command_round_trips"]
+    assert commands["environment_info_equal"]
+    assert commands["manager_after"] == "BulletDiscreteBVHManager"
+    assert commands["batch_applied"]
+    assert commands["batch_origins_applied"]
+    # one COMMAND_APPLIED event per applyCommand / applyCommands call, carrying the whole history
+    assert commands["events"] == [
+        (2, ["ADD_SCENE_GRAPH", "ADD_CONTACT_MANAGERS_PLUGIN_INFO"]),
+        (
+            4,
+            [
+                "ADD_SCENE_GRAPH",
+                "ADD_CONTACT_MANAGERS_PLUGIN_INFO",
+                "CHANGE_JOINT_ORIGIN",
+                "CHANGE_JOINT_ORIGIN",
+            ],
+        ),
+    ]
+    assert commands["events_match_history"]
+
+    # init(commands): same history, but timestamps differ, so env != replay (environment.cpp:393-413)
+    replay = result["replay"]
+    assert replay == {
+        "initialized": True,
+        "histories_equal": True,
+        "revisions_equal": True,
+        "states_equal": True,
+        "timestamps_differ": True,
+        "replay_equals_env": False,
+        "clone_equals_env": True,
+        "clone_after_command_equals_env": False,
+    }
+
+    assert result["bytes_resource"] == {
+        "url": ex.FIXTURE_URL,
+        "is_file": False,
+        "contents_equal": True,
+        "constructors_equal": True,
+        "contents_are_fixture": True,
+    }
+
+
+@pytest.mark.basic
 def test_geometry_showcase_example():
     tesseract_robotics.examples.geometry_showcase_example()
 
