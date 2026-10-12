@@ -6,6 +6,7 @@ from .chain_example import run as chain_example
 from .contact_managers_example import run as contact_managers_example
 from .convex_decomposition_example import run as convex_decomposition_example
 from .environment_commands_example import run as environment_commands_example
+from .environment_state_example import run as environment_state_example
 from .freespace_hybrid_example import run as freespace_hybrid_example
 from .freespace_ompl_example import run as freespace_ompl_example
 from .geometry_showcase_example import run as geometry_showcase_example

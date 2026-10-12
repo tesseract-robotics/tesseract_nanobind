@@ -8,6 +8,7 @@ docstring. Every value printed is also asserted in `tests/examples`.
 ```bash
 # Installed console scripts
 tesseract_environment_commands_example
+tesseract_environment_state_example
 
 # Or via Python module invocation
 pixi run python -m tesseract_robotics.examples.environment_commands_example
@@ -126,4 +127,121 @@ list of byte values. Both constructors give equal resources:
 
 ```python title="environment_commands_example.py"
 --8<-- "src/tesseract_robotics/examples/environment_commands_example.py:bytes_resource"
+```
+
+## Environment State
+
+The IIWA environment's state, with its first joint made FLOATING: every native
+`setState` / `getState` / `getLinkTransforms` overload, the joint and link
+queries, timestamps, and TCP lookup.
+
+### Floating joints
+
+A `ReplaceJointCommand` turns `joint_a1` into a FLOATING joint at x = 1.25, the
+first step of upstream's floating-joint test (`state_solver_test_suite.h:766–820`).
+A floating joint has no joint value, so it leaves `getActiveJointNames()`; its
+pose is read with `getCurrentFloatingJointValues()`, for all floating joints or
+for the names given. The command moves the revision from 3 to 4; the init
+revision stays 3.
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:floating_joint"
+```
+
+Each `setState` overload then moves the floating joint to the next origin of
+upstream's test (y = 1.5, then z = 1.5, then back to the first), starting from
+zero joint values and the previous origin, so a call that
+changed nothing would be caught. After each one, the joint values and the
+floating value read back, and `link_1` sits at `base_link` ∘ origin: a floating
+joint adds no motion of its own.
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:set_state"
+```
+
+| overload | `joint_a1` origin | joint values afterwards |
+|---|---|---|
+| `setState(floating)` | (1.25, 1.5, 0) | unchanged (zero) |
+| `setState(dict, floating)` | (1.25, 1.5, 1.5) | upstream's `jvals` |
+| `setState(names, values, floating)` | (1.25, 0, 0) | upstream's `jvals` |
+
+### Computing a state without setting it
+
+`getState` with arguments computes a state for other joint values and floating
+values and leaves the environment's own state as it was. `getLinkTransforms()`
+lists the current state in `getLinkNames()` order; with joint names and values
+(and optionally floating values) it computes, like `getState`. Each agrees with
+`getState` within upstream's precision of 1e-6 (`tesseract_environment_unit.cpp:155–158`).
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:get_state"
+```
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:link_transforms"
+```
+
+### Queries
+
+`getCurrentJointValues(names)` reads joint values in the order given.
+`getActiveLinkNames(joints)` lists the links those joints move, and
+`getStaticLinkNames(joints)` the rest. `getJointGroup(name, joints)` builds a
+`JointGroup` over any joints, whose forward kinematics match the environment's.
+`getJointLimits` returns the URDF limits; the URDF parser sets an unspecified
+acceleration to half the velocity and an unspecified jerk to 1000
+(`limits.cpp:59, 65`). `getLinkVisibility` and `getLinkCollisionEnabled` follow
+their commands.
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:queries"
+```
+
+| query | result |
+|---|---|
+| `getCurrentJointValues(["joint_a3", "joint_a2"])` | [−0.785398, 0.785398] |
+| `getActiveLinkNames(["joint_a5"])` | `link_5`, `link_6`, `link_7`, `tool0` |
+| `getStaticLinkNames(["joint_a5"])` | `base`, `base_link`, `link_1` … `link_4` |
+| `getJointLimits("joint_a2")` | lower −2.0942, upper 2.0942, velocity 1.4834, acceleration 0.7417, jerk 1000 |
+
+!!! note "Timestamps"
+    `setState` sets `getTimestamp()` and `getCurrentStateTimestamp()` from one
+    `system_clock::now()` (`environment.cpp:651–654`), so the two are equal right
+    after it; a command sets only `getTimestamp()`. `system_clock` can step
+    backwards, so compare timestamps for equality, not order.
+
+### Tool center points
+
+`findTCPOffset(manip_info)` resolves `manip_info.tcp_offset`
+(`environment.cpp:832–862`), as upstream's `EnvFindTCPUnit` test runs it:
+
+1. an `Isometry3d` is returned as is;
+2. a name must not be a link (`tool0` raises `RuntimeError`);
+3. a name is looked up in the manipulator's `group_tcps` in the SRDF
+   (`laser`, `welder`);
+4. otherwise each callback registered with `addFindTCPOffsetCallback` is asked
+   in turn, and one that raises means "not found here";
+5. if none finds it, `RuntimeError`.
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:find_tcp"
+```
+
+| `tcp_offset` | result |
+|---|---|
+| `Isometry3d`, z = 0.1 | that transform |
+| `"laser"` (`xyz="1 .1 1" rpy="0 1.57 0"`) | translation (1, 0.1, 1), rotation 1.57 rad about y |
+| `"welder"` (`xyz=".1 1 .2" wxyz="1 0 0 0"`) | translation (0.1, 1, 0.2), no rotation |
+| `"laser_callback"`, before the callback | `RuntimeError: Could not find tcp by name laser_callback'!` |
+| `"laser_callback"`, after the callback | z = 0.1 |
+| `"tool0"` (a link) | `RuntimeError: The tcp offset name 'tool0' should not be an existing link …` |
+| `"unknown"` | `RuntimeError: Could not find tcp by name unknown'!` |
+
+### Manipulator info
+
+A `ManipulatorInfo` is empty while its manipulator, working frame or TCP frame
+is unset. `getCombined(override)` takes every field the override sets, and its
+TCP offset with its TCP frame, as upstream's `ManipulatorInfo` unit test shows:
+
+```python title="environment_state_example.py"
+--8<-- "src/tesseract_robotics/examples/environment_state_example.py:manipulator_info"
 ```

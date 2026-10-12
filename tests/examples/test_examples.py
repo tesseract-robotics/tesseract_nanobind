@@ -548,6 +548,99 @@ def test_environment_commands_example():
 
 
 @pytest.mark.basic
+def test_environment_state_example():
+    ex = importlib.import_module("tesseract_robotics.examples.environment_state_example")
+
+    result = tesseract_robotics.examples.environment_state_example()
+
+    # upstream getEnvironment: revision 3 after init; a command moves the revision, not the init revision
+    assert result["revisions"] == {"after_init": (3, 3), "after_replace_joint": (4, 3)}
+    assert result["active_joint_names"] == [f"joint_a{i}" for i in range(2, 8)]
+    assert result["floating_after_replace"] == {"joint_a1": [1.25, 0.0, 0.0]}
+    assert result["floating_by_name_equal"]
+
+    # upstream runSetFloatingJointStateTest origins, one setState overload each; the last
+    # overload moves back to the first origin
+    steps = result["floating_steps"]
+    assert [step["overload"] for step in steps] == [
+        "setState(floating)",
+        "setState(dict, floating)",
+        "setState(names, values, floating)",
+    ]
+    assert [step["origin"] for step in steps] == [
+        [1.25, 1.5, 0.0],
+        [1.25, 1.5, 1.5],
+        [1.25, 0.0, 0.0],
+    ]
+    for step in steps:
+        assert step["joints_read_back"], step["overload"]
+        assert step["floating_read_back"], step["overload"]
+        assert step["link_1_at_origin"], step["overload"]
+    assert result["get_state"] == {
+        "getState(floating)": True,
+        "getState(dict, floating)": True,
+        "getState(names, values, floating)": True,
+        "current_state_unchanged": True,
+    }
+    assert result["link_transforms"] == {
+        "getLinkTransforms()": True,
+        "getLinkTransforms(names, values)": True,
+        "getLinkTransforms(names, values, floating)": True,
+    }
+    # joint_a2 = 0.785398, joint_a3 = -0.785398, read back in the order asked for
+    assert result["current_joint_values"] == [-0.785398, 0.785398]
+    assert result["link_names_by_joint"] == {
+        "active": ["link_5", "link_6", "link_7", "tool0"],
+        "static": ["base", "base_link", "link_1", "link_2", "link_3", "link_4"],
+    }
+    assert result["joint_group"] == {
+        "joint_names": [f"joint_a{i}" for i in range(2, 8)],
+        "tool0_matches_environment": True,
+    }
+
+    # lbr_iiwa_14_r820.urdf joint_a2; acceleration and jerk are the URDF parser's defaults
+    assert result["joint_limits"] == {
+        "lower": -2.0942,
+        "upper": 2.0942,
+        "velocity": 1.4834,
+        "acceleration": 0.5 * 1.4834,
+        "jerk": 1000.0,
+    }
+    assert result["link_flags"] == {"before": (True, True), "after_commands": (False, False)}
+    assert result["state_timestamps_equal"]
+
+    # upstream EnvFindTCPUnit + the SRDF group_tcps (lbr_iiwa_14_r820.srdf:36-44)
+    tcp = result["tcp"]
+    assert tcp["explicit"] == [0.0, 0.0, 0.1]
+    assert tcp["laser_translation"] == [1.0, 0.1, 1.0]
+    assert tcp["laser_rotation_error"] <= ex.TCP_ROTATION_TOL
+    assert tcp["welder"] == [
+        [1.0, 0.0, 0.0, 0.1],
+        [0.0, 1.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 0.2],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+    assert tcp["unresolved_before_callback"] == "Could not find tcp by name laser_callback'!"
+    assert tcp["callback"] == [0.0, 0.0, 0.1]
+    assert tcp["link_name"].startswith("The tcp offset name 'tool0' should not be an existing link")
+    assert tcp["unknown"] == "Could not find tcp by name unknown'!"
+
+    # upstream TesseractCommonUnit ManipulatorInfo
+    assert result["manipulator_info"] == {
+        "default_empty": True,
+        "combined": {
+            "manipulator": "manipulator",
+            "manipulator_ik_solver": "OPWInvKin",
+            "working_frame": "base_link",
+            "tcp_frame": "tool0",
+            "tcp_offset": [0.0, 0.0, 0.25],
+        },
+        "combined_empty": False,
+        "one_field_missing_empty": [True, True, True],
+    }
+
+
+@pytest.mark.basic
 def test_geometry_showcase_example():
     tesseract_robotics.examples.geometry_showcase_example()
 
