@@ -641,6 +641,84 @@ def test_environment_state_example():
 
 
 @pytest.mark.basic
+def test_plugin_configuration_example():
+    result = tesseract_robotics.examples.plugin_configuration_example()
+
+    # contact_manager_plugins.yaml, built as a Bullet part and an FCL part merged with insert
+    contact = result["contact_managers"]
+    assert contact["empty"] == {"new": True, "part": False, "merged": False, "cleared": True}
+    assert contact["merged"] == {
+        "search_paths": ["/usr/local/lib"],
+        "search_libraries": [
+            "tesseract_collision_bullet_factories",
+            "tesseract_collision_fcl_factories",
+        ],
+        "discrete_default": "BulletDiscreteBVHManager",
+        "discrete_plugins": {
+            "BulletDiscreteBVHManager": "BulletDiscreteBVHManagerFactory",
+            "BulletDiscreteSimpleManager": "BulletDiscreteSimpleManagerFactory",
+            "FCLDiscreteBVHManager": "FCLDiscreteBVHManagerFactory",
+        },
+        "continuous_default": "BulletCastBVHManager",
+        "continuous_plugins": {
+            "BulletCastBVHManager": "BulletCastBVHManagerFactory",
+            "BulletCastSimpleManager": "BulletCastSimpleManagerFactory",
+        },
+    }
+    # wheels strip search_paths from the shipped YAML, so compare the rest
+    assert contact["matches_shipped_except_search_paths"]
+    # applied to a URDF-only environment: every manager is created by name
+    assert contact["managers_before"] == {"discrete": None, "continuous": None}
+    assert contact["applied"]
+    assert contact["environment_info_equal"]
+    assert contact["created"] == {
+        "BulletDiscreteBVHManager": "BulletDiscreteBVHManager",
+        "BulletDiscreteSimpleManager": "BulletDiscreteSimpleManager",
+        "FCLDiscreteBVHManager": "FCLDiscreteBVHManager",
+        "BulletCastBVHManager": "BulletCastBVHManager",
+        "BulletCastSimpleManager": "BulletCastSimpleManager",
+    }
+
+    # upstream ProfilePluginInfoUnit fixture (tesseract_common_unit.cpp:1268-1298)
+    profiles = result["profiles"]
+    assert profiles["empty"] == {"new": True, "part": False, "merged": False, "cleared": True}
+    assert profiles["merged"] == {
+        "search_paths": ["/usr/local/lib"],
+        "search_libraries": ["tesseract_collision"],
+        "plugin_infos": {"manipulator": {"KDLFwdKin": "Profile", "KDLInvKin": "Profile"}},
+    }
+    assert profiles["equals_single_build"]
+
+    # config/task_composer_plugins.yaml: the executor block, and two of its task entries
+    task_composer = result["task_composer"]
+    assert task_composer["empty"] == {"new": True, "part": False, "merged": False, "cleared": True}
+    assert task_composer["merged"] == {
+        "search_paths": ["/usr/local/lib"],
+        "search_libraries": [
+            "tesseract_task_composer_factories",
+            "tesseract_task_composer_planning_factories",
+            "tesseract_task_composer_taskflow_factories",
+        ],
+        "executor_default": "TaskflowExecutor",
+        "executor_plugins": {
+            "TaskflowExecutor": ("TaskflowTaskComposerExecutorFactory", "threads: 5")
+        },
+        "task_plugins": {
+            "FreespacePipeline": "PipelineTaskFactory",
+            "TrajOptPipeline": "PipelineTaskFactory",
+        },
+    }
+
+    # TaskComposerPluginFactory introspection of the shipped config
+    factory = result["factory"]
+    assert factory["default_executor"] == "TaskflowExecutor"
+    assert factory["mirrored_tasks_match"]
+    assert factory["configured_classes_available"]
+    assert factory["pipelines_are_configured"]
+    assert factory["num_pipelines"] > 0
+
+
+@pytest.mark.basic
 def test_geometry_showcase_example():
     tesseract_robotics.examples.geometry_showcase_example()
 

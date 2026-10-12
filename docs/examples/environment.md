@@ -9,6 +9,7 @@ docstring. Every value printed is also asserted in `tests/examples`.
 # Installed console scripts
 tesseract_environment_commands_example
 tesseract_environment_state_example
+tesseract_plugin_configuration_example
 
 # Or via Python module invocation
 pixi run python -m tesseract_robotics.examples.environment_commands_example
@@ -245,3 +246,82 @@ TCP offset with its TCP frame, as upstream's `ManipulatorInfo` unit test shows:
 ```python title="environment_state_example.py"
 --8<-- "src/tesseract_robotics/examples/environment_state_example.py:manipulator_info"
 ```
+
+## Plugin Configuration
+
+The plugin information tesseract reads from YAML, built in Python: contact
+managers, profiles and the task composer. Each info type has `search_paths`,
+`search_libraries` and its plugins; `insert` merges one into another, `empty`
+and `clear` do what they say.
+
+!!! note "`insert` merges, it does not replace"
+    `insert(other)` appends `other`'s search paths and libraries, adds or
+    overwrites its plugins by name, and takes its default plugin only when
+    `other` names one (`plugin_info.cpp:71–81, 162–184, 214–230`). Inserting the
+    same information twice lists its libraries twice.
+
+### Contact managers
+
+The example builds `contact_manager_plugins.yaml` as a Bullet part, with the
+defaults, and an FCL part without one, and merges them. The result equals the
+information the IIWA SRDF loads from the shipped file. (Wheels strip
+`search_paths` from the shipped support YAMLs, so the example compares the
+other fields.)
+
+```python title="plugin_configuration_example.py"
+--8<-- "src/tesseract_robotics/examples/plugin_configuration_example.py:contact_managers"
+```
+
+Applied to a URDF-only environment with `AddContactManagersPluginInfoCommand`,
+it makes every manager it names available, each created by name:
+
+```python title="plugin_configuration_example.py"
+--8<-- "src/tesseract_robotics/examples/plugin_configuration_example.py:apply"
+```
+
+### Profiles and the task composer
+
+There is no shipped profile-plugin YAML; the example uses the values of
+upstream's `ProfilePluginInfoUnit` test (`tesseract_common_unit.cpp:1268–1298`).
+`plugin_infos` maps a group to its plugins, and `insert` merges into a group
+rather than replacing it:
+
+```python title="plugin_configuration_example.py"
+--8<-- "src/tesseract_robotics/examples/plugin_configuration_example.py:profiles"
+```
+
+`TaskComposerPluginInfo` mirrors `task_composer_plugins.yaml`'s search
+libraries, its executor block (`TaskflowExecutor`, 5 threads) and two of its
+36 task entries, each a `PipelineTaskFactory`:
+
+```python title="plugin_configuration_example.py"
+--8<-- "src/tesseract_robotics/examples/plugin_configuration_example.py:task_composer"
+```
+
+!!! warning "Data only, for now"
+    Upstream builds a `ProfilePluginFactory` from a `ProfilesPluginInfo` and a
+    `TaskComposerPluginFactory` from a `TaskComposerPluginInfo`. Neither
+    constructor is bound, so in Python these two types hold data but nothing
+    consumes them yet. `TaskComposerPluginFactory` is built from a config file.
+
+### Configured and available task composer plugins
+
+`getTaskComposerNodePlugins()` returns the configured nodes, name → `PluginInfo`:
+the names `createTaskComposerNode` accepts. `getAvailableTaskComposerNodePlugins()`
+returns the factory classes the search libraries export: the valid values of a
+`PluginInfo.class_name`. Every configured class is available, and
+`TaskComposer.get_available_pipelines()` lists only configured names, the ones
+whose node is created without error.
+
+```python title="plugin_configuration_example.py"
+--8<-- "src/tesseract_robotics/examples/plugin_configuration_example.py:factory"
+```
+
+| | count (macOS arm64, conda env) |
+|---|---|
+| configured node plugins | 36, all `PipelineTaskFactory` |
+| available node classes | 33 |
+| loadable pipelines | 36 |
+
+`get_available_pipelines()` creates every configured pipeline once, so it loads
+the planner plugins: the first call in a process took 12 s here.

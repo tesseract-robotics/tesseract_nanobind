@@ -17,6 +17,7 @@ from .online_planning_example import run as online_planning_example
 from .online_planning_sqp_example import run as online_planning_sqp_example
 from .pointcloud_octree_collision_example import run as pointcloud_octree_collision_example
 from .pick_and_place_example import run as pick_and_place_example
+from .plugin_configuration_example import run as plugin_configuration_example
 from .puzzle_piece_auxillary_axes_example import run as puzzle_piece_auxillary_axes_example
 from .raster_example import run as raster_example
 from .scene_graph_example import run as scene_graph_example
