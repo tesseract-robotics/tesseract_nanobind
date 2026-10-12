@@ -124,7 +124,10 @@ is applied to it.
 ### Bytes resources
 
 A `BytesResource` is a resource held in memory, built from `bytes` or from a
-list of byte values. Both constructors give equal resources:
+list of byte values; both constructors give equal resources. Its optional
+`parent` locator resolves a relative url next to the resource's own url, here
+`package.xml` beside the calibration file. Without a parent nothing resolves,
+and `BytesResource ==` counts whether a parent is set, so the two are unequal.
 
 ```python title="environment_commands_example.py"
 --8<-- "src/tesseract_robotics/examples/environment_commands_example.py:bytes_resource"

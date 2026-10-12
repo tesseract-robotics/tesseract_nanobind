@@ -30,7 +30,8 @@ Overview
    environments are not: `Environment ==` compares timestamps, and the replay
    was built later. A `clone()` copies the timestamps, so it is equal until a
    command is applied to it.
-6. `BytesResource` from `bytes` and from a list of byte values.
+6. `BytesResource` from `bytes` and from a list of byte values, with a parent
+   locator that resolves a relative url next to the resource.
 
 Key Concepts
 ------------
@@ -344,8 +345,11 @@ def run_in(fixture_root: Path) -> dict[str, Any]:
 
     # --8<-- [start:bytes_resource]
     data = CALIBRATION_YAML.encode()
-    from_bytes = BytesResource(FIXTURE_URL, data)
-    from_list = BytesResource(FIXTURE_URL, list(data))
+    from_bytes = BytesResource(FIXTURE_URL, data, locator)
+    from_list = BytesResource(FIXTURE_URL, list(data), locator)
+    # The parent resolves a relative url next to the resource's own url
+    sibling = from_bytes.locateResource("package.xml")
+    without_parent = BytesResource(FIXTURE_URL, data)
     # --8<-- [end:bytes_resource]
     bytes_resource = {
         "url": from_bytes.getUrl(),
@@ -354,6 +358,11 @@ def run_in(fixture_root: Path) -> dict[str, Any]:
         "constructors_equal": from_bytes == from_list,
         "contents_are_fixture": from_bytes.getResourceContents()
         == locate(locator, FIXTURE_URL).read_bytes(),
+        "sibling_resolved": sibling is not None
+        and Path(sibling.getFilePath()) == fixture_root / FIXTURE_PACKAGE / "package.xml",
+        "without_parent_resolves": without_parent.locateResource("package.xml") is not None,
+        # BytesResource == compares url, bytes and whether a parent is set
+        "without_parent_equal": without_parent == from_bytes,
     }
 
     return {

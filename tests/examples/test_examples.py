@@ -544,6 +544,10 @@ def test_environment_commands_example():
         "contents_equal": True,
         "constructors_equal": True,
         "contents_are_fixture": True,
+        # a parent locator resolves a relative url as a sibling of the resource's own url
+        "sibling_resolved": True,
+        "without_parent_resolves": False,
+        "without_parent_equal": False,
     }
 
 
