@@ -491,18 +491,10 @@ NB_MODULE(_tesseract_collision, m) {
                 const tcommon::VectorIsometry3d& poses) {
                  self.setCollisionObjectsTransform(names, poses);
              }, "names"_a, "poses"_a)
+        // One map overload only: a second (std::map) one converts the same dicts and is never reached (gh-241)
         .def("setCollisionObjectsTransform",
              [](tc::DiscreteContactManager& self, const tcommon::TransformMap& transforms) {
                  self.setCollisionObjectsTransform(transforms);
-             }, "transforms"_a)
-        // Overload accepting std::map (from Python dict / link_transforms property)
-        .def("setCollisionObjectsTransform",
-             [](tc::DiscreteContactManager& self, const std::map<std::string, Eigen::Isometry3d>& transforms) {
-                 tcommon::TransformMap tm;
-                 for (const auto& p : transforms) {
-                     tm[p.first] = p.second;
-                 }
-                 self.setCollisionObjectsTransform(tm);
              }, "transforms"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("getCollisionObjects", &tc::DiscreteContactManager::getCollisionObjects)
         .def("setActiveCollisionObjects", &tc::DiscreteContactManager::setActiveCollisionObjects, "names"_a)
@@ -587,7 +579,7 @@ NB_MODULE(_tesseract_collision, m) {
                  tcommon::TransformMap tm;
                  for (const auto& p : transforms) { tm[p.first] = p.second; }
                  self.setCollisionObjectsTransform(tm);
-             }, "transforms"_a)
+             }, "transforms"_a, nb::call_guard<nb::gil_scoped_release>())
         // Cast (moving, start+end pose) overloads, under the native name and under the Python-only
         // setCollisionObjectsTransformCast, which stays until its removal is approved separately.
         .def("setCollisionObjectsTransform", cast_name, "name"_a, "pose1"_a, "pose2"_a)

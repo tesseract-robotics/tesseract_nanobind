@@ -7,6 +7,7 @@ missing (addCollisionObject, cast transforms, etc.).
 
 import gc
 import os
+import types
 from pathlib import Path
 
 import numpy as np
@@ -250,6 +251,47 @@ def test_discrete_set_transform_vector_overload():
         poses = [Isometry3d(np.eye(4)), Isometry3d(far)]
         checker.setCollisionObjectsTransform(["box_a", "box_b"], poses)
 
+        assert _num_contacts(checker) == 0
+    finally:
+        del checker
+        del factory
+        del locator
+        gc.collect()
+
+
+# --------------------------------------------------------------------------- #
+# gh-241: one Mapping overload of setCollisionObjectsTransform per manager
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("manager", [DiscreteContactManager, ContinuousContactManager])
+def test_set_transform_has_one_single_mapping_overload(manager):
+    """A second (TransformMap + std::map) overload is unreachable: nanobind takes the first."""
+    single_mapping = [
+        sig
+        for sig, *_ in manager.setCollisionObjectsTransform.__nb_signature__
+        if "(self, transforms: collections.abc.Mapping[" in sig
+    ]
+    assert len(single_mapping) == 1, single_mapping
+
+
+@pytest.mark.parametrize("as_mapping", [dict, types.MappingProxyType], ids=["dict", "mappingproxy"])
+@pytest.mark.parametrize(
+    "create",
+    [
+        lambda f: f.createDiscreteContactManager("BulletDiscreteBVHManager"),
+        lambda f: f.createContinuousContactManager("BulletCastBVHManager"),
+    ],
+    ids=["discrete", "continuous"],
+)
+def test_set_transform_mapping_overload_moves_object(create, as_mapping):
+    factory, locator = _get_discrete_factory()
+    checker = create(factory)
+    try:
+        _two_overlapping_boxes(checker)
+        assert _num_contacts(checker) == 1
+
+        far = np.eye(4)
+        far[0][3] = 10.0
+        checker.setCollisionObjectsTransform(as_mapping({"box_b": Isometry3d(far)}))
         assert _num_contacts(checker) == 0
     finally:
         del checker
