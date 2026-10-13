@@ -822,6 +822,34 @@ def test_members_inherited_from_another_module_stub_are_not_gaps(fixture_report)
     assert {"LostRunner.go", "LostRunner.__call__"} <= gaps
 
 
+BOUND_ELSEWHERE = FIXTURES / "bound_elsewhere"
+
+
+def test_members_of_a_class_bound_in_another_module_are_compared_against_its_stub():
+    """#232: `SceneState` is declared in a scene_graph header and bound in state_solver. The
+    class is accepted as bound-in-other-module; its members are compared against the binding
+    module's stub, so an unbound member is a gap instead of being dropped with the class."""
+    here = "tests/audit/fixtures/bound_elsewhere/snapshot.h"
+    method = [audit.CppOverload(audit.Arity(1, 1), (), f"{here}:4")]
+    cpp = {
+        "Snapshot": audit.CppSymbol("Snapshot", audit.Kind.CLASS, f"{here}:1"),
+        "Snapshot.joints": audit.CppSymbol("Snapshot.joints", audit.Kind.FIELD, f"{here}:2"),
+        "Snapshot.floating": audit.CppSymbol("Snapshot.floating", audit.Kind.FIELD, f"{here}:3"),
+        "Snapshot.values": audit.CppSymbol("Snapshot.values", audit.Kind.METHOD, "", method),
+        "Snapshot.floating_values": audit.CppSymbol(
+            "Snapshot.floating_values", audit.Kind.METHOD, "", method
+        ),
+    }
+    stub = BOUND_ELSEWHERE / "_snapshot_header.pyi"
+    py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
+    report = audit.match(
+        "snapshot_header", cpp, frozenset(), py, audit.rel(stub), stub_roots=(BOUND_ELSEWHERE,)
+    )
+    assert {(a.symbol, a.rule) for a in report.accepted} == {("Snapshot", "bound-in-other-module")}
+    assert {g.symbol for g in report.gaps} == {"Snapshot.floating", "Snapshot.floating_values"}
+    assert report.covered == 2  # Snapshot.joints, Snapshot.values
+
+
 def test_call_operator_is_neither_gap_nor_deviation(fixture_report):
     """I5: operator() is bound as __call__."""
     assert "Runner.__call__" not in {g.symbol for g in fixture_report.gaps}

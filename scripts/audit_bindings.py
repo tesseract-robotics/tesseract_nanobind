@@ -1005,7 +1005,7 @@ ACCEPTED = {
     "boost-graph-property-tag": "Boost Graph property tags (`vertex_link_t`, …) select the "
     "properties `SceneGraph` stores; Python reaches the properties through `SceneGraph` methods.",
     "bound-in-other-module": "The class is bound in another extension module, which defines its "
-    "Python type once for every module.",
+    "Python type once for every module; its members are compared against that module's stub.",
     "module-getattr": "A package `__init__.py` defines a PEP 562 module `__getattr__` to re-export "
     "a name lazily (an eager import would be an import cycle); it is an attribute-lookup hook, "
     "not API.",
@@ -1160,15 +1160,18 @@ def _py_member(name: str, py: PyApi, stub_roots: Sequence[Path] = (SRC,)) -> PyS
     return None
 
 
-def _bound_elsewhere(name: str, stub_rel: str, stub_roots: Sequence[Path]) -> bool:
-    """A top-level class `name` is declared in another extension's stub under `stub_roots`."""
+def _binding_stub(name: str, stub_rel: str, stub_roots: Sequence[Path]) -> PyApi | None:
+    """The other extension's stub under `stub_roots` declaring top-level class `name`, or None."""
     if "." in name:
-        return False
-    return any(
-        name in _stub_py_api(stub).symbols
-        for root in stub_roots
-        for stub in _stubs_under(root)
-        if rel(stub) != stub_rel
+        return None
+    return next(
+        (
+            api
+            for root in stub_roots
+            for stub in _stubs_under(root)
+            if rel(stub) != stub_rel and name in (api := _stub_py_api(stub)).symbols
+        ),
+        None,
     )
 
 
@@ -1196,18 +1199,29 @@ def match(
     gaps: list[Gap] = []
     accepted: list[Accepted] = []
     covered = 0
+    # Top-level classes this stub lacks but another extension binds: their members are
+    # compared against that extension's stub (#232).
+    elsewhere = {
+        name: api
+        for name, sym in cpp.items()
+        if sym.kind is Kind.CLASS
+        and name not in py.symbols
+        and (api := _binding_stub(name, stub_rel, stub_roots)) is not None
+    }
     for name, sym in cpp.items():
-        if _ancestor_missing(name, cpp, py):
+        top, dot, _ = name.partition(".")
+        api = elsewhere.get(top, py) if dot else py
+        if _ancestor_missing(name, cpp, api):
             continue  # the missing class is the one row
-        ps = _py_member(name, py, stub_roots)
+        ps = _py_member(name, api, stub_roots)
         if ps is None:
             owner, _, leaf = name.rpartition(".")
             dunder = PROTOCOL_MEMBERS.get(leaf)
-            if dunder and _py_member(f"{owner}.{dunder}", py, stub_roots):
+            if dunder and _py_member(f"{owner}.{dunder}", api, stub_roots):
                 covered += 1  # the dunder's own row names the rule
             elif rule := ACCEPTED_SYMBOLS.get((module, name)):
                 accepted.append(Accepted(name, rule, sym.location))
-            elif sym.kind is Kind.CLASS and _bound_elsewhere(name, stub_rel, stub_roots):
+            elif name in elsewhere:
                 accepted.append(Accepted(name, "bound-in-other-module", sym.location))
             else:
                 gaps.append(Gap(name, sym.kind, sym.location))
