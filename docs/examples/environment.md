@@ -116,10 +116,10 @@ is applied to it.
 ```
 
 !!! note "Comparing states"
-    `SceneState` has no `==` binding yet ([#232](https://github.com/tesseract-robotics/tesseract_nanobind/issues/232)),
-    so `state_a == state_b` compares identity. The example compares joints and
-    transforms itself, with the precision of upstream's `SceneState ==`
-    (`scene_state.cpp:53–67`).
+    `state_a == state_b` is upstream's `SceneState ==` (`scene_state.cpp:53–67`,
+    bound in [#232](https://github.com/tesseract-robotics/tesseract_nanobind/issues/232)):
+    exact joint values, transforms within `isApprox(1e-5)`. The example spells
+    the comparison out to show what it covers.
 
 ### Bytes resources
 
