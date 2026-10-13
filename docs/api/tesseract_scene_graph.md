@@ -26,8 +26,9 @@ link = graph.getLink("base_link")
 joint = graph.getJoint("joint_1")
 
 # Kinematic queries
-child_joints = graph.getJointChildrenNames("base_link")
 child_links = graph.getLinkChildrenNames("base_link")
+moved_links = graph.getJointChildrenNames("joint_1")              # links below joint_1
+moved_links = graph.getJointChildrenNames(["joint_1", "joint_2"])  # union, sorted, no duplicates
 path = graph.getShortestPath("base_link", "tool0")
 root = graph.getRoot()
 
@@ -254,6 +255,9 @@ positions = state.joints  # dict[str, float]
 transforms = state.link_transforms  # dict[str, Isometry3d]
 tcp_pose = transforms["tool0"]
 ```
+
+`floating_joints`, `getFloatingJointValues` and `==` are described with the state solver:
+[SceneState](tesseract_state_solver.md#scenestate).
 
 ## Auto-generated API Reference
 

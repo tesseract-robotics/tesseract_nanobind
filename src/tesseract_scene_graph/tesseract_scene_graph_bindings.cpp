@@ -328,6 +328,10 @@ NB_MODULE(_tesseract_scene_graph, m) {
         .def("getJointChildrenNames",
              nb::overload_cast<const std::string&>(&tsg::SceneGraph::getJointChildrenNames, nb::const_),
              "name"_a)
+        // after the str overload, so a str (itself a sequence of str) never reaches the list form
+        .def("getJointChildrenNames",
+             nb::overload_cast<const std::vector<std::string>&>(&tsg::SceneGraph::getJointChildrenNames, nb::const_),
+             "names"_a)
         .def("getShortestPath", &tsg::SceneGraph::getShortestPath, "root"_a, "tip"_a)
         .def("getAdjacencyMap", [](const tsg::SceneGraph& self, const std::vector<std::string>& link_names) {
             // upstream's getVertex throws std::runtime_error for an unknown name (graph.cpp:1083-1090)
