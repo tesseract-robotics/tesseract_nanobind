@@ -18,6 +18,8 @@ import re
 import subprocess
 import sys
 
+from tests.trajopt_sqp.child_stderr import child_stderr
+
 N_NODES = 4
 PINNED_NODE = 2
 SEED = 1.0  # rad, every node's initial joint value
@@ -128,7 +130,7 @@ def _run_child(script: str) -> subprocess.CompletedProcess:
 def _sentinel(proc: subprocess.CompletedProcess, pattern: str) -> re.Match:
     """The child's sentinel match, after asserting that the child exited cleanly."""
     assert proc.returncode == 0, (
-        f"child died (rc={proc.returncode}, SIGABRT is -6): {proc.stderr[-500:]}"
+        f"child died (rc={proc.returncode}, SIGABRT is -6): {child_stderr(proc.stderr)}"
     )
     match = re.search(pattern, proc.stdout)
     assert match, f"no sentinel in the child's stdout: {proc.stdout[-500:]}"

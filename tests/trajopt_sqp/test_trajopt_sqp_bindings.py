@@ -26,6 +26,7 @@ from tesseract_robotics.tesseract_common import (
     Isometry3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
+from tests.trajopt_sqp.child_stderr import child_stderr
 
 
 def _make_nodes_variables(joint_names, joint_limits, initial_states, name="trajectory"):
@@ -871,6 +872,9 @@ MODEL_ROUND_OFF = 1e-8
 MODEL_STEP = 1e-3
 # OSQP's absolute tolerance as the trajopt_sqp wrapper sets it: a QP solution is exact to this.
 OSQP_ABSOLUTE_TOLERANCE = 1e-4
+# s; the child imports the bindings and solves in about 1-2 s. A hang must fail the test, not
+# the session, and 60 s leaves room for a loaded runner.
+TEARDOWN_CHILD_TIMEOUT_S = 60.0
 
 _TRAJOPT_QP_TEARDOWN_SCRIPT = """\
 import numpy as np
@@ -978,14 +982,19 @@ class TestTrajOptQPProblem:
         )
 
     def test_model_matches_the_exact_cost(self):
+        """The solver's trust-region ratio, (E(x0) - E(x1)) / (E(x0) - M(x1)) with E the exact
+        cost and M the convex model built at x0 (trust_region_sqp_solver.cpp:395,406,411,
+        trajopt 0.35.0). Measuring the model's improvement from E(x0), not from M(x0), keeps a
+        model that is off by a constant at x0 visible: M(x1) - M(x0) cancels it."""
         rng = np.random.default_rng(0)
         x0 = np.cumsum(rng.normal(size=8))
         x1 = x0 + MODEL_STEP * rng.normal(size=8)
         base = _one_joint_problem(x0, self.SPECS)
         base.convexify()
         trial = _one_joint_problem(x1, self.SPECS)
-        exact = trial.getExactCosts().sum() - base.getExactCosts().sum()
-        predicted = base.evaluateConvexCosts(x1).sum() - base.evaluateConvexCosts(x0).sum()
+        exact_at_x0 = base.getExactCosts().sum()
+        exact = exact_at_x0 - trial.getExactCosts().sum()
+        predicted = exact_at_x0 - base.evaluateConvexCosts(x1).sum()
         assert exact / predicted == pytest.approx(1.0, abs=MODEL_ROUND_OFF)
 
     def test_total_exact_cost_is_the_sum(self):
@@ -1029,10 +1038,11 @@ class TestTrajOptQPProblem:
             capture_output=True,
             text=True,
             check=False,
+            timeout=TEARDOWN_CHILD_TIMEOUT_S,
         )
         assert proc.returncode == 0, (
             f"interpreter teardown died (rc={proc.returncode}, SIGSEGV is -11/139): "
-            f"{proc.stderr[-500:]}"
+            f"{child_stderr(proc.stderr)}"
         )
         assert "OK: NLP_CONVERGED" in proc.stdout
 
@@ -1466,7 +1476,7 @@ class TestConvexEvaluatorArguments:
             timeout=EVALUATOR_CHILD_TIMEOUT_S,
         )
         assert proc.returncode == 0, (
-            f"child died (rc={proc.returncode}, SIGSEGV is -11/139): {proc.stderr[-500:]}"
+            f"child died (rc={proc.returncode}, SIGSEGV is -11/139): {child_stderr(proc.stderr)}"
         )
         outcomes = [ln for ln in proc.stdout.splitlines() if ln.startswith(("RAISED", "RETURNED"))]
         assert len(outcomes) == 2 * len(CONVEX_EVALUATORS), proc.stdout[-500:]
