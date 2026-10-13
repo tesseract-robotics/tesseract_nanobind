@@ -113,9 +113,24 @@ NB_MODULE(_tesseract_state_solver, m) {
     nb::module_::import_("tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph");
 
     // ========== SceneState ==========
-    nb::class_<tsg::SceneState>(m, "SceneState")
+    nb::class_<tsg::SceneState> scene_state(m, "SceneState");
+    scene_state
         .def(nb::init<>())
         .def_rw("joints", &tsg::SceneState::joints)
+        .def_prop_rw("floating_joints",
+            [](const tsg::SceneState& self) {
+                std::map<std::string, Eigen::Isometry3d> result;
+                for (const auto& p : self.floating_joints) {
+                    result[p.first] = p.second;
+                }
+                return result;
+            },
+            [](tsg::SceneState& self, const std::map<std::string, Eigen::Isometry3d>& m) {
+                self.floating_joints.clear();
+                for (const auto& p : m) {
+                    self.floating_joints[p.first] = p.second;
+                }
+            })
         .def_prop_rw("link_transforms",
             [](const tsg::SceneState& self) {
                 // Convert AlignedMap to std::map for Python
@@ -145,7 +160,19 @@ NB_MODULE(_tesseract_state_solver, m) {
                     self.joint_transforms[p.first] = p.second;
                 }
             })
-        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_names"_a);
+        .def("getJointValues", &tsg::SceneState::getJointValues, "joint_names"_a)
+        // #232: upstream's floating_joints.at(name) (scene_state.cpp:48) throws std::out_of_range
+        // for an unknown name; a missing mapping key is KeyError in Python.
+        .def("getFloatingJointValues",
+            [](const tsg::SceneState& self, const std::vector<std::string>& joint_names) {
+                for (const auto& name : joint_names)
+                    if (self.floating_joints.find(name) == self.floating_joints.end())
+                        throw nb::key_error(("getFloatingJointValues: unknown floating joint name: " + name).c_str());
+                return self.getFloatingJointValues(joint_names);
+            },
+            "joint_names"_a);
+    // Upstream compares the transforms with isApprox(1e-5) (scene_state.cpp:56).
+    bind_value_equality(scene_state);
 
     // ========== StateSolver (abstract base) ==========
     // gh-219: every setState / getState / getJacobian / getLinkTransforms overload under its native

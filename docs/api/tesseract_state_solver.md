@@ -43,6 +43,25 @@ the same functions, so they validate the same way.
     `KDLStateSolver` ignores `floating_joint_values`, and `setState(floating_joint_values)` /
     `getState(floating_joint_values)` raise `RuntimeError` (upstream: "not supported").
 
+## SceneState
+
+`joints` is a `dict[str, float]`; `floating_joints`, `link_transforms` and `joint_transforms`
+are `dict[str, Isometry3d]`. Each transform map is a copy on read and is assigned as a whole,
+so `state.link_transforms["tool0"] = tf` changes nothing.
+
+```python
+solver.setState({"joint_f": Isometry3d.Identity()})
+state = solver.getState()
+state.floating_joints                         # {"joint_f": Isometry3d}
+state.getFloatingJointValues(["joint_f"])     # KeyError for a name that is not a floating joint
+state.getJointValues(names)                   # NDArray, in the given order
+state == solver.getState()                    # True
+```
+
+`==` and `!=` are upstream's comparison: exact joint values, and every transform within
+`isApprox(1e-5)`, Eigen's relative test on the 4×4 matrix. `SceneState` is mutable and
+unhashable.
+
 ## Inserting a scene graph
 
 `MutableStateSolver.insertSceneGraph(scene_graph, joint, prefix="")` attaches another graph

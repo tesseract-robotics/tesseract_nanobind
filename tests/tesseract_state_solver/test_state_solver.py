@@ -12,7 +12,7 @@ import pytest
 
 import tesseract_robotics.tesseract_scene_graph as sg
 from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
-from tesseract_robotics.tesseract_state_solver import KDLStateSolver, OFKTStateSolver
+from tesseract_robotics.tesseract_state_solver import KDLStateSolver, OFKTStateSolver, SceneState
 
 SOLVERS = {"ofkt": OFKTStateSolver, "kdl": KDLStateSolver}
 ACTIVE_JOINTS = ["joint_1", "joint_2", "joint_3"]
@@ -292,6 +292,74 @@ def test_kdl_set_state_floating_is_unsupported():
     solver = _solver("kdl")
     with pytest.raises(RuntimeError, match="not supported"):
         solver.setState({FLOATING_JOINT: _translation(1.0, 0.0, 0.0)})
+
+
+# --- SceneState floating joints and equality (#232) -------------------------------------------
+
+# SceneState::operator== compares transforms with `isApprox(.., 1e-5)` (scene_state.cpp:56),
+# Eigen's relative test on the 4x4 matrix: ||A - B||_F <= 1e-5 * min(||A||_F, ||B||_F).
+SCENE_STATE_PRECISION = 1e-5
+# FLOATING_TARGET has ||M||_F = sqrt(4 + 1 + 4 + 9) ~ 4.24, so the equality threshold is ~4.2e-5 m
+# of translation: 1e-3 m is 24x beyond it, 1e-8 m 4000x within it.
+MOVED_BEYOND_PRECISION = 1e-3
+MOVED_WITHIN_PRECISION = 1e-8
+FLOATING_TARGET = _translation(1.0, -2.0, 3.0)
+
+
+def _floating_state():
+    solver = _solver("ofkt")
+    solver.setState({FLOATING_JOINT: FLOATING_TARGET})
+    return solver.getState()
+
+
+def _shifted(state, dx: float):
+    t = state.floating_joints[FLOATING_JOINT].translation
+    state.floating_joints = {FLOATING_JOINT: _translation(t[0] + dx, t[1], t[2])}
+    return state
+
+
+def test_scene_state_floating_joints_read_back_after_set_state():
+    """state_solver_test_suite.h:812-815 reads the floating joint values back from getState()."""
+    _assert_transforms_equal(_floating_state().floating_joints, {FLOATING_JOINT: FLOATING_TARGET})
+
+
+def test_scene_state_floating_joints_assigned_whole():
+    state = _floating_state()
+    moved = _translation(0.0, 0.0, 1.0)
+    state.floating_joints = {FLOATING_JOINT: moved}
+    _assert_transforms_equal(state.floating_joints, {FLOATING_JOINT: moved})
+
+
+def test_scene_state_get_floating_joint_values():
+    values = _floating_state().getFloatingJointValues([FLOATING_JOINT])
+    _assert_transforms_equal(values, {FLOATING_JOINT: FLOATING_TARGET})
+
+
+def test_scene_state_get_floating_joint_values_unknown_name_raises_key_error():
+    """Upstream's floating_joints.at(name) (scene_state.cpp:48) throws std::out_of_range."""
+    with pytest.raises(KeyError, match="nope"):
+        _floating_state().getFloatingJointValues([FLOATING_JOINT, "nope"])
+
+
+def test_scene_state_equal_copies():
+    a, b = _floating_state(), _floating_state()
+    assert a == b
+    assert not (a != b)
+
+
+def test_scene_state_floating_joint_moved_beyond_precision_is_not_equal():
+    a = _floating_state()
+    b = _shifted(_floating_state(), MOVED_BEYOND_PRECISION)
+    assert a != b
+    assert not (a == b)
+
+
+def test_scene_state_floating_joint_moved_within_precision_is_equal():
+    assert _floating_state() == _shifted(_floating_state(), MOVED_WITHIN_PRECISION)
+
+
+def test_scene_state_is_unhashable():
+    assert SceneState.__hash__ is None
 
 
 # --- insertSceneGraph -------------------------------------------------------------------------

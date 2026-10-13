@@ -52,10 +52,10 @@ Key Concepts
     same for each entry of a path-list variable.
 
 **Comparing states**:
-    `SceneState` binds no `==` yet (#232), so `==` on two states compares
-    identity. The replay check compares joints and transforms itself, with
-    upstream's `SceneState ==` precision; the IRB2400 has no floating joints,
-    whose values `SceneState` does not expose yet either.
+    `SceneState ==` is upstream's comparison (#232): exact joint values,
+    transforms within `isApprox(1e-5)`. The replay check spells that comparison
+    out to show what it covers; the IRB2400 has no floating joints, so
+    `floating_joints` is left out.
 """
 
 import tempfile
@@ -168,7 +168,7 @@ def is_approx(a: Isometry3d, b: Isometry3d) -> bool:
 
 
 def states_equal(a: SceneState, b: SceneState) -> bool:
-    """Upstream `SceneState ==` (scene_state.cpp:53-67), minus `floating_joints` (not bound, #232)."""
+    """Upstream `SceneState ==` (scene_state.cpp:53-67), minus `floating_joints` (the IRB2400 has none)."""
 
     def maps_equal(x: dict[str, Isometry3d], y: dict[str, Isometry3d]) -> bool:
         return x.keys() == y.keys() and all(is_approx(tf, y[name]) for name, tf in x.items())
