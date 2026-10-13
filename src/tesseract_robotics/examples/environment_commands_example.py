@@ -142,7 +142,8 @@ def write_fixture_package(root: Path) -> None:
     (package / "package.xml").write_text(
         f'<package format="3"><name>{FIXTURE_PACKAGE}</name></package>\n'
     )
-    (package / "calibration.yaml").write_text(CALIBRATION_YAML)
+    # bytes, not text: text mode writes \r\n on Windows, and the BytesResource holds \n
+    (package / "calibration.yaml").write_bytes(CALIBRATION_YAML.encode())
 
 
 def plugin_info_summary(srdf: SRDFModel) -> dict[str, Any]:
