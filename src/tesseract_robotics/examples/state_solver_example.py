@@ -36,10 +36,10 @@ Key Concepts
     the same link transforms. PLANAR joints are unsupported by KDL, so this
     oracle is valid for FLOATING only.
 
-**Read-back gap**:
-    Upstream's third step reads `state.floating_joints` from a `SceneState`,
-    edits it and passes it back. `SceneState.floating_joints` is not bound in
-    Python, so this example builds the `floating_joint_values` dict itself.
+**Reading floating values back**:
+    `SceneState.floating_joints` holds the floating values the state was
+    computed with. Upstream's third step reads it, edits it and passes it back;
+    so does this example. It is a copy, so edit it and pass it in.
 """
 
 from pathlib import Path
@@ -143,6 +143,7 @@ def check_step(solver: StateSolver, scene_graph: SceneGraph, origin: Isometry3d)
         ),
         # link_1 = base_link ∘ origin: a FLOATING joint has no motion of its own
         "link_1_at_origin": is_approx(state.link_transforms["link_1"], base_link * origin),
+        "floating_value_read_back": is_approx(state.floating_joints[FLOATING_JOINT], origin),
     }
 
 
@@ -176,9 +177,12 @@ def run() -> dict[str, Any]:
     edits.append(scene_graph.changeJointOrigin(FLOATING_JOINT, origin))
     steps.append(check_step(solver, scene_graph, origin))
 
-    # Joints and floating values together
+    # Joints and floating values together: read the state back, edit it, pass it in
     origin = translation(ORIGIN_X, ORIGIN_Y, ORIGIN_Z)
-    solver.setState(solver.getState().joints, {FLOATING_JOINT: origin})
+    state = solver.getState()
+    floating_joints = state.floating_joints  # a copy: edit it, then pass it back
+    floating_joints[FLOATING_JOINT] = origin
+    solver.setState(state.joints, floating_joints)
     edits.append(scene_graph.changeJointOrigin(FLOATING_JOINT, origin))
     steps.append(check_step(solver, scene_graph, origin))
     # --8<-- [end:move_floating]

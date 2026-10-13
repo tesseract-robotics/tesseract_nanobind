@@ -205,16 +205,13 @@ longer an active joint, so `joint_a2`…`joint_a7` remain:
 ```
 
 Move the floating joint with floating values only, then with joints and
-floating values together (upstream's y = 1.5 m and z = 1.5 m steps):
+floating values together (upstream's y = 1.5 m and z = 1.5 m steps). The second
+move is upstream's: read `state.floating_joints`, edit it, pass it back. It is a
+`dict` copy, so editing it changes nothing until it is passed to `setState`:
 
 ```python title="state_solver_example.py"
 --8<-- "src/tesseract_robotics/examples/state_solver_example.py:move_floating"
 ```
-
-!!! note "Reading floating values back"
-    Upstream's last step reads `state.floating_joints` from the `SceneState`,
-    edits it and passes it back. `SceneState.floating_joints` is not bound in
-    Python, so the example builds the `floating_joint_values` dict itself.
 
 Every native `setState`, `getState` and `getLinkTransforms` overload, each with
 `floating_joint_values`. Each `setState` starts from a different state, so a

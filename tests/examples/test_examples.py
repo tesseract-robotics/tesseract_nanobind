@@ -165,6 +165,7 @@ def test_state_solver_example():
     for step in steps:
         assert step["agrees_with_kdl"], step["origin"]
         assert step["link_1_at_origin"], step["origin"]
+        assert step["floating_value_read_back"], step["origin"]  # SceneState.floating_joints, #232
 
     # every native overload, each checked against a KDL solver on the same scene graph
     assert result["state_overloads"] == {
