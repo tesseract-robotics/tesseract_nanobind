@@ -70,6 +70,7 @@ tesseract_geometry_showcase_example = "tesseract_robotics.examples.geometry_show
 tesseract_glass_upright_example = "tesseract_robotics.examples.glass_upright_example:main"
 tesseract_kinematics_analysis_example = "tesseract_robotics.examples.kinematics_analysis_example:main"
 tesseract_kinematics_plugins_example = "tesseract_robotics.examples.kinematics_plugins_example:main"
+tesseract_mesh_roundtrip_example = "tesseract_robotics.examples.mesh_roundtrip_example:main"
 tesseract_online_planning_example = "tesseract_robotics.examples.online_planning_example:main"
 tesseract_online_planning_sqp_example = "tesseract_robotics.examples.online_planning_sqp_example:main"
 tesseract_pointcloud_octree_collision_example = "tesseract_robotics.examples.pointcloud_octree_collision_example:main"

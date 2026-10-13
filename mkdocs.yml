@@ -146,6 +146,7 @@ nav:
   - Examples:
     - examples/index.md
     - Basic Examples: examples/basic.md
+    - Geometry Examples: examples/geometry.md
     - Kinematics Examples: examples/kinematics.md
     - Collision Examples: examples/collision.md
     - Environment Examples: examples/environment.md

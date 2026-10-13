@@ -441,6 +441,72 @@ def test_convex_decomposition_example():
 
 
 @pytest.mark.basic
+def test_mesh_roundtrip_example():
+    result = tesseract_robotics.examples.mesh_roundtrip_example()
+
+    # box_2m.ply from bytes: the default triangulates its 6 quads into 12 triangles; a ConvexMesh
+    # with triangulate=False keeps the 6 quads (tesseract_geometry_unit.cpp:800-811)
+    assert result["bytes"] == {
+        "url": "box_2m.ply",
+        "Mesh": [(12, 8)],
+        "SDFMesh": [(12, 8)],
+        "ConvexMesh": [(6, 8)],
+    }
+
+    # tesseract_material_mesh.glb with every flag on (LoadMeshWithMaterialGltf2Unit, :816-889)
+    counts = [(34, 68), (15, 17), (15, 17), (2, 4)]
+    flags = result["flags"]
+    for source in ("path", "resource"):
+        assert flags[source] == {"Mesh": counts, "SDFMesh": counts, "ConvexMesh": counts}
+    assert flags["normals"] == [68, 17, 17, 4]
+    assert flags["textures"] == [0, 0, 0, 1]
+    assert flags["texture_bytes"] == 38212
+    assert flags["uvs"] == 4
+    assert flags["unflagged"] == {"normals": False, "textures": False}
+
+    # the textured quad rebuilt through each full constructor, with and without face_count:
+    # == compares type, UUID, counts and scale (polygon_mesh.cpp:111-120), ConvexMesh also
+    # its creation method (convex_mesh.cpp:80-86)
+    rebuilt = result["constructors"]
+    assert list(rebuilt) == ["Mesh", "SDFMesh", "PolygonMesh", "ConvexMesh"]
+    for name, parts in rebuilt.items():
+        assert parts["counts"] == [(2, 4), (2, 4)], name
+        assert parts["parts_kept"] == [True, True], name
+        assert parts["equal_before_uuid"] is False, name
+        assert parts["equal_after_uuid"] is True, name
+    assert rebuilt["PolygonMesh"]["type"] == "POLYGON_MESH"
+    assert result["creation_method"] == {
+        "loaded": "DEFAULT",
+        "set": "CONVERTED",
+        "equal_before_set": True,
+        "equal_after_set": False,
+    }
+
+    # writeMeshToFile writes positions only; the reload joins identical vertices
+    # (mesh_parser.h:372), so its vertex count is the number of distinct positions
+    assert result["roundtrip"] == {
+        "box_2m.ply": {
+            "source": (12, 8),
+            "reloaded": (12, 8),
+            "distinct": 8,
+            "within_ply_precision": True,
+        },
+        "tesseract_material_mesh.glb[0]": {
+            "source": (34, 68),
+            "reloaded": (34, 34),
+            "distinct": 34,
+            "within_ply_precision": True,
+        },
+    }
+
+    # apply_points / apply_directions are tf * p and rotation * n, bit for bit
+    assert result["transform"] == {"points": True, "directions": True}
+
+    # 8 box corners 2 m apart plus the default Point() at the origin: 9 one-centimetre voxels
+    assert result["point_cloud"] == {"points": 9, "default_point": (0.0, 0.0, 0.0), "leaves": 9}
+
+
+@pytest.mark.basic
 def test_environment_commands_example():
     ex = importlib.import_module("tesseract_robotics.examples.environment_commands_example")
 
