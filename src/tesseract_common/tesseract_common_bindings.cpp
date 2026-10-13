@@ -107,6 +107,7 @@ public:
 
 NB_MODULE(_tesseract_common, m) {
     m.doc() = "tesseract_common Python bindings (nanobind)";
+    register_python_error_translator();  // ResourceLocator and OutputHandler trampolines
 
     // Single source of truth for the float64 default precision used across
     // the project. Eigen exposes this as `NumTraits<double>::dummy_precision()`

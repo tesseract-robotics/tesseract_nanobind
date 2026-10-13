@@ -196,6 +196,7 @@ NB_MODULE(_tesseract_collision, m) {
     // C++ name). It imports tesseract_common in turn, which covers Isometry3d, ACM and CollisionMarginData.
     nb::module_::import_("tesseract_robotics.tesseract_geometry._tesseract_geometry");
     m.doc() = "tesseract_collision Python bindings";
+    register_python_error_translator();  // ContactResultValidator trampoline
 
     // ========== Enums ==========
     nb::enum_<tc::ContinuousCollisionType>(m, "ContinuousCollisionType")

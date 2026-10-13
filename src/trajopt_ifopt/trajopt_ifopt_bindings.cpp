@@ -144,6 +144,9 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::exception<CartLineIndicesUnsupportedError>(m, "CartLineIndicesUnsupportedError", PyExc_ValueError)
         .attr("__doc__") = "CartLineConstraint.getJacobian() with fewer than 6 indices (#237).";
 
+    // ConstraintSet's trampoline is called from _trajopt_sqp (TrajOptQPProblem, the solver)
+    register_python_error_translator();
+
     // ========== BoundsType enum ==========
     nb::enum_<ti::BoundsType>(m, "BoundsType")
         .value("UNBOUNDED", ti::BoundsType::kUnbounded)

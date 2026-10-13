@@ -175,3 +175,31 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     Until it is decided, a consumer hitting this runs Descartes single-threaded
     under `KMP_DUPLICATE_LIB_OK=TRUE` and treats any wall-clock comparison as
     provisional.
+
+## A Python exception crossing two extension modules lost its type
+
+!!! note "Every module that defines a trampoline calls `register_python_error_translator()`"
+    A Python override that raises reaches C++ as `nanobind::python_error`. The
+    extensions are built `NB_STATIC`, so each `.so` holds its own strong
+    `typeinfo for nanobind::python_error` (`nm -m` lists one per module), and
+    macOS libc++ compares default-visibility typeinfo by pointer. When the
+    trampoline is in one module and the bound function that called it in
+    another (`ConstraintSet` in `_trajopt_ifopt`, called by
+    `TrajOptQPProblem` / `TrustRegionSQPSolver` in `_trajopt_sqp`), the
+    caller's `catch (python_error &)` misses, and nanobind's default
+    translator turns the error into `RuntimeError(what())`: an `IndexError`
+    arrived as `RuntimeError` with the traceback as its message
+    ([#156](https://github.com/tesseract-robotics/tesseract_nanobind/issues/156)).
+    A call that stays inside one module kept its type.
+
+    `register_python_error_translator()` (`src/tesseract_nb.h`) registers a
+    translator that runs the defining module's code, so its catch tests that
+    module's typeinfo and restores the Python exception. It must be `static`:
+    as an `inline` function its lambda was a weak symbol, dyld coalesced it
+    across images, and every module registered the first-loaded module's
+    copy, which fixed nothing. Linux (libstdc++) and Windows (MSVC) compare
+    typeinfo by name, so they should not lose the type (not measured; the
+    regression test `tests/trajopt_sqp/test_python_set_exception_type.py`
+    runs on all three). The alternative, one shared `libnanobind` instead of
+    `NB_STATIC`, would give the process a single typeinfo, at the cost of
+    another shared library in all three wheel layouts.

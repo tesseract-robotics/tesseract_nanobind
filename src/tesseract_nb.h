@@ -124,6 +124,25 @@ const std::vector<std::shared_ptr<T>>& require_non_null(const std::vector<std::s
     return items;
 }
 
+// A Python override that raises reaches C++ as nb::python_error. Every module links nanobind
+// statically (NB_STATIC), so each carries its own typeinfo for it, and on macOS libc++
+// compares typeinfo by pointer: another module's dispatcher misses `catch (python_error&)`
+// and its default translator turns the error into RuntimeError(what()) (#156). A translator
+// registered here runs this module's code, so its catch matches the python_error this
+// module's trampolines throw, and restores the original Python exception. Every module that
+// defines a trampoline calls this in NB_MODULE. `static`, not `inline`: an inline function's
+// lambda is a weak symbol, and dyld coalesces weak symbols across images, so every module
+// would register the first-loaded module's copy, whose catch tests that module's typeinfo.
+static void register_python_error_translator() {
+    nb::register_exception_translator([](const std::exception_ptr& p, void*) {
+        try {
+            std::rethrow_exception(p);
+        } catch (nb::python_error& e) {
+            e.restore();
+        }
+    });
+}
+
 // Note: Eigen::Isometry3d is bound as an explicit class in tesseract_common_bindings.cpp
 // for SWIG API compatibility (tests expect .matrix() method etc.)
 // No type caster is needed since we have explicit bindings.

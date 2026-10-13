@@ -180,6 +180,7 @@ public:
 
 NB_MODULE(_tesseract_motion_planners_descartes, m) {
     m.doc() = "tesseract_motion_planners_descartes Python bindings";
+    register_python_error_translator();  // evaluator, sampler and profile trampolines
 
     // Import Profile type from tesseract_command_language for cross-module inheritance
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");

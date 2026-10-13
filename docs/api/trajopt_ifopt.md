@@ -77,6 +77,12 @@ A constraint has a Jacobian only once it is linked to the optimization variables
 would dereference a null pointer. The collision constraints also need `update()` before
 `getValues()` or `getJacobian()`, which `TrajOptQPProblem.setup()` calls for every set.
 
+An exception raised in a Python `ConstraintSet` subclass reaches the caller with its own type,
+also when trajopt calls the set from `TrajOptQPProblem` or `TrustRegionSQPSolver.solve()`: an
+`IndexError` in `getValues()` is an `IndexError`, not trajopt's `RuntimeError`. On macOS it
+used to arrive as `RuntimeError` with the Python traceback as its message
+([#156](https://github.com/tesseract-robotics/tesseract_nanobind/issues/156)).
+
 `CartLineConstraint.getJacobian()` raises `CartLineIndicesUnsupportedError` (a `ValueError`)
 unless `CartLineInfo.indices` holds all 6 twist rows. Upstream sizes the Jacobian by the number
 of indices but fills 6 rows, numeric and analytic alike, so fewer corrupt memory
