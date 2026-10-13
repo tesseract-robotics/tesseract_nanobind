@@ -507,6 +507,79 @@ def test_mesh_roundtrip_example():
 
 
 @pytest.mark.basic
+def test_scene_graph_example():
+    result = tesseract_robotics.examples.scene_graph_example()
+
+    # high-level part: lbr_iiwa_14_r820.urdf has 10 links and 9 joints
+    assert result["success"]
+    assert result["link_count"] == 10
+    assert result["joint_count"] == 9
+
+    # low-level part: upstream's five-link test graph (tesseract_scene_graph_unit.cpp:40-93)
+    built = result["built"]
+    # operator<<(JointType) (tesseract_scene_graph_joint_unit.cpp:201-221)
+    assert built["joint_types"] == {
+        "FIXED": "Fixed",
+        "PLANAR": "Planar",
+        "FLOATING": "Floating",
+        "REVOLUTE": "Revolute",
+        "PRISMATIC": "Prismatic",
+        "CONTINUOUS": "Continuous",
+        "UNKNOWN": "Unknown",
+    }
+    # runTest (tesseract_scene_graph_unit.cpp:95-140)
+    assert built["adjacent"] == ["link_4"]
+    assert built["inv_adjacent"] == ["link_2"]
+    assert built["children"] == ["link_3", "link_4", "link_5"]
+    assert built["joint_children"] == ["link_5"]
+    assert built["adjacency_map"] == {
+        "link_2": "link_2",
+        "link_3": "link_3",
+        "link_4": "link_3",
+        "link_5": "link_2",
+    }
+    # build_scene_graph_example.cpp: tree, disconnected link, removed, then a cycle
+    assert built["graph_checks"] == {
+        "acyclic": True,
+        "tree": True,
+        "tree_with_link_6": False,
+        "tree_after_remove": True,
+        "acyclic_with_joint_5": True,
+        "tree_with_joint_5": False,
+    }
+    assert built["shortest_path"] == (
+        "Links:\n  link_1\n  link_2\n  link_3\n  link_4\n"
+        "Joints:\n  joint_1\n  joint_2\n  joint_3\n"
+        "Active Joints:\n  joint_2\n"
+    )
+    # operator<< of the joint value types (joint.cpp:49-198); limits from createTestSceneGraph,
+    # the rest from tesseract_scene_graph_joint_unit.cpp
+    assert built["joint_values"] == {
+        "joint_2.limits": "lower=-1 upper=1 effort=0 velocity=2 acceleration=3 jerk=6",
+        "joint_4.limits": "lower=-1 upper=1 effort=0 velocity=2 acceleration=3 jerk=4",
+        "dynamics": "damping=10 friction=5",
+        "safety": "soft_upper_limit=1 soft_lower_limit=2 k_position=3 k_velocity=4",
+        "calibration": "reference_position=1 rising=2 falling=3",
+        "mimic": "joint_name=joint_name offset=1 multiplier=2",
+    }
+    # the ACM is replaced, and the graph keeps the matrix object (graph.cpp:746-749)
+    assert built["acm"] == {
+        "initial_entries": 4,
+        "link_1_link_2_before": True,
+        "link_1_link_2_after": False,
+        "link_3_link_4_after": True,
+        "entries_after": 1,
+        "later_edit_seen": True,
+    }
+    # Link.visible / collision_enabled are the flags SceneGraph get/set (graph.cpp:417-432)
+    assert built["link_flags"] == {
+        "defaults": (True, True),
+        "link_5_after_graph_set": (False, False),
+        "link_6_from_link": (False, False),
+    }
+
+
+@pytest.mark.basic
 def test_environment_commands_example():
     ex = importlib.import_module("tesseract_robotics.examples.environment_commands_example")
 

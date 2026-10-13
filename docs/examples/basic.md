@@ -56,6 +56,59 @@ tesseract_scene_graph_example
 See the source at
 [`scene_graph_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/scene_graph_example.py).
 
+### Building a scene graph
+
+The example's second part builds a `SceneGraph` directly, without an
+`Environment`: upstream's five-link test graph (`tesseract_scene_graph_unit.cpp:40–93`,
+`build_scene_graph_example.cpp`), with one joint of each kind and `JointLimits`
+on the planar and revolute joints.
+
+```python title="scene_graph_example.py"
+--8<-- "src/tesseract_robotics/examples/scene_graph_example.py:build"
+```
+
+`getAdjacencyMap(link_names)` maps every link at or below the given links to the
+nearest of them above it: `link_4` to `link_3`, `link_5` to `link_2`.
+
+```python title="scene_graph_example.py"
+--8<-- "src/tesseract_robotics/examples/scene_graph_example.py:queries"
+```
+
+`str()` prints what upstream's `operator<<` prints: `JointType.REVOLUTE` is
+`Revolute`, a `JointLimits` is `lower=-1 upper=1 effort=0 velocity=2
+acceleration=3 jerk=4`, and a `ShortestPath` lists its links, joints and active
+joints. The `JointType_*` module constants are gone; use the enum
+([breaking changes](../breaking-changes.md#swig-era-jointtype_-constants-removed)).
+
+```python title="scene_graph_example.py"
+--8<-- "src/tesseract_robotics/examples/scene_graph_example.py:strings"
+```
+
+`setAllowedCollisionMatrix` replaces the graph's allowed collision matrix:
+after it, `link_1`/`link_2` is no longer allowed. The graph keeps the matrix
+object itself (`graph.cpp:746–749`), so an edit to `acm` after the call shows up
+in `isCollisionAllowed`.
+
+```python title="scene_graph_example.py"
+--8<-- "src/tesseract_robotics/examples/scene_graph_example.py:acm"
+```
+
+`Link.visible` and `Link.collision_enabled` are the flags that
+`SceneGraph.setLinkVisibility` / `setLinkCollisionEnabled` set and
+`getLinkVisibility` / `getLinkCollisionEnabled` read (`graph.cpp:417–432`).
+They default to `True`; set on a `Link` before `addLink`, the graph reads them back.
+
+```python title="scene_graph_example.py"
+--8<-- "src/tesseract_robotics/examples/scene_graph_example.py:link_flags"
+```
+
+!!! note "Shortest path before the cycle"
+    Upstream's example prints `getShortestPath("link_1", "link_4")` after
+    `joint_5` gives `link_4` a second parent. Edges weigh the length of their
+    joint origin (`graph.cpp:599`), and both paths then weigh 3.75 m, so which one
+    is returned is a tie-break. The example takes the path while the graph is a
+    tree, where it is unique.
+
 ## Geometry Showcase
 
 All available geometry types (Box, Sphere, Cylinder, Capsule, Cone, Mesh,
@@ -70,14 +123,18 @@ See the source at
 
 ??? tip "Loading Mesh Files"
     ```python
-    from tesseract_robotics.tesseract_geometry import Mesh
+    import numpy as np
 
-    # From file (STL, OBJ, DAE)
-    mesh = Mesh.fromFile("/path/to/model.stl")
+    from tesseract_robotics.tesseract_geometry import createMeshFromPath
+
+    # From file (STL, OBJ, DAE, PLY, glTF): one Mesh per mesh in the file
+    meshes = createMeshFromPath("/path/to/model.stl")
 
     # With scale
-    mesh = Mesh.fromFile("/path/to/model.stl", scale=[0.001, 0.001, 0.001])  # mm to m
+    meshes = createMeshFromPath("/path/to/model.stl", np.array([0.001, 0.001, 0.001]))  # mm to m
     ```
+
+    Loading from bytes, normals and textures, and writing PLY: [Geometry Examples](geometry.md).
 
 ## Point cloud → Octree Example
 
