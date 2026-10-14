@@ -17,6 +17,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
 
+# audit_bindings imports its sibling audit_types, which a script run finds next to it.
+_types_spec = importlib.util.spec_from_file_location(
+    "audit_types", REPO_ROOT / "scripts" / "audit_types.py"
+)
+_types = importlib.util.module_from_spec(_types_spec)
+sys.modules["audit_types"] = _types
+_types_spec.loader.exec_module(_types)
+
 _spec = importlib.util.spec_from_file_location(
     "audit_bindings", REPO_ROOT / "scripts" / "audit_bindings.py"
 )
@@ -539,10 +547,11 @@ def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
         assert f"`{pattern}`: {reason}" in text
 
 
-def test_limitations_say_overloads_match_by_arity_only(fixture_report):
-    """Note 2: an overload with a bound overload of the same arity is never reported."""
+def test_limitations_describe_type_matching(fixture_report):
+    """#247: overloads match by arity and parameter type; unknown types fall back to arity."""
     text = audit.render_markdown([fixture_report], PROV)
-    assert "Overloads are matched by arity only" in text
+    assert "Overloads are matched by arity and parameter type" in text
+    assert "`type fallbacks`" in text
 
 
 def test_fixture_deviations_exact(fixture_report):
@@ -801,7 +810,15 @@ def test_json_roundtrip(fixture_report):
         "LostRunner.go",
         "LostRunner.__call__",
     }
-    assert set(module) == {"covered", "gaps", "deviations", "accepted", "quoted", "delegated"}
+    assert set(module) == {
+        "covered",
+        "gaps",
+        "deviations",
+        "accepted",
+        "quoted",
+        "delegated",
+        "type_fallbacks",
+    }
 
 
 def test_cli_rejects_unknown_module():

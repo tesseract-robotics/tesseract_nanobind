@@ -29,9 +29,11 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 
+import audit_types
 import clang.cindex as ci
 import nanobind
 import tomllib
+from audit_types import NO_ANCESTORS, Ancestors, TypeKey, record_path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src"
@@ -346,6 +348,14 @@ class CppOverload:
     raw_buffer: bool = False  # takes a pointer to a non-char scalar: never covered by arity alone
     # Python positions of (const uint8_t*, size_t) pairs, each counted as one `bytes` parameter
     byte_buffers: tuple[int, ...] = ()
+    # Keys a stub annotation may take, per parameter (a byte-buffer pair as one `bytes`);
+    # empty: no parameter types to compare (`audit_types`, #247)
+    params: tuple[frozenset[TypeKey] | None, ...] = ()
+    out_positions: tuple[int, ...] = ()  # indices into `params` of the out-params
+
+    def returned_out_params(self) -> tuple[frozenset[TypeKey] | None, ...]:
+        """`params` of the Python form that returns the out-params."""
+        return tuple(k for i, k in enumerate(self.params) if i not in self.out_positions)
 
 
 @dataclass
@@ -561,14 +571,20 @@ def _has_default(parm: ci.Cursor) -> bool:
     return any(c.kind.is_expression() for c in parm.get_children())
 
 
-def _record_path(decl: ci.Cursor) -> str:
-    """Dotted name of a record within its namespace (`Outer.Inner`)."""
-    parts = [decl.spelling]
-    parent = decl.semantic_parent
-    while parent is not None and parent.kind in RECORD_KINDS:
-        parts.append(parent.spelling)
-        parent = parent.semantic_parent
-    return ".".join(reversed(parts))
+# The key of a `(const uint8_t*, size_t)` pair: one Python `bytes` argument.
+BYTES_KEYS = frozenset({("bytes",)})
+
+
+def _same_python_form(a: CppOverload, b: CppOverload) -> bool:
+    """Overloads that differ only in `const` of `this` or `&`/`&&` of a parameter: their
+    parameter keys are equal and fully known, so one Python overload binds both."""
+    same = (a.arity, a.out_params, a.params, a.out_positions) == (
+        b.arity,
+        b.out_params,
+        b.params,
+        b.out_positions,
+    )
+    return same and all(audit_types.is_known(k) for k in a.params)
 
 
 def _stream_insertion_owner(c: ci.Cursor) -> str | None:
@@ -583,7 +599,7 @@ def _stream_insertion_owner(c: ci.Cursor) -> str | None:
         value.kind not in RECORD_KINDS and value.kind != ci.CursorKind.ENUM_DECL
     ):
         return None
-    return _record_path(value)
+    return record_path(value)
 
 
 def _befriends_cereal(record: ci.Cursor) -> bool:
@@ -642,10 +658,26 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         void = c.result_type.kind == ci.TypeKind.VOID
         absent_ok = nullary_absent_ok if arity.hi == 0 else None
         raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
-        ov = CppOverload(
-            arity, out, location(c), void, absent_ok=absent_ok, raw_buffer=raw, byte_buffers=pairs
+        pointers = {pos + k for k, pos in enumerate(pairs)}
+        python_params = [(i, p) for i, p in enumerate(params) if i in pointers or i not in paired]
+        keys = tuple(
+            BYTES_KEYS if i in pointers else audit_types.cpp_keys(p.type) for i, p in python_params
         )
-        add(name, kind, c).overloads.append(ov)
+        out_positions = tuple(j for j, (_, p) in enumerate(python_params) if _is_out_param(p))
+        ov = CppOverload(
+            arity,
+            out,
+            location(c),
+            void,
+            absent_ok=absent_ok,
+            raw_buffer=raw,
+            byte_buffers=pairs,
+            params=keys,
+            out_positions=out_positions,
+        )
+        sym = add(name, kind, c)
+        if not any(_same_python_form(ov, other) for other in sym.overloads):
+            sym.overloads.append(ov)
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
@@ -760,7 +792,8 @@ class PyOverload:
     arity: Arity
     returns: str
     line: int
-    params: tuple[str, ...] = ()  # positional parameter annotations, `self` excluded
+    params: tuple[str, ...] = ()  # parameter annotations, `self` excluded, keyword-only last
+    keys: tuple[TypeKey, ...] = ()  # `audit_types.py_key` of each of `params`
 
 
 @dataclass
@@ -816,10 +849,11 @@ def _py_arity(node: ast.FunctionDef, bound: bool) -> Arity:
     return Arity(lo, hi)
 
 
-def _py_params(node: ast.FunctionDef, bound: bool) -> tuple[str, ...]:
+def _py_param_nodes(node: ast.FunctionDef, bound: bool) -> list[ast.arg]:
+    """Positional parameters (`self` excluded), then keyword-only ones: nanobind's
+    `nb::kw_only()` makes trailing C++ parameters keyword-only, in C++ order."""
     a = node.args
-    positional = [*a.posonlyargs, *a.args][1 if bound else 0 :]
-    return tuple(ast.unparse(p.annotation) if p.annotation else "" for p in positional)
+    return [*a.posonlyargs, *a.args][1 if bound else 0 :] + a.kwonlyargs
 
 
 def _function_kind(node: ast.FunctionDef, in_class: bool) -> Kind:
@@ -890,9 +924,14 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                 if kind is not Kind.FIELD:
                     bound = bool(prefix) and "staticmethod" not in _decorators(node)
                     returns = ast.unparse(node.returns) if node.returns else ""
+                    args = _py_param_nodes(node, bound)
                     sym.overloads.append(
                         PyOverload(
-                            _py_arity(node, bound), returns, node.lineno, _py_params(node, bound)
+                            _py_arity(node, bound),
+                            returns,
+                            node.lineno,
+                            tuple(ast.unparse(p.annotation) if p.annotation else "" for p in args),
+                            tuple(audit_types.py_key(p.annotation) for p in args),
                         )
                     )
             elif isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -1068,36 +1107,76 @@ class ModuleReport:
     # Headers under this module's prefix that its binding does not #include but another does:
     # header spelling -> the module that audits it (`header_auditor`).
     delegated: dict[str, str] = field(default_factory=dict)
+    # C++ overloads covered by arity alone: a parameter type `audit_types` has no key for.
+    type_fallbacks: int = 0
 
 
-def _cover(ov: CppOverload, pys: list[PyOverload]) -> str | None:
-    """How a C++ overload is covered by Python overloads: "exact", an ACCEPTED rule, or None.
+@dataclass(frozen=True)
+class Cover:
+    """How Python overloads cover a C++ overload."""
+
+    rule: str  # "exact" or an ACCEPTED rule
+    typed: bool  # every compared parameter type is known; False: covered by arity alone
+
+
+def _fits(
+    params: tuple[frozenset[TypeKey] | None, ...],
+    arity: Arity,
+    pys: list[PyOverload],
+    ancestors: Ancestors,
+) -> dict[PyOverload, bool]:
+    """Python overloads of an overlapping arity whose parameter types do not contradict
+    `params`, each mapped to whether every compared type was known."""
+    out: dict[PyOverload, bool] = {}
+    for p in pys:
+        if p.arity.overlaps(arity):
+            verdict = audit_types.signature_verdict(params, p.keys, ancestors)
+            if verdict is not False:
+                out[p] = verdict is True
+    return out
+
+
+def _covered(rule: str, fits: Mapping[PyOverload, bool]) -> Cover | None:
+    return Cover(rule, any(fits.values())) if fits else None
+
+
+def _cover(
+    ov: CppOverload, pys: list[PyOverload], ancestors: Ancestors = NO_ANCESTORS
+) -> Cover | None:
+    """How a C++ overload is covered by Python overloads, or None.
 
     Out-param rules are tried first: `checkTrajectory`'s 5-parameter C++ overload would
-    otherwise pair by raw arity with the wrong 5-argument Python overload.
+    otherwise pair by raw arity with the wrong 5-argument Python overload. A Python overload
+    covers only if its parameter types do not contradict the C++ ones (#247).
     """
     if ov.out_params:
         reduced = ov.arity.reduced(len(ov.out_params))
-        fits = [p for p in pys if p.arity.overlaps(reduced)]
-        if set(ov.out_params) == {STRINGSTREAM} and any(p.returns == "str" for p in fits):
-            return "stringstream"
-        if any(p.returns.startswith("tuple[") for p in fits):
-            return "out-param"
+        fits = _fits(ov.returned_out_params(), reduced, pys, ancestors)
+        if set(ov.out_params) == {STRINGSTREAM}:
+            if cover := _covered(
+                "stringstream", {p: t for p, t in fits.items() if p.returns == "str"}
+            ):
+                return cover
+        tuples = {p: t for p, t in fits.items() if p.returns.startswith("tuple[")}
+        if cover := _covered("out-param", tuples):
+            return cover
         if ov.returns_void and len(ov.out_params) == 1 and fits:
-            return "out-param"  # nothing else to return: the out-param is the result
+            return _covered(
+                "out-param", fits
+            )  # nothing else to return: the out-param is the result
     if ov.raw_buffer:
         return None  # no Python overload binds a raw pointer; matching arity proves nothing
+    fits = _fits(ov.params, ov.arity, pys, ancestors)
     if ov.byte_buffers:
-        fits = [
-            p
-            for p in pys
-            if p.arity.overlaps(ov.arity)
-            and all(i < len(p.params) and p.params[i] == "bytes" for i in ov.byte_buffers)
-        ]
-        return "byte-buffer" if fits else None
-    if any(p.arity.overlaps(ov.arity) for p in pys):
-        return ov.mapped or "exact"
-    return None
+        return _covered(
+            "byte-buffer",
+            {
+                p: t
+                for p, t in fits.items()
+                if all(i < len(p.params) and p.params[i] == "bytes" for i in ov.byte_buffers)
+            },
+        )
+    return _covered(ov.mapped or "exact", fits)
 
 
 def _protocol_rule(name: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str]) -> str | None:
@@ -1194,11 +1273,14 @@ def match(
     py: PyApi,
     stub_rel: str,
     stub_roots: Sequence[Path] = (SRC,),
+    ancestors: Ancestors = NO_ANCESTORS,
 ) -> ModuleReport:
-    """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`."""
+    """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`,
+    C++ class ancestry (`audit_types.class_ancestors`) lets a subclass bind a base parameter."""
     gaps: list[Gap] = []
     accepted: list[Accepted] = []
     covered = 0
+    fallbacks = 0
     # Top-level classes this stub lacks but another extension binds: their members are
     # compared against that extension's stub (#232).
     elsewhere = {
@@ -1228,14 +1310,16 @@ def match(
             continue
         ok = True
         for ov in sym.overloads:
-            how = _cover(ov, ps.overloads)
+            how = _cover(ov, ps.overloads, ancestors)
             if how is None and ov.absent_ok:
                 accepted.append(Accepted(name, ov.absent_ok, ov.location))
             elif how is None:
                 gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
                 ok = False
-            elif how != "exact":
-                accepted.append(Accepted(name, how, ov.location))
+            else:
+                fallbacks += not how.typed
+                if how.rule != "exact":
+                    accepted.append(Accepted(name, how.rule, ov.location))
         covered += ok
 
     deviations: list[Deviation] = []
@@ -1272,7 +1356,7 @@ def match(
             continue
         if name in cpp and cpp[name].overloads:
             for p in ps.overloads:
-                if not any(_cover(ov, [p]) for ov in cpp[name].overloads):
+                if not any(_cover(ov, [p], ancestors) is not None for ov in cpp[name].overloads):
                     deviations.append(
                         Deviation(name, Kind.OVERLOAD, f"{stub_rel}:{p.line}", str(p.arity))
                     )
@@ -1280,7 +1364,13 @@ def match(
             accepted.append(Accepted(name, rule, where))
 
     return ModuleReport(
-        module, covered, sorted(gaps), sorted(deviations), sorted(accepted), py.quoted
+        module,
+        covered,
+        sorted(gaps),
+        sorted(deviations),
+        sorted(accepted),
+        py.quoted,
+        type_fallbacks=fallbacks,
     )
 
 
@@ -1362,6 +1452,7 @@ def audit_tu(
         py_api(load_stub(stub_path), rel(stub_path)),
         rel(stub_path),
         stub_roots,
+        audit_types.class_ancestors(tu),
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}
     report.gaps = sorted(
@@ -1397,11 +1488,13 @@ REPORT_PATH = REPO_ROOT / "docs" / "developer" / "binding-api-audit.md"
 LIMITATION = (
     "Python member names are checked against every declaration in the TU, so a "
     "Python-only member that shares a common C++ name (`size`, `clear`) is not flagged. "
-    "Parameter types are not compared beyond quoted C++ names. "
-    "Overloads are matched by arity only: a C++ overload is never reported while a bound "
-    "overload takes the same number of arguments (e.g. `Environment::init(commands)` hidden "
-    "by `init(scene_graph)`). The exception is an overload taking a raw buffer (a pointer "
-    "to a non-`char` scalar), which has no Python form and is reported whatever the arity, "
+    "Overloads are matched by arity and parameter type: each C++ parameter type and each stub "
+    "annotation map to a key (`scripts/audit_types.py`), and a bound overload covers a C++ one "
+    "only where the keys agree. A type the mapping does not know (a template parameter, "
+    "`object`, a quoted C++ name) leaves that position to arity alone; the `type fallbacks` "
+    "column counts the C++ overloads covered that way. Overloads that differ only in `const` "
+    "of `this` or `&`/`&&` of a parameter count as one. An overload taking a raw buffer (a "
+    "pointer to a non-`char` scalar) has no Python form and is reported whatever the arity, "
     "unless it is a `(const uint8_t*, size_t)` pair bound as one `bytes` parameter."
 )
 
@@ -1452,11 +1545,11 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
         f"tesseract-robotics `{prov['tesseract-robotics']}` · libclang `{prov['libclang']}` · "
         f"stubs `{prov['stubs']}`.",
         "",
-        "| module | covered | gaps | deviations | accepted | quoted types |",
-        "|---|---|---|---|---|---|",
+        "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |",
+        "|---|---|---|---|---|---|---|",
         *(
             f"| {r.module} | {r.covered} | {len(r.gaps)} | {len(r.deviations)} | "
-            f"{len(r.accepted)} | {len(r.quoted)} |"
+            f"{len(r.accepted)} | {len(r.quoted)} | {r.type_fallbacks} |"
             for r in reports
         ),
         "",
@@ -1525,6 +1618,7 @@ def to_json(reports: list[ModuleReport], prov: dict[str, str]) -> str:
             "accepted": [asdict(a) for a in r.accepted],
             "quoted": [asdict(q) for q in r.quoted],
             "delegated": r.delegated,
+            "type_fallbacks": r.type_fallbacks,
         }
         for r in reports
     }

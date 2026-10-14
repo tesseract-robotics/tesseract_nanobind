@@ -1,5 +1,5 @@
 import enum
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Annotated, overload
 
 from numpy.typing import NDArray
@@ -51,6 +51,9 @@ class Record:
     def __init__(self, id: int) -> None: ...
 
 class Buffer:
+    @overload
+    def __init__(self, url: str, bytes: Sequence[int], parent: int = 0) -> None: ...
+    @overload
     def __init__(self, url: str, bytes: bytes, parent: int = 0) -> None: ...
     def write(self, data: str) -> None: ...
 
