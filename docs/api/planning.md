@@ -23,8 +23,8 @@ robot = Robot.from_urdf(
 )
 
 # FK / IK — group_name is the first positional argument
-pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
-solution = robot.ik("manipulator", target_pose, seed=[0, 0, 0, 0, 0, 0])
+pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0], "tool0")
+solution = robot.ik("manipulator", target_pose, "tool0", seed=[0, 0, 0, 0, 0, 0])
 
 # Access the underlying Environment
 env = robot.env
@@ -44,7 +44,7 @@ from tesseract_robotics.planning import (
 )
 
 program = (
-    MotionProgram("manipulator")
+    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
     .move_to(CartesianTarget(Pose.from_xyz(0.5, 0.0, 0.5)))
     .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))

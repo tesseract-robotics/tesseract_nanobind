@@ -39,12 +39,14 @@ def test_emitted_ls_parses_back_to_inputs() -> None:
     jn = [f"joint_{i}" for i in range(1, 7)]
     j1 = [0.0, -20.0, 30.0, 0.0, 50.0, 0.0]
     j2 = [30.0, 10.0, 15.0, 20.0, 40.0, -10.0]
-    prog = MotionProgram("manipulator", tcp_frame="tool0", profile="SPIKE")
+    prog = MotionProgram(
+        "manipulator", tcp_frame="tool0", working_frame="base_link", profile="SPIKE"
+    )
     prog.move_to(JointTarget(np.deg2rad(j1), profile="J"))
     prog.move_to(JointTarget(np.deg2rad(j2), profile="J"))
     prog.linear_to(CartesianTarget(Pose.from_xyz_rpy([0.6, -0.1, 0.8], [np.pi, 0, 0]), profile="L"))
     prog.set_joint_names(jn)
-    composite = prog.to_composite_instruction(joint_names=jn, tcp_frame="tool0")
+    composite = prog.to_composite_instruction(joint_names=jn)
 
     text = emit_ls(
         composite, {"J": LsProfile.build(), "L": LsProfile.build()}, program_name="SPIKE"

@@ -151,9 +151,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # - to_end: final waypoint -> home (freespace)
     num_segments = 3
 
-    program = MotionProgram("manipulator", tcp_frame="tool0", profile="RASTER").set_joint_names(
-        joint_names
-    )
+    program = MotionProgram(
+        "manipulator", tcp_frame="tool0", working_frame="base_link", profile="RASTER"
+    ).set_joint_names(joint_names)
 
     # Start from home position
     program.move_to(StateTarget(home_pos, names=joint_names, profile="FREESPACE"))

@@ -88,7 +88,9 @@ def run():
     # LINEAR motion type (vs FREESPACE) tells TrajOpt to interpolate in Cartesian space,
     # essential for maintaining orientation at intermediate waypoints
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
+        MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="UPRIGHT"
+        )
         .set_joint_names(joint_names)
         # StateTarget specifies full joint configuration (not just Cartesian pose)
         # TrajOpt will optimize intermediate states while enforcing UPRIGHT constraints

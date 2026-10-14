@@ -55,7 +55,7 @@ from tesseract_robotics.planning import (
 
 robot = Robot.from_tesseract_support("abb_irb2400")
 program = (
-    MotionProgram("manipulator")
+    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
     .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
 )

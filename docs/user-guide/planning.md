@@ -35,7 +35,7 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
 
     robot = Robot.from_tesseract_support("abb_irb2400")
     program = (
-        MotionProgram("manipulator")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget(np.zeros(6)))
         .move_to(JointTarget(np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])))
     )
@@ -68,7 +68,7 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
     from tesseract_robotics.planning import CartesianTarget, Pose, plan_cartesian
 
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(CartesianTarget(Pose.from_xyz(0.5, -0.2, 0.5)))
         .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
     )
@@ -511,6 +511,44 @@ for pose in waypoints:
 
 The `MotionProgram` fluent API builds exactly the same structure with far less
 ceremony, and the planning entry points accept either form.
+
+## Frames and the TCP
+
+A `MotionProgram` names its frames; the planning API never picks one for you:
+
+| Argument | Meaning | ABB IRB2400 example |
+|---|---|---|
+| `tcp_frame` (required) | the link the TCP is attached to | `"tool0"` |
+| `working_frame` (required) | the link `CartesianTarget` poses are relative to | `"base_link"` |
+| `tcp_offset` (keyword, optional) | offset from `tcp_frame`: a named TCP or an `Isometry3d` | `"laser"` |
+
+The planner puts the tool, `T(tcp_frame) * tcp_offset`, on each Cartesian target. A named
+offset is resolved by the environment at plan time, first from the SRDF `group_tcps` of the
+program's group, then from find-TCP callbacks; a link name there is an error (use it as
+`tcp_frame`). The full rule, with upstream sources, is under
+[TCP offsets](../api/tesseract_environment.md#tcp-offsets); the SRDF side is under
+[Named TCPs](../api/tesseract_srdf.md#named-tcps-group_tcps).
+
+```python
+import numpy as np
+from tesseract_robotics.planning import CartesianTarget, MotionProgram, Pose
+from tesseract_robotics.tesseract_common import Isometry3d
+
+# a named TCP from abb_irb2400.srdf's <group_tcps group="manipulator">
+welder = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link", tcp_offset="welder")
+
+# or an explicit offset: a tool 10 cm along tool0's z axis
+offset = np.eye(4)
+offset[2, 3] = 0.10
+program = MotionProgram(
+    "manipulator", tcp_frame="tool0", working_frame="base_link", tcp_offset=Isometry3d(offset)
+).move_to(CartesianTarget(Pose.from_xyz(0.8, 0.0, 1.0)))
+```
+
+`Robot.get_manipulator_info(group, tcp_frame, working_frame, tcp_offset=...)` builds the same
+`ManipulatorInfo` for the low-level API. `Robot.fk` / `Robot.ik` take a link (`tip_link`), not
+a named TCP: apply or strip the offset yourself (see
+[Tool Frames](kinematics.md#tool-frames)).
 
 ## Planning with Constraints
 

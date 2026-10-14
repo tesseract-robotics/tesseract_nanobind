@@ -27,7 +27,7 @@ import numpy as np
 
 joints = np.zeros(6)
 # group_name is the first positional argument; tip_link defaults to the chain's tip.
-tcp_pose = robot.fk("manipulator", joints)
+tcp_pose = robot.fk("manipulator", joints, "tool0")
 print(f"Position: {tcp_pose.position}")
 print(f"Quaternion (scalar-last [x, y, z, w]): {tcp_pose.quaternion}")
 ```
@@ -39,7 +39,7 @@ from tesseract_robotics.planning import Pose
 
 # Scalar-last quaternion convention [qx, qy, qz, qw]
 target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, 0.0, 0.0)
-ik_solution = robot.ik("manipulator", target, seed=joints)
+ik_solution = robot.ik("manipulator", target, "tool0", seed=joints)
 
 if ik_solution is not None:
     print(f"IK solution: {ik_solution}")
@@ -77,7 +77,7 @@ from tesseract_robotics.planning import (
 )
 
 program = (
-    MotionProgram("manipulator")
+    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .move_to(JointTarget(np.zeros(6)))
     .move_to(CartesianTarget(target))
 )

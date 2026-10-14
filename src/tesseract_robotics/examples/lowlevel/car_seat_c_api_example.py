@@ -424,7 +424,7 @@ def run():
     # - tcp_frame: end_effector link for Cartesian operations
     # - StateTarget: joint-space waypoints with planning profile
     pick_program = (
-        MotionProgram("manipulator", tcp_frame="end_effector")
+        MotionProgram("manipulator", tcp_frame="end_effector", working_frame="base_link")
         .set_joint_names(joint_names)
         .move_to(StateTarget(start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(pick_pos, names=joint_names, profile="FREESPACE"))
@@ -455,7 +455,7 @@ def run():
     place_end_pos = get_position_vector(joint_names, positions["Place1"])
 
     place_program = (
-        MotionProgram("manipulator", tcp_frame="end_effector")
+        MotionProgram("manipulator", tcp_frame="end_effector", working_frame="base_link")
         .set_joint_names(joint_names)
         .move_to(StateTarget(place_start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(place_end_pos, names=joint_names, profile="FREESPACE"))

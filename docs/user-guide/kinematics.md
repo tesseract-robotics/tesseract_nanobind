@@ -39,9 +39,8 @@ Compute a link's pose from joint values.
 
     joints = np.array([0.0, -0.5, 0.5, 0.0, 0.5, 0.0])
 
-    # group_name is the FIRST positional argument;
-    # tip_link defaults to the last active link in the chain.
-    tcp_pose = robot.fk("manipulator", joints)
+    # group_name, joint positions, then the link whose pose you want
+    tcp_pose = robot.fk("manipulator", joints, "tool0")
 
     print(f"Position:   ({tcp_pose.x}, {tcp_pose.y}, {tcp_pose.z})")
     print(f"Quaternion: ({tcp_pose.qx}, {tcp_pose.qy}, {tcp_pose.qz}, {tcp_pose.qw})")
@@ -104,14 +103,14 @@ Find joint values that achieve a target pose.
     target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, np.pi, 0.0)
 
     # Returns a single np.ndarray solution, None, or a list if all_solutions=True
-    solution = robot.ik("manipulator", target, seed=joints)
+    solution = robot.ik("manipulator", target, "tool0", seed=joints)
     if solution is not None:
         print(f"Solution: {solution}")
     else:
         print("No IK solution found")
 
     # Enumerate all solutions (e.g. redundant 7-DOF arms)
-    solutions = robot.ik("manipulator", target, seed=joints, all_solutions=True)
+    solutions = robot.ik("manipulator", target, "tool0", seed=joints, all_solutions=True)
     if solutions:
         print(f"Found {len(solutions)} solution(s)")
     ```
@@ -217,13 +216,17 @@ from tesseract_robotics.planning import Pose
 tool_offset = Pose.from_xyz(0.0, 0.0, 0.15)
 
 # FK to flange, then apply the tool offset
-flange_pose = robot.fk("manipulator", joints)
+flange_pose = robot.fk("manipulator", joints, "tool0")
 tcp_pose = flange_pose @ tool_offset
 
 # For IK, transform the target back into the flange frame
 target_flange = target_tcp @ tool_offset.inverse()
-solution = robot.ik("manipulator", target_flange)
+solution = robot.ik("manipulator", target_flange, "tool0")
 ```
+
+`fk` and `ik` work on links only. For planning, pass the offset to the `MotionProgram`
+instead (`tcp_offset=tool_offset`, or the name of an SRDF group TCP) and the planner applies
+it: see [Frames and the TCP](planning.md#frames-and-the-tcp).
 
 ## Working with Multiple Groups
 

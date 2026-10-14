@@ -88,7 +88,9 @@ def run(pipeline="FreespacePipeline", use_ifopt=False, num_planners=None):
     # Simple joint-to-joint motion program
     # FREESPACE profile uses OMPL (RRTConnect by default)
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0", profile="FREESPACE")
+        MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="FREESPACE"
+        )
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_start, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(joint_end, names=joint_names, profile="FREESPACE"))

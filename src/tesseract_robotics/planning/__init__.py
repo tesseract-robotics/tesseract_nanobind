@@ -26,7 +26,7 @@ Example Usage:
                             "package://my_robot/urdf/robot.srdf")
 
     # Create motion program with builder pattern
-    program = (MotionProgram("manipulator")
+    program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         .move_to(CartesianTarget([0.5, 0.0, 0.5], [0, 0, 1, 0]))
         .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))

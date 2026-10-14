@@ -8,7 +8,7 @@ Example:
     from tesseract_robotics.planning import Robot, MotionProgram, TaskComposer
 
     robot = Robot.from_tesseract_support("abb_irb2400")
-    program = MotionProgram("manipulator").move_to(...)
+    program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link").move_to(...)
 
     composer = TaskComposer.from_config()
     result = composer.plan(robot, program, pipeline="TrajOptPipeline")
@@ -460,11 +460,7 @@ class TaskComposer:
         # Convert MotionProgram to CompositeInstruction if needed
         if hasattr(program, "to_composite_instruction"):
             joint_names = robot.get_joint_names(program.group_name)
-            tcp_frame = program.tcp_frame
-            if tcp_frame is None:
-                manip_info = robot.get_manipulator_info(program.group_name)
-                tcp_frame = manip_info.tcp_frame
-            composite = program.to_composite_instruction(joint_names, tcp_frame)
+            composite = program.to_composite_instruction(joint_names)
         else:
             composite = program
 

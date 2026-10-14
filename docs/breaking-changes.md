@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | Unreleased | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
 | Unreleased | `tesseract_scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
 | Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
@@ -23,6 +24,32 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### The planning API no longer picks a TCP or working frame
+
+`tesseract_robotics.planning` used to fill in frames it could not know (#30): the TCP as the last
+of `getActiveLinkNames()`, which is only the tip for a serial chain, and the working frame as the
+literal `"base_link"`. `get_manipulator_info` also cached the guess and returned one shared,
+mutable `ManipulatorInfo` per key. Now the caller names every frame: a missing one raises
+`TypeError` at the call.
+
+| before | after |
+| --- | --- |
+| `MotionProgram("manipulator")` | `MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")` |
+| `MotionProgram("manipulator", tcp_frame="tool0")` | `MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")` |
+| `robot.get_manipulator_info("manipulator")` | `robot.get_manipulator_info("manipulator", "tool0", "base_link")` |
+| `robot.fk("manipulator", q)` | `robot.fk("manipulator", q, "tool0")` |
+| `robot.ik("manipulator", pose, seed=q)` | `robot.ik("manipulator", pose, "tool0", seed=q)` |
+| `robot.ik("manipulator", pose, q, "tool0")` (positional `seed`, `tip_link`) | `robot.ik("manipulator", pose, "tool0", q)` |
+| `program.to_composite_instruction(joint_names, "tool0")` | `program.to_composite_instruction(joint_names)` |
+
+For the bundled `abb_irb2400` and `lbr_iiwa_14_r820` the old guesses were `"tool0"` and
+`"base_link"`, so the right-hand column behaves exactly as before. For another robot, pass the
+link your tool is mounted on and the frame your Cartesian targets are expressed in.
+
+New: `MotionProgram` and `get_manipulator_info` take a keyword-only `tcp_offset`, a named TCP
+(SRDF `group_tcps`, #133) or an `Isometry3d`, and the planner puts `tcp_frame * tcp_offset` on
+each Cartesian target. See [Frames and the TCP](user-guide/planning.md#frames-and-the-tcp).
 
 ### `PointCloudPoint` renamed to `PointCloud.Point`
 

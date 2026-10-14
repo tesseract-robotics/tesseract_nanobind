@@ -200,7 +200,9 @@ def run(pipeline="TrajOptPipeline", num_iterations=5, num_planners=None):
         # StateTarget: plan in joint space (vs CartesianTarget for Cartesian)
         # First move_to sets start state, second sets goal
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0", profile="DEFAULT")
+            MotionProgram(
+                "manipulator", tcp_frame="tool0", working_frame="base_link", profile="DEFAULT"
+            )
             .set_joint_names(joint_names)
             .move_to(StateTarget(current_joints, names=joint_names, profile="DEFAULT"))
             .move_to(StateTarget(target_position, names=joint_names, profile="DEFAULT"))

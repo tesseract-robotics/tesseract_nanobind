@@ -246,7 +246,7 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     # difference is whether collision pulls the trajectory away from the cloud.
     robot.set_joints(START_JOINTS, joint_names=joint_names)
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(joint_names)
         .move_to(JointTarget(START_JOINTS))
         .move_to(JointTarget(GOAL_JOINTS))

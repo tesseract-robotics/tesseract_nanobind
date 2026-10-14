@@ -97,7 +97,9 @@ def run():
     # Phase 3: LINEAR move to wp2 (straight-line tool path, Cartesian interpolation)
     # Phase 4: FREESPACE move back to start joint state
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0", profile="cartesian_program")
+        MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="cartesian_program"
+        )
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_pos, names=joint_names, profile="freespace_profile"))
         .move_to(CartesianTarget(wp1_pose, profile="freespace_profile"))  # FREESPACE to pose

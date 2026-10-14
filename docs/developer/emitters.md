@@ -58,13 +58,13 @@ from tesseract_robotics.emitters.krl import KrlProfile, emit_krl
 from tesseract_robotics.planning import CartesianTarget, JointTarget, MotionProgram, Pose
 
 joint_names = [f"joint_{i}" for i in range(1, 7)]
-program = MotionProgram("manipulator", tcp_frame="tool0", profile="weld")
+program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link", profile="weld")
 program.move_to(JointTarget(np.deg2rad([0, -20, 30, 0, 50, 0]), profile="approach"))
 program.linear_to(
     CartesianTarget(Pose.from_xyz_rpy([0.6, -0.1, 0.8], [np.pi, 0, 0]), profile="weld")
 )
 program.set_joint_names(joint_names)
-composite = program.to_composite_instruction(joint_names=joint_names, tcp_frame="tool0")
+composite = program.to_composite_instruction(joint_names=joint_names)
 
 profiles = {"approach": KrlProfile.build(), "weld": KrlProfile.build(cp_speed_mms=100.0)}
 result = emit_krl(composite, profiles, program_name="WELD_01")

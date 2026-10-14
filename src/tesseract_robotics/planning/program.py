@@ -13,7 +13,7 @@ Example:
     )
 
     # Build a program with fluent API
-    program = (MotionProgram("manipulator")
+    program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .start_at(JointTarget([0, 0, 0, 0, 0, 0]))
         .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
         .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
@@ -51,7 +51,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
 )
-from tesseract_robotics.tesseract_common import ManipulatorInfo
+from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
 
 
 class MoveType(Enum):
@@ -246,12 +246,15 @@ class MotionProgram:
 
     Attributes:
         group_name: Kinematic group name (e.g., "manipulator")
+        tcp_frame: Link the TCP is attached to
+        working_frame: Link Cartesian targets are relative to
+        tcp_offset: Offset from `tcp_frame` (named TCP or Isometry3d), or None for identity
         profile: Default motion profile
         targets: List of motion targets
 
     Example:
         # Build program with chained calls
-        program = (MotionProgram("manipulator")
+        program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .start_at(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
             .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
@@ -259,7 +262,7 @@ class MotionProgram:
         )
 
         # Or add targets individually
-        program = MotionProgram("manipulator")
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         program.add_target(JointTarget([0, 0, 0, 0, 0, 0]))
         program.add_target(CartesianTarget(pose))
     """
@@ -267,22 +270,31 @@ class MotionProgram:
     def __init__(
         self,
         group_name: str,
-        tcp_frame: str | None = None,
-        working_frame: str = "base_link",
+        tcp_frame: str,
+        working_frame: str,
         profile: str = DEFAULT_PROFILE_KEY,
+        *,
+        tcp_offset: str | Isometry3d | None = None,
     ):
         """
         Initialize motion program builder.
 
+        The TCP is `tcp_frame * tcp_offset`; see
+        [TCP offsets](../api/tesseract_environment.md#tcp-offsets).
+
         Args:
             group_name: Kinematic group name
-            tcp_frame: TCP frame name (auto-detected if None)
-            working_frame: Working/base frame name
+            tcp_frame: Link the TCP is attached to (e.g. "tool0")
+            working_frame: Link Cartesian targets are relative to (e.g. "base_link")
             profile: Default motion profile name
+            tcp_offset: Offset from `tcp_frame`: a named TCP (SRDF `group_tcps` of this group,
+                or a find-TCP callback), resolved by the environment at plan time, or an
+                `Isometry3d`. None leaves upstream's default, identity.
         """
         self.group_name = group_name
         self.tcp_frame = tcp_frame
         self.working_frame = working_frame
+        self.tcp_offset = tcp_offset
         self.profile = profile
         self._targets: list[Target] = []
         self._joint_names: list[str] | None = None
@@ -400,16 +412,15 @@ class MotionProgram:
     def to_composite_instruction(
         self,
         joint_names: list[str] | None = None,
-        tcp_frame: str | None = None,
     ) -> CompositeInstruction:
         """
         Convert to low-level CompositeInstruction.
 
-        Handles all poly-type wrapping automatically.
+        Handles all poly-type wrapping automatically. The composite's ManipulatorInfo carries
+        the program's group, frames and TCP offset unchanged.
 
         Args:
             joint_names: Joint names (required for JointTarget without names)
-            tcp_frame: Override TCP frame
 
         Returns:
             CompositeInstruction ready for planning
@@ -418,14 +429,10 @@ class MotionProgram:
             raise ValueError("Program has no targets")
 
         joint_names = joint_names or self._joint_names
-        tcp_frame = tcp_frame or self.tcp_frame
 
-        # Create manipulator info
-        manip_info = ManipulatorInfo()
-        manip_info.manipulator = self.group_name
-        manip_info.working_frame = self.working_frame
-        if tcp_frame:
-            manip_info.tcp_frame = tcp_frame
+        manip_info = ManipulatorInfo(self.group_name, self.working_frame, self.tcp_frame)
+        if self.tcp_offset is not None:
+            manip_info.tcp_offset = self.tcp_offset
 
         # Create composite instruction
         program = CompositeInstruction(self.profile)

@@ -60,16 +60,16 @@ robot = Robot.from_tesseract_support("abb_irb2400")
 
 # Forward kinematics (note: group_name is first positional arg)
 joints = np.zeros(6)
-tcp_pose = robot.fk("manipulator", joints)
+tcp_pose = robot.fk("manipulator", joints, "tool0")
 print(f"TCP position: {tcp_pose.position}")
 
 # Inverse kinematics
 target = Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0.0, 0.0, 0.0)
-ik_solution = robot.ik("manipulator", target, seed=joints)
+ik_solution = robot.ik("manipulator", target, "tool0", seed=joints)
 
 # Plan a freespace motion
 program = (
-    MotionProgram("manipulator")
+    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .move_to(JointTarget(joints))
     .move_to(CartesianTarget(target))
 )

@@ -121,10 +121,10 @@ class Robot:
         joints = robot.get_joint_names("manipulator")
 
         # Compute forward kinematics
-        pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
+        pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0], "tool0")
 
         # Compute inverse kinematics
-        solutions = robot.ik("manipulator", target_pose)
+        solutions = robot.ik("manipulator", target_pose, "tool0")
     """
 
     def __init__(
@@ -144,7 +144,6 @@ class Robot:
         ensure_configured()
         self.env = env
         self.locator = locator or GeneralResourceLocator()
-        self._manipulator_cache: dict[str, ManipulatorInfo] = {}
 
     @classmethod
     def from_urdf(
@@ -328,7 +327,7 @@ class Robot:
         self,
         group_name: str,
         joint_positions: ArrayLike,
-        tip_link: str | None = None,
+        tip_link: str,
     ) -> Pose:
         """
         Compute forward kinematics.
@@ -336,19 +335,15 @@ class Robot:
         Args:
             group_name: Kinematic group name
             joint_positions: Joint positions array
-            tip_link: Target link (uses default TCP if None)
+            tip_link: Link whose pose to return (e.g. "tool0"); a link, not a named TCP
 
         Returns:
-            Pose of the tip link
+            Pose of the tip link in world
         """
         group = self.env.getKinematicGroup(group_name)
         joint_positions = np.asarray(joint_positions, dtype=np.float64)
 
         poses = group.calcFwdKin(joint_positions)
-
-        if tip_link is None:
-            # Use first tip link
-            tip_link = list(group.getActiveLinkNames())[-1]
 
         return Pose(poses[tip_link])
 
@@ -356,8 +351,8 @@ class Robot:
         self,
         group_name: str,
         target_pose: Pose | Isometry3d,
+        tip_link: str,
         seed: ArrayLike | None = None,
-        tip_link: str | None = None,
         all_solutions: bool = False,
     ) -> np.ndarray | list[np.ndarray] | None:
         """
@@ -365,9 +360,10 @@ class Robot:
 
         Args:
             group_name: Kinematic group name
-            target_pose: Desired end-effector pose
+            target_pose: Desired pose of `tip_link`, relative to the group's base link
+            tip_link: Link to solve for (e.g. "tool0"); a link, not a named TCP: strip a TCP
+                offset first (`target * offset.inverse()`)
             seed: Initial joint configuration (current state if None)
-            tip_link: Target link name
             all_solutions: If True, return all solutions; otherwise return first
 
         Returns:
@@ -380,9 +376,6 @@ class Robot:
             seed = self.get_state(list(group.getJointNames())).joint_positions
         else:
             seed = np.asarray(seed, dtype=np.float64)
-
-        if tip_link is None:
-            tip_link = list(group.getActiveLinkNames())[-1]
 
         # Get working frame from group
         working_frame = group.getBaseLinkName()
@@ -403,37 +396,32 @@ class Robot:
     def get_manipulator_info(
         self,
         group_name: str,
-        tcp_frame: str | None = None,
-        working_frame: str = "base_link",
+        tcp_frame: str,
+        working_frame: str,
+        *,
+        tcp_offset: str | Isometry3d | None = None,
     ) -> ManipulatorInfo:
         """
-        Get or create ManipulatorInfo for a kinematic group.
+        Build a ManipulatorInfo for a kinematic group.
+
+        Every call returns a new object. The TCP is `tcp_frame * tcp_offset`; see
+        [TCP offsets](../api/tesseract_environment.md#tcp-offsets).
 
         Args:
             group_name: Kinematic group name
-            tcp_frame: TCP frame name (auto-detected if None)
-            working_frame: Working frame name
+            tcp_frame: Link the TCP is attached to (e.g. "tool0")
+            working_frame: Link Cartesian waypoints are relative to (e.g. "base_link")
+            tcp_offset: Offset from `tcp_frame`: a named TCP (SRDF `group_tcps` of this group,
+                or a find-TCP callback), resolved by the environment at plan time, or an
+                `Isometry3d`. None leaves upstream's default, identity.
 
         Returns:
             Configured ManipulatorInfo
         """
-        cache_key = f"{group_name}:{tcp_frame}:{working_frame}"
-
-        if cache_key not in self._manipulator_cache:
-            info = ManipulatorInfo()
-            info.manipulator = group_name
-
-            if tcp_frame is None:
-                # Auto-detect from kinematic group
-                group = self.env.getKinematicGroup(group_name)
-                tcp_frame = list(group.getActiveLinkNames())[-1]
-
-            info.tcp_frame = tcp_frame
-            info.working_frame = working_frame
-
-            self._manipulator_cache[cache_key] = info
-
-        return self._manipulator_cache[cache_key]
+        info = ManipulatorInfo(group_name, working_frame, tcp_frame)
+        if tcp_offset is not None:
+            info.tcp_offset = tcp_offset
+        return info
 
     def add_link(
         self,

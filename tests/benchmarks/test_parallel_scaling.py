@@ -84,7 +84,7 @@ def plan_freespace(
     robot.set_joints(joint_start, joint_names=joint_names)
 
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(joint_names)
         .move_to(JointTarget(joint_start))
         .move_to(JointTarget(joint_end))

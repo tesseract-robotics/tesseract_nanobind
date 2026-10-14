@@ -30,7 +30,7 @@ graph TD
     robot = Robot.from_tesseract_support("abb_irb2400")
 
     program = (
-        MotionProgram("manipulator")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget(np.zeros(6)))
         .move_to(CartesianTarget(Pose.from_xyz_rpy(0.6, 0.0, 0.5, 0, 0, 0)))
     )

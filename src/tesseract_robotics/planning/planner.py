@@ -9,7 +9,7 @@ Example:
 
     robot = Robot.from_tesseract_support("abb_irb2400")
 
-    program = (MotionProgram("manipulator")
+    program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
     )
@@ -64,7 +64,7 @@ def plan_freespace(
         )
 
         robot = Robot.from_tesseract_support("abb_irb2400")
-        program = (MotionProgram("manipulator")
+        program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
         )
@@ -114,7 +114,7 @@ def plan_ompl(
         )
 
         robot = Robot.from_tesseract_support("abb_irb2400")
-        program = (MotionProgram("manipulator")
+        program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0.5, 0.5, 0, 0, 0]))
         )
@@ -163,7 +163,7 @@ def plan_cartesian(
         robot = Robot.from_tesseract_support("abb_irb2400")
 
         # Create linear path
-        program = (MotionProgram("manipulator")
+        program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .move_to(CartesianTarget(Pose.from_xyz(0.5, -0.2, 0.5)))
             .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
         )

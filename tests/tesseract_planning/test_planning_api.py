@@ -340,14 +340,14 @@ class TestRobot:
         np.testing.assert_array_almost_equal(state.joint_positions, values)
 
     def test_fk(self, robot):
-        pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
+        pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0], "tool0")
         assert isinstance(pose, Pose)
         # ABB IRB2400 tool0 at zeros should be around x=0.94, z=1.455
         assert pose.translation[0] > 0.9
         assert pose.translation[2] > 1.4
 
     def test_get_manipulator_info(self, robot):
-        info = robot.get_manipulator_info("manipulator")
+        info = robot.get_manipulator_info("manipulator", "tool0", "base_link")
         assert info.manipulator == "manipulator"
         assert info.tcp_frame is not None
 
@@ -393,16 +393,16 @@ class TestRobot:
         """Test basic inverse kinematics computation."""
         # First do FK to get a known reachable pose
         zero_joints = [0, 0, 0, 0, 0, 0]
-        target_pose = robot.fk("manipulator", zero_joints)
+        target_pose = robot.fk("manipulator", zero_joints, "tool0")
 
         # Now solve IK for that pose
-        result = robot.ik("manipulator", target_pose, seed=zero_joints)
+        result = robot.ik("manipulator", target_pose, "tool0", seed=zero_joints)
 
         assert result is not None
         assert len(result) == 6
 
         # Verify FK of result matches target
-        result_pose = robot.fk("manipulator", result)
+        result_pose = robot.fk("manipulator", result, "tool0")
         np.testing.assert_array_almost_equal(
             result_pose.translation, target_pose.translation, decimal=4
         )
@@ -411,15 +411,15 @@ class TestRobot:
         """Test IK with different seed configurations."""
         # Get pose at non-zero configuration
         seed_joints = [0.3, -0.5, 0.4, 0.0, 0.5, 0.0]
-        target_pose = robot.fk("manipulator", seed_joints)
+        target_pose = robot.fk("manipulator", seed_joints, "tool0")
 
         # Solve IK starting from the known solution
-        result = robot.ik("manipulator", target_pose, seed=seed_joints)
+        result = robot.ik("manipulator", target_pose, "tool0", seed=seed_joints)
 
         assert result is not None
 
         # Result should produce same end-effector pose
-        result_pose = robot.fk("manipulator", result)
+        result_pose = robot.fk("manipulator", result, "tool0")
         np.testing.assert_array_almost_equal(
             result_pose.translation, target_pose.translation, decimal=4
         )
@@ -429,7 +429,7 @@ class TestRobot:
         # Create a pose far outside robot workspace
         unreachable_pose = Pose.from_xyz(10.0, 10.0, 10.0)
 
-        result = robot.ik("manipulator", unreachable_pose)
+        result = robot.ik("manipulator", unreachable_pose, "tool0")
 
         # Should return None for unreachable pose
         assert result is None
@@ -442,15 +442,15 @@ class TestRobot:
         robot.set_joints(test_joints, joint_names=joint_names)
 
         # Get pose at this configuration
-        target_pose = robot.fk("manipulator", test_joints)
+        target_pose = robot.fk("manipulator", test_joints, "tool0")
 
         # Solve IK without seed - should use current state
-        result = robot.ik("manipulator", target_pose)
+        result = robot.ik("manipulator", target_pose, "tool0")
 
         assert result is not None
 
         # Verify solution is valid
-        result_pose = robot.fk("manipulator", result)
+        result_pose = robot.fk("manipulator", result, "tool0")
         np.testing.assert_array_almost_equal(
             result_pose.translation, target_pose.translation, decimal=4
         )
@@ -460,10 +460,12 @@ class TestRobot:
         # ABB IRB2400 uses OPW solver which can return up to 8 analytical solutions
         # Get a reachable pose in workspace interior
         test_joints = [0.0, 0.3, -0.3, 0.0, 0.5, 0.0]
-        target_pose = robot.fk("manipulator", test_joints)
+        target_pose = robot.fk("manipulator", test_joints, "tool0")
 
         # Get all IK solutions
-        solutions = robot.ik("manipulator", target_pose, seed=test_joints, all_solutions=True)
+        solutions = robot.ik(
+            "manipulator", target_pose, "tool0", seed=test_joints, all_solutions=True
+        )
 
         # OPW typically returns multiple solutions for 6-DOF industrial robots
         assert solutions is not None
@@ -471,7 +473,7 @@ class TestRobot:
 
         # Verify each solution produces correct end-effector pose
         for sol in solutions:
-            result_pose = robot.fk("manipulator", sol)
+            result_pose = robot.fk("manipulator", sol, "tool0")
             np.testing.assert_array_almost_equal(
                 result_pose.translation, target_pose.translation, decimal=3
             )
@@ -481,16 +483,16 @@ class TestMotionProgram:
     """Test MotionProgram builder."""
 
     def test_create_empty(self):
-        program = MotionProgram("manipulator")
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         assert len(program) == 0
 
     def test_add_joint_target(self):
-        program = MotionProgram("manipulator")
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         program.move_to(JointTarget([0, 0, 0, 0, 0, 0]))
         assert len(program) == 1
 
     def test_add_cartesian_target(self):
-        program = MotionProgram("manipulator")
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         program.move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
         assert len(program) == 1
 
@@ -501,13 +503,15 @@ class TestMotionProgram:
             CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)),
             JointTarget([0.5, 0, 0, 0, 0, 0]),
         ]
-        program = MotionProgram("manipulator").add_targets(targets)
+        program = MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link"
+        ).add_targets(targets)
         assert len(program) == 3
         assert program.targets == targets
 
     def test_repr(self):
         """Test MotionProgram string representation."""
-        program = MotionProgram("my_group")
+        program = MotionProgram("my_group", tcp_frame="tool0", working_frame="base_link")
         program.move_to(JointTarget([0, 0, 0]))
         program.move_to(JointTarget([1, 1, 1]))
 
@@ -518,7 +522,7 @@ class TestMotionProgram:
 
     def test_fluent_api(self):
         program = (
-            MotionProgram("manipulator")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(CartesianTarget(Pose.from_xyz(0.5, 0, 0.5)))
             .linear_to(CartesianTarget(Pose.from_xyz(0.5, 0.2, 0.5)))
@@ -529,7 +533,7 @@ class TestMotionProgram:
     def test_to_composite_instruction(self):
         joint_names = ["j1", "j2", "j3", "j4", "j5", "j6"]
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
@@ -889,7 +893,7 @@ class TestPlanningIntegration:
 
         joint_names = robot.get_joint_names("manipulator")
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
@@ -907,7 +911,7 @@ class TestPlanningIntegration:
 
         joint_names = robot.get_joint_names("manipulator")
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
@@ -929,7 +933,7 @@ class TestPlanningIntegration:
 
         # Build program with Cartesian target (needs seed)
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(CartesianTarget(Pose.from_xyz(0.8, 0, 0.8)))
         )
@@ -1084,7 +1088,7 @@ class TestTaskComposer:
         from tesseract_robotics.planning import TaskComposer
 
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(robot.get_joint_names("manipulator"))
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
@@ -1100,7 +1104,7 @@ class TestTaskComposer:
 
         joint_names = robot.get_joint_names("manipulator")
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.5, 0, 0, 0, 0, 0]))
@@ -1118,7 +1122,7 @@ class TestTaskComposer:
 
         joint_names = robot.get_joint_names("manipulator")
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
@@ -1143,7 +1147,7 @@ class TestTaskComposer:
         robot.set_joints(start_joints, joint_names=joint_names)
 
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 1.2], [0.707, 0.0, 0.707, 0.0])))
             .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 1.2], [0.707, 0.0, 0.707, 0.0])))
@@ -1172,7 +1176,7 @@ class TestTaskComposer:
         robot.set_joints(start_joints, joint_names=joint_names)
 
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 1.2], [0.707, 0.0, 0.707, 0.0])))
             .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 1.2], [0.707, 0.0, 0.707, 0.0])))
@@ -1200,7 +1204,7 @@ class TestTaskComposer:
         # Get start pose for Cartesian planning
         start_joints = [0, 0.3, -0.3, 0, 0.5, 0]
         robot.set_joints(start_joints, joint_names=joint_names)
-        start_pose = robot.fk("manipulator", start_joints)
+        start_pose = robot.fk("manipulator", start_joints, "tool0")
 
         # Create Cartesian motion (freespace to Cartesian target)
         start_pos = start_pose.translation
@@ -1209,7 +1213,7 @@ class TestTaskComposer:
         )
 
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(StateTarget(start_joints, names=joint_names))
             .move_to(CartesianTarget(end_pose))
@@ -1237,7 +1241,7 @@ class TestDescartesPipeline:
         robot.set_joints(np.zeros(6), joint_names=joint_names)
         tool_down = [0.0, -1.0, 0.0, 0.0]  # scalar-last [qx, qy, qz, qw]
         return (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, -0.2, 0.8], tool_down)))
             .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.2, 0.8], tool_down)))
@@ -1442,7 +1446,7 @@ class TestFailureMessage:
         start = np.zeros(6)
         robot.set_joints(start, joint_names=joint_names)
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(StateTarget(start, names=joint_names))
             .move_to(CartesianTarget(Pose.from_xyz_quat([3.0, 0.0, 1.0], [0, 1.0, 0, 0])))
@@ -1628,7 +1632,7 @@ class TestProgramErrors:
 
     def test_motion_program_empty_targets_error(self):
         """Test MotionProgram.to_composite_instruction raises ValueError on empty."""
-        program = MotionProgram("manipulator")
+        program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
 
         with pytest.raises(ValueError, match="has no targets"):
             program.to_composite_instruction(joint_names=["j1", "j2"])
@@ -1817,7 +1821,7 @@ class TestPluginLifetime:
     def _simple_program(self, robot):
         joint_names = robot.get_joint_names("manipulator")
         return (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
             .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))

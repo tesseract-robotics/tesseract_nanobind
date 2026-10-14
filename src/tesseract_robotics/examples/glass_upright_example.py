@@ -137,7 +137,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # LINEAR motion type ensures Cartesian interpolation at intermediate points
     # StateTarget specifies joint config - TrajOpt uses FK for Cartesian constraint
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0", profile="UPRIGHT")
+        MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="UPRIGHT"
+        )
         .set_joint_names(joint_names)
         .linear_to(StateTarget(joint_start_pos, names=joint_names, profile="UPRIGHT"))
         .linear_to(StateTarget(joint_end_pos, names=joint_names, profile="UPRIGHT"))

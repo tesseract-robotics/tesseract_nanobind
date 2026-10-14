@@ -209,7 +209,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # 3. CartesianTarget + linear_to: LINEAR to wp2 (straight-line Cartesian path)
     # 4. StateTarget: FREESPACE return to start joints
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0", profile="cartesian_program")
+        MotionProgram(
+            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="cartesian_program"
+        )
         .set_joint_names(joint_names)
         .move_to(StateTarget(joint_pos, names=joint_names, profile="freespace_profile"))
         .move_to(CartesianTarget(wp1, profile="freespace_profile"))  # FREESPACE to pose

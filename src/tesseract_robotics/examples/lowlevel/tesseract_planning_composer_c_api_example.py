@@ -136,7 +136,7 @@ def main():
     # construction. Internally creates CartesianWaypoint, wraps in poly types,
     # and adds to CompositeInstruction with proper ManipulatorInfo.
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(joint_names)  # WHY: Required for JointTarget, optional for CartesianTarget
         .move_to(
             CartesianTarget(wp1)

@@ -639,7 +639,7 @@ class TestPipelineDataStorageExposure:
         robot.set_joints(j_start, joint_names=joint_names)
 
         program = (
-            MotionProgram("manipulator", tcp_frame="tool0")
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
             .set_joint_names(joint_names)
             .move_to(JointTarget(j_start))
             .move_to(JointTarget(j_end))
@@ -656,7 +656,7 @@ class TestPipelineDataStorageExposure:
             profiles.addProfile("DiscreteContactCheckTask", profile_name, forcing)
 
         composer = TaskComposer.from_config(config_path=config_file)
-        composite = program.to_composite_instruction(joint_names, "tool0")
+        composite = program.to_composite_instruction(joint_names)
         assignCurrentStateAsSeed(composite, robot.env)
 
         task = composer.factory.createTaskComposerNode("FreespacePipeline")

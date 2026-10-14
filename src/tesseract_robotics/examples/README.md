@@ -34,7 +34,7 @@ robot = Robot.from_urdf("package://my_robot/urdf/robot.urdf",
                         "package://my_robot/urdf/robot.srdf")
 
 # Build motion program
-program = (MotionProgram("manipulator")
+program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .move_to(JointTarget([0, 0, 0, -1.57, 0, 0, 0]))
     .move_to(CartesianTarget(Pose.from_xyz(0.5, 0.0, 0.5)))
 )

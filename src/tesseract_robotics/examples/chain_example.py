@@ -92,7 +92,7 @@ def run(pipeline="CartesianPipeline", num_planners=None):
     # FREESPACE profile: uses OMPL sampling-based planner (handles obstacles)
     # CARTESIAN profile: uses Descartes ladder graph (optimal IK selection)
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(joint_names)
         # Segment 1: FREESPACE motion from home to first raster point
         .move_to(StateTarget(joint_start, names=joint_names, profile="FREESPACE"))

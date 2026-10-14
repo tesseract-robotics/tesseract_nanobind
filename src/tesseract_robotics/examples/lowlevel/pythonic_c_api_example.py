@@ -144,7 +144,7 @@ def main():
     # group lookup and returns a Pose object with convenient accessors.
     print("\n3. Forward kinematics...")
 
-    pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0])
+    pose = robot.fk("manipulator", [0, 0, 0, 0, 0, 0], "tool0")
     print(f"   FK at zeros: {pose}")
     pos = pose.translation
     print(f"   Position: x={float(pos[0]):.3f}, y={float(pos[1]):.3f}, z={float(pos[2]):.3f}")
@@ -219,7 +219,7 @@ def main():
     # programs are conceptualized - a sequence of waypoints to visit.
     # Returns CompositeInstruction with all poly types properly wrapped.
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(robot.get_joint_names("manipulator"))
         # Start at current position (joints)
         .move_to(JointTarget([0, 0, 0, 0, 0, 0]))

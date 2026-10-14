@@ -97,7 +97,9 @@ def zigzag_square_program() -> MotionProgram:
     ``Y_RANGE_M``. Square corners + closure produce 5 ``MoveL`` instructions;
     zigzag produces 2 endpoints per line × ``ZIGZAG_LINE_COUNT`` lines.
     """
-    program = MotionProgram(MANIPULATOR, tcp_frame=TCP_FRAME, profile="cartesian_program")
+    program = MotionProgram(
+        MANIPULATOR, tcp_frame=TCP_FRAME, working_frame="base_link", profile="cartesian_program"
+    )
 
     x_lo, x_hi = X_RANGE_M
     y_lo, y_hi = Y_RANGE_M
@@ -151,9 +153,7 @@ def zigzag_composite(zigzag_square_program: MotionProgram, abb_irb2400: Robot):
     """
     joint_names = abb_irb2400.get_joint_names(MANIPULATOR)
     zigzag_square_program.set_joint_names(joint_names)
-    return zigzag_square_program.to_composite_instruction(
-        joint_names=joint_names, tcp_frame=TCP_FRAME
-    )
+    return zigzag_square_program.to_composite_instruction(joint_names=joint_names)
 
 
 # ---------------------------------------------------------------------------
@@ -197,9 +197,7 @@ def test_zigzag_square_program_instruction_count(
     """
     joint_names = abb_irb2400.get_joint_names(MANIPULATOR)
     zigzag_square_program.set_joint_names(joint_names)
-    composite = zigzag_square_program.to_composite_instruction(
-        joint_names=joint_names, tcp_frame=TCP_FRAME
-    )
+    composite = zigzag_square_program.to_composite_instruction(joint_names=joint_names)
     instructions = composite.getInstructions()
     assert len(instructions) == EXPECTED_INSTRUCTION_COUNT, (
         f"expected exactly {EXPECTED_INSTRUCTION_COUNT} leaf instructions, got {len(instructions)}"

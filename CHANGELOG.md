@@ -4,6 +4,20 @@
 
 ### Breaking changes
 
+- **The planning API no longer picks a TCP or a working frame** — `Robot.get_manipulator_info` and `TaskComposer.plan` guessed the TCP as the last entry of `getActiveLinkNames()` (an order that holds for a serial chain, not a tree), `MotionProgram` and `get_manipulator_info` defaulted `working_frame` to the literal `"base_link"`, and `get_manipulator_info` cached the guess and handed every caller the same mutable `ManipulatorInfo`. `Robot.fk` / `Robot.ik` guessed `tip_link` the same way. `tcp_frame` and `working_frame` are now required in `MotionProgram` and `get_manipulator_info`, `tip_link` in `fk` and `ik`; a missing one raises `TypeError` at the call. Both take a keyword-only `tcp_offset` (`str | Isometry3d`, default identity) that goes to `ManipulatorInfo.tcp_offset` unchanged, so a named SRDF TCP reaches the planner, which resolves it with `Environment.findTCPOffset`. `get_manipulator_info` builds a new object per call; `to_composite_instruction` loses its `tcp_frame` override, the program's frames are the only source ([#30], [#133]).
+
+  | before | after |
+  | --- | --- |
+  | `MotionProgram("manipulator")` | `MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")` |
+  | `MotionProgram("manipulator", tcp_frame="tool0")` | `MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")` |
+  | `robot.get_manipulator_info("manipulator")` | `robot.get_manipulator_info("manipulator", "tool0", "base_link")` |
+  | `robot.fk("manipulator", q)` | `robot.fk("manipulator", q, "tool0")` |
+  | `robot.ik("manipulator", pose, seed=q)` (also `tip_link=` after `seed`) | `robot.ik("manipulator", pose, "tool0", seed=q)` |
+  | `program.to_composite_instruction(joint_names, "tool0")` | `program.to_composite_instruction(joint_names)` |
+  | `ManipulatorInfo` with a TCP offset, built by hand | `MotionProgram(..., tcp_offset="laser")` or `tcp_offset=Isometry3d(...)` |
+
+  For the support robots (`abb_irb2400`, `lbr_iiwa_14_r820`) the old guesses were `"tool0"` and `"base_link"`: passing those reproduces the old behaviour exactly.
+
 - **`std::filesystem::path` is `pathlib.Path`; `Environment.init(str, …)` always means content** — `tesseract_common.FilesystemPath` was a `str` subclass, so `Environment.init` could not tell a path from URDF content: `init(str, str, locator)` treated both strings as *paths* (the opposite of the C++ `std::string` overload), `init(str, locator)` guessed from a leading `<`, and the Python-only `initFromUrdf` / `initFromUrdfSrdf` existed to work around the guess. `std::filesystem::path` now converts with nanobind's caster (`str | os.PathLike` in, `pathlib.Path` out), and `Environment.init` binds the four native overloads: a `str` is URDF/SRDF content, a `pathlib.Path` (any `os.PathLike`) is a file. Where a path overload sits beside a content overload (`Environment.init` ×2, the `ContactManagersPluginFactory` and `KinematicsPluginFactory` config constructors), the path parameter accepts `os.PathLike` only, so a `str` never reaches it and a mixed `init(content, Path, locator)` raises `TypeError`. Removed: `FilesystemPath`, `_FilesystemPath`, `TransformMap` (a plain `dict` converts) and `Environment.initFromUrdf` / `initFromUrdfSrdf`. A path left as `str` makes `init` return `False`; it does not raise ([#165]).
 
   | before | after |
@@ -78,6 +92,7 @@
 
 ### Changes
 
+- **Named TCPs: the composition contract documented and a parsed-SRDF roundtrip tested** — `group_tcps` was readable since [#133]'s read path landed, but nothing said how a named TCP composes or parsed one from an SRDF. A test parses an SRDF with three TCPs in one group and two in another (one name in both, with different transforms), reads each back exactly through `SRDFModel.kinematics_information.group_tcps` and `Environment.getKinematicsInformation()`, and resolves each with `findTCPOffset`. The API pages document the rule from the tesseract 0.35.0 sources: `findTCPOffset`'s resolution order, the TCP pose `T(tcp_frame) * offset`, Cartesian targets relative to `working_frame`, IK on `C * offset⁻¹`, `getCombined` taking `tcp_offset` only with `tcp_frame`, the SRDF's scalar-first `wxyz`, and `saveToFile` writing TCPs at 6 significant digits ([#133]).
 - **A Python exception keeps its type across extension modules** — a Python `ConstraintSet` whose `getValues` raised `IndexError` reached the caller of `TrustRegionSQPSolver.solve`, `init`, `TrajOptQPProblem.convexify` or `getExactCosts` as `RuntimeError` on macOS, with the traceback as its message. Each extension links nanobind statically and so carries its own typeinfo for `nanobind::python_error`; macOS libc++ compares typeinfo by pointer, so `_trajopt_sqp` did not recognise the error thrown by `_trajopt_ifopt`'s trampoline. Every module that defines a trampoline (`tesseract_common`, `tesseract_collision`, `trajopt_ifopt`, `trajopt_sqp`, `tesseract_motion_planners_descartes`) now registers a translator that restores the Python exception ([#156]).
 - **`build_macos_wheel.sh` sets `MACOSX_DEPLOYMENT_TARGET=14.0`** — a local wheel build tagged the host's macOS (15.0) while every published macOS wheel is 14.0, which CI's wheels got only from their `macos-14` runner. CI's wheel tags do not change ([#156]).
 - **The missing `Environment` getters bound** — `getInitRevision`, `getTimestamp`, `getCurrentStateTimestamp`, `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility`, `getLinkTransforms` (all three overloads), `getCurrentFloatingJointValues` (both) and `getContactManagersPluginInfo`. The timestamps return a naive local-time `datetime.datetime`. `getLinkTransforms(names, values[, floating_joints])` returns the C++ out-param as a `dict` and validates its input like `setState` (`ValueError`). A name that is not in the scene graph raises `KeyError` from `getJointLimits`, `getLinkCollisionEnabled`, `getLinkVisibility` and `getCurrentFloatingJointValues(names)`, instead of `None` or an arbitrary `bool`. `getJointLimits` returns a copy ([#188]).
@@ -317,6 +332,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [0.34.1.4]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.2...0.34.1.4
 [0.34.1.2]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.1...0.34.1.2
 [0.34.1.1]: https://github.com/tesseract-robotics/tesseract_nanobind/compare/0.34.1.0...0.34.1.1
+[#30]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/30
 [#35]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/35
 [#40]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/40
 [#43]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/43
@@ -360,6 +376,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#126]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/126
 [#127]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/127
 [#128]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/128
+[#133]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/133
 [#135]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/135
 [#134]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/134
 [#148]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/148

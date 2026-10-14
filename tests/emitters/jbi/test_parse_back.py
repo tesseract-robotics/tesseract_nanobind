@@ -40,11 +40,13 @@ def test_emitted_jbi_parses_back_to_inputs() -> None:
         [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     ]
-    prog = MotionProgram("manipulator", tcp_frame="tool0", profile="SPIKE")
+    prog = MotionProgram(
+        "manipulator", tcp_frame="tool0", working_frame="base_link", profile="SPIKE"
+    )
     for row in rows:
         prog.move_to(JointTarget(np.deg2rad(row), profile="J"))
     prog.set_joint_names(jn)
-    composite = prog.to_composite_instruction(joint_names=jn, tcp_frame="tool0")
+    composite = prog.to_composite_instruction(joint_names=jn)
 
     jbi = emit_jbi(composite, {"J": JbiProfile.build()}, program_name="SPIKE").text
 

@@ -316,7 +316,7 @@ def plan_motion(
 ):
     """Plan a motion from start to end position."""
     program = (
-        MotionProgram("manipulator", tcp_frame="end_effector")
+        MotionProgram("manipulator", tcp_frame="end_effector", working_frame="base_link")
         .set_joint_names(joint_names)
         .move_to(StateTarget(start_pos, names=joint_names, profile="FREESPACE"))
         .move_to(StateTarget(end_pos, names=joint_names, profile="FREESPACE"))

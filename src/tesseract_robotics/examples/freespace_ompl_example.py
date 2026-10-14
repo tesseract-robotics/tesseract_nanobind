@@ -112,7 +112,7 @@ def run(pipeline="FreespacePipeline", num_planners=None):
     # FREESPACE motion type = joint-space planning, no Cartesian constraints
     # The planner finds ANY collision-free path (not necessarily shortest)
     program = (
-        MotionProgram("manipulator", tcp_frame="tool0")
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(joint_names)
         .move_to(JointTarget(joint_start_pos))  # Start configuration
         .move_to(JointTarget(joint_end_pos))  # Goal configuration

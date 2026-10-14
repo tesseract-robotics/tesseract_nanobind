@@ -33,7 +33,7 @@ robot = Robot.from_tesseract_support("abb_irb2400")
 create_obstacle(robot, "box", box(0.5, 0.5, 0.5), Pose.from_xyz(0.5, 0, 0.3))
 
 # Build motion program
-program = (MotionProgram("manipulator", tcp_frame="tool0")
+program = (MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .set_joint_names(robot.get_joint_names("manipulator"))
     .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
     .move_to(CartesianTarget(Pose.from_xyz(0.5, 0.3, 0.8)))

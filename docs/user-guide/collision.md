@@ -307,7 +307,7 @@ import numpy as np
 
 # Build a program (start/goal joint states)
 program = (
-    MotionProgram("manipulator")
+    MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
     .move_to(JointTarget(np.zeros(6)))
     .move_to(JointTarget(np.array([0.5, -0.5, 0.5, 0.0, 0.5, 0.0])))
 )

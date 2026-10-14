@@ -26,13 +26,15 @@ def _normalize_version(text: str) -> str:
 
 
 def _spike_composite():
-    prog = MotionProgram("manipulator", tcp_frame="tool0", profile="SPIKE")
+    prog = MotionProgram(
+        "manipulator", tcp_frame="tool0", working_frame="base_link", profile="SPIKE"
+    )
     prog.move_to(JointTarget(np.deg2rad([0, -20, 30, 0, 50, 0]), profile="JMOVE"))
     prog.move_to(JointTarget(np.deg2rad([30, 10, 15, 20, 40, -10]), profile="JMOVE"))
     prog.move_to(JointTarget(np.deg2rad([10, 20, 30, 40, 50, 60]), profile="JMOVE"))
     prog.move_to(JointTarget(np.deg2rad([0, 0, 0, 0, 0, 0]), profile="JMOVE"))
     prog.set_joint_names(JOINT_NAMES)
-    return prog.to_composite_instruction(joint_names=JOINT_NAMES, tcp_frame="tool0")
+    return prog.to_composite_instruction(joint_names=JOINT_NAMES)
 
 
 def _profiles():
