@@ -133,10 +133,32 @@ graph. `getJointGroup` also needs every joint to move: a fixed joint raises `Run
 
 ### TCP offsets
 
-`findTCPOffset(manip_info)` resolves `manip_info.tcp_offset`: an `Isometry3d` is returned as is,
-a name is looked up in the SRDF group TCPs of `manip_info.manipulator`, and any other name is
-passed to the find-TCP callbacks, in registration order. A name that is a link raises
-`RuntimeError`: use it as `tcp_frame` instead.
+`findTCPOffset(manip_info)` resolves `manip_info.tcp_offset`, in this order
+(`environment.cpp:832–862`, tesseract 0.35.0):
+
+1. an `Isometry3d` is returned as is;
+2. a name that is a link of the scene raises `RuntimeError`: use it as `tcp_frame` instead;
+3. a name in the SRDF group TCPs of `manip_info.manipulator`
+   ([named TCPs](tesseract_srdf.md#named-tcps-group_tcps)) returns that transform; there is no
+   fallback to another group;
+4. any other name goes to the find-TCP callbacks, in registration order;
+5. if none returns a transform, `RuntimeError: Could not find tcp by name …`.
+
+Every planner calls `findTCPOffset` itself and composes the result the same way
+(tesseract_planning 0.35.0):
+
+| Quantity | Composition | Source |
+|---|---|---|
+| TCP pose in world | `T_world_{tcp_frame}(q) * offset` | `simple/src/interpolation.cpp:108`, `core/src/utils.cpp:73` |
+| Cartesian waypoint `C` | relative to `working_frame`: `T_world_{working_frame} * C` is the TCP pose | `core/src/utils.cpp:90`, `trajopt/src/trajopt_utils.cpp:83–87` |
+| IK target | the `tcp_frame` pose, `C * offset.inverse()`, in `working_frame` | `ompl/src/profile/ompl_real_vector_move_profile.cpp:187`, `descartes/include/tesseract/motion_planners/descartes/impl/descartes_robot_sampler.hpp:92` |
+
+FK (`calcFwdKin`) returns link poses and IK (`KinGroupIKInput`) takes a link pose: neither
+applies the offset, so a caller doing FK/IK by hand multiplies or strips it as above. When a
+move instruction carries its own `ManipulatorInfo`, it overrides the program's field by field,
+but `tcp_offset` only together with a non-empty `tcp_frame`
+(`ManipulatorInfo::getCombined`, `manipulator_info.cpp:54–58`): an instruction that sets only
+`tcp_offset` keeps the program's offset.
 
 ```python
 import numpy as np
