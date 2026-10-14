@@ -20,6 +20,11 @@ fi
 
 cd "$PROJECT_ROOT"
 
+# Tag and build for macOS 14.0, the tag of every published macOS wheel (#156). Unset,
+# scikit-build-core uses the host's macOS: a local build on 15 tagged 15.0. The bundled
+# conda-forge dylibs require 11.0.
+export MACOSX_DEPLOYMENT_TARGET=14.0
+
 # The tesseract C++ libs + plugin factories are provided by the tesseract-robotics
 # conda packages (no more colcon ws/install tree). Normally they live in the active
 # env ($CONDA_PREFIX); the cp39 wheel build (Rhino 8) runs from a minimal py39 env
