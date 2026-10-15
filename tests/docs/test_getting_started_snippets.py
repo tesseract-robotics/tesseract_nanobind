@@ -42,7 +42,7 @@ for label, code in json.loads(sys.argv[1]):
 def extract_blocks(page: Path) -> list[tuple[int, str, bool]]:
     """Return `(index, code, skipped)` for every ```python block of `page`, in order."""
     blocks: list[tuple[int, str, bool]] = []
-    lines = page.read_text().splitlines()
+    lines = page.read_text(encoding="utf-8").splitlines()
     i = 0
     while i < len(lines):
         if lines[i].strip() == FENCE_OPEN:
@@ -58,17 +58,20 @@ def extract_blocks(page: Path) -> list[tuple[int, str, bool]]:
 
 def run_page(page: Path) -> subprocess.CompletedProcess[str]:
     """Run the page's non-skipped blocks in one fresh interpreter."""
-    name = page.relative_to(ROOT)
+    # POSIX separators: the label is what a traceback prints, on every OS.
+    name = page.relative_to(ROOT).as_posix()
     payload = [
         (f"{name} block {i}", code) for i, code, skipped in extract_blocks(page) if not skipped
     ]
     # Subprocess, not in-process exec: the pages load plugins, seed OMPL and start a
     # viewer server, all process-global; a crash in C++ must not take the pytest worker.
     return subprocess.run(
-        [sys.executable, "-c", RUNNER, json.dumps(payload)],
+        # UTF-8 mode: on Windows the child would otherwise write tracebacks in the ANSI
+        # code page, which cannot encode the pages' non-ASCII text.
+        [sys.executable, "-X", "utf8", "-c", RUNNER, json.dumps(payload)],
         input="\n",  # quickstart's viewer block waits on input("Press Enter to exit...")
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         cwd=ROOT,
         timeout=PAGE_TIMEOUT_S,
     )
