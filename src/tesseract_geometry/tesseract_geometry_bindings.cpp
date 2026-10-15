@@ -381,7 +381,10 @@ NB_MODULE(_tesseract_geometry, m) {
         .def("getMeshes", &tg::CompoundMesh::getMeshes, nb::rv_policy::reference_internal,
              "Get the vector of meshes")
         .def("getResource", &tg::CompoundMesh::getResource, "Get the resource used to create this mesh")
-        .def("getScale", &tg::CompoundMesh::getScale, "Get the scale applied to the mesh");
+        .def("getScale", &tg::CompoundMesh::getScale, "Get the scale applied to the mesh")
+        // #247: compares every mesh; the inherited Geometry.__eq__ compares type and UUID only
+        .def("__eq__", &tg::CompoundMesh::operator==)
+        .def("__ne__", &tg::CompoundMesh::operator!=);
 
     // octomap::OcTree - minimal binding so callers can construct/load and
     // pass it to tesseract::geometry::Octree

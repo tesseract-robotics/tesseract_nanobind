@@ -26,6 +26,25 @@ JOINT_VALUES = np.array([0.3, -0.4, 0.5])
 TRANSFORM_ATOL = 1e-12
 
 
+def test_ofkt_state_solver_from_a_root_link_name():
+    """#247: OFKTStateSolver(root_name) starts with the root link only; links are added later."""
+    solver = OFKTStateSolver("world")
+    assert solver.getBaseLinkName() == "world"
+    assert solver.getLinkNames() == ["world"]
+
+    link = sg.Link("arm")
+    joint = sg.Joint("world_arm")
+    joint.type = sg.JointType.FIXED
+    joint.parent_link_name = "world"
+    joint.child_link_name = "arm"
+    joint.parent_to_joint_origin_transform = _translation(0.0, 0.0, 1.0)
+    assert solver.addLink(link, joint)
+    assert sorted(solver.getLinkNames()) == ["arm", "world"]
+    np.testing.assert_allclose(
+        solver.getState().link_transforms["arm"].translation, [0.0, 0.0, 1.0]
+    )
+
+
 def _translation(x: float, y: float, z: float) -> Isometry3d:
     return Isometry3d(np.array([x, y, z]), Quaterniond.Identity())
 

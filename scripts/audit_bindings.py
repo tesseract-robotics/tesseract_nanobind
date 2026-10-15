@@ -571,6 +571,17 @@ def _has_default(parm: ci.Cursor) -> bool:
     return any(c.kind.is_expression() for c in parm.get_children())
 
 
+# Canonical spelling of yaml-cpp's node type, which has no Python form.
+YAML_NODE = "YAML::Node"
+
+
+def _is_yaml_node(parm: ci.Cursor) -> bool:
+    t = parm.type.get_canonical()
+    if t.kind in (ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
+        t = t.get_pointee().get_canonical()
+    return t.spelling.removeprefix("const ") == YAML_NODE
+
+
 # The key of a `(const uint8_t*, size_t)` pair: one Python `bytes` argument.
 BYTES_KEYS = frozenset({("bytes",)})
 
@@ -657,6 +668,8 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         arity = Arity(n - n_default, n)
         void = c.result_type.kind == ci.TypeKind.VOID
         absent_ok = nullary_absent_ok if arity.hi == 0 else None
+        if any(_is_yaml_node(p) for p in params):
+            absent_ok = "yaml-node"
         raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
         pointers = {pos + k for k, pos in enumerate(pairs)}
         python_params = [(i, p) for i, p in enumerate(params) if i in pointers or i not in paired]
@@ -1045,6 +1058,12 @@ ACCEPTED = {
     "properties `SceneGraph` stores; Python reaches the properties through `SceneGraph` methods.",
     "bound-in-other-module": "The class is bound in another extension module, which defines its "
     "Python type once for every module; its members are compared against that module's stub.",
+    "yaml-node": "An overload taking a `YAML::Node` has no Python form (no Python type converts "
+    "to one); the sibling overloads taking a config file path or YAML text load the same config.",
+    "derived-element-container": "An overload taking a container of a derived class only upcasts "
+    "into its base-element sibling (`CompoundMesh(vector<ConvexMesh>)` → "
+    "`CompoundMesh(vector<PolygonMesh>)`, compound_mesh.cpp:59-63); Python passes a list of any "
+    "subclass to the bound base-element overload.",
     "module-getattr": "A package `__init__.py` defines a PEP 562 module `__getattr__` to re-export "
     "a name lazily (an eager import would be an import cycle); it is an attribute-lookup hook, "
     "not API.",
@@ -1134,6 +1153,42 @@ def _fits(
             if verdict is not False:
                 out[p] = verdict is True
     return out
+
+
+def _upcasts_to(
+    derived: frozenset[TypeKey] | None, base: frozenset[TypeKey] | None, ancestors: Ancestors
+) -> bool:
+    """`derived` is a container of a class derived from `base`'s container element."""
+    for d in derived or ():
+        for b in base or ():
+            if (
+                d[0] == b[0] == "seq"
+                and d[1] is not None
+                and b[1] is not None
+                and d[1][0] == b[1][0] == "class"
+                and b[1][1] in ancestors.get(d[1][1], frozenset())
+            ):
+                return True
+    return False
+
+
+def _derived_element_sibling(
+    ov: CppOverload, sym: CppSymbol, pys: list[PyOverload], ancestors: Ancestors
+) -> bool:
+    """A covered sibling overload equals `ov` but for container elements that `ov` takes as a
+    derived class: a C++ convenience that upcasts (`CompoundMesh(vector<ConvexMesh>)`), which
+    Python reaches through the base-element overload with any subclass."""
+    for other in sym.overloads:
+        if other is ov or other.arity != ov.arity or len(other.params) != len(ov.params):
+            continue
+        if _cover(other, pys, ancestors) is None:
+            continue
+        pairs = list(zip(ov.params, other.params))
+        if any(_upcasts_to(a, b, ancestors) for a, b in pairs) and all(
+            a == b or _upcasts_to(a, b, ancestors) for a, b in pairs
+        ):
+            return True
+    return False
 
 
 def _covered(rule: str, fits: Mapping[PyOverload, bool]) -> Cover | None:
@@ -1313,6 +1368,8 @@ def match(
             how = _cover(ov, ps.overloads, ancestors)
             if how is None and ov.absent_ok:
                 accepted.append(Accepted(name, ov.absent_ok, ov.location))
+            elif how is None and _derived_element_sibling(ov, sym, ps.overloads, ancestors):
+                accepted.append(Accepted(name, "derived-element-container", ov.location))
             elif how is None:
                 gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
                 ok = False

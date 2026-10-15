@@ -346,6 +346,8 @@ NB_MODULE(_tesseract_state_solver, m) {
     // ========== OFKTStateSolver (concrete, mutable) ==========
     nb::class_<tsg::OFKTStateSolver, tsg::MutableStateSolver>(m, "OFKTStateSolver")
         .def(nb::init<const tsg::SceneGraph&>(), "scene_graph"_a)
+        // #247: the root link only; grow it with addLink / moveLink
+        .def(nb::init<const std::string&>(), "root_name"_a)
         .def("clone", [](const tsg::OFKTStateSolver& self) {
             return self.clone();
         });

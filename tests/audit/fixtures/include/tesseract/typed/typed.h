@@ -15,6 +15,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <boost/uuid/uuid.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace tesseract::typed
 {
@@ -67,6 +68,24 @@ struct Ball : Shape
 };
 // The stub takes the base: a Shape is no Ball, so this overload stays a gap.
 void roll(const std::vector<std::shared_ptr<Ball>>& balls);
+
+// As CompoundMesh: the derived-element overload only upcasts into the base-element one,
+// which Python binds with any subclass (derived-element-container).
+class Bundle
+{
+public:
+  Bundle(std::vector<std::shared_ptr<Shape>> shapes);
+  Bundle(std::vector<std::shared_ptr<Ball>> balls);
+};
+
+// As the plugin factories: YAML::Node has no Python form (yaml-node).
+class Factory
+{
+public:
+  Factory();
+  Factory(YAML::Node config);
+  Factory(const std::string& config);
+};
 
 // One parameter per mapping rule; the stub spells each one as nanobind does.
 void kinds(bool b,

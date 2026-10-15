@@ -332,6 +332,10 @@ class CompoundMesh(Geometry):
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
         """Get the scale applied to the mesh"""
 
+    def __eq__(self, arg: CompoundMesh, /) -> bool: ...
+
+    def __ne__(self, arg: CompoundMesh, /) -> bool: ...
+
 class OcTree:
     @overload
     def __init__(self, resolution: float) -> None:

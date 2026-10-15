@@ -294,6 +294,27 @@ class TestChangeCollisionMarginsCommand:
         cmd = ChangeCollisionMarginsCommand(0.01)
         env.applyCommand(cmd)
 
+    def test_constructor_with_default_margin_and_pair_data(self):
+        """#247: the default margin and the pair margins in one command, upstream's
+        (default_margin, pair_margins, pair_override_type = MODIFY)."""
+        from tesseract_robotics.tesseract_common import (
+            CollisionMarginPairData,
+            CollisionMarginPairOverrideType,
+        )
+
+        pair_data = CollisionMarginPairData({("link_1", "link_2"): 0.2})
+        cmd = ChangeCollisionMarginsCommand(
+            0.05, pair_data, CollisionMarginPairOverrideType.REPLACE
+        )
+        assert cmd.getDefaultCollisionMargin() == 0.05
+        assert cmd.getCollisionMarginPairData().getCollisionMargins() == {("link_1", "link_2"): 0.2}
+        assert cmd.getCollisionMarginPairOverrideType() == CollisionMarginPairOverrideType.REPLACE
+
+        defaulted = ChangeCollisionMarginsCommand(0.05, pair_data)
+        assert (
+            defaulted.getCollisionMarginPairOverrideType() == CollisionMarginPairOverrideType.MODIFY
+        )
+
 
 class TestChangeJointOriginCommand:
     """Tests for ChangeJointOriginCommand"""

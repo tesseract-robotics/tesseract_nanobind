@@ -655,6 +655,10 @@ NB_MODULE(_tesseract_environment, m) {
         .def(nb::init<double>(), "default_margin"_a)
         .def(nb::init<tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
              "pair_margin_data"_a, "override_type"_a = tc::CollisionMarginPairOverrideType::REPLACE)
+        // #247: upstream's default for override_type is MODIFY
+        .def(nb::init<double, tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
+             "default_margin"_a, "pair_margin_data"_a,
+             "override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)
         .def("getDefaultCollisionMargin", &te::ChangeCollisionMarginsCommand::getDefaultCollisionMargin)
         .def("getCollisionMarginPairData", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairData)
         .def("getCollisionMarginPairOverrideType", &te::ChangeCollisionMarginsCommand::getCollisionMarginPairOverrideType);

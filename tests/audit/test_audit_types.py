@@ -112,7 +112,7 @@ def test_same_arity_unbound_overload_is_a_gap(typed_report):
     """`pick(vector<string>)` is not covered by the bound `pick(str)` of the same arity."""
     [row] = [g for g in typed_report.gaps if g.symbol == "pick"]
     assert (row.kind, row.arity) == (audit.Kind.FUNCTION, "1")
-    assert row.location.endswith("tesseract/typed/typed.h:42")
+    assert row.location.endswith("tesseract/typed/typed.h:43")
 
 
 def test_typed_gaps_exact(typed_report):
@@ -134,6 +134,23 @@ def test_derived_class_argument_binds_the_base_parameter(typed_report):
     """`apply(Command)` bound once per (transitive) subclass: covered, and no deviation."""
     rows = {g.symbol for g in typed_report.gaps} | {d.name for d in typed_report.deviations}
     assert "apply" not in rows
+
+
+@pytest.mark.parametrize(
+    ("symbol", "rule"),
+    [
+        ("Bundle.__init__", "derived-element-container"),
+        ("Factory.__init__", "yaml-node"),
+    ],
+)
+def test_unbound_overload_accepted_by_rule(typed_report, symbol, rule):
+    assert (symbol, rule) in {(a.symbol, a.rule) for a in typed_report.accepted}
+    assert symbol not in {g.symbol for g in typed_report.gaps}
+
+
+def test_derived_element_rule_needs_a_covered_base_sibling(typed_report):
+    """`roll(vector<Ball>)` has no base-element sibling: it stays a gap."""
+    assert "roll" not in {a.symbol for a in typed_report.accepted}
 
 
 def test_type_fallbacks_counted(typed_report):

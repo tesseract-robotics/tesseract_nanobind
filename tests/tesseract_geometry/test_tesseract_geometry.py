@@ -280,6 +280,26 @@ def test_geometry_equality_is_type_and_uuid():
     assert a == clone
 
 
+def _triangle_mesh(z):
+    vertices = [np.array([0, 0, z]), np.array([1, 0, z]), np.array([0, 1, z])]
+    return tesseract_geometry.Mesh(vertices, np.array([3, 0, 1, 2], np.int32))
+
+
+def test_compound_mesh_equality_compares_the_meshes():
+    """#247: `==` is CompoundMesh::operator== (every mesh), not Geometry's (type and UUID)."""
+    first, second, other = _triangle_mesh(0.0), _triangle_mesh(1.0), _triangle_mesh(2.0)
+    a = tesseract_geometry.CompoundMesh([first, second])
+    b = tesseract_geometry.CompoundMesh([first, other])
+    b.setUUID(a.getUUID())
+    assert a != b
+    assert not a == b
+
+    same = tesseract_geometry.CompoundMesh([first, second])
+    same.setUUID(a.getUUID())
+    assert a == same
+    assert not a != same
+
+
 def test_geometry_set_uuid_refuses_malformed_string():
     geom = tesseract_geometry.Box(1, 1, 1)
     before = geom.getUUID()
