@@ -345,6 +345,8 @@ NB_MODULE(_tesseract_state_solver, m) {
 
     // ========== OFKTStateSolver (concrete, mutable) ==========
     nb::class_<tsg::OFKTStateSolver, tsg::MutableStateSolver>(m, "OFKTStateSolver")
+        // `prefix` stays unbound: upstream 0.35.0 looks the prefixed root up in the unprefixed
+        // graph (ofkt_state_solver.cpp:1053, :1075) and throws for any non-empty prefix (#247)
         .def(nb::init<const tsg::SceneGraph&>(), "scene_graph"_a)
         // #247: the root link only; grow it with addLink / moveLink
         .def(nb::init<const std::string&>(), "root_name"_a)

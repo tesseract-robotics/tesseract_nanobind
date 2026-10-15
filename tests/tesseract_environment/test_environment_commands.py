@@ -294,6 +294,16 @@ class TestChangeCollisionMarginsCommand:
         cmd = ChangeCollisionMarginsCommand(0.01)
         env.applyCommand(cmd)
 
+    def test_pair_data_override_type_defaults_to_modify(self):
+        """#247: upstream's default is MODIFY (merge the pairs), not REPLACE."""
+        from tesseract_robotics.tesseract_common import (
+            CollisionMarginPairData,
+            CollisionMarginPairOverrideType,
+        )
+
+        cmd = ChangeCollisionMarginsCommand(CollisionMarginPairData())
+        assert cmd.getCollisionMarginPairOverrideType() == CollisionMarginPairOverrideType.MODIFY
+
     def test_constructor_with_default_margin_and_pair_data(self):
         """#247: the default margin and the pair margins in one command, upstream's
         (default_margin, pair_margins, pair_override_type = MODIFY)."""

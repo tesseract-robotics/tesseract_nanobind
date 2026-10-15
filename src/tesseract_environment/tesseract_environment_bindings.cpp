@@ -654,8 +654,8 @@ NB_MODULE(_tesseract_environment, m) {
     auto change_collision_margins_command = nb::class_<te::ChangeCollisionMarginsCommand, te::Command>(m, "ChangeCollisionMarginsCommand")
         .def(nb::init<double>(), "default_margin"_a)
         .def(nb::init<tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
-             "pair_margin_data"_a, "override_type"_a = tc::CollisionMarginPairOverrideType::REPLACE)
-        // #247: upstream's default for override_type is MODIFY
+             "pair_margin_data"_a, "override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)
+        // #247: override_type defaults to MODIFY in both overloads, as upstream
         .def(nb::init<double, tc::CollisionMarginPairData, tc::CollisionMarginPairOverrideType>(),
              "default_margin"_a, "pair_margin_data"_a,
              "override_type"_a = tc::CollisionMarginPairOverrideType::MODIFY)

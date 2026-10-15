@@ -90,6 +90,8 @@
   | `PointCloudPoint()`, `PointCloudPoint(x, y, z)` | `PointCloud.Point()`, `PointCloud.Point(x, y, z)` |
   | `from tesseract_robotics.tesseract_geometry import PointCloudPoint` | `from tesseract_robotics.tesseract_geometry import PointCloud`, then `PointCloud.Point` |
 
+- **`ChangeCollisionMarginsCommand(pair_margin_data)` defaults to `MODIFY`, as upstream** — the binding defaulted `override_type` to `REPLACE`, so leaving it out replaced every pair margin where the same C++ call merges the given pairs into the existing ones. Pass `CollisionMarginPairOverrideType.REPLACE` to keep the old behaviour ([#247]).
+
 ### Changes
 
 - **Named TCPs: the composition contract documented and a parsed-SRDF roundtrip tested** — `group_tcps` was readable since [#133]'s read path landed, but nothing said how a named TCP composes or parsed one from an SRDF. A test parses an SRDF with three TCPs in one group and two in another (one name in both, with different transforms), reads each back exactly through `SRDFModel.kinematics_information.group_tcps` and `Environment.getKinematicsInformation()`, and resolves each with `findTCPOffset`. The API pages document the rule from the tesseract 0.35.0 sources: `findTCPOffset`'s resolution order, the TCP pose `T(tcp_frame) * offset`, Cartesian targets relative to `working_frame`, IK on `C * offset⁻¹`, `getCombined` taking `tcp_offset` only with `tcp_frame`, the SRDF's scalar-first `wxyz`, and `saveToFile` writing TCPs at 6 significant digits ([#133]).
