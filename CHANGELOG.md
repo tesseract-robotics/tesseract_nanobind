@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changes
+
+- **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
+
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
 ### Breaking changes
@@ -446,6 +450,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#241]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/241
 [#232]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/232
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
+[#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [trajopt#618]: https://github.com/tesseract-robotics/trajopt/issues/618
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336

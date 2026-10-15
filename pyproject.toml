@@ -213,11 +213,6 @@ numpy = ">=1.21.0"
 loguru = ">=0.7.0"
 scipy = ">=1.7.0"              # Required for nanobind Eigen sparse matrix conversion
 
-# Docs
-mkdocs-material = ">=9.0"
-mkdocstrings = { version = ">=0.24", extras = ["python"] }
-mkdocs-exclude = ">=1.0"
-
 # Type checking
 pyright = ">=1.1"
 pytest-testmon = ">=2.0"  # PyPI version for pytest>=7 compat
@@ -237,8 +232,6 @@ install = { cmd = "pip install -e . --no-build-isolation", description = "Instal
 build = { depends-on = [
     "install",
 ], description = "Install bindings against the conda tesseract C++ libs" }
-docs = { cmd = "mkdocs serve --dev-addr=localhost:8000 --open", description = "Live docs server with auto-reload" }
-docs-build = { cmd = "mkdocs build", description = "Build static docs to site/" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
 docs-dotgraphs = { cmd = "python scripts/generate_pipeline_dotgraphs.py", depends-on = [
     "install",
@@ -289,6 +282,20 @@ setuptools-scm = ">=8"
 [tool.pixi.feature.py39.target.osx-arm64.tasks]
 build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build portable cp39 macOS wheel against TESSERACT_CPP_PREFIX" }
 
+# Docs: Zensical and mkdocstrings>=1 need Python >=3.11, so they can't sit in the default
+# feature (the py310 env inherits it). The build reads the committed .pyi stubs through
+# PYTHONPATH=src, exactly like the Docs workflow, so this env carries no C++ stack.
+[tool.pixi.feature.docs.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.docs.pypi-dependencies]
+zensical = ">=0.0.70"
+mkdocstrings = { version = ">=1.0", extras = ["python"] }
+
+[tool.pixi.feature.docs.tasks]
+docs = { cmd = "zensical serve --dev-addr=localhost:8000 --open", env = { PYTHONPATH = "src" }, description = "Live docs server with incremental rebuilds" }
+docs-build = { cmd = "zensical build --strict", env = { PYTHONPATH = "src" }, description = "Build static docs to site/ with the same strict check as CI" }
+
 # Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding
 # TUs, ast reads the committed stubs. Dev-only: never in the default env or the wheel.
 [tool.pixi.feature.audit.dependencies]
@@ -314,3 +321,4 @@ py311 = { features = ["py311"], solve-group = "py311" }
 py312 = { features = ["py312"], solve-group = "py312" }
 # Own solve group: libclang 22 must not move libcxx/llvm-openmp in the env CI builds wheels from.
 audit = { features = ["audit"], solve-group = "audit" }
+docs = { features = ["docs"], no-default-feature = true, solve-group = "docs" }

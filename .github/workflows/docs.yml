@@ -38,7 +38,7 @@ jobs:
       run: pip install -r docs/requirements.txt
 
     - name: Build docs (strict)
-      run: PYTHONPATH=src mkdocs build --strict
+      run: PYTHONPATH=src zensical build --strict
 
     - name: Upload artifact
       if: github.ref == 'refs/heads/main'

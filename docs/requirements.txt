@@ -1,4 +1,2 @@
-mkdocs>=1.5
-mkdocs-material>=9.5
-mkdocs-exclude>=1.0
-mkdocstrings[python]>=0.24
+zensical>=0.0.70
+mkdocstrings[python]>=1.0

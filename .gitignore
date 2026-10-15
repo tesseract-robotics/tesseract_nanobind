@@ -36,6 +36,7 @@ docs/readme.md
 wheelhouse/
 src/tesseract_robotics/.cache/
 site/
+.cache/
 .pixi/
 pixi.lock
 .testmondata
