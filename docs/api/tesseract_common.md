@@ -2,6 +2,16 @@
 
 Common types, utilities, and resource handling.
 
+!!! note "Eigen arguments take arrays, lists and tuples"
+    Every `Eigen::Vector3d`, `VectorXd`, `Matrix3d`, `Matrix4d` (and other dense Eigen)
+    parameter accepts a NumPy array, a list or a tuple, nested for a matrix:
+    `iso.translate([0.5, 0.2, 0.3])`, `Isometry3d([x, y, z], q)`, `Quaterniond(R.tolist())`.
+    The shape must match exactly (`[1, 2]` for a `Vector3d` raises `TypeError`, nothing is
+    padded or truncated). Integers convert to `float64`; strings, `None`, complex numbers and
+    ragged nesting raise `TypeError`, and an integer parameter (mesh `faces`) refuses floats.
+    Returned matrices are always NumPy arrays. The exception is a parameter a function writes
+    into (see [Frame and error math](#frame-and-error-math)): it needs the array itself.
+
 ## Transforms
 
 ### Isometry3d
@@ -104,15 +114,15 @@ from tesseract_robotics.tesseract_common import jacobianChangeBase, jacobianChan
 
 J = joint_group.calcJacobian(q, "tool0")    # (6, n), Fortran order, in the group base frame
 jacobianChangeBase(J, T_new_base)           # rotate every column into T_new_base, in place
-jacobianChangeRefPoint(J, np.array([0.0, 0.0, 0.1]))  # v += ω × p, in place
+jacobianChangeRefPoint(J, [0.0, 0.0, 0.1])  # v += ω × p, in place
 ```
 
 !!! warning "In place: these functions write into the array you pass"
     `twistChangeRefPoint`, `twistChangeBase`, `jacobianChangeBase`, `jacobianChangeRefPoint`
     and `applyTolerances` return `None` and change their first argument, as in C++. They
-    raise `TypeError` for any array they would have to convert first, since the result
-    would be written into a temporary copy and lost: `float32`, read-only or non-contiguous
-    arrays, and C-order `(6, n > 1)` jacobians. `calcJacobian` returns Fortran order;
+    raise `TypeError` for anything they would have to convert first, since the result
+    would be written into a temporary copy and lost: a list or tuple, `float32`, read-only
+    or non-contiguous arrays, and C-order `(6, n > 1)` jacobians. `calcJacobian` returns Fortran order;
     convert others with `np.asfortranarray`.
 
 `jacobianChangeRefPoint` takes the point in the jacobian's base frame. To match

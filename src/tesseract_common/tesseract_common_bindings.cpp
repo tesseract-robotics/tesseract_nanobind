@@ -1180,30 +1180,30 @@ NB_MODULE(_tesseract_common, m) {
     // TypeError, instead of writing into a temporary copy. The 6-row shapes live in the type, so
     // a wrong-length twist fails at the call boundary; upstream does not check sizes and the
     // release build compiles out Eigen's assertions.
-    using RefTwist = Eigen::Ref<Eigen::Matrix<double, 6, 1>>;
-    using RefJacobian = Eigen::Ref<Eigen::Matrix<double, 6, Eigen::Dynamic>>;  // column-major
+    using RefTwist = tesseract_nb::InPlace<Eigen::Matrix<double, 6, 1>>;
+    using RefJacobian = tesseract_nb::InPlace<Eigen::Matrix<double, 6, Eigen::Dynamic>>;  // column-major
     using RefPoint = Eigen::Ref<const Eigen::Vector3d>;
     nb::exception<ToleranceSizeMismatchError>(m, "ToleranceSizeMismatchError", PyExc_ValueError)
         .attr("__doc__") = "lower_tolerance / upper_tolerance are not both empty or both the expected size.";
 
     m.def("twistChangeRefPoint",
-        [](RefTwist twist, const RefPoint& ref_point) { tesseract::common::twistChangeRefPoint(twist, ref_point); },
+        [](RefTwist twist, const RefPoint& ref_point) { tesseract::common::twistChangeRefPoint(twist.ref, ref_point); },
         "twist"_a, "ref_point"_a,
         "Move the twist's reference point by `ref_point` (v += ω × ref_point), in place.");
     m.def("twistChangeBase",
         [](RefTwist twist, const Eigen::Isometry3d& change_base) {
-            tesseract::common::twistChangeBase(twist, change_base);
+            tesseract::common::twistChangeBase(twist.ref, change_base);
         },
         "twist"_a, "change_base"_a, "Rotate the twist into the frame `change_base`, in place.");
     m.def("jacobianChangeBase",
         [](RefJacobian jacobian, const Eigen::Isometry3d& change_base) {
-            tesseract::common::jacobianChangeBase(jacobian, change_base);
+            tesseract::common::jacobianChangeBase(jacobian.ref, change_base);
         },
         "jacobian"_a, "change_base"_a,
         "Rotate every column of a (6, n) Fortran-order jacobian into `change_base`, in place.");
     m.def("jacobianChangeRefPoint",
         [](RefJacobian jacobian, const RefPoint& ref_point) {
-            tesseract::common::jacobianChangeRefPoint(jacobian, ref_point);
+            tesseract::common::jacobianChangeRefPoint(jacobian.ref, ref_point);
         },
         "jacobian"_a, "ref_point"_a,
         "Move the reference point of a (6, n) Fortran-order jacobian by `ref_point`, in place.");
@@ -1244,9 +1244,10 @@ NB_MODULE(_tesseract_common, m) {
         "upper_tolerance"_a);
 
     m.def("applyTolerances",
-        [](Eigen::Ref<Eigen::VectorXd> v, const RefTolerance& lower_tolerance, const RefTolerance& upper_tolerance) {
-            check_tolerance_size(v.size(), lower_tolerance, upper_tolerance);
-            tesseract::common::applyTolerances(v, lower_tolerance, upper_tolerance);
+        [](tesseract_nb::InPlace<Eigen::VectorXd> v, const RefTolerance& lower_tolerance,
+           const RefTolerance& upper_tolerance) {
+            check_tolerance_size(v.ref.size(), lower_tolerance, upper_tolerance);
+            tesseract::common::applyTolerances(v.ref, lower_tolerance, upper_tolerance);
         },
         "v"_a, "lower_tolerance"_a, "upper_tolerance"_a,
         "In place: 0 inside [lower, upper], v - lower below it, v - upper above it; no-op when both are empty.");

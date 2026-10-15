@@ -548,20 +548,20 @@ NB_MODULE(_tesseract_kinematics, m) {
 
     // In place, as #184: writable Eigen::Ref, so an array nanobind would have to convert (float32,
     // read-only, non-contiguous) raises TypeError instead of being written as a lost copy.
-    m.def("harmonizeTowardZero", [](Eigen::Ref<Eigen::VectorXd> qs,
+    m.def("harmonizeTowardZero", [](tesseract_nb::InPlace<Eigen::VectorXd> qs,
                                     const std::vector<Eigen::Index>& redundancy_capable_joints) {
-        require_indices(redundancy_capable_joints, qs.size(), "qs");
-        tk::harmonizeTowardZero<double>(qs, redundancy_capable_joints);
+        require_indices(redundancy_capable_joints, qs.ref.size(), "qs");
+        tk::harmonizeTowardZero<double>(qs.ref, redundancy_capable_joints);
     }, "qs"_a, "redundancy_capable_joints"_a,
     "Wrap qs[i] into [-pi, pi) in place for each i in redundancy_capable_joints.\n\n"
     "Raises:\n"
     "    IndexError: an index is outside qs; qs is left unchanged.");
-    m.def("harmonizeTowardMedian", [](Eigen::Ref<Eigen::VectorXd> qs,
+    m.def("harmonizeTowardMedian", [](tesseract_nb::InPlace<Eigen::VectorXd> qs,
                                       const std::vector<Eigen::Index>& redundancy_capable_joints,
                                       const Eigen::Ref<const Eigen::Matrix<double, Eigen::Dynamic, 2>>& position_limits) {
-        require_indices(redundancy_capable_joints, qs.size(), "qs");
+        require_indices(redundancy_capable_joints, qs.ref.size(), "qs");
         require_indices(redundancy_capable_joints, position_limits.rows(), "position_limits");
-        tk::harmonizeTowardMedian<double>(qs, redundancy_capable_joints, position_limits);
+        tk::harmonizeTowardMedian<double>(qs.ref, redundancy_capable_joints, position_limits);
     }, "qs"_a, "redundancy_capable_joints"_a, "position_limits"_a,
     "Wrap qs[i] into [median - pi, median + pi) in place, median the midpoint of row i of position_limits.\n\n"
     "Raises:\n"

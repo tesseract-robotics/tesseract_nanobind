@@ -181,7 +181,7 @@ checkKinematics(kin_group)           # FK -> IK round trip, tol=1e-3 (m and rad)
 | `numericalJacobian` | `KeyError` for a link the solver or group does not have; `ValueError` when `joint_values` is not `numJoints()` long |
 | `calcManipulability` | `TypeError` for a jacobian without 6 rows |
 | `isNearSingularity` | `ValueError` for an empty matrix |
-| `harmonizeTowardZero`, `harmonizeTowardMedian` | `IndexError` for an index outside `qs` (or `position_limits`), before any write; `TypeError` for an array that would need converting (`float32`, read-only) |
+| `harmonizeTowardZero`, `harmonizeTowardMedian` | `IndexError` for an index outside `qs` (or `position_limits`), before any write; `TypeError` for a list, a tuple or an array that would need converting (`float32`, read-only) |
 | `isValid` | `TypeError` for anything but 6 values |
 
 !!! note "Upstream semantics"

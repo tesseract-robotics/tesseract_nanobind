@@ -104,9 +104,9 @@ class KinGroupIKInputs:
     def clear(self) -> None: ...
 
 class ForwardKinematics:
-    def calcFwdKin(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+    def calcFwdKin(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
 
-    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_name: str) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
     def getBaseLinkName(self) -> str: ...
 
@@ -121,7 +121,7 @@ class ForwardKinematics:
     def clone(self) -> ForwardKinematics: ...
 
 class InverseKinematics:
-    def calcInvKin(self, tip_link_poses: Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
+    def calcInvKin(self, tip_link_poses: Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
 
     def getJointNames(self) -> list[str]: ...
 
@@ -140,21 +140,21 @@ class InverseKinematics:
 class JointGroup:
     def __init__(self, name: str, joint_names: Sequence[str], scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> None: ...
 
-    def calcFwdKin(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+    def calcFwdKin(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> dict[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
 
     @overload
-    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_name: str) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
     @overload
-    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
     @overload
-    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], base_link_name: str, link_name: str) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], base_link_name: str, link_name: str) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
     @overload
-    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], base_link_name: str, link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+    def calcJacobian(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], base_link_name: str, link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
 
-    def calcJacobianWithPoint(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+    def calcJacobianWithPoint(self, joint_angles: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
         """
         Alias of `calcJacobian(joint_angles, link_name, link_point)`, the native form.
         """
@@ -183,21 +183,21 @@ class JointGroup:
 
     def getName(self) -> str: ...
 
-    def checkJoints(self, vec: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+    def checkJoints(self, vec: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
 
 class KinematicGroup(JointGroup):
     def __init__(self, name: str, joint_names: Sequence[str], inv_kin: InverseKinematics, scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> None: ...
 
     @overload
-    def calcInvKin(self, tip_link_poses: KinGroupIKInputs, seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
+    def calcInvKin(self, tip_link_poses: KinGroupIKInputs, seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
 
     @overload
-    def calcInvKin(self, tip_link_pose: KinGroupIKInput, seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
+    def calcInvKin(self, tip_link_pose: KinGroupIKInput, seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
 
     @overload
-    def calcInvKin(self, tip_link_poses: Sequence[KinGroupIKInput], seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
+    def calcInvKin(self, tip_link_poses: Sequence[KinGroupIKInput], seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]: ...
 
-    def calcInvKinMultiple(self, tip_link_poses: Sequence[KinGroupIKInput], seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
+    def calcInvKinMultiple(self, tip_link_poses: Sequence[KinGroupIKInput], seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
         """
         Alias of `calcInvKin(tip_link_poses, seed)` with a list, the native form.
         """
@@ -294,13 +294,13 @@ class KinematicsPluginRemovalError(RuntimeError):
     Refused to remove a group's last kinematics solver: tesseract 0.35.0 then reads and writes through an erased map iterator (kinematics_plugin_factory.cpp:150-154, tesseract-robotics/tesseract#1381).
     """
 
-def getRedundantSolutions(sol: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)], redundancy_capable_joints: Sequence[int]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
+def getRedundantSolutions(sol: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)] | Sequence[Sequence[float]], redundancy_capable_joints: Sequence[int]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
     """
     Get redundant solutions for a joint configuration by adding +/- 2*pi to redundancy capable joints
     """
 
 @overload
-def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, kin: ForwardKinematics, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, kin: ForwardKinematics, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
     """
     Finite-difference Jacobian of a tip link (step 1e-8 rad per joint, utils.cpp:44).
 
@@ -310,7 +310,7 @@ def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesserac
     """
 
 @overload
-def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, joint_group: JointGroup, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, joint_group: JointGroup, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], link_name: str, link_point: Annotated[NDArray[numpy.float64], dict(shape=(3), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
     """
     Finite-difference Jacobian of a link of joint_group (step 1e-8 rad per joint, utils.cpp:80).
 
@@ -320,7 +320,7 @@ def numericalJacobian(change_base: tesseract_robotics.tesseract_common._tesserac
     """
 
 @overload
-def numericalJacobian(joint_group: JointGroup, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], base_link_name: str, base_link_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, link_name: str, link_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+def numericalJacobian(joint_group: JointGroup, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], base_link_name: str, base_link_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, link_name: str, link_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
     """
     Finite-difference Jacobian of link_name relative to base_link_name, in the base link frame.
 
@@ -329,7 +329,7 @@ def numericalJacobian(joint_group: JointGroup, joint_values: Annotated[NDArray[n
         KeyError: base_link_name or link_name is not a link of joint_group.
     """
 
-def isNearSingularity(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(None, None), writable=False)], threshold: float = 0.01) -> bool:
+def isNearSingularity(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(None, None), writable=False)] | Sequence[Sequence[float]], threshold: float = 0.01) -> bool:
     """
     True when the smallest singular value of jacobian is below threshold.
 
@@ -377,7 +377,7 @@ class Manipulability:
 
     def __repr__(self) -> str: ...
 
-def calcManipulability(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None), writable=False)]) -> Manipulability:
+def calcManipulability(jacobian: Annotated[NDArray[numpy.float64], dict(shape=(6, None), writable=False)] | Sequence[Sequence[float]]) -> Manipulability:
     """
     Manipulability and force ellipsoids of a 6-row jacobian.
 
@@ -393,7 +393,7 @@ def harmonizeTowardZero(qs: Annotated[NDArray[numpy.float64], dict(shape=(None,)
         IndexError: an index is outside qs; qs is left unchanged.
     """
 
-def harmonizeTowardMedian(qs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], redundancy_capable_joints: Sequence[int], position_limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)]) -> None:
+def harmonizeTowardMedian(qs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], redundancy_capable_joints: Sequence[int], position_limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)] | Sequence[Sequence[float]]) -> None:
     """
     Wrap qs[i] into [median - pi, median + pi) in place, median the midpoint of row i of position_limits.
 

@@ -204,7 +204,7 @@ class MeshMaterial:
     def __init__(self) -> None: ...
 
     @overload
-    def __init__(self, base_color_factor: Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')], metallic_factor: float, roughness_factor: float, emissive_factor: Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]) -> None: ...
+    def __init__(self, base_color_factor: Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float], metallic_factor: float, roughness_factor: float, emissive_factor: Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]) -> None: ...
 
     def getBaseColorFactor(self) -> Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]:
         """Get base color (RGBA)"""
@@ -219,7 +219,7 @@ class MeshMaterial:
         """Get emissive factor (RGBA)"""
 
 class MeshTexture:
-    def __init__(self, texture_image: tesseract_robotics.tesseract_common._tesseract_common.Resource, uvs: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]]) -> None:
+    def __init__(self, texture_image: tesseract_robotics.tesseract_common._tesseract_common.Resource, uvs: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')] | Sequence[float]]) -> None:
         """Create a texture from a jpg or png image resource and per-vertex UVs"""
 
     def getTextureImage(self) -> tesseract_robotics.tesseract_common._tesseract_common.Resource:
@@ -235,10 +235,10 @@ class MeshFaceCountError(ValueError):
 
 class PolygonMesh(Geometry):
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None, type: GeometryType = GeometryType.POLYGON_MESH) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None, type: GeometryType = GeometryType.POLYGON_MESH) -> None: ...
 
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None, type: GeometryType = GeometryType.POLYGON_MESH) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None, type: GeometryType = GeometryType.POLYGON_MESH) -> None: ...
 
     def __eq__(self, arg: PolygonMesh, /) -> bool: ...
 
@@ -274,10 +274,10 @@ class PolygonMesh(Geometry):
 
 class Mesh(PolygonMesh):
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
     def __eq__(self, arg: Mesh, /) -> bool: ...
 
@@ -285,10 +285,10 @@ class Mesh(PolygonMesh):
 
 class ConvexMesh(PolygonMesh):
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
     class CreationMethod(enum.Enum):
         DEFAULT = 0
@@ -311,10 +311,10 @@ class ConvexMesh(PolygonMesh):
 
 class SDFMesh(PolygonMesh):
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
     @overload
-    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
+    def __init__(self, vertices: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], faces: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], face_count: int, resource: tesseract_robotics.tesseract_common._tesseract_common.Resource | None = None, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., normals: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]] | None = None, vertex_colors: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(4), order='C')] | Sequence[float]] | None = None, mesh_material: MeshMaterial | None = None, mesh_textures: Sequence[MeshTexture] | None = None) -> None: ...
 
     def __eq__(self, arg: SDFMesh, /) -> bool: ...
 
@@ -439,35 +439,35 @@ class Octree(Geometry):
 def createOctree(point_cloud: PointCloud, resolution: float, prune: bool, binary: bool = True) -> OcTree:
     """Build an octomap OcTree from a PointCloud"""
 
-def createMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
+def createMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
     """Load mesh from file and return vector of Mesh geometries"""
 
-def createConvexMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
+def createConvexMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
     """Load mesh from file and return vector of ConvexMesh geometries"""
 
-def createSDFMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
+def createSDFMeshFromPath(path: str, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
     """Load mesh from file and return vector of SDFMesh geometries"""
 
-def createMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
+def createMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
     """Load Mesh from resource (e.g., package:// URL)"""
 
-def createConvexMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
+def createConvexMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
     """Load ConvexMesh from resource (e.g., package:// URL)"""
 
-def createSDFMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
+def createSDFMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
     """Load SDFMesh from resource (e.g., package:// URL)"""
 
-def createMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
+def createMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
     """
     Load Mesh geometries from an in-memory mesh file; url's extension (.stl, .dae, ...) selects the format
     """
 
-def createConvexMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
+def createConvexMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
     """
     Load ConvexMesh geometries from an in-memory mesh file; url's extension selects the format
     """
 
-def createSDFMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
+def createSDFMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[SDFMesh]:
     """
     Load SDFMesh geometries from an in-memory mesh file; url's extension selects the format
     """

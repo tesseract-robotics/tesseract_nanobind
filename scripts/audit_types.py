@@ -233,7 +233,14 @@ def py_key(node: ast.expr | None) -> TypeKey:
         if any(_dotted(m) == "os.PathLike" for m in members):
             return ("path",)
         keys = [py_key(m) for m in members]
-        return None if None in keys else _union(keys)
+        if None in keys:
+            return None
+        # tesseract_nb.h spells an Eigen argument's input as the array or a sequence of numbers
+        # (nested for a matrix): one C++ type, keyed as the array.
+        arrays = [k for k in keys if k[0] == "ndarray"]
+        if len(arrays) == 1 and all(k in arrays or _is_number_sequence(k) for k in keys):
+            return arrays[0]
+        return _union(keys)
     node = members[0]
     if isinstance(node, ast.Subscript):
         name = (_dotted(node.value) or "").rpartition(".")[2]
@@ -265,6 +272,14 @@ def py_key(node: ast.expr | None) -> TypeKey:
     if leaf == "NDArray":
         return ("ndarray", None)
     return ("class", _class_name(dotted))
+
+
+def _is_number_sequence(key: TypeKey) -> bool:
+    """`Sequence[float]`, `Sequence[int]`, or a sequence of those."""
+    if key is None or key[0] != "seq":
+        return False
+    item = key[1]
+    return item in (("float",), ("int",)) or _is_number_sequence(item)
 
 
 def _is_none(node: ast.expr) -> bool:

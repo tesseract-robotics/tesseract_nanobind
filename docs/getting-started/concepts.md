@@ -248,6 +248,9 @@ methods.
 Eigen matrices and vectors are used extensively in Tesseract. These are automatically converted
 to NumPy arrays by nanobind. This conversion works for `float64` types (`double` in C++) and
 `int32` types (`int` in C++). The conversion uses efficient buffer protocols with minimal copying.
+An Eigen argument also accepts a list or a tuple (nested for a matrix) of the exact shape;
+integers convert to `float64`. A function that writes into its argument in place needs the
+NumPy array itself.
 
 Some Eigen geometry types are wrapped as classes in the `tesseract_common` module:
 
@@ -257,7 +260,7 @@ import numpy as np
 
 # Identity transform
 pose = Isometry3d.Identity()
-pose.translate(np.array([0.5, 0.2, 0.3]))
+pose.translate([0.5, 0.2, 0.3])
 
 # Get components
 position = pose.translation    # np.array([x, y, z])

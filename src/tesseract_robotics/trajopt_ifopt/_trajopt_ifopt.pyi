@@ -69,7 +69,7 @@ class Variables(Component):
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get the current variable values"""
 
-    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]) -> None:
+    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> None:
         """Set the variable values from a flat decision vector"""
 
     def getBounds(self) -> list[Bounds]:
@@ -140,7 +140,7 @@ class Var:
     def bounds(self) -> list[Bounds]:
         """Get the variable bounds"""
 
-    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> None:
+    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> None:
         """Set the variable values from the full decision vector"""
 
 class Node:
@@ -155,7 +155,7 @@ class Node:
         """Add a scalar variable to this node"""
 
     @overload
-    def addVar(self, name: str, child_names: Sequence[str], values: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], bounds: Sequence[Bounds]) -> Var:
+    def addVar(self, name: str, child_names: Sequence[str], values: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds]) -> Var:
         """Add a vector-valued variable to this node"""
 
     def hasVar(self, name: str) -> bool:
@@ -173,7 +173,7 @@ class Node:
     def size(self) -> int:
         """Get total number of scalar decision variables"""
 
-    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> None:
+    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> None:
         """Update all variable values from the full decision vector"""
 
 class NodesVariables(Variables):
@@ -186,7 +186,7 @@ class NodesVariables(Variables):
     def getDim(self) -> int:
         """Get the dimensions of every node"""
 
-def createNodesVariables(variable_name: str, joint_names: Sequence[str], initial_values: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]], bounds: Sequence[Bounds]) -> NodesVariables:
+def createNodesVariables(variable_name: str, joint_names: Sequence[str], initial_values: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]], bounds: Sequence[Bounds]) -> NodesVariables:
     """
     Create NodesVariables with one vector Var per node.
 
@@ -197,15 +197,15 @@ def createNodesVariables(variable_name: str, joint_names: Sequence[str], initial
         bounds: Joint bounds (shared across all waypoints)
     """
 
-def interpolate(start: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], end: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], steps: int) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
+def interpolate(start: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], end: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], steps: int) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
     """Interpolate between two joint vectors, returning 'steps' waypoints"""
 
 @overload
-def toBounds(limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)]) -> list[Bounds]:
+def toBounds(limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), writable=False)] | Sequence[Sequence[float]]) -> list[Bounds]:
     """Convert Nx2 matrix [lower, upper] to vector of Bounds"""
 
 @overload
-def toBounds(lower_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], upper_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> list[Bounds]:
+def toBounds(lower_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], upper_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Bounds]:
     """Convert lower/upper limit vectors to vector of Bounds"""
 
 class CartPosConstraint(ConstraintSet):
@@ -214,12 +214,12 @@ class CartPosConstraint(ConstraintSet):
         """Create Cartesian position constraint"""
 
     @overload
-    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], bounds: Sequence[Bounds], manip: "tesseract::kinematics::JointGroup", source_frame: str, target_frame: str, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds], manip: "tesseract::kinematics::JointGroup", source_frame: str, target_frame: str, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """
         Create Cartesian position constraint with per-axis coefficients and bounds. coeffs and bounds are both length 6, ordered [x, y, z, rx, ry, rz]; a zero coefficient frees that axis.
         """
 
-    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -243,11 +243,11 @@ class CartPosConstraint(ConstraintSet):
 
 class JointPosConstraint(ConstraintSet):
     @overload
-    def __init__(self, target: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, target: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """Create joint position constraint with target values"""
 
     @overload
-    def __init__(self, bounds: Sequence[Bounds], position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, bounds: Sequence[Bounds], position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """
         Create joint position constraint with one bound per joint: an equality, a one-sided limit or a range. coeffs has length n_dof, 1 (one weight for every joint) or 0 (weight 1 for every joint). A range becomes two one-sided rows unless range_bound_handling is KEEP_AS_IS.
         """
@@ -256,14 +256,14 @@ class JointPosConstraint(ConstraintSet):
         """Get current constraint values"""
 
 class JointVelConstraint(ConstraintSet):
-    def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointVel') -> None:
+    def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointVel') -> None:
         """Create joint velocity constraint with target values"""
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
 
 class JointAccelConstraint(ConstraintSet):
-    def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointAccel') -> None:
+    def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointAccel') -> None:
         """Create joint acceleration constraint with target values"""
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -369,7 +369,7 @@ class ContinuousCollisionConstraint(ConstraintSet):
     def getCollisionEvaluator(self) -> ContinuousCollisionEvaluator: ...
 
 class JointJerkConstraint(ConstraintSet):
-    def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'JointJerk') -> None:
+    def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointJerk') -> None:
         """Create joint jerk constraint (requires 4+ consecutive waypoints)"""
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -425,10 +425,10 @@ class CartLineInfo:
         """DOF indices to constrain: default {0,1,2,3,4,5}"""
 
     @indices.setter
-    def indices(self, arg: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')], /) -> None: ...
+    def indices(self, arg: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int], /) -> None: ...
 
 class CartLineConstraint(ConstraintSet):
-    def __init__(self, info: CartLineInfo, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], name: str = 'CartLine') -> None:
+    def __init__(self, info: CartLineInfo, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'CartLine') -> None:
         """Create Cartesian line constraint"""
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -439,7 +439,7 @@ class CartLineConstraint(ConstraintSet):
         Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError unless all 6 indices are set (#237)
         """
 
-    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""
 
     def getLinePoint(self, source_tf: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_tf1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_tf2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
@@ -458,7 +458,7 @@ class DiscreteCollisionNumericalConstraint(ConstraintSet):
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
-    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
     def getCollisionEvaluator(self) -> DiscreteCollisionEvaluator: ...
 

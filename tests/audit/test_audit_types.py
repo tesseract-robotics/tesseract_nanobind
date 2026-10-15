@@ -82,6 +82,23 @@ def test_every_mapping_rule_gives_the_stub_key(typed_cpp, typed_py):
         ("AddTrajectoryLinkCommand.Method", ("class", "AddTrajectoryLinkCommand.Method")),
         ("fixture_remote._fixture_remote.Runner", ("class", "Runner")),
         ("NDArray", ("ndarray", None)),
+        # An Eigen argument's input spelling (tesseract_nb.h): the array, or a sequence of numbers.
+        (
+            "Annotated[NDArray[numpy.float64], dict(shape=(3))] | Sequence[float]",
+            ("ndarray", "float64"),
+        ),
+        (
+            "Annotated[NDArray[numpy.float64], dict(shape=(3, 3))] | Sequence[Sequence[float]]",
+            ("ndarray", "float64"),
+        ),
+        (
+            "Annotated[NDArray[numpy.int32], dict(shape=(None,))] | Sequence[int]",
+            ("ndarray", "int32"),
+        ),
+        (
+            "NDArray[numpy.float64] | Sequence[str]",
+            ("union", ("ndarray", "float64"), ("seq", ("str",))),
+        ),
         ("object", None),
         ('"tesseract::fixture::Owner"', None),  # an unbound C++ type: no key
     ],

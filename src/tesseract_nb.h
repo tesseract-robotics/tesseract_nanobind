@@ -41,6 +41,98 @@
 #include <nanobind/eigen/sparse.h>
 #include <nanobind/operators.h>
 
+// Dense Eigen arguments accept Python sequences.
+//
+// nanobind's dense Eigen casters (eigen/dense.h) all import their argument through
+// type_caster<ndarray<Scalar, numpy, shape<...>, Order>>, and ndarray_import (nb_ndarray.cpp,
+// nanobind 2.12) takes only DLPack or buffer-protocol objects: a list or tuple was a TypeError
+// at every Vector3d / VectorXd / Matrix3d parameter. This specialization matches exactly the
+// argument order eigen/dense.h spells (array_for_eigen_t) and delegates to nanobind's own
+// caster; when that fails and implicit conversion is allowed it runs a sequence through
+// numpy.asarray and asks nanobind again, so shape, dtype and order checks stay nanobind's.
+//
+// - Only when cast_flags::convert is set: noconvert() arguments, Eigen::Map and mutable
+//   Eigen::Ref (whose casters clear the flag) stay strict.
+// - Element kinds are checked before conversion: a str, object or complex array is refused
+//   rather than parsed, and an integer target refuses floats rather than truncating them.
+// - Every module sees this through tesseract_nb.h, the only include of nanobind/eigen and
+//   nanobind/ndarray in src/, so all translation units instantiate the same caster.
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+template <typename Scalar, ssize_t... Is, typename Order>
+struct type_caster<ndarray<Scalar, numpy, shape<Is...>, Order>>
+{
+  // The same array with the framework tag moved first: nanobind reads ndarray template
+  // arguments in any order, and this spelling does not match this specialization,
+  // so it names nanobind's own caster.
+  using Array = ndarray<Scalar, numpy, shape<Is...>, Order>;
+  using StockCaster = type_caster<ndarray<numpy, Scalar, shape<Is...>, Order>>;
+  using Plain = std::remove_const_t<Scalar>;
+
+  static constexpr bool IsFloat = std::is_floating_point_v<Plain>;
+  static constexpr bool IsInteger = std::is_integral_v<Plain> && !std::is_same_v<Plain, bool>;
+  static constexpr bool AcceptsSequence = (IsFloat || IsInteger) && (sizeof...(Is) == 1 || sizeof...(Is) == 2);
+
+  static constexpr auto ItemName = const_name<IsFloat>("float", "int");
+  static constexpr auto SequenceName =
+      const_name<sizeof...(Is) == 1>(const_name("collections.abc.Sequence[") + ItemName + const_name("]"),
+                                     const_name("collections.abc.Sequence[collections.abc.Sequence[") +
+                                         ItemName + const_name("]]"));
+  // Input: the array or a sequence; output: the array only (io_name encoding, nb_descr.h).
+  static constexpr auto IOName =
+      const_name<AcceptsSequence>(const_name("@") + StockCaster::Name + const_name(" | ") + SequenceName +
+                                      const_name("@") + StockCaster::Name + const_name("@"),
+                                  StockCaster::Name);
+
+  NB_TYPE_CASTER(Array, IOName)
+
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
+  {
+    StockCaster stock;
+    if (stock.from_python(src, flags, cleanup))
+    {
+      value = Value(stock.value);
+      return true;
+    }
+    if constexpr (AcceptsSequence)
+    {
+      if (!(flags & (uint8_t)cast_flags::convert) || !PySequence_Check(src.ptr()) || PyUnicode_Check(src.ptr()) ||
+          PyBytes_Check(src.ptr()))
+        return false;
+      object array;
+      try
+      {
+        array = module_::import_("numpy").attr("asarray")(src);
+        // numpy dtype.kind: b bool, i signed, u unsigned, f float. Strings (U, S), objects (O)
+        // and complex (c) are refused; an integer target also refuses f.
+        const char kind = borrow<str>(array.attr("dtype").attr("kind")).c_str()[0];
+        const bool numeric = kind == 'b' || kind == 'i' || kind == 'u' || (IsFloat && kind == 'f');
+        if (!numeric)
+          return false;
+      }
+      catch (const python_error&)
+      {
+        // numpy.asarray raised (e.g. a ragged sequence): the argument does not match this
+        // overload, and the dispatcher reports TypeError with the accepted signatures.
+        return false;
+      }
+      if (stock.from_python(array, flags, cleanup))
+      {
+        value = Value(stock.value);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static handle from_cpp(const Value& tensor, rv_policy policy, cleanup_list* cleanup) noexcept
+  {
+    return StockCaster::from_cpp(typename StockCaster::Value{tensor}, policy, cleanup);
+  }
+};
+NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
 // nanobind's std::unordered_map caster (stl/unordered_map.h, nanobind 2.12) names
 // only four template parameters, so it matches default-allocator maps only.
 // Tesseract's Aligned* maps (e.g. tesseract::common::TransformMap) use
@@ -90,6 +182,55 @@ struct type_caster<tesseract_nb::StrictPath>
     value.value = std::move(path_caster.value);
     return true;
   }
+};
+NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
+namespace tesseract_nb
+{
+// An Eigen matrix parameter the binding writes into: the caller's numpy array, bound in place
+// as a mutable Eigen::Ref (`.ref`).
+//
+// Converts exactly as Eigen::Ref<Matrix> does, so a list, a tuple or an array of another dtype
+// or layout is refused (a write could not reach it). What it adds is the annotation: nanobind
+// names a mutable Ref after the shared ndarray caster, whose input name above includes
+// `Sequence`; this names the array alone. A second Eigen::Ref specialization cannot do that,
+// since nanobind's own is SFINAE-constrained and clang reports the pair ambiguous. Use it for
+// every in-place Eigen parameter.
+template <typename Matrix>
+struct InPlace
+{
+  Eigen::Ref<Matrix> ref;
+};
+}  // namespace tesseract_nb
+
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+template <typename Matrix>
+struct type_caster<tesseract_nb::InPlace<Matrix>>
+{
+  using RefCaster = make_caster<Eigen::Ref<Matrix>>;
+
+  static constexpr auto Name = RefCaster::MapCaster::NDArrayCaster::StockCaster::Name;
+  template <typename T_>
+  using Cast = tesseract_nb::InPlace<Matrix>;
+  template <typename T_>
+  static constexpr bool can_cast()
+  {
+    return true;
+  }
+
+  RefCaster caster;
+
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
+  {
+    return caster.from_python(src, flags, cleanup);
+  }
+
+  // A parameter type only.
+  static handle from_cpp(const tesseract_nb::InPlace<Matrix>&, rv_policy, cleanup_list*) noexcept = delete;
+
+  operator tesseract_nb::InPlace<Matrix>() { return { caster.operator Eigen::Ref<Matrix>() }; }
 };
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)

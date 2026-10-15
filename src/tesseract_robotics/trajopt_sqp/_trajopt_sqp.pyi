@@ -228,14 +228,14 @@ class SQPResults:
         """Variable values for best_exact_merit"""
 
     @best_var_vals.setter
-    def best_var_vals(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_var_vals(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def new_var_vals(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Variable values this iteration"""
 
     @new_var_vals.setter
-    def new_var_vals(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_var_vals(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def approx_merit_improve(self) -> float:
@@ -263,70 +263,70 @@ class SQPResults:
         """Trust region box size (var_vals +/- box_size)"""
 
     @box_size.setter
-    def box_size(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def box_size(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def merit_error_coeffs(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Coefficients weighting constraint violations"""
 
     @merit_error_coeffs.setter
-    def merit_error_coeffs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def merit_error_coeffs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def best_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Constraint violations for best solution (positive = violation)"""
 
     @best_constraint_violations.setter
-    def best_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def new_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Constraint violations this iteration"""
 
     @new_constraint_violations.setter
-    def new_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def best_approx_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Convexified constraint violations for best solution"""
 
     @best_approx_constraint_violations.setter
-    def best_approx_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_approx_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def new_approx_constraint_violations(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Convexified constraint violations this iteration"""
 
     @new_approx_constraint_violations.setter
-    def new_approx_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_approx_constraint_violations(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def best_costs(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Cost values for best solution"""
 
     @best_costs.setter
-    def best_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def new_costs(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Cost values this iteration"""
 
     @new_costs.setter
-    def new_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def best_approx_costs(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Convexified costs for best solution"""
 
     @best_approx_costs.setter
-    def best_approx_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def best_approx_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def new_approx_costs(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Convexified costs this iteration"""
 
     @new_approx_costs.setter
-    def new_approx_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], /) -> None: ...
+    def new_approx_costs(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
     @property
     def constraint_names(self) -> list[str]:
@@ -409,13 +409,13 @@ class OSQPEigenSolver(QPSolver):
 
     def getSolverStatus(self) -> QPSolverStatus: ...
 
-    def updateGradient(self, gradient: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+    def updateGradient(self, gradient: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
 
-    def updateLowerBound(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+    def updateLowerBound(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
 
-    def updateUpperBound(self, upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+    def updateUpperBound(self, upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
 
-    def updateBounds(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)], upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> bool: ...
+    def updateBounds(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
 
     def setPolish(self, polish: bool) -> None:
         """Enable solution polishing (default: true)"""
@@ -456,7 +456,7 @@ class QPProblem:
     def convexify(self) -> None:
         """Run the full convexification routine"""
 
-    def evaluateTotalConvexCost(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> float:
+    def evaluateTotalConvexCost(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> float:
         """
         Evaluate the convexified total cost at var_vals.
 
@@ -473,7 +473,7 @@ class QPProblem:
                 first convexify().
         """
 
-    def evaluateConvexCosts(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def evaluateConvexCosts(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """
         Evaluate each cost term of the convexified problem at var_vals.
 
@@ -496,7 +496,7 @@ class QPProblem:
     def getExactCosts(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current exact costs"""
 
-    def evaluateConvexConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def evaluateConvexConstraintViolations(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """
         Evaluate the convexified constraint violations at var_vals.
 
@@ -520,10 +520,10 @@ class QPProblem:
     def scaleBoxSize(self, scale: float) -> None:
         """Uniformly scale the trust region box size"""
 
-    def setBoxSize(self, box_size: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> None:
+    def setBoxSize(self, box_size: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> None:
         """Set trust region box size"""
 
-    def setConstraintMeritCoeff(self, merit_coeff: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> None:
+    def setConstraintMeritCoeff(self, merit_coeff: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> None:
         """Set constraint merit coefficients"""
 
     def getBoxSize(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
