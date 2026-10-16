@@ -75,6 +75,8 @@ PARSE = {
     "TYPE_INDEX", "_is_reference_wrapper_vector",  # #256 group 1
     # G2 (R13)
     "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
+    # G4 (forwarding ctor templates)
+    "REFERENCE_TYPE_KINDS", "_is_forwarding_ctor_template",
 }  # fmt: skip
 
 
