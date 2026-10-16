@@ -9,6 +9,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Release | What breaks | Use instead |
 |---|---|---|
 | Unreleased | 16 command-language waypoint, instruction and Poly types compare by value and are unhashable | [A stable key, or `id()`](#command-language-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` compare by value and are unhashable | [A stable key, or `id()`](#time-parameterization-profiles-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -46,6 +47,18 @@ built separately are unequal until the UUIDs match:
 | `seen = {move}` | `seen = {move.getUUID()}` |
 | `cache[waypoint] = result` | `cache[id(waypoint)] = result` (keep `waypoint` alive) |
 | `move in done` meant identity | `any(m is move for m in done)`; `in` now compares values |
+
+### Time-parameterization profiles compare by value and are unhashable
+
+The four time-parameterization profiles were bound without their C++ `operator==`, so `==`
+compared identity: `TOTGCompositeProfile() == TOTGCompositeProfile()` was `False`. They now bind
+`__eq__`/`__ne__` and set `__hash__ = None` (#261), as the collision, common and environment value
+types did in 0.35.0.9. The new `RuckigTrajectorySmoothingCompositeProfile` behaves the same way.
+
+| before | after |
+| --- | --- |
+| `{TOTGCompositeProfile(): …}`, `set_of_profiles.add(p)` | key by name, e.g. `{"DEFAULT": p}`, or by `id(p)` |
+| `p == q` (identity) | `p is q` |
 
 ## 0.35.0.9
 
