@@ -140,7 +140,8 @@ ACCEPTED = {
     "bound-in-other-module": "The class is bound in another extension module, which defines its "
     "Python type once for every module; its members are compared against that module's stub.",
     "yaml-node": "An overload taking a `YAML::Node` has no Python form (no Python type converts "
-    "to one); the sibling overloads taking a config file path or YAML text load the same config.",
+    "to one). It is accepted when a bound sibling overload of the same symbol takes a config file "
+    "path or YAML text in that position and loads the same config.",
     "derived-element-container": "An overload taking a container of a derived class only upcasts "
     "into its base-element sibling (`CompoundMesh(vector<ConvexMesh>)` → "
     "`CompoundMesh(vector<PolygonMesh>)`, compound_mesh.cpp:59-63); Python passes a list of any "
@@ -267,8 +268,37 @@ def _derived_element_sibling(
     return False
 
 
+# Keys of a parameter that takes a config file path or YAML text: a `YAML::Node` sibling (T1).
+YAML_TEXT_KEYS = frozenset({("str",), ("path",)})
+
+
+def _yaml_sibling(
+    ov: CppOverload, sym: CppSymbol, pys: list[PyOverload], ancestors: Ancestors = NO_ANCESTORS
+) -> bool:
+    """A covered sibling overload of `sym` equals `ov` but takes a config file path or YAML
+    text where `ov` takes its `YAML::Node` (T1, the `yaml-node` premise)."""
+    pos = ov.yaml_position
+    if pos is None:
+        return False
+    for other in sym.overloads:
+        if other is ov or other.arity != ov.arity or len(other.params) != len(ov.params):
+            continue
+        if not YAML_TEXT_KEYS & (other.params[pos] or frozenset()):
+            continue
+        if any(a != b for i, (a, b) in enumerate(zip(ov.params, other.params)) if i != pos):
+            continue
+        if _cover(other, pys, ancestors) is not None:
+            return True
+    return False
+
+
 def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
-    """The overload's structural `absent_ok` rule accepts leaving it unbound."""
+    """The overload's structural `absent_ok` rule accepts leaving it unbound; `yaml-node` only
+    when its premise holds (T1)."""
+    if ov.absent_ok == "yaml-node":
+        # A YAML sibling is declared on the class itself (a ctor, never inherited), so C++
+        # ancestry cannot supply one.
+        return _yaml_sibling(ov, sym, ps.overloads, NO_ANCESTORS)
     return ov.absent_ok is not None
 
 

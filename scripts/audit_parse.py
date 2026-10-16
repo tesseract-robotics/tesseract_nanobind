@@ -241,6 +241,7 @@ class CppOverload:
     # empty: no parameter types to compare (`audit_types`, #247)
     params: tuple[frozenset[TypeKey] | None, ...] = ()
     out_positions: tuple[int, ...] = ()  # indices into `params` of the out-params
+    yaml_position: int | None = None  # index into `params` of the first `YAML::Node` parameter
 
     def returned_out_params(self) -> tuple[frozenset[TypeKey] | None, ...]:
         """`params` of the Python form that returns the out-params."""
@@ -543,6 +544,9 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             BYTES_KEYS if i in pointers else audit_types.cpp_keys(p.type) for i, p in python_params
         )
         out_positions = tuple(j for j, (_, p) in enumerate(python_params) if _is_out_param(p))
+        yaml_position = next(
+            (j for j, (_, p) in enumerate(python_params) if _is_yaml_node(p)), None
+        )
         ov = CppOverload(
             arity,
             out,
@@ -553,6 +557,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             byte_buffers=pairs,
             params=keys,
             out_positions=out_positions,
+            yaml_position=yaml_position,
         )
         sym = add(name, kind, c)
         if not any(_same_python_form(ov, other) for other in sym.overloads):
