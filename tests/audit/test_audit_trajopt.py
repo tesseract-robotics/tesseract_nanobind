@@ -45,3 +45,42 @@ def test_inplace_operators_are_dunders():
 def test_bound_inplace_operators_cover_the_cpp_operators(solver_report):
     rows = {g.symbol for g in solver_report.gaps} | {d.name for d in solver_report.deviations}
     assert not rows & {"Shift.__iadd__", "Shift.__isub__", "Shift.operator+=", "Shift.operator-="}
+
+
+# T10 + R15: `k-prefix-enumerator`.
+
+
+@pytest.mark.parametrize(
+    ("leaf", "python"),
+    [
+        ("kSquared", "SQUARED"),
+        ("kLowerBound", "LOWER_BOUND"),
+        ("kQPSolveFailed", "QP_SOLVE_FAILED"),
+        ("kSplitToTwoInequalities", "SPLIT_TO_TWO_INEQUALITIES"),
+        ("kStackRows", "STACK_ROWS"),
+        ("kSE3", "SE3"),
+        ("kConverged", "CONVERGED"),
+    ],
+)
+def test_k_enumerator_python_name(leaf, python):
+    assert audit.k_enumerator_python_name(leaf) == python
+
+
+@pytest.mark.parametrize("leaf", ["RUNNING", "key", "k", "kx", "k_lower", "ALL"])
+def test_k_enumerator_python_name_rejects_other_spellings(leaf):
+    assert audit.k_enumerator_python_name(leaf) is None
+
+
+def test_k_prefix_accepts_both_sides_of_a_mechanical_pair(solver_report):
+    accepted = {(a.symbol, a.rule) for a in solver_report.accepted}
+    for pair in (
+        ("Status.kRunning", "Status.RUNNING"),
+        ("Status.kQPSolveFailed", "Status.QP_SOLVE_FAILED"),
+    ):
+        for symbol in pair:
+            assert (symbol, "k-prefix-enumerator") in accepted
+
+
+def test_k_prefix_rejects_non_mechanical_names(solver_report):
+    assert "Status.kConverged" in {g.symbol for g in solver_report.gaps}
+    assert "Status.NLP_CONVERGED" in {d.name for d in solver_report.deviations}
