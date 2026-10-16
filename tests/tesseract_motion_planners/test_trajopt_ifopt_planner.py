@@ -817,3 +817,33 @@ class TestTrajOptIfoptProfileCreateKey:
             TrajOptIfoptSolverProfile.createKey(),
         }
         assert len(keys) == 3
+
+
+class TestTrajOptIfoptProfileFromYaml:
+    """`from_yaml` reads a profile with the C++ YAML constructor (gh-331)."""
+
+    def test_move_profile(self):
+        expected = TrajOptIfoptDefaultMoveProfile()
+        expected.joint_cost_config.enabled = not expected.joint_cost_config.enabled
+        text = f"joint_cost_config:\n  enabled: {str(expected.joint_cost_config.enabled).lower()}\n"
+        assert TrajOptIfoptDefaultMoveProfile.from_yaml(text) == expected
+
+    def test_composite_profile(self):
+        expected = TrajOptIfoptDefaultCompositeProfile()
+        expected.smooth_jerks = not expected.smooth_jerks
+        text = f"smooth_jerks: {str(expected.smooth_jerks).lower()}\n"
+        assert TrajOptIfoptDefaultCompositeProfile.from_yaml(text) == expected
+
+    def test_osqp_solver_profile(self):
+        expected = TrajOptIfoptOSQPSolverProfile()
+        expected.opt_params.max_iterations = 7
+        text = "opt_params:\n  max_iterations: 7\n"
+        assert TrajOptIfoptOSQPSolverProfile.from_yaml(text) == expected
+
+    def test_malformed_yaml_raises_value_error(self):
+        with pytest.raises(ValueError):
+            TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: [true")
+
+    def test_wrong_value_type_raises_the_constructor_error(self):
+        with pytest.raises(RuntimeError, match="Failed to parse yaml config"):
+            TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: not-a-bool\n")
