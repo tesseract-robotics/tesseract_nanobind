@@ -83,14 +83,18 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
 
     // ========== TrajOptIfoptMoveProfile (base, was TrajOptIfoptPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptMoveProfile, tc::Profile>(m, "TrajOptIfoptMoveProfile")
-        .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey);
+        .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptMoveProfile>,
+            "The key every TrajOpt-Ifopt move profile carries");
 
     // SWIG-compatible alias
     m.attr("TrajOptIfoptPlanProfile") = m.attr("TrajOptIfoptMoveProfile");
 
     // ========== TrajOptIfoptCompositeProfile (base) ==========
     nb::class_<tp::TrajOptIfoptCompositeProfile, tc::Profile>(m, "TrajOptIfoptCompositeProfile")
-        .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey);
+        .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptCompositeProfile>,
+            "The key every TrajOpt-Ifopt composite profile carries");
 
     // ========== TrajOptIfoptSolverProfile (base) ==========
     // opt_params is the SQP loop itself (max_iterations, max_qp_solver_failures,
@@ -101,7 +105,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // 50, max_qp_solver_failures 3).
     nb::class_<tp::TrajOptIfoptSolverProfile, tc::Profile>(m, "TrajOptIfoptSolverProfile")
         .def_rw("opt_params", &tp::TrajOptIfoptSolverProfile::opt_params)
-        .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey);
+        .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptSolverProfile>,
+            "The key every TrajOpt-Ifopt solver profile carries");
 
     // ========== TrajOptIfoptDefaultMoveProfile (was TrajOptIfoptDefaultPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptDefaultMoveProfile, tp::TrajOptIfoptMoveProfile> default_move_profile(

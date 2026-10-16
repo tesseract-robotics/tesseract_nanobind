@@ -36,6 +36,7 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesLadderGraphSolverProfileD,
     DescartesMotionPlannerD,
     DescartesMoveProfileD,
+    DescartesSolverProfileD,
     DescartesStateD,
     DescartesStateSampleD,
     DescartesWaypointSamplerD,
@@ -492,3 +493,16 @@ class TestDescartesProfileEquality:
         assert a != b
         with pytest.raises(TypeError):
             hash(a)
+
+
+class TestDescartesProfileCreateKey:
+    """Static `createKey()` is the key the profile carries (gh-273)."""
+
+    @pytest.mark.parametrize(
+        "cls", [DescartesDefaultMoveProfileD, DescartesLadderGraphSolverProfileD]
+    )
+    def test_create_key_matches_instance_key(self, cls):
+        assert cls.createKey() == cls().getKey()
+
+    def test_move_and_solver_keys_differ(self):
+        assert DescartesMoveProfileD.createKey() != DescartesSolverProfileD.createKey()
