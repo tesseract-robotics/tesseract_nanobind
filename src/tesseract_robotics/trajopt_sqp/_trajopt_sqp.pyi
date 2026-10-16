@@ -37,8 +37,8 @@ class SQPStatus(enum.Enum):
     RUNNING = 0
     """Optimization is currently running"""
 
-    NLP_CONVERGED = 1
-    """NLP successfully converged"""
+    CONVERGED = 1
+    """Optimization converged"""
 
     ITERATION_LIMIT = 2
     """Reached iteration limit"""
@@ -46,13 +46,13 @@ class SQPStatus(enum.Enum):
     PENALTY_ITERATION_LIMIT = 3
     """Reached penalty iteration limit"""
 
-    OPT_TIME_LIMIT = 4
+    TIME_LIMIT = 4
     """Reached time limit"""
 
-    QP_SOLVER_ERROR = 5
+    QP_SOLVE_FAILED = 5
     """QP solver failed"""
 
-    CALLBACK_STOPPED = 6
+    STOPPED_BY_CALLBACK = 6
     """Stopped by callback"""
 
 def toString(status: SQPStatus) -> str:
@@ -61,14 +61,14 @@ def toString(status: SQPStatus) -> str:
 class QPSolverStatus(enum.Enum):
     """Status of QP solver"""
 
-    UNITIALIZED = 0
+    UNINITIALIZED = 0
     """Solver not initialized"""
 
     INITIALIZED = 1
     """Solver initialized"""
 
-    QP_ERROR = 2
-    """QP solver error"""
+    FAILED = 2
+    """QP solver failed"""
 
 class SQPParameters:
     """Parameters controlling SQP optimization"""

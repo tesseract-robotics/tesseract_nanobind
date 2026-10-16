@@ -242,7 +242,7 @@ class TestTrajOptSQPTypes:
     def test_sqp_status_enum(self):
         """Test SQPStatus enum values."""
         assert tsqp.SQPStatus.RUNNING is not None
-        assert tsqp.SQPStatus.NLP_CONVERGED is not None
+        assert tsqp.SQPStatus.CONVERGED is not None
         assert tsqp.SQPStatus.ITERATION_LIMIT is not None
 
     def test_sqp_parameters(self):
@@ -260,7 +260,7 @@ class TestTrajOptSQPTypes:
     def test_qp_solver_status(self):
         """Test QPSolverStatus enum."""
         assert tsqp.QPSolverStatus.INITIALIZED is not None
-        assert tsqp.QPSolverStatus.QP_ERROR is not None
+        assert tsqp.QPSolverStatus.FAILED is not None
 
     def test_sqp_parameters_full(self):
         """Test all SQPParameters options."""
@@ -309,9 +309,9 @@ class TestTrajOptSQPTypes:
         solver.solve(problem)
         status = solver.getStatus()
         assert status in [
-            tsqp.SQPStatus.NLP_CONVERGED,
+            tsqp.SQPStatus.CONVERGED,
             tsqp.SQPStatus.ITERATION_LIMIT,
-            tsqp.SQPStatus.CALLBACK_STOPPED,
+            tsqp.SQPStatus.STOPPED_BY_CALLBACK,
         ]
 
     def test_sqp_results_attributes(self, kuka_setup):
@@ -854,7 +854,7 @@ class TestConstraintSetInterface:
 
         status = solver.getStatus()
         assert status in [
-            tsqp.SQPStatus.NLP_CONVERGED,
+            tsqp.SQPStatus.CONVERGED,
             tsqp.SQPStatus.ITERATION_LIMIT,
         ]
 
@@ -972,7 +972,7 @@ class TestTrajOptQPProblem:
 
         solver.solve(problem)
 
-        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
         results = solver.getResults()
         assert len(results.merit_error_coeffs) == 1  # one merit unit per constraint set
         np.testing.assert_allclose(
@@ -1016,7 +1016,7 @@ class TestTrajOptQPProblem:
 
         solver.solve(problem)
 
-        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
         assert nodes.getValues()[2] == pytest.approx(2.0, abs=OSQP_ABSOLUTE_TOLERANCE)
 
     def test_squared_cost_needs_equality_bounds(self):
@@ -1042,7 +1042,7 @@ class TestTrajOptQPProblem:
             f"interpreter teardown died (rc={proc.returncode}, SIGSEGV is -11/139): "
             f"{child_stderr(proc.stderr)}"
         )
-        assert "OK: NLP_CONVERGED" in proc.stdout
+        assert "OK: CONVERGED" in proc.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -1259,7 +1259,7 @@ class TestTrajOptQPProblemPenaltyCosts:
 
         solver.solve(problem)
 
-        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
         # The position is exact to OSQP_ABSOLUTE_TOLERANCE; after trajopt#592 the exact cost is
         # that residual times coeff, so the cost's tolerance scales with coeff.
         assert problem.getExactCosts().tolist() == pytest.approx(
@@ -1288,7 +1288,7 @@ class TestTrajOptQPProblemPenaltyCosts:
         rejected when its ratio is below improve_ratio_threshold
         (trust_region_sqp_solver.cpp:339): here the ratio is box / SEED_VIOLATION = 0.1 / 0.5 =
         0.2 < 0.25, and each rejection shrinks the box tenfold, dividing the ratio by 10 (0.02,
-        0.002, ...), until the box collapses and the solve reports NLP_CONVERGED at the seed. A
+        0.002, ...), until the box collapses and the solve reports CONVERGED at the seed. A
         violation of 0.4 or less is removed:
         test_penalty_only_cost_the_trust_box_cuts_by_a_quarter_is_reduced.
 
@@ -1328,7 +1328,7 @@ class TestTrajOptQPProblemPenaltyCosts:
         )
         assert results.merit_improve_ratio < solver.params.improve_ratio_threshold
         # The outcome: converged, at the seed, the cost untouched.
-        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
         np.testing.assert_array_equal(nodes.getValues(), [0.0, SEED_NODE_1, 0.0])
         assert problem.getExactCosts().tolist() == [SEED_VIOLATION]
 

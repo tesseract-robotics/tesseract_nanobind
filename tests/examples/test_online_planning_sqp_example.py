@@ -75,7 +75,7 @@ def test_the_global_solve_reaches_the_target_from_the_pinned_start(robot, proble
 
     solver.solve(problem_data["problem"])
 
-    assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+    assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
     # The solver accepts a set within cnt_tolerance, so each translational row of the target
     # pose is within it and the TCP within sqrt(3) of it.
     tolerance = solver.params.cnt_tolerance

@@ -52,6 +52,17 @@
   | `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
   | `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
 
+- **Six `trajopt_sqp` enumerators renamed to their C++ names** — every `SQPStatus` and `QPSolverStatus` member is now the `UPPER_SNAKE` form of its C++ `kCamelCase` name. This reverses the 0.34 "Python names preserved" choice for the six whose kept name differed from C++ (one was a typo). No aliases: the old names raise `AttributeError`, and code comparing `status.name` against an old string now silently fails to match — search for those strings ([#330]).
+
+  | before | after |
+  | --- | --- |
+  | `SQPStatus.NLP_CONVERGED` | `SQPStatus.CONVERGED` |
+  | `SQPStatus.OPT_TIME_LIMIT` | `SQPStatus.TIME_LIMIT` |
+  | `SQPStatus.QP_SOLVER_ERROR` | `SQPStatus.QP_SOLVE_FAILED` |
+  | `SQPStatus.CALLBACK_STOPPED` | `SQPStatus.STOPPED_BY_CALLBACK` |
+  | `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
+  | `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -725,3 +736,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276
 [#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328
 [#329]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/329
+[#330]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/330

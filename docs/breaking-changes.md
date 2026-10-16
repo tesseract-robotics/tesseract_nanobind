@@ -27,6 +27,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
 | Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
 | Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
+| Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -311,6 +312,24 @@ package's `__all__` list, which named the old classes, is gone as well.
 
 The earlier Unreleased entries for these profiles (value equality, `createKey()`,
 `minimum_time_delta`) apply under the new names.
+
+### Six `trajopt_sqp` enumerators renamed to their C++ names
+
+trajopt 0.34 renamed its enumerators to `kCamelCase`; the bindings kept the old Python names.
+For most of them the old name already was the `UPPER_SNAKE` form of the C++ name
+(`kRunning` → `RUNNING`). For six it was not, so they now follow the same rule (#330). There
+are no aliases. Code that reads an old member raises `AttributeError`; code that compares
+`status.name` to an old string (`status.name == "NLP_CONVERGED"`) no longer matches and
+raises nothing, so search for the strings as well as the attributes.
+
+| before | after |
+| --- | --- |
+| `SQPStatus.NLP_CONVERGED` | `SQPStatus.CONVERGED` |
+| `SQPStatus.OPT_TIME_LIMIT` | `SQPStatus.TIME_LIMIT` |
+| `SQPStatus.QP_SOLVER_ERROR` | `SQPStatus.QP_SOLVE_FAILED` |
+| `SQPStatus.CALLBACK_STOPPED` | `SQPStatus.STOPPED_BY_CALLBACK` |
+| `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
+| `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
 
 ## 0.35.0.9
 

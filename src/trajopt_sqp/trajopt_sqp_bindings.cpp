@@ -153,20 +153,20 @@ NB_MODULE(_trajopt_sqp, m) {
 
     nb::enum_<tsqp::SQPStatus>(m, "SQPStatus", "Status codes for SQP optimization")
         .value("RUNNING", tsqp::SQPStatus::kRunning, "Optimization is currently running")
-        .value("NLP_CONVERGED", tsqp::SQPStatus::kConverged, "NLP successfully converged")
+        .value("CONVERGED", tsqp::SQPStatus::kConverged, "Optimization converged")
         .value("ITERATION_LIMIT", tsqp::SQPStatus::kIterationLimit, "Reached iteration limit")
         .value("PENALTY_ITERATION_LIMIT", tsqp::SQPStatus::kPenaltyIterationLimit, "Reached penalty iteration limit")
-        .value("OPT_TIME_LIMIT", tsqp::SQPStatus::kTimeLimit, "Reached time limit")
-        .value("QP_SOLVER_ERROR", tsqp::SQPStatus::kQPSolveFailed, "QP solver failed")
-        .value("CALLBACK_STOPPED", tsqp::SQPStatus::kStoppedByCallback, "Stopped by callback");
+        .value("TIME_LIMIT", tsqp::SQPStatus::kTimeLimit, "Reached time limit")
+        .value("QP_SOLVE_FAILED", tsqp::SQPStatus::kQPSolveFailed, "QP solver failed")
+        .value("STOPPED_BY_CALLBACK", tsqp::SQPStatus::kStoppedByCallback, "Stopped by callback");
 
     m.def("toString", nb::overload_cast<tsqp::SQPStatus>(&tsqp::toString), "status"_a,
           "trajopt's text for a solver status (e.g. 'SQP_CONVERGED')");
 
     nb::enum_<tsqp::QPSolverStatus>(m, "QPSolverStatus", "Status of QP solver")
-        .value("UNITIALIZED", tsqp::QPSolverStatus::kUninitialized, "Solver not initialized")
+        .value("UNINITIALIZED", tsqp::QPSolverStatus::kUninitialized, "Solver not initialized")
         .value("INITIALIZED", tsqp::QPSolverStatus::kInitialized, "Solver initialized")
-        .value("QP_ERROR", tsqp::QPSolverStatus::kFailed, "QP solver error");
+        .value("FAILED", tsqp::QPSolverStatus::kFailed, "QP solver failed");
 
     // ========== SQPParameters ==========
 

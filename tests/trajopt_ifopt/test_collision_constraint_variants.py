@@ -63,7 +63,7 @@ def test_discrete_d_solves_collision_free(two_boxes: TwoBoxes):
     solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
     solver.solve(problem)
 
-    assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+    assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
     x = solver.getResults().best_var_vals[0]  # the slider; slack variables follow
     # the boxes touch at |x| == BOX_SIZE; the solve keeps the margin on top of that
     assert abs(x) >= BOX_SIZE

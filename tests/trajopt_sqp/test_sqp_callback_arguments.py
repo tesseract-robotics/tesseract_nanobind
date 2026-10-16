@@ -140,7 +140,7 @@ def _sentinel(proc: subprocess.CompletedProcess, pattern: str) -> re.Match:
 class TestSQPCallbackArguments:
     def test_a_callback_on_trajopt_qp_problem_lets_the_solve_converge(self):
         match = _sentinel(_run_child(_TRIVIAL_CALLBACK), r"SOLVE COMPLETED: (\w+)")
-        assert match.group(1) == "NLP_CONVERGED"
+        assert match.group(1) == "CONVERGED"
 
     def test_the_callback_receives_the_solved_problem(self):
         match = _sentinel(_run_child(_IDENTITY), r"IDENTITY calls=(\d+) same=(True|False)")
