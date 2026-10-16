@@ -156,6 +156,49 @@ Configure the solver in the SRDF:
 </kinematics_plugin_config>
 ```
 
+### Filtering IK solutions by configuration
+
+An analytical solver returns one solution per arm configuration. `getRobotConfig`
+classifies a six-axis solution by three letters: wrist **F**lipped or **N**ot (sign of
+joint 5), elbow **U**p or **D**own (joint 3 against π/2), and arm in fron**T** of or
+**B**ehind joint 1. Keep one family to get a consistent path, e.g. no wrist flip on an
+ABB IRB2400:
+
+```python
+import numpy as np
+from tesseract_robotics.planning import Pose, Robot
+from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+from tesseract_robotics.tesseract_motion_planners import (
+    RobotConfig,
+    getJointTurns,
+    getRobotConfig,
+    isWithinJointLimits,
+)
+
+robot = Robot.from_tesseract_support("abb_irb2400")
+manip = robot.env.getKinematicGroup("manipulator")
+
+# tool0 pointing along +x of base_link
+target = Pose.from_xyz_quat(0.8, 0.0, 1.0, 0.0, 0.70710678, 0.0, 0.70710678)
+solutions = manip.calcInvKin(KinGroupIKInput(target, "base_link", "tool0"), np.zeros(6))
+
+for q in solutions:
+    config = getRobotConfig(manip, "base_link", "tool0", q)
+    print(config.name, getJointTurns(q))   # FUT [ 0  0  0 -1  0 -1], NUT [0 0 0 0 0 0]
+
+no_flip = [q for q in solutions if getRobotConfig(manip, "base_link", "tool0", q) == RobotConfig.NUT]
+
+# Joint limits plus a joint-4 + joint-6 coupling window (for a dress pack, say).
+limits = manip.getLimits().joint_limits
+in_window = [q for q in no_flip if isWithinJointLimits(q, limits, np.array([-np.pi, np.pi]))]
+```
+
+`getRobotConfig` reads the last six joint values, so it works for an arm on a rail or
+positioner too. Its `sign_correction` argument (default `[1, 1]`) flips the sign of
+joint 3 and joint 5 for manufacturers whose joint directions differ from the convention.
+`getJointTurns` gives `int(q / π)` per joint: non-zero where a wrist joint is more than
+half a turn from zero.
+
 ## Joint Limits
 
 ```python

@@ -65,6 +65,33 @@ from tesseract_robotics.tesseract_motion_planners import MotionPlanner
 response = planner.solve(request)
 ```
 
+Every concrete planner derives from `MotionPlanner`, so `isinstance(planner, MotionPlanner)`
+holds and `MotionPlanner.solve(planner, request)` dispatches to the concrete planner.
+
+### Checking a request
+
+`checkRequest(request)` is the C++ predicate; `checkRequestReason(request)` says why it fails.
+
+```python
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
+
+request = PlannerRequest()
+MotionPlanner.checkRequest(request)        # False
+MotionPlanner.checkRequestReason(request)  # "PlannerRequest environment is nullptr"
+```
+
+`checkRequestReason` returns `""` for a valid request.
+
+### assignSolution
+
+Writes a joint solution into a move instruction in place, the way every planner fills its
+results: a state waypoint, or with `format_result_as_input=True` the seed of a Cartesian
+waypoint (the position of an unconstrained joint waypoint).
+
+```python
+MotionPlanner.assignSolution(move_instruction, joint_names, joint_values, False)
+```
+
 ## Utility Functions
 
 ### assignCurrentStateAsSeed
@@ -77,6 +104,53 @@ from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSee
 # Modifies program in-place to use current state as seed
 assignCurrentStateAsSeed(program, env)
 ```
+
+### formatProgram
+
+Reorders joint and state waypoints in place to the kinematic group's joint order.
+Returns `True` if the program needed formatting.
+
+```python
+from tesseract_robotics.tesseract_motion_planners import formatProgram
+
+changed = formatProgram(program, env)
+```
+
+### toToolpath
+
+TCP poses of a program in each instruction's working frame. Takes a `CompositeInstruction`,
+`MoveInstructionPoly` or `InstructionPoly`; returns a list with one `VectorIsometry3d` per
+sub-composite (one for a flat program).
+
+```python
+from tesseract_robotics.tesseract_motion_planners import toToolpath
+
+toolpath = toToolpath(program, env)
+first_tcp_pose = toolpath[0][0]  # Isometry3d
+```
+
+### contactCheckProgram
+
+Collision-checks a planned program. Pass a discrete or continuous contact manager; the
+C++ out-parameter comes back as the second element of the result, one `ContactResultMap`
+per step.
+
+```python
+from tesseract_robotics.tesseract_collision import CollisionCheckConfig
+from tesseract_robotics.tesseract_motion_planners import contactCheckProgram
+
+results, contacts = contactCheckProgram(
+    env.getDiscreteContactManager(), env.getStateSolver(), response.results, CollisionCheckConfig()
+)
+if results:
+    print(results.condensedSummary())
+```
+
+### Robot configuration
+
+`RobotConfig`, `getRobotConfig`, `getJointTurns` and `isWithinJointLimits`
+classify a six-axis arm's joint solution by wrist, elbow and arm configuration. See
+[Filtering IK solutions by configuration](../user-guide/kinematics.md#filtering-ik-solutions-by-configuration).
 
 ## Usage with TaskComposer
 

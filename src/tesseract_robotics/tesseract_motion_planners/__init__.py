@@ -4,4 +4,12 @@ __all__ = [
     "PlannerRequest",
     "PlannerResponse",
     "MotionPlanner",
+    "assignCurrentStateAsSeed",
+    "formatProgram",
+    "toToolpath",
+    "contactCheckProgram",
+    "RobotConfig",
+    "getRobotConfig",
+    "getJointTurns",
+    "isWithinJointLimits",
 ]
