@@ -27,7 +27,7 @@ def defined_names(module: str) -> set[str]:
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
 # audit_types, audit_ownership, audit_parse, audit_stub, audit_match, audit_report, audit_bindings.
-EXPECTED_SCRIPTS = ("audit_types", "audit_ownership", "audit_match")
+EXPECTED_SCRIPTS = ("audit_types", "audit_ownership", "audit_parse", "audit_match")
 
 
 def test_every_script_is_loaded_once():
@@ -42,3 +42,23 @@ def test_combined_namespace_rejects_two_definitions_of_one_name():
     a.x, b.x = object(), object()
     with pytest.raises(DuplicateNameError, match="x"):
         combine([a, b])
+
+
+PARSE = {
+    "CONDA_PREFIX", "CONDA_INCLUDE", "LIBCLANG_MAJOR", "CLANG_RESOURCE_DIR", "CXX_STD",
+    "IncludeDirError", "versioned_include", "INCLUDE_DIRS", "PARSE_ARGS", "PARSE_OPTIONS",
+    "MAX_REPORTED_DIAGNOSTICS", "HeaderParseError", "parse_tu", "STRINGSTREAM", "CEREAL_HOOKS",
+    "ALLOCATION_OPERATORS", "OPERATOR_DUNDERS", "OSTREAM_DECL", "FOREIGN_NAMESPACES",
+    "FUNCTION_KINDS", "METHOD_KINDS", "FIELD_KINDS", "RAW_BUFFER_POINTEES",
+    "SIZE_SPELLINGS", "YAML_NODE", "BYTES_KEYS", "Kind", "Arity", "CppOverload", "CppSymbol",
+    "header_rel", "location", "audited_headers", "_owns", "prefix_headers",
+    "direct_include_spellings", "binding_module", "foreign_headers",
+    "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
+    "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
+    "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",
+}  # fmt: skip
+
+
+def test_parse_defines_exactly():
+    assert defined_names("audit_parse") == PARSE
+    assert not defined_names("audit_match") & PARSE
