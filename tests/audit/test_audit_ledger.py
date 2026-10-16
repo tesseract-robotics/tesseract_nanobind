@@ -23,14 +23,6 @@ def ledger():
     return audit.load_ledger()
 
 
-@pytest.fixture(scope="module")
-def audited_modules(ledger):
-    """`to_json`'s per-module data for a fresh audit of every audited module."""
-    cov = audit.coverage()
-    reports = [audit.audit_module(m) for m in cov.audited]
-    return json.loads(audit.to_json(reports, PROV, cov, ledger))["modules"]
-
-
 def _open_rows(modules):
     for module, data in modules.items():
         for table, key in OPEN_TABLES:
@@ -38,20 +30,18 @@ def _open_rows(modules):
                 yield module, table, row[key], row
 
 
-def test_every_open_row_has_an_outcome(audited_modules):
+def test_every_open_row_has_an_outcome_and_every_entry_a_row(ledger):
+    """Both directions on one fresh audit of every audited module (one regeneration per run)."""
+    cov = audit.coverage()
+    reports = [audit.audit_module(m) for m in cov.audited]
+    modules = json.loads(audit.to_json(reports, PROV, cov, ledger))["modules"]
+    rows = list(_open_rows(modules))
     missing = sorted(
-        {
-            (module, table, key)
-            for module, table, key, row in _open_rows(audited_modules)
-            if row["issue"] is None and row["wont_fix"] is None
-        }
+        {(m, t, k) for m, t, k, row in rows if row["issue"] is None and row["wont_fix"] is None}
     )
+    keys = {(m, k) for m, _, k, _ in rows}
+    stale = sorted((m, s) for m, entries in ledger.items() for s in entries if (m, s) not in keys)
     assert not missing, f"open rows with no issue or won't-fix entry in the ledger: {missing}"
-
-
-def test_every_ledger_entry_has_a_row(ledger, audited_modules):
-    rows = {(module, key) for module, _, key, _ in _open_rows(audited_modules)}
-    stale = sorted((m, s) for m, entries in ledger.items() for s in entries if (m, s) not in rows)
     assert not stale, f"ledger entries with no open row (fix landed: remove them): {stale}"
 
 
@@ -66,6 +56,11 @@ MALFORMED = {
     "issue with a suffix": json.dumps({"m": {"s": {"issue": "#163 (part)"}}}),
     "empty reason": json.dumps({"m": {"s": {"wont_fix": ""}}}),
     "reason not a string": json.dumps({"m": {"s": {"wont_fix": 1}}}),
+    "whitespace-only reason": json.dumps({"m": {"s": {"wont_fix": "  "}}}),
+    "issue not a string": json.dumps({"m": {"s": {"issue": 163}}}),
+    "top level not an object": json.dumps([]),
+    "duplicate symbol": '{"m": {"s": {"issue": "#1"}, "s": {"issue": "#2"}}}',
+    "duplicate module": '{"m": {"s": {"issue": "#1"}}, "m": {"t": {"issue": "#2"}}}',
 }
 
 
@@ -111,9 +106,14 @@ def test_issue_column_renders_each_outcome():
         if line.startswith("|") and "`" in line
     }
     assert rows["Filed"].endswith("| #12 |")
-    assert rows["Open"].endswith("| — |")
+    assert rows["Open"] == "| `Open` | class | tesseract/fixture/a.h:2 | — | — |"
     assert rows["pyOnly"].endswith("| won't fix: Python covers it. |")
     assert rows["f"].endswith("| #13 |")
+    # Table headers of Gaps, Deviations and the quoted names.
+    starts = ("| C++ symbol |", "| Python name |", "| module | Python name |")
+    headers = [line for line in text.splitlines() if line.startswith(starts)]
+    assert len(headers) == 3
+    assert all(h.endswith("| issue |") for h in headers)
 
     data = json.loads(audit.to_json([report], PROV, cov, ledger))["modules"]["fixture"]
     assert [(g["issue"], g["wont_fix"]) for g in data["gaps"]] == [("#12", None), (None, None)]
