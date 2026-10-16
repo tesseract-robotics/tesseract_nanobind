@@ -14,7 +14,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
-TYPED_PREFIX = "tesseract/typed/"
+TYPED_PREFIX = ("tesseract/typed/",)
 
 
 def _load(name):
@@ -26,7 +26,9 @@ def _load(name):
 
 
 types = _load("audit_types")
+_load("audit_ownership")
 audit = _load("audit_bindings")
+COVERAGE = audit.Coverage(audited=("typed",), unaudited={}, total=1)
 
 
 @pytest.fixture(scope="module")
@@ -45,7 +47,9 @@ def typed_report():
 @pytest.fixture(scope="module")
 def typed_cpp():
     tu = audit.parse_tu(FIXTURES / "typed_bindings.cpp", (FIXTURE_INCLUDE,))
-    headers = audit.audited_headers(tu, TYPED_PREFIX, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS))
+    headers = audit.audited_headers(
+        tu, "typed", {"typed": TYPED_PREFIX}, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
+    )
     return audit.cpp_api(tu, headers)
 
 
@@ -177,7 +181,7 @@ def test_type_fallbacks_counted(typed_report):
 
 def test_report_renders_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    text = audit.render_markdown([typed_report], prov)
+    text = audit.render_markdown([typed_report], prov, COVERAGE)
     assert (
         "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |"
         in text
@@ -188,4 +192,4 @@ def test_report_renders_type_fallbacks(typed_report):
 
 def test_json_has_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov)
+    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE)

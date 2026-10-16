@@ -25,6 +25,13 @@ _types = importlib.util.module_from_spec(_types_spec)
 sys.modules["audit_types"] = _types
 _types_spec.loader.exec_module(_types)
 
+_own_spec = importlib.util.spec_from_file_location(
+    "audit_ownership", REPO_ROOT / "scripts" / "audit_ownership.py"
+)
+_own = importlib.util.module_from_spec(_own_spec)
+sys.modules["audit_ownership"] = _own
+_own_spec.loader.exec_module(_own)
+
 _spec = importlib.util.spec_from_file_location(
     "audit_bindings", REPO_ROOT / "scripts" / "audit_bindings.py"
 )
@@ -63,14 +70,14 @@ def test_core_binding_tu_parses_clean(module):
 @pytest.mark.parametrize("module", sorted(CORE_PREFIX))
 def test_core_unincluded_headers_parse_clean(module):
     """E0's synthetic TU (every unincluded, non-unaudited header) parses: one error aborts the module."""
-    prefix = CORE_PREFIX[module]
+    prefixes = audit.owner_prefixes()
     cpp = REPO_ROOT / "src" / module / f"{module}_bindings.cpp"
     tu = audit.parse_tu(cpp)
     included = {Path(i.include.name).resolve() for i in tu.get_includes()}
     headers = {
         h: s
-        for h, s in audit.prefix_headers(prefix, audit.INCLUDE_DIRS).items()
-        if h not in included and not audit.is_unaudited(s, prefix)
+        for h, s in audit.prefix_headers(module, prefixes, audit.INCLUDE_DIRS).items()
+        if h not in included and not audit.is_unaudited(s, prefixes[module])
     }
     audit.unincluded_header_gaps(cpp, headers)  # raises HeaderParseError on any error
 
@@ -78,7 +85,7 @@ def test_core_unincluded_headers_parse_clean(module):
 @pytest.mark.parametrize("module", sorted(CORE_PREFIX))
 def test_core_modules_resolve(module):
     assert audit.resolve_module(module) == module
-    assert audit.AUDITED_HEADER_PREFIX[module] == CORE_PREFIX[module]
+    assert audit.AUDITED_HEADER_PREFIX[module] == (CORE_PREFIX[module],)
 
 
 @pytest.mark.parametrize("module", sorted(CORE_PREFIX))
@@ -175,6 +182,39 @@ def test_state_solver_kdl_still_audited(core_reports):
     assert any(n.startswith("KDLStateSolver.") for n in names)
 
 
+# #256: the planning and trajopt bindings, audited group by group.
+PLANNING = (
+    "tesseract_command_language",
+    "tesseract_time_parameterization",
+    "trajopt_ifopt",
+    "trajopt_sqp",
+    "tesseract_motion_planners",
+    "tesseract_motion_planners_simple",
+    "tesseract_motion_planners_ompl",
+    "tesseract_motion_planners_trajopt",
+    "tesseract_motion_planners_trajopt_ifopt",
+    "tesseract_motion_planners_descartes",
+    "tesseract_task_composer",
+    "tesseract_task_composer_planning",
+)
+
+
+@pytest.mark.parametrize("module", PLANNING)
+def test_planning_binding_tu_parses_clean(module):
+    """#256: the binding build's include dirs (OMPL, OSQP) and defines reach the audit parse."""
+    audit.parse_tu(audit.binding_source(module))
+
+
+def test_versioned_include_requires_one_match(tmp_path):
+    with pytest.raises(audit.IncludeDirError, match="ompl-"):
+        audit.versioned_include("ompl", tmp_path)
+    (tmp_path / "ompl-1.7").mkdir()
+    assert audit.versioned_include("ompl", tmp_path) == tmp_path / "ompl-1.7"
+    (tmp_path / "ompl-1.8").mkdir()
+    with pytest.raises(audit.IncludeDirError, match="2"):
+        audit.versioned_include("ompl", tmp_path)
+
+
 def test_syntax_error_raises_header_parse_error():
     with pytest.raises(audit.HeaderParseError, match="broken_bindings.cpp"):
         audit.parse_tu(FIXTURES / "broken_bindings.cpp")
@@ -192,8 +232,8 @@ def test_unknown_module_raises():
 
 
 def test_unmapped_module_raises():
-    """A2: a binding module without an AUDITED_HEADER_PREFIX entry is not auditable yet."""
-    with pytest.raises(audit.UnknownModuleError, match="AUDITED_HEADER_PREFIX"):
+    """#256: a binding module listed in UNAUDITED_MODULES is refused with its reason."""
+    with pytest.raises(audit.UnauditedModuleError, match="not audited: To be removed"):
         audit.resolve_module("ompl_base")
 
 
@@ -207,7 +247,10 @@ def test_missing_stub_raises(tmp_path):
         audit.load_stub(tmp_path / "missing.pyi")
 
 
-FIXTURE_PREFIX = "tesseract/fixture/"
+FIXTURE_PREFIX = ("tesseract/fixture/",)
+# The fixture module and a module owning the nested `tesseract/fixture/sub/` (#256).
+NESTED = {"fixture": FIXTURE_PREFIX, "fixture_sub": ("tesseract/fixture/sub/",)}
+NESTED_HEADER = "tesseract/fixture/sub/nested.h"
 
 
 @pytest.fixture(scope="module")
@@ -218,14 +261,14 @@ def fixture_tu():
 @pytest.fixture(scope="module")
 def fixture_cpp(fixture_tu):
     headers = audit.audited_headers(
-        fixture_tu, FIXTURE_PREFIX, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
+        fixture_tu, "fixture", NESTED, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
     )
     return audit.cpp_api(fixture_tu, headers)
 
 
 def test_audited_headers_are_direct_includes_under_prefix(fixture_tu):
     headers = audit.audited_headers(
-        fixture_tu, FIXTURE_PREFIX, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
+        fixture_tu, "fixture", NESTED, (FIXTURE_INCLUDE, *audit.INCLUDE_DIRS)
     )
     # gadget.h is first included by widget.h, then by the TU itself (C1);
     # detail.h is only included transitively.
@@ -436,10 +479,19 @@ def fixture_report():
         (FIXTURE_INCLUDE,),
         other_bindings=(FIXTURES / "other_bindings.cpp",),
         stub_roots=(FIXTURES,),
+        prefixes=NESTED,
     )
 
 
+def test_nested_header_is_no_row_of_the_parent(fixture_report):
+    """#256: `sub/nested.h` belongs to the module owning `tesseract/fixture/sub/`."""
+    assert NESTED_HEADER not in {g.symbol for g in fixture_report.gaps}
+    assert "Nested" not in {g.symbol for g in fixture_report.gaps}
+    assert NESTED_HEADER not in fixture_report.delegated
+
+
 ORPHAN_HEADER = "tesseract/fixture/orphan.h"
+BROKEN_HEADER = "tesseract/fixture/broken_header.h"
 
 
 def test_fixture_gaps_exact(fixture_report):
@@ -450,6 +502,7 @@ def test_fixture_gaps_exact(fixture_report):
         ("Widget.resize", audit.Kind.METHOD, "—"),
         ("Widget.operator+", audit.Kind.OPERATOR, "—"),
         (ORPHAN_HEADER, audit.Kind.HEADER, "—"),  # never included: one row (E0)
+        (BROKEN_HEADER, audit.Kind.UNPARSEABLE_HEADER, "—"),  # does not compile alone (#256)
         # raw-buffer ctor: the bound arity-2-3 ctor overlaps it but cannot cover it (#166)
         ("Buffer.__init__", audit.Kind.CONSTRUCTOR, "3"),
         # byte-buffer pair bound as `str`, not `bytes` (#210)
@@ -467,6 +520,26 @@ def test_unincluded_header_row_locates_its_first_declaration(fixture_report):
     assert path == f"tests/audit/fixtures/include/{ORPHAN_HEADER}"
     source = (REPO_ROOT / path).read_text(encoding="utf-8").splitlines()
     assert "struct Orphan" in source[int(line) - 1]
+
+
+def test_unparseable_unincluded_header_is_a_row_and_others_still_reported(fixture_report):
+    """#256: a header that does not compile on its own is one row; the others keep theirs."""
+    rows = {(g.symbol, g.kind) for g in fixture_report.gaps}
+    assert (BROKEN_HEADER, audit.Kind.UNPARSEABLE_HEADER) in rows
+    assert (ORPHAN_HEADER, audit.Kind.HEADER) in rows
+
+
+def test_unparseable_header_row_locates_its_first_error(fixture_report):
+    [row] = [g for g in fixture_report.gaps if g.kind is audit.Kind.UNPARSEABLE_HEADER]
+    path, line = row.location.rsplit(":", 1)
+    assert path == f"tests/audit/fixtures/include/{BROKEN_HEADER}"
+    source = (REPO_ROOT / path).read_text(encoding="utf-8").splitlines()
+    assert "undeclared_t" in source[int(line) - 1]
+
+
+def test_limitations_name_unparseable_headers(fixture_report):
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    assert "`unparseable header`" in text
 
 
 def test_unincluded_header_members_are_not_listed(fixture_report):
@@ -497,11 +570,11 @@ def test_including_binding_audits_a_foreign_header_its_owner_does_not_include():
         FIXTURES / "other_bindings.cpp",
         FIXTURES / "_other.pyi",
         FIXTURES / "package_init.py",
-        "tesseract/other/",
+        ("tesseract/other/",),
         (FIXTURE_INCLUDE,),
         other_bindings=(FIXTURES / "fixture_bindings.cpp",),
         stub_roots=(FIXTURES,),
-        prefixes={"fixture": FIXTURE_PREFIX, "other": "tesseract/other/"},
+        prefixes={"fixture": FIXTURE_PREFIX, "other": ("tesseract/other/",)},
     )
     assert ("Shared", audit.Kind.CLASS) in {(g.symbol, g.kind) for g in report.gaps}
 
@@ -530,7 +603,7 @@ def test_third_party_header_never_audited_even_when_included_directly(fixture_re
 
 
 def test_third_party_header_patterns_rendered_with_reasons(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
     assert audit.THIRD_PARTY_HEADERS
     for pattern, reason in audit.THIRD_PARTY_HEADERS.items():
         assert f"`{pattern}`: {reason}" in text
@@ -542,14 +615,14 @@ def test_hacd_header_has_its_own_reason():
 
 
 def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
     for pattern, reason in audit.UNAUDITED_HEADERS.items():
         assert f"`{pattern}`: {reason}" in text
 
 
 def test_limitations_describe_type_matching(fixture_report):
     """#247: overloads match by arity and parameter type; unknown types fall back to arity."""
-    text = audit.render_markdown([fixture_report], PROV)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
     assert "Overloads are matched by arity and parameter type" in text
     assert "`type fallbacks`" in text
 
@@ -629,7 +702,7 @@ def test_scene_graph_joint_type_operator_is_not_a_free_function(core_reports):
 
 
 def test_new_accepted_rules_rendered_with_reasons(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
     for rule in (
         "container-protocol",
         "iterator-pair",
@@ -767,20 +840,47 @@ def test_bytes_resource_byte_buffer_ctor_accepted(real_reports):
 
 
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
+COVERAGE = audit.Coverage(audited=("fixture",), unaudited={"other": "Not yet audited."}, total=2)
+
+
+def test_report_states_coverage_first(fixture_report):
+    """#256: the report names its coverage before any per-module result."""
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    assert "1 of 2 binding modules audited." in text
+    assert "| other | Not yet audited. |" in text
+    assert text.index("binding modules audited") < text.index("| module | covered |")
+
+
+def test_quoted_names_heading_is_scoped(fixture_report):
+    """#256: no statement of the report is scoped wider than what it audited."""
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    assert "Quoted C++ names in the stubs of audited modules" in text
+
+
+def test_json_has_coverage(fixture_report):
+    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE))
+    assert data["coverage"] == {"audited": ["fixture"], "unaudited": {"other": "Not yet audited."}}
+
+
+def test_coverage_of_the_real_tables():
+    coverage = audit.coverage()
+    assert coverage.audited == tuple(sorted(audit.AUDITED_HEADER_PREFIX))
+    assert coverage.unaudited["ompl_base"] == audit.UNAUDITED_MODULES["ompl_base"][0]
+    assert len(coverage.audited) + len(coverage.unaudited) == len(audit.binding_modules())
 
 
 def test_render_lists_delegated_headers(fixture_report):
     """Phase C: a header audited with another module is named in its owner's section, with
     whether that module is audited yet, so no header is silently dropped."""
-    text = audit.render_markdown([fixture_report], PROV)
-    assert "| `tesseract/fixture/shared.h` | other | not yet: module unmapped |" in text
-    data = json.loads(audit.to_json([fixture_report], PROV))
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    assert "| `tesseract/fixture/shared.h` | other | not yet: Not yet audited. |" in text
+    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE))
     assert data["modules"]["fixture"]["delegated"] == {"tesseract/fixture/shared.h": "other"}
 
 
 def test_render_is_deterministic_and_sorted(fixture_report):
-    a = audit.render_markdown([fixture_report], PROV)
-    b = audit.render_markdown([fixture_report], PROV)
+    a = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    b = audit.render_markdown([fixture_report], PROV, COVERAGE)
     assert a == b
     assert "abc1234" in a and "==0.35.0" in a
     gaps = a[a.index("### Gaps") : a.index("### Deviations")]
@@ -790,12 +890,12 @@ def test_render_is_deterministic_and_sorted(fixture_report):
 
 
 def test_render_conclusion_precedes_tables(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
     assert text.index("| fixture |") < text.index("### Gaps")
 
 
 def test_json_roundtrip(fixture_report):
-    data = json.loads(audit.to_json([fixture_report], PROV))
+    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE))
     assert data["provenance"] == PROV
     module = data["modules"]["fixture"]
     assert {g["symbol"] for g in module["gaps"]} == {
@@ -805,6 +905,7 @@ def test_json_roundtrip(fixture_report):
         "Widget.resize",
         "Widget.operator+",
         ORPHAN_HEADER,
+        BROKEN_HEADER,
         "Buffer.__init__",
         "Buffer.write",
         "LostRunner.go",
@@ -876,5 +977,7 @@ def test_call_operator_is_neither_gap_nor_deviation(fixture_report):
 def test_common_audits_directly_included_acm():
     """C1: allowed_collision_matrix.h reaches the TU via utils.h before its own #include."""
     tu = audit.parse_tu(audit.binding_source("tesseract_common"))
-    headers = audit.audited_headers(tu, "tesseract/common/", audit.INCLUDE_DIRS)
+    headers = audit.audited_headers(
+        tu, "tesseract_common", audit.owner_prefixes(), audit.INCLUDE_DIRS
+    )
     assert "allowed_collision_matrix.h" in {h.name for h in headers}

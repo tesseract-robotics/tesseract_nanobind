@@ -16,15 +16,13 @@ from __future__ import annotations
 
 import argparse
 import ast
-import fnmatch
 import functools
 import json
 import os
-import re
 import subprocess
 import sys
 import sysconfig
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -33,11 +31,32 @@ import audit_types
 import clang.cindex as ci
 import nanobind
 import tomllib
+from audit_ownership import (
+    AUDITED_HEADER_PREFIX,
+    HEADER_SUFFIXES,
+    INCLUDE_DIRECTIVE,
+    REPO_ROOT,
+    SRC,
+    STUB_ROOT,
+    THIRD_PARTY_HEADERS,
+    UNAUDITED_HEADERS,
+    UNAUDITED_MODULES,
+    Coverage,
+    UnauditedModuleError,
+    UnknownModuleError,
+    binding_modules,
+    binding_source,
+    check_coverage,
+    committed_stub,
+    coverage,
+    header_auditor,
+    header_owner,
+    is_third_party,
+    is_unaudited,
+    owner_prefixes,
+    owning_prefix,
+)
 from audit_types import NO_ANCESTORS, Ancestors, TypeKey, record_path
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-SRC = REPO_ROOT / "src"
-STUB_ROOT = SRC / "tesseract_robotics"
 
 CONDA_PREFIX = Path(os.environ["CONDA_PREFIX"])
 CONDA_INCLUDE = CONDA_PREFIX / "include"
@@ -48,12 +67,36 @@ LIBCLANG_MAJOR = 22
 CLANG_RESOURCE_DIR = CONDA_PREFIX / "lib" / "clang" / str(LIBCLANG_MAJOR)
 # Matches CMakeLists.txt `set(CMAKE_CXX_STANDARD 17)`.
 CXX_STD = "c++17"
+
+
+class IncludeDirError(FileNotFoundError):
+    """A versioned include dir of the binding build is missing or ambiguous."""
+
+
+def versioned_include(name: str, include: Path) -> Path:
+    """The one `include/<name>-<version>` dir (OMPL installs under `include/ompl-1.7`).
+
+    Raises:
+        IncludeDirError: no such dir, or more than one (an upstream bump left two).
+    """
+    found = sorted(d for d in include.glob(f"{name}-*") if d.is_dir())
+    if len(found) != 1:
+        raise IncludeDirError(
+            f"expected one {include / name}-<version> dir, found {len(found)}: "
+            f"{[d.name for d in found]}"
+        )
+    return found[0]
+
+
 # Header search path of the binding build: tesseract, yaml-cpp and console_bridge
-# from the conda prefix; Eigen under include/eigen3; tesseract_nb.h from src/;
-# nanobind and Python headers from their packages.
+# from the conda prefix; Eigen under include/eigen3; OMPL under include/ompl-<version> and
+# OSQP under include/osqp (the ompl and osqp CMake targets export both); tesseract_nb.h from
+# src/; nanobind and Python headers from their packages.
 INCLUDE_DIRS = (
     CONDA_INCLUDE,
     CONDA_INCLUDE / "eigen3",
+    versioned_include("ompl", CONDA_INCLUDE),
+    CONDA_INCLUDE / "osqp",
     SRC,
     Path(nanobind.include_dir()),
     Path(sysconfig.get_paths()["include"]),
@@ -62,6 +105,8 @@ PARSE_ARGS = (
     "-x",
     "c++",
     f"-std={CXX_STD}",
+    # osqp-eigen's CMake target exports this for OSQP >= 1.0; its headers need it.
+    "-DOSQP_EIGEN_OSQP_IS_V1",
     "-fsyntax-only",
     "-resource-dir",
     str(CLANG_RESOURCE_DIR),
@@ -78,7 +123,15 @@ MAX_REPORTED_DIAGNOSTICS = 20
 
 
 class HeaderParseError(RuntimeError):
-    """libclang reported an error; a partial AST would silently under-report."""
+    """libclang reported an error; a partial AST would silently under-report.
+
+    Attributes:
+        first_error: `file:line` of the first error, relative like `location`.
+    """
+
+    def __init__(self, message: str, first_error: str) -> None:
+        super().__init__(message)
+        self.first_error = first_error
 
 
 def parse_tu(
@@ -103,109 +156,35 @@ def parse_tu(
     errors = [d for d in tu.diagnostics if d.severity >= ci.Diagnostic.Error]
     if errors:
         shown = "\n".join(str(d) for d in errors[:MAX_REPORTED_DIAGNOSTICS])
-        raise HeaderParseError(f"{cpp}: {len(errors)} error diagnostics\n{shown}")
+        first = errors[0].location
+        raise HeaderParseError(
+            f"{cpp}: {len(errors)} error diagnostics\n{shown}",
+            f"{header_rel(Path(first.file.name))}:{first.line}",
+        )
     return tu
 
 
-# One extension module per binding TU: src/<module>/<module>_bindings.cpp.
-# tests/scripts/test_generate_stubs.py pins this set == generate_stubs.discover_modules().
-BINDING_GLOB = "*/*_bindings.cpp"
-
-# Directly included headers under this prefix (relative to an include dir) are a module's
-# audited API; every other declaration in the TU only resolves Python names. Explicit per
-# module because binding TUs also include other components' headers (spec amendment A2).
-AUDITED_HEADER_PREFIX = {
-    "tesseract_collision": "tesseract/collision/",
-    "tesseract_common": "tesseract/common/",
-    "tesseract_environment": "tesseract/environment/",
-    "tesseract_geometry": "tesseract/geometry/",
-    "tesseract_kinematics": "tesseract/kinematics/",
-    "tesseract_scene_graph": "tesseract/scene_graph/",
-    # No such directory: the module wraps templates in other modules' headers, so it audits
-    # only the foreign headers it is the first binding to #include (`header_auditor`).
-    "tesseract_serialization": "tesseract/serialization/",
-    "tesseract_srdf": "tesseract/srdf/",
-    "tesseract_state_solver": "tesseract/state_solver/",
-    "tesseract_urdf": "tesseract/urdf/",
-}
-# Headers under a prefix that are not Python API, as fnmatch patterns on the path below the
-# prefix (`*` also matches `/`). A header the binding #includes directly is audited anyway.
-UNAUDITED_HEADERS = {
-    "test_suite/*": "gtest and Google Benchmark sources installed for plugin authors' tests.",
-    "*_impl.hpp": "cereal implementation fragment, valid only after its `cereal_serialization.h`.",
-    "bullet/*": "Bullet backend internals, loaded as a contact manager plugin; Python reaches "
-    "them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.",
-    "fcl/*": "FCL backend internals, loaded as a contact manager plugin; Python reaches them "
-    "through the `DiscreteContactManager` interface.",
-    "bullet/convex_decomposition_hacd.h": "Declared but not built in 0.35.0: no HACD symbol in any collision library and no CMake target.",
-    # Patterns match below every module prefix; these four exist only under tesseract/common.
-    "cereal_make_array.h": "cereal text-I/O helper for serialization, not API.",
-    "serialization_extensions.h": "Macros and SFINAE checks behind `TESSERACT_CLASS_EXTENSION`, not API.",
-    "sfinae_utils.h": "Compile-time member-detection templates, not API.",
-    "unit_test_utils.h": "gtest serialization helpers for plugin authors' tests.",
-    "environment_cache.h": "No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.",
-    "environment_monitor.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
-    "environment_monitor_interface.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
-    # Kinematics solver plugins, loaded by `KinematicsPluginFactory`; Python reaches them
-    # through `ForwardKinematics`/`InverseKinematics`. `kdl/*` also matches
-    # `state_solver/kdl/*`, whose `KDLStateSolver` stays audited: the binding includes it.
-    "ikfast/*": "IKFast solver plugin template, loaded by `KinematicsPluginFactory`.",
-    "kdl/*": "KDL solver plugins, loaded by `KinematicsPluginFactory`.",
-    "opw/*": "OPW solver plugin, loaded by `KinematicsPluginFactory`.",
-    "ur/*": "Universal Robots solver plugin, loaded by `KinematicsPluginFactory`.",
-    "rep_*": "Robot-with-external-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
-    "rop_*": "Robot-on-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
-    "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to `OFKTStateSolver`.",
-}
-# Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
-# UNAUDITED_HEADERS. Never audited, not even when the binding #includes one directly: such an
-# include is build plumbing, not a statement that the library is module API.
-THIRD_PARTY_HEADERS = {
-    "vhacd/VHACD.h": "Vendored third-party V-HACD library (namespace `VHACD`). The collision "
-    "binding #includes it directly only so that `convex_decomposition_vhacd.h` does not compile "
-    "a second copy of its implementation (#179).",
-}
-# Direct `<…>` includes decide header ownership: a header its prefix owner's binding does not
-# #include, but another binding does, is audited with `header_auditor` of those modules.
-INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
-HEADER_SUFFIXES = frozenset({".h", ".hpp"})
-
-
-class UnknownModuleError(LookupError):
-    """The requested module is not an auditable binding module."""
+class PrefixMismatchError(ValueError):
+    """`audit_tu` got a module prefix that disagrees with that module's `prefixes` entry."""
 
 
 class StubMissingError(FileNotFoundError):
     """The module has no committed stub."""
 
 
-def binding_modules() -> list[str]:
-    """Short names of all binding modules, sorted."""
-    return sorted(p.parent.name for p in SRC.glob(BINDING_GLOB))
-
-
-def binding_source(module: str) -> Path:
-    """`tesseract_collision` → `src/tesseract_collision/tesseract_collision_bindings.cpp`."""
-    return SRC / module / f"{module}_bindings.cpp"
-
-
-def committed_stub(module: str) -> Path:
-    """`tesseract_collision` → `src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi`."""
-    return STUB_ROOT / module / f"_{module}.pyi"
-
-
 def resolve_module(module: str) -> str:
     """Validate a short module name for auditing.
 
     Raises:
-        UnknownModuleError: not a binding module, or no `AUDITED_HEADER_PREFIX` entry yet.
+        UnknownModuleError: not a binding module.
+        UnauditedModuleError: listed in `UNAUDITED_MODULES`.
         StubMissingError: no committed stub.
     """
     known = binding_modules()
     if module not in known:
         raise UnknownModuleError(f"{module!r} is not a binding module; known: {', '.join(known)}")
-    if module not in AUDITED_HEADER_PREFIX:
-        raise UnknownModuleError(f"{module!r} has no AUDITED_HEADER_PREFIX entry yet")
+    if module in UNAUDITED_MODULES:
+        raise UnauditedModuleError(f"{module!r} is not audited: {UNAUDITED_MODULES[module][0]}")
     load_stub(committed_stub(module))
     return module
 
@@ -313,6 +292,7 @@ class Kind(str, Enum):
     PROTOCOL = "protocol"
     FAIL_LOUD = "fail-loud"
     HEADER = "header"
+    UNPARSEABLE_HEADER = "unparseable header"
 
 
 @dataclass(frozen=True)
@@ -379,15 +359,18 @@ def location(cursor: ci.Cursor) -> str:
 
 
 def audited_headers(
-    tu: ci.TranslationUnit, prefix: str, include_dirs: Sequence[Path]
+    tu: ci.TranslationUnit,
+    module: str,
+    prefixes: Mapping[str, tuple[str, ...]],
+    include_dirs: Sequence[Path],
 ) -> frozenset[Path]:
-    """Headers the TU's main file `#include`s itself and that live under `prefix`,
+    """Headers the TU's main file `#include`s itself that `module` owns (`owning_prefix`),
     except `THIRD_PARTY_HEADERS`.
 
     Read from the main file's inclusion directives, not `get_includes()` depth: a header
     that an earlier include already pulled in is reported there only at that depth.
     """
-    roots = [(d / prefix).resolve() for d in include_dirs]
+    roots = [((d / p).resolve(), p) for d in include_dirs for p in prefixes[module]]
     main = Path(tu.spelling).resolve()
     direct = (
         Path(c.get_included_file().name).resolve()
@@ -398,21 +381,36 @@ def audited_headers(
     return frozenset(
         h
         for h in direct
-        for r in roots
-        if h.is_relative_to(r) and not is_third_party(h.relative_to(r).as_posix())
+        for r, p in roots
+        if h.is_relative_to(r) and _owns(module, p + h.relative_to(r).as_posix(), prefixes)
     )
 
 
-def prefix_headers(prefix: str, include_dirs: Sequence[Path]) -> dict[Path, str]:
-    """Every header under `prefix` in the include dirs: resolved path → `#include` spelling."""
+def _owns(module: str, spelling: str, prefixes: Mapping[str, tuple[str, ...]]) -> bool:
+    """`module` owns the header and it is not a `THIRD_PARTY_HEADERS` entry."""
+    owner = owning_prefix(spelling, prefixes)
+    return (
+        owner is not None
+        and owner[0] == module
+        and not is_third_party(spelling.removeprefix(owner[1]))
+    )
+
+
+def prefix_headers(
+    module: str, prefixes: Mapping[str, tuple[str, ...]], include_dirs: Sequence[Path]
+) -> dict[Path, str]:
+    """Every header under `module`'s prefixes in the include dirs that `module` owns (a header
+    under a longer prefix of another module is that module's): resolved path → spelling."""
     found: dict[Path, str] = {}
     for d in include_dirs:
-        root = d / prefix
-        if not root.is_dir():
-            continue
-        for h in sorted(root.rglob("*")):
-            if h.suffix in HEADER_SUFFIXES:
-                found.setdefault(h.resolve(), h.relative_to(d).as_posix())
+        for prefix in prefixes[module]:
+            root = d / prefix
+            if not root.is_dir():
+                continue
+            for h in sorted(root.rglob("*")):
+                spelling = h.relative_to(d).as_posix()
+                if h.suffix in HEADER_SUFFIXES and header_owner(spelling, prefixes) == module:
+                    found.setdefault(h.resolve(), spelling)
     return found
 
 
@@ -428,40 +426,11 @@ def binding_module(path: Path) -> str:
     return path.stem.removesuffix("_bindings")
 
 
-def header_auditor(includers: Iterable[str]) -> str:
-    """The one module that audits a header its prefix owner's binding does not #include.
-
-    The first of the #including modules by name, mapped or not, so the choice does not move
-    when another module gets an `AUDITED_HEADER_PREFIX` entry.
-    """
-    return min(includers)
-
-
-def header_owner(spelling: str, prefixes: Mapping[str, str]) -> str | None:
-    """The module whose prefix holds the header (longest prefix wins), or None."""
-    owners = [m for m, p in prefixes.items() if spelling.startswith(p)]
-    return max(owners, key=lambda m: len(prefixes[m]), default=None)
-
-
-def owner_prefixes() -> dict[str, str]:
-    """Every binding module's header prefix: `AUDITED_HEADER_PREFIX`, else `tesseract_<x>` →
-    `tesseract/<x>/` where that directory exists. Used only to decide who owns a header."""
-    out: dict[str, str] = {}
-    for m in binding_modules():
-        if m in AUDITED_HEADER_PREFIX:
-            out[m] = AUDITED_HEADER_PREFIX[m]
-        elif m.startswith("tesseract_"):
-            p = f"tesseract/{m.removeprefix('tesseract_')}/"
-            if any((d / p).is_dir() for d in INCLUDE_DIRS):
-                out[m] = p
-    return out
-
-
 def foreign_headers(
     module: str,
     own_includes: frozenset[str],
     other_includes: Mapping[str, frozenset[str]],
-    prefixes: Mapping[str, str],
+    prefixes: Mapping[str, tuple[str, ...]],
     include_dirs: Sequence[Path],
 ) -> dict[Path, str]:
     """Headers under another module's prefix that this binding #includes directly, that the
@@ -481,18 +450,6 @@ def foreign_headers(
                 found[(d / spelling).resolve()] = spelling
                 break
     return found
-
-
-def is_third_party(below: str) -> bool:
-    """`below`: a header path relative to its module prefix."""
-    return any(fnmatch.fnmatchcase(below, pattern) for pattern in THIRD_PARTY_HEADERS)
-
-
-def is_unaudited(spelling: str, prefix: str) -> bool:
-    below = spelling.removeprefix(prefix)
-    return is_third_party(below) or any(
-        fnmatch.fnmatchcase(below, pattern) for pattern in UNAUDITED_HEADERS
-    )
 
 
 def _is_eigen_ref_of_non_const(t: ci.Type) -> bool:
@@ -1438,10 +1395,44 @@ def unincluded_header_gaps(
 
     The headers are parsed in a synthetic TU that includes the binding first, so they see
     the binding's flags and macros. The row points at the header's first auditable
-    declaration; a header of forward declarations or macros only gets no row.
+    declaration; a header of forward declarations or macros only gets no row. If that TU does
+    not compile, each header is parsed alone, and one that does not compile on its own is an
+    `unparseable header` row at its first error: it must not hide the other headers' rows.
+    The headers that do parse alone must still parse together.
+
+    Raises:
+        HeaderParseError: the synthetic TU does not compile and no header fails on its own
+            (headers that conflict only together), or the headers that parse alone do not
+            parse together.
     """
     if not headers:
         return []
+    try:
+        return _header_gaps(cpp_path, headers, extra_include_dirs)
+    except HeaderParseError:
+        unparseable: list[Gap] = []
+        parseable: dict[Path, str] = {}
+        for h, spelling in sorted(headers.items(), key=lambda hs: hs[1]):
+            try:
+                _header_gaps(cpp_path, {h: spelling}, extra_include_dirs)
+            except HeaderParseError as e:
+                unparseable.append(Gap(spelling, Kind.UNPARSEABLE_HEADER, e.first_error))
+            else:
+                parseable[h] = spelling
+        if not unparseable:
+            raise  # no header is at fault alone: the combined error is the finding
+    rows = _header_gaps(cpp_path, parseable, extra_include_dirs) if parseable else []
+    return [*unparseable, *rows]
+
+
+def _header_gaps(
+    cpp_path: Path, headers: dict[Path, str], extra_include_dirs: Sequence[Path]
+) -> list[Gap]:
+    """`unincluded_header_gaps` for headers that parse together in one synthetic TU.
+
+    Raises:
+        HeaderParseError: the synthetic TU does not compile.
+    """
     synthetic = cpp_path.with_name(f"{cpp_path.stem}_unincluded_headers.cpp")
     text = f'#include "{cpp_path.name}"\n' + "".join(
         f"#include <{spelling}>\n" for spelling in sorted(headers.values())
@@ -1464,30 +1455,38 @@ def audit_tu(
     cpp_path: Path,
     stub_path: Path,
     init_path: Path,
-    prefix: str,
+    prefix: tuple[str, ...],
     extra_include_dirs: Sequence[Path] = (),
     other_bindings: Sequence[Path] = (),
     stub_roots: Sequence[Path] = (SRC,),
-    prefixes: Mapping[str, str] | None = None,
+    prefixes: Mapping[str, tuple[str, ...]] | None = None,
 ) -> ModuleReport:
     """Audit one translation unit against one stub and package `__init__.py`.
 
-    Audits every header under `prefix`, except `UNAUDITED_HEADERS` and headers that the binding
+    Audits every header under `prefix` (the module's prefixes) that the module owns, except
+    `UNAUDITED_HEADERS` and headers that the binding
     does not #include but one of `other_bindings` does: those are audited by `header_auditor`
     of their includers and listed in `ModuleReport.delegated`. Conversely, a header under
-    another module's prefix (`prefixes`: module → prefix, for ownership) that this binding
+    another module's prefix (`prefixes`: module → prefixes, for ownership) that this binding
     #includes and its owner's binding does not is audited here when this module is its auditor.
     Stub base classes bound in other extensions resolve through stubs under `stub_roots`.
+
+    Raises:
+        PrefixMismatchError: `prefixes` holds `module` with other prefixes than `prefix`.
     """
     include_dirs = (*extra_include_dirs, *INCLUDE_DIRS)
-    prefixes = {module: prefix} if prefixes is None else prefixes
+    if prefixes is not None and prefixes.get(module, prefix) != prefix:
+        raise PrefixMismatchError(
+            f"{module}: prefix {prefix} disagrees with prefixes[{module!r}] = {prefixes[module]}"
+        )
+    prefixes = {**(prefixes or {}), module: prefix}
     tu = parse_tu(cpp_path, extra_include_dirs)
-    direct = audited_headers(tu, prefix, include_dirs)
+    direct = audited_headers(tu, module, prefixes, include_dirs)
     other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
     owned_elsewhere = frozenset().union(*other_includes.values())
     audited: dict[Path, str] = {}
     delegated: dict[str, str] = {}
-    for h, spelling in prefix_headers(prefix, include_dirs).items():
+    for h, spelling in prefix_headers(module, prefixes, include_dirs).items():
         if h in direct:
             audited[h] = spelling
         elif is_unaudited(spelling, prefix):
@@ -1526,6 +1525,7 @@ def audit_module(module: str) -> ModuleReport:
 
     Raises:
         UnknownModuleError: see `resolve_module`.
+        UnauditedModuleError: see `resolve_module`.
         StubMissingError: see `resolve_module`.
         HeaderParseError: see `parse_tu`.
     """
@@ -1552,7 +1552,9 @@ LIMITATION = (
     "column counts the C++ overloads covered that way. Overloads that differ only in `const` "
     "of `this` or `&`/`&&` of a parameter count as one. An overload taking a raw buffer (a "
     "pointer to a non-`char` scalar) has no Python form and is reported whatever the arity, "
-    "unless it is a `(const uint8_t*, size_t)` pair bound as one `bytes` parameter."
+    "unless it is a `(const uint8_t*, size_t)` pair bound as one `bytes` parameter. "
+    "A header the binding never includes that does not compile on its own is listed as "
+    "`unparseable header`, at its first error, and its API is not checked."
 )
 
 
@@ -1593,8 +1595,8 @@ def _table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
     ]
 
 
-def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
-    """The mkdocs report page: provenance, conclusion, then per-module tables."""
+def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Coverage) -> str:
+    """The mkdocs report page: provenance, coverage, conclusion, then per-module tables."""
     out = [
         "# Binding API audit",
         "",
@@ -1602,6 +1604,11 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
         f"tesseract-robotics `{prov['tesseract-robotics']}` · libclang `{prov['libclang']}` · "
         f"stubs `{prov['stubs']}`.",
         "",
+        f"{len(cov.audited)} of {cov.total} binding modules audited.",
+        "",
+        "Not audited:",
+        "",
+        *_table(("module", "reason"), list(cov.unaudited.items())),
         "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |",
         "|---|---|---|---|---|---|---|",
         *(
@@ -1610,7 +1617,8 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
             for r in reports
         ),
         "",
-        "Quoted C++ names in stubs (unbound type, or a missing `nb::module_::import_`):",
+        "Quoted C++ names in the stubs of audited modules (unbound type, or a missing "
+        "`nb::module_::import_`):",
         "",
         *_table(
             ("module", "Python name", "annotation", "stub:line"),
@@ -1657,7 +1665,7 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
                 (
                     f"`{h}`",
                     m,
-                    "audited" if m in AUDITED_HEADER_PREFIX else "not yet: module unmapped",
+                    "audited" if m in cov.audited else f"not yet: {cov.unaudited[m]}",
                 )
                 for h, m in r.delegated.items()
             ],
@@ -1665,7 +1673,7 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str]) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-def to_json(reports: list[ModuleReport], prov: dict[str, str]) -> str:
+def to_json(reports: list[ModuleReport], prov: dict[str, str], cov: Coverage) -> str:
     """Same data as the page, for issue drafting."""
     modules = {
         r.module: {
@@ -1679,7 +1687,12 @@ def to_json(reports: list[ModuleReport], prov: dict[str, str]) -> str:
         }
         for r in reports
     }
-    return json.dumps({"provenance": prov, "modules": modules}, indent=2, sort_keys=True) + "\n"
+    data = {
+        "provenance": prov,
+        "coverage": {"audited": list(cov.audited), "unaudited": dict(cov.unaudited)},
+        "modules": modules,
+    }
+    return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1691,12 +1704,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", type=Path, help="also write the findings as JSON")
     args = parser.parse_args(argv)
 
+    check_coverage(binding_modules())
     modules = sorted(resolve_module(m) for m in args.modules)
     reports = [audit_module(m) for m in modules]
     prov = provenance(modules)
-    REPORT_PATH.write_text(render_markdown(reports, prov), encoding="utf-8")
+    cov = coverage()
+    REPORT_PATH.write_text(render_markdown(reports, prov, cov), encoding="utf-8")
     if args.json:
-        args.json.write_text(to_json(reports, prov), encoding="utf-8")
+        args.json.write_text(to_json(reports, prov, cov), encoding="utf-8")
     print(f"{len(reports)} modules → {REPORT_PATH.relative_to(REPO_ROOT)}")
     return 0
 

@@ -143,7 +143,7 @@ def test_check_reports_unified_diff():
 
 
 def test_binding_sources_match_extension_modules():
-    """The audit (scripts/audit_bindings.py, BINDING_GLOB) takes its module list from
+    """The audit (scripts/audit_ownership.py, BINDING_GLOB) takes its module list from
     src/*/*_bindings.cpp because it must not import the package; this pins that set
     to the modules the build actually produces."""
     sources = {p.parent.name for p in (REPO_ROOT / "src").glob("*/*_bindings.cpp")}
