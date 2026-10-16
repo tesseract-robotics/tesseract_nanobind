@@ -2,7 +2,7 @@
 trajopt_ifopt Python bindings - variables, constraints, and costs for IFOPT-based trajectory optimization
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 import enum
 from typing import Annotated, overload
 
@@ -12,6 +12,8 @@ import scipy.sparse
 
 import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_common._tesseract_common
+import tesseract_robotics.tesseract_environment._tesseract_environment
+import tesseract_robotics.tesseract_kinematics._tesseract_kinematics
 
 
 class ConstraintNotLinkedError(RuntimeError):
@@ -19,6 +21,20 @@ class ConstraintNotLinkedError(RuntimeError):
 
 class CartLineIndicesUnsupportedError(ValueError):
     """CartLineConstraint.getJacobian() with fewer than 6 indices (#237)."""
+
+class BoundsSizeError(ValueError):
+    """
+    A bounds list whose length is not the number of rows or values it bounds.
+    """
+
+class JointValuesSizeError(ValueError):
+    """joint_vals whose length is not the constraint's number of joints."""
+
+class VarSizeMismatchError(ValueError):
+    """toTrajArray over Vars of different sizes."""
+
+class VarNotInVariableSetError(ValueError):
+    """A collision constraint built on a Var that is not in a NodesVariables."""
 
 class BoundsType(enum.Enum):
     UNBOUNDED = 0
@@ -58,6 +74,12 @@ class Bounds:
     def getType(self) -> BoundsType:
         """Get the cached bound classification"""
 
+    def __iadd__(self, scalar: float) -> Bounds:
+        """Shift both limits up by scalar and reclassify the bounds type"""
+
+    def __isub__(self, scalar: float) -> Bounds:
+        """Shift both limits down by scalar and reclassify the bounds type"""
+
 class Component:
     def getName(self) -> str:
         """Get the component name"""
@@ -65,20 +87,32 @@ class Component:
     def getRows(self) -> int:
         """Get the number of rows"""
 
-class Variables(Component):
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
-        """Get the current variable values"""
-
-    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> None:
-        """Set the variable values from a flat decision vector"""
+        """Get the current values (variables, or constraint / cost values)"""
 
     def getBounds(self) -> list[Bounds]:
-        """Get the variable bounds"""
+        """Get the bounds, one per row"""
+
+class Variables(Component):
+    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> None:
+        """Set the variable values from a flat decision vector"""
 
     def getHash(self) -> int:
         """Get the variable hash for caching"""
 
 class Differentiable(Component):
+    class Mode(enum.Enum):
+        STACK_ROWS = 0
+        """One row per value"""
+
+        SUM_TO_SCALAR = 1
+        """All values summed into one row"""
+
+    def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
+        """
+        Get the Jacobian (sparse matrix); a constraint set must be linked to variables first
+        """
+
     def isDynamic(self) -> bool:
         """Whether this component can change its number of rows"""
 
@@ -106,12 +140,6 @@ class ConstraintSet(Differentiable):
         Get the linked optimization variables (protected in C++, exposed via trampoline)
         """
 
-    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
-        """Get the current constraint values"""
-
-    def getBounds(self) -> list[Bounds]:
-        """Get the constraint bounds"""
-
     def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
         """Get the constraint Jacobian (sparse matrix)"""
 
@@ -122,8 +150,25 @@ class ConstraintSet(Differentiable):
         """Get the coefficient vector"""
 
 class Var:
+    @overload
+    def __init__(self, index: int, name: str, value: float, bounds: Bounds = ...) -> None:
+        """
+        Create a standalone scalar variable at index of the decision vector; a value outside bounds is clamped into them
+        """
+
+    @overload
+    def __init__(self, index: int, identifier: str, names: Sequence[str], values: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds]) -> None:
+        """
+        Create a standalone vector variable starting at index of the decision vector; values outside bounds are clamped into them
+        """
+
     def getIdentifier(self) -> str:
         """Get the identifier for the variable segment"""
+
+    def getParent(self) -> Node | None:
+        """
+        The Node holding this variable, or None for a standalone Var. The Node belongs to its NodesVariables: use it only while that set is alive
+        """
 
     def getIndex(self) -> int:
         """Get the starting index of this variable segment"""
@@ -149,6 +194,11 @@ class Node:
 
     def getName(self) -> str:
         """Get the name of this node"""
+
+    def getParent(self) -> NodesVariables | None:
+        """
+        The NodesVariables holding this node, or None before it is handed to one. Use it only while that set is alive
+        """
 
     @overload
     def addVar(self, name: str, value: float, bounds: Bounds = ...) -> Var:
@@ -177,6 +227,11 @@ class Node:
         """Update all variable values from the full decision vector"""
 
 class NodesVariables(Variables):
+    def __init__(self, variable_name: str, nodes: Sequence[Node]) -> None:
+        """
+        Create the variable set from its nodes, in order; takes ownership of the nodes
+        """
+
     def getNode(self, opt_idx: int) -> Node:
         """Get node based on index"""
 
@@ -208,19 +263,53 @@ def toBounds(limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), wri
 def toBounds(lower_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], upper_limits: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> list[Bounds]:
     """Convert lower/upper limit vectors to vector of Bounds"""
 
+def getClosestValidPoint(input: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], bounds: Sequence[Bounds]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """input clamped into bounds, entry by entry"""
+
+def calcBoundsErrors(input: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], bounds: Sequence[Bounds]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """
+    Signed bound error per entry: input - lower below the lower bound (negative), input - upper above the upper bound (positive), else 0
+    """
+
+def calcBoundsViolations(input: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], bounds: Sequence[Bounds]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """Bound violation per entry: the magnitude of calcBoundsErrors"""
+
+def calcNumericalConstraintGradient(variables: Variables, constraint_set: ConstraintSet, epsilon: float = 1e-08) -> scipy.sparse.csr_matrix[float]:
+    """
+    Forward-difference Jacobian of constraint_set's values over variables (sparse matrix). Perturbs each variable in turn through variables.setVariables, calling update() and getValues(), and restores the variables afterwards.
+    """
+
+def calcForwardNumJac(f: Callable[[Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]], Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]], x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], epsilon: float) -> scipy.sparse.csr_matrix[float]:
+    """
+    Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x))
+    """
+
+def toTrajArray(joint_positions: Sequence[Var]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')]:
+    """The Vars' values as a waypoints x joints matrix, one row per Var"""
+
+def toJointTrajectory(joint_positions: Sequence[Var]) -> tesseract_robotics.tesseract_common._tesseract_common.JointTrajectory:
+    """
+    A JointTrajectory with one JointState (the Var's names and values) per Var
+    """
+
 class CartPosConstraint(ConstraintSet):
     @overload
-    def __init__(self, position_var: Var, manip: "tesseract::kinematics::JointGroup", source_frame: str, target_frame: str, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, position_var: Var, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: str, target_frame: str, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """Create Cartesian position constraint"""
 
     @overload
-    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds], manip: "tesseract::kinematics::JointGroup", source_frame: str, target_frame: str, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+    def __init__(self, position_var: Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], bounds: Sequence[Bounds], manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: str, target_frame: str, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, name: str = 'CartPos', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
         """
         Create Cartesian position constraint with per-axis coefficients and bounds. coeffs and bounds are both length 6, ordered [x, y, z, rx, ry, rz]; a zero coefficient frees that axis.
         """
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
+        """
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
@@ -276,6 +365,12 @@ class CollisionCoeffData:
     @overload
     def __init__(self, default_collision_coeff: float) -> None: ...
 
+    def __eq__(self, arg: CollisionCoeffData, /) -> bool: ...
+
+    def __ne__(self, arg: CollisionCoeffData, /) -> bool: ...
+
+    __hash__: None = None
+
     def setDefaultCollisionCoeff(self, arg: float, /) -> None: ...
 
     def getDefaultCollisionCoeff(self) -> float: ...
@@ -284,9 +379,11 @@ class CollisionCoeffData:
 
     def getCollisionCoeff(self, obj1: str, obj2: str) -> float: ...
 
-    def setPairCollisionCoeff(self, obj1: str, obj2: str, collision_coeff: float) -> None: ...
+    def getCollisionCoeffPairData(self) -> dict[tuple[str, str], float]:
+        """Every pair with a coefficient: {(link_a, link_b): coeff}"""
 
-    def getPairCollisionCoeff(self, obj1: str, obj2: str) -> float: ...
+    def getPairsWithZeroCoeff(self) -> set[tuple[str, str]]:
+        """The pairs whose coefficient is 0 (collision checking switched off)"""
 
 class TrajOptCollisionConfig:
     @overload
@@ -294,6 +391,12 @@ class TrajOptCollisionConfig:
 
     @overload
     def __init__(self, margin: float, coeff: float) -> None: ...
+
+    def __eq__(self, arg: TrajOptCollisionConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptCollisionConfig, /) -> bool: ...
+
+    __hash__: None = None
 
     @property
     def enabled(self) -> bool: ...
@@ -331,7 +434,184 @@ class TrajOptCollisionConfig:
     @max_num_cnt.setter
     def max_num_cnt(self, arg: int, /) -> None: ...
 
+class LinkGradientResults:
+    def __init__(self) -> None: ...
+
+    @property
+    def has_gradient(self) -> bool: ...
+
+    @has_gradient.setter
+    def has_gradient(self, arg: bool, /) -> None: ...
+
+    @property
+    def gradient(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    @gradient.setter
+    def gradient(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
+
+    @property
+    def translation_vector(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    @translation_vector.setter
+    def translation_vector(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
+
+    @property
+    def jacobian(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]: ...
+
+    @jacobian.setter
+    def jacobian(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')] | Sequence[Sequence[float]], /) -> None: ...
+
+    @property
+    def scale(self) -> float: ...
+
+    @scale.setter
+    def scale(self, arg: float, /) -> None: ...
+
+    @property
+    def cc_type(self) -> tesseract_robotics.tesseract_collision._tesseract_collision.ContinuousCollisionType: ...
+
+    @cc_type.setter
+    def cc_type(self, arg: tesseract_robotics.tesseract_collision._tesseract_collision.ContinuousCollisionType, /) -> None: ...
+
+    def clear(self) -> None: ...
+
+class GradientResults:
+    def __init__(self) -> None: ...
+
+    @property
+    def gradients(self) -> list[LinkGradientResults]: ...
+
+    @gradients.setter
+    def gradients(self, arg: Sequence[LinkGradientResults], /) -> None: ...
+
+    @property
+    def cc_gradients(self) -> list[LinkGradientResults]: ...
+
+    @cc_gradients.setter
+    def cc_gradients(self, arg: Sequence[LinkGradientResults], /) -> None: ...
+
+    @property
+    def error(self) -> float: ...
+
+    @error.setter
+    def error(self, arg: float, /) -> None: ...
+
+    @property
+    def error_with_buffer(self) -> float: ...
+
+    @error_with_buffer.setter
+    def error_with_buffer(self, arg: float, /) -> None: ...
+
+    def clear(self) -> None: ...
+
+class LinkMaxError:
+    def __init__(self) -> None: ...
+
+    @property
+    def has_error(self) -> list[bool]: ...
+
+    @has_error.setter
+    def has_error(self, arg: Sequence[bool], /) -> None: ...
+
+    @property
+    def error(self) -> list[float]: ...
+
+    @error.setter
+    def error(self, arg: Sequence[float], /) -> None: ...
+
+    @property
+    def error_with_buffer(self) -> list[float]: ...
+
+    @error_with_buffer.setter
+    def error_with_buffer(self, arg: Sequence[float], /) -> None: ...
+
+    def getMaxError(self) -> float: ...
+
+    def getMaxErrorWithBuffer(self) -> float: ...
+
+class GradientResultsSet:
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, reserve: int) -> None: ...
+
+    @property
+    def key(self) -> tuple[str, str]: ...
+
+    @key.setter
+    def key(self, arg: tuple[str, str], /) -> None: ...
+
+    @property
+    def shape_key(self) -> tuple[int, int]: ...
+
+    @shape_key.setter
+    def shape_key(self, arg: tuple[int, int], /) -> None: ...
+
+    @property
+    def coeff(self) -> float: ...
+
+    @coeff.setter
+    def coeff(self, arg: float, /) -> None: ...
+
+    @property
+    def is_continuous(self) -> bool: ...
+
+    @is_continuous.setter
+    def is_continuous(self, arg: bool, /) -> None: ...
+
+    @property
+    def max_error(self) -> list[LinkMaxError]: ...
+
+    @max_error.setter
+    def max_error(self, arg: Sequence[LinkMaxError], /) -> None: ...
+
+    @property
+    def results(self) -> list[GradientResults]: ...
+
+    @results.setter
+    def results(self, arg: Sequence[GradientResults], /) -> None: ...
+
+    def add(self, gradient_result: GradientResults) -> None: ...
+
+    def getMaxError(self) -> float: ...
+
+    def getMaxErrorT0(self) -> float: ...
+
+    def getMaxErrorT1(self) -> float: ...
+
+    def getMaxErrorWithBuffer(self) -> float: ...
+
+    def getMaxErrorWithBufferT0(self) -> float: ...
+
+    def getMaxErrorWithBufferT1(self) -> float: ...
+
+class CollisionCacheData:
+    def __init__(self) -> None: ...
+
+    @property
+    def contact_results_map(self) -> tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap: ...
+
+    @contact_results_map.setter
+    def contact_results_map(self, arg: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap, /) -> None: ...
+
+    @property
+    def gradient_results_sets(self) -> list[GradientResultsSet]: ...
+
+    @gradient_results_sets.setter
+    def gradient_results_sets(self, arg: Sequence[GradientResultsSet], /) -> None: ...
+
 class DiscreteCollisionEvaluator:
+    def calcCollisions(self, dof_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], max_allowed: int) -> CollisionCacheData:
+        """
+        Check collisions at dof_vals, keeping at most max_allowed contacts per link pair; returns the contacts and their gradient result sets
+        """
+
+    def getGradient(self, dofvals: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], contact_result: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResult) -> GradientResults:
+        """Gradient of one contact at dofvals"""
+
+    def getJointGroup(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup: ...
+
     def getCollisionMarginBuffer(self) -> float: ...
 
     def getCollisionMarginData(self) -> tesseract_robotics.tesseract_common._tesseract_common.CollisionMarginData: ...
@@ -339,16 +619,29 @@ class DiscreteCollisionEvaluator:
     def getCollisionCoeffData(self) -> CollisionCoeffData: ...
 
 class SingleTimestepCollisionEvaluator(DiscreteCollisionEvaluator):
-    def __init__(self, manip: "tesseract::kinematics::JointGroup", env: "tesseract::environment::Environment", collision_config: TrajOptCollisionConfig, dynamic_environment: bool = False) -> None: ...
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, collision_config: TrajOptCollisionConfig, dynamic_environment: bool = False) -> None: ...
 
 class DiscreteCollisionConstraint(ConstraintSet):
     def __init__(self, collision_evaluator: DiscreteCollisionEvaluator, position_var: Var, max_num_cnt: int = 1, fixed_sparsity: bool = False, name: str = 'DiscreteCollision') -> None: ...
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
     def getCollisionEvaluator(self) -> DiscreteCollisionEvaluator: ...
 
 class ContinuousCollisionEvaluator:
+    def calcCollisionData(self, dof_vals0: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], dof_vals1: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars0_fixed: bool, vars1_fixed: bool, max_allowed: int) -> CollisionCacheData:
+        """
+        Check collisions along the segment dof_vals0 -> dof_vals1, keeping at most max_allowed contacts per link pair; returns the contacts and their gradient result sets
+        """
+
+    def calcGradientData(self, dof_vals0: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], dof_vals1: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], contact_results: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResult) -> GradientResults:
+        """Gradient of one contact along the segment dof_vals0 -> dof_vals1"""
+
+    def getJointGroup(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup: ...
+
     def getCollisionMarginBuffer(self) -> float: ...
 
     def getCollisionMarginData(self) -> tesseract_robotics.tesseract_common._tesseract_common.CollisionMarginData: ...
@@ -356,15 +649,55 @@ class ContinuousCollisionEvaluator:
     def getCollisionCoeffData(self) -> CollisionCoeffData: ...
 
 class LVSDiscreteCollisionEvaluator(ContinuousCollisionEvaluator):
-    def __init__(self, manip: "tesseract::kinematics::JointGroup", env: "tesseract::environment::Environment", collision_config: TrajOptCollisionConfig, dynamic_environment: bool = False) -> None: ...
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, collision_config: TrajOptCollisionConfig, dynamic_environment: bool = False) -> None: ...
 
 class LVSContinuousCollisionEvaluator(ContinuousCollisionEvaluator):
-    def __init__(self, manip: "tesseract::kinematics::JointGroup", env: "tesseract::environment::Environment", collision_config: TrajOptCollisionConfig, dynamic_environment: bool = False) -> None: ...
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, collision_config: TrajOptCollisionConfig, dynamic_environment: bool = False) -> None: ...
 
 class ContinuousCollisionConstraint(ConstraintSet):
     def __init__(self, collision_evaluator: ContinuousCollisionEvaluator, position_var0: Var, position_var1: Var, fixed0: bool = False, fixed1: bool = False, max_num_cnt: int = 1, fixed_sparsity: bool = False, name: str = 'LVSCollision') -> None: ...
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def getCollisionEvaluator(self) -> ContinuousCollisionEvaluator: ...
+
+class DiscreteCollisionConstraintD(ConstraintSet):
+    def __init__(self, collision_evaluator: DiscreteCollisionEvaluator, position_var: Var, name: str = 'DiscreteCollision') -> None:
+        """
+        Create a discrete collision constraint with one row per contact (rows change on update())
+        """
+
+    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def getCollisionEvaluator(self) -> DiscreteCollisionEvaluator: ...
+
+class ContinuousCollisionConstraintD(ConstraintSet):
+    def __init__(self, collision_evaluator: ContinuousCollisionEvaluator, position_var0: Var, position_var1: Var, fixed0: bool = False, fixed1: bool = False, name: str = 'LVSCollision') -> None:
+        """
+        Create a continuous collision constraint with one row per contact (rows change on update())
+        """
+
+    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def getCollisionEvaluator(self) -> ContinuousCollisionEvaluator: ...
+
+class ContinuousCollisionNumericalConstraint(ConstraintSet):
+    def __init__(self, collision_evaluator: ContinuousCollisionEvaluator, position_var0: Var, position_var1: Var, fixed0: bool = False, fixed1: bool = False, max_num_cnt: int = 1, fixed_sparsity: bool = False, name: str = 'LVSCollision') -> None:
+        """Create continuous collision constraint with numerical jacobians"""
+
+    def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
 
     def getCollisionEvaluator(self) -> ContinuousCollisionEvaluator: ...
 
@@ -376,14 +709,31 @@ class JointJerkConstraint(ConstraintSet):
         """Get current constraint values"""
 
 class CartLineInfo:
+    @overload
     def __init__(self) -> None: ...
 
+    @overload
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: str, target_frame: str, target_frame_offset1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, indices: Annotated[NDArray[numpy.int32], dict(shape=(None,), order='C')] | Sequence[int]) -> None:
+        """
+        Create the info of a line from target_frame_offset1 to target_frame_offset2
+        """
+
+    @overload
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: str, target_frame: str, target_frame_offset1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, source_frame_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> None:
+        """Create the info of a line, constraining all 6 indices"""
+
+    @overload
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: str, target_frame: str, target_frame_offset1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_frame_offset2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> None:
+        """
+        Create the info of a line, with an identity source_frame_offset and all 6 indices
+        """
+
     @property
-    def manip(self) -> "tesseract::kinematics::JointGroup":
+    def manip(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup:
         """The joint group"""
 
     @manip.setter
-    def manip(self, arg: "tesseract::kinematics::JointGroup", /) -> None: ...
+    def manip(self, arg: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, /) -> None: ...
 
     @property
     def source_frame(self) -> str:
@@ -434,9 +784,23 @@ class CartLineConstraint(ConstraintSet):
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
 
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def getLine(self) -> tuple[tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]:
+        """The line's two end poses (target_frame_offset1, target_frame_offset2)"""
+
+    def getInfo(self) -> CartLineInfo:
+        """The constraint's CartLineInfo"""
+
     def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
         """
         Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError unless all 6 indices are set (#237)
+        """
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables and all 6 indices (#237)
         """
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -458,19 +822,38 @@ class DiscreteCollisionNumericalConstraint(ConstraintSet):
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables and an update() since the last variable change
+        """
 
     def getCollisionEvaluator(self) -> DiscreteCollisionEvaluator: ...
 
 class InverseKinematicsInfo:
+    @overload
     def __init__(self) -> None: ...
 
+    @overload
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup, working_frame: str, tcp_frame: str, tcp_offset: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> None:
+        """Create IK info; raises if manip has no link tcp_frame"""
+
+    @overload
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup, working_frame: str, tcp_frame: str) -> None:
+        """
+        Create IK info with an identity tcp_offset; raises if manip has no link tcp_frame
+        """
+
     @property
-    def manip(self) -> "tesseract::kinematics::KinematicGroup":
+    def manip(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup:
         """The kinematic group (with IK solver)"""
 
     @manip.setter
-    def manip(self, arg: "tesseract::kinematics::KinematicGroup", /) -> None: ...
+    def manip(self, arg: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup, /) -> None: ...
 
     @property
     def working_frame(self) -> str:
@@ -501,3 +884,12 @@ class InverseKinematicsConstraint(ConstraintSet):
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
+
+    def setBounds(self, bounds: Sequence[Bounds]) -> None:
+        """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def setTargetPose(self, target_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> None:
+        """Set the target pose the IK solution is computed for"""
+
+    def getKinematicInfo(self) -> InverseKinematicsInfo:
+        """The constraint's InverseKinematicsInfo"""

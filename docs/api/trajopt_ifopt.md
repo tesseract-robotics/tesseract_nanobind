@@ -10,7 +10,10 @@ The `JointPosition` class from 0.33 is removed. Variables now use a three-level 
 
 ### Var
 
-A single variable — typically one joint value at one waypoint.
+A single variable — typically one joint value at one waypoint. `Var(index, name, value, bounds)`
+and `Var(index, identifier, names, values, bounds)` build a standalone one (no parent `Node`) at
+`index` of the decision vector. It works in the joint and Cartesian constraints, which read only
+its index and values; the collision constraints raise `VarNotInVariableSetError` on it (below).
 
 ### Node
 
@@ -18,7 +21,21 @@ Groups multiple `Var`s per waypoint (e.g., joints + velocities at one waypoint).
 
 ### NodesVariables
 
-Container of `Node`s. Passed to `TrajOptQPProblem`.
+Container of `Node`s. Passed to `TrajOptQPProblem`. `NodesVariables(name, nodes)` takes
+ownership of the `Node`s: after the call the Python `Node` objects are unusable, and each `Var`
+reports its `Node` (`Var.getParent()`) and the `Node` its set (`Node.getParent()`).
+
+```python
+from tesseract_robotics.trajopt_ifopt import Bounds, Node, NodesVariables
+
+nodes = []
+for k, q in enumerate(initial_states):
+    node = Node(f"waypoint_{k}")
+    node.addVar("joints", joint_names, q, joint_bounds)
+    node.addVar("time", 0.1, Bounds(0.01, 1.0))  # a second var per node
+    nodes.append(node)
+nodes_variables = NodesVariables("trajectory", nodes)
+```
 
 ### createNodesVariables
 
@@ -64,6 +81,12 @@ the fix arrives only with a wheel built on a newer trajopt (none yet).
 | `DiscreteCollisionNumericalConstraint` | The same, with a numerical Jacobian | one-sided (upper) | `HINGE` |
 | `ContinuousCollisionConstraint` | Collision along the segment between two waypoints | one-sided (upper) | `HINGE` |
 | `InverseKinematicsConstraint` | Joints toward an IK solution of a target pose | equality | `SQUARED`, `ABSOLUTE` |
+| `DiscreteCollisionConstraintD` | Collision at a waypoint, one row per contact (the TrajOpt-Ifopt planner's term) | one-sided (upper) | `HINGE` |
+| `ContinuousCollisionConstraintD` | Collision along a segment, one row per contact | one-sided (upper) | `HINGE` |
+| `ContinuousCollisionNumericalConstraint` | `ContinuousCollisionConstraint` with a numerical Jacobian | one-sided (upper) | `HINGE` |
+
+The `…D` sets are dynamic: `update()` recounts their rows from the contacts it finds, and resets
+their bounds to one upper bound per row.
 
 A range row kept whole (`RangeBoundHandling.KEEP_AS_IS`) goes into neither: `addCostSet` raises,
 and a constraint raises `Unsupported bounds type!` at the first `convexify()`. Measured on trajopt
@@ -92,6 +115,20 @@ only: `TrajOptQPProblem` calls the C++ Jacobian, so a solve with fewer than 6 in
 crash. Use all 6 indices for a constraint you solve. The check goes once the pinned trajopt
 includes the upstream fix (trajopt#618).
 
+`setBounds(bounds)` replaces a set's row bounds; it raises `BoundsSizeError` (a `ValueError`)
+unless there is one bound per row (trajopt checks with `assert` only).
+
+`calcJacobianBlock(joint_vals)` on `CartPosConstraint`, `CartLineConstraint` and
+`DiscreteCollisionNumericalConstraint` evaluates the Jacobian at given joint values, sized like
+`getJacobian()`, so it also needs linked variables; a wrong `joint_vals` length raises
+`JointValuesSizeError`. `InverseKinematicsConstraint` declares the method, but trajopt 0.35.0
+never defines it, so it is not bound. Nor are the `list[Bounds]` constructors of
+`JointVelConstraint`, `JointAccelConstraint` and `JointJerkConstraint`, for the same reason.
+
+The collision constraints read the variable set's hash through `var.getParent().getParent()`.
+They raise `VarNotInVariableSetError` (a `ValueError`) at construction for a `Var` that is not in
+a `NodesVariables`; upstream would dereference null on the first `update()`.
+
 0.34 constraint constructors take `Var` references directly (not
 `JointPosition` lists). See [changes](../changes.md) for the migration details.
 
@@ -110,12 +147,32 @@ Set the type with `config.collision_check_config.type = CollisionEvaluatorType.L
 
 `CollisionCache` was removed in 0.34 — caching is internal to each evaluator.
 
+The two bases expose what a collision constraint works from. `calcCollisions(dof_vals,
+max_allowed)` (discrete) and `calcCollisionData(dof_vals0, dof_vals1, vars0_fixed, vars1_fixed,
+max_allowed)` (continuous) return a `CollisionCacheData`: the `ContactResultMap` and one
+`GradientResultsSet` per link pair. `getGradient(dofvals, contact)` /
+`calcGradientData(dof_vals0, dof_vals1, contact)` return the `GradientResults` of one contact,
+and `getJointGroup()` the evaluator's joint group.
+
+```python
+data = evaluator.calcCollisions(q, 3)
+for results_set in data.gradient_results_sets:
+    print(results_set.key, results_set.getMaxError())
+```
+
 ## Info Structs (for Cartesian / IK constraints)
 
 | Struct | Used by |
 |---|---|
 | `CartLineInfo` | `CartLineConstraint` |
 | `InverseKinematicsInfo` | `InverseKinematicsConstraint` |
+
+Both have field constructors: `CartLineInfo(manip, source_frame, target_frame,
+target_frame_offset1, target_frame_offset2[, source_frame_offset[, indices]])` and
+`InverseKinematicsInfo(manip, working_frame, tcp_frame[, tcp_offset])`. The bracketed arguments
+default to the identity and all 6 indices. `CartLineConstraint.getInfo()`, `getLine()` and
+`InverseKinematicsConstraint.getKinematicInfo()` read them back; `setTargetPose` moves the IK
+target.
 
 `CartPosInfo` from 0.33 is gone — `CartPosConstraint` now takes parameters
 directly (see [changes](../changes.md)).
@@ -124,14 +181,30 @@ directly (see [changes](../changes.md)).
 
 - `TrajOptCollisionConfig(margin, coeff)` — re-exported here and from
   `tesseract_motion_planners_trajopt`.
-- `CollisionCoeffData` — per-pair collision coefficient data.
-- `Bounds(lower, upper)` — single-variable bounds.
+- `CollisionCoeffData` — per-pair collision coefficient data. `getCollisionCoeffPairData()`
+  returns `{(link_a, link_b): coeff}`, `getPairsWithZeroCoeff()` the switched-off pairs.
+- `CollisionCoeffData` and `TrajOptCollisionConfig` compare by value and are unhashable.
+- `Bounds(lower, upper)` — single-variable bounds. `b += s` / `b -= s` shift both limits and
+  reclassify `getType()`.
 - Enums: `BoundsType`, `RangeBoundHandling`.
 
 ## Utilities
 
 - `interpolate(start, end, steps)` — linear joint interpolation.
 - `toBounds(joint_limits)` — convert a limits matrix into a `Bounds` list.
+- `getClosestValidPoint(x, bounds)`, `calcBoundsErrors(x, bounds)`,
+  `calcBoundsViolations(x, bounds)` — clamp into bounds, the signed error and the violation per
+  entry; one bound per entry or `BoundsSizeError`.
+- `toTrajArray(vars)` / `toJointTrajectory(vars)` — the vars' values as a waypoints × joints
+  matrix, or a `JointTrajectory` with one state per var.
+- `calcNumericalConstraintGradient(variables, constraint_set, epsilon=1e-8)` and
+  `calcForwardNumJac(f, x, epsilon)` — forward-difference Jacobians, to check an analytic
+  `getJacobian()` (a Python `ConstraintSet` subclass's included).
+
+```python
+numerical = calcNumericalConstraintGradient(nodes_variables, my_constraint)
+assert np.allclose(numerical.toarray(), my_constraint.getJacobian().toarray(), atol=1e-6)
+```
 
 ## Module API
 
