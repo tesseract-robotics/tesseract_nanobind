@@ -11,62 +11,74 @@ from tests.audit._load import audit
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
+# Its own stub root, so no other fixture stub's class reads as bound elsewhere.
+HOLDER = FIXTURES / "holder"
 HOLDER_PREFIX = ("tesseract/holder/",)
-HOLDER_HEADER = "holder.h"
+HOLDER_HEADER = "tests/audit/fixtures/include/tesseract/holder/holder.h"
+# holder.h lines of AnyHolderInterface and the AnyHolder constructors.
+INTERFACE_LINE = 9  # struct AnyHolderInterface
+PLAIN_CTOR_LINE = 19  # AnyHolder(const AnyHolderInterface&)
+FORWARDING_LINE = 28  # template <T, enable_if> AnyHolder(T&&)
+CONST_REF_LINE = 34  # template <T, enable_if> AnyHolder(const T&)
+TWO_PARAM_LINE = 37  # template <T> AnyHolder(const T&, int)
 
 
 @pytest.fixture(scope="module")
 def holder_report():
     return audit.audit_tu(
         "holder",
-        FIXTURES / "holder_bindings.cpp",
-        FIXTURES / "_holder.pyi",
-        FIXTURES / "holder_init.py",
+        HOLDER / "holder_bindings.cpp",
+        HOLDER / "_holder.pyi",
+        HOLDER / "holder_init.py",
         HOLDER_PREFIX,
         (FIXTURE_INCLUDE,),
-        stub_roots=(FIXTURES,),
+        stub_roots=(HOLDER,),
     )
 
 
 @pytest.fixture(scope="module")
-def holder_ctor_templates():
-    """`Holder`'s constructor templates, keyed by parameter count."""
-    tu = audit.parse_tu(FIXTURES / "holder_bindings.cpp", (FIXTURE_INCLUDE,))
+def holder_ctors():
+    """`AnyHolder`'s constructors and constructor templates, keyed by holder.h line."""
+    tu = audit.parse_tu(HOLDER / "holder_bindings.cpp", (FIXTURE_INCLUDE,))
     holder = next(
         c
         for c in tu.cursor.walk_preorder()
-        if c.spelling == "Holder"
+        if c.spelling == "AnyHolder"
         and c.is_definition()
         and c.location.file is not None
-        and Path(c.location.file.name).name == HOLDER_HEADER
+        and c.location.file.name.endswith(HOLDER_HEADER)
     )
-    return {
-        len([p for p in m.get_children() if p.kind == audit.ci.CursorKind.PARM_DECL]): m
-        for m in holder.get_children()
-        if m.kind == audit.ci.CursorKind.FUNCTION_TEMPLATE
-    }
+    kinds = {audit.ci.CursorKind.CONSTRUCTOR, audit.ci.CursorKind.FUNCTION_TEMPLATE}
+    return {m.location.line: m for m in holder.get_children() if m.kind in kinds}
 
 
-def test_forwarding_ctor_template_accepted(holder_report):
-    """`template <T> Holder(T&&)` has one Python function per instance: template-instance-name."""
-    rules = {a.rule for a in holder_report.accepted if a.symbol == "Holder.__init__"}
-    assert "template-instance-name" in rules
-
-
-def test_ctor_templates_and_plain_ctors_that_are_not_forwarding_stay_rows(holder_report):
-    arities = {g.arity for g in holder_report.gaps if g.symbol == "Holder.__init__"}
-    assert arities == {"1", "2"}  # Holder(const HolderInterface&), Holder(const T&, int)
+def test_forwarding_ctor_templates_accepted(holder_report):
+    """Both constrained `AnyHolder(T&&)` and `AnyHolder(const T&)`: template-instance-name."""
+    assert sorted(
+        (a.rule, a.location) for a in holder_report.accepted if a.symbol == "AnyHolder.__init__"
+    ) == [
+        ("template-instance-name", f"{HOLDER_HEADER}:{FORWARDING_LINE}"),
+        ("template-instance-name", f"{HOLDER_HEADER}:{CONST_REF_LINE}"),
+    ]
 
 
 def test_holder_gaps_exact(holder_report):
-    assert sorted((g.symbol, g.kind, g.arity) for g in holder_report.gaps) == [
-        ("Holder.__init__", audit.Kind.CONSTRUCTOR, "1"),
-        ("Holder.__init__", audit.Kind.CONSTRUCTOR, "2"),
-        ("HolderInterface", audit.Kind.CLASS, audit.NOT_AN_OVERLOAD),
+    """The plain ctor and the non-forwarding template stay rows; nothing else does."""
+    assert sorted((g.symbol, g.kind, g.arity, g.location) for g in holder_report.gaps) == [
+        ("AnyHolder.__init__", audit.Kind.CONSTRUCTOR, "1", f"{HOLDER_HEADER}:{PLAIN_CTOR_LINE}"),
+        ("AnyHolder.__init__", audit.Kind.CONSTRUCTOR, "2", f"{HOLDER_HEADER}:{TWO_PARAM_LINE}"),
+        (
+            "AnyHolderInterface",
+            audit.Kind.CLASS,
+            audit.NOT_AN_OVERLOAD,
+            f"{HOLDER_HEADER}:{INTERFACE_LINE}",
+        ),
     ]
     assert holder_report.deviations == []
 
 
-def test_is_forwarding_ctor_template_unit(holder_ctor_templates):
-    assert audit._is_forwarding_ctor_template(holder_ctor_templates[1])
-    assert not audit._is_forwarding_ctor_template(holder_ctor_templates[2])
+def test_is_forwarding_ctor_template_unit(holder_ctors):
+    assert audit._is_forwarding_ctor_template(holder_ctors[FORWARDING_LINE])
+    assert audit._is_forwarding_ctor_template(holder_ctors[CONST_REF_LINE])
+    assert not audit._is_forwarding_ctor_template(holder_ctors[TWO_PARAM_LINE])
+    assert not audit._is_forwarding_ctor_template(holder_ctors[PLAIN_CTOR_LINE])
