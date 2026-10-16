@@ -44,6 +44,7 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesStateD,
     DescartesStateSampleD,
     DescartesWaypointSamplerD,
+    ProfileOverrideNotDispatchedError,
     cast_DescartesMoveProfileD,
     cast_DescartesPlanProfileD,
     sampleFixed,
@@ -590,3 +591,30 @@ class TestDescartesCreateKinematicGroup:
             f"{proc.stderr[traceback_at:] if traceback_at >= 0 else proc.stderr}"
         )
         assert proc.stdout.splitlines()[-1] == "OK", proc.stdout
+
+
+class TestDescartesConcreteProfileOverrides:
+    """A hook override on a concrete profile is refused, not silently ignored (gh-340)."""
+
+    @pytest.mark.parametrize(
+        ("concrete", "hook", "base"),
+        [
+            (DescartesDefaultMoveProfileD, "createWaypointSampler", "DescartesMoveProfileD"),
+            (DescartesDefaultMoveProfileD, "createEdgeEvaluator", "DescartesMoveProfileD"),
+            (DescartesDefaultMoveProfileD, "createStateEvaluator", "DescartesMoveProfileD"),
+            (DescartesLadderGraphSolverProfileD, "create", "fields"),
+        ],
+    )
+    def test_hook_override_raises(self, concrete, hook, base):
+        with pytest.raises(ProfileOverrideNotDispatchedError, match=base):
+            type("Overrides", (concrete,), {hook: lambda self, *args: None})
+
+    def test_alias_is_covered(self):
+        with pytest.raises(ProfileOverrideNotDispatchedError):
+            type("Overrides", (DescartesDefaultPlanProfileD,), {"createEdgeEvaluator": None})
+
+    def test_subclass_without_hooks_is_allowed(self):
+        class Configured(DescartesDefaultMoveProfileD):
+            pass
+
+        assert isinstance(Configured(), DescartesMoveProfileD)
