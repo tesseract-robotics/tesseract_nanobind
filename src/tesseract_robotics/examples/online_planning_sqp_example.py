@@ -259,16 +259,13 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     num_replan = 10
     print(f"\nOnline replanning ({num_replan} iterations)...")
 
-    n_joints = len(joint_names)
-
     for iteration in range(num_replan):
         # Move obstacle
         human_x = 0.5 + 0.3 * np.sin(iteration * 0.3)
         update_human_position(robot, human_x, 0.0)
 
-        # Extract joint values from solution
-        joint_vals = x[: steps * n_joints]
-        traj = joint_vals.reshape(steps, n_joints)
+        # The solver leaves the problem's variables at best_var_vals: one row per waypoint
+        traj = ti.toTrajArray(problem_data["vars_list"])
 
         # Rebuild problem with warm-start
         t0 = time.perf_counter()

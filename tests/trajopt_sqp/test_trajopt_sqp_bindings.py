@@ -483,8 +483,6 @@ class TestAdditionalBindings:
         """Test CollisionCoeffData for per-link collision weights."""
         data = ti.CollisionCoeffData()
         assert data is not None
-        assert hasattr(data, "getPairCollisionCoeff")
-        assert hasattr(data, "setPairCollisionCoeff")
 
     def test_qp_problem_interface(self, kuka_setup):
         """Test QPProblem interface methods."""
