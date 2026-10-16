@@ -42,6 +42,12 @@ struct Tagged : Runner  // stub names its base: no row
   void go() override;
 };
 
+struct RemoteRunner : Runner  // stub base is bases_remote's Runner: same class only if the index agrees
+{
+  RemoteRunner();
+  void go() override;
+};
+
 template <typename T>
 struct Planner : Runner  // Planner<double> bound as PlannerD without its base: gap PlannerD(Runner)
 {
