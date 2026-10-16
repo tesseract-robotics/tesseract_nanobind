@@ -8,6 +8,10 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `TaskComposerPluginFactory(str, locator)` and `TaskComposerServer.loadConfig(str, locator)` read the `str` as YAML text | [A `pathlib.Path`](#taskcomposerpluginfactory-a-str-is-yaml-text) |
+| Unreleased | `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo` and the container overloads of `getDotgraph` / `saveDotgraph` removed | [The C++ names](#task-composer-compatibility-helpers-removed) |
+| Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -23,6 +27,52 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
+
+## Unreleased
+
+### `TaskComposerPluginFactory`: a `str` is YAML text
+
+The factory bound one constructor, `(config: str, locator)`, and passed the string to the C++
+*path* constructor, while `KinematicsPluginFactory`, `ContactManagersPluginFactory` and
+`Environment.init` read a `str` as content. It now binds both C++ constructors the same way: an
+`os.PathLike` (`pathlib.Path`) is a config file, a `str` is YAML text. A path passed as `str`
+parses as a YAML scalar and raises `ValueError` naming the text. `loadConfig` and the new
+`TaskComposerServer.loadConfig` take the same pair (#337, #323).
+
+| before | after |
+| --- | --- |
+| `TaskComposerPluginFactory(str(p), loc)` | `TaskComposerPluginFactory(Path(p), loc)` |
+| `createTaskComposerPluginFactory(str(p), loc)` | `TaskComposerPluginFactory(Path(p), loc)` |
+
+### Task-composer compatibility helpers removed
+
+Python-only names that duplicated a constructor, or stood in for C++ API that is now bound
+under its own name (#313, #314, #336, #338):
+
+| before | after |
+| --- | --- |
+| `createTaskComposerDataStorage()` | `TaskComposerDataStorage()` |
+| `createTaskComposerPluginFactory(p, loc)` | `TaskComposerPluginFactory(Path(p), loc)` |
+| `keys.addKeys(port, ["a", "b"])` | `keys.add(port, ["a", "b"])` |
+| `storage.getAllData()` | `storage.getData()` |
+| `infos.getAllInfos()` | `list(infos.getInfoMap().values())` |
+| `infos.getAbortingNodeInfo()` | `infos.getInfo(infos.getAbortingNode())` (`None` when nothing aborted) |
+| `node.getDotgraph(infos)` | `node.getDotgraph(infos.getInfoMap())` |
+| `node.saveDotgraph(path, infos)` | `node.saveDotgraph(path, infos.getInfoMap())` |
+| `tesseract_task_composer.__all__` | the module's attributes (`from … import *` still works) |
+
+### Task-composer value types compare by value and are unhashable
+
+As for the collision, common and environment types in 0.35.0.9: `AnyPoly`, `TaskComposerKeys`,
+`TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`,
+`TaskComposerContext` and `TaskComposerNodePorts` bind C++ `operator==`, so
+`==` compares content, and `hash()`, `set` members and `dict` keys raise `TypeError` (#261).
+Two `AnyPoly` holding separately built instructions are unequal: an instruction's uuid takes
+part in its equality.
+
+`TaskComposerKeys.get(port)` returns what the port holds, `str` or `list[str]`; it raised
+`RuntimeError` for a list port before (#313). `TaskComposerNodeInfo`'s fields are read-write
+(#319).
 
 ## 0.35.0.9
 
@@ -273,8 +323,8 @@ each sits beside a `str` content overload. Every other `std::filesystem::path` p
 | `TaskComposerPluginFactory(FilesystemPath(p), loc)` | `TaskComposerPluginFactory(str(p), loc)` |
 | `TransformMap()` | `{}` |
 
-`TaskComposerPluginFactory` still takes its config path as `str`; its path/content pair is not
-bound yet.
+`TaskComposerPluginFactory` kept its config path as `str` in this release; the next one binds
+its path/content pair the same way (#337).
 
 ### The convex evaluators take the QP solution vector
 

@@ -999,7 +999,7 @@ class TestTaskComposer:
         from tesseract_robotics.tesseract_common import GeneralResourceLocator
         from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
 
-        config = str(tesseract_robotics.get_task_composer_config_path())
+        config = tesseract_robotics.get_task_composer_config_path()
         factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
 
         assert TaskComposer(factory).get_available_pipelines() == (

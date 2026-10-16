@@ -95,70 +95,41 @@ There are reference leaks warnings at exit. These are likely due to:
 
 These don't affect functionality but should be investigated and fixed.
 
-## TaskComposerPluginFactory Cross-Module Issue - RESOLVED
+## TaskComposerPluginFactory and cross-module types
 
-### Problem
-
-`TaskComposerPluginFactory` takes a `ResourceLocator&` in C++, but nanobind cannot cast `GeneralResourceLocator` (from `tesseract_common` module) to `ResourceLocator` across module boundaries. Even with:
-- `nb::module_::import_()` to import the base module
-- The type displaying as identical in error messages
-- Using `const T&` or `shared_ptr<T>` signatures
-
-The cast fails because nanobind maintains separate type registries per module.
-
-### Solution - WORKING
-
-Use `nb::handle` to accept any Python object, manually verify the type using `nb::isinstance()` with the imported type, then use `nb::cast<>()`:
+`TaskComposerPluginFactory` takes a `ResourceLocator&`, a type bound in `tesseract_common`.
+An earlier binding accepted an `nb::handle` and checked `isinstance` against
+`GeneralResourceLocator` by hand, behind a free function `createTaskComposerPluginFactory`.
+Neither is needed: the module imports `tesseract_common` at init, so nanobind resolves the
+`ResourceLocator` base across modules, and any subclass (`GeneralResourceLocator`, a Python
+subclass) is accepted directly (gh-150). The free function was removed (#338).
 
 **C++ Binding:**
 ```cpp
-// In tesseract_task_composer_bindings.cpp
-// Import the module at module init
+// In tesseract_task_composer_bindings.cpp: import the module that binds the type first
 nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
 
-// Use nb::handle + isinstance for cross-module type resolution
-m.def("createTaskComposerPluginFactory", [](const std::string& config_str, nb::handle locator_handle) {
-    tc::fs::path config(config_str);
-
-    // Get the type from the imported module
-    auto common_module = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
-    auto grl_type = common_module.attr("GeneralResourceLocator");
-
-    // Verify type
-    if (!nb::isinstance(locator_handle, grl_type)) {
-        throw nb::type_error("locator must be a GeneralResourceLocator");
-    }
-
-    // Cast to C++ type
-    auto* locator = nb::cast<tc::GeneralResourceLocator*>(locator_handle);
-    return std::make_unique<tp::TaskComposerPluginFactory>(config, *locator);
-}, "config"_a, "locator"_a);
+// StrictPath (tesseract_nb.h): an os.PathLike is a config file, a str is YAML text (#337)
+.def("__init__", [](Factory* self, const tesseract_nb::StrictPath& config_path, const tc::ResourceLocator& locator) {
+    new (self) Factory(config_path.value, locator);
+}, "config_path"_a, "locator"_a)
 ```
 
 **Python Usage:**
 ```python
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import createTaskComposerPluginFactory
+from pathlib import Path
 
-locator = GeneralResourceLocator()
-factory = createTaskComposerPluginFactory(task_composer_config_file, locator)
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
+
+factory = TaskComposerPluginFactory(Path(task_composer_config_file), GeneralResourceLocator())
 ```
 
-### Key Points
+### General pattern for cross-module types
 
-1. Accept `nb::handle` (not the concrete type) to avoid nanobind's automatic type checking
-2. Import the module containing the type at runtime
-3. Use `nb::isinstance(handle, type)` to check the type
-4. Use `nb::cast<T*>(handle)` to get the C++ pointer
-5. Accept `std::string` for path arguments instead of `tc::fs::path` to avoid additional cross-module issues
-
-### General Pattern for Cross-Module Inheritance
-
-When a function in module B accepts a type from module A:
-1. Accept `nb::handle` in the binding
-2. Import module A at runtime to get the type object
-3. Use `nb::isinstance()` for type checking
-4. Use `nb::cast<T*>()` for conversion
+When a function in module B takes or returns a type bound in module A, import module A in
+module B's `NB_MODULE` before defining the function, and bind the C++ base type as the
+parameter. nanobind then converts subclasses and names the type in the signature.
 
 ## TrajOpt Planner
 
