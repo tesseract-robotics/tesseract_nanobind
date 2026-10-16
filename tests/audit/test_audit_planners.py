@@ -66,6 +66,13 @@ def test_yaml_ctor_with_an_unbound_sibling_is_a_gap(planner_report):
     assert "Orphan.__init__" not in {a.symbol for a in planner_report.accepted}
 
 
+def test_base_class_yaml_sibling_does_not_cover_a_derived_yaml_ctor(planner_report):
+    """A YAML sibling is declared on the class itself (ctors are never inherited, `from_yaml`
+    is per profile class): `BaseProfile.from_yaml` does not accept `DerivedProfile`'s."""
+    assert ("DerivedProfile.__init__", "1") in {(g.symbol, g.arity) for g in planner_report.gaps}
+    assert "DerivedProfile.__init__" not in {a.symbol for a in planner_report.accepted}
+
+
 def test_failed_yaml_premise_falls_through_to_the_overload_table(monkeypatch):
     """No sibling, but an `ACCEPTED_CPP_OVERLOADS` entry: the entry's rule accepts the overload."""
     monkeypatch.setitem(audit.ACCEPTED, "fixture-plugin-config-ctor", "fixture")
