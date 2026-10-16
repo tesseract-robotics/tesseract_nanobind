@@ -22,6 +22,8 @@ TWIST_SIZE = 6
 LINE_LENGTH = 0.1
 # rad: a joint configuration with every joint off zero, so no Jacobian column vanishes
 CONFIG = np.array([0.1, 0.4, -0.2, -1.2, 0.3, 0.6, -0.1])
+# m / rad: half width of the CartPos band, a true range on every axis so each row splits in two
+BAND_HALF_WIDTH = 0.01
 
 
 @pytest.fixture
@@ -116,3 +118,42 @@ def test_wrong_joint_count_raises(iiwa: Iiwa, linked):
     constraint.linkWithVariables(nodes)
     with pytest.raises(ti.JointValuesSizeError, match="7"):
         constraint.calcJacobianBlock(np.zeros(3))
+
+
+def _cart_pos_band(iiwa: Iiwa, var: ti.Var, coeffs: np.ndarray) -> ti.CartPosConstraint:
+    """A CartPosConstraint whose range rows are split in two: more rows than an equality."""
+    target = iiwa.manip.calcFwdKin(np.zeros(len(iiwa.joint_names)))["tool0"]
+    band = ti.toBounds(-np.full(TWIST_SIZE, BAND_HALF_WIDTH), np.full(TWIST_SIZE, BAND_HALF_WIDTH))
+    return ti.CartPosConstraint(
+        var,
+        coeffs,
+        band,
+        iiwa.manip,
+        "tool0",
+        "base_link",
+        Isometry3d.Identity(),
+        target,
+        "CartPos",
+        ti.RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES,
+    )
+
+
+def test_cart_pos_joint_count_is_the_manipulators(iiwa: Iiwa, linked):
+    nodes, var = linked
+    n_dof = iiwa.manip.numJoints()
+    constraint = _cart_pos_band(iiwa, var, np.ones(TWIST_SIZE))
+    constraint.linkWithVariables(nodes)
+    _assert_block_matches(constraint, var)
+    with pytest.raises(ti.JointValuesSizeError, match=f"{n_dof} joints"):
+        constraint.calcJacobianBlock(np.zeros(n_dof + 1))
+
+
+def test_cart_pos_without_rows_still_checks_the_joint_count(iiwa: Iiwa, linked):
+    nodes, var = linked
+    n_dof = iiwa.manip.numJoints()
+    constraint = _cart_pos_band(iiwa, var, np.zeros(TWIST_SIZE))
+    constraint.linkWithVariables(nodes)
+    assert constraint.getRows() == 0
+    assert constraint.calcJacobianBlock(var.value()).shape == (0, nodes.getRows())
+    with pytest.raises(ti.JointValuesSizeError, match=f"{n_dof} joints"):
+        constraint.calcJacobianBlock(np.zeros(n_dof + 1))

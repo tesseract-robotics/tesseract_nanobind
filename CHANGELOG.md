@@ -35,6 +35,7 @@
 - **`NodesVariables.getNode` / `getNodes` return usable `Node`s while the caller still holds the handed-over ones** — they returned the caller's relinquished object, on which every method raised `TypeError`. A `Node` given twice, or one already in a set, raises `NodeOwnershipError` (a `ValueError`) and leaves every `Node` with the caller ([#297]).
 - **Linking a constraint to a variable set that does not hold its `Var`s raises `VarNotInVariableSetError`** — from `linkWithVariables` and from `TrajOptQPProblem.addConstraintSet` / `addCostSet`; a standalone `Var` or one from another set put the Jacobian's columns out of range ([#297]).
 - **`calcForwardNumJac` raises `NumericalJacobianSizeError`** (a `ValueError`) when `f` returns a different length at a perturbed `x`; trajopt read past the shorter vector ([#295]).
+- **`CartPosConstraint.calcJacobianBlock` takes its joint count from its `Var`** — it divided `getNonZeros()` by `getRows()`, and accepted any length with every axis weighted zero ([#289]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
