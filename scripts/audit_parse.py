@@ -256,6 +256,7 @@ class CppOverload:
     out_positions: tuple[int, ...] = ()  # indices into `params` of the out-params
     # takes a `std::vector<std::reference_wrapper<T>>`: a view a sibling overload builds (R4)
     reference_wrapper_view: bool = False
+    yaml_position: int | None = None  # index into `params` of the first `YAML::Node` parameter
 
     def returned_out_params(self) -> tuple[frozenset[TypeKey] | None, ...]:
         """`params` of the Python form that returns the out-params."""
@@ -647,6 +648,7 @@ def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload
         BYTES_KEYS if i in pointers else audit_types.cpp_keys(p.type) for i, p in python_params
     )
     out_positions = tuple(j for j, (_, p) in enumerate(python_params) if _is_out_param(p))
+    yaml_position = next((j for j, (_, p) in enumerate(python_params) if _is_yaml_node(p)), None)
     return CppOverload(
         arity,
         out,
@@ -658,6 +660,7 @@ def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload
         byte_buffers=pairs,
         params=keys,
         out_positions=out_positions,
+        yaml_position=yaml_position,
     )
 
 
