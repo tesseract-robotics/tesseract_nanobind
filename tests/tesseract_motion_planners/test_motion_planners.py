@@ -258,37 +258,43 @@ def _joint_program(*states, names=IRB2400_JOINTS):
     return program
 
 
-def _tool0_in_base(env, q):
+# A non-root working frame: toToolpath must ignore it and return world-frame poses.
+TOOLPATH_WORKING_FRAME = "link_2"
+
+
+def _link2_manip_info():
+    return ManipulatorInfo("manipulator", TOOLPATH_WORKING_FRAME, "tool0")
+
+
+def _assert_world_frame(env, q, pose):
     transforms = env.getState(IRB2400_JOINTS, q).link_transforms
-    return transforms["base_link"].inverse() * transforms["tool0"]
+    np.testing.assert_allclose(pose.matrix, transforms["tool0"].matrix, atol=1e-9)
+    in_working = transforms[TOOLPATH_WORKING_FRAME].inverse() * transforms["tool0"]
+    assert not np.allclose(pose.matrix, in_working.matrix, atol=1e-6)
 
 
 class TestToToolpath:
-    """#303: toToolpath returns world-frame TCP poses per move."""
+    """#303: toToolpath returns world-frame TCP poses per move, whatever the working frame."""
 
     def test_composite_overload(self, abb_irb2400_environment):
         env = abb_irb2400_environment
         program = _joint_program(IRB2400_START, IRB2400_END)
+        program.setManipulatorInfo(_link2_manip_info())
         toolpath = toToolpath(program, env)
         assert len(toolpath) == 1
         poses = toolpath[0]
         assert len(poses) == 2
-        np.testing.assert_allclose(
-            poses[0].matrix, _tool0_in_base(env, IRB2400_START).matrix, atol=1e-9
-        )
-        np.testing.assert_allclose(
-            poses[1].matrix, _tool0_in_base(env, IRB2400_END).matrix, atol=1e-9
-        )
+        _assert_world_frame(env, IRB2400_START, poses[0])
+        _assert_world_frame(env, IRB2400_END, poses[1])
 
     def test_move_and_instruction_overloads(self, abb_irb2400_environment):
         env = abb_irb2400_environment
         mi = _joint_move(IRB2400_JOINTS, IRB2400_END)
-        mi.setManipulatorInfo(_irb2400_manip_info())
-        expected = _tool0_in_base(env, IRB2400_END).matrix
+        mi.setManipulatorInfo(_link2_manip_info())
         for arg in (mi, InstructionPoly(mi)):
             toolpath = toToolpath(arg, env)
             assert len(toolpath) == 1
-            np.testing.assert_allclose(toolpath[0][0].matrix, expected, atol=1e-9)
+            _assert_world_frame(env, IRB2400_END, toolpath[0][0])
 
 
 class TestFormatProgram:
@@ -405,6 +411,19 @@ class TestAssignSolution:
         np.testing.assert_allclose(seed.position, IRB2400_END)
 
 
+def _waypoint_positions(composite):
+    """Joint positions of every move in a (possibly nested) composite, in order."""
+    for instruction in composite:
+        if instruction.isCompositeInstruction():
+            yield from _waypoint_positions(instruction.asCompositeInstruction())
+            continue
+        wp = instruction.asMoveInstruction().getWaypoint()
+        if wp.isStateWaypoint():
+            yield WaypointPoly_as_StateWaypointPoly(wp).getPosition()
+        else:
+            yield WaypointPoly_as_JointWaypointPoly(wp).getPosition()
+
+
 class TestMotionPlannerBase:
     """#299: SimpleMotionPlanner is a MotionPlanner."""
 
@@ -431,7 +450,11 @@ class TestMotionPlannerBase:
         via_base = MotionPlanner.solve(planner, request)
         direct = planner.solve(request)
         assert via_base.successful and direct.successful
-        assert len(via_base.results) == len(direct.results)
+        via_base_positions = list(_waypoint_positions(via_base.results))
+        direct_positions = list(_waypoint_positions(direct.results))
+        assert len(via_base_positions) == len(direct_positions) > 0
+        for a, b in zip(via_base_positions, direct_positions, strict=True):
+            np.testing.assert_allclose(a, b)
 
 
 # ---- robot configuration (#333) ----------------------------------------------

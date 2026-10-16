@@ -116,16 +116,16 @@ def formatProgram(composite_instructions: tesseract_robotics.tesseract_command_l
 @overload
 def toToolpath(ci: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> list[tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d]:
     """
-    TCP poses of a program in the working frame, one VectorIsometry3d per sub-composite.
+    World-frame TCP poses of a program, one VectorIsometry3d per sub-composite.
     """
 
 @overload
 def toToolpath(mi: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> list[tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d]:
-    """TCP pose of a move instruction in its working frame."""
+    """World-frame TCP pose of a move instruction."""
 
 @overload
 def toToolpath(instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.InstructionPoly, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> list[tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d]:
-    """TCP poses of a composite or move instruction."""
+    """World-frame TCP poses of a composite or move instruction."""
 
 @overload
 def contactCheckProgram(manager: tesseract_robotics.tesseract_collision._tesseract_collision.ContinuousContactManager, state_solver: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.StateSolver, program: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, config: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig) -> tuple[tesseract_robotics.tesseract_collision._tesseract_collision.ContactTrajectoryResults, list[tesseract_robotics.tesseract_collision._tesseract_collision.ContactResultMap]]:
@@ -160,7 +160,7 @@ class RobotConfig(enum.Enum):
 
     FUB = 7
 
-def getRobotConfig(joint_group: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, base_link: str, tcp_frame: str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], sign_correction: Annotated[NDArray[numpy.int32], dict(shape=(2), order='C')] | Sequence[int] = ...) -> RobotConfig:
+def getRobotConfig(joint_group: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, base_link: str, tcp_frame: str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], sign_correction: Annotated[NDArray[numpy.int32], dict(shape=(2), order='C')] | Sequence[int] = [1, 1]) -> RobotConfig:
     """
     Configuration of a six-axis arm. The last six joint values are the arm's; `sign_correction` flips the sign of joint 3 and joint 5 for the manufacturer's convention.
     """
