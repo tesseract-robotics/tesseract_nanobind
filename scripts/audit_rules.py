@@ -128,6 +128,26 @@ ACCEPTED = {
     "module binds (`OsqpEigen::Settings`, `OsqpEigen::Solver`) has no Python form; the owning "
     "object exposes what Python needs instead, such as `OSQPEigenSolver`'s `set…` forwarders "
     "into its OSQP settings (`setPolish`, `setWarmStart(bool)`, `setMaxIteration`, …).",
+    # Group 4 (task composer).
+    "plugin-author-factory-interface": "An abstract `…Factory` whose pure virtual `create(…)` "
+    "takes a `YAML::Node` is the interface a C++ plugin library implements; Python creates "
+    "objects through the owning plugin factory (`TaskComposerPluginFactory`, "
+    "`KinematicsPluginFactory`, `ContactManagersPluginFactory`) and cannot implement a plugin.",
+    "plugin-config-ctor": "A `(…, const YAML::Node& config)` constructor that only the plugin "
+    "factory calls (`TaskComposerExecutorFactoryImpl<T>::create(name, config)` passes the "
+    "plugin's config block) has no Python caller; Python constructs the class from its other "
+    "constructors or gets it from `TaskComposerPluginFactory.createTaskComposerExecutor`.",
+    "std-library-enum": "The enum is declared by the C++ standard library, not an audited header; "
+    "it is bound because a bound member returns it (`std::future_status` → `FutureStatus`, "
+    "returned by `TaskComposerFuture.waitFor`).",
+    "clock-deadline": "`TaskComposerFuture.waitUntil` takes a `std::chrono::high_resolution_clock` "
+    "time point, which is `steady_clock` under libc++ and MSVC and has no epoch Python can name; "
+    "`waitFor(duration)` is its Python form.",
+    "context-from-data-storage": "`TaskComposerExecutor.run(node, data_storage, dotgraph=False)` "
+    "builds the `TaskComposerContext` that the C++ `run(node, context)` takes, the shape of "
+    "upstream's `TaskComposerServer::run(node, data_storage, dotgraph, executor_name)`.",
+    "dot-dump-hook": "`TaskComposerNode::dump(std::ostream&, …)` and its overrides are the virtual "
+    "hook behind `getDotgraph`/`saveDotgraph`, which return or write the same DOT text.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -158,20 +178,65 @@ ACCEPTED_SYMBOLS = {
         ("tesseract_scene_graph", tag): "boost-graph-property-tag"
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
+    # tesseract_task_composer (#256 group 4; ledger phaseF-triage-tc.md). Instances of AnyPoly's
+    # forwarding ctor templates (any_poly.h:121, :138): Python-only names.
+    **{
+        ("tesseract_task_composer", f"AnyPoly_wrap_{t}"): "template-instance-name"
+        for t in (
+            "CompositeInstruction",
+            "ProfileDictionary",
+            "EnvironmentConst",
+            "TaskComposerDataStorage",
+        )
+    },
+    ("tesseract_task_composer", "AnyInterface"): "type-erasure-interface",
+    ("tesseract_task_composer", "AnyWrapper"): "type-erasure-interface",
+    ("tesseract_task_composer", "AnyPoly.get"): "type-erasure-interface",
+    ("tesseract_task_composer", "FutureStatus"): "std-library-enum",
+    ("tesseract_task_composer", "TaskComposerFuture.waitUntil"): "clock-deadline",
+    ("tesseract_task_composer", "TaskComposerNode.dump"): "dot-dump-hook",
+    ("tesseract_task_composer", "TaskComposerNodeFactory"): "plugin-author-factory-interface",
+    ("tesseract_task_composer", "TaskComposerExecutorFactory"): "plugin-author-factory-interface",
+    # C20: the core plugin factory interfaces, under the same rule.
+    ("tesseract_kinematics", "FwdKinFactory"): "plugin-author-factory-interface",
+    ("tesseract_kinematics", "InvKinFactory"): "plugin-author-factory-interface",
+    ("tesseract_collision", "DiscreteContactManagerFactory"): "plugin-author-factory-interface",
+    ("tesseract_collision", "ContinuousContactManagerFactory"): "plugin-author-factory-interface",
 }
 # A C++ member template bound once per instance, under a name Python can spell
 # (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
 # name) -> the Python dotted names of its instances. The C++ row is accepted only when every
 # listed instance is bound; each instance is accepted on the Python side (template-instance-name).
-TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {}
+TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {
+    # tesseract_task_composer (#256 group 4): `template <T> T& AnyPoly::as()`.
+    ("tesseract_task_composer", "AnyPoly.as"): (
+        "AnyPoly_as_CompositeInstruction",
+        "AnyPoly_as_TaskComposerDataStorage",
+        "AnyPoly_as_ContactResultMapVector",
+    ),
+}
 # The rule `TEMPLATE_INSTANCES` entries are accepted under.
 TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
 # symbol Python binds, where the other overloads stay checked (T4).
-ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {}
+ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
+    # tesseract_task_composer (#256 group 4). any_poly.h:115 `AnyPoly(const AnyInterface&)`: the
+    # arity-1 forwarding ctor templates (:121, :138) are template-instance-name before this table.
+    ("tesseract_task_composer", "AnyPoly.__init__", "1"): "type-erasure-interface",
+    # taskflow_task_composer_executor.h:71 `(std::string name, const YAML::Node& config)`: no
+    # YAML-text sibling, so `yaml-node` falls through to here (T1).
+    ("tesseract_task_composer", "TaskflowTaskComposerExecutor.__init__", "2"): "plugin-config-ctor",
+}
 # A Python-only overload accepted: (module, dotted name, `PyOverload.params`) -> ACCEPTED rule.
 # Two overloads of one arity differ by their annotations (G2: `setWarmStart(bool)`).
-ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {}
+ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
+    # tesseract_task_composer (#256 group 4; C23 keeps the rule).
+    (
+        "tesseract_task_composer",
+        "TaskComposerExecutor.run",
+        ("TaskComposerNode", "TaskComposerDataStorage", "bool"),
+    ): "context-from-data-storage",
+}
 # A type-erased Poly -> the bound classes it wraps, which C++ converts into it through the
 # Poly's converting constructors (R8). A Python overload typed by an alternative stands for
 # the Poly-typed C++ parameter.
