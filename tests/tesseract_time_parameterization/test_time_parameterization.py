@@ -7,6 +7,8 @@ Tests cover:
 - Profile-based time parameterization (0.33 API)
 """
 
+import gc
+
 import numpy as np
 import pytest
 
@@ -218,9 +220,69 @@ class TestConstantTCPSpeedCompositeProfile:
 
 
 # ---------------------------------------------------------------------------
+# Helpers: programs on the ABB IRB2400 joints
+# ---------------------------------------------------------------------------
+
+ABB_JOINTS = [f"joint_{i}" for i in range(1, 7)]
+
+
+def _move(position):
+    swp = StateWaypoint(ABB_JOINTS, np.asarray(position, dtype=np.float64))
+    return MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(
+            StateWaypointPoly_wrap_StateWaypoint(swp), MoveInstructionType_FREESPACE, "DEFAULT"
+        )
+    )
+
+
+def _manipulator_info():
+    manip = ManipulatorInfo()
+    manip.manipulator = "manipulator"
+    manip.working_frame = "base_link"
+    manip.tcp_frame = "tool0"
+    return manip
+
+
+def _abb_program(num=10, span=1.0):
+    """A flat FREESPACE program on the IRB2400 joints, joint_1 swept over `span` rad."""
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(_manipulator_info())
+    for i in range(num + 1):
+        p = np.zeros(6)
+        p[0] = i * span / num
+        p[1] = 0.5 * i * span / num
+        program.appendMoveInstruction(_move(p))
+    return program
+
+
+# ---------------------------------------------------------------------------
 # #277: the stub names Environment, not the C++ type
 # ---------------------------------------------------------------------------
 
 
 def test_compute_signature_names_python_environment():
     assert "tesseract::" not in TimeParameterization.compute.__doc__
+
+
+# ---------------------------------------------------------------------------
+# #281: InstructionsTrajectory keeps its program alive
+# ---------------------------------------------------------------------------
+
+
+def test_instructions_trajectory_keeps_program_alive():
+    first = np.array([0.25, -0.5, 0.75, -1.0, 1.25, -1.5])
+
+    def make_program():
+        program = CompositeInstruction("DEFAULT")
+        program.setManipulatorInfo(_manipulator_info())
+        program.appendMoveInstruction(_move(first))
+        program.appendMoveInstruction(_move(np.zeros(6)))
+        return program
+
+    traj = InstructionsTrajectory(make_program())
+    gc.collect()
+    # Reuse the freed memory, so a dangling reference reads someone else's data.
+    junk = [_abb_program(num=20, span=9.0) for _ in range(20)]
+    del junk
+    gc.collect()
+    np.testing.assert_array_equal(traj.getPosition(0), first)
