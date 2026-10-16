@@ -22,6 +22,16 @@ problem.setup()                                             # must call before s
 
 A squared or absolute cost must have equality bounds on every row, a hinge cost one-sided bounds; `addCostSet` raises otherwise, on a range row too. Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for squared costs the trust-region ratio compares like with like. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles (`TrajOptQPProblem` first ships in 0.35.0.9; earlier releases bind only `IfoptQPProblem`), there are two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt, none yet): constraint coefficients weight a set's slack in the QP but not its violation in the merit, and `ABSOLUTE` and `HINGE` costs are mis-modelled (below). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
 
+After `convexify()` the problem exposes the QP it built: minimise x'Hx + g'x over
+`getNumQPVars()` variables (the NLP variables, then the slacks) subject to
+lower ≤ A x ≤ upper over `getNumQPConstraints()` rows. `getHessian()` and
+`getConstraintMatrix()` return `scipy.sparse` copies; `getGradient()`, `getBoundsLower()`,
+`getBoundsUpper()` and `getConstraintMeritCoeff()` vectors.
+
+`problem.setVariables(x)` sets the NLP variables and then updates every component, so a
+dynamic set recounts its rows; `NodesVariables.setVariables` only writes the values. It raises
+`VariablesSizeError` (a `ValueError`) unless `len(x) == getNumNLPVars()`.
+
 !!! warning "`ABSOLUTE` and `HINGE` costs on trajopt 0.35.0"
     The convex model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution: it
     evaluates the cost with its slack variables, which absorb the violation. The predicted
@@ -68,7 +78,29 @@ on the QP problem (no arguments) — the 0.33
 
 ### OSQPEigenSolver
 
-`QPSolver` implementation backed by OSQP. Used by `TrustRegionSQPSolver`.
+`QPSolver` implementation backed by OSQP. Used by `TrustRegionSQPSolver`, or driven by hand
+through the `QPSolver` interface: `init(num_vars, num_cnts)`, then `updateHessianMatrix(H)`,
+`updateGradient(g)`, `updateLinearConstraintsMatrix(A)` and `updateBounds(lower, upper)`, then
+`solve()` and `getSolution()`. The objective is x'Hx + g'x (the solver doubles H for OSQP's
+½ x'Px). Each update raises `QPSizeError` (a `ValueError`) unless its size matches `init()`.
+Before the first `solve()` only `updateBounds` stores bounds; `updateLowerBound` and
+`updateUpperBound` return `False` until OSQP is set up.
+
+```python
+solver = tsqp.OSQPEigenSolver()
+solver.init(2, 2)
+solver.updateHessianMatrix(scipy.sparse.identity(2, format="csr"))
+solver.updateGradient([-2.0, -4.0])
+solver.updateLinearConstraintsMatrix(scipy.sparse.identity(2, format="csr"))
+solver.updateBounds([-10.0, -10.0], [0.5, 10.0])
+solver.solve()
+solver.getSolution()  # [0.5, 2.0]
+```
+
+`setWarmStart` has two forms: `setWarmStart(True)` / `setWarmStart(False)` sets the OSQP
+option, and `setWarmStart(problem)` seeds the next solve from a convexified problem's variables
+and slacks (a no-op while the option is off; the solver must be `init()`-ed at the problem's QP
+size, else `QPSizeError`).
 
 ## Parameters and Results
 
@@ -77,7 +109,9 @@ on the QP problem (no arguments) — the 0.33
 - `SQPResults` — the solver's iteration state. Notable attributes:
   `best_var_vals`, `best_exact_merit`, `best_costs`, `best_constraint_violations`,
   `cost_names`, `constraint_names`, plus the various iteration counters.
-- Solver status: `solver.getStatus()` returns the `SQPStatus` enum.
+- Solver status: `solver.getStatus()` returns the `SQPStatus` enum; `toString(status)` gives
+  trajopt's text for it (`"SQP_CONVERGED"`).
+- `SQPParameters` compares by value and is unhashable.
 
 ## Enums
 

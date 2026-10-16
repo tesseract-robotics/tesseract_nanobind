@@ -6,9 +6,18 @@ from typing import Annotated, overload
 
 import numpy
 from numpy.typing import NDArray
+import scipy.sparse
 
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
+
+class VariablesSizeError(ValueError):
+    """QPProblem.setVariables with a vector that is not getNumNLPVars() long."""
+
+class QPSizeError(ValueError):
+    """
+    QPSolver input whose size is not the (num_vars, num_cnts) of its init().
+    """
 
 class CostPenaltyType(enum.Enum):
     """Penalty type for cost terms"""
@@ -46,6 +55,9 @@ class SQPStatus(enum.Enum):
     CALLBACK_STOPPED = 6
     """Stopped by callback"""
 
+def toString(status: SQPStatus) -> str:
+    """trajopt's text for a solver status (e.g. 'SQP_CONVERGED')"""
+
 class QPSolverStatus(enum.Enum):
     """Status of QP solver"""
 
@@ -62,6 +74,12 @@ class SQPParameters:
     """Parameters controlling SQP optimization"""
 
     def __init__(self) -> None: ...
+
+    def __eq__(self, arg: SQPParameters, /) -> bool: ...
+
+    def __ne__(self, arg: SQPParameters, /) -> bool: ...
+
+    __hash__: None = None
 
     @property
     def improve_ratio_threshold(self) -> float:
@@ -387,6 +405,31 @@ class QPSolver:
     def getSolverStatus(self) -> QPSolverStatus:
         """Get solver status"""
 
+    def updateHessianMatrix(self, hessian: scipy.sparse.csr_matrix[float]) -> bool:
+        """
+        Set the Hessian H (sparse, num_vars square) of the objective x'Hx + g'x
+        """
+
+    def updateGradient(self, gradient: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool:
+        """Set the gradient g (num_vars)"""
+
+    def updateLowerBound(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool:
+        """Set the constraint lower bounds (num_cnts)"""
+
+    def updateUpperBound(self, upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool:
+        """Set the constraint upper bounds (num_cnts)"""
+
+    def updateBounds(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool:
+        """Set both constraint bounds (num_cnts each)"""
+
+    def updateLinearConstraintsMatrix(self, linear_constraints_matrix: scipy.sparse.csr_matrix[float]) -> bool:
+        """Set the constraint matrix A (sparse, num_cnts x num_vars)"""
+
+    def setWarmStart(self, qp_problem: QPProblem) -> bool:
+        """
+        Seed the next solve from the problem's variables (and its slacks); a no-op while the solver's warm-start option is off
+        """
+
     @property
     def verbosity(self) -> int:
         """Verbosity level (0 = silent)"""
@@ -409,19 +452,18 @@ class OSQPEigenSolver(QPSolver):
 
     def getSolverStatus(self) -> QPSolverStatus: ...
 
-    def updateGradient(self, gradient: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
-
-    def updateLowerBound(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
-
-    def updateUpperBound(self, upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
-
-    def updateBounds(self, lower_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], upper_bound: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> bool: ...
-
     def setPolish(self, polish: bool) -> None:
         """Enable solution polishing (default: true)"""
 
+    @overload
     def setWarmStart(self, warm_start: bool) -> None:
         """Enable warm-starting (default: true)"""
+
+    @overload
+    def setWarmStart(self, qp_problem: QPProblem) -> bool:
+        """
+        Seed the next solve from the problem's variables (and its slacks); a no-op while warm-starting is off
+        """
 
     def setAdaptiveRho(self, adaptive_rho: bool) -> None:
         """Enable adaptive step size (default: true)"""
@@ -452,6 +494,11 @@ class QPProblem:
 
     def getVariableValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current optimization variable values"""
+
+    def setVariables(self, x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> None:
+        """
+        Set the NLP variables and update every component (a TrajOptQPProblem also recounts its dynamic rows). Raises VariablesSizeError unless len(x) == getNumNLPVars().
+        """
 
     def convexify(self) -> None:
         """Run the full convexification routine"""
@@ -528,6 +575,32 @@ class QPProblem:
 
     def getBoxSize(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get trust region box size"""
+
+    def getConstraintMeritCoeff(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """Get the constraint merit coefficients, one per constraint set"""
+
+    def getHessian(self) -> scipy.sparse.csr_matrix[float]:
+        """
+        The QP Hessian (sparse, getNumQPVars() square), from the last convexify()
+        """
+
+    def getGradient(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """The QP gradient (getNumQPVars()), from the last convexify()"""
+
+    def getConstraintMatrix(self) -> scipy.sparse.csr_matrix[float]:
+        """
+        The QP constraint matrix (sparse, getNumQPConstraints() x getNumQPVars()), from the last convexify()
+        """
+
+    def getBoundsLower(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """
+        The QP constraint lower bounds (getNumQPConstraints()), from the last convexify()
+        """
+
+    def getBoundsUpper(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """
+        The QP constraint upper bounds (getNumQPConstraints()), from the last convexify()
+        """
 
     def print(self) -> None:
         """Print problem to console"""
