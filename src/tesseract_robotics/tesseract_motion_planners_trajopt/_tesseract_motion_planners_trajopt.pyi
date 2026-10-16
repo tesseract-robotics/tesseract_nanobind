@@ -44,6 +44,12 @@ class TrajOptCartesianWaypointConfig:
     @coeff.setter
     def coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptCartesianWaypointConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptCartesianWaypointConfig, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptJointWaypointConfig:
     def __init__(self) -> None: ...
 
@@ -77,13 +83,25 @@ class TrajOptJointWaypointConfig:
     @coeff.setter
     def coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptJointWaypointConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptJointWaypointConfig, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int: ...
 
 TrajOptPlanProfile: TypeAlias = TrajOptMoveProfile
 
 class TrajOptCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int: ...
 
 class TrajOptDefaultMoveProfile(TrajOptMoveProfile):
     def __init__(self) -> None: ...
@@ -111,6 +129,18 @@ class TrajOptDefaultMoveProfile(TrajOptMoveProfile):
 
     @joint_constraint_config.setter
     def joint_constraint_config(self, arg: TrajOptJointWaypointConfig, /) -> None: ...
+
+    def __eq__(self, arg: TrajOptDefaultMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptDefaultMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptDefaultMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 TrajOptDefaultPlanProfile: TypeAlias = TrajOptDefaultMoveProfile
 
@@ -176,6 +206,27 @@ class TrajOptDefaultCompositeProfile(TrajOptCompositeProfile):
 
     @avoid_singularity_coeff.setter
     def avoid_singularity_coeff(self, arg: float, /) -> None: ...
+
+    @staticmethod
+    def computeLongestValidSegmentLength(joint_limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')] | Sequence[Sequence[float]], longest_valid_segment_fraction: float, longest_valid_segment_length: float) -> float:
+        """
+        Collision-check step length from the joint limits (n x 2, lower/upper) and a
+        longest-valid-segment fraction and length: the smaller of fraction * extent and
+        length where both are positive, else the positive one, else 0.01 * extent,
+        with extent = ||upper - lower||.
+        """
+
+    def __eq__(self, arg: TrajOptDefaultCompositeProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptDefaultCompositeProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptDefaultCompositeProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 class BasicTrustRegionSQPParameters:
     def __init__(self) -> None: ...
@@ -316,6 +367,12 @@ class BasicTrustRegionSQPParameters:
     @num_threads.setter
     def num_threads(self, arg: int, /) -> None: ...
 
+    def __eq__(self, arg: BasicTrustRegionSQPParameters, /) -> bool: ...
+
+    def __ne__(self, arg: BasicTrustRegionSQPParameters, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptSolverProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     @property
     def opt_params(self) -> BasicTrustRegionSQPParameters:
@@ -326,8 +383,209 @@ class TrajOptSolverProfile(tesseract_robotics.tesseract_command_language._tesser
 
     def getKey(self) -> int: ...
 
+    @staticmethod
+    def createKey() -> int: ...
+
+    def createOptimizationParameters(self) -> BasicTrustRegionSQPParameters:
+        """The optimization parameters the planner uses for this profile"""
+
+class OSQPSettings:
+    def __init__(self) -> None:
+        """
+        OSQP's own defaults (osqp_set_default_settings). TrajOptOSQPSolverProfile().settings holds trajopt's defaults instead.
+        """
+
+    @property
+    def device(self) -> int: ...
+
+    @device.setter
+    def device(self, arg: int, /) -> None: ...
+
+    @property
+    def allocate_solution(self) -> int: ...
+
+    @allocate_solution.setter
+    def allocate_solution(self, arg: int, /) -> None: ...
+
+    @property
+    def verbose(self) -> int: ...
+
+    @verbose.setter
+    def verbose(self, arg: int, /) -> None: ...
+
+    @property
+    def profiler_level(self) -> int: ...
+
+    @profiler_level.setter
+    def profiler_level(self, arg: int, /) -> None: ...
+
+    @property
+    def warm_starting(self) -> int: ...
+
+    @warm_starting.setter
+    def warm_starting(self, arg: int, /) -> None: ...
+
+    @property
+    def scaling(self) -> int: ...
+
+    @scaling.setter
+    def scaling(self, arg: int, /) -> None: ...
+
+    @property
+    def polishing(self) -> int: ...
+
+    @polishing.setter
+    def polishing(self, arg: int, /) -> None: ...
+
+    @property
+    def rho(self) -> float: ...
+
+    @rho.setter
+    def rho(self, arg: float, /) -> None: ...
+
+    @property
+    def rho_is_vec(self) -> int: ...
+
+    @rho_is_vec.setter
+    def rho_is_vec(self, arg: int, /) -> None: ...
+
+    @property
+    def sigma(self) -> float: ...
+
+    @sigma.setter
+    def sigma(self, arg: float, /) -> None: ...
+
+    @property
+    def alpha(self) -> float: ...
+
+    @alpha.setter
+    def alpha(self, arg: float, /) -> None: ...
+
+    @property
+    def cg_max_iter(self) -> int: ...
+
+    @cg_max_iter.setter
+    def cg_max_iter(self, arg: int, /) -> None: ...
+
+    @property
+    def cg_tol_reduction(self) -> int: ...
+
+    @cg_tol_reduction.setter
+    def cg_tol_reduction(self, arg: int, /) -> None: ...
+
+    @property
+    def cg_tol_fraction(self) -> float: ...
+
+    @cg_tol_fraction.setter
+    def cg_tol_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def adaptive_rho(self) -> int: ...
+
+    @adaptive_rho.setter
+    def adaptive_rho(self, arg: int, /) -> None: ...
+
+    @property
+    def adaptive_rho_interval(self) -> int: ...
+
+    @adaptive_rho_interval.setter
+    def adaptive_rho_interval(self, arg: int, /) -> None: ...
+
+    @property
+    def adaptive_rho_fraction(self) -> float: ...
+
+    @adaptive_rho_fraction.setter
+    def adaptive_rho_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def adaptive_rho_tolerance(self) -> float: ...
+
+    @adaptive_rho_tolerance.setter
+    def adaptive_rho_tolerance(self, arg: float, /) -> None: ...
+
+    @property
+    def max_iter(self) -> int: ...
+
+    @max_iter.setter
+    def max_iter(self, arg: int, /) -> None: ...
+
+    @property
+    def eps_abs(self) -> float: ...
+
+    @eps_abs.setter
+    def eps_abs(self, arg: float, /) -> None: ...
+
+    @property
+    def eps_rel(self) -> float: ...
+
+    @eps_rel.setter
+    def eps_rel(self, arg: float, /) -> None: ...
+
+    @property
+    def eps_prim_inf(self) -> float: ...
+
+    @eps_prim_inf.setter
+    def eps_prim_inf(self, arg: float, /) -> None: ...
+
+    @property
+    def eps_dual_inf(self) -> float: ...
+
+    @eps_dual_inf.setter
+    def eps_dual_inf(self, arg: float, /) -> None: ...
+
+    @property
+    def scaled_termination(self) -> int: ...
+
+    @scaled_termination.setter
+    def scaled_termination(self, arg: int, /) -> None: ...
+
+    @property
+    def check_termination(self) -> int: ...
+
+    @check_termination.setter
+    def check_termination(self, arg: int, /) -> None: ...
+
+    @property
+    def check_dualgap(self) -> int: ...
+
+    @check_dualgap.setter
+    def check_dualgap(self, arg: int, /) -> None: ...
+
+    @property
+    def time_limit(self) -> float: ...
+
+    @time_limit.setter
+    def time_limit(self, arg: float, /) -> None: ...
+
+    @property
+    def delta(self) -> float: ...
+
+    @delta.setter
+    def delta(self, arg: float, /) -> None: ...
+
+    @property
+    def polish_refine_iter(self) -> int: ...
+
+    @polish_refine_iter.setter
+    def polish_refine_iter(self, arg: int, /) -> None: ...
+
+    def __eq__(self, arg: OSQPSettings, /) -> bool: ...
+
+    def __ne__(self, arg: OSQPSettings, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptOSQPSolverProfile(TrajOptSolverProfile):
     def __init__(self) -> None: ...
+
+    @property
+    def settings(self) -> OSQPSettings:
+        """
+        OSQP settings; trajopt's defaults (sco::OSQPModelConfig::setDefaultOSQPSettings)
+        """
+
+    @settings.setter
+    def settings(self, arg: OSQPSettings, /) -> None: ...
 
     @property
     def update_workspace(self) -> bool:
@@ -337,6 +595,18 @@ class TrajOptOSQPSolverProfile(TrajOptSolverProfile):
 
     @update_workspace.setter
     def update_workspace(self, arg: bool, /) -> None: ...
+
+    def __eq__(self, arg: TrajOptOSQPSolverProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptOSQPSolverProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptOSQPSolverProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 def ProfileDictionary_addTrajOptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptMoveProfile) -> None:
     """Add TrajOpt move profile to ProfileDictionary"""
@@ -350,15 +620,5 @@ def ProfileDictionary_addTrajOptCompositeProfile(dict: tesseract_robotics.tesser
 def ProfileDictionary_addTrajOptSolverProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptSolverProfile) -> None:
     """Add TrajOpt solver profile to ProfileDictionary"""
 
-class TrajOptMotionPlanner:
+class TrajOptMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...
-
-    def getName(self) -> str: ...
-
-    def solve(self, request: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerRequest) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerResponse: ...
-
-    def terminate(self) -> bool: ...
-
-    def clear(self) -> None: ...
-
-    def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...

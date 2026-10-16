@@ -11,6 +11,7 @@ from ._tesseract_motion_planners_trajopt import *
 __all__ = [
     "BasicTrustRegionSQPParameters",
     "CollisionEvaluatorType",
+    "OSQPSettings",
     "ProfileDictionary_addTrajOptCompositeProfile",
     "ProfileDictionary_addTrajOptMoveProfile",
     "ProfileDictionary_addTrajOptPlanProfile",
