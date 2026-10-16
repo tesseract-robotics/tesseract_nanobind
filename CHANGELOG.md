@@ -29,6 +29,12 @@
 - **`QPProblem` convex model and `setVariables`** — `getHessian`, `getGradient`, `getConstraintMatrix`, `getBoundsLower`, `getBoundsUpper`, `getConstraintMeritCoeff`, and `setVariables(x)`, which raises `VariablesSizeError` unless `len(x) == getNumNLPVars()` ([#282]).
 - **`QPSolver` update interface** — `updateHessianMatrix`, `updateGradient`, `updateLowerBound`, `updateUpperBound`, `updateBounds`, `updateLinearConstraintsMatrix` and `setWarmStart(problem)` on the base; `OSQPEigenSolver.setWarmStart` takes a `bool` (the OSQP option) or a `QPProblem` ([#283]).
 
+### Fixed
+
+- **A `Var` or `Node` read out of a variable set keeps the set alive** — `Node.getVar` / `addVar`, `NodesVariables.getNode` / `getNodes` and `Var.getParent` tie the result to its source, and a `Node` handed to `NodesVariables` keeps the set alive; `var.getParent()` after the set was dropped read freed memory ([#297]).
+- **`NodesVariables.getNode` / `getNodes` return usable `Node`s while the caller still holds the handed-over ones** — they returned the caller's relinquished object, on which every method raised `TypeError`. A `Node` given twice, or one already in a set, raises `NodeOwnershipError` (a `ValueError`) and leaves every `Node` with the caller ([#297]).
+- **Linking a constraint to a variable set that does not hold its `Var`s raises `VarNotInVariableSetError`** — from `linkWithVariables` and from `TrajOptQPProblem.addConstraintSet` / `addCostSet`; a standalone `Var` or one from another set put the Jacobian's columns out of range ([#297]).
+
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
 ### Breaking changes

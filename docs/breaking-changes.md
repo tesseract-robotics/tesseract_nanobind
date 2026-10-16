@@ -10,7 +10,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 |---|---|---|
 | Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | The collision constraints raise `VarNotInVariableSetError` on a `Var` outside a `NodesVariables` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
+| Unreleased | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
 | Unreleased | `OSQPEigenSolver.update*` raise `QPSizeError` on a wrong-length vector | [Size by `init()`](#osqpeigensolver-updates-check-sizes) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |

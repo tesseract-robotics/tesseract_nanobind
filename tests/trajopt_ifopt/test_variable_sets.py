@@ -1,9 +1,11 @@
 """Python builds variable sets: Var and NodesVariables constructors (#297).
 
 NodesVariables takes its Nodes by unique_ptr: the Python Node objects hand over ownership and
-become unusable, which keeps each Var's parent pointer valid. A standalone Var (no parent) works
-in constraints that read only its index and values; the collision constraints read the parent
-chain to the variable set, so they reject a Var that is not in one.
+become unusable, which keeps each Var's parent pointer valid. A constraint indexes the decision
+vector through its Vars, so linking it to a variable set (linkWithVariables, or adding it to a
+problem) rejects a Var outside that set: a standalone Var, or one from another set, would put
+Jacobian columns out of range. The collision constraints read the parent chain to the variable
+set from construction on, so they reject such a Var already when built.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import trajopt_sqp as tsqp
 
 from .scenes import TwoBoxes
 
@@ -85,3 +88,35 @@ def test_collision_constraint_rejects_a_var_without_a_variable_set(two_boxes: Tw
         ti.DiscreteCollisionConstraint(two_boxes.discrete_evaluator(), loose)
     with pytest.raises(ti.VarNotInVariableSetError):
         ti.DiscreteCollisionConstraintD(two_boxes.discrete_evaluator(), loose)
+
+
+def _two_joint_set(name: str) -> ti.NodesVariables:
+    return ti.createNodesVariables(name, ["a", "b"], [np.zeros(2)], [ti.Bounds(-1.0, 1.0)] * 2)
+
+
+def test_linking_a_standalone_var_raises():
+    var = ti.Var(100, "joints", ["a", "b"], np.array([0.2, 0.3]), [ti.Bounds(-1.0, 1.0)] * 2)
+    constraint = ti.JointPosConstraint(np.zeros(2), var, np.ones(2))
+    with pytest.raises(ti.VarNotInVariableSetError, match="'JointPos'.*'joints'"):
+        constraint.linkWithVariables(_two_joint_set("set"))
+
+
+def test_linking_a_var_of_another_set_raises():
+    other = _two_joint_set("other")
+    var = other.getNode(0).getVar("joints")
+    constraint = ti.JointVelConstraint(np.zeros(2), [var, var], np.ones(2))
+    with pytest.raises(ti.VarNotInVariableSetError):
+        constraint.linkWithVariables(_two_joint_set("set"))
+    constraint.linkWithVariables(other)
+    assert constraint.getJacobian().shape == (constraint.getRows(), other.getRows())
+
+
+def test_adding_a_constraint_on_a_standalone_var_to_a_problem_raises():
+    var = ti.Var(100, "joints", ["a", "b"], np.array([0.2, 0.3]), [ti.Bounds(-1.0, 1.0)] * 2)
+    problem = tsqp.TrajOptQPProblem(_two_joint_set("set"))
+    with pytest.raises(ti.VarNotInVariableSetError):
+        problem.addConstraintSet(ti.JointPosConstraint(np.zeros(2), var, np.ones(2)))
+    with pytest.raises(ti.VarNotInVariableSetError):
+        problem.addCostSet(
+            ti.JointPosConstraint(np.zeros(2), var, np.ones(2)), tsqp.CostPenaltyType.SQUARED
+        )
