@@ -71,6 +71,8 @@ PARSE = {
     "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
     "_base_definition", "_overload", "own_header_lines",
     "TYPE_INDEX", "_is_reference_wrapper_vector",  # #256 group 1
+    # G2 (R13)
+    "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
 }  # fmt: skip
 
 
@@ -131,6 +133,8 @@ MATCH = {
     "VECTOR_FORWARDING_MEMBERS", "VECTOR_FORWARDER_MEMBERS", "UnknownAcceptedRuleError",
     "_check_rule_keys", "poly_ancestors", "_absent_ok_accepts", "_whole_symbol_rule",
     "_bound_as_method", "_unbound_rule", "_uncovered_rule",
+    # G2 (T10, R15)
+    "K_ENUMERATOR", "CAMEL_BOUNDARY", "k_enumerator_python_name", "_k_alias",
 }  # fmt: skip
 
 
