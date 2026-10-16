@@ -10,7 +10,7 @@
       "wont_fix": "Internal to the collision checkers (types.h:322)."
     },
     "ContinuousContactManager.setCollisionObjectsTransformCast": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #174."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174)"
     },
     "ContinuousContactManagerFactory": {
       "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
@@ -27,10 +27,10 @@
   },
   "tesseract_common": {
     "Isometry3d.apply_directions": {
-      "wont_fix": "Python-only batched `iso * d` over an `(N, 3)` array; no C++ counterpart."
+      "wont_fix": "Intentional Python-only batched extension (CHANGELOG.md:169)."
     },
     "Isometry3d.apply_points": {
-      "wont_fix": "Python-only batched `iso * p` over an `(N, 3)` array; no C++ counterpart."
+      "wont_fix": "Intentional Python-only batched extension (CHANGELOG.md:169)."
     },
     "JointTrajectory.crbegin": {
       "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
@@ -117,16 +117,16 @@
       "wont_fix": "`datetime` covers it."
     },
     "isIdentical": {
-      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "isIdenticalArray": {
-      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "isIdenticalMap": {
-      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "isIdenticalSet": {
-      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "isNumeric": {
       "wont_fix": "Python `str` covers it."
@@ -135,22 +135,22 @@
       "wont_fix": "Python `str` covers it."
     },
     "numeric_cast": {
-      "wont_fix": "C++ numeric conversion template; Python `int`/`float` cover it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "operator==": {
       "wont_fix": "Compares `AllowedCollisionEntries`, which Python receives as a dict; dict `==` compares by value."
     },
     "pointersComparison": {
-      "wont_fix": "Compares `shared_ptr` targets; Python `==` on the bound objects covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "pointersEqual": {
-      "wont_fix": "Compares `shared_ptr` targets; Python `==` on the bound objects covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "printNestedException": {
-      "wont_fix": "Prints a C++ exception chain; Python's traceback shows the chained exception."
+      "wont_fix": "`tempfile`/`pathlib`/`datetime` cover the file, temp-path, timestamp and exception-printing helpers (phaseB PE-M7)."
     },
     "removeDuplicates": {
-      "wont_fix": "Generic C++ container helper; `dict.fromkeys` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "reorder": {
       "wont_fix": "numpy covers it."
@@ -162,7 +162,7 @@
       "wont_fix": "Python `str` covers it."
     },
     "tesseract/common/clone_cache.h": {
-      "wont_fix": "C++ template cache of clones; Python calls `clone()` on the bound type."
+      "wont_fix": "No reason recorded (phaseB PE-M13)."
     },
     "tesseract/common/ply_io.h": {
       "wont_fix": "`createMeshFromPath` reads PLY files."
@@ -180,10 +180,10 @@
       "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
     },
     "tesseract/common/stopwatch.h": {
-      "wont_fix": "C++ timing utility; Python's `time` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M13)."
     },
     "tesseract/common/timer.h": {
-      "wont_fix": "C++ timing utility; Python's `time` covers it."
+      "wont_fix": "No reason recorded (phaseB PE-M13)."
     },
     "tesseract/common/yaml_utils.h": {
       "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
@@ -197,7 +197,7 @@
   },
   "tesseract_environment": {
     "Command.__init__": {
-      "wont_fix": "A base `Command` claiming a derived type breaks the `getType` + `static_pointer_cast` dispatch."
+      "wont_fix": "A base `Command` claiming a derived type would be undefined behaviour under the `getType` + `static_pointer_cast` dispatch; unverified (environment.cpp not read, phaseB E3)."
     },
     "CommandAppliedEvent.__init__": {
       "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
@@ -206,7 +206,7 @@
       "wont_fix": "Takes the private `Environment::Implementation`, used only by `clone`."
     },
     "Environment.getCurrentJointValuesByNames": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
     },
     "Environment.getEventCallbacks": {
       "wont_fix": "Returns opaque `std::function` objects."
@@ -215,16 +215,16 @@
       "wont_fix": "Returns opaque `std::function` objects."
     },
     "Environment.getStateByMap": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
     },
     "Environment.getStateByNamesAndValues": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
     },
     "Environment.lockRead": {
       "wont_fix": "A `shared_lock` held from Python while other calls release the GIL is a deadlock trap."
     },
     "Environment.setStateByNamesAndValues": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
     },
     "Event.__init__": {
       "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
@@ -233,10 +233,10 @@
       "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
     },
     "cast_CommandAppliedEvent": {
-      "wont_fix": "Python-only downcast for event callbacks, type-checked by #191; removing it is a breaking change."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191)"
     },
     "cast_SceneStateChangedEvent": {
-      "wont_fix": "Python-only downcast for event callbacks, type-checked by #191; removing it is a breaking change."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191)"
     },
     "getActiveLinkNamesRecursive": {
       "wont_fix": "Recursion helper behind `getActiveLinkNames`."
@@ -264,10 +264,10 @@
       "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
     },
     "JointGroup.calcJacobianWithPoint": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #212."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212)"
     },
     "KinematicGroup.calcInvKinMultiple": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #212."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212)"
     },
     "dampedPInv": {
       "wont_fix": "numpy covers it."
@@ -311,10 +311,10 @@
       "wont_fix": "`data` is a `KDLTreeData`, a KDL tree type; KDL is never exposed to Python."
     },
     "StateSolver.setStateByMap": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #219."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219)"
     },
     "StateSolver.setStateByNamesAndValues": {
-      "wont_fix": "Compatibility alias of the native overload, kept by #219."
+      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219)"
     }
   },
   "tesseract_urdf": {
