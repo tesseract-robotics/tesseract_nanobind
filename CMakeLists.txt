@@ -206,6 +206,8 @@ add_tesseract_nanobind_extension(
   tesseract::environment
   tesseract::scene_graph
   tesseract::common
+  # TaskComposerLog; the target is imported by find_package(tesseract_planning) below
+  tesseract::task_composer
 )
 
 # Find motion planners
