@@ -395,6 +395,21 @@ def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
     return any(o in cpp and o not in py.symbols for o in owners)
 
 
+# Rules that also accept a symbol that is entirely unbound.
+WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index"})
+
+
+def _whole_symbol_rule(sym: CppSymbol) -> str | None:
+    """The whole-symbol rule of an unbound `sym`: its own `absent_ok`, or the one rule all its
+    overloads share; mixed rules stay a gap."""
+    if sym.absent_ok in WHOLE_SYMBOL_ABSENT_OK:
+        return sym.absent_ok
+    rules = {ov.absent_ok for ov in sym.overloads}
+    if len(rules) == 1 and (rule := next(iter(rules))) in WHOLE_SYMBOL_ABSENT_OK:
+        return rule
+    return None
+
+
 def match(
     module: str,
     cpp: dict[str, CppSymbol],
@@ -431,6 +446,8 @@ def match(
             if dunder and _py_member(f"{owner}.{dunder}", api, stub_roots):
                 covered += 1  # the dunder's own row names the rule
             elif rule := ACCEPTED_SYMBOLS.get((module, name)):
+                accepted.append(Accepted(name, rule, sym.location))
+            elif rule := _whole_symbol_rule(sym):
                 accepted.append(Accepted(name, rule, sym.location))
             elif name in elsewhere:
                 accepted.append(Accepted(name, "bound-in-other-module", sym.location))

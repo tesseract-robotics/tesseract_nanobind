@@ -253,6 +253,8 @@ class CppSymbol:
     kind: Kind
     location: str
     overloads: list[CppOverload] = field(default_factory=list)
+    # ACCEPTED rule under which leaving the whole symbol unbound is accepted
+    absent_ok: str | None = None
 
 
 def header_rel(path: Path) -> str:
