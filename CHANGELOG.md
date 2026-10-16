@@ -16,6 +16,7 @@
 - **Descartes tool-pose samplers** — `sampleFixed`, `sampleToolAxis`, `sampleToolXAxis`, `sampleToolYAxis`, `sampleToolZAxis`, returning `tesseract_common.VectorIsometry3d` ([#311]).
 - **TrajOpt-Ifopt profile hooks** — `TrajOptIfoptMoveProfile.create`, `TrajOptIfoptCompositeProfile.create` and `TrajOptIfoptSolverProfile.create`, with the structs they return: `TrajOptIfoptTermInfos` and the move-only `TrajOptIfoptWaypointInfo` (its `node` read-only and keeping the info alive) ([#339]).
 - **`createKey()` on the TrajOpt-Ifopt and Descartes profile bases** — `TrajOptIfopt{Move,Composite,Solver}Profile.createKey()` and `Descartes{Move,Solver}ProfileD.createKey()` return the key every profile of that kind carries; subclasses inherit it ([#273]).
+- **TrajOpt-Ifopt profiles load from YAML text** — `TrajOptIfoptDefaultMoveProfile.from_yaml`, `TrajOptIfoptDefaultCompositeProfile.from_yaml` and `TrajOptIfoptOSQPSolverProfile.from_yaml(config)` run the C++ YAML constructor; malformed YAML raises `ValueError`, a value of the wrong type the constructor's `RuntimeError` ([#331]).
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
 - **The binding audit states its coverage** — the report names every binding module it does not audit, with the reason; a binding module in neither table fails the run. Header ownership supports several prefixes per module and nested prefixes; the planning and trajopt bindings now parse ([#256]).
 
@@ -570,3 +571,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#310]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/310
 [#311]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/311
 [#339]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/339
+[#331]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/331

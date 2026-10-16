@@ -9,6 +9,7 @@
  */
 
 #include "tesseract_nb.h"
+#include "tesseract_nb_yaml.h"
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
@@ -210,6 +211,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("joint_cost_config", &tp::TrajOptIfoptDefaultMoveProfile::joint_cost_config)
         .def_rw("joint_constraint_config", &tp::TrajOptIfoptDefaultMoveProfile::joint_constraint_config);
     bind_value_equality(default_move_profile);
+    bind_from_yaml(default_move_profile);
 
     // SWIG-compatible alias
     m.attr("TrajOptIfoptDefaultPlanProfile") = m.attr("TrajOptIfoptDefaultMoveProfile");
@@ -235,6 +237,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("smooth_jerks", &tp::TrajOptIfoptDefaultCompositeProfile::smooth_jerks)
         .def_rw("jerk_coeff", &tp::TrajOptIfoptDefaultCompositeProfile::jerk_coeff);
     bind_value_equality(default_composite_profile);
+    bind_from_yaml(default_composite_profile);
 
     // ========== TrajOptIfoptOSQPSolverProfile ==========
     // qp_settings is a unique_ptr<OsqpEigen::Settings>; expose setters that forward into it
@@ -272,6 +275,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
             "Enable OSQP console output (default: false)");
     // operator== also compares qp_settings, through upstream's free OsqpEigen::Settings operator==.
     bind_value_equality(osqp_solver_profile);
+    bind_from_yaml(osqp_solver_profile);
 
     // Helper to add TrajOptIfopt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptIfoptMoveProfile", [](tc::ProfileDictionary& dict,
