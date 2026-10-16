@@ -64,6 +64,8 @@ PARSE = {
     "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
     "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
     "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",
+    # G2 (R13)
+    "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
 }  # fmt: skip
 
 
@@ -111,6 +113,10 @@ MATCH = {
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
+    # G1 (scaffold in g2-mech; G1's own entries replace these at merge)
+    "WHOLE_SYMBOL_ABSENT_OK", "_whole_symbol_rule",
+    # G2 (T10, R15)
+    "K_ENUMERATOR", "CAMEL_BOUNDARY", "k_enumerator_python_name", "_k_alias",
 }  # fmt: skip
 
 
