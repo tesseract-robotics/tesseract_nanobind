@@ -67,6 +67,9 @@ PARSE = {
     # 0b Task 6 (class identity)
     "BODY_PARSE_OPTIONS", "NB_CLASS_TEMPLATES", "NB_CLASS_CTORS", "NB_MODULE_SCOPE",
     "NB_MODULE_INIT_PREFIX", "SkippedBodiesError", "_in_main_file", "_scope_type", "bound_classes",
+    # 0b Task 7 (inherited members)
+    "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
+    "_base_definition", "_overload", "own_header_lines",
 }  # fmt: skip
 
 
@@ -119,6 +122,8 @@ MATCH = {
     "_renamed",
     # 0b Task 8 (stub bases)
     "_stub_base", "_base_rows",
+    # 0b Task 7 (inherited members)
+    "_inherited_from_bound",
 }  # fmt: skip
 
 
