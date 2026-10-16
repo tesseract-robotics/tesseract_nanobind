@@ -10,5 +10,7 @@ __all__ = [
     "IterativeSplineParameterization",
     "ConstantTCPSpeedCompositeProfile",
     "ConstantTCPSpeedParameterization",
+    "RuckigTrajectorySmoothingCompositeProfile",
+    "RuckigTrajectorySmoothing",
     "rescaleTimings",
 ]
