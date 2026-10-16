@@ -33,6 +33,9 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesEdgeEvaluatorD,
     DescartesMotionPlannerD,
     DescartesMoveProfileD,
+    DescartesStateD,
+    DescartesStateSampleD,
+    DescartesWaypointSamplerD,
     cast_DescartesMoveProfileD,
     cast_DescartesPlanProfileD,
 )
@@ -327,3 +330,52 @@ class TestPythonEdgeEvaluator:
         assert call_counter["n"] > 0, (
             "Python EdgeEvaluator.evaluate() was never called by the planner"
         )
+
+
+def _cartesian_move(pose, manip_info, profile="TEST_PROFILE"):
+    """A LINEAR MoveInstructionPoly to `pose` carrying `manip_info`."""
+    instruction = MoveInstruction(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose)),
+        MoveInstructionType_LINEAR,
+        profile,
+    )
+    instruction.setManipulatorInfo(manip_info)
+    return MoveInstructionPoly_wrap_MoveInstruction(instruction)
+
+
+class TestDescartesStateSample:
+    """`DescartesStateSampleD(state)` defaults the cost to 0 (gh-310)."""
+
+    def test_state_only_constructor(self):
+        state = DescartesStateD(np.array([0.1, 0.2]))
+        sample = DescartesStateSampleD(state)
+        assert sample.cost == 0.0
+        np.testing.assert_array_equal(sample.state.values, state.values)
+
+
+class TestDescartesWaypointSamplerStr:
+    """`str()` on a waypoint sampler shows upstream's `print` (gh-310)."""
+
+    def test_robot_sampler_str(self, abb_irb2400_environment):
+        env, manip_info, _ = abb_irb2400_environment
+        pose = (
+            Isometry3d.Identity()
+            * Translation3d(0.8, -0.2, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+        )
+        sampler = DescartesDefaultMoveProfileD().createWaypointSampler(
+            _cartesian_move(pose, manip_info), manip_info, env
+        )
+        text = str(sampler)
+        assert "Working Frame:" in text
+        assert "TCP Frame:" in text
+
+    def test_python_sampler_keeps_its_own_str(self):
+        class NamedSampler(DescartesWaypointSamplerD):
+            def sample(self):
+                return []
+
+            def __str__(self):
+                return "named"
+
+        assert str(NamedSampler()) == "named"
