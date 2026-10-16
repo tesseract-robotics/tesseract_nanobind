@@ -72,6 +72,10 @@ class DescartesStateEvaluatorD:
 class DescartesSolverProfileD(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
 
+    @staticmethod
+    def createKey() -> int:
+        """The key every Descartes solver profile carries"""
+
 class DescartesLadderGraphSolverProfileD(DescartesSolverProfileD):
     def __init__(self) -> None: ...
 
@@ -97,6 +101,10 @@ class DescartesMoveProfileD(tesseract_robotics.tesseract_command_language._tesse
     def __init__(self) -> None: ...
 
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key every Descartes move profile carries"""
 
     def createWaypointSampler(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> DescartesWaypointSamplerD: ...
 

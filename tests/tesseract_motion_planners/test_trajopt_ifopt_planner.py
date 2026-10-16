@@ -27,11 +27,13 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptPlanProfile,
     ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptCartesianWaypointConfig,
+    TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptDefaultPlanProfile,
     TrajOptIfoptJointWaypointConfig,
     TrajOptIfoptMotionPlanner,
+    TrajOptIfoptMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptSolverProfile,
 )
@@ -511,3 +513,26 @@ class TestTrajOptIfoptValueEquality:
         assert a != b
         with pytest.raises(TypeError):
             hash(a)
+
+
+class TestTrajOptIfoptProfileCreateKey:
+    """Static `createKey()` is the key the profile carries (gh-273)."""
+
+    @pytest.mark.parametrize(
+        "cls",
+        [
+            TrajOptIfoptDefaultMoveProfile,
+            TrajOptIfoptDefaultCompositeProfile,
+            TrajOptIfoptOSQPSolverProfile,
+        ],
+    )
+    def test_create_key_matches_instance_key(self, cls):
+        assert cls.createKey() == cls().getKey()
+
+    def test_keys_differ_between_profile_kinds(self):
+        keys = {
+            TrajOptIfoptMoveProfile.createKey(),
+            TrajOptIfoptCompositeProfile.createKey(),
+            TrajOptIfoptSolverProfile.createKey(),
+        }
+        assert len(keys) == 3

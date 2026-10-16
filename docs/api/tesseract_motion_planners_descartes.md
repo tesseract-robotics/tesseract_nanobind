@@ -66,6 +66,10 @@ Both profiles compare by value (`==` compares every field, as the C++ `operator=
 are unhashable. `DescartesMoveProfileD.createKey()` and `DescartesSolverProfileD.createKey()`
 return the key every profile of that kind carries, the key `ProfileDictionary` looks up:
 
+```python
+assert DescartesDefaultMoveProfileD.createKey() == DescartesDefaultMoveProfileD().getKey()
+```
+
 ## Inspecting the samplers
 
 The move profile's `create*` hooks return what the planner builds for one waypoint. `str()` on

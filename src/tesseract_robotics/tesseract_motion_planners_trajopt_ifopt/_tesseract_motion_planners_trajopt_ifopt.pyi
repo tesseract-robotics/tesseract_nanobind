@@ -95,10 +95,20 @@ class TrajOptIfoptJointWaypointConfig:
 class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
 
+    @staticmethod
+    def createKey() -> int:
+        """The key every TrajOpt-Ifopt move profile carries"""
+
+
 TrajOptIfoptPlanProfile: TypeAlias = TrajOptIfoptMoveProfile
 
 class TrajOptIfoptCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key every TrajOpt-Ifopt composite profile carries"""
+
 
 class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     @property
@@ -108,6 +118,11 @@ class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._t
     def opt_params(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPParameters, /) -> None: ...
 
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key every TrajOpt-Ifopt solver profile carries"""
+
 
 class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
     def __init__(self) -> None: ...
