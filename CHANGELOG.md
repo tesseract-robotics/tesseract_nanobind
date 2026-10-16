@@ -36,6 +36,7 @@
 - **`from_yaml` on the OMPL, TrajOpt and task-composer planning profiles** — `OMPLRealVectorMoveProfile`, `TrajOptDefaultMoveProfile`, `TrajOptDefaultCompositeProfile`, `TrajOptOSQPSolverProfile` and the seven `tesseract_task_composer_planning` profiles load from YAML text through the C++ YAML constructor. A key replaces the whole sub-config it names, starting from that config's own defaults (`collision_check_config: {...}` resets `type` to `DISCRETE`; `solver_config: {...}` starts with no planners). Malformed YAML raises `ValueError`, a value of the wrong type the profile's `RuntimeError` ([#331]).
 - **TrajOpt-Ifopt and Descartes planners are `MotionPlanner`s** — `TrajOptIfoptMotionPlanner` and `DescartesMotionPlannerD` derive from `tesseract_motion_planners.MotionPlanner`; `getName`/`solve`/`terminate`/`clear`/`clone` are the base's (its `solve` releases the GIL) ([#299]).
 - **The Descartes stub names `Environment`** — the binding imports `tesseract_environment`, so `DescartesMoveProfileD.create*` no longer quote `"tesseract::environment::Environment"` ([#300]).
+- **Python SQP callbacks reach the TrajOpt-Ifopt planner** — `TrajOptIfoptSolverProfile.callbacks` (copied on access; `None` rejected) and `createOptimizationCallbacks()`. On trajopt 0.35.0 a callback returning `False` does not stop the solve (upstream `stepSQPSolver` ignores the stopped status) ([#308]).
 - **The TrajOpt-Ifopt term factories** — `createJointPositionConstraint`, `createCollisionConstraints`, `createJointVelocityConstraint`, `createJointAccelerationConstraint`, `createJointJerkConstraint` from `trajopt_ifopt_utils.h`; an empty or `None`-holding `vars` raises ([#309]).
 - **`DescartesStateSampleD(state)` and `str()` on Descartes waypoint samplers** — the one-argument constructor (cost 0) and `__str__` from upstream's `print` ([#310]).
 - **Descartes tool-pose samplers** — `sampleFixed`, `sampleToolAxis`, `sampleToolXAxis`, `sampleToolYAxis`, `sampleToolZAxis`, returning `tesseract_common.VectorIsometry3d` ([#311]).
@@ -669,6 +670,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#300]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/300
 [#303]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/303
 [#305]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/305
+[#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [#309]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/309
 [#310]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/310
 [#311]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/311

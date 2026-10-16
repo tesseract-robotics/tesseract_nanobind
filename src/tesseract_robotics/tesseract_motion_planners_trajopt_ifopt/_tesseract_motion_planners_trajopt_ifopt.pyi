@@ -178,6 +178,15 @@ class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._t
     @opt_params.setter
     def opt_params(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPParameters, /) -> None: ...
 
+    @property
+    def callbacks(self) -> list[tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPCallback]:
+        """SQP callbacks registered on the solver, called once per SQP iteration"""
+
+    @callbacks.setter
+    def callbacks(self, arg: Sequence[tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPCallback], /) -> None: ...
+
+    def createOptimizationCallbacks(self) -> list[tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPCallback]: ...
+
     def getKey(self) -> int: ...
 
     @staticmethod

@@ -49,7 +49,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
 )
 from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.trajopt_sqp import SQPParameters
+from tesseract_robotics.trajopt_sqp import SQPCallback, SQPParameters
 
 TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
@@ -486,6 +486,80 @@ def _request(t_env, manip_info, joint_names, solver_profile):
     request.env = t_env
     request.profiles = profiles
     return request
+
+
+class _RecordingCallback(SQPCallback):
+    """Records the SQP iteration of every call; returns `keep_going`."""
+
+    def __init__(self, keep_going=True):
+        super().__init__()
+        self.keep_going = keep_going
+        self.iterations = []
+
+    def execute(self, problem, sqp_results):
+        self.iterations.append(sqp_results.overall_iteration)
+        return self.keep_going
+
+
+class TestTrajOptIfoptSolverCallbacks:
+    """`TrajOptIfoptSolverProfile.callbacks` reach the planner's solver (gh-308)."""
+
+    def test_create_optimization_callbacks_returns_assigned_list(self):
+        callback = _RecordingCallback()
+        profile = TrajOptIfoptOSQPSolverProfile()
+        profile.callbacks = [callback]
+        callbacks = profile.createOptimizationCallbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] is callback
+
+    def test_none_callback_is_rejected(self):
+        profile = TrajOptIfoptOSQPSolverProfile()
+        with pytest.raises(TypeError, match=r"callbacks\[0\] is None"):
+            profile.callbacks = [None]
+
+    def test_callback_called_every_iteration(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        callback = _RecordingCallback()
+        solver_profile = TrajOptIfoptOSQPSolverProfile()
+        solver_profile.callbacks = [callback]
+
+        response = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(
+            _request(t_env, manip_info, joint_names, solver_profile)
+        )
+
+        assert response.successful, response.message
+        assert callback.iterations, "the planner never called the Python callback"
+        # every SQP iteration the solver reached called the callback at least once
+        assert set(range(1, max(callback.iterations) + 1)) <= set(callback.iterations)
+
+    def test_callback_returning_false_is_called_each_iteration(self, kuka_iiwa_environment):
+        # Whether False stops the solve is upstream's (trajopt 0.35.0 keeps iterating, see
+        # docs/user-guide/low-level-sqp.md); the binding guarantees the calls and their arguments.
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        seen = []
+
+        class Recorder(SQPCallback):
+            def execute(self, problem, sqp_results):
+                seen.append((problem, sqp_results))
+                return False
+
+        max_iterations = 5
+        solver_profile = TrajOptIfoptOSQPSolverProfile()
+        solver_profile.opt_params.max_iterations = max_iterations
+        solver_profile.callbacks = [Recorder()]
+
+        TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(
+            _request(t_env, manip_info, joint_names, solver_profile)
+        )
+
+        iterations = [r.overall_iteration for _, r in seen]
+        assert iterations, "the planner never called the Python callback"
+        # one call per SQP iteration the solver reached, never past max_iterations
+        assert iterations == sorted(set(iterations))
+        assert 1 <= iterations[0] and iterations[-1] <= max_iterations
+        for problem, sqp_results in seen:
+            assert isinstance(problem, tsqp.QPProblem)
+            assert isinstance(sqp_results, tsqp.SQPResults)
 
 
 class TestTrajOptIfoptConstraintFactories:
