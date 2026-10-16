@@ -55,7 +55,7 @@ def test_trajopt_sqp_includes_of_trajopt_ifopt_headers_are_not_delegated(g2_repo
 
 
 def test_unbound_inplace_operator_is_a_gap_under_its_dunder(g2_reports):
-    # trajopt_ifopt Bounds: unbound until g2/05 lands.
+    # trajopt_ifopt Bounds: unbound until #286 lands.
     gaps = {g.symbol for g in g2_reports["trajopt_ifopt"].gaps}
     assert {"Bounds.__iadd__", "Bounds.__isub__"} <= gaps
     assert not {"Bounds.operator+=", "Bounds.operator-="} & gaps
@@ -82,6 +82,38 @@ def test_real_k_prefix_rows_accepted(g2_reports, module, symbol):
     report = g2_reports[module]
     assert (symbol, "k-prefix-enumerator") in accepted_pairs(report)
     assert symbol not in open_rows(report)
+
+
+K_PREFIX_ACCEPTED = {
+    # sqp ledger rows 1-3, 24, 29, 30, 32, 50-52, 54, 58, 61, 63.
+    "trajopt_sqp": {
+        *(f"CostPenaltyType.{e}" for e in ("kAbsolute", "kHinge", "kSquared")),
+        *(f"CostPenaltyType.{e}" for e in ("ABSOLUTE", "HINGE", "SQUARED")),
+        *(f"SQPStatus.{e}" for e in ("kIterationLimit", "kPenaltyIterationLimit", "kRunning")),
+        *(f"SQPStatus.{e}" for e in ("ITERATION_LIMIT", "PENALTY_ITERATION_LIMIT", "RUNNING")),
+        "QPSolverStatus.kInitialized",
+        "QPSolverStatus.INITIALIZED",
+    },
+    # trajopt_ifopt ledger rows 3-7, 60, 61, 94-98, 102, 103.
+    "trajopt_ifopt": {
+        *(
+            f"BoundsType.{e}"
+            for e in ("kEquality", "kLowerBound", "kRangeBound", "kUnbounded", "kUpperBound")
+        ),
+        *(
+            f"BoundsType.{e}"
+            for e in ("EQUALITY", "LOWER_BOUND", "RANGE_BOUND", "UNBOUNDED", "UPPER_BOUND")
+        ),
+        *(f"RangeBoundHandling.{e}" for e in ("kKeepAsIs", "kSplitToTwoInequalities")),
+        *(f"RangeBoundHandling.{e}" for e in ("KEEP_AS_IS", "SPLIT_TO_TWO_INEQUALITIES")),
+    },
+}
+
+
+@pytest.mark.parametrize("module", G2)
+def test_real_k_prefix_rows_exact(g2_reports, module):
+    accepted = {a.symbol for a in g2_reports[module].accepted if a.rule == "k-prefix-enumerator"}
+    assert accepted == K_PREFIX_ACCEPTED[module]
 
 
 @pytest.mark.parametrize(
@@ -119,8 +151,16 @@ def test_real_osqp_rows_accepted(g2_reports, symbol):
     assert symbol not in {d.name for d in report.deviations}
 
 
+@pytest.mark.parametrize(
+    "symbol", ["OSQPEigenSolver.setDefaultOSQPSettings", "OSQPEigenSolver.solver_"]
+)
+def test_real_osqp_whole_symbols_leave_no_gap(g2_reports, symbol):
+    # setWarmStart is not here: its C++ QPProblem overload stays a gap (#283).
+    assert symbol not in {g.symbol for g in g2_reports["trajopt_sqp"].gaps}
+
+
 def test_real_osqp_warm_start_from_problem_stays_a_gap(g2_reports):
-    """The C++ setWarmStart(const QPProblem&) is unbound: binding-fix g2/02."""
+    """The C++ setWarmStart(const QPProblem&) is unbound: binding-fix #283."""
     assert ("OSQPEigenSolver.setWarmStart", "1") in {
         (g.symbol, g.arity) for g in g2_reports["trajopt_sqp"].gaps
     }
@@ -229,6 +269,57 @@ def test_g2_not_api_header_has_no_row(g2_reports, module, header):
 def test_g2_not_api_transitive_class_has_no_row(g2_reports, symbol):
     """cache.h and core/composite.h reach the TU through other headers, not as direct includes."""
     assert symbol not in {g.symbol for g in g2_reports["trajopt_ifopt"].gaps}
+
+
+@pytest.mark.parametrize(
+    "symbol",
+    [
+        # trajopt_ifopt ledger rows 85, 91, 92, 15: binding-fix, next to not-API headers.
+        "trajopt_ifopt/constraints/collision/continuous_collision_numerical_constraint.h",
+        "trajopt_ifopt/utils/numeric_differentiation.h",
+        "trajopt_ifopt/utils/trajopt_utils.h",
+        "CollisionCacheData",
+    ],
+)
+def test_g2_binding_fix_neighbour_stays_a_gap(g2_reports, symbol):
+    assert symbol in {g.symbol for g in g2_reports["trajopt_ifopt"].gaps}
+
+
+G2_PATTERNS = {
+    "trajopt_sqp/": {"callbacks/*", "expressions.h", "ifopt_qp_problem.h"},
+    "trajopt_ifopt/": {
+        "constraints/collision/weighted_average_methods.h",
+        "core/problem.h",
+        "core/cost_term.h",
+        "costs/*",
+        "core/composite.h",
+        "variable_sets/nodes_observer.h",
+    },
+    "trajopt_common/": {
+        "basic_array.hpp",
+        "eigen_conversions.hpp",
+        "eigen_slicing.hpp",
+        "interpolation.hpp",
+        "utils.hpp",
+        "vector_ops.hpp",
+        "stl_to_string.hpp",
+        "clock.hpp",
+        "config.hpp",
+        "logging.hpp",
+        "collision_utils.h",
+        "cache.h",
+    },
+}
+
+
+@pytest.mark.parametrize("prefix", sorted(G2_PATTERNS))
+def test_g2_patterns_exact(prefix):
+    assert set(own.UNAUDITED_HEADERS[prefix]) == G2_PATTERNS[prefix]
+
+
+def test_no_g2_pattern_under_any_prefix():
+    g2 = set().union(*G2_PATTERNS.values())
+    assert not g2 & set(own.UNAUDITED_HEADERS[own.ANY_PREFIX])
 
 
 @pytest.mark.parametrize(
