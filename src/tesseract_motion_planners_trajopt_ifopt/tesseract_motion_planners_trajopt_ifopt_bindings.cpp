@@ -122,12 +122,39 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("coeff", &tp::TrajOptIfoptJointWaypointConfig::coeff);
     bind_value_equality(joint_wp_config);
 
+    // ========== TrajOptIfoptTermInfos ==========
+    // The constraint and cost sets a profile's create() hands the planner, which adds each
+    // list to its TrajOptQPProblem as constraints / squared / absolute / hinge costs.
+    nb::class_<tp::TrajOptIfoptTermInfos> term_infos(m, "TrajOptIfoptTermInfos",
+        "Constraint and cost sets a TrajOpt-Ifopt profile adds to the planner's problem");
+    term_infos.def(nb::init<>());
+    def_term_list<&tp::TrajOptIfoptTermInfos::constraints>(term_infos, "constraints");
+    def_term_list<&tp::TrajOptIfoptTermInfos::squared_costs>(term_infos, "squared_costs");
+    def_term_list<&tp::TrajOptIfoptTermInfos::absolute_costs>(term_infos, "absolute_costs");
+    def_term_list<&tp::TrajOptIfoptTermInfos::hinge_costs>(term_infos, "hinge_costs");
+
+    // ========== TrajOptIfoptWaypointInfo ==========
+    // Move-only: it owns its Node through a unique_ptr. `node` is read-only and refers into
+    // this object (reference_internal), so a Python Node keeps its waypoint info alive.
+    nb::class_<tp::TrajOptIfoptWaypointInfo>(m, "TrajOptIfoptWaypointInfo",
+        "What a TrajOpt-Ifopt move profile builds for one waypoint: its variables and terms")
+        .def(nb::init<>())
+        .def_rw("term_infos", &tp::TrajOptIfoptWaypointInfo::term_infos)
+        .def_prop_ro("node", [](tp::TrajOptIfoptWaypointInfo& self) { return self.node.get(); },
+            nb::rv_policy::reference_internal,
+            nb::for_getter(nb::sig("def node(self, /) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node | None")),
+            "The waypoint's variable node (owned by this object), or None")
+        .def_rw("fixed", &tp::TrajOptIfoptWaypointInfo::fixed,
+            "Whether the waypoint is fixed (no collision terms at this step)");
 
     // ========== TrajOptIfoptMoveProfile (base, was TrajOptIfoptPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptMoveProfile, tc::Profile>(m, "TrajOptIfoptMoveProfile")
         .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptMoveProfile>,
-            "The key every TrajOpt-Ifopt move profile carries");
+            "The key every TrajOpt-Ifopt move profile carries")
+        .def("create", &tp::TrajOptIfoptMoveProfile::create,
+            "move_instruction"_a, "composite_manip_info"_a, "env"_a, "index"_a,
+            "Build the waypoint info the planner adds for this move instruction");
 
     // SWIG-compatible alias
     m.attr("TrajOptIfoptPlanProfile") = m.attr("TrajOptIfoptMoveProfile");
@@ -136,7 +163,17 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     nb::class_<tp::TrajOptIfoptCompositeProfile, tc::Profile>(m, "TrajOptIfoptCompositeProfile")
         .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptCompositeProfile>,
-            "The key every TrajOpt-Ifopt composite profile carries");
+            "The key every TrajOpt-Ifopt composite profile carries")
+        .def("create",
+            [](const tp::TrajOptIfoptCompositeProfile& self, const tc::ManipulatorInfo& composite_manip_info,
+               const std::shared_ptr<const tesseract::environment::Environment>& env,
+               const std::vector<std::shared_ptr<const ti::Node>>& nodes, const std::vector<int>& fixed_indices) {
+                return self.create(composite_manip_info, env,
+                                   require_non_null(nodes, "TrajOptIfoptCompositeProfile.create", "nodes", "Node"),
+                                   fixed_indices);
+            },
+            "composite_manip_info"_a, "env"_a, "nodes"_a, "fixed_indices"_a,
+            "Build the trajectory-wide terms the planner adds over all waypoint nodes");
 
     // ========== TrajOptIfoptSolverProfile (base) ==========
     // opt_params is the SQP loop itself (max_iterations, max_qp_solver_failures,
@@ -149,7 +186,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("opt_params", &tp::TrajOptIfoptSolverProfile::opt_params)
         .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptSolverProfile>,
-            "The key every TrajOpt-Ifopt solver profile carries");
+            "The key every TrajOpt-Ifopt solver profile carries")
+        .def("create", &tp::TrajOptIfoptSolverProfile::create, "verbose"_a = false,
+            "Build the TrustRegionSQPSolver the planner solves with");
 
     // ========== TrajOptIfoptDefaultMoveProfile (was TrajOptIfoptDefaultPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptDefaultMoveProfile, tp::TrajOptIfoptMoveProfile> default_move_profile(

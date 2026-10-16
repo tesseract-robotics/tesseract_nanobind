@@ -92,6 +92,61 @@ class TrajOptIfoptJointWaypointConfig:
 
     __hash__: None = None
 
+class TrajOptIfoptTermInfos:
+    """
+    Constraint and cost sets a TrajOpt-Ifopt profile adds to the planner's problem
+    """
+
+    def __init__(self) -> None: ...
+
+    @property
+    def constraints(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @constraints.setter
+    def constraints(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+    @property
+    def squared_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @squared_costs.setter
+    def squared_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+    @property
+    def absolute_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @absolute_costs.setter
+    def absolute_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+    @property
+    def hinge_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @hinge_costs.setter
+    def hinge_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+class TrajOptIfoptWaypointInfo:
+    """
+    What a TrajOpt-Ifopt move profile builds for one waypoint: its variables and terms
+    """
+
+    def __init__(self) -> None: ...
+
+    @property
+    def term_infos(self) -> TrajOptIfoptTermInfos: ...
+
+    @term_infos.setter
+    def term_infos(self, arg: TrajOptIfoptTermInfos, /) -> None: ...
+
+    @property
+    def node(self, /) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node | None:
+        """The waypoint's variable node (owned by this object), or None"""
+
+    @property
+    def fixed(self) -> bool:
+        """Whether the waypoint is fixed (no collision terms at this step)"""
+
+    @fixed.setter
+    def fixed(self, arg: bool, /) -> None: ...
+
 class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
 
@@ -99,6 +154,8 @@ class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tes
     def createKey() -> int:
         """The key every TrajOpt-Ifopt move profile carries"""
 
+    def create(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, index: int) -> TrajOptIfoptWaypointInfo:
+        """Build the waypoint info the planner adds for this move instruction"""
 
 TrajOptIfoptPlanProfile: TypeAlias = TrajOptIfoptMoveProfile
 
@@ -109,6 +166,10 @@ class TrajOptIfoptCompositeProfile(tesseract_robotics.tesseract_command_language
     def createKey() -> int:
         """The key every TrajOpt-Ifopt composite profile carries"""
 
+    def create(self, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, nodes: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node], fixed_indices: Sequence[int]) -> TrajOptIfoptTermInfos:
+        """
+        Build the trajectory-wide terms the planner adds over all waypoint nodes
+        """
 
 class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     @property
@@ -123,6 +184,8 @@ class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._t
     def createKey() -> int:
         """The key every TrajOpt-Ifopt solver profile carries"""
 
+    def create(self, verbose: bool = False) -> tesseract_robotics.trajopt_sqp._trajopt_sqp.TrustRegionSQPSolver:
+        """Build the TrustRegionSQPSolver the planner solves with"""
 
 class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
     def __init__(self) -> None: ...
