@@ -122,6 +122,38 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
         "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to "
         "`OFKTStateSolver`.",
     },
+    # Group 3: OMPL plugin internals and classic TrajOpt's solver layers. `*` is safe only
+    # because each pattern is scoped to its owning prefix.
+    "tesseract/motion_planners/ompl/": {
+        "*_validator.h": "OMPL `StateValidityChecker`/`MotionValidator` subclasses that "
+        "`OMPLRealVectorMoveProfile::createSimpleSetup` installs into the `SimpleSetup`; Python "
+        "reaches them only through OMPL types (`ompl_base` is removed, #258).",
+        "collision_cost_objective.h": "OMPL `StateCostIntegralObjective` subclass the OMPL "
+        "profile installs; it has no Python form without OMPL types.",
+        "weighted_real_vector_state_sampler.h": "OMPL `StateSampler` subclass the OMPL profile "
+        "installs; it has no Python form without OMPL types.",
+        "utils.h": "Helpers the OMPL planner and profile call while building and reading the "
+        "`SimpleSetup`; all but `checkStateInCollision` take OMPL types, and that one is "
+        "`JointGroup.calcFwdKin` plus `DiscreteContactManager.contactTest`, both bound.",
+    },
+    "tesseract/motion_planners/trajopt/": {
+        "trajopt_utils.h": "Factories for classic-TrajOpt `TermInfo`s that the default TrajOpt "
+        "profiles' `create` calls; all but `createKinematicGroup` return `trajopt::TermInfo`, "
+        "and that one duplicates `Environment.getKinematicGroup`/`getJointGroup`.",
+    },
+    "trajopt_sco/": {
+        "*": "Classic TrajOpt's SQP layer: expressions, convex models, QP-solver backends (OSQP, "
+        "qpOASES, Gurobi, BPMPD) and numeric differentiation. `TrajOptMotionPlanner` builds and "
+        "solves it from the profiles; Python sets its parameters through "
+        "`TrajOptSolverProfile.opt_params`. `optimizers.hpp`, #included by the binding, stays "
+        "audited.",
+    },
+    "trajopt/": {
+        "*": "Classic TrajOpt's problem description (`ProblemConstructionInfo`, `TermInfo` and "
+        "its cost and constraint terms, JSON marshalling, plot and file callbacks), which "
+        "`TrajOptMotionPlanner::createProblem` builds from the profiles; Python configures the "
+        "profiles.",
+    },
 }
 # Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
 # UNAUDITED_HEADERS. Never audited, not even when the binding #includes one directly: such an
