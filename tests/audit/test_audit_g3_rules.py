@@ -40,6 +40,8 @@ def _planner_report():
 def planner_report():
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parse, "UNBOUND_DEPENDENCY_ROOTS", (FIXTURE_THIRD_PARTY,))
+        # An `UNAUDITED_HEADERS` key must be a module's prefix (`UnknownPrefixError`).
+        mp.setitem(own.AUDITED_HEADER_PREFIX, "planner", PLANNER_PREFIX)
         mp.setitem(own.UNAUDITED_HEADERS, PLANNER_PREFIX[0], FIXTURE_NOT_API)
         return _planner_report()
 
@@ -80,6 +82,7 @@ def test_not_api_half_needs_an_unaudited_header(monkeypatch):
 
 
 def test_header_is_unaudited_reads_the_owning_prefix(monkeypatch):
+    monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "planner", PLANNER_PREFIX)
     monkeypatch.setitem(own.UNAUDITED_HEADERS, PLANNER_PREFIX[0], FIXTURE_NOT_API)
     prefixes = {"planner": PLANNER_PREFIX, "other": ("tesseract/other/",)}
     assert own.header_is_unaudited("tesseract/planner/internal/term.h", prefixes)
