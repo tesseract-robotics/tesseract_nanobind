@@ -1,0 +1,3 @@
+# Audit contract fixture (#256 T3): binds C++ LongWidgetName as Widget.
+class Widget:
+    def size(self) -> int: ...
