@@ -43,6 +43,15 @@
   | `WaypointPoly_as_CartesianWaypointPoly(wp)` (also `Joint…`, `State…`) | `wp.asCartesianWaypoint()` (a reference) |
   | `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
 
+- **Time-parameterization profiles bound under their C++ names** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` are now `TimeOptimalTrajectoryGenerationCompositeProfile`, `IterativeSplineParameterizationCompositeProfile`, `IterativeSplineParameterizationMoveProfile` and `ConstantTCPSpeedParameterizationCompositeProfile`, as every other planner profile is (#187). No alias: the old names raise `ImportError`. The package's `__all__` is gone; `import *` exports every public name of the extension ([#329]).
+
+  | before | after |
+  | --- | --- |
+  | `TOTGCompositeProfile` | `TimeOptimalTrajectoryGenerationCompositeProfile` |
+  | `ISPCompositeProfile` | `IterativeSplineParameterizationCompositeProfile` |
+  | `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
+  | `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -715,3 +724,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275
 [#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276
 [#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328
+[#329]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/329

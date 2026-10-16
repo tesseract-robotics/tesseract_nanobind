@@ -26,19 +26,19 @@ from tesseract_robotics.tesseract_command_language import (
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
-    ConstantTCPSpeedCompositeProfile,
     ConstantTCPSpeedParameterization,
+    ConstantTCPSpeedParameterizationCompositeProfile,
     InstructionsTrajectory,
-    ISPCompositeProfile,
-    ISPMoveProfile,
     IterativeSplineParameterization,
+    IterativeSplineParameterizationCompositeProfile,
+    IterativeSplineParameterizationMoveProfile,
     RuckigTrajectorySmoothing,
     RuckigTrajectorySmoothingCompositeProfile,
     ScalingsLengthError,
     StaleTrajectoryError,
     TimeOptimalTrajectoryGeneration,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
     TimeParameterization,
-    TOTGCompositeProfile,
     rescaleTimings,
 )
 
@@ -76,10 +76,10 @@ class TestIterativeSplineParameterization:
 
 
 class TestTOTGCompositeProfile:
-    """Test TOTGCompositeProfile."""
+    """Test TimeOptimalTrajectoryGenerationCompositeProfile."""
 
     def test_default_constructor(self):
-        profile = TOTGCompositeProfile()
+        profile = TimeOptimalTrajectoryGenerationCompositeProfile()
         assert profile is not None
         assert profile.max_velocity_scaling_factor == 1.0
         assert profile.max_acceleration_scaling_factor == 1.0
@@ -87,14 +87,14 @@ class TestTOTGCompositeProfile:
         assert profile.min_angle_change == 0.001
 
     def test_custom_constructor(self):
-        profile = TOTGCompositeProfile(0.5, 0.5, 0.05, 0.002)
+        profile = TimeOptimalTrajectoryGenerationCompositeProfile(0.5, 0.5, 0.05, 0.002)
         assert profile.max_velocity_scaling_factor == 0.5
         assert profile.max_acceleration_scaling_factor == 0.5
         assert profile.path_tolerance == 0.05
         assert profile.min_angle_change == 0.002
 
     def test_override_limits(self):
-        profile = TOTGCompositeProfile()
+        profile = TimeOptimalTrajectoryGenerationCompositeProfile()
         profile.override_limits = True
         profile.velocity_limits = np.column_stack((-np.ones(6), np.ones(6)))
         profile.acceleration_limits = np.column_stack((-np.ones(6) * 2, np.ones(6) * 2))
@@ -104,31 +104,31 @@ class TestTOTGCompositeProfile:
 
 
 class TestISPCompositeProfile:
-    """Test ISPCompositeProfile."""
+    """Test IterativeSplineParameterizationCompositeProfile."""
 
     def test_default_constructor(self):
-        profile = ISPCompositeProfile()
+        profile = IterativeSplineParameterizationCompositeProfile()
         assert profile is not None
         assert profile.add_points is True
         assert profile.max_velocity_scaling_factor == 1.0
         assert profile.max_acceleration_scaling_factor == 1.0
 
     def test_custom_constructor(self):
-        profile = ISPCompositeProfile(0.5, 0.5)
+        profile = IterativeSplineParameterizationCompositeProfile(0.5, 0.5)
         assert profile.max_velocity_scaling_factor == 0.5
         assert profile.max_acceleration_scaling_factor == 0.5
 
     def test_add_points_setting(self):
-        profile = ISPCompositeProfile()
+        profile = IterativeSplineParameterizationCompositeProfile()
         profile.add_points = False
         assert profile.add_points is False
 
 
 class TestISPMoveProfile:
-    """Test ISPMoveProfile."""
+    """Test IterativeSplineParameterizationMoveProfile."""
 
     def test_default_constructor(self):
-        profile = ISPMoveProfile()
+        profile = IterativeSplineParameterizationMoveProfile()
         assert profile is not None
         assert profile.max_velocity_scaling_factor == 1.0
         assert profile.max_acceleration_scaling_factor == 1.0
@@ -187,7 +187,7 @@ class TestConstantTCPSpeedParameterization:
 
 class TestConstantTCPSpeedCompositeProfile:
     def test_default_construction(self):
-        p = ConstantTCPSpeedCompositeProfile()
+        p = ConstantTCPSpeedParameterizationCompositeProfile()
         assert p is not None
         # Defaults (from C++ header)
         assert p.max_translational_velocity == pytest.approx(1.0)
@@ -198,7 +198,7 @@ class TestConstantTCPSpeedCompositeProfile:
         assert p.max_acceleration_scaling_factor == pytest.approx(1.0)
 
     def test_full_constructor(self):
-        p = ConstantTCPSpeedCompositeProfile(
+        p = ConstantTCPSpeedParameterizationCompositeProfile(
             max_translational_velocity=0.5,
             max_rotational_velocity=0.8,
             max_translational_acceleration=1.5,
@@ -215,13 +215,13 @@ class TestConstantTCPSpeedCompositeProfile:
 
     def test_constructor_scaling_defaults(self):
         # scaling factors default to 1.0 when omitted
-        p = ConstantTCPSpeedCompositeProfile(0.2, 0.3, 0.4, 0.5)
+        p = ConstantTCPSpeedParameterizationCompositeProfile(0.2, 0.3, 0.4, 0.5)
         assert p.max_translational_velocity == pytest.approx(0.2)
         assert p.max_velocity_scaling_factor == pytest.approx(1.0)
         assert p.max_acceleration_scaling_factor == pytest.approx(1.0)
 
     def test_member_assignment(self):
-        p = ConstantTCPSpeedCompositeProfile()
+        p = ConstantTCPSpeedParameterizationCompositeProfile()
         p.max_translational_velocity = 0.123
         p.max_velocity_scaling_factor = 0.5
         assert p.max_translational_velocity == pytest.approx(0.123)
@@ -408,12 +408,12 @@ def test_instructions_trajectory_rebuilt_after_append_works():
 
 
 # ---------------------------------------------------------------------------
-# #280: ISPCompositeProfile.minimum_time_delta
+# #280: IterativeSplineParameterizationCompositeProfile.minimum_time_delta
 # ---------------------------------------------------------------------------
 
 
 def test_isp_composite_profile_minimum_time_delta():
-    profile = ISPCompositeProfile()
+    profile = IterativeSplineParameterizationCompositeProfile()
     assert profile.minimum_time_delta == sys.float_info.epsilon
     profile.minimum_time_delta = 1e-3
     assert profile.minimum_time_delta == 1e-3
@@ -489,7 +489,7 @@ class TestRuckigTrajectorySmoothing:
     def test_compute_respects_jerk_limit(self, abb_env):
         program = _abb_program()
         profiles = ProfileDictionary()
-        profiles.addProfile("TOTG", "DEFAULT", TOTGCompositeProfile())
+        profiles.addProfile("TOTG", "DEFAULT", TimeOptimalTrajectoryGenerationCompositeProfile())
         assert TimeOptimalTrajectoryGeneration().compute(program, abb_env, profiles)
         # TOTG limits velocity and acceleration only: its output exceeds the jerk limit below,
         # so the bound checked at the end is Ruckig's doing.
@@ -513,10 +513,10 @@ class TestRuckigTrajectorySmoothing:
 
 # (class, field, value that differs from the default)
 PROFILE_FIELD_CHANGES = [
-    (TOTGCompositeProfile, "path_tolerance", 0.05),
-    (ISPCompositeProfile, "add_points", False),
-    (ISPMoveProfile, "max_velocity_scaling_factor", 0.5),
-    (ConstantTCPSpeedCompositeProfile, "max_translational_velocity", 0.5),
+    (TimeOptimalTrajectoryGenerationCompositeProfile, "path_tolerance", 0.05),
+    (IterativeSplineParameterizationCompositeProfile, "add_points", False),
+    (IterativeSplineParameterizationMoveProfile, "max_velocity_scaling_factor", 0.5),
+    (ConstantTCPSpeedParameterizationCompositeProfile, "max_translational_velocity", 0.5),
     (RuckigTrajectorySmoothingCompositeProfile, "duration_extension_fraction", 1.5),
 ]
 

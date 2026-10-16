@@ -26,6 +26,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `tesseract_command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
 | Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
 | Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
+| Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -293,6 +294,23 @@ snapshot = copy.copy(mi.getWaypoint().asCartesianWaypoint())  # an independent c
 ```
 
 `InstructionPoly.as…()` returns a copy, as the helpers did.
+
+### Time-parameterization profiles renamed to their C++ names
+
+The four time-parameterization profiles were bound under abbreviated names. They now carry
+their C++ names, as every other planner profile does (#329, following #187). There is no
+alias: importing an old name raises `ImportError`. The `tesseract_time_parameterization`
+package's `__all__` list, which named the old classes, is gone as well.
+
+| before | after |
+| --- | --- |
+| `TOTGCompositeProfile` | `TimeOptimalTrajectoryGenerationCompositeProfile` |
+| `ISPCompositeProfile` | `IterativeSplineParameterizationCompositeProfile` |
+| `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
+| `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
+
+The earlier Unreleased entries for these profiles (value equality, `createKey()`,
+`minimum_time_delta`) apply under the new names.
 
 ## 0.35.0.9
 

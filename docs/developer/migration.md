@@ -305,13 +305,13 @@ ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask
 ```python
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
 )
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
 # Create TOTG with profile-based configuration
 totg = TimeOptimalTrajectoryGeneration()
-totg_profile = TOTGCompositeProfile()
+totg_profile = TimeOptimalTrajectoryGenerationCompositeProfile()
 totg_profile.max_velocity_scaling_factor = 1.0
 totg_profile.max_acceleration_scaling_factor = 1.0
 

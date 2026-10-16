@@ -121,7 +121,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def("isTimeStrictlyIncreasing", [](GIT& self) { return self.checked().isTimeStrictlyIncreasing(); });
 
     // ========== TimeOptimalTrajectoryGenerationCompositeProfile ==========
-    auto totg_composite_profile = nb::class_<tp::TimeOptimalTrajectoryGenerationCompositeProfile, tc::Profile>(m, "TOTGCompositeProfile")
+    auto totg_composite_profile = nb::class_<tp::TimeOptimalTrajectoryGenerationCompositeProfile, tc::Profile>(m, "TimeOptimalTrajectoryGenerationCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double, double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a,
@@ -137,7 +137,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     bind_value_equality(totg_composite_profile);
 
     // ========== IterativeSplineParameterizationCompositeProfile ==========
-    auto isp_composite_profile = nb::class_<tp::IterativeSplineParameterizationCompositeProfile, tc::Profile>(m, "ISPCompositeProfile")
+    auto isp_composite_profile = nb::class_<tp::IterativeSplineParameterizationCompositeProfile, tc::Profile>(m, "IterativeSplineParameterizationCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
@@ -152,7 +152,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     bind_value_equality(isp_composite_profile);
 
     // ========== IterativeSplineParameterizationMoveProfile ==========
-    auto isp_move_profile = nb::class_<tp::IterativeSplineParameterizationMoveProfile, tc::Profile>(m, "ISPMoveProfile")
+    auto isp_move_profile = nb::class_<tp::IterativeSplineParameterizationMoveProfile, tc::Profile>(m, "IterativeSplineParameterizationMoveProfile")
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
@@ -177,7 +177,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def(nb::init<std::string>(), "name"_a = "ISP");
 
     // ========== ConstantTCPSpeedParameterizationCompositeProfile ==========
-    auto constant_tcp_speed_composite_profile = nb::class_<tp::ConstantTCPSpeedParameterizationCompositeProfile, tc::Profile>(m, "ConstantTCPSpeedCompositeProfile")
+    auto constant_tcp_speed_composite_profile = nb::class_<tp::ConstantTCPSpeedParameterizationCompositeProfile, tc::Profile>(m, "ConstantTCPSpeedParameterizationCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double, double, double, double, double>(),
              "max_translational_velocity"_a,

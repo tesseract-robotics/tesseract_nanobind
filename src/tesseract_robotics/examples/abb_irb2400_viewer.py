@@ -37,7 +37,7 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
 )
 from tesseract_robotics.viewer import TesseractViewer
 
@@ -194,7 +194,7 @@ def main():
         time_parameterization = TimeOptimalTrajectoryGeneration()
 
         # Create profile with velocity/acceleration scaling
-        totg_profile = TOTGCompositeProfile()
+        totg_profile = TimeOptimalTrajectoryGenerationCompositeProfile()
         totg_profile.max_velocity_scaling_factor = 1.0
         totg_profile.max_acceleration_scaling_factor = 1.0
 
