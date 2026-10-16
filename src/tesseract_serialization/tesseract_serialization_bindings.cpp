@@ -16,6 +16,9 @@
 #include <tesseract/environment/cereal_serialization.h>
 #include <tesseract/scene_graph/scene_state.h>
 #include <tesseract/scene_graph/cereal_serialization.h>
+#include <tesseract/task_composer/task_composer_context.h>
+#include <tesseract/task_composer/task_composer_log.h>
+#include <tesseract/task_composer/cereal_serialization.h>
 
 // CEREAL_REGISTER_TYPE expansion needs all archive headers visible before the
 // macro fires (so cereal can bind the type to each archive at TU init).
@@ -28,6 +31,7 @@ using namespace tesseract::common;
 using namespace tesseract::command_language;
 using namespace tesseract::environment;
 using namespace tesseract::scene_graph;
+using tesseract::task_composer::TaskComposerLog;
 
 // In tesseract 0.35, upstream's <tesseract/command_language/cereal_serialization.h>
 // transitively includes cereal_serialization_impl.hpp, which issues all the
@@ -47,6 +51,7 @@ NB_MODULE(_tesseract_serialization, m)
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
     nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
     nb::module_::import_("tesseract_robotics.tesseract_state_solver._tesseract_state_solver");
+    nb::module_::import_("tesseract_robotics.tesseract_task_composer._tesseract_task_composer");
 
     // ============================================================
     // CompositeInstruction - Motion Programs
@@ -198,4 +203,50 @@ NB_MODULE(_tesseract_serialization, m)
         },
         nb::arg("data"),
         "Deserialize SceneState from binary data.");
+
+    // ============================================================
+    // TaskComposerLog - a run recorded for replay
+    // ============================================================
+
+    m.def("task_composer_log_to_xml",
+        [](const TaskComposerLog& log) {
+            return Serialization::toArchiveStringXML(log);
+        },
+        nb::arg("log"),
+        "Serialize TaskComposerLog to XML string: description, initial data, context and dot graph.");
+
+    m.def("task_composer_log_from_xml",
+        [](const std::string& xml) {
+            return Serialization::fromArchiveStringXML<TaskComposerLog>(xml);
+        },
+        nb::arg("xml"),
+        "Deserialize TaskComposerLog from XML string.");
+
+    m.def("task_composer_log_to_file",
+        [](const TaskComposerLog& log, const std::string& path) {
+            return Serialization::toArchiveFileXML(log, path);
+        },
+        nb::arg("log"), nb::arg("path"),
+        "Save TaskComposerLog to XML file.");
+
+    m.def("task_composer_log_from_file",
+        [](const std::string& path) {
+            return Serialization::fromArchiveFileXML<TaskComposerLog>(path);
+        },
+        nb::arg("path"),
+        "Load TaskComposerLog from XML file.");
+
+    m.def("task_composer_log_to_binary",
+        [](const TaskComposerLog& log) {
+            return Serialization::toArchiveBinaryData(log);
+        },
+        nb::arg("log"),
+        "Serialize TaskComposerLog to binary data.");
+
+    m.def("task_composer_log_from_binary",
+        [](const std::vector<uint8_t>& data) {
+            return Serialization::fromArchiveBinaryData<TaskComposerLog>(data);
+        },
+        nb::arg("data"),
+        "Deserialize TaskComposerLog from binary data.");
 }
