@@ -320,7 +320,7 @@ python-clang = { version = "==22.1.8", build = "default_hccd1708_2" }
 clang-22 = "==22.1.8"
 
 [tool.pixi.feature.audit.tasks]
-audit-bindings = { cmd = "python scripts/audit_match.py", description = "Diff each binding's C++ API against its committed stub; writes docs/developer/binding-api-audit.md" }
+audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff each binding's C++ API against its committed stub; writes docs/developer/binding-api-audit.md" }
 audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GIL release in the bindings against scripts/nogil_entry_points.yaml (#124)" }
 # -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
 # which imports the (uninstalled) extension modules.
