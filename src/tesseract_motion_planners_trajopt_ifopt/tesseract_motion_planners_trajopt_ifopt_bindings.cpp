@@ -98,6 +98,12 @@ struct WaypointInfoInUseError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
+// super().create(...) from a Python override: both hooks are pure virtual, so the base binding
+// has nothing to call.
+struct PureVirtualCallError : std::logic_error {
+    using std::logic_error::logic_error;
+};
+
 // Python subclasses of the move and composite profiles. The instruction and manipulator-info
 // arguments are const references into the planner's data and go to Python as copies; env and the
 // nodes are shared_ptrs and are passed as such. The ticket takes the GIL, which solve released.
@@ -122,7 +128,8 @@ public:
                 "TrajOptIfoptMoveProfile.create returned a TrajOptIfoptWaypointInfo without a node; return "
                 "the info a C++ move profile's create builds");
         // `result` is the one reference the call returned; any other is a holder the planner's
-        // move would leave with a dangling node.
+        // move would leave with a dangling node. Exact on GIL builds of CPython, the only ones
+        // shipped; free-threaded CPython would need another way to tell.
         if (Py_REFCNT(result.ptr()) != 1)
             throw WaypointInfoInUseError(
                 "TrajOptIfoptMoveProfile.create returned a TrajOptIfoptWaypointInfo that is still referenced "
@@ -155,6 +162,8 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt_ifopt Python bindings";
     register_python_error_translator();  // move and composite profile trampolines
 
+    nb::exception<PureVirtualCallError>(m, "TrajOptIfoptPureVirtualCallError", PyExc_NotImplementedError)
+        .attr("__doc__") = "super().create(...) from a Python TrajOpt-Ifopt profile: the base is pure virtual.";
     nb::exception<ProfileReturnTypeError>(m, "TrajOptIfoptProfileReturnTypeError", PyExc_TypeError)
         .attr("__doc__") = "A Python TrajOpt-Ifopt profile's create returned the wrong type.";
     nb::exception<WaypointInfoWithoutNodeError>(m, "TrajOptIfoptWaypointInfoWithoutNodeError", PyExc_ValueError)
@@ -237,7 +246,17 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptMoveProfile>,
             "The key every TrajOpt-Ifopt move profile carries")
-        .def("create", &tp::TrajOptIfoptMoveProfile::create,
+        .def("create",
+            [](const tp::TrajOptIfoptMoveProfile& self, const tcl::MoveInstructionPoly& move_instruction,
+               const tc::ManipulatorInfo& composite_manip_info, const std::shared_ptr<const te::Environment>& env,
+               int index) {
+                // Only a direct Python subclass is built on the trampoline; a Python subclass of a
+                // concrete C++ profile delegates to that profile's create.
+                if (dynamic_cast<const PyTrajOptIfoptMoveProfile*>(&self) != nullptr)
+                    throw PureVirtualCallError("TrajOptIfoptMoveProfile.create is pure virtual: a Python "
+                                               "profile cannot delegate to it with super().create(...)");
+                return self.create(move_instruction, composite_manip_info, env, index);
+            },
             "move_instruction"_a, "composite_manip_info"_a, "env"_a, "index"_a,
             "Build the waypoint info the planner adds for this move instruction");
 
@@ -256,6 +275,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
             [](const tp::TrajOptIfoptCompositeProfile& self, const tc::ManipulatorInfo& composite_manip_info,
                const std::shared_ptr<const tesseract::environment::Environment>& env,
                const std::vector<std::shared_ptr<const ti::Node>>& nodes, const std::vector<int>& fixed_indices) {
+                if (dynamic_cast<const PyTrajOptIfoptCompositeProfile*>(&self) != nullptr)
+                    throw PureVirtualCallError("TrajOptIfoptCompositeProfile.create is pure virtual: a Python "
+                                               "profile cannot delegate to it with super().create(...)");
                 return self.create(composite_manip_info, env,
                                    require_non_null(nodes, "TrajOptIfoptCompositeProfile.create", "nodes", "Node"),
                                    fixed_indices);
