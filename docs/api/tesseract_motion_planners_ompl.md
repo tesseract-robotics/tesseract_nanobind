@@ -18,7 +18,8 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
 
 ## OMPLMotionPlanner
 
-The OMPL motion planner.
+The OMPL motion planner. It derives from `MotionPlanner`
+(`tesseract_motion_planners`), so it is accepted wherever a `MotionPlanner` is.
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_ompl import OMPLMotionPlanner
@@ -71,61 +72,76 @@ profile.collision_check_config.longest_valid_segment_length = 0.01
 
 ## Planner Configurators
 
-### RRTConnectConfigurator
+Each `OMPLPlannerType` has a configurator class, `<type>Configurator`. Each
+one default-constructs with OMPL's defaults; `getType()` returns its
+`OMPLPlannerType`. A `range` of 0 lets OMPL pick the step size.
 
-Rapidly-exploring Random Tree Connect - fast, bidirectional.
+| `OMPLPlannerType` | Configurator | Fields |
+|---|---|---|
+| `SBL` | `SBLConfigurator` | `range` |
+| `EST` | `ESTConfigurator` | `range`, `goal_bias` |
+| `LBKPIECE1` | `LBKPIECE1Configurator` | `range`, `border_fraction`, `min_valid_path_fraction` |
+| `BKPIECE1` | `BKPIECE1Configurator` | `range`, `border_fraction`, `failed_expansion_score_factor`, `min_valid_path_fraction` |
+| `KPIECE1` | `KPIECE1Configurator` | `range`, `goal_bias`, `border_fraction`, `failed_expansion_score_factor`, `min_valid_path_fraction` |
+| `BiTRRT` | `BiTRRTConfigurator` | `range`, `temp_change_factor`, `cost_threshold`, `init_temperature`, `frontier_threshold`, `frontier_node_ratio` |
+| `RRT` | `RRTConfigurator` | `range`, `goal_bias` |
+| `RRTConnect` | `RRTConnectConfigurator` | `range` |
+| `RRTstar` | `RRTstarConfigurator` | `range`, `goal_bias`, `delay_collision_checking` |
+| `TRRT` | `TRRTConfigurator` | `range`, `goal_bias`, `temp_change_factor`, `init_temperature`, `frontier_threshold`, `frontier_node_ratio` |
+| `PRM` | `PRMConfigurator` | `max_nearest_neighbors` |
+| `PRMstar` | `PRMstarConfigurator` | none |
+| `LazyPRMstar` | `LazyPRMstarConfigurator` | none |
+| `SPARS` | `SPARSConfigurator` | `max_failures`, `dense_delta_fraction`, `sparse_delta_fraction`, `stretch_factor` |
+
+RRTConnect is the default and usually the fastest. The PRM family and the
+asymptotically optimal planners (RRTstar, PRMstar) use the whole
+`planning_time`.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import RRTConnectConfigurator
-
-config = RRTConnectConfigurator()
-config.range = 0.0  # 0 = auto
-
-profile.solver_config.addPlanner(config)
-```
-
-### RRTstarConfigurator
-
-RRT* - asymptotically optimal.
-
-```python
-from tesseract_robotics.tesseract_motion_planners_ompl import RRTstarConfigurator
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    PRMstarConfigurator, RRTstarConfigurator,
+)
 
 config = RRTstarConfigurator()
-config.range = 0.0
-config.goal_bias = 0.05
+config.goal_bias = 0.1
 
-profile.solver_config.addPlanner(config)
+profile.solver_config.planners = [config, PRMstarConfigurator()]
 ```
 
-### SBLConfigurator
-
-Single-query Bidirectional Lazy PRM.
+`planning.profiles.create_ompl_planner_configurators` builds them by type
+name and sets shared fields on the configurators that have them:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import SBLConfigurator
+from tesseract_robotics.planning.profiles import create_ompl_planner_configurators
 
-config = SBLConfigurator()
-config.range = 0.0
-
-profile.solver_config.addPlanner(config)
+profile.solver_config.planners = create_ompl_planner_configurators(
+    planners=["RRTConnect", "KPIECE1"], num_planners=2, range=0.1
+)
 ```
 
-## OMPLPlannerType
+`create` (which builds the OMPL planner from an `ompl::base::SpaceInformation`)
+is not bound: it takes and returns OMPL types.
 
-Available OMPL planners:
+## OMPLSolverConfig.planners
 
-| Type | Description |
-|------|-------------|
-| `RRTConnect` | Bidirectional RRT (default, fast) |
-| `RRT` | Basic RRT |
-| `RRTstar` | Asymptotically optimal RRT |
-| `PRM` | Probabilistic Roadmap |
-| `PRMstar` | Optimal PRM |
-| `SBL` | Single-query Bidirectional Lazy |
-| `EST` | Expansive Space Trees |
-| `LBTRRT` | Lower Bound Tree RRT |
-| `BiTRRT` | Bidirectional Transition RRT |
+`solver_config.planners` is the list of configurators, one parallel planner
+each. The default profile holds two `RRTConnectConfigurator`. The list is
+copied on access: `cfg.planners.append(x)` changes the copy, not `cfg`.
+Assign a new list, or use `addPlanner` / `clearPlanners`, which change it in
+place. `len(cfg.planners)` replaces the removed `getNumPlanners()`.
+
+```python
+cfg = profile.solver_config
+cfg.planners = [RRTConnectConfigurator()]  # replace
+cfg.addPlanner(SBLConfigurator())          # append in place
+assert len(cfg.planners) == 2
+```
+
+`OMPLSolverConfig` and `OMPLRealVectorMoveProfile` compare by value and are
+unhashable. Upstream compares `planners` by count only, so two configs that
+hold different configurator types of the same number compare equal.
+`profile.createSolverConfig()` returns the solver config the planner uses for
+that profile (a copy of `solver_config`).
 
 ## Adding Profiles
 
@@ -147,6 +163,16 @@ ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", p
 
 # Use with planner request
 request.profiles = profiles
+```
+
+`ProfileDictionary.hasProfile` / `getProfile` take a profile key.
+`OMPLMoveProfile.createKey()`, inherited by every OMPL move profile, returns
+it without building a profile:
+
+```python
+assert profiles.hasProfile(
+    OMPLRealVectorPlanProfile.createKey(), "OMPLMotionPlannerTask", "DEFAULT"
+)
 ```
 
 ## Complete Example
