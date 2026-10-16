@@ -34,6 +34,8 @@ NB_MODULE(_tesseract_time_parameterization, m) {
 
     // Import Profile from tesseract_command_language for cross-module inheritance
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
+    // Import Environment so TimeParameterization.compute's signature names the Python type
+    nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
 
     // ========== InstructionsTrajectory ==========
     nb::class_<tp::InstructionsTrajectory>(m, "InstructionsTrajectory")
