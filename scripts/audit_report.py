@@ -11,6 +11,7 @@ import clang.cindex as ci
 import tomllib
 from audit_match import ACCEPTED, ModuleReport
 from audit_ownership import (
+    ANY_PREFIX,
     REPO_ROOT,
     THIRD_PARTY_HEADERS,
     UNAUDITED_HEADERS,
@@ -73,6 +74,16 @@ def _table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
     ]
 
 
+def _unaudited_patterns() -> list[tuple[str, str]]:
+    """Each `UNAUDITED_HEADERS` pattern below its prefix (`*/` for `ANY_PREFIX`), with its
+    reason, sorted by that path."""
+    return sorted(
+        (f"{'*/' if prefix == ANY_PREFIX else prefix}{pattern}", reason)
+        for prefix, patterns in UNAUDITED_HEADERS.items()
+        for pattern, reason in patterns.items()
+    )
+
+
 def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Coverage) -> str:
     """The mkdocs report page: provenance, coverage, conclusion, then per-module tables."""
     out = [
@@ -110,7 +121,7 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Cove
         *(f"    - `{k}`: {v}" for k, v in sorted(ACCEPTED.items())),
         "",
         '!!! note "Unaudited headers"',
-        *(f"    - `{k}`: {v}" for k, v in UNAUDITED_HEADERS.items()),
+        *(f"    - `{k}`: {v}" for k, v in _unaudited_patterns()),
         "    - A header its prefix owner's binding does not #include, but another binding does, is "
         "audited with the first such module by name; each module's section lists those headers.",
         "",
