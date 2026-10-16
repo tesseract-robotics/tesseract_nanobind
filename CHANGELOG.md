@@ -87,6 +87,10 @@
 - **`ISPCompositeProfile.minimum_time_delta`** is bound ([#280]).
 - **`createKey()` on the time-parameterization profiles** — a static `X.createKey()` returns the `ProfileDictionary` key `X().getKey()` without building a profile, on all five profile classes ([#273]).
 
+### Fixed
+
+- **`TaskComposerExecutor.run` keeps the node alive until the run ends** — the executor runs the node in its own threads after `run` returns, but the future held no reference to it, so a node dropped before `wait()` (`future = executor.run(factory.createTaskComposerNode(name), storage)`) was freed under the running task: a bus error or segfault. Both `run` overloads, on `TaskComposerExecutor` and `TaskflowTaskComposerExecutor`, now tie the node's lifetime to the returned future.
+
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
 ### Breaking changes
