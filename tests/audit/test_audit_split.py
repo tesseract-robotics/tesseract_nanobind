@@ -111,6 +111,9 @@ MATCH = {
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
+    # #256 group 1
+    "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
+    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "_unbound_rule",
 }  # fmt: skip
 
 
