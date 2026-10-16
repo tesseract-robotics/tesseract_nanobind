@@ -11,7 +11,14 @@ import tesseract_robotics.tesseract_environment._tesseract_environment
 
 
 class InstructionsTrajectory:
-    def __init__(self, program: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction) -> None: ...
+    def __init__(self, program: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction) -> None:
+        """
+        Build a trajectory view over the move instructions of `program`.
+
+        The trajectory keeps `program` alive but holds references into its instruction
+        vector: do not append, insert or erase instructions in `program` while the
+        trajectory is in use, or it reads freed memory.
+        """
 
     def getPosition(self, i: int) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
 
@@ -296,6 +303,9 @@ class RuckigTrajectorySmoothingCompositeProfile(tesseract_robotics.tesseract_com
 class RuckigTrajectorySmoothing(TimeParameterization):
     def __init__(self, name: str = 'RuckigTrajectorySmoothing') -> None: ...
 
+class ScalingsLengthError(ValueError):
+    """rescaleTimings got a scalings list that is not len(program) long."""
+
 def rescaleTimings(program: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, scalings: Sequence[float]) -> None:
     """
     Rescale the timing of each sub-composite of `program` in place.
@@ -305,5 +315,5 @@ def rescaleTimings(program: tesseract_robotics.tesseract_command_language._tesse
     with only a logged warning.
 
     Raises:
-        ValueError: `scalings` is not `len(program)` long.
+        ScalingsLengthError: `scalings` is not `len(program)` long (a `ValueError`).
     """

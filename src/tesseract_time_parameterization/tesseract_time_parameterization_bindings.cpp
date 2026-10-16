@@ -32,6 +32,12 @@ namespace tp = tesseract::time_parameterization;
 namespace tcl = tesseract::command_language;
 namespace tc = tesseract::common;
 
+// rescaleTimings needs one scaling per sub-composite; upstream only assert()s it (utils.cpp),
+// so a release build reads past the end of a short list.
+struct ScalingsLengthError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 NB_MODULE(_tesseract_time_parameterization, m) {
     m.doc() = "tesseract_time_parameterization Python bindings";
 
@@ -43,7 +49,11 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     // ========== InstructionsTrajectory ==========
     nb::class_<tp::InstructionsTrajectory>(m, "InstructionsTrajectory")
         // Holds references into `program`: keep it alive as long as the trajectory
-        .def(nb::init<tcl::CompositeInstruction&>(), "program"_a, nb::keep_alive<1, 2>())
+        .def(nb::init<tcl::CompositeInstruction&>(), "program"_a, nb::keep_alive<1, 2>(),
+             "Build a trajectory view over the move instructions of `program`.\n\n"
+             "The trajectory keeps `program` alive but holds references into its instruction\n"
+             "vector: do not append, insert or erase instructions in `program` while the\n"
+             "trajectory is in use, or it reads freed memory.")
         .def("getPosition", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getPosition, nb::const_), "i"_a)
         .def("getVelocity", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getVelocity, nb::const_), "i"_a)
         .def("getAcceleration", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getAcceleration, nb::const_), "i"_a)
@@ -151,13 +161,15 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def(nb::init<std::string>(), "name"_a = "RuckigTrajectorySmoothing");
 
     // ========== Utilities ==========
+    nb::exception<ScalingsLengthError>(m, "ScalingsLengthError", PyExc_ValueError)
+        .attr("__doc__") = "rescaleTimings got a scalings list that is not len(program) long.";
     m.def("rescaleTimings", [](tcl::CompositeInstruction& program, std::vector<double> scalings) {
         // Upstream checks the length only with assert(), compiled out in release builds:
         // a short list would read past its end.
         if (scalings.size() != program.size())
-            throw nb::value_error(("rescaleTimings: scalings has " + std::to_string(scalings.size()) +
-                                   " elements, program has " + std::to_string(program.size()) +
-                                   " sub-composites; they must match").c_str());
+            throw ScalingsLengthError("rescaleTimings: scalings has " + std::to_string(scalings.size()) +
+                                      " elements, program has " + std::to_string(program.size()) +
+                                      " sub-composites; they must match");
         tp::rescaleTimings(program, std::move(scalings));
     }, "program"_a, "scalings"_a,
     "Rescale the timing of each sub-composite of `program` in place.\n\n"
@@ -165,5 +177,5 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     "element i linearly (0.5 is half speed). A scaling below 1e-6 is replaced by 1.0\n"
     "with only a logged warning.\n\n"
     "Raises:\n"
-    "    ValueError: `scalings` is not `len(program)` long.");
+    "    ScalingsLengthError: `scalings` is not `len(program)` long (a `ValueError`).");
 }

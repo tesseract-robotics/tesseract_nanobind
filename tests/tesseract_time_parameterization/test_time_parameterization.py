@@ -33,6 +33,7 @@ from tesseract_robotics.tesseract_time_parameterization import (
     IterativeSplineParameterization,
     RuckigTrajectorySmoothing,
     RuckigTrajectorySmoothingCompositeProfile,
+    ScalingsLengthError,
     TimeOptimalTrajectoryGeneration,
     TimeParameterization,
     TOTGCompositeProfile,
@@ -299,22 +300,15 @@ def test_compute_signature_names_python_environment():
 
 
 def test_instructions_trajectory_keeps_program_alive():
-    first = np.array([0.25, -0.5, 0.75, -1.0, 1.25, -1.5])
-
-    def make_program():
-        program = CompositeInstruction("DEFAULT")
-        program.setManipulatorInfo(_manipulator_info())
-        program.appendMoveInstruction(_move(first))
-        program.appendMoveInstruction(_move(np.zeros(6)))
-        return program
-
-    traj = InstructionsTrajectory(make_program())
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(_manipulator_info())
+    program.appendMoveInstruction(_move(np.zeros(6)))
+    refs = sys.getrefcount(program)
+    traj = InstructionsTrajectory(program)
+    assert sys.getrefcount(program) == refs + 1
+    del traj
     gc.collect()
-    # Reuse the freed memory, so a dangling reference reads someone else's data.
-    junk = [_abb_program(num=20, span=9.0) for _ in range(20)]
-    del junk
-    gc.collect()
-    np.testing.assert_array_equal(traj.getPosition(0), first)
+    assert sys.getrefcount(program) == refs
 
 
 # ---------------------------------------------------------------------------
@@ -358,8 +352,9 @@ def test_rescale_timings_halves_speed_of_second_segment():
 
 def test_rescale_timings_wrong_length_raises():
     program = _two_segment_program()
-    with pytest.raises(ValueError, match="scalings"):
+    with pytest.raises(ScalingsLengthError, match="scalings has 1 elements, program has 2"):
         rescaleTimings(program, [1.0])
+    assert issubclass(ScalingsLengthError, ValueError)
 
 
 # ---------------------------------------------------------------------------
