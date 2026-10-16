@@ -15,7 +15,7 @@ from tesseract_robotics.tesseract_command_language import (
     JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
@@ -206,12 +206,12 @@ class TestTrajOptPlanning:
 
         start_instruction = MoveInstruction(
             JointWaypointPoly_wrap_JointWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "TEST_PROFILE",
         )
         plan_f1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "TEST_PROFILE",
         )
 
@@ -273,12 +273,12 @@ class TestTrajOptPlanning:
 
         start_instruction = MoveInstruction(
             JointWaypointPoly_wrap_JointWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "COLLISION_TEST",
         )
         plan_f1 = MoveInstruction(
             JointWaypointPoly_wrap_JointWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "COLLISION_TEST",
         )
 
@@ -332,7 +332,7 @@ def _joint_request(env, manip_info, joint_names, profile_name):
     for q in ([0, 0, 0, -1.0, 0, 0, 0], [0.5, 0, 0, -1.0, 0, 0, 0]):
         wp = JointWaypoint(joint_names, np.array(q, dtype=np.float64))
         instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp), MoveInstructionType_FREESPACE, profile_name
+            JointWaypointPoly_wrap_JointWaypoint(wp), MoveInstructionType.FREESPACE, profile_name
         )
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(instr))
     request = PlannerRequest()

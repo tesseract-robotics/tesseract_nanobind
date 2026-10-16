@@ -42,8 +42,7 @@ from tesseract_robotics.tesseract_command_language import (
     InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
+    MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
@@ -105,7 +104,7 @@ def _cartesian_waypoint(y: float) -> CartesianWaypoint:
 def _freespace_move(waypoint: CartesianWaypoint, description: str) -> MoveInstruction:
     instruction = MoveInstruction(
         CartesianWaypointPoly_wrap_CartesianWaypoint(waypoint),
-        MoveInstructionType_FREESPACE,
+        MoveInstructionType.FREESPACE,
         DEFAULT_PROFILE_KEY,
     )
     instruction.setDescription(description)
@@ -121,7 +120,7 @@ def _raster_segment() -> CompositeInstruction:
             MoveInstructionPoly_wrap_MoveInstruction(
                 MoveInstruction(
                     CartesianWaypointPoly_wrap_CartesianWaypoint(_cartesian_waypoint(y)),
-                    MoveInstructionType_LINEAR,
+                    MoveInstructionType.LINEAR,
                     DEFAULT_PROFILE_KEY,
                 )
             )
@@ -198,7 +197,7 @@ def main():
 
     start_instruction = MoveInstruction(
         StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(joint_names, np.zeros(6))),
-        MoveInstructionType_FREESPACE,
+        MoveInstructionType.FREESPACE,
         DEFAULT_PROFILE_KEY,
     )
     start_instruction.setDescription("Start")

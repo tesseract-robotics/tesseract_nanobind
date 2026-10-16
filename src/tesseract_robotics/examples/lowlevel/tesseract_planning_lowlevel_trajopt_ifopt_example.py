@@ -24,7 +24,7 @@ from tesseract_robotics.tesseract_command_language import (
     InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
@@ -111,12 +111,12 @@ def main():
     # Create move instructions
     start_instruction = MoveInstruction(
         CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-        MoveInstructionType_FREESPACE,
+        MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     plan_f1 = MoveInstruction(
         CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-        MoveInstructionType_FREESPACE,
+        MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
 

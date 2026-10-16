@@ -17,7 +17,7 @@ from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
@@ -138,7 +138,7 @@ def abb_irb2400_request():
         )
         return MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 

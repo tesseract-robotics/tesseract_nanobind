@@ -19,7 +19,7 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstruction,
     MoveInstructionPoly,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
     WaypointPoly,
     WaypointPoly_as_CartesianWaypointPoly,
@@ -278,7 +278,7 @@ def test_interpolate_waypoint_joints():
 
 def _move(values, profile="RASTER"):
     return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(_joint_wp(values), MoveInstructionType_FREESPACE, profile)
+        MoveInstruction(_joint_wp(values), MoveInstructionType.FREESPACE, profile)
     )
 
 
@@ -351,14 +351,14 @@ def test_generate_matches_planner_segment(irb2400_env):
     start = MoveInstructionPoly_wrap_MoveInstruction(
         MoveInstruction(
             JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, IRB2400_START)),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
     )
     end = MoveInstructionPoly_wrap_MoveInstruction(
         MoveInstruction(
             JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, IRB2400_END)),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
     )

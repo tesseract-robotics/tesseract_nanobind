@@ -18,7 +18,7 @@ from tesseract_robotics.tesseract_command_language import (
     JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
@@ -307,10 +307,10 @@ class TestTrajOptIfoptPlanner:
 
         # Create instructions
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
         )
 
         # Create program
@@ -367,10 +367,10 @@ class TestTrajOptIfoptPlanner:
         wp1 = JointWaypoint(joint_names, start_pos)
         wp2 = JointWaypoint(joint_names, end_pos)
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
         )
 
         program = CompositeInstruction("DEFAULT")
@@ -431,7 +431,7 @@ def _joint_move(joint_names, position):
     """A FREESPACE MoveInstructionPoly to a constrained joint waypoint."""
     waypoint = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joint_names, position))
     return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(waypoint, MoveInstructionType_FREESPACE, "DEFAULT")
+        MoveInstruction(waypoint, MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 

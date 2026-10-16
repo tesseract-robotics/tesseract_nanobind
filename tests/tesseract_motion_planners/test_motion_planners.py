@@ -20,7 +20,7 @@ from tesseract_robotics.tesseract_command_language import (
     JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
@@ -128,12 +128,12 @@ class TestOMPLPlanning:
         # Create instructions
         start_instruction = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         plan_f1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
@@ -203,7 +203,7 @@ class TestSimplePlanner:
 
         mi = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
@@ -246,7 +246,7 @@ def _irb2400_manip_info():
 def _joint_move(names, values):
     wp = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(names, values))
     return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(wp, MoveInstructionType_FREESPACE, "DEFAULT")
+        MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 
@@ -320,7 +320,7 @@ def _state_program(*states):
         wp = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(IRB2400_JOINTS, q))
         program.appendMoveInstruction(
             MoveInstructionPoly_wrap_MoveInstruction(
-                MoveInstruction(wp, MoveInstructionType_FREESPACE, "DEFAULT")
+                MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT")
             )
         )
     return program
@@ -390,7 +390,7 @@ class TestAssignSolution:
     def _cartesian_move():
         wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(Isometry3d.Identity()))
         return MoveInstructionPoly_wrap_MoveInstruction(
-            MoveInstruction(wp, MoveInstructionType_FREESPACE, "DEFAULT")
+            MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT")
         )
 
     def test_replaces_waypoint_with_state(self):

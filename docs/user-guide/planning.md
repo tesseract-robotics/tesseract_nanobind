@@ -496,7 +496,7 @@ automatically. For reference, the equivalent low-level call would be:
 ```python
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
-    CompositeInstruction, MoveInstruction, MoveInstructionType_LINEAR,
+    CompositeInstruction, MoveInstruction, MoveInstructionType,
     MoveInstructionPoly_wrap_MoveInstruction,
 )
 
@@ -504,7 +504,7 @@ composite = CompositeInstruction("DEFAULT")
 for pose in waypoints:
     wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
     instr = MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(wp, MoveInstructionType_LINEAR, "DEFAULT")
+        MoveInstruction(wp, MoveInstructionType.LINEAR, "DEFAULT")
     )
     composite.appendMoveInstruction(instr)
 ```

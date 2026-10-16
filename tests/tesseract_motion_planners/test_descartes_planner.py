@@ -13,7 +13,7 @@ from tesseract_robotics.tesseract_command_language import (
     InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_LINEAR,
+    MoveInstructionType,
     ProfileDictionary,
     WaypointPoly_as_StateWaypointPoly,
 )
@@ -189,14 +189,14 @@ class TestDescartesPlanning:
 
         start_instruction = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_LINEAR,
+            MoveInstructionType.LINEAR,
             "TEST_PROFILE",
         )
         start_instruction.setManipulatorInfo(manip_info)
 
         plan_f1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_LINEAR,
+            MoveInstructionType.LINEAR,
             "TEST_PROFILE",
         )
         plan_f1.setManipulatorInfo(manip_info)
@@ -301,14 +301,14 @@ class TestPythonEdgeEvaluator:
 
         start_instruction = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_LINEAR,
+            MoveInstructionType.LINEAR,
             "PY_EDGE_PROFILE",
         )
         start_instruction.setManipulatorInfo(manip_info)
 
         plan_f1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_LINEAR,
+            MoveInstructionType.LINEAR,
             "PY_EDGE_PROFILE",
         )
         plan_f1.setManipulatorInfo(manip_info)
@@ -345,7 +345,7 @@ def _cartesian_move(pose, manip_info, profile="TEST_PROFILE"):
     """A LINEAR MoveInstructionPoly to `pose` carrying `manip_info`."""
     instruction = MoveInstruction(
         CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose)),
-        MoveInstructionType_LINEAR,
+        MoveInstructionType.LINEAR,
         profile,
     )
     instruction.setManipulatorInfo(manip_info)

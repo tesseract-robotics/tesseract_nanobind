@@ -19,7 +19,7 @@ from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
@@ -157,7 +157,7 @@ class TestInstructionsTrajectory:
             wp = StateWaypoint(joint_names, pos)
             mi = MoveInstruction(
                 StateWaypointPoly_wrap_StateWaypoint(wp),
-                MoveInstructionType_FREESPACE,
+                MoveInstructionType.FREESPACE,
                 "DEFAULT",
             )
             program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
@@ -246,7 +246,7 @@ def _move(position, time=None):
         swp.setTime(time)
     return MoveInstructionPoly_wrap_MoveInstruction(
         MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(swp), MoveInstructionType_FREESPACE, "DEFAULT"
+            StateWaypointPoly_wrap_StateWaypoint(swp), MoveInstructionType.FREESPACE, "DEFAULT"
         )
     )
 
@@ -356,7 +356,7 @@ def test_instructions_trajectory_stale_read_does_not_crash(appends):
 import numpy as np
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction, MoveInstruction, MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE, StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
+    MoveInstructionType, StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     InstructionsTrajectory, StaleTrajectoryError,
@@ -367,7 +367,7 @@ def move(x):
     p[0] = x
     swp = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint([f"joint_{{i}}" for i in range(1, 7)], p))
     return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(swp, MoveInstructionType_FREESPACE, "DEFAULT")
+        MoveInstruction(swp, MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 program = CompositeInstruction("DEFAULT")

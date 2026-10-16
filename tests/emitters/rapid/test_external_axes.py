@@ -32,7 +32,7 @@ from tesseract_robotics.tesseract_command_language import (
     JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
 )
 
 _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")
@@ -56,7 +56,7 @@ def _joint_move(names, positions_rad):
     jw.setNames(list(names))
     jw.setPosition(np.asarray(positions_rad, dtype=np.float64))
     poly = JointWaypointPoly_wrap_JointWaypoint(jw)
-    move = MoveInstruction(poly, MoveInstructionType_FREESPACE, "P")
+    move = MoveInstruction(poly, MoveInstructionType.FREESPACE, "P")
     return MoveInstructionPoly_wrap_MoveInstruction(move)
 
 

@@ -45,9 +45,6 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType,
-    MoveInstructionType_CIRCULAR,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
 )
@@ -118,10 +115,10 @@ class CartesianTarget:
     def _get_move_type(self) -> MoveInstructionType:
         """Get low-level move instruction type."""
         if self.move_type == MoveType.LINEAR:
-            return MoveInstructionType_LINEAR
+            return MoveInstructionType.LINEAR
         if self.move_type == MoveType.CIRCULAR:
-            return MoveInstructionType_CIRCULAR
-        return MoveInstructionType_FREESPACE
+            return MoveInstructionType.CIRCULAR
+        return MoveInstructionType.FREESPACE
 
 
 @dataclass
@@ -170,10 +167,10 @@ class JointTarget:
 
     def _get_move_type(self) -> MoveInstructionType:
         if self.move_type == MoveType.LINEAR:
-            return MoveInstructionType_LINEAR
+            return MoveInstructionType.LINEAR
         if self.move_type == MoveType.CIRCULAR:
-            return MoveInstructionType_CIRCULAR
-        return MoveInstructionType_FREESPACE
+            return MoveInstructionType.CIRCULAR
+        return MoveInstructionType.FREESPACE
 
 
 @dataclass
@@ -227,10 +224,10 @@ class StateTarget:
 
     def _get_move_type(self) -> MoveInstructionType:
         if self.move_type == MoveType.LINEAR:
-            return MoveInstructionType_LINEAR
+            return MoveInstructionType.LINEAR
         if self.move_type == MoveType.CIRCULAR:
-            return MoveInstructionType_CIRCULAR
-        return MoveInstructionType_FREESPACE
+            return MoveInstructionType.CIRCULAR
+        return MoveInstructionType.FREESPACE
 
 
 # Type alias for any target type (Union for Python 3.9 compatibility)

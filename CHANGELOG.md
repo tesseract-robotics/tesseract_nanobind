@@ -24,6 +24,12 @@
 - **Task-composer compatibility helpers removed** — `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo`, the container overloads of `getDotgraph` / `saveDotgraph` and the package `__all__`; each has a C++-named replacement ([#313], [#314], [#336], [#338]).
 - **Task-composer value types compare by value** — `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` bind `==` and are unhashable ([#261]).
 
+- **SWIG-era `MoveInstructionType_*` constants removed** — `tesseract_command_language` exported `MoveInstructionType_LINEAR`, `MoveInstructionType_FREESPACE` and `MoveInstructionType_CIRCULAR`, copies of the enum members kept from the SWIG bindings; C++ has none of them. Importing one raises `ImportError`, reading one as a module attribute raises `AttributeError`; the enum members are the same objects. The package's hand-kept `__all__` is gone too, so `from tesseract_robotics.tesseract_command_language import *` exports every public name of the extension (`toJointTrajectory`, `moveFilter`, …), not a stale subset. The module joins the #176 no-alias guard ([#275]).
+
+  | before | after |
+  | --- | --- |
+  | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -693,3 +699,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#336]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/336
 [#337]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/337
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
+[#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275

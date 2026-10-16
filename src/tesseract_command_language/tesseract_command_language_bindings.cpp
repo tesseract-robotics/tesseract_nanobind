@@ -203,11 +203,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .value("FREESPACE", tp::MoveInstructionType::FREESPACE)
         .value("CIRCULAR", tp::MoveInstructionType::CIRCULAR);
 
-    // For SWIG compatibility
-    m.attr("MoveInstructionType_LINEAR") = tp::MoveInstructionType::LINEAR;
-    m.attr("MoveInstructionType_FREESPACE") = tp::MoveInstructionType::FREESPACE;
-    m.attr("MoveInstructionType_CIRCULAR") = tp::MoveInstructionType::CIRCULAR;
-
     // ========== CompositeInstructionOrder enum ==========
     nb::enum_<tp::CompositeInstructionOrder>(m, "CompositeInstructionOrder")
         .value("ORDERED", tp::CompositeInstructionOrder::ORDERED)

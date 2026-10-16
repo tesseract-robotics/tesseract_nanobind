@@ -23,6 +23,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo` and the container overloads of `getDotgraph` / `saveDotgraph` removed | [The C++ names](#task-composer-compatibility-helpers-removed) |
 | Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `tesseract_command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -229,6 +230,23 @@ part in its equality.
 `TaskComposerKeys.get(port)` returns what the port holds, `str` or `list[str]`; it raised
 `RuntimeError` for a list port before (#313). `TaskComposerNodeInfo`'s fields are read-write
 (#319).
+
+### SWIG-era `MoveInstructionType_*` constants removed
+
+`tesseract_command_language` no longer exports a module constant per `MoveInstructionType` value.
+The three constants were copies kept from the SWIG bindings; C++ has none of them, and
+`MoveInstructionType` is bound as an enum whose members are the same objects (#275, as #176 and
+#214 did for the other modules). Importing one now raises
+`ImportError: cannot import name 'MoveInstructionType_LINEAR' from 'tesseract_robotics.tesseract_command_language'`;
+reading one as an attribute raises `AttributeError`.
+
+The package's `__all__` list is gone as well: `from tesseract_robotics.tesseract_command_language import *`
+now exports every public name of the extension instead of a hand-kept subset.
+
+| before | after |
+| --- | --- |
+| `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
+| `from tesseract_robotics.tesseract_command_language import MoveInstructionType_LINEAR` | `from tesseract_robotics.tesseract_command_language import MoveInstructionType` |
 
 ## 0.35.0.9
 
