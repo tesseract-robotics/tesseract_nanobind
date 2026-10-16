@@ -28,3 +28,6 @@ class PlannerD:
 
 class RemoteRunner(bases_remote._bases_remote.Runner):
     def __init__(self) -> None: ...
+
+class SubPlanner(PlannerD):
+    def __init__(self) -> None: ...
