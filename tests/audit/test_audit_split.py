@@ -64,6 +64,9 @@ PARSE = {
     "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
     "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
     "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",
+    # 0b Task 6 (class identity)
+    "BODY_PARSE_OPTIONS", "NB_CLASS_TEMPLATES", "NB_CLASS_CTORS", "NB_MODULE_SCOPE",
+    "NB_MODULE_INIT_PREFIX", "SkippedBodiesError", "_in_main_file", "_scope_type", "bound_classes",
 }  # fmt: skip
 
 
@@ -111,6 +114,9 @@ MATCH = {
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
+    # 0b Task 6 (class identity)
+    "BoundLookup", "NO_ALIAS", "no_bound", "_bound_classes_of", "bound_index", "_same_class",
+    "_renamed",
 }  # fmt: skip
 
 
