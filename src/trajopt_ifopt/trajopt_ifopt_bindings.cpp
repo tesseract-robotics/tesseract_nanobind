@@ -743,12 +743,8 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Calculate error values for given joint values")
         .def("calcJacobianBlock",
              [](const CartPosConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
-                 // CartPosConstraint does not expose its manipulator; it reserves
-                 // n_dof * rows non-zeros (cartesian_position_constraint.cpp:136, trajopt 0.35.0).
-                 // With every axis weighted zero there are no rows and nothing reads joint_vals.
-                 const Eigen::Index n_dof =
-                     self.getRows() == 0 ? joint_vals.size() : self.getNonZeros() / self.getRows();
-                 return jacobian_block_checked(self, joint_vals, n_dof);
+                 // CartPosConstraint does not expose its manipulator; its Var holds one value per joint
+                 return jacobian_block_checked(self, joint_vals, self.vars().front()->size());
              },
              "joint_vals"_a,
              "The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); "
@@ -1177,7 +1173,6 @@ NB_MODULE(_trajopt_ifopt, m) {
              "unless all 6 indices are set (#237)")
         .def("calcJacobianBlock",
              [](const CartLineConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
-                 require_linked(self, "calcJacobianBlock");
                  require_six_indices(self, "calcJacobianBlock");
                  return jacobian_block_checked(self, joint_vals, self.getInfo().manip->numJoints());
              },
