@@ -229,6 +229,12 @@ class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
 
     __hash__: None = None
 
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptDefaultMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 TrajOptIfoptDefaultPlanProfile: TypeAlias = TrajOptIfoptDefaultMoveProfile
 
 class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
@@ -288,6 +294,12 @@ class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
 
     __hash__: None = None
 
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptDefaultCompositeProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def __init__(self) -> None: ...
 
@@ -324,6 +336,12 @@ class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def __ne__(self, arg: TrajOptIfoptOSQPSolverProfile, /) -> bool: ...
 
     __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptOSQPSolverProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
     """Add TrajOptIfopt move profile to ProfileDictionary"""
