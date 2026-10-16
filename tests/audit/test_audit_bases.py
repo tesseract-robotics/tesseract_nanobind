@@ -15,8 +15,8 @@ BASES = FIXTURES / "bases"  # own stub root: its class names stay out of other f
 BASES_CPP = BASES / "bases_bindings.cpp"
 
 
-@pytest.fixture(scope="module")
-def bases_report():
+def bases_report_with(**kw):
+    """The bases fixture's `audit_tu`, with `kw` (an injected `bound` lookup) forwarded."""
     return audit.audit_tu(
         "bases",
         BASES_CPP,
@@ -25,7 +25,13 @@ def bases_report():
         ("tesseract/bases/",),
         (FIXTURE_INCLUDE,),
         stub_roots=(BASES,),
+        **kw,
     )
+
+
+@pytest.fixture(scope="module")
+def bases_report():
+    return bases_report_with()
 
 
 def _base_rows(report):
@@ -35,12 +41,14 @@ def _base_rows(report):
 
 
 def test_public_bases_lists_direct_public_bases_only():
+    """Qualified class -> its direct public bases' qualified classes (T3 identity)."""
     bases = audit.public_bases(audit.parse_tu(BASES_CPP, (FIXTURE_INCLUDE,)))
-    assert bases["SlowRunner"] == ("Runner",)
-    assert bases["DeepRunner"] == ("Middle",)  # direct only: Runner comes through Middle
-    assert bases["Hidden"] == ()  # private base
-    assert bases["Loner"] == ()
-    assert bases["Planner"] == ("Runner",)  # the class template's base
+    ns = "tesseract::bases::"
+    assert bases[f"{ns}SlowRunner"] == (f"{ns}Runner",)
+    assert bases[f"{ns}DeepRunner"] == (f"{ns}Middle",)  # direct only: Runner through Middle
+    assert bases[f"{ns}Hidden"] == ()  # private base
+    assert bases[f"{ns}Loner"] == ()
+    assert bases[f"{ns}Planner"] == (f"{ns}Runner",)  # the class template's base
 
 
 def test_base_rows_exact(bases_report):
@@ -72,3 +80,30 @@ def test_nearest_bound_ancestor_through_an_unbound_intermediate_is_enough(bases_
 def test_renamed_class_is_checked_under_its_python_name(bases_report):
     """`Planner<double>` is bound as `PlannerD` (T3): the base pass reaches it by that name."""
     assert "PlannerD(Runner)" in _base_rows(bases_report)[0]
+
+
+def _rows_of(report, cls):
+    rows = {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
+    return {r for r in rows if r.startswith(f"{cls}(")}
+
+
+def test_cross_module_base_without_an_index_entry_compares_by_leaf(bases_report):
+    """`bases_remote` has no binding TU: positive evidence only, leaf `Runner` = C++ `Runner`."""
+    assert not _rows_of(bases_report, "RemoteRunner")
+
+
+def test_cross_module_base_with_the_same_leaf_but_another_class_is_a_gap():
+    """Identity, not leaf: `bases_remote` binds `Runner` as `other::Runner`, so the stub base
+    `bases_remote._bases_remote.Runner` is not the C++ base `tesseract::bases::Runner`."""
+    index = {"bases_remote": {"Runner": "other::Runner"}}
+    report = bases_report_with(bound=lambda m: index.get(m, {}))
+    assert ("RemoteRunner(Runner)", audit.Kind.BASE) in {(g.symbol, g.kind) for g in report.gaps}
+    assert ("RemoteRunner(Runner)", audit.Kind.BASE) in {
+        (d.name, d.kind) for d in report.deviations
+    }
+
+
+def test_cross_module_base_with_the_same_class_raises_no_row():
+    index = {"bases_remote": {"Runner": "tesseract::bases::Runner"}}
+    report = bases_report_with(bound=lambda m: index.get(m, {}))
+    assert not _rows_of(report, "RemoteRunner")
