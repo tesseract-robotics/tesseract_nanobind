@@ -53,6 +53,26 @@ def test_unknown_prefix_key_raises(monkeypatch):
         own.is_unaudited("tesseract/collision/x.h", ("tesseract/collision/",))
 
 
+def test_every_unaudited_header_pattern_hides_a_header():
+    """The not-API table's "every entry fires" test (plan review 2026-10-16): a pattern that
+    matches no installed header is stale (upstream renamed or removed it) and must go."""
+    prefixes = own.owner_prefixes()
+    for key, patterns in own.UNAUDITED_HEADERS.items():
+        owners = (
+            [(m, p) for m, ps in prefixes.items() for p in ps]
+            if key == own.ANY_PREFIX
+            else [(m, key) for m, ps in prefixes.items() if key in ps]
+        )
+        below = [
+            s.removeprefix(p)
+            for m, p in owners
+            for s in audit.prefix_headers(m, prefixes, audit.INCLUDE_DIRS).values()
+            if s.startswith(p)
+        ]
+        for pattern in patterns:
+            assert any(fnmatch.fnmatchcase(h, pattern) for h in below), (key, pattern)
+
+
 @pytest.mark.parametrize(
     ("spelling", "prefixes", "hidden"),
     [
