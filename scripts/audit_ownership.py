@@ -33,6 +33,8 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
     "tesseract_serialization": ("tesseract/serialization/",),
     "tesseract_srdf": ("tesseract/srdf/",),
     "tesseract_state_solver": ("tesseract/state_solver/",),
+    "tesseract_task_composer": ("tesseract/task_composer/",),
+    "tesseract_task_composer_planning": ("tesseract/task_composer/planning/",),
     "tesseract_urdf": ("tesseract/urdf/",),
     # trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h).
     "trajopt_ifopt": ("trajopt_ifopt/", "trajopt_common/"),
@@ -74,11 +76,6 @@ UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
     "tesseract_motion_planners_descartes": (
         "Not yet audited: #256 group 3.",
         ("tesseract/motion_planners/descartes/", "descartes_light/"),
-    ),
-    "tesseract_task_composer": ("Not yet audited: #256 group 4.", ("tesseract/task_composer/",)),
-    "tesseract_task_composer_planning": (
-        "Not yet audited: #256 group 4.",
-        ("tesseract/task_composer/planning/",),
     ),
 }
 # Patterns that apply below every owning prefix.
