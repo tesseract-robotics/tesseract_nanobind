@@ -9,8 +9,14 @@ class Loader:
 class Profile:
     def __init__(self) -> None: ...
 
-class Orphan:
+class UnboundSibling:
     def __init__(self) -> None: ...
+
+class Mismatched:
+    @overload
+    def __init__(self) -> None: ...
+    @overload
+    def __init__(self, config: str, x: float) -> None: ...
 
 class BaseProfile:
     def __init__(self) -> None: ...
@@ -30,11 +36,11 @@ class Hooks:
 class PluginFactory:
     def __init__(self) -> None: ...
 
-class Box:
+class CtorTemplateBox:
     @overload
     def __init__(self) -> None: ...
     @overload
     def __init__(self, u: float) -> None: ...
 
-class Holder:
+class AssignHolder:
     def __init__(self) -> None: ...
