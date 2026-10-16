@@ -33,6 +33,7 @@ EXPECTED_SCRIPTS = (
     "audit_parse",
     "audit_stub",
     "audit_match",
+    "audit_report",
     "audit_bindings",
 )
 
@@ -89,3 +90,34 @@ def test_cli_defines_only_main():
     # `resolve_module` stays in audit_match: `audit_module` calls it, and audit_match must not
     # import the CLI (layer order).
     assert defined_names("audit_bindings") == {"main"}
+
+
+# `_gap_arity` joins this set when #251 lands (0b plan Task 0 table).
+REPORT = {
+    "REPORT_PATH", "LIMITATION", "_git", "libclang_version", "provenance", "_table",
+    "render_markdown", "to_json",
+}  # fmt: skip
+
+
+def test_report_defines_exactly():
+    assert defined_names("audit_report") == REPORT
+    assert not defined_names("audit_match") & REPORT
+
+
+# `ACCEPTED_DEFAULTS` joins this set when #251 lands.
+MATCH = {
+    "PrefixMismatchError", "resolve_module", "PROTOCOL_MEMBERS", "PROTOCOL_RULES", "ACCEPTED",
+    "ACCEPTED_SYMBOLS", "Gap", "ModuleReport", "Cover", "_fits", "_upcasts_to",
+    "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
+    "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
+    "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
+}  # fmt: skip
+
+
+def test_match_defines_exactly():
+    assert defined_names("audit_match") == MATCH
+
+
+@pytest.mark.parametrize("module", SCRIPTS)
+def test_each_script_stays_below_1k_lines(module):
+    assert len((SCRIPTS_DIR / f"{module}.py").read_text().splitlines()) < 1000

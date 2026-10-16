@@ -18,14 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from audit_match import (
-    REPORT_PATH,
-    audit_module,
-    provenance,
-    render_markdown,
-    resolve_module,
-    to_json,
-)
+from audit_match import audit_module, resolve_module
 from audit_ownership import (
     AUDITED_HEADER_PREFIX,
     REPO_ROOT,
@@ -33,6 +26,7 @@ from audit_ownership import (
     check_coverage,
     coverage,
 )
+from audit_report import REPORT_PATH, provenance, render_markdown, to_json
 
 
 def main(argv: list[str] | None = None) -> int:
