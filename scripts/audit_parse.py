@@ -241,6 +241,8 @@ class CppOverload:
     # empty: no parameter types to compare (`audit_types`, #247)
     params: tuple[frozenset[TypeKey] | None, ...] = ()
     out_positions: tuple[int, ...] = ()  # indices into `params` of the out-params
+    # takes a `std::vector<std::reference_wrapper<T>>`: a view a sibling overload builds (R4)
+    reference_wrapper_view: bool = False
 
     def returned_out_params(self) -> tuple[frozenset[TypeKey] | None, ...]:
         """`params` of the Python form that returns the out-params."""
@@ -448,6 +450,18 @@ def _is_yaml_node(parm: ci.Cursor) -> bool:
     return t.spelling.removeprefix("const ") == YAML_NODE
 
 
+def _is_reference_wrapper_vector(parm: ci.Cursor) -> bool:
+    """`std::vector<std::reference_wrapper<T>>`, by value or reference, T const or not."""
+    t = parm.type.get_canonical()
+    if t.kind in (ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
+        t = t.get_pointee().get_canonical()
+    decl = t.get_declaration()
+    if decl.spelling != "vector" or audit_types._top_namespace(decl) != "std":
+        return False
+    element = t.get_template_argument_type(0).get_canonical().get_declaration()
+    return element.spelling == "reference_wrapper" and audit_types._top_namespace(element) == "std"
+
+
 # The key of a `(const uint8_t*, size_t)` pair: one Python `bytes` argument.
 BYTES_KEYS = frozenset({("bytes",)})
 
@@ -549,6 +563,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             location(c),
             void,
             absent_ok=absent_ok,
+            reference_wrapper_view=any(_is_reference_wrapper_vector(p) for p in params),
             raw_buffer=raw,
             byte_buffers=pairs,
             params=keys,

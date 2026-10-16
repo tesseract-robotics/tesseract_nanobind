@@ -148,6 +148,15 @@ ACCEPTED = {
     "module-getattr": "A package `__init__.py` defines a PEP 562 module `__getattr__` to re-export "
     "a name lazily (an eager import would be an import cycle); it is an attribute-lookup hook, "
     "not API.",
+    # #256 group 1.
+    "reference-wrapper-view": "An overload taking `std::vector<std::reference_wrapper<T>>` "
+    "views objects owned elsewhere; Python passes the owner to a bound sibling overload, which "
+    "builds the same view (`InstructionsTrajectory(program)`). Accepted only when a sibling "
+    "overload is covered.",
+    "profile-key-template": "`ProfileDictionary::getProfile<ProfileType>(ns, name, default)` "
+    "derives the profile key from its template argument; Python passes the key to the bound "
+    "`getProfile(key, ns, name)` (`profile.getKey()`, or `ProfileType.createKey()` once bound), "
+    "which returns the registered profile class, and checks `hasProfile` for the default.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -196,6 +205,30 @@ ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {}
 # Poly's converting constructors (R8). A Python overload typed by an alternative stands for
 # the Poly-typed C++ parameter.
 POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {}
+
+
+class UnknownAcceptedRuleError(LookupError):
+    """A rule table entry names a rule that `ACCEPTED` does not justify."""
+
+
+def _check_rule_keys() -> None:
+    """Every entry of `ACCEPTED_SYMBOLS`, both overload tables and `TEMPLATE_INSTANCES` names an
+    `ACCEPTED` rule.
+
+    Raises:
+        UnknownAcceptedRuleError: one error naming every offending entry and its rule.
+    """
+    entries = [
+        *ACCEPTED_SYMBOLS.items(),
+        *ACCEPTED_CPP_OVERLOADS.items(),
+        *ACCEPTED_PY_OVERLOADS.items(),
+        *((key, TEMPLATE_INSTANCE_RULE) for key in TEMPLATE_INSTANCES),
+    ]
+    if bad := [f"{key} -> {rule!r}" for key, rule in entries if rule not in ACCEPTED]:
+        raise UnknownAcceptedRuleError(f"rule table entries without an ACCEPTED rule: {bad}")
+
+
+_check_rule_keys()
 
 
 @dataclass(frozen=True, order=True)
@@ -427,6 +460,38 @@ def _unbound_rule(
     return ACCEPTED_SYMBOLS.get((module, name))
 
 
+def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
+    """Whether the overload's structural `absent_ok` accepts leaving it unbound. When it does
+    not, the overload falls through to `ACCEPTED_CPP_OVERLOADS` and the later rules."""
+    return ov.absent_ok is not None
+
+
+def _uncovered_rule(
+    module: str,
+    name: str,
+    ov: CppOverload,
+    sym: CppSymbol,
+    ps: PySymbol,
+    ancestors: Ancestors,
+) -> str | None:
+    """The ACCEPTED rule for a C++ overload no Python overload covers, or None (a gap).
+
+    Order: the structural `absent_ok` (`_absent_ok_accepts`); `ACCEPTED_CPP_OVERLOADS`; a
+    reference-wrapper view beside a covered sibling (R4); a derived-element container sibling.
+    """
+    if _absent_ok_accepts(ov, sym, ps):
+        return ov.absent_ok
+    if rule := ACCEPTED_CPP_OVERLOADS.get((module, name, str(ov.arity))):
+        return rule
+    if ov.reference_wrapper_view and any(
+        _cover(o, ps.overloads, ancestors) is not None for o in sym.overloads if o is not ov
+    ):
+        return "reference-wrapper-view"
+    if _derived_element_sibling(ov, sym, ps.overloads, ancestors):
+        return "derived-element-container"
+    return None
+
+
 def match(
     module: str,
     cpp: dict[str, CppSymbol],
@@ -472,10 +537,8 @@ def match(
         ok = True
         for ov in sym.overloads:
             how = _cover(ov, ps.overloads, ancestors)
-            if how is None and ov.absent_ok:
-                accepted.append(Accepted(name, ov.absent_ok, ov.location))
-            elif how is None and _derived_element_sibling(ov, sym, ps.overloads, ancestors):
-                accepted.append(Accepted(name, "derived-element-container", ov.location))
+            if how is None and (rule := _uncovered_rule(module, name, ov, sym, ps, ancestors)):
+                accepted.append(Accepted(name, rule, ov.location))
             elif how is None:
                 gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
                 ok = False
@@ -523,10 +586,13 @@ def match(
             continue
         if name in cpp and cpp[name].overloads:
             for p in ps.overloads:
-                if not any(_cover(ov, [p], ancestors) is not None for ov in cpp[name].overloads):
-                    deviations.append(
-                        Deviation(name, Kind.OVERLOAD, f"{stub_rel}:{p.line}", str(p.arity))
-                    )
+                at = f"{stub_rel}:{p.line}"
+                if any(_cover(ov, [p], ancestors) is not None for ov in cpp[name].overloads):
+                    continue
+                if py_rule := ACCEPTED_PY_OVERLOADS.get((module, name, p.params)):
+                    accepted.append(Accepted(name, py_rule, at))
+                else:
+                    deviations.append(Deviation(name, Kind.OVERLOAD, at, str(p.arity)))
         elif rule:
             accepted.append(Accepted(name, rule, where))
 
