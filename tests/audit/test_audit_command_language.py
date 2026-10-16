@@ -15,6 +15,7 @@ from tests.audit._load import audit, load
 
 own = load("audit_ownership")
 match_ = load("audit_match")  # monkeypatch the module that calls a function, not `audit`
+rules_ = load("audit_rules")  # `_check_rule_keys` reads the tables here
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
@@ -290,11 +291,11 @@ def test_every_rule_table_is_checked(monkeypatch, table, key):
 def test_template_instances_need_their_rule(monkeypatch):
     """`TEMPLATE_INSTANCES` names `template-instance-name` implicitly: the rule must exist.
     The other tables are emptied, so only the instance entry can raise."""
-    monkeypatch.setattr(match_, "ACCEPTED_SYMBOLS", {})
-    monkeypatch.setattr(match_, "ACCEPTED_CPP_OVERLOADS", {})
-    monkeypatch.setattr(match_, "ACCEPTED_PY_OVERLOADS", {})
+    monkeypatch.setattr(rules_, "ACCEPTED_SYMBOLS", {})
+    monkeypatch.setattr(rules_, "ACCEPTED_CPP_OVERLOADS", {})
+    monkeypatch.setattr(rules_, "ACCEPTED_PY_OVERLOADS", {})
     monkeypatch.setattr(
-        match_, "TEMPLATE_INSTANCES", {("poly", "ThingPoly.as"): ("ThingPoly.asSquare",)}
+        rules_, "TEMPLATE_INSTANCES", {("poly", "ThingPoly.as"): ("ThingPoly.asSquare",)}
     )
     monkeypatch.delitem(audit.ACCEPTED, "template-instance-name")
     with pytest.raises(audit.UnknownAcceptedRuleError, match="ThingPoly.as"):

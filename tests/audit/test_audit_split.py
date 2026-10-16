@@ -26,12 +26,14 @@ def defined_names(module: str) -> set[str]:
 
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
-# audit_types, audit_ownership, audit_parse, audit_stub, audit_match, audit_report, audit_bindings.
+# audit_types, audit_ownership, audit_parse, audit_stub, audit_rules, audit_match, audit_report,
+# audit_bindings.
 EXPECTED_SCRIPTS = (
     "audit_types",
     "audit_ownership",
     "audit_parse",
     "audit_stub",
+    "audit_rules",
     "audit_match",
     "audit_report",
     "audit_bindings",
@@ -114,9 +116,25 @@ def test_report_defines_exactly():
 
 
 # `ACCEPTED_DEFAULTS` joins this set when #251 lands.
+RULES = {
+    "PROTOCOL_MEMBERS", "PROTOCOL_RULES", "ACCEPTED", "ACCEPTED_SYMBOLS",
+    # #256 group 1
+    "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
+    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "WHOLE_SYMBOL_ABSENT_OK",
+    "VECTOR_FORWARDING_MEMBERS", "VECTOR_FORWARDER_MEMBERS", "UnknownAcceptedRuleError",
+    "_check_rule_keys",
+    # G2 (T10, R15)
+    "K_ENUMERATOR", "CAMEL_BOUNDARY", "k_enumerator_python_name", "_k_alias",
+}  # fmt: skip
+
+
+def test_rules_defines_exactly():
+    assert defined_names("audit_rules") == RULES
+    assert not defined_names("audit_match") & RULES
+
+
 MATCH = {
-    "PrefixMismatchError", "resolve_module", "PROTOCOL_MEMBERS", "PROTOCOL_RULES", "ACCEPTED",
-    "ACCEPTED_SYMBOLS", "Gap", "ModuleReport", "Cover", "_fits", "_upcasts_to",
+    "PrefixMismatchError", "resolve_module", "Gap", "ModuleReport", "Cover", "_fits", "_upcasts_to",
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
@@ -128,13 +146,8 @@ MATCH = {
     # 0b Task 7 (inherited members)
     "_inherited_from_bound",
     # #256 group 1
-    "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
-    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "WHOLE_SYMBOL_ABSENT_OK",
-    "VECTOR_FORWARDING_MEMBERS", "VECTOR_FORWARDER_MEMBERS", "UnknownAcceptedRuleError",
-    "_check_rule_keys", "poly_ancestors", "_absent_ok_accepts", "_whole_symbol_rule",
-    "_bound_as_method", "_unbound_rule", "_uncovered_rule",
-    # G2 (T10, R15)
-    "K_ENUMERATOR", "CAMEL_BOUNDARY", "k_enumerator_python_name", "_k_alias",
+    "poly_ancestors", "_absent_ok_accepts", "_whole_symbol_rule", "_bound_as_method",
+    "_unbound_rule", "_uncovered_rule",
     # G3 T1: the yaml-node premise.
     "YAML_TEXT_KEYS", "_yaml_sibling",
 }  # fmt: skip
