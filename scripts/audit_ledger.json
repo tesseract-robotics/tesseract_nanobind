@@ -80,6 +80,18 @@
     "QueryStringValue": {
       "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
     },
+    "Resource.__eq__": {
+      "wont_fix": "upstream Resource::operator== ignores rhs and returns true (resource_locator.cpp:206, tesseract 0.35.0); it exists only for subclasses to chain into; SimpleLocatedResource and BytesResource bind their own value equality"
+    },
+    "Resource.__ne__": {
+      "wont_fix": "upstream Resource::operator== ignores rhs and returns true (resource_locator.cpp:206, tesseract 0.35.0); it exists only for subclasses to chain into; SimpleLocatedResource and BytesResource bind their own value equality"
+    },
+    "ResourceLocator.__eq__": {
+      "wont_fix": "upstream ResourceLocator::operator== ignores rhs and returns true (resource_locator.cpp:46); binding it would make every locator equal; GeneralResourceLocator binds its own value equality"
+    },
+    "ResourceLocator.__ne__": {
+      "wont_fix": "upstream ResourceLocator::operator== ignores rhs and returns true (resource_locator.cpp:46); binding it would make every locator equal; GeneralResourceLocator binds its own value equality"
+    },
     "StringAttribute": {
       "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
     },
