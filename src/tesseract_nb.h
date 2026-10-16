@@ -15,6 +15,11 @@
 #include <stdexcept>
 #include <filesystem>
 
+// boost::uuids::uuid <-> str (caster below)
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/string_generator.hpp>
+
 // Eigen
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -147,6 +152,83 @@ struct type_caster<std::unordered_map<Key, T, Hash, KeyEqual, Eigen::aligned_all
 NAMESPACE_END(detail)
 NAMESPACE_END(NB_NAMESPACE)
 
+// boost::uuids::uuid <-> str, the canonical "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spelling.
+//
+// from_python takes a `str` only (anything else is a TypeError from the dispatcher) and keeps
+// the text; it is parsed when the bound function reads the argument, so a malformed string
+// raises ValueError with the string instead of a TypeError listing the overloads. Every
+// module sees this through tesseract_nb.h, so a binding takes or returns boost::uuids::uuid
+// directly (`&tp::MoveInstruction::getUUID`) and its stub type is `str`.
+NAMESPACE_BEGIN(NB_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+template <>
+struct type_caster<boost::uuids::uuid>
+{
+  using Value = boost::uuids::uuid;
+  static constexpr auto Name = const_name("str");
+  template <typename T_>
+  using Cast = movable_cast_t<T_>;
+  template <typename T_>
+  static constexpr bool can_cast()
+  {
+    return true;
+  }
+
+  std::string text;
+  Value value;
+
+  bool from_python(handle src, uint8_t, cleanup_list*) noexcept
+  {
+    if (!PyUnicode_Check(src.ptr()))
+      return false;
+    Py_ssize_t size = 0;
+    const char* data = PyUnicode_AsUTF8AndSize(src.ptr(), &size);
+    if (!data)
+    {
+      PyErr_Clear();
+      return false;
+    }
+    text.assign(data, static_cast<std::size_t>(size));
+    return true;
+  }
+
+  static handle from_cpp(const Value& uuid, rv_policy, cleanup_list*) noexcept
+  {
+    const std::string s = boost::uuids::to_string(uuid);
+    return PyUnicode_FromStringAndSize(s.data(), static_cast<Py_ssize_t>(s.size()));
+  }
+
+  template <typename T_, enable_if_t<std::is_same_v<std::remove_cv_t<T_>, Value>> = 0>
+  static handle from_cpp(T_* p, rv_policy policy, cleanup_list* list)
+  {
+    if (!p)
+      return none().release();
+    return from_cpp(*p, policy, list);
+  }
+
+  explicit operator Value*() { return &parse(); }
+  explicit operator Value&() { return parse(); }
+  explicit operator Value&&() { return std::move(parse()); }
+
+private:
+  // Called from the bound function's argument unpacking, inside nanobind's dispatcher,
+  // so std::invalid_argument reaches Python as ValueError.
+  Value& parse()
+  {
+    try
+    {
+      value = boost::uuids::string_generator()(text);
+    }
+    catch (const std::runtime_error&)
+    {
+      throw std::invalid_argument("not a UUID string: '" + text + "'");
+    }
+    return value;
+  }
+};
+NAMESPACE_END(detail)
+NAMESPACE_END(NB_NAMESPACE)
+
 namespace tesseract_nb
 {
 // A std::filesystem::path parameter that refuses `str` and `bytes`.
@@ -247,6 +329,17 @@ template <typename Class, typename... Extra>
 void bind_value_equality(Class& cls, const Extra&... extra) {
     cls.def(nb::self == nb::self, extra...).def(nb::self != nb::self, extra...);
     cls.attr("__hash__") = nb::none();
+}
+
+// Bind the copy protocol from the C++ copy constructor: `copy.copy(x)` and `copy.deepcopy(x)`
+// return a new object of the concrete type. Only for value types whose copy constructor
+// copies everything they own (a Poly deep-copies its stored object through clone()), so
+// __copy__ and __deepcopy__ give the same result and `memo` has nothing to record.
+template <typename Class>
+void bind_copy(Class& cls) {
+    using T = typename Class::Type;
+    cls.def("__copy__", [](const T& self) { return T(self); })
+        .def("__deepcopy__", [](const T& self, nb::dict /*memo*/) { return T(self); }, "memo"_a);
 }
 
 // nanobind rejects None for a direct std::shared_ptr<T> argument, but converts a None *element*
