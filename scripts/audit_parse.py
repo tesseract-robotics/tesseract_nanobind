@@ -72,8 +72,11 @@ PARSE_ARGS = (
     "-x",
     "c++",
     f"-std={CXX_STD}",
-    # osqp-eigen's CMake target exports this for OSQP >= 1.0; its headers need it.
+    # osqp-eigen's CMake target exports both for OSQP >= 1.0 (OsqpEigenTargets.cmake
+    # INTERFACE_COMPILE_DEFINITIONS); Compat.hpp's inline bodies, which `bound_classes`
+    # parses, need the second.
     "-DOSQP_EIGEN_OSQP_IS_V1",
+    "-DOSQP_EIGEN_OSQP_IS_V1_FINAL",
     "-fsyntax-only",
     "-resource-dir",
     str(CLANG_RESOURCE_DIR),
