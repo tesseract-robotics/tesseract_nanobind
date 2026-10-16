@@ -4,6 +4,13 @@
  */
 
 #include "tesseract_nb.h"
+#include "tesseract_nb_yaml.h"
+
+#include <tesseract/common/eigen_types.h>
+
+// interpolate() returns, and getInterpolatedInstructions() takes, the opaque VectorIsometry3d
+// bound in tesseract_common.
+NB_MAKE_OPAQUE(tesseract::common::VectorIsometry3d)
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
@@ -29,6 +36,9 @@
 
 // tesseract_command_language
 #include <tesseract/command_language/composite_instruction.h>
+#include <tesseract/command_language/poly/instruction_poly.h>
+#include <tesseract/command_language/poly/move_instruction_poly.h>
+#include <tesseract/command_language/poly/waypoint_poly.h>
 
 namespace tp = tesseract::motion_planners;
 namespace tcl = tesseract::command_language;
@@ -38,21 +48,18 @@ namespace tc = tesseract::common;
 NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.doc() = "tesseract_motion_planners_simple Python bindings";
 
-    // Import MotionPlanner base type for clone() return type
+    // Modules defining the types this one names, imported first so the stubs resolve them.
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
+    // MotionPlanner base
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
-
-    // Import Profile base from tesseract_command_language (re-exported from tesseract_common)
+    // Profile base and the instruction types (Profile is re-exported from tesseract_common)
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
 
     // ========== SimpleMotionPlanner ==========
-    // Note: Not binding inheritance from MotionPlanner to avoid cross-module issues
-    nb::class_<tp::SimpleMotionPlanner>(m, "SimpleMotionPlanner")
-        .def(nb::init<std::string>(), "name"_a = "SIMPLE")
-        .def("getName", &tp::SimpleMotionPlanner::getName)
-        .def("solve", &tp::SimpleMotionPlanner::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
-        .def("terminate", &tp::SimpleMotionPlanner::terminate)
-        .def("clear", &tp::SimpleMotionPlanner::clear)
-        .def("clone", [](const tp::SimpleMotionPlanner& self) { return self.clone(); });
+    // getName/solve/terminate/clear/clone come from MotionPlanner (virtual dispatch).
+    nb::class_<tp::SimpleMotionPlanner, tp::MotionPlanner>(m, "SimpleMotionPlanner")
+        .def(nb::init<std::string>(), "name"_a = "SIMPLE");
 
     // ========== generateInterpolatedProgram ==========
     m.def("generateInterpolatedProgram",
@@ -72,33 +79,78 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
           "min_steps"_a = 1,
           "Generate an interpolated program from a composite instruction");
 
+    // ========== Interpolation (interpolation.h) ==========
+    m.def("interpolate",
+          nb::overload_cast<const Eigen::Isometry3d&, const Eigen::Isometry3d&, long>(&tp::interpolate),
+          "start"_a, "stop"_a, "steps"_a,
+          "Poses from `start` to `stop`: `steps + 1` of them, translation lerped, rotation slerped.");
+    m.def("interpolate",
+          nb::overload_cast<const Eigen::Ref<const Eigen::VectorXd>&, const Eigen::Ref<const Eigen::VectorXd>&, long>(
+              &tp::interpolate),
+          "start"_a, "stop"_a, "steps"_a,
+          "Joint states from `start` to `stop`, one per column: `steps + 1` columns.");
+    m.def("interpolate_waypoint", &tp::interpolate_waypoint, "start"_a, "stop"_a, "steps"_a,
+          "Waypoints from `start` to `stop`: `steps + 1` of them, of the start's type.");
+    m.def("getInterpolatedInstructions",
+          nb::overload_cast<const std::vector<std::string>&, const Eigen::MatrixXd&, const tcl::MoveInstructionPoly&>(
+              &tp::getInterpolatedInstructions),
+          "joint_names"_a, "states"_a, "base_instruction"_a,
+          "Move instructions for the columns of `states` after the first, each a child of "
+          "`base_instruction`; the last is `base_instruction` itself.");
+    m.def("getInterpolatedInstructions",
+          nb::overload_cast<const tc::VectorIsometry3d&, const std::vector<std::string>&, const Eigen::MatrixXd&,
+                            const tcl::MoveInstructionPoly&>(&tp::getInterpolatedInstructions),
+          "poses"_a, "joint_names"_a, "states"_a, "base_instruction"_a,
+          "Cartesian move instructions for the columns of `states` after the first, seeded with "
+          "those states; the last is `base_instruction` itself.");
+
     // ========== SimplePlannerMoveProfile (abstract base) ==========
-    nb::class_<tp::SimplePlannerMoveProfile, tc::Profile>(m, "SimplePlannerMoveProfile");
+    nb::class_<tp::SimplePlannerMoveProfile, tc::Profile>(m, "SimplePlannerMoveProfile")
+        .def_static("createKey", &tc::Profile::createKey<tp::SimplePlannerMoveProfile>,
+                    "The key every simple-planner move profile registers under.")
+        .def("generate", &tp::SimplePlannerMoveProfile::generate,
+             "prev_instruction"_a, "prev_seed"_a, "base_instruction"_a, "next_instruction"_a, "env"_a,
+             "global_manip_info"_a,
+             "The move instructions the simple planner emits for `base_instruction`, ending with it. "
+             "`next_instruction` is a null InstructionPoly for the last move.",
+             nb::call_guard<nb::gil_scoped_release>());
 
     // ========== SimplePlannerCompositeProfile ==========
     nb::class_<tp::SimplePlannerCompositeProfile, tc::Profile>(m, "SimplePlannerCompositeProfile")
-        .def(nb::init<>());
+        .def(nb::init<>())
+        .def_static("createKey", &tc::Profile::createKey<tp::SimplePlannerCompositeProfile>,
+                    "The key this profile type registers under in a ProfileDictionary.");
 
     // ========== SimplePlannerFixedSizeMoveProfile ==========
-    nb::class_<tp::SimplePlannerFixedSizeMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerFixedSizeMoveProfile")
+    auto py_FixedSizeMoveProfile = nb::class_<tp::SimplePlannerFixedSizeMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerFixedSizeMoveProfile");
+    py_FixedSizeMoveProfile
         .def(nb::init<int, int>(), "freespace_steps"_a = 10, "linear_steps"_a = 10)
         .def_rw("freespace_steps", &tp::SimplePlannerFixedSizeMoveProfile::freespace_steps)
         .def_rw("linear_steps", &tp::SimplePlannerFixedSizeMoveProfile::linear_steps);
+    bind_value_equality(py_FixedSizeMoveProfile);
+    bind_from_yaml(py_FixedSizeMoveProfile);
 
     // ========== SimplePlannerFixedSizeAssignMoveProfile ==========
-    nb::class_<tp::SimplePlannerFixedSizeAssignMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerFixedSizeAssignMoveProfile")
+    auto py_FixedSizeAssignMoveProfile = nb::class_<tp::SimplePlannerFixedSizeAssignMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerFixedSizeAssignMoveProfile");
+    py_FixedSizeAssignMoveProfile
         .def(nb::init<int, int>(), "freespace_steps"_a = 10, "linear_steps"_a = 10)
         .def_rw("freespace_steps", &tp::SimplePlannerFixedSizeAssignMoveProfile::freespace_steps)
         .def_rw("linear_steps", &tp::SimplePlannerFixedSizeAssignMoveProfile::linear_steps);
+    bind_value_equality(py_FixedSizeAssignMoveProfile);
+    bind_from_yaml(py_FixedSizeAssignMoveProfile);
 
     // ========== SimplePlannerFixedSizeAssignNoIKMoveProfile ==========
-    nb::class_<tp::SimplePlannerFixedSizeAssignNoIKMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerFixedSizeAssignNoIKMoveProfile")
+    auto py_FixedSizeAssignNoIKMoveProfile = nb::class_<tp::SimplePlannerFixedSizeAssignNoIKMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerFixedSizeAssignNoIKMoveProfile");
+    py_FixedSizeAssignNoIKMoveProfile
         .def(nb::init<int, int>(), "freespace_steps"_a = 10, "linear_steps"_a = 10)
         .def_rw("freespace_steps", &tp::SimplePlannerFixedSizeAssignNoIKMoveProfile::freespace_steps)
         .def_rw("linear_steps", &tp::SimplePlannerFixedSizeAssignNoIKMoveProfile::linear_steps);
+    bind_value_equality(py_FixedSizeAssignNoIKMoveProfile);
+    bind_from_yaml(py_FixedSizeAssignNoIKMoveProfile);
 
     // ========== SimplePlannerLVSMoveProfile ==========
-    nb::class_<tp::SimplePlannerLVSMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSMoveProfile")
+    auto py_LVSMoveProfile = nb::class_<tp::SimplePlannerLVSMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSMoveProfile");
+    py_LVSMoveProfile
         .def(nb::init<double, double, double, int, int>(),
              "state_longest_valid_segment_length"_a = 5 * M_PI / 180,
              "translation_longest_valid_segment_length"_a = 0.1,
@@ -110,9 +162,12 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def_rw("rotation_longest_valid_segment_length", &tp::SimplePlannerLVSMoveProfile::rotation_longest_valid_segment_length)
         .def_rw("min_steps", &tp::SimplePlannerLVSMoveProfile::min_steps)
         .def_rw("max_steps", &tp::SimplePlannerLVSMoveProfile::max_steps);
+    bind_value_equality(py_LVSMoveProfile);
+    bind_from_yaml(py_LVSMoveProfile);
 
     // ========== SimplePlannerLVSNoIKMoveProfile ==========
-    nb::class_<tp::SimplePlannerLVSNoIKMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSNoIKMoveProfile")
+    auto py_LVSNoIKMoveProfile = nb::class_<tp::SimplePlannerLVSNoIKMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSNoIKMoveProfile");
+    py_LVSNoIKMoveProfile
         .def(nb::init<double, double, double, int, int>(),
              "state_longest_valid_segment_length"_a = 5 * M_PI / 180,
              "translation_longest_valid_segment_length"_a = 0.1,
@@ -124,9 +179,12 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def_rw("rotation_longest_valid_segment_length", &tp::SimplePlannerLVSNoIKMoveProfile::rotation_longest_valid_segment_length)
         .def_rw("min_steps", &tp::SimplePlannerLVSNoIKMoveProfile::min_steps)
         .def_rw("max_steps", &tp::SimplePlannerLVSNoIKMoveProfile::max_steps);
+    bind_value_equality(py_LVSNoIKMoveProfile);
+    bind_from_yaml(py_LVSNoIKMoveProfile);
 
     // ========== SimplePlannerLVSAssignMoveProfile ==========
-    nb::class_<tp::SimplePlannerLVSAssignMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSAssignMoveProfile")
+    auto py_LVSAssignMoveProfile = nb::class_<tp::SimplePlannerLVSAssignMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSAssignMoveProfile");
+    py_LVSAssignMoveProfile
         .def(nb::init<double, double, double, int, int>(),
              "state_longest_valid_segment_length"_a = 5 * M_PI / 180,
              "translation_longest_valid_segment_length"_a = 0.1,
@@ -138,9 +196,12 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def_rw("rotation_longest_valid_segment_length", &tp::SimplePlannerLVSAssignMoveProfile::rotation_longest_valid_segment_length)
         .def_rw("min_steps", &tp::SimplePlannerLVSAssignMoveProfile::min_steps)
         .def_rw("max_steps", &tp::SimplePlannerLVSAssignMoveProfile::max_steps);
+    bind_value_equality(py_LVSAssignMoveProfile);
+    bind_from_yaml(py_LVSAssignMoveProfile);
 
     // ========== SimplePlannerLVSAssignNoIKMoveProfile ==========
-    nb::class_<tp::SimplePlannerLVSAssignNoIKMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSAssignNoIKMoveProfile")
+    auto py_LVSAssignNoIKMoveProfile = nb::class_<tp::SimplePlannerLVSAssignNoIKMoveProfile, tp::SimplePlannerMoveProfile>(m, "SimplePlannerLVSAssignNoIKMoveProfile");
+    py_LVSAssignNoIKMoveProfile
         .def(nb::init<double, double, double, int, int>(),
              "state_longest_valid_segment_length"_a = 5 * M_PI / 180,
              "translation_longest_valid_segment_length"_a = 0.1,
@@ -152,4 +213,6 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def_rw("rotation_longest_valid_segment_length", &tp::SimplePlannerLVSAssignNoIKMoveProfile::rotation_longest_valid_segment_length)
         .def_rw("min_steps", &tp::SimplePlannerLVSAssignNoIKMoveProfile::min_steps)
         .def_rw("max_steps", &tp::SimplePlannerLVSAssignNoIKMoveProfile::max_steps);
+    bind_value_equality(py_LVSAssignNoIKMoveProfile);
+    bind_from_yaml(py_LVSAssignNoIKMoveProfile);
 }
