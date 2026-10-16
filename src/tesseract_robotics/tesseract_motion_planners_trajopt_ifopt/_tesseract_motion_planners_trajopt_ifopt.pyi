@@ -47,6 +47,12 @@ class TrajOptIfoptCartesianWaypointConfig:
     @coeff.setter
     def coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptIfoptCartesianWaypointConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptCartesianWaypointConfig, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptIfoptJointWaypointConfig:
     def __init__(self) -> None: ...
 
@@ -79,6 +85,12 @@ class TrajOptIfoptJointWaypointConfig:
 
     @coeff.setter
     def coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
+
+    def __eq__(self, arg: TrajOptIfoptJointWaypointConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptJointWaypointConfig, /) -> bool: ...
+
+    __hash__: None = None
 
 class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
@@ -123,6 +135,12 @@ class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
 
     @joint_constraint_config.setter
     def joint_constraint_config(self, arg: TrajOptIfoptJointWaypointConfig, /) -> None: ...
+
+    def __eq__(self, arg: TrajOptIfoptDefaultMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptDefaultMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
 
 TrajOptIfoptDefaultPlanProfile: TypeAlias = TrajOptIfoptDefaultMoveProfile
 
@@ -177,6 +195,12 @@ class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
     @jerk_coeff.setter
     def jerk_coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptIfoptDefaultCompositeProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptDefaultCompositeProfile, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def __init__(self) -> None: ...
 
@@ -207,6 +231,12 @@ class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
 
     def setVerbosity(self, verbose: bool) -> None:
         """Enable OSQP console output (default: false)"""
+
+    def __eq__(self, arg: TrajOptIfoptOSQPSolverProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptOSQPSolverProfile, /) -> bool: ...
+
+    __hash__: None = None
 
 def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
     """Add TrajOptIfopt move profile to ProfileDictionary"""

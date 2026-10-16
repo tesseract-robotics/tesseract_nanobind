@@ -251,10 +251,13 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def("getKey", &tp::DescartesSolverProfile<double>::getKey);
 
     // ========== DescartesLadderGraphSolverProfile<double> ==========
-    nb::class_<tp::DescartesLadderGraphSolverProfile<double>, tp::DescartesSolverProfile<double>>(m, "DescartesLadderGraphSolverProfileD")
+    nb::class_<tp::DescartesLadderGraphSolverProfile<double>, tp::DescartesSolverProfile<double>> ladder_graph_profile(
+        m, "DescartesLadderGraphSolverProfileD");
+    ladder_graph_profile
         .def(nb::init<>())
         .def_rw("num_threads", &tp::DescartesLadderGraphSolverProfile<double>::num_threads,
             "Number of threads to use during planning (default: 1)");
+    bind_value_equality(ladder_graph_profile);
 
     // Helper to cast DescartesLadderGraphSolverProfileD to Profile
     m.def("cast_DescartesSolverProfileD", [](std::shared_ptr<tp::DescartesLadderGraphSolverProfile<double>> profile) {
@@ -286,7 +289,9 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     m.attr("DescartesPlanProfileD") = m.attr("DescartesMoveProfileD");
 
     // ========== DescartesDefaultMoveProfile<double> (was DescartesDefaultPlanProfile) ==========
-    nb::class_<tp::DescartesDefaultMoveProfile<double>, tp::DescartesMoveProfile<double>>(m, "DescartesDefaultMoveProfileD")
+    nb::class_<tp::DescartesDefaultMoveProfile<double>, tp::DescartesMoveProfile<double>> default_move_profile(
+        m, "DescartesDefaultMoveProfileD");
+    default_move_profile
         .def(nb::init<>())
         .def_rw("target_pose_fixed", &tp::DescartesDefaultMoveProfile<double>::target_pose_fixed)
         .def_rw("target_pose_sample_axis", &tp::DescartesDefaultMoveProfile<double>::target_pose_sample_axis)
@@ -303,6 +308,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def_rw("edge_collision_check_config", &tp::DescartesDefaultMoveProfile<double>::edge_collision_check_config)
         .def_rw("use_redundant_joint_solutions", &tp::DescartesDefaultMoveProfile<double>::use_redundant_joint_solutions)
         .def_rw("debug", &tp::DescartesDefaultMoveProfile<double>::debug);
+    bind_value_equality(default_move_profile);
 
     // SWIG-compatible alias
     m.attr("DescartesDefaultPlanProfileD") = m.attr("DescartesDefaultMoveProfileD");
