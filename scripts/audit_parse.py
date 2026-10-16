@@ -263,6 +263,7 @@ class CppSymbol:
     location: str
     overloads: list[CppOverload] = field(default_factory=list)
     qualified: str = ""  # `audit_types.qualified_path`, for Kind.CLASS and Kind.ENUM
+    inherited_from: str | None = None  # `record_path` of the base declaring an inherited member
 
 
 def header_rel(path: Path) -> str:
@@ -502,14 +503,115 @@ def _befriends_cereal(record: ci.Cursor) -> bool:
     return False
 
 
+# Header roots of the libraries this project owns (spec D8): only a base declared under one
+# of them contributes inherited members (A), not std, Eigen, ifopt or OMPL bases.
+OWNED_ROOTS = ("tesseract/", "trajopt", "descartes_light/")
+
+
+def _owned_headers(tu: ci.TranslationUnit) -> frozenset[Path]:
+    """Headers the TU includes, from any file, by a spelling under `OWNED_ROOTS`."""
+    return frozenset(
+        Path(c.get_included_file().name).resolve()
+        for c in tu.cursor.get_children()
+        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE and c.spelling.startswith(OWNED_ROOTS)
+    )
+
+
+def _is_ctor(m: ci.Cursor, record: ci.Cursor) -> bool:
+    """`m` constructs `record`. A constructor template (`template <class It> T(It, It)`) is a
+    FUNCTION_TEMPLATE spelled like the class; it is a constructor, not a method named after it."""
+    return m.kind == ci.CursorKind.CONSTRUCTOR or (
+        m.kind == ci.CursorKind.FUNCTION_TEMPLATE and m.spelling == record.spelling
+    )
+
+
+def _member(m: ci.Cursor, record: ci.Cursor) -> tuple[str, Kind] | None:
+    """Leaf name and kind of a public, non-deprecated method, operator or field of `record`
+    that the audit compares, else None: the one member filter for a class's own members and
+    the members it inherits. Constructors and nested types are not members here."""
+    if m.access_specifier != ci.AccessSpecifier.PUBLIC:
+        return None
+    if m.availability == ci.AvailabilityKind.DEPRECATED:
+        return None
+    if m.kind in FIELD_KINDS:
+        return m.spelling, Kind.FIELD
+    if (
+        m.kind not in METHOD_KINDS
+        or _is_ctor(m, record)
+        or m.spelling in CEREAL_HOOKS
+        or m.spelling in ALLOCATION_OPERATORS
+        or m.is_deleted_method()
+        or m.is_copy_assignment_operator_method()
+        or m.is_move_assignment_operator_method()
+    ):
+        return None
+    kind = Kind.OPERATOR if m.spelling.startswith("operator") else Kind.METHOD
+    return OPERATOR_DUNDERS.get(m.spelling, m.spelling), kind
+
+
+def _declared_leaves(record: ci.Cursor) -> frozenset[str]:
+    """Member names `record` declares itself, at any access: C++ name hiding, each hides every
+    base member of that name. A using-declaration hides nothing: it re-exposes the base's
+    member, which stays in the inherited walk and is reported if unbound."""
+    return frozenset(
+        OPERATOR_DUNDERS.get(m.spelling, m.spelling)
+        for m in record.get_children()
+        if m.kind in METHOD_KINDS or m.kind in FIELD_KINDS
+    )
+
+
+def _base_definition(base: ci.Cursor) -> ci.Cursor | None:
+    """The class a `CXX_BASE_SPECIFIER` names; a template-instance base through `referenced`."""
+    definition = base.type.get_declaration().get_definition()
+    return definition if definition is not None else base.referenced
+
+
+def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload:
+    """The Python-facing form of one C++ function, method or constructor."""
+    params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
+    n_default = sum(_has_default(p) for p in params)
+    out = tuple(_out_param_type(p) for p in params if _is_out_param(p))
+    pairs = _byte_buffer_pairs(params)
+    paired = {pos + k + d for k, pos in enumerate(pairs) for d in (0, 1)}
+    n = len(params) - len(pairs)
+    arity = Arity(n - n_default, n)
+    void = c.result_type.kind == ci.TypeKind.VOID
+    absent_ok = nullary_absent_ok if arity.hi == 0 else None
+    if any(_is_yaml_node(p) for p in params):
+        absent_ok = "yaml-node"
+    raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
+    pointers = {pos + k for k, pos in enumerate(pairs)}
+    python_params = [(i, p) for i, p in enumerate(params) if i in pointers or i not in paired]
+    keys = tuple(
+        BYTES_KEYS if i in pointers else audit_types.cpp_keys(p.type) for i, p in python_params
+    )
+    out_positions = tuple(j for j, (_, p) in enumerate(python_params) if _is_out_param(p))
+    return CppOverload(
+        arity,
+        out,
+        location(c),
+        void,
+        absent_ok=absent_ok,
+        raw_buffer=raw,
+        byte_buffers=pairs,
+        params=keys,
+        out_positions=out_positions,
+    )
+
+
 def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSymbol]:
     """The audited C++ API: public, non-deprecated declarations in `headers`.
 
     Keys are dotted names within the namespace; operators that a binding maps to a
-    dunder are keyed by the dunder, constructors by `__init__`.
+    dunder are keyed by the dunder, constructors by `__init__`. A class also holds the public
+    members it inherits through public bases under `OWNED_ROOTS` (`inherited_from` set).
     """
     symbols: dict[str, CppSymbol] = {}
     seen: set[str] = set()
+    owned = _owned_headers(tu)
+    # Inherited overloads dedupe per (derived class, USR), never through `seen`: the base's
+    # own record must keep its members, and each derived class its inherited copy.
+    inherited: set[tuple[str, str]] = set()
 
     def first_time(c: ci.Cursor) -> bool:
         usr = c.get_usr()
@@ -520,6 +622,10 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
 
     def add(name: str, kind: Kind, c: ci.Cursor) -> CppSymbol:
         return symbols.setdefault(name, CppSymbol(name, kind, location(c)))
+
+    def add_overload(sym: CppSymbol, ov: CppOverload) -> None:
+        if not any(_same_python_form(ov, other) for other in sym.overloads):
+            sym.overloads.append(ov)
 
     def add_callable(
         name: str,
@@ -535,38 +641,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             ov = CppOverload(Arity(0, 0), (), location(c), mapped=mapped)
             add(name, kind, c).overloads.append(ov)
             return
-        params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
-        n_default = sum(_has_default(p) for p in params)
-        out = tuple(_out_param_type(p) for p in params if _is_out_param(p))
-        pairs = _byte_buffer_pairs(params)
-        paired = {pos + k + d for k, pos in enumerate(pairs) for d in (0, 1)}
-        n = len(params) - len(pairs)
-        arity = Arity(n - n_default, n)
-        void = c.result_type.kind == ci.TypeKind.VOID
-        absent_ok = nullary_absent_ok if arity.hi == 0 else None
-        if any(_is_yaml_node(p) for p in params):
-            absent_ok = "yaml-node"
-        raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
-        pointers = {pos + k for k, pos in enumerate(pairs)}
-        python_params = [(i, p) for i, p in enumerate(params) if i in pointers or i not in paired]
-        keys = tuple(
-            BYTES_KEYS if i in pointers else audit_types.cpp_keys(p.type) for i, p in python_params
-        )
-        out_positions = tuple(j for j, (_, p) in enumerate(python_params) if _is_out_param(p))
-        ov = CppOverload(
-            arity,
-            out,
-            location(c),
-            void,
-            absent_ok=absent_ok,
-            raw_buffer=raw,
-            byte_buffers=pairs,
-            params=keys,
-            out_positions=out_positions,
-        )
-        sym = add(name, kind, c)
-        if not any(_same_python_form(ov, other) for other in sym.overloads):
-            sym.overloads.append(ov)
+        add_overload(add(name, kind, c), _overload(c, nullary_absent_ok))
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
@@ -584,11 +659,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         befriends_cereal = False
         ctors: list[ci.Cursor] = []
         for m in c.get_children():
-            # A constructor template (`template <class It> T(It, It)`) is a FUNCTION_TEMPLATE
-            # spelled like the class; it is a constructor, not a method named after the class.
-            is_ctor = m.kind == ci.CursorKind.CONSTRUCTOR or (
-                m.kind == ci.CursorKind.FUNCTION_TEMPLATE and m.spelling == c.spelling
-            )
+            is_ctor = _is_ctor(m, c)
             if is_ctor:
                 declares_ctor = True
             if m.kind == ci.CursorKind.FRIEND_DECL:
@@ -609,22 +680,12 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                     or m.is_deleted_method()
                 ):
                     ctors.append(m)
-            elif m.kind in METHOD_KINDS:
-                if (
-                    m.spelling in CEREAL_HOOKS
-                    or m.spelling in ALLOCATION_OPERATORS
-                    or m.is_deleted_method()
-                    or m.is_copy_assignment_operator_method()
-                    or m.is_move_assignment_operator_method()
-                ):
-                    continue
-                if m.spelling.startswith("operator"):
-                    dunder = OPERATOR_DUNDERS.get(m.spelling, m.spelling)
-                    add_callable(f"{name}.{dunder}", Kind.OPERATOR, m)
+            elif (member := _member(m, c)) is not None:
+                leaf, kind = member
+                if kind is Kind.FIELD:
+                    add(f"{name}.{leaf}", kind, m)
                 else:
-                    add_callable(f"{name}.{m.spelling}", Kind.METHOD, m)
-            elif m.kind in FIELD_KINDS:
-                add(f"{name}.{m.spelling}", Kind.FIELD, m)
+                    add_callable(f"{name}.{leaf}", kind, m)
             elif m.kind in RECORD_KINDS and m.is_definition():
                 add_record(f"{name}.", m)
             elif m.kind == ci.CursorKind.ENUM_DECL and m.is_definition():
@@ -639,6 +700,36 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             add(f"{name}.__init__", Kind.CONSTRUCTOR, c).overloads.append(
                 CppOverload(Arity(0, 0), (), location(c))
             )
+        add_inherited(name, c, _declared_leaves(c))
+
+    def add_inherited(name: str, record: ci.Cursor, hidden: frozenset[str]) -> None:
+        """Register as `name.leaf` the members `record`'s public bases under an owned root
+        declare and `hidden` does not name, then recurse into their bases (A)."""
+        for b in record.get_children():
+            if b.kind != ci.CursorKind.CXX_BASE_SPECIFIER:
+                continue
+            if b.access_specifier != ci.AccessSpecifier.PUBLIC:
+                continue
+            base = _base_definition(b)
+            if base is None or base.location.file is None:
+                continue
+            if Path(base.location.file.name).resolve() not in owned:
+                continue
+            for m in base.get_children():
+                member = _member(m, base)
+                if member is None or member[0] in hidden or (name, m.get_usr()) in inherited:
+                    continue
+                inherited.add((name, m.get_usr()))
+                leaf, kind = member
+                sym = symbols.setdefault(
+                    f"{name}.{leaf}",
+                    CppSymbol(
+                        f"{name}.{leaf}", kind, location(m), inherited_from=record_path(base)
+                    ),
+                )
+                if kind is not Kind.FIELD:
+                    add_overload(sym, _overload(m))
+            add_inherited(name, base, hidden | _declared_leaves(base))
 
     def visit(scope: ci.Cursor) -> None:
         for c in scope.get_children():
@@ -663,6 +754,17 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
 
     visit(tu.cursor)
     return symbols
+
+
+def own_header_lines(cpp: Mapping[str, CppSymbol]) -> dict[str, list[int]]:
+    """Header path → lines of the symbols it declares. An inherited symbol sits at its base's
+    member, in another header, so it says nothing about where its class's header starts."""
+    lines: dict[str, list[int]] = {}
+    for sym in cpp.values():
+        if sym.inherited_from is None:
+            path, line = sym.location.rsplit(":", 1)
+            lines.setdefault(path, []).append(int(line))
+    return lines
 
 
 def decl_names(tu: ci.TranslationUnit) -> frozenset[str]:
