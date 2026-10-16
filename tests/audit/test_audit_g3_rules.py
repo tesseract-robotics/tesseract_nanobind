@@ -1,6 +1,6 @@
 """Fixture contract tests of the group 3 rules: R13's extension (Task 4) and C6 = 6a (Task 6).
 
-The planner fixture TU is g3-mech's (`tests/audit/fixtures/planner_bindings.cpp`); this file
+The planner fixture TU is g3-mech's (`tests/audit/fixtures/planner/planner_bindings.cpp`); this file
 audits it with the fixture's third-party root and not-API pattern in place, as the real
 modules see `ompl-<v>/ompl/` and `trajopt_sco/*`.
 
@@ -17,6 +17,8 @@ own = load("audit_ownership")
 parse = load("audit_parse")
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+# g3-mech's planner fixture: its own stub root; headers stay under `include/tesseract/planner/`.
+PLANNER = FIXTURES / "planner"
 FIXTURE_INCLUDE = FIXTURES / "include"
 PLANNER_PREFIX = ("tesseract/planner/",)
 # The fixture's third-party root, as `header_rel` spells it (relative to the repo).
@@ -27,12 +29,12 @@ FIXTURE_NOT_API = {"internal/*": "fixture internals"}
 def _planner_report():
     return audit.audit_tu(
         "planner",
-        FIXTURES / "planner_bindings.cpp",
-        FIXTURES / "_planner.pyi",
-        FIXTURES / "planner_init.py",
+        PLANNER / "planner_bindings.cpp",
+        PLANNER / "_planner.pyi",
+        PLANNER / "planner_init.py",
         PLANNER_PREFIX,
         (FIXTURE_INCLUDE,),
-        stub_roots=(FIXTURES,),
+        stub_roots=(PLANNER,),
     )
 
 
