@@ -70,6 +70,7 @@ PARSE = {
     # 0b Task 7 (inherited members)
     "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
     "_base_definition", "_overload", "own_header_lines",
+    "_is_reference_wrapper_vector",  # #256 group 1
 }  # fmt: skip
 
 
@@ -126,7 +127,8 @@ MATCH = {
     "_inherited_from_bound",
     # #256 group 1
     "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
-    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "_unbound_rule",
+    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "UnknownAcceptedRuleError",
+    "_check_rule_keys", "_absent_ok_accepts", "_unbound_rule", "_uncovered_rule",
 }  # fmt: skip
 
 
