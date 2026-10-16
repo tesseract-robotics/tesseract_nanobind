@@ -16,6 +16,7 @@
 #include <tesseract/time_parameterization/isp/iterative_spline_parameterization_profiles.h>
 #include <tesseract/time_parameterization/kdl/constant_tcp_speed_parameterization.h>
 #include <tesseract/time_parameterization/kdl/constant_tcp_speed_parameterization_profiles.h>
+#include <tesseract/time_parameterization/utils.h>
 
 // tesseract_command_language
 #include <tesseract/command_language/composite_instruction.h>
@@ -121,4 +122,21 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     // ========== ConstantTCPSpeedParameterization ==========
     nb::class_<tp::ConstantTCPSpeedParameterization, tp::TimeParameterization>(m, "ConstantTCPSpeedParameterization")
         .def(nb::init<std::string>(), "name"_a = "ConstantTCPSpeed");
+
+    // ========== Utilities ==========
+    m.def("rescaleTimings", [](tcl::CompositeInstruction& program, std::vector<double> scalings) {
+        // Upstream checks the length only with assert(), compiled out in release builds:
+        // a short list would read past its end.
+        if (scalings.size() != program.size())
+            throw nb::value_error(("rescaleTimings: scalings has " + std::to_string(scalings.size()) +
+                                   " elements, program has " + std::to_string(program.size()) +
+                                   " sub-composites; they must match").c_str());
+        tp::rescaleTimings(program, std::move(scalings));
+    }, "program"_a, "scalings"_a,
+    "Rescale the timing of each sub-composite of `program` in place.\n\n"
+    "Every element of `program` must be a CompositeInstruction; `scalings[i]` scales\n"
+    "element i linearly (0.5 is half speed). A scaling below 1e-6 is replaced by 1.0\n"
+    "with only a logged warning.\n\n"
+    "Raises:\n"
+    "    ValueError: `scalings` is not `len(program)` long.");
 }

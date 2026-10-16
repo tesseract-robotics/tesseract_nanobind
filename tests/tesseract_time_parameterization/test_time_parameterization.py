@@ -32,6 +32,7 @@ from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TimeParameterization,
     TOTGCompositeProfile,
+    rescaleTimings,
 )
 
 
@@ -227,8 +228,10 @@ class TestConstantTCPSpeedCompositeProfile:
 ABB_JOINTS = [f"joint_{i}" for i in range(1, 7)]
 
 
-def _move(position):
+def _move(position, time=None):
     swp = StateWaypoint(ABB_JOINTS, np.asarray(position, dtype=np.float64))
+    if time is not None:
+        swp.setTime(time)
     return MoveInstructionPoly_wrap_MoveInstruction(
         MoveInstruction(
             StateWaypointPoly_wrap_StateWaypoint(swp), MoveInstructionType_FREESPACE, "DEFAULT"
@@ -254,6 +257,11 @@ def _abb_program(num=10, span=1.0):
         p[1] = 0.5 * i * span / num
         program.appendMoveInstruction(_move(p))
     return program
+
+
+def _times(program):
+    traj = InstructionsTrajectory(program)
+    return np.array([traj.getTimeFromStart(i) for i in range(traj.size())])
 
 
 # ---------------------------------------------------------------------------
@@ -299,3 +307,36 @@ def test_isp_composite_profile_minimum_time_delta():
     assert profile.minimum_time_delta == sys.float_info.epsilon
     profile.minimum_time_delta = 1e-3
     assert profile.minimum_time_delta == 1e-3
+
+
+# ---------------------------------------------------------------------------
+# #279: rescaleTimings
+# ---------------------------------------------------------------------------
+
+
+def _two_segment_program():
+    """Two timed sub-composites: segment A at t = 0, 1, 2; segment B at t = 3, 4, 5."""
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(_manipulator_info())
+    for times in ([0.0, 1.0, 2.0], [3.0, 4.0, 5.0]):
+        segment = CompositeInstruction("DEFAULT")
+        segment.setManipulatorInfo(_manipulator_info())
+        for t in times:
+            segment.appendMoveInstruction(_move(np.full(6, 0.1 * t), time=t))
+        program.push_back(segment)
+    return program
+
+
+def test_rescale_timings_halves_speed_of_second_segment():
+    program = _two_segment_program()
+    before = _times(program)
+    rescaleTimings(program, [1.0, 0.5])
+    after = _times(program)
+    np.testing.assert_allclose(after[:3], before[:3])
+    np.testing.assert_allclose(np.diff(after[3:]), 2.0 * np.diff(before[3:]))
+
+
+def test_rescale_timings_wrong_length_raises():
+    program = _two_segment_program()
+    with pytest.raises(ValueError, match="scalings"):
+        rescaleTimings(program, [1.0])

@@ -204,3 +204,15 @@ class ConstantTCPSpeedCompositeProfile(tesseract_robotics.tesseract_command_lang
 
 class ConstantTCPSpeedParameterization(TimeParameterization):
     def __init__(self, name: str = 'ConstantTCPSpeed') -> None: ...
+
+def rescaleTimings(program: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, scalings: Sequence[float]) -> None:
+    """
+    Rescale the timing of each sub-composite of `program` in place.
+
+    Every element of `program` must be a CompositeInstruction; `scalings[i]` scales
+    element i linearly (0.5 is half speed). A scaling below 1e-6 is replaced by 1.0
+    with only a logged warning.
+
+    Raises:
+        ValueError: `scalings` is not `len(program)` long.
+    """
