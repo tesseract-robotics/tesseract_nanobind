@@ -3,6 +3,8 @@
 Each cast returns a reference into the Poly, so an edit through it changes the stored object.
 """
 
+import gc
+
 import numpy as np
 import pytest
 
@@ -73,3 +75,27 @@ def test_move_instruction_poly_cast():
     assert mip.asMoveInstruction().getProfile() == mi.getProfile()
     mip.asMoveInstruction().setProfile("Q")
     assert mip.getProfile() == "Q"
+
+
+def test_cast_keeps_the_waypoint_poly_alive():
+    jwp = JointWaypointPoly(JointWaypoint(["a"], [1.0]))
+    w = jwp.asJointWaypoint()
+    del jwp
+    gc.collect()
+    assert list(w.getPosition()) == [1.0]
+
+
+def test_cast_keeps_the_move_instruction_poly_alive():
+    mip = MoveInstructionPoly(_cartesian_move())
+    mi = mip.asMoveInstruction()
+    del mip
+    gc.collect()
+    assert mi.getProfile() == "P"
+
+
+def test_cast_chain_keeps_the_instruction_alive():
+    mi = _cartesian_move()
+    cwp = mi.getWaypoint().asCartesianWaypoint()
+    del mi
+    gc.collect()
+    np.testing.assert_allclose(cwp.getTransform().matrix, np.eye(4))

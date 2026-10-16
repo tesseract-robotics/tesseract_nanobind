@@ -23,6 +23,8 @@ from tesseract_robotics.tesseract_command_language import (
     TimerInstructionType,
     WaitInstruction,
     WaypointPoly,
+    getJointPosition,
+    setJointPosition,
 )
 from tesseract_robotics.tesseract_common import Isometry3d
 
@@ -79,6 +81,24 @@ def test_poly_copy_is_independent(copier):
     y = copier(x)
     y.setPosition([2.0])
     assert list(x.getPosition()) == [1.0]
+
+
+@pytest.mark.parametrize("copier", [copy.copy, copy.deepcopy], ids=["copy", "deepcopy"])
+def test_waypoint_poly_copy_is_independent(copier):
+    x = WaypointPoly(JointWaypoint(["a"], [1.0]))
+    y = copier(x)
+    setJointPosition(y, [2.0])
+    assert list(getJointPosition(x)) == [1.0]
+    assert list(getJointPosition(y)) == [2.0]
+
+
+@pytest.mark.parametrize("copier", [copy.copy, copy.deepcopy], ids=["copy", "deepcopy"])
+def test_move_instruction_poly_copy_is_independent(copier):
+    x = MoveInstructionPoly(_move())
+    y = copier(x)
+    setJointPosition(y.getWaypoint(), [2.0])
+    assert list(getJointPosition(x.getWaypoint())) == [1.0]
+    assert list(getJointPosition(y.getWaypoint())) == [2.0]
 
 
 @pytest.mark.parametrize("copier", [copy.copy, copy.deepcopy], ids=["copy", "deepcopy"])

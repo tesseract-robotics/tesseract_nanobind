@@ -270,6 +270,10 @@ through a returned instruction changes the program, and the returned objects kee
 alive. A filter is any callable `filter(instruction, parent) -> bool`; `moveFilter`
 keeps move instructions.
 
+References returned by `flatten`, `__getitem__`, `front` and `back` dangle after
+`insert`, `__delitem__`/erase or `push_back` on the composite; take a copy
+(`copy.copy`) if you need to keep one.
+
 ```python
 from tesseract_robotics.tesseract_command_language import moveFilter, toJointTrajectory
 
