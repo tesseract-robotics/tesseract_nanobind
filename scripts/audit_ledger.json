@@ -1,0 +1,325 @@
+{
+  "tesseract_collision": {
+    "ContactResultMap.find": {
+      "wont_fix": "Returns a C++ iterator; `at` and iteration read a result by key."
+    },
+    "ContactResultMap.flattenWrapperResults": {
+      "wont_fix": "A vector of `std::reference_wrapper` has no Python form; `flattenCopyResults` and `flattenMoveResults` cover it."
+    },
+    "ContactTestData": {
+      "wont_fix": "Internal to the collision checkers (types.h:322)."
+    },
+    "ContinuousContactManager.setCollisionObjectsTransformCast": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #174."
+    },
+    "ContinuousContactManagerFactory": {
+      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
+    },
+    "DiscreteContactManagerFactory": {
+      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
+    },
+    "tesseract/collision/common.h": {
+      "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
+    },
+    "tesseract/collision/utils.h": {
+      "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
+    }
+  },
+  "tesseract_common": {
+    "Isometry3d.apply_directions": {
+      "wont_fix": "Python-only batched `iso * d` over an `(N, 3)` array; no C++ counterpart."
+    },
+    "Isometry3d.apply_points": {
+      "wont_fix": "Python-only batched `iso * p` over an `(N, 3)` array; no C++ counterpart."
+    },
+    "JointTrajectory.crbegin": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.crend": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.data": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.emplace": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.emplace_back": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.erase": {
+      "issue": "#269"
+    },
+    "JointTrajectory.insert": {
+      "issue": "#269"
+    },
+    "JointTrajectory.rbegin": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.rend": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "JointTrajectory.swap": {
+      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
+    },
+    "QueryDoubleAttributeRequired": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "QueryIntAttributeRequired": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "QueryStringAttribute": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "QueryStringAttributeRequired": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "QueryStringText": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "QueryStringValue": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "StringAttribute": {
+      "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
+    },
+    "almostEqualRelativeAndAbs": {
+      "wont_fix": "numpy covers it."
+    },
+    "computeRandomColor": {
+      "wont_fix": "numpy covers it."
+    },
+    "concat": {
+      "wont_fix": "numpy covers it."
+    },
+    "fileToString": {
+      "wont_fix": "`pathlib.Path.read_text` covers it."
+    },
+    "generateRandomNumber": {
+      "wont_fix": "numpy covers it."
+    },
+    "getTempPath": {
+      "wont_fix": "`tempfile` covers it."
+    },
+    "getTimestampString": {
+      "wont_fix": "`datetime` covers it."
+    },
+    "isIdentical": {
+      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+    },
+    "isIdenticalArray": {
+      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+    },
+    "isIdenticalMap": {
+      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+    },
+    "isIdenticalSet": {
+      "wont_fix": "Generic C++ container comparison; Python `==` covers it."
+    },
+    "isNumeric": {
+      "wont_fix": "Python `str` covers it."
+    },
+    "ltrim": {
+      "wont_fix": "Python `str` covers it."
+    },
+    "numeric_cast": {
+      "wont_fix": "C++ numeric conversion template; Python `int`/`float` cover it."
+    },
+    "operator==": {
+      "wont_fix": "Compares `AllowedCollisionEntries`, which Python receives as a dict; dict `==` compares by value."
+    },
+    "pointersComparison": {
+      "wont_fix": "Compares `shared_ptr` targets; Python `==` on the bound objects covers it."
+    },
+    "pointersEqual": {
+      "wont_fix": "Compares `shared_ptr` targets; Python `==` on the bound objects covers it."
+    },
+    "printNestedException": {
+      "wont_fix": "Prints a C++ exception chain; Python's traceback shows the chained exception."
+    },
+    "removeDuplicates": {
+      "wont_fix": "Generic C++ container helper; `dict.fromkeys` covers it."
+    },
+    "reorder": {
+      "wont_fix": "numpy covers it."
+    },
+    "rtrim": {
+      "wont_fix": "Python `str` covers it."
+    },
+    "strFormat": {
+      "wont_fix": "Python `str` covers it."
+    },
+    "tesseract/common/clone_cache.h": {
+      "wont_fix": "C++ template cache of clones; Python calls `clone()` on the bound type."
+    },
+    "tesseract/common/ply_io.h": {
+      "wont_fix": "`createMeshFromPath` reads PLY files."
+    },
+    "tesseract/common/profile_plugin_factory.h": {
+      "wont_fix": "No concrete `ProfileFactory` plugin ships in 0.35.0; revisit when upstream ships one."
+    },
+    "tesseract/common/property_tree.h": {
+      "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
+    },
+    "tesseract/common/schema_registration.h": {
+      "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
+    },
+    "tesseract/common/schema_registry.h": {
+      "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
+    },
+    "tesseract/common/stopwatch.h": {
+      "wont_fix": "C++ timing utility; Python's `time` covers it."
+    },
+    "tesseract/common/timer.h": {
+      "wont_fix": "C++ timing utility; Python's `time` covers it."
+    },
+    "tesseract/common/yaml_utils.h": {
+      "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
+    },
+    "toNumeric": {
+      "wont_fix": "Python `str` covers it."
+    },
+    "trim": {
+      "wont_fix": "Python `str` covers it."
+    }
+  },
+  "tesseract_environment": {
+    "Command.__init__": {
+      "wont_fix": "A base `Command` claiming a derived type breaks the `getType` + `static_pointer_cast` dispatch."
+    },
+    "CommandAppliedEvent.__init__": {
+      "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
+    },
+    "Environment.__init__": {
+      "wont_fix": "Takes the private `Environment::Implementation`, used only by `clone`."
+    },
+    "Environment.getCurrentJointValuesByNames": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+    },
+    "Environment.getEventCallbacks": {
+      "wont_fix": "Returns opaque `std::function` objects."
+    },
+    "Environment.getFindTCPOffsetCallbacks": {
+      "wont_fix": "Returns opaque `std::function` objects."
+    },
+    "Environment.getStateByMap": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+    },
+    "Environment.getStateByNamesAndValues": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+    },
+    "Environment.lockRead": {
+      "wont_fix": "A `shared_lock` held from Python while other calls release the GIL is a deadlock trap."
+    },
+    "Environment.setStateByNamesAndValues": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #187."
+    },
+    "Event.__init__": {
+      "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
+    },
+    "SceneStateChangedEvent.__init__": {
+      "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
+    },
+    "cast_CommandAppliedEvent": {
+      "wont_fix": "Python-only downcast for event callbacks, type-checked by #191; removing it is a breaking change."
+    },
+    "cast_SceneStateChangedEvent": {
+      "wont_fix": "Python-only downcast for event callbacks, type-checked by #191; removing it is a breaking change."
+    },
+    "getActiveLinkNamesRecursive": {
+      "wont_fix": "Recursion helper behind `getActiveLinkNames`."
+    }
+  },
+  "tesseract_geometry": {
+    "GeometriesConst": {
+      "wont_fix": "The opaque container class needs a Python name; upstream's typedef is spelled `GeometrysConst` (geometry.h:104)."
+    },
+    "Octree.update": {
+      "wont_fix": "Its body is `assert(false)` (octree.h:83)."
+    },
+    "createMeshFromAsset": {
+      "wont_fix": "Takes an assimp `aiScene`; assimp is never exposed to Python."
+    },
+    "extractMeshData": {
+      "wont_fix": "Takes an assimp `aiScene`/`aiNode`; assimp is never exposed to Python."
+    }
+  },
+  "tesseract_kinematics": {
+    "FwdKinFactory": {
+      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
+    },
+    "InvKinFactory": {
+      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
+    },
+    "JointGroup.calcJacobianWithPoint": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #212."
+    },
+    "KinematicGroup.calcInvKinMultiple": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #212."
+    },
+    "dampedPInv": {
+      "wont_fix": "numpy covers it."
+    },
+    "getRedundantSolutionsHelper": {
+      "wont_fix": "Recursion helper behind `getRedundantSolutions`."
+    },
+    "solvePInv": {
+      "wont_fix": "numpy covers it."
+    }
+  },
+  "tesseract_scene_graph": {
+    "Link.getHash": {
+      "wont_fix": "A `__hash__` from it would contradict value equality."
+    },
+    "SceneGraph.getEdge": {
+      "wont_fix": "Returns a Boost Graph descriptor."
+    },
+    "SceneGraph.getVertex": {
+      "wont_fix": "Returns a Boost Graph descriptor."
+    },
+    "tesseract/scene_graph/kdl_parser.h": {
+      "wont_fix": "KDL tree types; KDL is never exposed to Python."
+    }
+  },
+  "tesseract_serialization": {
+    "Serialization": {
+      "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` … functions."
+    }
+  },
+  "tesseract_srdf": {
+    "compareLinkPairAlphabetically": {
+      "wont_fix": "Sorting helper for SRDF writing."
+    },
+    "getAlphabeticalACMKeys": {
+      "wont_fix": "Sorting helper for SRDF writing."
+    }
+  },
+  "tesseract_state_solver": {
+    "KDLStateSolver.__init__": {
+      "wont_fix": "`data` is a `KDLTreeData`, a KDL tree type; KDL is never exposed to Python."
+    },
+    "StateSolver.setStateByMap": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #219."
+    },
+    "StateSolver.setStateByNamesAndValues": {
+      "wont_fix": "Compatibility alias of the native overload, kept by #219."
+    }
+  },
+  "tesseract_urdf": {
+    "makeURDFFilePath": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "noLeadingSlash": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "noTrailingSlash": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "toString": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "trailingSlash": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    }
+  }
+}
