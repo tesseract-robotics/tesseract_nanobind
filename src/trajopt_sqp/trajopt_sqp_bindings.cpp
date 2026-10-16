@@ -97,6 +97,82 @@ trajopt_ifopt::Jacobian compressed(const trajopt_ifopt::Jacobian& matrix) {
 }
 }  // namespace
 
+// A QPProblem used after the SQPCallback call it was handed to has returned
+struct QPProblemExpiredError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// The problem an SQPCallback receives when it has no Python object: one a planner built in C++
+// (TrajOptIfoptMotionPlanner), freed when its solve returns. Python owns this view, at its own
+// address, so nanobind's instance map never holds an entry at the problem's address; expire()
+// cuts the view off when the call returns, so a callback that stored it gets
+// QPProblemExpiredError instead of reading freed memory.
+class QPProblemView final : public tsqp::QPProblem {
+public:
+    explicit QPProblemView(const tsqp::QPProblem& problem)
+        // The callback API passes const&; Python reaches the mutators (setVariables, ...) on the
+        // solver's problem as it does through the reference cast of a Python-owned problem.
+        : problem_(const_cast<tsqp::QPProblem*>(&problem)) {}
+
+    void expire() { problem_ = nullptr; }
+
+    void addConstraintSet(std::shared_ptr<trajopt_ifopt::ConstraintSet> constraint_set) override {
+        live().addConstraintSet(std::move(constraint_set));
+    }
+    void addCostSet(std::shared_ptr<trajopt_ifopt::ConstraintSet> constraint_set,
+                    tsqp::CostPenaltyType penalty_type) override {
+        live().addCostSet(std::move(constraint_set), penalty_type);
+    }
+    void setup() override { live().setup(); }
+    void setVariables(const double* x) override { live().setVariables(x); }
+    Eigen::VectorXd getVariableValues() const override { return live().getVariableValues(); }
+    void convexify() override { live().convexify(); }
+    double evaluateTotalConvexCost(const Eigen::Ref<const Eigen::VectorXd>& var_vals) const override {
+        return live().evaluateTotalConvexCost(var_vals);
+    }
+    Eigen::VectorXd evaluateConvexCosts(const Eigen::Ref<const Eigen::VectorXd>& var_vals) const override {
+        return live().evaluateConvexCosts(var_vals);
+    }
+    double getTotalExactCost() const override { return live().getTotalExactCost(); }
+    Eigen::VectorXd getExactCosts() const override { return live().getExactCosts(); }
+    Eigen::VectorXd
+    evaluateConvexConstraintViolations(const Eigen::Ref<const Eigen::VectorXd>& var_vals) const override {
+        return live().evaluateConvexConstraintViolations(var_vals);
+    }
+    Eigen::VectorXd getExactConstraintViolations() const override { return live().getExactConstraintViolations(); }
+    void scaleBoxSize(double& scale) override { live().scaleBoxSize(scale); }
+    void setBoxSize(const Eigen::Ref<const Eigen::VectorXd>& box_size) override { live().setBoxSize(box_size); }
+    void setConstraintMeritCoeff(const Eigen::Ref<const Eigen::VectorXd>& merit_coeff) override {
+        live().setConstraintMeritCoeff(merit_coeff);
+    }
+    void print() const override { live().print(); }
+    Eigen::Index getNumNLPVars() const override { return live().getNumNLPVars(); }
+    Eigen::Index getNumNLPConstraints() const override { return live().getNumNLPConstraints(); }
+    Eigen::Index getNumNLPCosts() const override { return live().getNumNLPCosts(); }
+    Eigen::Index getNumQPVars() const override { return live().getNumQPVars(); }
+    Eigen::Index getNumQPConstraints() const override { return live().getNumQPConstraints(); }
+    const std::vector<std::string>& getNLPConstraintNames() const override { return live().getNLPConstraintNames(); }
+    const std::vector<std::string>& getNLPCostNames() const override { return live().getNLPCostNames(); }
+    const Eigen::VectorXd& getBoxSize() const override { return live().getBoxSize(); }
+    const Eigen::VectorXd& getConstraintMeritCoeff() const override { return live().getConstraintMeritCoeff(); }
+    const trajopt_ifopt::Jacobian& getHessian() const override { return live().getHessian(); }
+    const Eigen::VectorXd& getGradient() const override { return live().getGradient(); }
+    const trajopt_ifopt::Jacobian& getConstraintMatrix() const override { return live().getConstraintMatrix(); }
+    const Eigen::VectorXd& getBoundsLower() const override { return live().getBoundsLower(); }
+    const Eigen::VectorXd& getBoundsUpper() const override { return live().getBoundsUpper(); }
+
+private:
+    tsqp::QPProblem& live() const {
+        if (problem_ == nullptr)
+            throw QPProblemExpiredError(
+                "QPProblem: the problem an SQPCallback received is valid only during that call; the "
+                "solve that owned it has returned");
+        return *problem_;
+    }
+
+    tsqp::QPProblem* problem_;
+};
+
 // Trampoline for SQPCallback (allow Python subclasses)
 class PySQPCallback : public tsqp::SQPCallback {
 public:
@@ -105,14 +181,22 @@ public:
     bool execute(const tsqp::QPProblem& problem, const tsqp::SQPResults& sqp_results) override {
         // Mirrors nanobind 2.12.0 trampoline.h NB_OVERRIDE_PURE_NAME, with explicit argument
         // policies: its default for const& arguments is a copy, which aborts on a non-copyable
-        // problem (TrajOptQPProblem) and deep-copied every other problem on every trial. The
-        // problem goes by reference (Python gets the object passed to solve()); a problem with
-        // no Python instance (none reachable today) would arrive as a non-owning view valid
-        // only for the duration of the call. The results stay a copy, a per-trial snapshot.
+        // problem (TrajOptQPProblem) and deep-copied every other problem on every trial. A problem
+        // with a Python object (one passed to solve() from Python) arrives as that object. One
+        // without (built by a planner in C++) arrives as a QPProblemView that expires when the
+        // call returns. The results stay a copy, a per-trial snapshot.
         nanobind::detail::ticket nb_ticket(nb_trampoline, "execute", true);  // takes the GIL
-        return nb::cast<bool>(nb_trampoline.base().attr(nb_ticket.key)(
-            nb::cast(problem, nb::rv_policy::reference),
-            nb::cast(sqp_results, nb::rv_policy::copy)));
+        nb::object results = nb::cast(sqp_results, nb::rv_policy::copy);
+        nb::object existing = nb::find(problem);
+        if (existing.is_valid())
+            return nb::cast<bool>(nb_trampoline.base().attr(nb_ticket.key)(existing, results));
+        nb::object view_object = nb::cast(std::make_unique<QPProblemView>(problem));
+        auto& view = nb::cast<QPProblemView&>(view_object);
+        struct Expire {  // also when the callback raises
+            QPProblemView& view;
+            ~Expire() { view.expire(); }
+        } expire{ view };
+        return nb::cast<bool>(nb_trampoline.base().attr(nb_ticket.key)(view_object, results));
     }
 };
 
@@ -136,6 +220,8 @@ NB_MODULE(_trajopt_sqp, m) {
     m.doc() = "trajopt_sqp Python bindings - SQP solver for trajectory optimization";
     register_python_error_translator();  // SQPCallback trampoline
 
+    nb::exception<QPProblemExpiredError>(m, "QPProblemExpiredError", PyExc_RuntimeError)
+        .attr("__doc__") = "A QPProblemView used after the SQPCallback call it was passed to returned.";
     nb::exception<VariablesSizeError>(m, "VariablesSizeError", PyExc_ValueError)
         .attr("__doc__") = "QPProblem.setVariables with a vector that is not getNumNLPVars() long.";
     nb::exception<QPSizeError>(m, "QPSizeError", PyExc_ValueError)
@@ -506,11 +592,20 @@ NB_MODULE(_trajopt_sqp, m) {
 
     // ========== SQPCallback ==========
     // NOTE: PySQPCallback trampoline allows Python subclasses
+    nb::class_<QPProblemView, tsqp::QPProblem>(
+        m, "QPProblemView",
+        "The problem an SQPCallback receives from a solve whose problem has no Python object (one a\n"
+        "planner built in C++). Valid only during that call; afterwards every method raises\n"
+        "QPProblemExpiredError.");
+
     nb::class_<tsqp::SQPCallback, PySQPCallback>(
         m, "SQPCallback", "Base class for SQP optimization callbacks")
         .def(nb::init<>())
         .def("execute", &tsqp::SQPCallback::execute, "problem"_a, "sqp_results"_a,
-             "Called during SQP. Return false to stop optimization.");
+             "Called during SQP. Return false to stop optimization. problem is valid only during "
+             "the call: a problem passed to solve() from Python arrives as that object; one a "
+             "planner built in C++ arrives as a QPProblemView, which raises QPProblemExpiredError "
+             "once the call has returned. sqp_results is a copy the callback may keep.");
 
     // ========== TrustRegionSQPSolver ==========
 

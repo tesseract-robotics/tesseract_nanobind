@@ -36,6 +36,7 @@
 - **Linking a constraint to a variable set that does not hold its `Var`s raises `VarNotInVariableSetError`** — from `linkWithVariables` and from `TrajOptQPProblem.addConstraintSet` / `addCostSet`; a standalone `Var` or one from another set put the Jacobian's columns out of range ([#297]).
 - **`calcForwardNumJac` raises `NumericalJacobianSizeError`** (a `ValueError`) when `f` returns a different length at a perturbed `x`; trajopt read past the shorter vector ([#295]).
 - **`CartPosConstraint.calcJacobianBlock` takes its joint count from its `Var`** — it divided `getNonZeros()` by `getRows()`, and accepted any length with every axis weighted zero ([#289]).
+- **A stored `SQPCallback` problem can't outlive the call** — a problem with no Python object (one `TrajOptIfoptMotionPlanner` builds in C++) reaches a Python callback as a `QPProblemView`; once the call returns, every method on it raises `QPProblemExpiredError` (a `RuntimeError`). A callback that kept the problem used to read freed memory after `solve()` returned. A problem passed to `solve()` from Python still arrives as that object ([#308]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
@@ -504,6 +505,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#296]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/296
 [#297]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/297
 [#298]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/298
+[#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [trajopt#618]: https://github.com/tesseract-robotics/trajopt/issues/618
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
