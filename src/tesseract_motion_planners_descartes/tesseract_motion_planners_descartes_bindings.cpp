@@ -248,7 +248,9 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
 
     // ========== DescartesSolverProfile<double> (base for solver profiles) ==========
     nb::class_<tp::DescartesSolverProfile<double>, tc::Profile>(m, "DescartesSolverProfileD")
-        .def("getKey", &tp::DescartesSolverProfile<double>::getKey);
+        .def("getKey", &tp::DescartesSolverProfile<double>::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::DescartesSolverProfile<double>>,
+            "The key every Descartes solver profile carries");
 
     // ========== DescartesLadderGraphSolverProfile<double> ==========
     nb::class_<tp::DescartesLadderGraphSolverProfile<double>, tp::DescartesSolverProfile<double>> ladder_graph_profile(
@@ -271,6 +273,8 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     nb::class_<tp::DescartesMoveProfile<double>, tc::Profile, PyDescartesMoveProfileD>(m, "DescartesMoveProfileD")
         .def(nb::init<>())
         .def("getKey", &tp::DescartesMoveProfile<double>::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::DescartesMoveProfile<double>>,
+            "The key every Descartes move profile carries")
         .def("createWaypointSampler", &tp::DescartesMoveProfile<double>::createWaypointSampler,
              "move_instruction"_a, "composite_manip_info"_a, "env"_a)
         .def("createEdgeEvaluator", &tp::DescartesMoveProfile<double>::createEdgeEvaluator,
