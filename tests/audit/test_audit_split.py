@@ -124,6 +124,9 @@ MATCH = {
     "_stub_base", "_base_rows",
     # 0b Task 7 (inherited members)
     "_inherited_from_bound",
+    # #256 group 1
+    "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
+    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "_unbound_rule",
 }  # fmt: skip
 
 
