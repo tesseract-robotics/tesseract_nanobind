@@ -201,7 +201,7 @@ def main() -> None:
 
     config = get_task_composer_config_path()
 
-    factory = TaskComposerPluginFactory(str(config), GeneralResourceLocator())
+    factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
 
     for name in DOCUMENTED_PIPELINES:
         node = factory.createTaskComposerNode(name)  # raises TaskComposerPluginError
