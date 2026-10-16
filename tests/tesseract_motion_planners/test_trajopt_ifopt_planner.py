@@ -1162,6 +1162,72 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
 )
 
 
+# create is pure virtual on both bases: super().create from a Python override must raise, not
+# dispatch back into the override.
+_SUPER_CREATE = textwrap.dedent(
+    """
+    from pathlib import Path
+
+    from tesseract_robotics.tesseract_command_language import (
+        JointWaypoint,
+        JointWaypointPoly_wrap_JointWaypoint,
+        MoveInstruction,
+        MoveInstructionPoly_wrap_MoveInstruction,
+        MoveInstructionType_FREESPACE,
+    )
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.tesseract_environment import Environment
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        TrajOptIfoptPureVirtualCallError,
+    )
+
+    class MoveCallsUp(TrajOptIfoptMoveProfile):
+        def create(self, move_instruction, composite_manip_info, env, index):
+            return super().create(move_instruction, composite_manip_info, env, index)
+
+    class CompositeCallsUp(TrajOptIfoptCompositeProfile):
+        def create(self, composite_manip_info, env, nodes, fixed_indices):
+            return super().create(composite_manip_info, env, nodes, fixed_indices)
+
+    class ExtendsDefault(TrajOptIfoptDefaultMoveProfile):
+        def create(self, move_instruction, composite_manip_info, env, index):
+            return super().create(move_instruction, composite_manip_info, env, index)
+
+    locator = GeneralResourceLocator()
+    support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
+    env = Environment()
+    assert env.init(
+        Path(locator.locateResource(support + ".urdf").getFilePath()),
+        Path(locator.locateResource(support + ".srdf").getFilePath()),
+        locator,
+    )
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    joints = list(env.getJointGroup("manipulator").getJointNames())
+    move = MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(
+            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.zeros(len(joints)))),
+            MoveInstructionType_FREESPACE,
+            "DEFAULT",
+        )
+    )
+    for call in (
+        lambda: MoveCallsUp().create(move, manip_info, env, 0),
+        lambda: CompositeCallsUp().create(manip_info, env, [], []),
+    ):
+        try:
+            call()
+        except TrajOptIfoptPureVirtualCallError as error:
+            assert isinstance(error, NotImplementedError)
+            assert "create" in str(error), str(error)
+        else:
+            raise AssertionError("super().create did not raise")
+    # a Python subclass of a concrete C++ profile delegates to that profile's create
+    assert ExtendsDefault().create(move, manip_info, env, 0).node is not None
+    print("OK")
+    """
+)
+
+
 def _run_child(body):
     proc = subprocess.run(
         [sys.executable, "-c", _CHILD_PREAMBLE + body],
@@ -1253,6 +1319,9 @@ class TestTrajOptIfoptPythonProfiles:
         request = _python_profile_request(t_env, manip_info, joint_names, composite=Bare())
         with pytest.raises(RuntimeError, match="pure virtual"):
             TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    def test_super_create_raises_pure_virtual_call_error(self):
+        _run_child(_SUPER_CREATE)
 
     def test_kept_waypoint_info_is_refused(self):
         _run_child(_KEPT_WAYPOINT_INFO)

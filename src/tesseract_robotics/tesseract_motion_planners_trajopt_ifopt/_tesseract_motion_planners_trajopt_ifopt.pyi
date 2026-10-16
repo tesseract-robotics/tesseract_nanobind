@@ -14,6 +14,11 @@ import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 import tesseract_robotics.trajopt_sqp._trajopt_sqp
 
 
+class TrajOptIfoptPureVirtualCallError(NotImplementedError):
+    """
+    super().create(...) from a Python TrajOpt-Ifopt profile: the base is pure virtual.
+    """
+
 class TrajOptIfoptProfileReturnTypeError(TypeError):
     """A Python TrajOpt-Ifopt profile's create returned the wrong type."""
 

@@ -29,6 +29,7 @@ __all__ = [
     "TrajOptIfoptOSQPSolverProfile",
     "TrajOptIfoptPlanProfile",
     "TrajOptIfoptProfileReturnTypeError",
+    "TrajOptIfoptPureVirtualCallError",
     "TrajOptIfoptSolverProfile",
     "TrajOptIfoptTermInfos",
     "TrajOptIfoptWaypointInfo",
