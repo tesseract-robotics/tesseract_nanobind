@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import tesseract_robotics.tesseract_motion_planners_trajopt as trajopt
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
@@ -26,7 +27,7 @@ from tesseract_robotics.tesseract_common import (
     Translation3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 
 # TrajOpt imports - skip tests if not available
@@ -322,3 +323,240 @@ class TestTrajOptPlanning:
         assert response.successful, (
             f"TrajOpt planning with collision config failed: {response.message}"
         )
+
+
+def _joint_request(env, manip_info, joint_names, profile_name):
+    """Two-waypoint joint move on the IIWA, interpolated as a TrajOpt seed."""
+    program = CompositeInstruction(profile_name)
+    program.setManipulatorInfo(manip_info)
+    for q in ([0, 0, 0, -1.0, 0, 0, 0], [0.5, 0, 0, -1.0, 0, 0, 0]):
+        wp = JointWaypoint(joint_names, np.array(q, dtype=np.float64))
+        instr = MoveInstruction(
+            JointWaypointPoly_wrap_JointWaypoint(wp), MoveInstructionType_FREESPACE, profile_name
+        )
+        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(instr))
+    request = PlannerRequest()
+    request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
+    request.env = env
+    return request
+
+
+def _trajopt_profiles(profile_name, solver_profile=None):
+    profiles = ProfileDictionary()
+    trajopt.ProfileDictionary_addTrajOptMoveProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultMoveProfile()
+    )
+    trajopt.ProfileDictionary_addTrajOptCompositeProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultCompositeProfile()
+    )
+    if solver_profile is not None:
+        trajopt.ProfileDictionary_addTrajOptSolverProfile(
+            profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, solver_profile
+        )
+    return profiles
+
+
+class TestOSQPSettings:
+    """#306: OSQPSettings and TrajOptOSQPSolverProfile.settings."""
+
+    def test_profile_holds_trajopt_defaults(self):
+        # trajopt_sco OSQPModelConfig::setDefaultOSQPSettings, not osqp's or zeros
+        s = trajopt.TrajOptOSQPSolverProfile().settings
+        assert isinstance(s, trajopt.OSQPSettings)
+        assert s.eps_abs == 1e-4
+        assert s.eps_rel == 1e-6
+        assert s.max_iter == 8192
+        assert s.polishing == 1
+        assert s.adaptive_rho == 1
+        assert s.check_dualgap == 0
+
+    def test_default_constructor_fills_osqp_defaults(self):
+        s = trajopt.OSQPSettings()
+        assert s.max_iter > 0
+        assert s.eps_abs > 0
+        assert s.rho > 0
+
+    def test_assign_settings_round_trips(self):
+        p = trajopt.TrajOptOSQPSolverProfile()
+        s = p.settings
+        s.eps_abs = 1e-5
+        p.settings = s
+        assert p.settings.eps_abs == 1e-5
+
+    def test_equality(self):
+        a = trajopt.TrajOptOSQPSolverProfile().settings
+        b = trajopt.TrajOptOSQPSolverProfile().settings
+        assert a == b
+        b.max_iter = 100
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)
+
+    def test_plan_with_python_assigned_settings(self, lbr_iiwa_environment):
+        env, manip_info, joint_names = lbr_iiwa_environment
+        solver = trajopt.TrajOptOSQPSolverProfile()
+        s = solver.settings
+        s.max_iter = 4000
+        s.eps_abs = 1e-5
+        solver.settings = s
+        request = _joint_request(env, manip_info, joint_names, "OSQP_SETTINGS")
+        request.profiles = _trajopt_profiles("OSQP_SETTINGS", solver)
+        response = trajopt.TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE).solve(request)
+        assert response.successful, response.message
+
+
+class TestComputeLongestValidSegmentLength:
+    """#307: one case per branch of the upstream definition."""
+
+    # extent = ||upper - lower|| = ||(3, 4)|| = 5
+    LIMITS = np.array([[0.0, 3.0], [0.0, 4.0]])
+
+    @pytest.mark.parametrize(
+        ("fraction", "length", "expected"),
+        [
+            (0.1, 0.2, 0.2),  # both positive: min(0.1 * 5, 0.2)
+            (0.1, 1.0, 0.5),  # both positive: min(0.1 * 5, 1.0)
+            (0.1, 0.0, 0.5),  # fraction only: 0.1 * 5
+            (0.0, 0.3, 0.3),  # length only
+            (0.0, 0.0, 0.05),  # neither: LONGEST_VALID_SEGMENT_FRACTION_DEFAULT (0.01) * 5
+        ],
+    )
+    def test_branches(self, fraction, length, expected):
+        result = trajopt.TrajOptDefaultCompositeProfile.computeLongestValidSegmentLength(
+            self.LIMITS, fraction, length
+        )
+        assert result == pytest.approx(expected)
+
+
+class TestTrajOptMotionPlannerBase:
+    """#299: TrajOptMotionPlanner is a MotionPlanner."""
+
+    def test_isinstance(self):
+        assert isinstance(trajopt.TrajOptMotionPlanner("x"), MotionPlanner)
+
+    def test_inherited_methods(self):
+        planner = trajopt.TrajOptMotionPlanner("x")
+        assert planner.getName() == "x"
+        planner.terminate()
+        planner.clear()
+        cloned = planner.clone()
+        assert type(cloned) is trajopt.TrajOptMotionPlanner
+        assert cloned.getName() == "x"
+
+    def test_base_solve_dispatches(self, lbr_iiwa_environment):
+        env, manip_info, joint_names = lbr_iiwa_environment
+        request = _joint_request(env, manip_info, joint_names, "BASE_SOLVE")
+        request.profiles = _trajopt_profiles("BASE_SOLVE")
+        planner = trajopt.TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
+        response = MotionPlanner.solve(planner, request)
+        assert response.successful, response.message
+
+
+class TestTrajOptProfileHooks:
+    """#339: TrajOptSolverProfile.createOptimizationParameters."""
+
+    def test_create_optimization_parameters_copies_opt_params(self):
+        p = trajopt.TrajOptOSQPSolverProfile()
+        p.opt_params.max_iter = 17
+        params = p.createOptimizationParameters()
+        assert isinstance(params, trajopt.BasicTrustRegionSQPParameters)
+        assert params.max_iter == 17
+        assert params == p.opt_params
+
+
+# (class, mutate) pairs for #261: mutate changes one field so the instances differ.
+TRAJOPT_VALUE_TYPES = [
+    ("TrajOptCartesianWaypointConfig", lambda x: setattr(x, "enabled", not x.enabled)),
+    ("TrajOptJointWaypointConfig", lambda x: setattr(x, "enabled", not x.enabled)),
+    ("TrajOptDefaultMoveProfile", lambda x: setattr(x.joint_cost_config, "enabled", True)),
+    ("TrajOptDefaultCompositeProfile", lambda x: setattr(x, "smooth_jerks", not x.smooth_jerks)),
+    ("TrajOptOSQPSolverProfile", lambda x: setattr(x, "update_workspace", True)),
+    ("BasicTrustRegionSQPParameters", lambda x: setattr(x, "max_iter", 3)),
+]
+
+
+class TestTrajOptValueEquality:
+    """#261: __eq__/__ne__ compare by value; the types are unhashable."""
+
+    @pytest.mark.parametrize(("cls_name", "mutate"), TRAJOPT_VALUE_TYPES)
+    def test_equality(self, cls_name, mutate):
+        cls = getattr(trajopt, cls_name)
+        a, b = cls(), cls()
+        assert a == b
+        assert not (a != b)
+        mutate(b)
+        assert a != b
+        assert not (a == b)
+
+    @pytest.mark.parametrize(("cls_name", "mutate"), TRAJOPT_VALUE_TYPES)
+    def test_unhashable(self, cls_name, mutate):
+        with pytest.raises(TypeError):
+            hash(getattr(trajopt, cls_name)())
+
+
+class TestTrajOptCreateKey:
+    """#273: static createKey() matches the instance key."""
+
+    @pytest.mark.parametrize(
+        "cls_name",
+        ["TrajOptDefaultMoveProfile", "TrajOptDefaultCompositeProfile", "TrajOptOSQPSolverProfile"],
+    )
+    def test_create_key_matches_get_key(self, cls_name):
+        cls = getattr(trajopt, cls_name)
+        assert cls.createKey() == cls().getKey()
+
+    def test_keys_differ_between_profile_kinds(self):
+        keys = {
+            trajopt.TrajOptMoveProfile.createKey(),
+            trajopt.TrajOptCompositeProfile.createKey(),
+            trajopt.TrajOptSolverProfile.createKey(),
+        }
+        assert len(keys) == 3
+
+
+class TestTrajOptFromYaml:
+    """#331: from_yaml on the three TrajOpt profiles reads the C++ YAML config."""
+
+    @pytest.mark.parametrize(
+        ("cls_name", "config", "mutate"),
+        [
+            (
+                "TrajOptDefaultMoveProfile",
+                "joint_cost_config:\n  enabled: true\n",
+                lambda p: setattr(p.joint_cost_config, "enabled", True),
+            ),
+            (
+                "TrajOptDefaultCompositeProfile",
+                "avoid_singularity_coeff: 7.5\n",
+                lambda p: setattr(p, "avoid_singularity_coeff", 7.5),
+            ),
+            (
+                "TrajOptOSQPSolverProfile",
+                "update_workspace: true\n",
+                lambda p: setattr(p, "update_workspace", True),
+            ),
+        ],
+    )
+    def test_one_field(self, cls_name, config, mutate):
+        cls = getattr(trajopt, cls_name)
+        expected = cls()
+        mutate(expected)
+        profile = cls.from_yaml(config)
+        assert profile == expected
+        assert profile != cls()
+
+    def test_osqp_settings_from_yaml(self):
+        profile = trajopt.TrajOptOSQPSolverProfile.from_yaml("settings:\n  max_iter: 321\n")
+        assert profile.settings.max_iter == 321
+
+    @pytest.mark.parametrize(
+        "cls_name",
+        ["TrajOptDefaultMoveProfile", "TrajOptDefaultCompositeProfile", "TrajOptOSQPSolverProfile"],
+    )
+    def test_malformed_yaml_raises_value_error(self, cls_name):
+        with pytest.raises(ValueError):
+            getattr(trajopt, cls_name).from_yaml("key: [")
+
+    def test_wrong_value_type_raises(self):
+        with pytest.raises(RuntimeError, match="Failed to parse yaml config"):
+            trajopt.TrajOptDefaultCompositeProfile.from_yaml("avoid_singularity_coeff: abc\n")
