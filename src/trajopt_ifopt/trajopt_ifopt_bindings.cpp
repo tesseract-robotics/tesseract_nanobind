@@ -229,6 +229,7 @@ std::vector<std::unique_ptr<ti::Node>> take_over_nodes(const std::vector<nb::han
     std::vector<std::unique_ptr<ti::Node>> owned_nodes;
     owned_nodes.reserve(nodes.size());
     for (std::size_t i = 0; i < nodes.size(); ++i) {
+        // nanobind::detail API (nanobind/nb_lib.h, nanobind 2.12.0 pinned here); recheck on a bump
         if (!nb::detail::nb_type_relinquish_ownership(nodes[i].ptr(), true)) {
             for (std::size_t j = 0; j < i; ++j)
                 nb::detail::nb_type_restore_ownership(nodes[j].ptr(), true);
