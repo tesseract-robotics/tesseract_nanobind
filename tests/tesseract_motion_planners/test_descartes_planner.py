@@ -1,5 +1,8 @@
 """Tests for tesseract_motion_planners_descartes bindings."""
 
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +31,7 @@ from tesseract_robotics.tesseract_common import (
     VectorIsometry3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.tesseract_kinematics import KinematicGroup
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
@@ -506,3 +510,83 @@ class TestDescartesProfileCreateKey:
 
     def test_move_and_solver_keys_differ(self):
         assert DescartesMoveProfileD.createKey() != DescartesSolverProfileD.createKey()
+
+
+# s: the child loads the IRB2400 environment and solves IK once; about 1 s on an M-series Mac
+CHILD_TIMEOUT_S = 60.0
+
+# A KinematicGroup's IK solver lives in a plugin library the environment loaded: the group must
+# keep the environment alive, or deleting the environment unloads the code the group calls.
+_KINEMATIC_GROUP_KEEPS_ENV_ALIVE = textwrap.dedent(
+    """
+    import gc
+    from pathlib import Path
+
+    import numpy as np
+
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.tesseract_environment import Environment
+    from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+    from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultMoveProfileD
+
+    locator = GeneralResourceLocator()
+    support = "package://tesseract/support/urdf/abb_irb2400"
+    env = Environment()
+    assert env.init(
+        Path(locator.locateResource(support + ".urdf").getFilePath()),
+        Path(locator.locateResource(support + ".srdf").getFilePath()),
+        locator,
+    )
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    manip_info.manipulator_ik_solver = "OPWInvKin"
+    group = DescartesDefaultMoveProfileD().createKinematicGroup(manip_info, env)
+    del env
+    gc.collect()
+    joints = np.array([0.5, 0.2, -0.3, 0.4, 0.6, -0.2])
+    pose = group.calcFwdKin(joints)["tool0"]
+    assert len(group.calcInvKin(KinGroupIKInput(pose, "base_link", "tool0"), joints)) > 0
+    del group
+    gc.collect()
+    print("OK")
+    """
+)
+
+
+class TestDescartesCreateKinematicGroup:
+    """`DescartesMoveProfileD.createKinematicGroup`, the helper a C++ override calls (gh-340)."""
+
+    def test_returns_the_manipulator_group(self, abb_irb2400_environment):
+        t_env, manip_info, joint_names = abb_irb2400_environment
+        group = DescartesDefaultMoveProfileD().createKinematicGroup(manip_info, t_env)
+        assert isinstance(group, KinematicGroup)
+        assert list(group.getJointNames()) == joint_names
+
+    def test_on_a_python_profile(self, abb_irb2400_environment):
+        t_env, manip_info, _ = abb_irb2400_environment
+
+        class Bare(DescartesMoveProfileD):
+            pass
+
+        assert isinstance(Bare().createKinematicGroup(manip_info, t_env), KinematicGroup)
+
+    def test_unknown_manipulator_raises(self, abb_irb2400_environment):
+        t_env, _, _ = abb_irb2400_environment
+        with pytest.raises(RuntimeError, match="failed to create kinematic group"):
+            DescartesDefaultMoveProfileD().createKinematicGroup(
+                ManipulatorInfo("no_such_group", "base_link", "tool0"), t_env
+            )
+
+    def test_group_keeps_environment_alive(self):
+        proc = subprocess.run(
+            [sys.executable, "-c", _KINEMATIC_GROUP_KEEPS_ENV_ALIVE],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=CHILD_TIMEOUT_S,
+        )
+        traceback_at = proc.stderr.find("Traceback")
+        assert proc.returncode == 0, (
+            f"child died (rc={proc.returncode}, SIGSEGV is -11/139): "
+            f"{proc.stderr[traceback_at:] if traceback_at >= 0 else proc.stderr}"
+        )
+        assert proc.stdout.splitlines()[-1] == "OK", proc.stdout

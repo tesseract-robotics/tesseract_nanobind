@@ -23,6 +23,9 @@
 // tesseract_motion_planners Descartes
 #include <tesseract/motion_planners/descartes/descartes_motion_planner.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_profile.h>
+// createKinematicGroup's definition: the library's instantiation is a local symbol (not
+// exported, tesseract_planning 0.35.0), so this TU instantiates its own.
+#include <tesseract/motion_planners/descartes/impl/profile/descartes_profile.hpp>
 #include <tesseract/motion_planners/descartes/profile/descartes_default_move_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_ladder_graph_solver_profile.h>
 #include <tesseract/motion_planners/descartes/descartes_utils.h>
@@ -37,6 +40,7 @@
 #include <tesseract/command_language/poly/move_instruction_poly.h>
 #include <tesseract/common/manipulator_info.h>
 #include <tesseract/environment/environment.h>
+#include <tesseract/kinematics/kinematic_group.h>
 
 // tesseract_collision for CollisionCheckConfig
 #include <tesseract/collision/types.h>
@@ -202,6 +206,8 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     // VectorIsometry3d (tool-pose samplers) and Environment (profile hooks)
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
     nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
+    // KinematicGroup (createKinematicGroup)
+    nb::module_::import_("tesseract_robotics.tesseract_kinematics._tesseract_kinematics");
 
     // ========== descartes_light::State<double> ==========
     // Python-readable view of a Descartes state. Constructable from a numpy
@@ -275,6 +281,11 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def("getKey", &tp::DescartesMoveProfile<double>::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::DescartesMoveProfile<double>>,
             "The key every Descartes move profile carries")
+        // The group's IK solver comes from the environment's kinematics plugins, so the group keeps
+        // the environment alive (as Environment.getKinematicGroup keeps its environment).
+        .def("createKinematicGroup", &tp::DescartesMoveProfile<double>::createKinematicGroup,
+             "manip_info"_a, "env"_a, nb::keep_alive<0, 3>(),
+             "The kinematic group for `manip_info`'s manipulator and IK solver")
         .def("createWaypointSampler", &tp::DescartesMoveProfile<double>::createWaypointSampler,
              "move_instruction"_a, "composite_manip_info"_a, "env"_a)
         .def("createEdgeEvaluator", &tp::DescartesMoveProfile<double>::createEdgeEvaluator,
