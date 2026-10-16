@@ -34,6 +34,9 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
     "tesseract_srdf": ("tesseract/srdf/",),
     "tesseract_state_solver": ("tesseract/state_solver/",),
     "tesseract_urdf": ("tesseract/urdf/",),
+    # trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h).
+    "trajopt_ifopt": ("trajopt_ifopt/", "trajopt_common/"),
+    "trajopt_sqp": ("trajopt_sqp/",),
 }
 # Binding modules the audit does not cover yet: module → (reason, owned prefixes). The prefixes
 # decide header ownership already, so a module moves to AUDITED_HEADER_PREFIX unchanged. Every
@@ -48,9 +51,6 @@ UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
         "Not yet audited: #256 group 1.",
         ("tesseract/time_parameterization/",),
     ),
-    # trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h).
-    "trajopt_ifopt": ("Not yet audited: #256 group 2.", ("trajopt_ifopt/", "trajopt_common/")),
-    "trajopt_sqp": ("Not yet audited: #256 group 2.", ("trajopt_sqp/",)),
     "tesseract_motion_planners": (
         "Not yet audited: #256 group 3.",
         ("tesseract/motion_planners/",),
