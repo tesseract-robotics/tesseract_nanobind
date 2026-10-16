@@ -26,8 +26,11 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptCompositeProfile,
     ProfileDictionary_addTrajOptIfoptPlanProfile,
     ProfileDictionary_addTrajOptIfoptSolverProfile,
+    TrajOptIfoptCartesianWaypointConfig,
     TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptDefaultPlanProfile,
+    TrajOptIfoptJointWaypointConfig,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptSolverProfile,
@@ -479,3 +482,32 @@ class TestTrajOptIfoptMotionPlannerBase:
         assert via_base.successful, via_base.message
         assert via_base.message == direct.message
         assert len(via_base.results) == len(direct.results)
+
+
+class TestTrajOptIfoptValueEquality:
+    """Value `__eq__` on configs and profiles; unhashable (gh-261)."""
+
+    @pytest.mark.parametrize(
+        ("cls", "mutate"),
+        [
+            (TrajOptIfoptCartesianWaypointConfig, lambda x: setattr(x, "enabled", not x.enabled)),
+            (TrajOptIfoptJointWaypointConfig, lambda x: setattr(x, "enabled", not x.enabled)),
+            (
+                TrajOptIfoptDefaultMoveProfile,
+                lambda x: setattr(x.joint_cost_config, "enabled", not x.joint_cost_config.enabled),
+            ),
+            (
+                TrajOptIfoptDefaultCompositeProfile,
+                lambda x: setattr(x, "smooth_jerks", not x.smooth_jerks),
+            ),
+            (TrajOptIfoptOSQPSolverProfile, lambda x: setattr(x.opt_params, "max_iterations", 7)),
+            (TrajOptIfoptOSQPSolverProfile, lambda x: x.setPolish(False)),
+        ],
+    )
+    def test_equality(self, cls, mutate):
+        a, b = cls(), cls()
+        assert a == b
+        mutate(b)
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)

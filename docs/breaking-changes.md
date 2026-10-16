@@ -19,6 +19,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `OMPLSolverConfig.getNumPlanners()` removed | [`len(cfg.planners)`](#omplsolverconfiggetnumplanners-removed) |
 | Unreleased | OMPL, TrajOpt and task-composer planning value types compare by value and are unhashable | [A stable key, or `id()`](#planner-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `create_ompl_planner_configurators` raises `ValueError` on a keyword none of the requested planners has | [Drop the keyword](#create_ompl_planner_configurators-rejects-unused-keywords) |
+| Unreleased | 7 TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable | [A stable key, or `id()`](#trajopt-ifopt-and-descartes-profiles-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -174,6 +175,20 @@ still accepted (`goal_bias` with `["RRTConnect", "RRTstar"]` sets it on the RRTs
 | before | after |
 | --- | --- |
 | `create_ompl_planner_configurators(["RRTConnect"], goal_bias=0.1)` | `create_ompl_planner_configurators(["RRTConnect"])` |
+
+### TrajOpt-Ifopt and Descartes profiles compare by value and are unhashable
+
+These classes bind `__eq__`/`__ne__` from their C++ `operator==` and set `__hash__ = None`, as the
+[0.35.0.9 value types](#value-types-compare-by-value-and-are-unhashable) do (#261):
+
+| `tesseract_motion_planners_trajopt_ifopt` | `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile` |
+| `tesseract_motion_planners_descartes` | `DescartesDefaultMoveProfileD`, `DescartesLadderGraphSolverProfileD` |
+
+`hash(profile)`, `{profile}` and `d[profile] = …` raise `TypeError: unhashable type`. Key on the
+profile's name in the `ProfileDictionary`, or on `id(profile)` where identity is what you mean:
+
+| `seen = {profile}` | `seen = {profile_name}` |
+| `cache[profile] = result` | `cache[id(profile)] = result` (keep `profile` alive) |
 
 ## 0.35.0.9
 

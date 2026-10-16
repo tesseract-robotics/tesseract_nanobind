@@ -20,6 +20,7 @@
 
 - **OMPL, TrajOpt and task-composer planning value types compare by value and are unhashable** — `OMPLSolverConfig`, `OMPLRealVectorMoveProfile`, `TrajOptCartesianWaypointConfig`, `TrajOptJointWaypointConfig`, `TrajOptDefaultMoveProfile`, `TrajOptDefaultCompositeProfile`, `TrajOptOSQPSolverProfile`, `BasicTrustRegionSQPParameters` and the seven `tesseract_task_composer_planning` profiles bind the C++ `operator==`; `hash()`, `set` members and `dict` keys raise `TypeError`. `OMPLSolverConfig` compares `planners` by count only, as upstream ([#261]).
 - **`create_ompl_planner_configurators` rejects a keyword that fits none of the requested planners** — it accepts every `OMPLPlannerType` name and sets each keyword on the configurators that have that field; a keyword no requested configurator has raises `ValueError` instead of being ignored ([#301]).
+- **TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable** — `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile`, `DescartesDefaultMoveProfileD` and `DescartesLadderGraphSolverProfileD` bind `__eq__`/`__ne__` from the C++ `operator==` and set `__hash__ = None`; `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
 
 ### Changes
 

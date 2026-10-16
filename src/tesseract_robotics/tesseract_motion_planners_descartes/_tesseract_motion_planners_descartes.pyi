@@ -82,6 +82,12 @@ class DescartesLadderGraphSolverProfileD(DescartesSolverProfileD):
     @num_threads.setter
     def num_threads(self, arg: int, /) -> None: ...
 
+    def __eq__(self, arg: DescartesLadderGraphSolverProfileD, /) -> bool: ...
+
+    def __ne__(self, arg: DescartesLadderGraphSolverProfileD, /) -> bool: ...
+
+    __hash__: None = None
+
 def cast_DescartesSolverProfileD(profile: DescartesLadderGraphSolverProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
     """
     Cast DescartesLadderGraphSolverProfileD to Profile for use with ProfileDictionary
@@ -197,6 +203,12 @@ class DescartesDefaultMoveProfileD(DescartesMoveProfileD):
 
     @debug.setter
     def debug(self, arg: bool, /) -> None: ...
+
+    def __eq__(self, arg: DescartesDefaultMoveProfileD, /) -> bool: ...
+
+    def __ne__(self, arg: DescartesDefaultMoveProfileD, /) -> bool: ...
+
+    __hash__: None = None
 
 DescartesDefaultPlanProfileD: TypeAlias = DescartesDefaultMoveProfileD
 

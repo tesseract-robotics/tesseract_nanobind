@@ -33,6 +33,7 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesDefaultPlanProfileD,
     DescartesEdgeEvaluatorD,
+    DescartesLadderGraphSolverProfileD,
     DescartesMotionPlannerD,
     DescartesMoveProfileD,
     DescartesStateD,
@@ -471,3 +472,23 @@ class TestDescartesMotionPlannerBase:
         assert via_base.successful, via_base.message
         assert via_base.message == direct.message
         assert len(via_base.results) == len(direct.results)
+
+
+class TestDescartesProfileEquality:
+    """Value `__eq__` on the Descartes profiles; unhashable (gh-261)."""
+
+    def test_default_move_profile(self):
+        a, b = DescartesDefaultMoveProfileD(), DescartesDefaultMoveProfileD()
+        assert a == b
+        b.target_pose_sample_resolution = 0.5
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)
+
+    def test_ladder_graph_solver_profile(self):
+        a, b = DescartesLadderGraphSolverProfileD(), DescartesLadderGraphSolverProfileD()
+        assert a == b
+        b.num_threads = 4
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)
