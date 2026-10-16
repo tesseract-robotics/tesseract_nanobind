@@ -524,6 +524,55 @@ _SUPER_GENERATE = textwrap.dedent(
 )
 
 
+# Upstream reads instruction_seed.back() on what generate returns (simple_motion_planner.cpp:261,
+# :270, tesseract_planning 0.35.0): an empty list read past the end, a null instruction planned as
+# a success. Both are refused before upstream sees them.
+_BAD_GENERATE_RESULTS = textwrap.dedent(
+    """
+    from tesseract_robotics.tesseract_command_language import MoveInstructionPoly
+    from tesseract_robotics.tesseract_motion_planners_simple import (
+        SimplePlannerEmptyGenerateError,
+        SimplePlannerNullInstructionError,
+    )
+
+    class Returns(SimplePlannerMoveProfile):
+        def __init__(self, make):
+            super().__init__()
+            self.make = make
+
+        def generate(self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi):
+            return self.make(base_instruction)
+
+    env = make_env()
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    cases = (
+        (lambda base: [], SimplePlannerEmptyGenerateError, "empty"),
+        (lambda base: [MoveInstructionPoly(), base], SimplePlannerNullInstructionError, "null"),
+        (lambda base: [base, MoveInstructionPoly()], SimplePlannerNullInstructionError, "null"),
+    )
+    for make, error_type, word in cases:
+        assert issubclass(error_type, ValueError)
+        program = CompositeInstruction("PY_PROFILE")
+        program.setManipulatorInfo(manip_info)
+        program.appendMoveInstruction(joint_move([0.0] * 6))
+        program.appendMoveInstruction(joint_move(END))
+        profiles = ProfileDictionary()
+        profiles.addProfile("SIMPLE", "PY_PROFILE", Returns(make))
+        request = PlannerRequest()
+        request.env = env
+        request.instructions = program
+        request.profiles = profiles
+        try:
+            SimpleMotionPlanner("SIMPLE").solve(request)
+        except error_type as error:
+            assert word in str(error), str(error)
+        else:
+            raise AssertionError(f"{word} result was not refused")
+    print("OK")
+    """
+)
+
+
 def _run_child(body):
     proc = subprocess.run(
         [sys.executable, "-c", _CHILD_PREAMBLE + body],
@@ -550,6 +599,10 @@ def test_stored_generate_arguments_outlive_solve():
 
 def test_super_generate_raises_pure_virtual_call_error():
     _run_child(_SUPER_GENERATE)
+
+
+def test_bad_generate_results_are_refused():
+    _run_child(_BAD_GENERATE_RESULTS)
 
 
 # ---- overrides on concrete profiles ----------------------------------------
