@@ -236,9 +236,9 @@ guidance:
 | `JointVelConstraint`, zero target | `SQUARED` cost | coefficient 1 |
 | Collision (`TrajOptCollisionConfig(0.1, 10)`) | constraint | 0.1 m margin, coefficient 10, `collision_margin_buffer` 0.10 m |
 
-After `solve`, `solver.getStatus()` returns an `SQPStatus`: `NLP_CONVERGED` is the only
-success. `ITERATION_LIMIT`, `PENALTY_ITERATION_LIMIT`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`
-and `CALLBACK_STOPPED` each name why it stopped. A run can stop with constraints still
+After `solve`, `solver.getStatus()` returns an `SQPStatus`: `CONVERGED` is the only
+success. `ITERATION_LIMIT`, `PENALTY_ITERATION_LIMIT`, `TIME_LIMIT`, `QP_SOLVE_FAILED`
+and `STOPPED_BY_CALLBACK` each name why it stopped. A run can stop with constraints still
 violated, so check `problem.getExactConstraintViolations()` before using the result.
 
 ## What the TrajOpt-Ifopt planner builds
