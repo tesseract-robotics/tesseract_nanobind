@@ -1,4 +1,4 @@
-// Audit contract fixture: inherited members (A) and stub base classes (T5).
+// Audit contract fixture: members inherited from an unbound base (A).
 #pragma once
 
 namespace tesseract::inherit
@@ -10,6 +10,12 @@ struct Shape  // unbound base: one class row; its public members are inherited r
   bool operator!=(const Shape& rhs) const;
   int sides() const;
   double area = 0;
+  // Filtered as in the base's own record: never inherited (A9).
+  Shape& operator=(const Shape&) = default;
+  void reset() = delete;
+  [[deprecated]] int legacy() const;
+  template <class A>
+  void serialize(A& ar, unsigned version);
 
 protected:
   bool equals(const Shape& other) const;  // not public: never inherited (A5)
@@ -36,6 +42,11 @@ struct Hidden : private Shape  // private base: nothing inherited (A4)
   Hidden();
 };
 
+struct Exposer : Shape  // a using-declaration hides nothing: unbound area stays a gap (A10)
+{
+  using Shape::area;
+};
+
 struct Runner  // bound base
 {
   virtual ~Runner() = default;
@@ -43,7 +54,7 @@ struct Runner  // bound base
   int laps() const;
 };
 
-struct SlowRunner final : Runner  // stub omits the Runner base: T5 gap; laps() is not an A row (A6)
+struct SlowRunner final : Runner  // laps() is not a row: the bound Runner audits it (A6)
 {
   SlowRunner();
   void go() override;
@@ -54,7 +65,7 @@ struct Middle : Runner  // unbound intermediate
   int depth() const;
 };
 
-struct DeepRunner final : Middle  // stub base Runner = nearest bound ancestor: no T5 row (T5-2); depth() inherited (A7)
+struct DeepRunner final : Middle  // depth() inherited from Middle, laps() through it (A7)
 {
   DeepRunner();
   void go() override;
@@ -66,8 +77,13 @@ struct Relay final : Runner  // re-binds Runner's API on the derived class (A8)
   void go() override;
 };
 
-struct Loner  // stub claims a base C++ does not have: T5 deviation (T5-3)
+struct Remote  // bound in another extension's stub (A11)
 {
-  Loner();
+  int ping() const;
+};
+
+struct Courier final : Remote  // ping() is not a row: the other module audits it (A11)
+{
+  Courier();
 };
 }  // namespace tesseract::inherit
