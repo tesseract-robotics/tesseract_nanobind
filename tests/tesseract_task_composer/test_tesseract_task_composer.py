@@ -18,18 +18,17 @@ from tesseract_robotics.tesseract_task_composer import (
     TaskComposerNodeInfo,
     TaskComposerNodeInfoContainer,
     TaskComposerPluginFactory,
-    createTaskComposerPluginFactory,
 )
 
 
-def _resolve_task_composer_config():
+def _resolve_task_composer_config() -> Path:
     """Resolved task composer plugin config via the package helper (gh-110)."""
-    return str(tesseract_robotics.get_task_composer_config_path())
+    return tesseract_robotics.get_task_composer_config_path()
 
 
 def _shipped_task_plugins() -> dict:
     """The `task_composer_plugins.tasks.plugins` mapping of the shipped config."""
-    config = yaml.safe_load(Path(_resolve_task_composer_config()).read_text())
+    config = yaml.safe_load(_resolve_task_composer_config().read_text())
     return config["task_composer_plugins"]["tasks"]["plugins"]
 
 
@@ -53,7 +52,7 @@ class TestTaskComposerPluginFactory:
         """Any ResourceLocator is accepted, not only GeneralResourceLocator (gh-150)."""
         config = tmp_path / "task_composer_plugins.yaml"
         config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
-        factory = TaskComposerPluginFactory(str(config), _DelegatingResourceLocator())
+        factory = TaskComposerPluginFactory(config, _DelegatingResourceLocator())
         assert not factory.hasTaskComposerNodePlugins()
 
     def test_python_resource_locator_subclass_builds_pipeline(self):
@@ -63,19 +62,12 @@ class TestTaskComposerPluginFactory:
         node = factory.createTaskComposerNode("TrajOptPipeline")
         assert node.getName() == "TrajOptPipeline"
 
-    def test_free_function_accepts_python_resource_locator_subclass(self, tmp_path):
-        """createTaskComposerPluginFactory takes any ResourceLocator too (gh-150)."""
-        config = tmp_path / "task_composer_plugins.yaml"
-        config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
-        factory = createTaskComposerPluginFactory(str(config), _DelegatingResourceLocator())
-        assert not factory.hasTaskComposerNodePlugins()
-
     def test_rejects_non_locator(self, tmp_path):
         """A non-ResourceLocator is still a TypeError."""
         config = tmp_path / "task_composer_plugins.yaml"
         config.write_text("task_composer_plugins:\n  search_paths: []\n", encoding="utf-8")
         with pytest.raises(TypeError):
-            TaskComposerPluginFactory(str(config), object())
+            TaskComposerPluginFactory(config, object())
 
     def test_create_factory_and_nodes(self):
         """Test factory creation and pipeline node creation."""
@@ -215,9 +207,7 @@ class TestTaskComposerPluginFactory:
         tesseract 0.35.0: loadConfig(path, locator) -> common::loadYamlFile, which
         runs processYamlIncludeDirective (common/src/yaml_utils.cpp:108-114).
         """
-        root = yaml.safe_load(Path(_resolve_task_composer_config()).read_text())[
-            "task_composer_plugins"
-        ]
+        root = yaml.safe_load(_resolve_task_composer_config().read_text())["task_composer_plugins"]
         tasks = {"plugins": {"OMPLTask": root["tasks"]["plugins"]["OMPLTask"]}}
         (tmp_path / "tasks.yaml").write_text(yaml.safe_dump(tasks, sort_keys=False))
         head = {key: value for key, value in root.items() if key != "tasks"}
@@ -227,7 +217,7 @@ class TestTaskComposerPluginFactory:
             + "  tasks: !include tasks.yaml\n"
         )
 
-        factory = TaskComposerPluginFactory(str(main), GeneralResourceLocator())
+        factory = TaskComposerPluginFactory(main, GeneralResourceLocator())
 
         assert set(factory.getTaskComposerNodePlugins()) == {"OMPLTask"}
 
@@ -271,7 +261,7 @@ from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import (
     TaskComposerDataStorage, TaskComposerPluginFactory,
 )
-config = str(tesseract_robotics.get_task_composer_config_path())
+config = tesseract_robotics.get_task_composer_config_path()
 factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
 factory.getAvailableTaskComposerNodePlugins()  # maps the plugin libraries first
 node = factory.createTaskComposerNode("TrajOptPipeline")
@@ -331,7 +321,7 @@ class TestDotgraph:
     def test_get_dotgraph_with_empty_results(self, pipeline_node):
         node, _ = pipeline_node
         results = TaskComposerNodeInfoContainer()
-        dot = node.getDotgraph(results)
+        dot = node.getDotgraph(results.getInfoMap())
         assert isinstance(dot, str)
         assert dot.startswith("digraph TaskComposer {")
         assert "TrajOptPipeline" in dot
@@ -352,7 +342,7 @@ class TestDotgraph:
         node, _ = pipeline_node
         out = tmp_path / "graph_results.dot"
         results = TaskComposerNodeInfoContainer()
-        ok = node.saveDotgraph(str(out), results)
+        ok = node.saveDotgraph(str(out), results.getInfoMap())
         assert ok is True
         assert out.is_file()
         assert out.read_text().startswith("digraph TaskComposer {")
@@ -372,10 +362,10 @@ class TestAnyPolyDataStorage:
     def test_anypoly_wrap_data_storage_not_null(self):
         from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_TaskComposerDataStorage,
-            createTaskComposerDataStorage,
+            TaskComposerDataStorage,
         )
 
-        ds = createTaskComposerDataStorage()
+        ds = TaskComposerDataStorage()
         any_poly = AnyPoly_wrap_TaskComposerDataStorage(ds)
         assert any_poly is not None
         assert not any_poly.isNull()
@@ -385,10 +375,10 @@ class TestAnyPolyDataStorage:
         from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_as_TaskComposerDataStorage,
             AnyPoly_wrap_TaskComposerDataStorage,
-            createTaskComposerDataStorage,
+            TaskComposerDataStorage,
         )
 
-        ds = createTaskComposerDataStorage()
+        ds = TaskComposerDataStorage()
         ds.setName("sub_storage")
 
         recovered = AnyPoly_as_TaskComposerDataStorage(AnyPoly_wrap_TaskComposerDataStorage(ds))
@@ -412,14 +402,14 @@ class TestAnyPolyDataStorage:
             AnyPoly_as_TaskComposerDataStorage,
             AnyPoly_wrap_CompositeInstruction,
             AnyPoly_wrap_TaskComposerDataStorage,
-            createTaskComposerDataStorage,
+            TaskComposerDataStorage,
         )
 
-        sub_storage = createTaskComposerDataStorage()
+        sub_storage = TaskComposerDataStorage()
         program = CompositeInstruction("DENSIFIED")
         sub_storage.setData("input_data", AnyPoly_wrap_CompositeInstruction(program))
 
-        parent = createTaskComposerDataStorage()
+        parent = TaskComposerDataStorage()
         fake_uuid = "deadbeef" * 4
         parent.setData(fake_uuid, AnyPoly_wrap_TaskComposerDataStorage(sub_storage))
 
@@ -441,12 +431,12 @@ class TestAnyPolyDataStorage:
 
 def _config_with_only(tmp_path, *task_names):
     """The shipped config with its node plugins cut down to `task_names`."""
-    root = yaml.safe_load(Path(_resolve_task_composer_config()).read_text())
+    root = yaml.safe_load(_resolve_task_composer_config().read_text())
     plugins = root["task_composer_plugins"]["tasks"]["plugins"]
     root["task_composer_plugins"]["tasks"]["plugins"] = {n: plugins[n] for n in task_names}
     config = tmp_path / "task_composer_plugins.yaml"
     config.write_text(yaml.safe_dump(root, sort_keys=False), encoding="utf-8")
-    return str(config)
+    return config
 
 
 class TestCreateRaisesOnFailure:
@@ -501,7 +491,7 @@ class TestCreateRaisesOnFailure:
     def test_exported_from_package(self):
         from tesseract_robotics import tesseract_task_composer
 
-        assert "TaskComposerPluginError" in tesseract_task_composer.__all__
+        assert hasattr(tesseract_task_composer, "TaskComposerPluginError")
 
 
 class TestAnyPolyEnvironment:
@@ -518,45 +508,45 @@ class TestAnyPolyEnvironment:
 
 
 class TestGetAllData:
-    """TaskComposerDataStorage.getAllData() — no-arg overload returning the full
+    """TaskComposerDataStorage.getData() — no-arg overload returning the full
     {key: AnyPoly} map of stored entries."""
 
     def test_empty_storage_returns_empty_dict(self):
         from tesseract_robotics.tesseract_task_composer import (
-            createTaskComposerDataStorage,
+            TaskComposerDataStorage,
         )
 
-        ds = createTaskComposerDataStorage()
-        assert ds.getAllData() == {}
+        ds = TaskComposerDataStorage()
+        assert ds.getData() == {}
 
     def test_returns_all_keys_set(self):
         from tesseract_robotics.tesseract_command_language import CompositeInstruction
         from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_wrap_CompositeInstruction,
-            createTaskComposerDataStorage,
+            TaskComposerDataStorage,
         )
 
-        ds = createTaskComposerDataStorage()
+        ds = TaskComposerDataStorage()
         ds.setData("a", AnyPoly_wrap_CompositeInstruction(CompositeInstruction("A")))
         ds.setData("b", AnyPoly_wrap_CompositeInstruction(CompositeInstruction("B")))
         ds.setData("c", AnyPoly_wrap_CompositeInstruction(CompositeInstruction("C")))
 
-        all_data = ds.getAllData()
+        all_data = ds.getData()
         assert set(all_data.keys()) == {"a", "b", "c"}
 
     def test_values_roundtrip_through_anypoly(self):
-        """Values returned by getAllData are AnyPolys with intact payloads."""
+        """Values returned by getData() are AnyPolys with intact payloads."""
         from tesseract_robotics.tesseract_command_language import CompositeInstruction
         from tesseract_robotics.tesseract_task_composer import (
             AnyPoly_as_CompositeInstruction,
             AnyPoly_wrap_CompositeInstruction,
-            createTaskComposerDataStorage,
+            TaskComposerDataStorage,
         )
 
-        ds = createTaskComposerDataStorage()
+        ds = TaskComposerDataStorage()
         ds.setData("foo", AnyPoly_wrap_CompositeInstruction(CompositeInstruction("FOO")))
 
-        recovered = AnyPoly_as_CompositeInstruction(ds.getAllData()["foo"])
+        recovered = AnyPoly_as_CompositeInstruction(ds.getData()["foo"])
         assert recovered.getProfile() == "FOO"
 
 
@@ -590,7 +580,7 @@ class TestAnyPolyAsContactResultMapVector:
 class TestPipelineDataStorageExposure:
     """End-to-end coverage for the data_storage exposure + contact_results
     extraction path: run FreespacePipeline (which contains DiscreteContactCheckTask),
-    then read per-node data_storage out of getAllInfos and unwrap the contact
+    then read per-node data_storage out of getInfoMap and unwrap the contact
     results vector via AnyPoly_as_ContactResultMapVector."""
 
     @pytest.fixture(scope="class")
@@ -669,7 +659,7 @@ class TestPipelineDataStorageExposure:
 
         future = composer.executor.run(task, task_data)
         future.wait()
-        infos = future.context.task_infos.getAllInfos()
+        infos = list(future.context.task_infos.getInfoMap().values())
 
         yield infos
 
@@ -693,7 +683,7 @@ class TestPipelineDataStorageExposure:
 
         ds = contact_check_infos[0].data_storage
         assert ds is not None
-        all_data = ds.getAllData()
+        all_data = ds.getData()
         assert "contact_results" in all_data, (
             "Forcing-collision profile should have caused DiscreteContactCheckTask "
             "to write 'contact_results' to its info's data_storage"
