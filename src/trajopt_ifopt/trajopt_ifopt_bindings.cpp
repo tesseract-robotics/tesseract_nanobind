@@ -204,6 +204,11 @@ nb::object node_object(const ti::Node* node, nb::handle owner) {
 
 // NodesVariables takes its Nodes by unique_ptr. All are checked before any is taken over, so a
 // rejected call leaves every Node with its caller.
+// nb_type_relinquish_ownership / nb_type_restore_ownership are nanobind::detail API
+// (nanobind/nb_lib.h, nanobind 2.12.0 as pinned in pixi.lock), the calls nanobind's own unique_ptr
+// caster makes. tests/trajopt_ifopt/test_variable_set_lifetimes.py pins their behaviour
+// (test_a_kept_node_is_unusable_after_handover, test_handing_the_same_node_over_twice_raises,
+// test_result_keeps_its_owner_alive[set_getters_while_caller_keeps_node]); rerun it on a bump.
 std::vector<std::unique_ptr<ti::Node>> take_over_nodes(const std::vector<nb::handle>& nodes) {
     std::set<PyObject*> seen;
     for (std::size_t i = 0; i < nodes.size(); ++i) {
