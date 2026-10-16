@@ -39,7 +39,8 @@ NB_MODULE(_tesseract_time_parameterization, m) {
 
     // ========== InstructionsTrajectory ==========
     nb::class_<tp::InstructionsTrajectory>(m, "InstructionsTrajectory")
-        .def(nb::init<tcl::CompositeInstruction&>(), "program"_a)
+        // Holds references into `program`: keep it alive as long as the trajectory
+        .def(nb::init<tcl::CompositeInstruction&>(), "program"_a, nb::keep_alive<1, 2>())
         .def("getPosition", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getPosition, nb::const_), "i"_a)
         .def("getVelocity", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getVelocity, nb::const_), "i"_a)
         .def("getAcceleration", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getAcceleration, nb::const_), "i"_a)
