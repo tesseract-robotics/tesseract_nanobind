@@ -12,6 +12,7 @@
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
+#include <tesseract/motion_planners/planner.h>
 
 // tesseract_common (Profile and ProfileDictionary moved here in 0.33)
 #include <tesseract/common/profile.h>
@@ -43,7 +44,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // Import Profile type from tesseract_command_language for cross-module inheritance
     auto cl_module = nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
 
-    // Import MotionPlanner base type for clone() return type
+    // Import MotionPlanner base type (TrajOptIfoptMotionPlanner's base)
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
 
     // ========== trajopt_common::TrajOptCollisionConfig ==========
@@ -197,11 +198,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     "Add TrajOptIfopt solver profile to ProfileDictionary");
 
     // ========== TrajOptIfoptMotionPlanner ==========
-    nb::class_<tp::TrajOptIfoptMotionPlanner>(m, "TrajOptIfoptMotionPlanner")
-        .def(nb::init<std::string>(), "name"_a)
-        .def("getName", &tp::TrajOptIfoptMotionPlanner::getName)
-        .def("solve", &tp::TrajOptIfoptMotionPlanner::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
-        .def("terminate", &tp::TrajOptIfoptMotionPlanner::terminate)
-        .def("clear", &tp::TrajOptIfoptMotionPlanner::clear)
-        .def("clone", [](const tp::TrajOptIfoptMotionPlanner& self) { return self.clone(); });
+    // getName/solve/terminate/clear/clone are MotionPlanner's (solve releases the GIL there)
+    nb::class_<tp::TrajOptIfoptMotionPlanner, tp::MotionPlanner>(m, "TrajOptIfoptMotionPlanner")
+        .def(nb::init<std::string>(), "name"_a);
 }
