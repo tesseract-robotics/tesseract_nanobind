@@ -171,7 +171,8 @@ def _failure_message(infos, aborting=None) -> str:
     Args:
         infos: The failed run's ``TaskComposerNodeInfo`` objects (``name``, ``status_code``,
             ``status_message``).
-        aborting: ``getAbortingNodeInfo()``, reported when no node carries a specific message.
+        aborting: The aborting node's info, ``getInfo(getAbortingNode())`` (``None`` when no node
+            aborted), reported when no node carries a specific message.
 
     Returns:
         ``"<node>: <message>"`` for every failed node with a specific message, sorted by node and
@@ -355,10 +356,8 @@ class TaskComposer:
                 f"Set TESSERACT_TASK_COMPOSER_CONFIG_FILE or install with bundled data."
             )
 
-        factory = TaskComposerPluginFactory(
-            str(config_path),
-            locator,
-        )
+        # A Path: the factory reads a `str` as YAML text (#337).
+        factory = TaskComposerPluginFactory(Path(config_path), locator)
 
         instance = cls(
             factory, locator, num_threads=num_threads, executor=executor, config_path=config_path
@@ -546,7 +545,10 @@ class TaskComposer:
             if not future.context.isSuccessful():
                 task_infos = future.context.task_infos
                 message = (
-                    _failure_message(task_infos.getAllInfos(), task_infos.getAbortingNodeInfo())
+                    _failure_message(
+                        task_infos.getInfoMap().values(),
+                        task_infos.getInfo(task_infos.getAbortingNode()),
+                    )
                     if task_infos is not None
                     else "Planning failed"
                 )
