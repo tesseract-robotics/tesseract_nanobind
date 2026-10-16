@@ -5,6 +5,7 @@ bound as methods (T7), Poly alternatives (T9), and the group 1 rules on the `pol
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
+import dataclasses
 import fnmatch
 from pathlib import Path
 
@@ -18,8 +19,19 @@ match_ = load("audit_match")  # monkeypatch the module that calls a function, no
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
 
-G1 = ("tesseract_command_language", "tesseract_time_parameterization")
-CORE_MODULES = frozenset(own.AUDITED_HEADER_PREFIX) - frozenset(G1)
+# The 10 core modules audited before #256: their rows must not move under TF-1.
+CORE_MODULES = (
+    "tesseract_collision",
+    "tesseract_common",
+    "tesseract_environment",
+    "tesseract_geometry",
+    "tesseract_kinematics",
+    "tesseract_scene_graph",
+    "tesseract_serialization",
+    "tesseract_srdf",
+    "tesseract_state_solver",
+    "tesseract_urdf",
+)
 
 
 # TF-1: UNAUDITED_HEADERS keyed by owning prefix.
@@ -34,7 +46,11 @@ def test_nested_prefix_header_sees_only_its_own_patterns(monkeypatch):
     """A header under a nested prefix is matched against that prefix's patterns and
     `ANY_PREFIX`, never its parent's: a `nodes/*` entry for `tesseract/task_composer/` must not
     hide `tesseract/task_composer/planning/nodes/*` (G4, C19)."""
-    monkeypatch.setitem(own.UNAUDITED_HEADERS, "tesseract/task_composer/", {"nodes/*": "tc nodes"})
+    monkeypatch.setattr(
+        own,
+        "UNAUDITED_HEADERS",
+        {own.ANY_PREFIX: {}, "tesseract/task_composer/": {"nodes/*": "tc nodes"}},
+    )
     spelling = "tesseract/task_composer/planning/nodes/x.h"
     both = ("tesseract/task_composer/", "tesseract/task_composer/planning/")
     assert not own.is_unaudited(spelling, both)
@@ -48,6 +64,9 @@ def test_common_yaml_utils_stays_audited():
 
 
 def test_unknown_prefix_key_raises(monkeypatch):
+    """The key check is not cached: every `is_unaudited` call compares the table's keys with
+    `owner_prefixes()`, so a key added after the first call still fails loud."""
+    assert not own.is_unaudited("tesseract/collision/x.h", ("tesseract/collision/",))
     monkeypatch.setitem(own.UNAUDITED_HEADERS, "tesseract/colision/", {"x.h": "typo"})
     with pytest.raises(own.UnknownPrefixError, match="tesseract/colision/"):
         own.is_unaudited("tesseract/collision/x.h", ("tesseract/collision/",))
@@ -86,7 +105,11 @@ def test_every_unaudited_header_pattern_hides_a_header():
         ),
         # Scoped: the kinematics plugin patterns no longer reach other prefixes.
         ("tesseract/state_solver/kdl/kdl_state_solver.h", ("tesseract/state_solver/",), False),
-        ("tesseract/command_language/kdl/x.h", ("tesseract/command_language/",), False),
+        (
+            "tesseract/time_parameterization/kdl/cereal_serialization.h",
+            ("tesseract/time_parameterization/",),
+            False,
+        ),
         (
             "tesseract/time_parameterization/unit_test_utils.h",
             ("tesseract/time_parameterization/",),
@@ -98,12 +121,14 @@ def test_unaudited_patterns_apply_below_their_prefix_only(spelling, prefixes, hi
     assert own.is_unaudited(spelling, prefixes) is hidden
 
 
-@pytest.mark.parametrize("module", sorted(CORE_MODULES))
+@pytest.mark.parametrize("module", CORE_MODULES)
 def test_rekeyed_core_patterns_hide_the_same_headers(module):
-    """Under the old unscoped table a pattern matched below every prefix. For each core
-    header, no pattern of *another* prefix matches it, unless the binding includes the
-    header directly (then it was audited anyway): re-keying changes no core row."""
+    """Under the old unscoped table a core pattern matched below every prefix. For each core
+    header, no pattern of *another* core prefix matches it, unless the binding includes the
+    header directly (then it was audited anyway): re-keying changes no core row. Planning
+    prefixes' patterns (G2-G4) were never in the old table and are not compared."""
     prefixes = own.AUDITED_HEADER_PREFIX[module]
+    core_prefixes = {p for m in CORE_MODULES for p in own.AUDITED_HEADER_PREFIX[m]}
     direct = audit.direct_include_spellings([own.binding_source(module)])
     for spelling in audit.prefix_headers(module, own.owner_prefixes(), audit.INCLUDE_DIRS).values():
         if spelling in direct:
@@ -111,7 +136,7 @@ def test_rekeyed_core_patterns_hide_the_same_headers(module):
         prefix = max((p for p in prefixes if spelling.startswith(p)), key=len)
         below = spelling.removeprefix(prefix)
         for key, patterns in own.UNAUDITED_HEADERS.items():
-            if key in (prefix, own.ANY_PREFIX):
+            if key == prefix or key not in core_prefixes:
                 continue
             assert not any(fnmatch.fnmatchcase(below, p) for p in patterns), (spelling, key)
 
@@ -125,17 +150,18 @@ POLY_SYMBOLS = {
     ("poly", "Box.setThing"): "reference-setter",
 }
 FIXTURE_OVERLOAD_RULE = "fixture-overload"
+POLY_STUBS = FIXTURES / "poly"
 
 
 def audit_poly():
     return audit.audit_tu(
         "poly",
         FIXTURES / "poly_bindings.cpp",
-        FIXTURES / "_poly.pyi",
-        FIXTURES / "poly_init.py",
+        POLY_STUBS / "_poly.pyi",
+        POLY_STUBS / "poly_init.py",
         POLY_PREFIX,
         (FIXTURE_INCLUDE,),
-        stub_roots=(FIXTURES,),
+        stub_roots=(POLY_STUBS,),
     )
 
 
@@ -197,14 +223,41 @@ def test_cpp_overload_accepted_by_table(poly_report):
     assert "Shelf.place" not in open_names(poly_report)
 
 
-def test_failed_absent_ok_falls_through_to_the_table(monkeypatch):
-    """G3/G4 contract: when `_absent_ok_accepts` says no, the overload tables still apply."""
-    monkeypatch.setattr(match_, "_absent_ok_accepts", lambda ov, sym, ps: False)
+def _yaml_node_place(monkeypatch):
+    """`audit_tu` with the 3-ary `Shelf.place` carrying a structural `absent_ok`, and the
+    overload table naming the same overload."""
+    real = match_.cpp_api
+
+    def cpp_api(*args, **kwargs):
+        cpp = real(*args, **kwargs)
+        cpp["Shelf.place"].overloads = [
+            dataclasses.replace(ov, absent_ok="yaml-node") if str(ov.arity) == "3" else ov
+            for ov in cpp["Shelf.place"].overloads
+        ]
+        return cpp
+
+    monkeypatch.setattr(match_, "cpp_api", cpp_api)
     monkeypatch.setitem(audit.ACCEPTED, FIXTURE_OVERLOAD_RULE, "x")
     monkeypatch.setitem(
         audit.ACCEPTED_CPP_OVERLOADS, ("poly", "Shelf.place", "3"), FIXTURE_OVERLOAD_RULE
     )
-    assert ("Shelf.place", FIXTURE_OVERLOAD_RULE) in accepted_pairs(audit_poly())
+
+
+def test_absent_ok_wins_over_the_table(monkeypatch):
+    """Control: a structural `absent_ok` accepts first, so the table entry does not fire."""
+    _yaml_node_place(monkeypatch)
+    pairs = accepted_pairs(audit_poly())
+    assert ("Shelf.place", "yaml-node") in pairs
+    assert ("Shelf.place", FIXTURE_OVERLOAD_RULE) not in pairs
+
+
+def test_failed_absent_ok_falls_through_to_the_table(monkeypatch):
+    """G3/G4 contract: when `_absent_ok_accepts` says no, the overload tables still apply."""
+    _yaml_node_place(monkeypatch)
+    monkeypatch.setattr(match_, "_absent_ok_accepts", lambda ov, sym, ps: False)
+    pairs = accepted_pairs(audit_poly())
+    assert ("Shelf.place", FIXTURE_OVERLOAD_RULE) in pairs
+    assert ("Shelf.place", "yaml-node") not in pairs
 
 
 def test_overload_table_entry_with_an_unknown_rule_raises(monkeypatch):
@@ -229,8 +282,14 @@ def test_every_rule_table_is_checked(monkeypatch, table, key):
 
 
 def test_template_instances_need_their_rule(monkeypatch):
-    """`TEMPLATE_INSTANCES` names `template-instance-name` implicitly: the rule must exist."""
-    monkeypatch.setitem(audit.TEMPLATE_INSTANCES, ("poly", "ThingPoly.as"), ("ThingPoly.asSquare",))
+    """`TEMPLATE_INSTANCES` names `template-instance-name` implicitly: the rule must exist.
+    The other tables are emptied, so only the instance entry can raise."""
+    monkeypatch.setattr(match_, "ACCEPTED_SYMBOLS", {})
+    monkeypatch.setattr(match_, "ACCEPTED_CPP_OVERLOADS", {})
+    monkeypatch.setattr(match_, "ACCEPTED_PY_OVERLOADS", {})
+    monkeypatch.setattr(
+        match_, "TEMPLATE_INSTANCES", {("poly", "ThingPoly.as"): ("ThingPoly.asSquare",)}
+    )
     monkeypatch.delitem(audit.ACCEPTED, "template-instance-name")
     with pytest.raises(audit.UnknownAcceptedRuleError, match="ThingPoly.as"):
         audit._check_rule_keys()
@@ -248,6 +307,26 @@ def test_py_overload_table_selects_by_annotations_not_arity(poly_report):
     assert ("Shelf.place", audit.Kind.OVERLOAD) not in {
         (d.name, d.kind) for d in poly_report.deviations
     }
+
+
+def test_py_overload_table_key_with_other_annotations_accepts_nothing(monkeypatch):
+    """`("int",)` has the arity of `place(name: str)` but not its annotations: no match."""
+    monkeypatch.setattr(
+        match_,
+        "ACCEPTED_PY_OVERLOADS",
+        {("poly", "Shelf.place", ("int",)): FIXTURE_OVERLOAD_RULE},
+    )
+    monkeypatch.setitem(audit.ACCEPTED, FIXTURE_OVERLOAD_RULE, "x")
+    report = audit_poly()
+    assert ("Shelf.place", audit.Kind.OVERLOAD) in {(d.name, d.kind) for d in report.deviations}
+
+
+def test_one_error_names_every_offending_entry(monkeypatch):
+    monkeypatch.setitem(audit.ACCEPTED_SYMBOLS, ("poly", "Box.setThing"), "no-such-rule")
+    monkeypatch.setitem(audit.ACCEPTED_CPP_OVERLOADS, ("poly", "Shelf.place", "3"), "other-rule")
+    with pytest.raises(audit.UnknownAcceptedRuleError) as err:
+        audit._check_rule_keys()
+    assert "no-such-rule" in str(err.value) and "other-rule" in str(err.value)
 
 
 def test_overload_table_keys_select_one_overload(monkeypatch):
@@ -415,3 +494,51 @@ def test_poly_alternatives_need_a_listed_poly(monkeypatch):
     monkeypatch.setattr(match_, "POLY_ALTERNATIVES", {})
     deviations = {(d.name, d.kind) for d in audit_poly().deviations}
     assert ("Box.put", audit.Kind.OVERLOAD) in deviations
+
+
+# The ACCEPTED texts of the group 1 rules, verbatim from the plan's rule tables.
+G1_RULE_TEXTS = {
+    "reference-wrapper-view": "An overload taking `std::vector<std::reference_wrapper<T>>` "
+    "views objects owned elsewhere; Python passes the owner to a bound sibling overload, which "
+    "builds the same view (`InstructionsTrajectory(program)`). Accepted only when a sibling "
+    "overload is covered.",
+    "profile-key-template": "`ProfileDictionary::getProfile<ProfileType>(ns, name, default)` "
+    "derives the profile key from its template argument; Python passes the key to the bound "
+    "`getProfile(key, ns, name)` (`profile.getKey()`, or `ProfileType.createKey()` once bound), "
+    "which returns the registered profile class, and checks `hasProfile` for the default.",
+    "free-function-as-method": "A free predicate whose only parameter is `const T&` is bound as "
+    "a method of `T` (`isWaitInstruction(const InstructionPoly&)` → "
+    "`InstructionPoly.isWaitInstruction()`), beside `T`'s member predicates of the same shape "
+    "(`isMoveInstruction`).",
+    "type-index": "`getType()` returns a `std::type_index`, which has no Python form; the bound "
+    "`is…()` predicates and `as…()` casts answer the same question by name.",
+    "type-erasure-interface": "The abstract `…Interface` of a type-erased `…Poly` is its C++ "
+    "extension point (pure virtuals, a protected `equals`, cereal registration); Python holds "
+    "the concrete classes and their Polys, and reaches the stored object through the bound casts "
+    "(`InstructionPoly.as…`, and the waypoint casts), not through the accessor that returns the "
+    "interface by reference.",
+    "algorithm-internal-namespace": "`time_parameterization::totg::{Path, PathSegment, PathData, "
+    "Trajectory}` are the implementation classes of the bound `TimeOptimalTrajectoryGeneration`; "
+    "Python reaches them through `compute`.",
+    "reference-setter": "C++ assigns through a getter that returns a non-const reference "
+    "(`getWaypoint() = wp`); Python cannot assign to a returned reference, so a `set…` method "
+    "assigns through it.",
+    "vector-forwarding-no-python-form": "A class that forwards the `std::vector` interface "
+    "leaves `data()` (raw pointer), `emplace`/`emplace_back` (perfect-forwarding templates), "
+    "`swap(std::vector&)` and the reverse iterators unbound: Python builds the element and passes "
+    "it to `push_back`/`insert`, and `reversed()` walks any sequence with `__len__` and "
+    "`__getitem__`.",
+    "clone-as-copy": "`__copy__`/`__deepcopy__` bind the C++ copy constructor and return the "
+    "concrete type; `clone()`, which returns the `unique_ptr<…Interface>` of the type erasure, "
+    "is then covered by `__deepcopy__`.",
+    "poly-alternative-overloads": "A parameter typed as a type-erased Poly (`InstructionPoly`, "
+    "`WaypointPoly`) is also bound once per alternative the Poly wraps "
+    "(`push_back(MoveInstructionPoly)`, `MoveInstruction(CartesianWaypointPoly, …)`), so the stub "
+    "names the types a caller passes; C++ converts each alternative through the Poly's "
+    "converting constructor.",
+}
+
+
+@pytest.mark.parametrize("rule", sorted(G1_RULE_TEXTS))
+def test_g1_rule_text_is_pinned(rule):
+    assert audit.ACCEPTED[rule] == G1_RULE_TEXTS[rule]
