@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import scipy.sparse
 
 from tesseract_robotics import trajopt_ifopt as ti
@@ -78,3 +79,16 @@ def test_forward_num_jac_of_a_linear_map():
     jacobian = ti.calcForwardNumJac(lambda x: a @ x, np.array([0.3, -0.2, 0.7]), EPSILON)
     assert scipy.sparse.issparse(jacobian)
     np.testing.assert_allclose(jacobian.toarray(), a, atol=FD_ATOL)
+
+
+def test_forward_num_jac_rejects_a_changing_output_length():
+    calls = 0
+
+    def ragged(x):
+        nonlocal calls
+        calls += 1
+        return np.ones(3) if calls == 1 else np.ones(1)
+
+    with pytest.raises(ti.NumericalJacobianSizeError, match="3"):
+        ti.calcForwardNumJac(ragged, np.zeros(2), EPSILON)
+    assert issubclass(ti.NumericalJacobianSizeError, ValueError)

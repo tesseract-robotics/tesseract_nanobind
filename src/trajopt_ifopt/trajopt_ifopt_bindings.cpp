@@ -133,6 +133,12 @@ struct NodeOwnershipError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
+// calcForwardNumJac sizes the Jacobian by len(f(x)) and subtracts every later f(x + h e_i) from
+// f(x) unchecked: an output of another length reads or writes out of range.
+struct NumericalJacobianSizeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 // A built-in constraint, plus the Vars it was built on, checked when it is linked to a variable
 // set: from linkWithVariables, and from TrajOptQPProblem.addConstraintSet / addCostSet, which link
 // in C++. The constraints keep their Vars private, so the binding keeps its own reference.
@@ -355,6 +361,8 @@ NB_MODULE(_trajopt_ifopt, m) {
                            "constraint built on a Var that is not in a NodesVariables.";
     nb::exception<NodeOwnershipError>(m, "NodeOwnershipError", PyExc_ValueError)
         .attr("__doc__") = "A Node handed to NodesVariables that is in a variable set already, or twice.";
+    nb::exception<NumericalJacobianSizeError>(m, "NumericalJacobianSizeError", PyExc_ValueError)
+        .attr("__doc__") = "calcForwardNumJac over a function whose output length changes between calls.";
 
     // ConstraintSet's trampoline is called from _trajopt_sqp (TrajOptQPProblem, the solver)
     register_python_error_translator();
@@ -638,10 +646,22 @@ NB_MODULE(_trajopt_ifopt, m) {
           "getValues(), and restores the variables afterwards.");
     m.def("calcForwardNumJac",
           [](const ti::ErrorCalculator& f, const Eigen::Ref<const Eigen::VectorXd>& x, double epsilon) {
-              return ti::calcForwardNumJac(f, x, epsilon);
+              std::optional<Eigen::Index> rows;  // len(f(x)), from the first call
+              const ti::ErrorCalculator checked = [&f, &rows](const Eigen::Ref<const Eigen::VectorXd>& at) {
+                  Eigen::VectorXd values = f(at);
+                  if (!rows)
+                      rows = values.size();
+                  else if (values.size() != *rows)
+                      throw NumericalJacobianSizeError(
+                          "calcForwardNumJac: f returned " + std::to_string(*rows) +
+                          " values at x and " + std::to_string(values.size()) + " at a perturbed x");
+                  return values;
+              };
+              return ti::calcForwardNumJac(checked, x, epsilon);
           },
           "f"_a, "x"_a, "epsilon"_a,
-          "Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x))");
+          "Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x)); raises "
+          "NumericalJacobianSizeError if f's output length changes");
 
     // ========== Trajectory conversion (trajopt_utils.h) ==========
     m.def("toTrajArray",

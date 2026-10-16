@@ -43,6 +43,11 @@ class NodeOwnershipError(ValueError):
     A Node handed to NodesVariables that is in a variable set already, or twice.
     """
 
+class NumericalJacobianSizeError(ValueError):
+    """
+    calcForwardNumJac over a function whose output length changes between calls.
+    """
+
 class BoundsType(enum.Enum):
     UNBOUNDED = 0
 
@@ -286,7 +291,7 @@ def calcNumericalConstraintGradient(variables: Variables, constraint_set: Constr
 
 def calcForwardNumJac(f: Callable[[Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]], Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]], x: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], epsilon: float) -> scipy.sparse.csr_matrix[float]:
     """
-    Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x))
+    Forward-difference Jacobian of f at x (sparse matrix, len(f(x)) x len(x)); raises NumericalJacobianSizeError if f's output length changes
     """
 
 def toTrajArray(joint_positions: Sequence[Var]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='C')]:
