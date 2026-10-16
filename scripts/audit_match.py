@@ -91,6 +91,7 @@ PROTOCOL_MEMBERS = {
     "end": "__iter__",
     "cbegin": "__iter__",
     "cend": "__iter__",
+    "clone": "__deepcopy__",  # clone-as-copy (R9)
 }
 # Python protocol dunders accepted by rule: dunder -> (ACCEPTED key, C++ members, keyed as in
 # `cpp_api`, the owner must declare). An owner with no C++ class (a bound std container
@@ -101,6 +102,9 @@ PROTOCOL_RULES = {
     "__iter__": ("iterator-pair", ("begin", "end")),
     "__repr__": ("presentation-dunder", ()),
     "__str__": ("presentation-dunder", ()),
+    # Bind the C++ copy constructor: no member to declare (R9).
+    "__copy__": ("clone-as-copy", ()),
+    "__deepcopy__": ("clone-as-copy", ()),
 }
 # Deviations accepted by rule; each is printed with its reason in the report.
 ACCEPTED = {
@@ -178,6 +182,14 @@ ACCEPTED = {
     "reference-setter": "C++ assigns through a getter that returns a non-const reference "
     "(`getWaypoint() = wp`); Python cannot assign to a returned reference, so a `set…` method "
     "assigns through it.",
+    "vector-forwarding-no-python-form": "A class that forwards the `std::vector` interface "
+    "leaves `data()` (raw pointer), `emplace`/`emplace_back` (perfect-forwarding templates), "
+    "`swap(std::vector&)` and the reverse iterators unbound: Python builds the element and passes "
+    "it to `push_back`/`insert`, and `reversed()` walks any sequence with `__len__` and "
+    "`__getitem__`.",
+    "clone-as-copy": "`__copy__`/`__deepcopy__` bind the C++ copy constructor and return the "
+    "concrete type; `clone()`, which returns the `unique_ptr<…Interface>` of the type erasure, "
+    "is then covered by `__deepcopy__`.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -231,6 +243,12 @@ POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {}
 # (`yaml-node` and `serialization-default-ctor` do not: they name one overload of a symbol
 # whose other overloads must be bound.)
 WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index"})
+# std::vector members with no Python form, on a class that forwards the vector interface (R11).
+VECTOR_FORWARDING_MEMBERS = frozenset(
+    {"data", "emplace", "emplace_back", "swap", "rbegin", "rend", "crbegin", "crend"}
+)
+# What makes a class a std::vector forwarder: it declares all of these.
+VECTOR_FORWARDER_MEMBERS = ("begin", "end", "size", "push_back")
 
 
 class UnknownAcceptedRuleError(LookupError):
@@ -569,6 +587,7 @@ def _unbound_rule(
     stub_roots: Sequence[Path],
 ) -> str | None:
     """The ACCEPTED rule for a C++ symbol Python does not bind, or None (a gap)."""
+    owner, _, leaf = name.rpartition(".")
     instances = TEMPLATE_INSTANCES.get((module, name))
     if instances and all(_py_member(i, py, stub_roots) for i in instances):
         return TEMPLATE_INSTANCE_RULE
@@ -576,6 +595,12 @@ def _unbound_rule(
         return rule
     if _bound_as_method(name, sym, py, stub_roots):
         return "free-function-as-method"
+    if (
+        owner
+        and leaf in VECTOR_FORWARDING_MEMBERS
+        and all(f"{owner}.{m}" in cpp for m in VECTOR_FORWARDER_MEMBERS)
+    ):
+        return "vector-forwarding-no-python-form"
     return None
 
 
