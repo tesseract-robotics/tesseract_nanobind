@@ -19,11 +19,13 @@ from tesseract_robotics.tesseract_command_language import (
 )
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
+    AngleAxisd,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
+    VectorIsometry3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
@@ -38,6 +40,11 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesWaypointSamplerD,
     cast_DescartesMoveProfileD,
     cast_DescartesPlanProfileD,
+    sampleFixed,
+    sampleToolAxis,
+    sampleToolXAxis,
+    sampleToolYAxis,
+    sampleToolZAxis,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 
@@ -379,3 +386,44 @@ class TestDescartesWaypointSamplerStr:
                 return "named"
 
         assert str(NamedSampler()) == "named"
+
+
+class TestDescartesToolPoseSamplers:
+    """`sampleFixed` and `sampleTool{,X,Y,Z}Axis` (gh-311)."""
+
+    POSE = (
+        Isometry3d.Identity() * Translation3d(0.8, -0.2, 0.8) * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+    )
+
+    def test_sample_fixed(self):
+        samples = sampleFixed(self.POSE)
+        assert type(samples) is VectorIsometry3d
+        assert len(samples) == 1
+        np.testing.assert_array_equal(samples[0].matrix, self.POSE.matrix)
+
+    def test_sample_tool_z_axis(self):
+        # upstream descartes_utils.cpp: angles minimum, minimum + resolution, ... while
+        # angle <= maximum, so -pi, -pi/2, 0, pi/2.
+        samples = sampleToolZAxis(
+            self.POSE, resolution=np.pi / 2, minimum=-np.pi, maximum=np.pi / 2
+        )
+        assert type(samples) is VectorIsometry3d
+        assert len(samples) == 4
+        z_axis = self.POSE.matrix[:3, 2]
+        for sample in samples:
+            np.testing.assert_allclose(sample.translation, self.POSE.translation)
+            np.testing.assert_allclose(sample.matrix[:3, 2], z_axis, atol=1e-12)
+        for sample, angle in ((samples[0], -np.pi), (samples[3], np.pi / 2)):
+            expected = self.POSE * AngleAxisd(angle, np.array([0.0, 0.0, 1.0]))
+            np.testing.assert_allclose(sample.matrix, expected.matrix, atol=1e-12)
+
+    @pytest.mark.parametrize(
+        ("sampler", "axis"),
+        [(sampleToolXAxis, (1.0, 0.0, 0.0)), (sampleToolYAxis, (0.0, 1.0, 0.0))],
+    )
+    def test_sample_tool_fixed_axes(self, sampler, axis):
+        expected = sampleToolAxis(self.POSE, np.array(axis), 0.5, -1.0, 1.0)
+        samples = sampler(self.POSE, 0.5, -1.0, 1.0)
+        assert len(samples) == len(expected) == 5
+        for sample, other in zip(samples, expected, strict=True):
+            np.testing.assert_allclose(sample.matrix, other.matrix)

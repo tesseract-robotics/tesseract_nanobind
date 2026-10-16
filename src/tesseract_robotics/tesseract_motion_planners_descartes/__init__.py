@@ -17,4 +17,9 @@ __all__ = [
     "cast_DescartesMoveProfileD",
     "cast_DescartesPlanProfileD",
     "cast_DescartesSolverProfileD",
+    "sampleFixed",
+    "sampleToolAxis",
+    "sampleToolXAxis",
+    "sampleToolYAxis",
+    "sampleToolZAxis",
 ]
