@@ -4,6 +4,7 @@
 
 ### Changes
 
+- **TrajOpt-Ifopt and Descartes planners are `MotionPlanner`s** — `TrajOptIfoptMotionPlanner` and `DescartesMotionPlannerD` derive from `tesseract_motion_planners.MotionPlanner`; `getName`/`solve`/`terminate`/`clear`/`clone` are the base's (its `solve` releases the GIL) ([#299]).
 - **The Descartes stub names `Environment`** — the binding imports `tesseract_environment`, so `DescartesMoveProfileD.create*` no longer quote `"tesseract::environment::Environment"` ([#300]).
 - **`DescartesStateSampleD(state)` and `str()` on Descartes waypoint samplers** — the one-argument constructor (cost 0) and `__str__` from upstream's `print` ([#310]).
 - **Descartes tool-pose samplers** — `sampleFixed`, `sampleToolAxis`, `sampleToolXAxis`, `sampleToolYAxis`, `sampleToolZAxis`, returning `tesseract_common.VectorIsometry3d` ([#311]).
@@ -552,6 +553,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [@johnwason]: https://github.com/johnwason
 [@marip8]: https://github.com/marip8
 [@seonixx]: https://github.com/seonixx
+[#299]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/299
 [#300]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/300
 [#310]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/310
 [#311]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/311
