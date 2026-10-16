@@ -50,6 +50,8 @@
 
 namespace tp = tesseract::motion_planners;
 namespace tc = tesseract::common;
+namespace tcl = tesseract::command_language;
+namespace te = tesseract::environment;
 namespace ti = trajopt_ifopt;
 
 namespace {
@@ -75,10 +77,90 @@ void def_term_list(nb::class_<tp::TrajOptIfoptTermInfos>& cls, const char* name)
             self.*Field = require_non_null(sets, "TrajOptIfoptTermInfos", name, "ConstraintSet");
         });
 }
+
+// A Python profile's create returned something other than the struct the planner takes. Its own
+// type, not nb::type_error: solve's dispatcher lives in another module, whose catch does not match
+// this module's nanobind exception types, so only a translator registered here maps it.
+struct ProfileReturnTypeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// A Python move profile's create returned a waypoint info without a node; the planner moves
+// every node into its NodesVariables, which dereferences it.
+struct WaypointInfoWithoutNodeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// A Python move profile's create returned a waypoint info something else still refers to (the
+// override kept it, or a Node taken from its `node`). The planner moves the node out of the
+// info and frees it with the problem, so that Node would dangle after solve.
+struct WaypointInfoInUseError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// Python subclasses of the move and composite profiles. The instruction and manipulator-info
+// arguments are const references into the planner's data and go to Python as copies; env and the
+// nodes are shared_ptrs and are passed as such. The ticket takes the GIL, which solve released.
+// A Python error propagates from solve: the planner does not catch it.
+class PyTrajOptIfoptMoveProfile : public tp::TrajOptIfoptMoveProfile {
+public:
+    NB_TRAMPOLINE(tp::TrajOptIfoptMoveProfile, 1);
+
+    tp::TrajOptIfoptWaypointInfo create(const tcl::MoveInstructionPoly& move_instruction,
+                                        const tc::ManipulatorInfo& composite_manip_info,
+                                        const std::shared_ptr<const te::Environment>& env,
+                                        int index) const override {
+        nb::detail::ticket t(nb_trampoline, "create", true);
+        nb::object result = nb_trampoline.base().attr(t.key)(
+            nb::cast(move_instruction, nb::rv_policy::copy), nb::cast(composite_manip_info, nb::rv_policy::copy),
+            env, index);
+        if (!nb::isinstance<tp::TrajOptIfoptWaypointInfo>(result))
+            throw ProfileReturnTypeError("TrajOptIfoptMoveProfile.create must return a TrajOptIfoptWaypointInfo");
+        auto& info = nb::cast<tp::TrajOptIfoptWaypointInfo&>(result);
+        if (!info.node)
+            throw WaypointInfoWithoutNodeError(
+                "TrajOptIfoptMoveProfile.create returned a TrajOptIfoptWaypointInfo without a node; return "
+                "the info a C++ move profile's create builds");
+        // `result` is the one reference the call returned; any other is a holder the planner's
+        // move would leave with a dangling node.
+        if (Py_REFCNT(result.ptr()) != 1)
+            throw WaypointInfoInUseError(
+                "TrajOptIfoptMoveProfile.create returned a TrajOptIfoptWaypointInfo that is still referenced "
+                "(kept by the profile, or through a Node from its `node`); the planner takes its node, so "
+                "return an info nothing else holds");
+        return std::move(info);
+    }
+};
+
+class PyTrajOptIfoptCompositeProfile : public tp::TrajOptIfoptCompositeProfile {
+public:
+    NB_TRAMPOLINE(tp::TrajOptIfoptCompositeProfile, 1);
+
+    tp::TrajOptIfoptTermInfos create(const tc::ManipulatorInfo& composite_manip_info,
+                                     const std::shared_ptr<const te::Environment>& env,
+                                     const std::vector<std::shared_ptr<const ti::Node>>& nodes,
+                                     const std::vector<int>& fixed_indices) const override {
+        nb::detail::ticket t(nb_trampoline, "create", true);
+        nb::object result = nb_trampoline.base().attr(t.key)(
+            nb::cast(composite_manip_info, nb::rv_policy::copy), env, nodes, fixed_indices);
+        if (!nb::isinstance<tp::TrajOptIfoptTermInfos>(result))
+            throw ProfileReturnTypeError("TrajOptIfoptCompositeProfile.create must return a TrajOptIfoptTermInfos");
+        // A copy: the sets are shared_ptrs, and a Python set's deleter takes the GIL to release it.
+        return nb::cast<tp::TrajOptIfoptTermInfos>(result);
+    }
+};
 }  // namespace
 
 NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt_ifopt Python bindings";
+    register_python_error_translator();  // move and composite profile trampolines
+
+    nb::exception<ProfileReturnTypeError>(m, "TrajOptIfoptProfileReturnTypeError", PyExc_TypeError)
+        .attr("__doc__") = "A Python TrajOpt-Ifopt profile's create returned the wrong type.";
+    nb::exception<WaypointInfoWithoutNodeError>(m, "TrajOptIfoptWaypointInfoWithoutNodeError", PyExc_ValueError)
+        .attr("__doc__") = "A Python TrajOptIfoptMoveProfile.create returned a waypoint info without a node.";
+    nb::exception<WaypointInfoInUseError>(m, "TrajOptIfoptWaypointInfoInUseError", PyExc_ValueError)
+        .attr("__doc__") = "A Python TrajOptIfoptMoveProfile.create returned a waypoint info still referenced elsewhere.";
 
     // Import Profile type from tesseract_command_language for cross-module inheritance
     auto cl_module = nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
@@ -149,7 +231,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
             "Whether the waypoint is fixed (no collision terms at this step)");
 
     // ========== TrajOptIfoptMoveProfile (base, was TrajOptIfoptPlanProfile) ==========
-    nb::class_<tp::TrajOptIfoptMoveProfile, tc::Profile>(m, "TrajOptIfoptMoveProfile")
+    // Python may subclass it and override create (PyTrajOptIfoptMoveProfile).
+    nb::class_<tp::TrajOptIfoptMoveProfile, tc::Profile, PyTrajOptIfoptMoveProfile>(m, "TrajOptIfoptMoveProfile")
+        .def(nb::init<>())
         .def("getKey", &tp::TrajOptIfoptMoveProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptMoveProfile>,
             "The key every TrajOpt-Ifopt move profile carries")
@@ -161,7 +245,10 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     m.attr("TrajOptIfoptPlanProfile") = m.attr("TrajOptIfoptMoveProfile");
 
     // ========== TrajOptIfoptCompositeProfile (base) ==========
-    nb::class_<tp::TrajOptIfoptCompositeProfile, tc::Profile>(m, "TrajOptIfoptCompositeProfile")
+    // Python may subclass it and override create (PyTrajOptIfoptCompositeProfile).
+    nb::class_<tp::TrajOptIfoptCompositeProfile, tc::Profile, PyTrajOptIfoptCompositeProfile>(
+        m, "TrajOptIfoptCompositeProfile")
+        .def(nb::init<>())
         .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptCompositeProfile>,
             "The key every TrajOpt-Ifopt composite profile carries")
@@ -177,6 +264,8 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
             "Build the trajectory-wide terms the planner adds over all waypoint nodes");
 
     // ========== TrajOptIfoptSolverProfile (base) ==========
+    // No trampoline: create returns a unique_ptr to the concrete TrustRegionSQPSolver, which a
+    // Python-allocated solver cannot become. Configure the solver through the fields (#340).
     // opt_params is the SQP loop itself (max_iterations, max_qp_solver_failures,
     // trust-region ratios, merit-coeff inflation) -- create() assigns it straight
     // onto the TrustRegionSQPSolver, so it is the only route to those knobs. The
