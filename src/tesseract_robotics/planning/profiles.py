@@ -5,7 +5,7 @@ These helpers create ProfileDictionary objects with planner profiles
 matching C++ example defaults (collision margins, cost coefficients, etc.).
 
 Also provides helpers for:
-- OMPL planner configurators (RRTConnect, RRTstar, SBL)
+- OMPL planner configurators (every OMPLPlannerType)
 - Time parameterization (TOTG, ISP)
 """
 
@@ -494,52 +494,47 @@ def create_ompl_default_profiles(
 def create_ompl_planner_configurators(
     planners: list[str] | None = None,
     num_planners: int | None = None,
-    **kwargs: float | bool,
+    **kwargs: float | int | bool,
 ) -> list:
     """Create OMPL planner configurators with custom parameters.
 
-    Supports multiple planner types with their specific parameters:
-    - RRTConnect: range (default: 0.0 = auto)
-    - RRTstar: range, goal_bias (0.05), delay_collision_checking (True)
-    - SBL: range (default: 0.0 = auto)
+    Every `OMPLPlannerType` name is accepted: SBL, EST, LBKPIECE1, BKPIECE1,
+    KPIECE1, BiTRRT, RRT, RRTConnect, RRTstar, TRRT, PRM, PRMstar,
+    LazyPRMstar, SPARS. Each maps to its `<name>Configurator` class.
 
     Args:
-        planners: List of planner names (default: ["RRTConnect"])
-            Supported: "RRTConnect", "RRTstar", "SBL"
-        num_planners: Number of instances per planner type (default: 1)
-            Use multiple instances for parallel planning
-        **kwargs: Planner-specific parameters:
-            range: Step size for tree extension (0.0 = auto)
-            goal_bias: Probability of sampling goal (RRTstar only)
-            delay_collision_checking: Delay collision checks (RRTstar only)
+        planners: Planner type names (default: ["RRTConnect"]).
+        num_planners: Number of instances per planner type (default: 1).
+            Use multiple instances for parallel planning.
+        **kwargs: Configurator fields, e.g. `range`, `goal_bias`,
+            `delay_collision_checking`, `max_nearest_neighbors`. Each is set on
+            every requested configurator that has the field.
 
     Returns:
-        List of configured OMPLPlannerConfigurator instances
+        List of configured OMPLPlannerConfigurator instances.
+
+    Raises:
+        ValueError: A planner name is not an `OMPLPlannerType`, or a keyword
+            argument is a field of none of the requested configurators.
 
     Example:
+        ```python
         # Single RRTConnect with default settings
         planners = create_ompl_planner_configurators()
 
         # Multiple parallel RRTConnect planners
-        planners = create_ompl_planner_configurators(
-            planners=["RRTConnect"],
-            num_planners=4
-        )
+        planners = create_ompl_planner_configurators(planners=["RRTConnect"], num_planners=4)
 
-        # Mix of planner types with custom parameters
+        # Mix of planner types; goal_bias applies to RRTstar only
         planners = create_ompl_planner_configurators(
             planners=["RRTConnect", "RRTstar"],
             num_planners=2,
             range=0.1,
             goal_bias=0.1,
-            delay_collision_checking=False
         )
+        ```
     """
-    from tesseract_robotics.tesseract_motion_planners_ompl import (
-        RRTConnectConfigurator,
-        RRTstarConfigurator,
-        SBLConfigurator,
-    )
+    from tesseract_robotics import tesseract_motion_planners_ompl as ompl
 
     if planners is None:
         planners = ["RRTConnect"]
@@ -547,36 +542,24 @@ def create_ompl_planner_configurators(
     if num_planners is None:
         num_planners = 1
 
+    planner_types = ompl.OMPLPlannerType.__members__
+    unknown = [name for name in planners if name not in planner_types]
+    if unknown:
+        raise ValueError(f"Unknown planner: {unknown}. Supported: {', '.join(planner_types)}")
+
+    classes = [getattr(ompl, f"{name}Configurator") for name in planners]
+    unused = [key for key in kwargs if not any(hasattr(cls, key) for cls in classes)]
+    if unused:
+        raise ValueError(f"{unused} is not a field of any of {planners}")
+
     configurators = []
-
-    for planner_name in planners:
+    for cls in classes:
         for _ in range(num_planners):
-            if planner_name == "RRTConnect":
-                cfg = RRTConnectConfigurator()
-                if "range" in kwargs:
-                    cfg.range = kwargs["range"]
-                configurators.append(cfg)
-
-            elif planner_name == "RRTstar":
-                cfg = RRTstarConfigurator()
-                if "range" in kwargs:
-                    cfg.range = kwargs["range"]
-                if "goal_bias" in kwargs:
-                    cfg.goal_bias = kwargs["goal_bias"]
-                if "delay_collision_checking" in kwargs:
-                    cfg.delay_collision_checking = kwargs["delay_collision_checking"]
-                configurators.append(cfg)
-
-            elif planner_name == "SBL":
-                cfg = SBLConfigurator()
-                if "range" in kwargs:
-                    cfg.range = kwargs["range"]
-                configurators.append(cfg)
-
-            else:
-                raise ValueError(
-                    f"Unknown planner: {planner_name}. Supported: RRTConnect, RRTstar, SBL"
-                )
+            cfg = cls()
+            for key, value in kwargs.items():
+                if hasattr(cls, key):
+                    setattr(cfg, key, value)
+            configurators.append(cfg)
 
     return configurators
 
