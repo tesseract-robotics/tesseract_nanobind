@@ -20,10 +20,10 @@ from tesseract_robotics.emitters.core.lowering import lower
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     SetToolInstruction,
     TimerInstruction,
@@ -33,8 +33,8 @@ from tesseract_robotics.tesseract_command_language import (
 
 
 def _cart_move(pose, move_type=MoveInstructionType.LINEAR, profile="P"):
-    wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
-    return MoveInstructionPoly_wrap_MoveInstruction(MoveInstruction(wp, move_type, profile))
+    wp = CartesianWaypointPoly(CartesianWaypoint(pose))
+    return MoveInstructionPoly(MoveInstruction(wp, move_type, profile))
 
 
 def _composite(*instructions):

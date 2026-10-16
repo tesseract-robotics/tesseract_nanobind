@@ -12,14 +12,12 @@ import pytest
 from tesseract_robotics.tesseract_collision import ACMOverrideType, ContactManagerConfig
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
@@ -194,14 +192,14 @@ class TestDescartesPlanning:
         )
 
         start_instruction = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+            CartesianWaypointPoly(wp1),
             MoveInstructionType.LINEAR,
             "TEST_PROFILE",
         )
         start_instruction.setManipulatorInfo(manip_info)
 
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+            CartesianWaypointPoly(wp2),
             MoveInstructionType.LINEAR,
             "TEST_PROFILE",
         )
@@ -209,8 +207,8 @@ class TestDescartesPlanning:
 
         program = CompositeInstruction()
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         # Interpolate the program (Descartes requires seed trajectory)
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
@@ -240,10 +238,10 @@ class TestDescartesPlanning:
         count = 0
         for instr in results:
             if instr.isMoveInstruction():
-                move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+                move_instr = instr.asMoveInstruction()
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
-                    state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+                    state_wp = wp.asStateWaypoint()
                     assert len(state_wp.getJointIds()) == 6  # ABB IRB2400 has 6 joints
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 6
@@ -310,14 +308,14 @@ class TestPythonEdgeEvaluator:
         )
 
         start_instruction = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+            CartesianWaypointPoly(wp1),
             MoveInstructionType.LINEAR,
             "PY_EDGE_PROFILE",
         )
         start_instruction.setManipulatorInfo(manip_info)
 
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+            CartesianWaypointPoly(wp2),
             MoveInstructionType.LINEAR,
             "PY_EDGE_PROFILE",
         )
@@ -325,8 +323,8 @@ class TestPythonEdgeEvaluator:
 
         program = CompositeInstruction()
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
@@ -354,12 +352,12 @@ class TestPythonEdgeEvaluator:
 def _cartesian_move(pose, manip_info, profile="TEST_PROFILE"):
     """A LINEAR MoveInstructionPoly to `pose` carrying `manip_info`."""
     instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose)),
+        CartesianWaypointPoly(CartesianWaypoint(pose)),
         MoveInstructionType.LINEAR,
         profile,
     )
     instruction.setManipulatorInfo(manip_info)
-    return MoveInstructionPoly_wrap_MoveInstruction(instruction)
+    return MoveInstructionPoly(instruction)
 
 
 def _fixed_pose_program(manip_info, profile="TEST_PROFILE"):
@@ -372,7 +370,7 @@ def _fixed_pose_program(manip_info, profile="TEST_PROFILE"):
             * Translation3d(0.8, y, 0.8)
             * Quaterniond.from_xyzw(0, -1.0, 0, 0)
         )
-        program.appendMoveInstruction(_cartesian_move(pose, manip_info, profile))
+        program.push_back(_cartesian_move(pose, manip_info, profile))
     return program
 
 

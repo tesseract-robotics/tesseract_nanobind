@@ -63,6 +63,17 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 - **`assign*Waypoint` and `ProfileDictionary_addProfile` removed** — `MoveInstruction` and `MoveInstructionPoly` lose `assignCartesianWaypoint`, `assignJointWaypoint` and `assignStateWaypoint`, SWIG-era copies of `setWaypoint` (C++ 0.33 removed them); `tesseract_command_language.ProfileDictionary_addProfile(d, ns, name, p)` is gone, since `d.addProfile(ns, name, p)` takes every module's profiles. Nothing in the repository called them ([#276]).
 
+- **SWIG-era Poly helpers and `appendMoveInstruction` removed** — the 14 module functions `CartesianWaypointPoly_wrap_CartesianWaypoint`, `JointWaypointPoly_wrap_JointWaypoint`, `StateWaypointPoly_wrap_StateWaypoint`, `MoveInstructionPoly_wrap_MoveInstruction`, `InstructionPoly_as_*` (7) and `WaypointPoly_as_*` (3), and `CompositeInstruction.appendMoveInstruction`, duplicated a constructor or method; C++ has none of them. Every in-repo caller moved to the native form. `wp.as…Waypoint()` returns a reference into the waypoint where `WaypointPoly_as_*` returned a copy: edits through it reach the program; `copy.copy(wp.as…Waypoint())` is the copy ([#328]).
+
+  | before | after |
+  | --- | --- |
+  | `CartesianWaypointPoly_wrap_CartesianWaypoint(wp)` (also `Joint…`, `State…`) | `CartesianWaypointPoly(wp)` |
+  | `MoveInstructionPoly_wrap_MoveInstruction(mi)` | `MoveInstructionPoly(mi)` |
+  | `InstructionPoly_as_MoveInstructionPoly(ip)` | `ip.asMoveInstruction()` |
+  | `InstructionPoly_as_CompositeInstruction(ip)` (also `Wait`, `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) | `ip.asCompositeInstruction()` (`asWaitInstruction()`, …) |
+  | `WaypointPoly_as_CartesianWaypointPoly(wp)` (also `Joint…`, `State…`) | `wp.asCartesianWaypoint()` (a reference) |
+  | `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
+
 ### Changes
 
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
@@ -789,3 +800,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
 [#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275
 [#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276
+[#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328

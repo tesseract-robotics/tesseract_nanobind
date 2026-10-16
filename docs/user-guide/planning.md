@@ -495,18 +495,18 @@ automatically. For reference, the equivalent low-level call would be:
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypoint, CartesianWaypointPoly,
     CompositeInstruction, MoveInstruction, MoveInstructionType,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
 )
 
 composite = CompositeInstruction("DEFAULT")
 for pose in waypoints:
-    wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
-    instr = MoveInstructionPoly_wrap_MoveInstruction(
+    wp = CartesianWaypointPoly(CartesianWaypoint(pose))
+    instr = MoveInstructionPoly(
         MoveInstruction(wp, MoveInstructionType.LINEAR, "DEFAULT")
     )
-    composite.appendMoveInstruction(instr)
+    composite.push_back(instr)
 ```
 
 The `MotionProgram` fluent API builds exactly the same structure with far less

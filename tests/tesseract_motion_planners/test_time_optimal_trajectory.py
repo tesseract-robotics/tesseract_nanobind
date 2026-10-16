@@ -8,10 +8,10 @@ import numpy as np
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
@@ -36,10 +36,10 @@ def create_straight_trajectory():
         p = np.zeros((6,), dtype=np.float64)
         p[0] = i * (max_ / num)
         swp = StateWaypoint(joint_names, p)
-        program.appendMoveInstruction(
-            MoveInstructionPoly_wrap_MoveInstruction(
+        program.push_back(
+            MoveInstructionPoly(
                 MoveInstruction(
-                    StateWaypointPoly_wrap_StateWaypoint(swp),
+                    StateWaypointPoly(swp),
                     MoveInstructionType.FREESPACE,
                 )
             )
@@ -48,10 +48,10 @@ def create_straight_trajectory():
     p = np.zeros((6,), dtype=np.float64)
     p[0] = max_
     swp = StateWaypoint(joint_names, p)
-    program.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
+    program.push_back(
+        MoveInstructionPoly(
             MoveInstruction(
-                StateWaypointPoly_wrap_StateWaypoint(swp),
+                StateWaypointPoly(swp),
                 MoveInstructionType.FREESPACE,
             )
         )

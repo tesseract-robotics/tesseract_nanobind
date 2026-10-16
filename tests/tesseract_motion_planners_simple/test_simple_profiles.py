@@ -15,16 +15,12 @@ from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     InstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
     MoveInstructionPoly,
-    MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType,
     ProfileDictionary,
     WaypointPoly,
-    WaypointPoly_as_CartesianWaypointPoly,
-    WaypointPoly_as_JointWaypointPoly,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -262,7 +258,7 @@ def test_interpolate_joints_is_linspace():
 
 
 def _joint_wp(values, names=("a", "b")):
-    return JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(list(names), values))
+    return JointWaypointPoly(JointWaypoint(list(names), values))
 
 
 def test_interpolate_waypoint_joints():
@@ -271,13 +267,11 @@ def test_interpolate_waypoint_joints():
     )
     assert len(waypoints) == STEPS + 1
     assert all(isinstance(w, WaypointPoly) and w.isJointWaypoint() for w in waypoints)
-    np.testing.assert_allclose(
-        WaypointPoly_as_JointWaypointPoly(waypoints[2]).getPosition(), [0.5, 1.0]
-    )
+    np.testing.assert_allclose(waypoints[2].asJointWaypoint().getPosition(), [0.5, 1.0])
 
 
 def _move(values, profile="RASTER"):
-    return MoveInstructionPoly_wrap_MoveInstruction(
+    return MoveInstructionPoly(
         MoveInstruction(_joint_wp(values), MoveInstructionType.FREESPACE, profile)
     )
 
@@ -291,11 +285,9 @@ def test_get_interpolated_instructions_joint_states():
     assert all(isinstance(mi, MoveInstructionPoly) for mi in instructions)
     assert all(mi.getProfile() == "RASTER" for mi in instructions)
     for mi, col in zip(instructions[:-1], states.T[1:-1]):
-        np.testing.assert_allclose(
-            WaypointPoly_as_JointWaypointPoly(mi.getWaypoint()).getPosition(), col
-        )
+        np.testing.assert_allclose(mi.getWaypoint().asJointWaypoint().getPosition(), col)
     np.testing.assert_allclose(
-        WaypointPoly_as_JointWaypointPoly(instructions[-1].getWaypoint()).getPosition(),
+        instructions[-1].getWaypoint().asJointWaypoint().getPosition(),
         [1.0, 2.0],
     )
 
@@ -309,7 +301,7 @@ def test_get_interpolated_instructions_poses():
     instructions = getInterpolatedInstructions(poses, ["a", "b"], states, base)
     assert len(instructions) == STEPS
     # A joint base instruction gets Cartesian children seeded with the joint states.
-    child = WaypointPoly_as_CartesianWaypointPoly(instructions[1].getWaypoint())
+    child = instructions[1].getWaypoint().asCartesianWaypoint()
     np.testing.assert_allclose(child.getTransform().translation, [0.5, 0.0, 0.0], atol=1e-12)
     np.testing.assert_allclose(child.getSeed().position, states[:, 2])
 
@@ -339,25 +331,25 @@ def irb2400_env():
 
 def _positions(instructions):
     return [
-        WaypointPoly_as_JointWaypointPoly(mi.getWaypoint()).getPosition()
+        mi.getWaypoint().asJointWaypoint().getPosition()
         if mi.getWaypoint().isJointWaypoint()
-        else WaypointPoly_as_StateWaypointPoly(mi.getWaypoint()).getPosition()
+        else mi.getWaypoint().asStateWaypoint().getPosition()
         for mi in instructions
     ]
 
 
 def test_generate_matches_planner_segment(irb2400_env):
     manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
-    start = MoveInstructionPoly_wrap_MoveInstruction(
+    start = MoveInstructionPoly(
         MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, IRB2400_START)),
+            JointWaypointPoly(JointWaypoint(IRB2400_JOINTS, IRB2400_START)),
             MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
     )
-    end = MoveInstructionPoly_wrap_MoveInstruction(
+    end = MoveInstructionPoly(
         MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, IRB2400_END)),
+            JointWaypointPoly(JointWaypoint(IRB2400_JOINTS, IRB2400_END)),
             MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
@@ -368,8 +360,8 @@ def test_generate_matches_planner_segment(irb2400_env):
 
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(start)
-    program.appendMoveInstruction(end)
+    program.push_back(start)
+    program.push_back(end)
     profiles = ProfileDictionary()
     profiles.addProfile(PLANNER_NAME, "DEFAULT", profile)
     request = PlannerRequest()

@@ -19,14 +19,12 @@ import numpy as np
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -105,12 +103,12 @@ def run():
 
     # Create move instructions
     start_instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+        CartesianWaypointPoly(wp1),
         MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     plan_f1 = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+        CartesianWaypointPoly(wp2),
         MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
@@ -118,8 +116,8 @@ def run():
     # Create program
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+    program.push_back(MoveInstructionPoly(start_instruction))
+    program.push_back(MoveInstructionPoly(plan_f1))
 
     # === OMPL Planning ===
     print("Running OMPL planner...")
@@ -217,9 +215,9 @@ def run():
     trajopt_results = trajopt_results_instruction.getInstructions()
     print(f"\nTrajectory has {len(trajopt_results)} waypoints:")
     for i, instr in enumerate(trajopt_results):
-        move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+        move_instr = instr.asMoveInstruction()
         wp_poly = move_instr.getWaypoint()
-        wp = WaypointPoly_as_StateWaypointPoly(wp_poly)
+        wp = wp_poly.asStateWaypoint()
         pos = wp.getPosition().flatten()
         time = wp.getTime()
         if i < 3 or i >= len(trajopt_results) - 2:
