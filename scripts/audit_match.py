@@ -179,6 +179,8 @@ ACCEPTED_SYMBOLS = {
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
 }
+# C++ overloads accepted by a named rule: (module, dotted name, `str(Arity)`) -> ACCEPTED key.
+ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {}
 
 
 @dataclass(frozen=True, order=True)
@@ -263,6 +265,11 @@ def _derived_element_sibling(
         ):
             return True
     return False
+
+
+def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
+    """The overload's structural `absent_ok` rule accepts leaving it unbound."""
+    return ov.absent_ok is not None
 
 
 def _covered(rule: str, fits: Mapping[PyOverload, bool]) -> Cover | None:
@@ -440,8 +447,12 @@ def match(
         ok = True
         for ov in sym.overloads:
             how = _cover(ov, ps.overloads, ancestors)
-            if how is None and ov.absent_ok:
+            if how is None and ov.absent_ok and _absent_ok_accepts(ov, sym, ps):
                 accepted.append(Accepted(name, ov.absent_ok, ov.location))
+            elif how is None and (
+                rule := ACCEPTED_CPP_OVERLOADS.get((module, name, str(ov.arity)))
+            ):
+                accepted.append(Accepted(name, rule, ov.location))
             elif how is None and _derived_element_sibling(ov, sym, ps.overloads, ancestors):
                 accepted.append(Accepted(name, "derived-element-container", ov.location))
             elif how is None:
