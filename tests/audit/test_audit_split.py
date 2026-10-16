@@ -110,7 +110,8 @@ MATCH = {
     "ACCEPTED_SYMBOLS", "Gap", "ModuleReport", "Cover", "_fits", "_upcasts_to",
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
-    "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
+    "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module", "BoundLookup",
+    "no_bound",
 }  # fmt: skip
 
 

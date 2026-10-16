@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -56,6 +56,14 @@ from audit_stub import (
     rel,
 )
 from audit_types import NO_ANCESTORS, Ancestors, TypeKey
+
+# Module → its `bound_classes` (Python class name → qualified C++ class).
+BoundLookup = Callable[[str], Mapping[str, str]]
+
+
+def no_bound(module: str) -> Mapping[str, str]:
+    """No binding evidence for any module (fixture stubs)."""
+    return {}
 
 
 class PrefixMismatchError(ValueError):
@@ -403,6 +411,7 @@ def match(
     stub_rel: str,
     stub_roots: Sequence[Path] = (SRC,),
     ancestors: Ancestors = NO_ANCESTORS,
+    bound: BoundLookup = no_bound,
 ) -> ModuleReport:
     """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`,
     C++ class ancestry (`audit_types.class_ancestors`) lets a subclass bind a base parameter."""
