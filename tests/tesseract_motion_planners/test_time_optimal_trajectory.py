@@ -9,7 +9,7 @@ from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionType,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
 )
@@ -40,7 +40,7 @@ def create_straight_trajectory():
             MoveInstructionPoly_wrap_MoveInstruction(
                 MoveInstruction(
                     StateWaypointPoly_wrap_StateWaypoint(swp),
-                    MoveInstructionType_FREESPACE,
+                    MoveInstructionType.FREESPACE,
                 )
             )
         )
@@ -52,7 +52,7 @@ def create_straight_trajectory():
         MoveInstructionPoly_wrap_MoveInstruction(
             MoveInstruction(
                 StateWaypointPoly_wrap_StateWaypoint(swp),
-                MoveInstructionType_FREESPACE,
+                MoveInstructionType.FREESPACE,
             )
         )
     )

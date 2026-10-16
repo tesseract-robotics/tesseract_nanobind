@@ -55,6 +55,12 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 - **`TaskComposerConfigError`** — a `str` config that does not load in `TaskComposerPluginFactory(str, locator)`, its `loadConfig` and `TaskComposerServer.loadConfig` raises `TaskComposerConfigError`, a `ValueError` subclass, instead of a bare `ValueError`; so does YAML text without a top-level `task_composer_plugins` mapping (empty, `~`, a list, an unrelated mapping), which upstream loaded silently as an empty config ([#337]).
 - **Task-composer value types compare by value** — `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` bind `==` and are unhashable ([#261]).
 
+- **SWIG-era `MoveInstructionType_*` constants removed** — `tesseract_command_language` exported `MoveInstructionType_LINEAR`, `MoveInstructionType_FREESPACE` and `MoveInstructionType_CIRCULAR`, copies of the enum members kept from the SWIG bindings; C++ has none of them. Importing one raises `ImportError`, reading one as a module attribute raises `AttributeError`; the enum members are the same objects. The package's hand-kept `__all__` is gone too, so `from tesseract_robotics.tesseract_command_language import *` exports every public name of the extension (`toJointTrajectory`, `moveFilter`, …), not a stale subset. The module joins the #176 no-alias guard ([#275]).
+
+  | before | after |
+  | --- | --- |
+  | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
+
 ### Changes
 
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
@@ -779,3 +785,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#336]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/336
 [#337]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/337
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
+[#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275

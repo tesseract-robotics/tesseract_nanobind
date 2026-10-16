@@ -30,8 +30,6 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionPoly_wrap_MoveInstruction,
     # Enums
     MoveInstructionType,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
     # Other
     ProfileDictionary,
     SetAnalogInstruction,
@@ -193,7 +191,7 @@ class TestMoveInstruction:
         transform = Isometry3d.Identity() * Translation3d(0.8, 0.3, 1.5)
         wp = CartesianWaypoint(transform)
         poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly, MoveInstructionType_FREESPACE, "DEFAULT")
+        mi = MoveInstruction(poly, MoveInstructionType.FREESPACE, "DEFAULT")
         assert mi is not None
         assert mi.getMoveType() == MoveInstructionType.FREESPACE
         assert mi.getProfile() == "DEFAULT"
@@ -204,7 +202,7 @@ class TestMoveInstruction:
         position = np.array([0.1, 0.2, 0.3])
         wp = JointWaypoint(names, position)
         poly = JointWaypointPoly_wrap_JointWaypoint(wp)
-        mi = MoveInstruction(poly, MoveInstructionType_LINEAR, "MY_PROFILE")
+        mi = MoveInstruction(poly, MoveInstructionType.LINEAR, "MY_PROFILE")
         assert mi.getMoveType() == MoveInstructionType.LINEAR
         assert mi.getProfile() == "MY_PROFILE"
 
@@ -213,7 +211,7 @@ class TestMoveInstruction:
         transform = Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5)
         wp = CartesianWaypoint(transform)
         poly_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly_wp, MoveInstructionType_FREESPACE, "DEFAULT")
+        mi = MoveInstruction(poly_wp, MoveInstructionType.FREESPACE, "DEFAULT")
         mi_poly = MoveInstructionPoly_wrap_MoveInstruction(mi)
         assert mi_poly is not None
         assert not mi_poly.isNull()
@@ -254,12 +252,12 @@ class TestCompositeInstruction:
 
         mi1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         mi2 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
@@ -278,7 +276,7 @@ class TestNestedCompositeInstruction:
         wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(x, 0.0, 1.0))
         mi = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         return MoveInstructionPoly_wrap_MoveInstruction(mi)
@@ -413,17 +411,17 @@ class TestABBExampleWorkflow:
         # Create instructions (as in example - 3-arg form with profile)
         start_instruction = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         plan_f1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         _plan_f2 = MoveInstruction(  # noqa: F841  # kept for test expansion
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp3),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
@@ -447,7 +445,7 @@ class TestMoveInstructionDescription:
         transform = Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5)
         wp = CartesianWaypoint(transform)
         poly_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly_wp, MoveInstructionType_FREESPACE, "DEFAULT")
+        mi = MoveInstruction(poly_wp, MoveInstructionType.FREESPACE, "DEFAULT")
 
         # Set description
         mi.setDescription("test_waypoint_1")
@@ -462,7 +460,7 @@ class TestMoveInstructionDescription:
         transform = Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5)
         wp = CartesianWaypoint(transform)
         poly_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly_wp, MoveInstructionType_FREESPACE, "DEFAULT")
+        mi = MoveInstruction(poly_wp, MoveInstructionType.FREESPACE, "DEFAULT")
         mi_poly = MoveInstructionPoly_wrap_MoveInstruction(mi)
 
         # MoveInstructionPoly also has setDescription
@@ -481,15 +479,6 @@ class TestNoTaskComposerReexport:
             "_HAS_TASK_COMPOSER",
         ):
             assert not hasattr(tesseract_command_language, name), name
-
-    def test_all_names_resolve(self):
-        """Every name in __all__ is an attribute of the package."""
-        missing = [
-            name
-            for name in tesseract_command_language.__all__
-            if not hasattr(tesseract_command_language, name)
-        ]
-        assert missing == []
 
     def test_import_does_not_load_task_composer(self):
         """Runs in a fresh interpreter: this process may already hold the task composer."""
@@ -516,7 +505,7 @@ class TestAnyPolyWrappers:
         wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5))
         mi = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
@@ -550,12 +539,12 @@ class TestAnyPolyWrappers:
         wp2 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.0, 1.0, 0.0))
         mi1 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         mi2 = MoveInstruction(
             CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_LINEAR,
+            MoveInstructionType.LINEAR,
             "DEFAULT",
         )
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi1))
@@ -643,7 +632,7 @@ class TestWaitInstruction:
             wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(x, 0.0, 0.5))
             mi = MoveInstruction(
                 CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-                MoveInstructionType_FREESPACE,
+                MoveInstructionType.FREESPACE,
                 "DEFAULT",
             )
             program.push_back(MoveInstructionPoly_wrap_MoveInstruction(mi))

@@ -158,12 +158,6 @@ class MoveInstructionType(enum.Enum):
 
     CIRCULAR = 2
 
-MoveInstructionType_LINEAR: MoveInstructionType = MoveInstructionType.LINEAR
-
-MoveInstructionType_FREESPACE: MoveInstructionType = MoveInstructionType.FREESPACE
-
-MoveInstructionType_CIRCULAR: MoveInstructionType = MoveInstructionType.CIRCULAR
-
 class CompositeInstructionOrder(enum.Enum):
     ORDERED = 0
 
