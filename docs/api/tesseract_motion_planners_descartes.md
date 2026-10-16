@@ -71,6 +71,31 @@ samples = sampler.sample()   # list[DescartesStateSampleD], one per IK solution
 
 `DescartesStateSampleD(state)` builds a sample with cost 0, as `DescartesStateSampleD(state, 0.0)`.
 
+## Tool-pose samplers
+
+The functions behind `DescartesDefaultMoveProfileD.target_pose_sample_*` turn one tool pose into
+candidate poses, returned as a `tesseract_common.VectorIsometry3d`:
+
+| Function | Samples |
+|---|---|
+| `sampleFixed(tool_pose)` | the pose itself |
+| `sampleToolAxis(tool_pose, axis, resolution, minimum, maximum)` | rotations of the pose about `axis` |
+| `sampleToolXAxis` / `sampleToolYAxis` / `sampleToolZAxis(tool_pose, resolution, minimum, maximum)` | rotations about the tool's X / Y / Z axis |
+
+The angles run from `minimum` in steps of `resolution` while they do not exceed `maximum`
+(equal within tolerance counts), so both ends are included when the range is a whole number of
+steps:
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_motion_planners_descartes import sampleToolZAxis
+
+poses = sampleToolZAxis(tool_pose, resolution=np.pi / 2, minimum=-np.pi, maximum=np.pi / 2)
+len(poses)  # 4: -pi, -pi/2, 0, pi/2
+```
+
+They are useful without the planner, for example to seed IK over a tool axis the process is
+indifferent to.
 
 ## How It Works
 

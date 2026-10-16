@@ -24,6 +24,7 @@
 #include <tesseract/motion_planners/descartes/profile/descartes_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_default_move_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_ladder_graph_solver_profile.h>
+#include <tesseract/motion_planners/descartes/descartes_utils.h>
 
 // descartes_light core types (needed for Python-side subclassing)
 #include <descartes_light/types.h>
@@ -43,6 +44,10 @@ namespace tp = tesseract::motion_planners;
 namespace tcl = tesseract::command_language;
 namespace tc = tesseract::common;
 namespace dl = descartes_light;
+
+// tesseract_common binds VectorIsometry3d as an opaque class; without this the stl/vector caster
+// would return the tool-pose samples as a plain list.
+NB_MAKE_OPAQUE(tc::VectorIsometry3d)
 
 // ------------------------------------------------------------------
 // Trampolines so Python can subclass the descartes_light interfaces.
@@ -193,6 +198,10 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     // Import MotionPlanner base type for clone() return type
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
 
+    // VectorIsometry3d (tool-pose samplers) and Environment (profile hooks)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
+
     // ========== descartes_light::State<double> ==========
     // Python-readable view of a Descartes state. Constructable from a numpy
     // vector so Python-side StateEvaluator/WaypointSampler subclasses can
@@ -302,6 +311,20 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         return std::static_pointer_cast<tc::Profile>(profile);
     }, "profile"_a,
     "Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)");
+
+    // ========== Tool-pose samplers (descartes_utils.h) ==========
+    // What DescartesDefaultMoveProfileD's target_pose_sample_* fields drive.
+    m.def("sampleToolAxis", &tp::sampleToolAxis,
+          "tool_pose"_a, "axis"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the provided axis.");
+    m.def("sampleToolXAxis", &tp::sampleToolXAxis, "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the x axis.");
+    m.def("sampleToolYAxis", &tp::sampleToolYAxis, "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the y axis.");
+    m.def("sampleToolZAxis", &tp::sampleToolZAxis, "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the z axis.");
+    m.def("sampleFixed", &tp::sampleFixed, "tool_pose"_a,
+          "This will return the tool pose as the only sample.");
 
     // ========== DescartesMotionPlanner<double> ==========
     nb::class_<tp::DescartesMotionPlanner<double>>(m, "DescartesMotionPlannerD")
