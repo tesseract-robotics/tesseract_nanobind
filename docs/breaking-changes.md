@@ -11,7 +11,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `TaskComposerPluginFactory(str, locator)` and `TaskComposerServer.loadConfig(str, locator)` read the `str` as YAML text | [A `pathlib.Path`](#taskcomposerpluginfactory-a-str-is-yaml-text) |
 | Unreleased | `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo` and the container overloads of `getDotgraph` / `saveDotgraph` removed | [The C++ names](#task-composer-compatibility-helpers-removed) |
 | Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
-| Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -65,7 +65,7 @@ under its own name (#313, #314, #336, #338):
 
 As for the collision, common and environment types in 0.35.0.9: `AnyPoly`, `TaskComposerKeys`,
 `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`,
-`TaskComposerContext` and `TaskComposerNodePorts` bind C++ `operator==`, so
+`TaskComposerContext`, `TaskComposerNodePorts` and `TaskComposerLog` bind C++ `operator==`, so
 `==` compares content, and `hash()`, `set` members and `dict` keys raise `TypeError` (#261).
 Two `AnyPoly` holding separately built instructions are unequal: an instruction's uuid takes
 part in its equality.

@@ -40,4 +40,11 @@ __all__ = [
     "scene_state_from_file",
     "scene_state_to_binary",
     "scene_state_from_binary",
+    # TaskComposerLog - a run recorded for replay
+    "task_composer_log_to_xml",
+    "task_composer_log_from_xml",
+    "task_composer_log_to_file",
+    "task_composer_log_from_file",
+    "task_composer_log_to_binary",
+    "task_composer_log_from_binary",
 ]

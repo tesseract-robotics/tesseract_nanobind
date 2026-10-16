@@ -224,6 +224,32 @@ future = server.run("TrajOptPipeline", data, False, "TaskflowExecutor")
 future.wait()
 ```
 
+### TaskComposerLog
+
+Upstream's record of a run for replay: the input data, the finished context and the dot graph.
+`tesseract_serialization` saves and loads it:
+
+```python
+from tesseract_robotics.tesseract_serialization import (
+    task_composer_log_from_file, task_composer_log_to_file,
+)
+from tesseract_robotics.tesseract_task_composer import TaskComposerLog
+
+log = TaskComposerLog("failing plan")
+log.initial_data = data            # a copy, taken before the run
+future = executor.run(task, data)
+future.wait()
+log.context = future.context
+log.dotgraph = task.getDotgraph(future.context.task_infos.getInfoMap())
+task_composer_log_to_file(log, "failing_plan.tclx")
+replay = task_composer_log_from_file("failing_plan.tclx")
+```
+
+The archive holds only types registered with `tesseract_serialization`'s cereal registry: a data
+storage holding planner profiles (`TrajOptDefaultMoveProfile`, …) raises `RuntimeError`
+("unregistered polymorphic type"). A loaded log is not `==` to the original: `AnyPoly` compares
+`shared_ptr` payloads (environment, profiles, nested data storages) by pointer.
+
 ### DOT Graph Export
 
 Every `TaskComposerNode` (pipelines included) exports its task graph as Graphviz DOT, mirroring the C++ `dump()`:
