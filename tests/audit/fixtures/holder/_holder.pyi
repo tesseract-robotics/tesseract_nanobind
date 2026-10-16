@@ -1,2 +1,2 @@
-class Holder:
+class AnyHolder:
     def __init__(self) -> None: ...
