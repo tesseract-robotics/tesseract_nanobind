@@ -16,8 +16,8 @@ from tesseract_robotics.tesseract_command_language import (
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
     InstructionsTrajectory,
-    ISPCompositeProfile,
     IterativeSplineParameterization,
+    IterativeSplineParameterizationCompositeProfile,
 )
 
 
@@ -68,8 +68,8 @@ def test_isp_constructor():
 
 
 def test_isp_profile():
-    """Test ISPCompositeProfile settings."""
-    profile = ISPCompositeProfile()
+    """Test IterativeSplineParameterizationCompositeProfile settings."""
+    profile = IterativeSplineParameterizationCompositeProfile()
     assert profile.add_points is True
 
     profile.add_points = False

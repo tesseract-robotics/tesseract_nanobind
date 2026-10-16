@@ -49,7 +49,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
 )
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
@@ -159,7 +159,7 @@ def run():
     time_parameterization = TimeOptimalTrajectoryGeneration()
 
     # Create profile with velocity/acceleration scaling
-    totg_profile = TOTGCompositeProfile()
+    totg_profile = TimeOptimalTrajectoryGenerationCompositeProfile()
     totg_profile.max_velocity_scaling_factor = 1.0
     totg_profile.max_acceleration_scaling_factor = 1.0
 
