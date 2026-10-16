@@ -310,6 +310,34 @@ problem.addCostSet(
 
 An empty `vars` raises `ValueError`, a `None` in it `TypeError`.
 
+### Progress callbacks through the planner
+
+A Python `SQPCallback` set in `TrajOptIfoptSolverProfile.callbacks` is registered on the solver
+the planner builds. `execute` runs once per SQP iteration, with the GIL taken for the call:
+
+```python
+from tesseract_robotics.trajopt_sqp import SQPCallback
+
+
+class Progress(SQPCallback):
+    def execute(self, problem, sqp_results):
+        print(sqp_results.overall_iteration, sqp_results.best_exact_merit)
+        return True
+
+
+solver_profile = TrajOptIfoptOSQPSolverProfile()
+solver_profile.callbacks = [Progress()]  # assign the whole list; it is copied
+```
+
+!!! warning "Returning `False` does not stop the solve on trajopt 0.35.0"
+    The callback's `False` reaches the solver, which drops it. In trajopt 0.35.0's
+    `trust_region_sqp_solver.cpp`, `runTrustRegionLoop` returns on `kStoppedByCallback`, but
+    `stepSQPSolver` does not check that status, so `solve` keeps stepping until
+    `opt_params.max_iterations`, and `verifySQPSolverConvergence` can then set `kConverged`.
+    Through `TrajOptIfoptMotionPlanner`, a callback that always returns `False` is called once
+    per iteration up to `max_iterations` and the response can still be successful. To bound a
+    solve, set `opt_params.max_iterations` or `opt_params.max_time`.
+
 ## Python Subclassing
 
 You can subclass `ConstraintSet` from Python to define custom constraints — the

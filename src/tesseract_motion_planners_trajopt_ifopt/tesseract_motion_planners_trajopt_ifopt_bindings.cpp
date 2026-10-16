@@ -184,6 +184,16 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // 50, max_qp_solver_failures 3).
     nb::class_<tp::TrajOptIfoptSolverProfile, tc::Profile>(m, "TrajOptIfoptSolverProfile")
         .def_rw("opt_params", &tp::TrajOptIfoptSolverProfile::opt_params)
+        // Copied on access: assign the whole list. Each callback is registered on the solver
+        // create() builds; the planner's solve() calls them with the GIL taken per call.
+        .def_prop_rw("callbacks",
+            [](const tp::TrajOptIfoptSolverProfile& self) { return self.callbacks; },
+            [](tp::TrajOptIfoptSolverProfile& self,
+               const std::vector<std::shared_ptr<trajopt_sqp::SQPCallback>>& callbacks) {
+                self.callbacks = require_non_null(callbacks, "TrajOptIfoptSolverProfile", "callbacks", "SQPCallback");
+            },
+            "SQP callbacks registered on the solver, called once per SQP iteration")
+        .def("createOptimizationCallbacks", &tp::TrajOptIfoptSolverProfile::createOptimizationCallbacks)
         .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey)
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptIfoptSolverProfile>,
             "The key every TrajOpt-Ifopt solver profile carries")
