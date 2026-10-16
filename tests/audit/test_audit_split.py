@@ -117,6 +117,8 @@ MATCH = {
     # 0b Task 6 (class identity)
     "BoundLookup", "NO_ALIAS", "no_bound", "_bound_classes_of", "bound_index", "_same_class",
     "_renamed",
+    # 0b Task 8 (stub bases)
+    "_stub_base", "_base_rows",
 }  # fmt: skip
 
 
