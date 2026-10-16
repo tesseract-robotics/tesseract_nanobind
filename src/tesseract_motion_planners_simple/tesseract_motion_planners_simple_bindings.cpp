@@ -34,6 +34,11 @@ NB_MAKE_OPAQUE(tesseract::common::VectorIsometry3d)
 // tesseract_environment
 #include <tesseract/environment/environment.h>
 
+// types the instruction-info helpers hold and take
+#include <tesseract/kinematics/joint_group.h>
+#include <tesseract/kinematics/kinematic_group.h>
+#include <tesseract/scene_graph/scene_state.h>
+
 // tesseract_command_language
 #include <tesseract/command_language/composite_instruction.h>
 #include <tesseract/command_language/poly/instruction_poly.h>
@@ -44,9 +49,129 @@ namespace tp = tesseract::motion_planners;
 namespace tcl = tesseract::command_language;
 namespace te = tesseract::environment;
 namespace tc = tesseract::common;
+namespace tk = tesseract::kinematics;
+
+namespace {
+
+// SimpleMotionPlanner::solve catches the std::exception a profile's generate throws and returns
+// a failed response carrying only its text (simple_motion_planner.cpp:101-112, tesseract_planning
+// 0.35.0). The Python-facing solve arms this thread's slot, the trampoline stores the Python
+// error there before upstream's catch sees it, and solve raises it once upstream returns. A solve
+// not started from Python (a task-composer worker) leaves the slot unarmed and keeps upstream's
+// failed response; nothing is stored on such a thread.
+struct PendingGenerateError {
+    bool armed{ false };
+    std::unique_ptr<nb::python_error> error;
+};
+thread_local PendingGenerateError pending_generate_error;
+
+// Arms the slot for one solve; restores the enclosing state, so a solve nested in a generate
+// override keeps its own error.
+class ArmedSolve {
+public:
+    ArmedSolve() : saved_armed_(pending_generate_error.armed), saved_error_(std::move(pending_generate_error.error)) {
+        pending_generate_error.armed = true;
+        pending_generate_error.error.reset();
+    }
+    ~ArmedSolve() {
+        pending_generate_error.armed = saved_armed_;
+        pending_generate_error.error = std::move(saved_error_);
+    }
+    ArmedSolve(const ArmedSolve&) = delete;
+    ArmedSolve& operator=(const ArmedSolve&) = delete;
+
+    // The first error a generate override raised during this solve, or null.
+    std::unique_ptr<nb::python_error> take() { return std::move(pending_generate_error.error); }
+
+private:
+    bool saved_armed_;
+    std::unique_ptr<nb::python_error> saved_error_;
+};
+
+// Python subclasses of SimplePlannerMoveProfile. generate's instruction and manipulator-info
+// arguments are const references into the planner's working data; they go to Python as copies,
+// so an override that stores one holds no dangling reference. env is a shared_ptr and is passed
+// as one. The ticket takes the GIL, which solve released.
+class PySimplePlannerMoveProfile : public tp::SimplePlannerMoveProfile {
+public:
+    NB_TRAMPOLINE(tp::SimplePlannerMoveProfile, 1);
+
+    std::vector<tcl::MoveInstructionPoly> generate(const tcl::MoveInstructionPoly& prev_instruction,
+                                                   const tcl::MoveInstructionPoly& prev_seed,
+                                                   const tcl::MoveInstructionPoly& base_instruction,
+                                                   const tcl::InstructionPoly& next_instruction,
+                                                   const std::shared_ptr<const te::Environment>& env,
+                                                   const tc::ManipulatorInfo& global_manip_info) const override {
+        nb::detail::ticket t(nb_trampoline, "generate", true);
+        try {
+            return nb::cast<std::vector<tcl::MoveInstructionPoly>>(nb_trampoline.base().attr(t.key)(
+                nb::cast(prev_instruction, nb::rv_policy::copy), nb::cast(prev_seed, nb::rv_policy::copy),
+                nb::cast(base_instruction, nb::rv_policy::copy), nb::cast(next_instruction, nb::rv_policy::copy),
+                env, nb::cast(global_manip_info, nb::rv_policy::copy)));
+        } catch (nb::python_error& e) {
+            if (pending_generate_error.armed && !pending_generate_error.error)
+                pending_generate_error.error = std::make_unique<nb::python_error>(e);
+            throw;
+        }
+    }
+};
+
+// The members both instruction-info structs share. `instruction` is a reference the struct
+// holds, so the getter keeps the struct (and through the constructor's keep_alive, the
+// instruction) alive; `manip` came from the environment's kinematics plugins, so it keeps the
+// struct (and so the environment) alive.
+template <typename Info, typename Group>
+void bind_instruction_info(nb::class_<Info>& cls) {
+    cls.def(nb::init<const tcl::MoveInstructionPoly&, const te::Environment&, const tc::ManipulatorInfo&>(),
+            nb::arg("plan_instruction").noconvert(), "env"_a, "manip_info"_a,
+            nb::keep_alive<1, 2>(), nb::keep_alive<1, 3>())
+        .def_prop_ro("instruction", [](const Info& self) -> const tcl::MoveInstructionPoly& { return self.instruction; },
+            nb::rv_policy::reference_internal, "The move instruction this info describes (not a copy)")
+        .def_prop_ro("manip", [](const Info& self) -> std::shared_ptr<const Group> { return self.manip; },
+            nb::for_getter(nb::keep_alive<0, 1>()))
+        .def_rw("working_frame", &Info::working_frame)
+        .def_rw("working_frame_transform", &Info::working_frame_transform)
+        .def_rw("tcp_frame", &Info::tcp_frame)
+        .def_rw("tcp_offset", &Info::tcp_offset)
+        .def_rw("has_cartesian_waypoint", &Info::has_cartesian_waypoint)
+        .def("calcCartesianPose", &Info::calcCartesianPose, "jp"_a, "in_world"_a = true,
+             "The tool pose at joint state `jp`, in world or in the working frame.")
+        .def("extractCartesianPose", &Info::extractCartesianPose, "in_world"_a = true,
+             "The Cartesian waypoint's pose, in world or in the working frame.")
+        .def("extractJointPosition", &Info::extractJointPosition,
+             "The joint or state waypoint's position.");
+}
+
+// The longest-valid-segment interpolators, which exist for both instruction-info types.
+template <typename Info>
+void def_lvs_interpolators(nb::module_& m) {
+    m.def("interpolateJointJointWaypoint",
+          nb::overload_cast<const Info&, const Info&, double, double, double, int, int>(
+              &tp::interpolateJointJointWaypoint),
+          "prev"_a, "base"_a, "state_lvs_length"_a, "translation_lvs_length"_a, "rotation_lvs_length"_a,
+          "min_steps"_a, "max_steps"_a);
+    m.def("interpolateJointCartWaypoint",
+          nb::overload_cast<const Info&, const Info&, double, double, double, int, int>(
+              &tp::interpolateJointCartWaypoint),
+          "prev"_a, "base"_a, "state_lvs_length"_a, "translation_lvs_length"_a, "rotation_lvs_length"_a,
+          "min_steps"_a, "max_steps"_a);
+    m.def("interpolateCartJointWaypoint",
+          nb::overload_cast<const Info&, const Info&, double, double, double, int, int>(
+              &tp::interpolateCartJointWaypoint),
+          "prev"_a, "base"_a, "state_lvs_length"_a, "translation_lvs_length"_a, "rotation_lvs_length"_a,
+          "min_steps"_a, "max_steps"_a);
+    m.def("interpolateCartCartWaypoint",
+          nb::overload_cast<const Info&, const Info&, double, double, double, int, int,
+                            const tesseract::scene_graph::SceneState&>(&tp::interpolateCartCartWaypoint),
+          "prev"_a, "base"_a, "state_lvs_length"_a, "translation_lvs_length"_a, "rotation_lvs_length"_a,
+          "min_steps"_a, "max_steps"_a, "scene_state"_a);
+}
+
+}  // namespace
 
 NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.doc() = "tesseract_motion_planners_simple Python bindings";
+    register_python_error_translator();  // SimplePlannerMoveProfile trampoline
 
     // Modules defining the types this one names, imported first so the stubs resolve them.
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
@@ -55,11 +180,30 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
     // Profile base and the instruction types (Profile is re-exported from tesseract_common)
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
+    // KinematicGroup/JointGroup (instruction info) and SceneState (Cartesian interpolation)
+    nb::module_::import_("tesseract_robotics.tesseract_kinematics._tesseract_kinematics");
+    nb::module_::import_("tesseract_robotics.tesseract_state_solver._tesseract_state_solver");
 
     // ========== SimpleMotionPlanner ==========
-    // getName/solve/terminate/clear/clone come from MotionPlanner (virtual dispatch).
+    // getName/terminate/clear/clone come from MotionPlanner (virtual dispatch). solve is
+    // MotionPlanner's plus one thing: an error a Python generate override raised is raised from
+    // it, where upstream would return a failed response (see PendingGenerateError).
     nb::class_<tp::SimpleMotionPlanner, tp::MotionPlanner>(m, "SimpleMotionPlanner")
-        .def(nb::init<std::string>(), "name"_a = "SIMPLE");
+        .def(nb::init<std::string>(), "name"_a = "SIMPLE")
+        .def("solve",
+            [](const tp::SimpleMotionPlanner& self, const tp::PlannerRequest& request) {
+                ArmedSolve armed;
+                tp::PlannerResponse response;
+                {
+                    nb::gil_scoped_release release;
+                    response = self.solve(request);
+                }
+                if (std::unique_ptr<nb::python_error> error = armed.take())
+                    throw nb::python_error(std::move(*error));
+                return response;
+            },
+            "request"_a,
+            "Plan `request`. An exception a Python profile's generate raises propagates from here.");
 
     // ========== generateInterpolatedProgram ==========
     m.def("generateInterpolatedProgram",
@@ -104,8 +248,59 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
           "Cartesian move instructions for the columns of `states` after the first, seeded with "
           "those states; the last is `base_instruction` itself.");
 
+    // ========== Instruction info (interpolation.h) ==========
+    // What the C++ move profiles build from an instruction before interpolating. Move-only; each
+    // holds a reference to its instruction (keep_alive<1, 2>, and noconvert so the reference is
+    // to the caller's object, never a converted temporary) and a group from the environment's
+    // kinematics plugins (keep_alive<1, 3>, as Environment.getKinematicGroup).
+    nb::class_<tp::JointGroupInstructionInfo> joint_info(m, "JointGroupInstructionInfo",
+        "A move instruction resolved against a joint group (no inverse kinematics)");
+    // JointGroupInstructionInfo::getWorkingFrame is declared upstream but never defined
+    // (tesseract_planning 0.35.0), so it stays unbound; working_frame_transform holds the pose.
+    bind_instruction_info<tp::JointGroupInstructionInfo, tk::JointGroup>(joint_info);
+    nb::class_<tp::KinematicGroupInstructionInfo> kin_info(m, "KinematicGroupInstructionInfo",
+        "A move instruction resolved against a kinematic group (with inverse kinematics)");
+    bind_instruction_info<tp::KinematicGroupInstructionInfo, tk::KinematicGroup>(kin_info);
+
+    // ========== Waypoint interpolation (interpolation.h) ==========
+    // Each returns the move instructions from `prev` to `base`, ending with `base`. The
+    // fixed-size forms take step counts; the LVS forms longest-valid-segment lengths (rad, m, rad)
+    // and step bounds. Cart-Cart takes the scene state the joint seeds come from.
+    using KinInfo = tp::KinematicGroupInstructionInfo;
+    using JointInfo = tp::JointGroupInstructionInfo;
+    m.def("interpolateJointJointWaypoint",
+          nb::overload_cast<const KinInfo&, const KinInfo&, int, int>(&tp::interpolateJointJointWaypoint),
+          "prev"_a, "base"_a, "linear_steps"_a, "freespace_steps"_a);
+    m.def("interpolateJointCartWaypoint",
+          nb::overload_cast<const KinInfo&, const KinInfo&, int, int>(&tp::interpolateJointCartWaypoint),
+          "prev"_a, "base"_a, "linear_steps"_a, "freespace_steps"_a);
+    m.def("interpolateCartJointWaypoint",
+          nb::overload_cast<const KinInfo&, const KinInfo&, int, int>(&tp::interpolateCartJointWaypoint),
+          "prev"_a, "base"_a, "linear_steps"_a, "freespace_steps"_a);
+    m.def("interpolateCartCartWaypoint",
+          nb::overload_cast<const KinInfo&, const KinInfo&, int, int, const tesseract::scene_graph::SceneState&>(
+              &tp::interpolateCartCartWaypoint),
+          "prev"_a, "base"_a, "linear_steps"_a, "freespace_steps"_a, "scene_state"_a);
+    def_lvs_interpolators<KinInfo>(m);
+    def_lvs_interpolators<JointInfo>(m);
+
+    m.def("getClosestJointSolution",
+          nb::overload_cast<const KinInfo&, const Eigen::VectorXd&>(&tp::getClosestJointSolution),
+          "info"_a, "seed"_a,
+          "The inverse-kinematics solution for `info`'s Cartesian waypoint closest to `seed`.");
+    m.def("getClosestJointSolution",
+          [](const KinInfo& info1, const KinInfo& info2, const Eigen::VectorXd& seed) {
+              std::array<Eigen::VectorXd, 2> solutions = tp::getClosestJointSolution(info1, info2, seed);
+              return std::make_pair(std::move(solutions[0]), std::move(solutions[1]));
+          },
+          "info1"_a, "info2"_a, "seed"_a,
+          "The pair of inverse-kinematics solutions, one per Cartesian waypoint, closest to each "
+          "other, as `(solution1, solution2)`.");
+
     // ========== SimplePlannerMoveProfile (abstract base) ==========
-    nb::class_<tp::SimplePlannerMoveProfile, tc::Profile>(m, "SimplePlannerMoveProfile")
+    // Python may subclass it and override generate (PySimplePlannerMoveProfile).
+    nb::class_<tp::SimplePlannerMoveProfile, tc::Profile, PySimplePlannerMoveProfile>(m, "SimplePlannerMoveProfile")
+        .def(nb::init<>())
         .def_static("createKey", &tc::Profile::createKey<tp::SimplePlannerMoveProfile>,
                     "The key every simple-planner move profile registers under.")
         .def("generate", &tp::SimplePlannerMoveProfile::generate,
