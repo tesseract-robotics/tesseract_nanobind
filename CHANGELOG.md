@@ -2,8 +2,14 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **The seven simple-planner move profiles compare by value and are unhashable** — `SimplePlannerFixedSize{,Assign,AssignNoIK}MoveProfile` and `SimplePlannerLVS{,NoIK,Assign,AssignNoIK}MoveProfile` bind the C++ `operator==`; `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
+
 ### Changes
 
+- **Motion-planner core: the rest of `utils.h`, request reasons, robot configuration** — `toToolpath` (three overloads), `formatProgram` and `contactCheckProgram` (discrete and continuous; returns `(ContactTrajectoryResults, list[ContactResultMap])` with the GIL released) ([#303]); `MotionPlanner.checkRequestReason(request) -> str` and `MotionPlanner.assignSolution` ([#332]); `RobotConfig`, `getRobotConfig`, `getJointTurns`, `isWithinJointLimits` ([#333]; `isValidState<double>` does not compile upstream and stays unbound). The module imports the modules that define `Environment`, `CompositeInstruction` and `ProfileDictionary`, so its stub names them instead of quoting C++ names ([#300]).
+- **Simple planner** — `SimpleMotionPlanner` derives from `MotionPlanner` ([#299]); `interpolate` (poses and joints), `interpolate_waypoint` and `getInterpolatedInstructions` ([#305]); `SimplePlannerMoveProfile.generate` ([#339]); `SimplePlannerMoveProfile.createKey()` / `SimplePlannerCompositeProfile.createKey()`, inherited by every concrete profile, return the key the profile registers under ([#273]); `from_yaml(text)` on the seven move profiles ([#331]).
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
 - **The binding audit states its coverage** — the report names every binding module it does not audit, with the reason; a binding module in neither table fails the run. Header ownership supports several prefixes per module and nested prefixes; the planning and trajopt bindings now parse ([#256]).
 
@@ -549,3 +555,13 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [@johnwason]: https://github.com/johnwason
 [@marip8]: https://github.com/marip8
 [@seonixx]: https://github.com/seonixx
+[#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
+[#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273
+[#299]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/299
+[#300]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/300
+[#303]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/303
+[#305]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/305
+[#331]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/331
+[#332]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/332
+[#333]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/333
+[#339]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/339
