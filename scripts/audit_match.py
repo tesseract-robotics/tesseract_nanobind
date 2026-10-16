@@ -183,6 +183,23 @@ ACCEPTED_SYMBOLS = {
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
 }
+# A C++ member template bound once per instance, under a name Python can spell
+# (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
+# name) -> the Python dotted names of its instances. The C++ row is accepted only when every
+# listed instance is bound; each instance is accepted on the Python side (template-instance-name).
+TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {}
+# The rule `TEMPLATE_INSTANCES` entries are accepted under.
+TEMPLATE_INSTANCE_RULE = "template-instance-name"
+# A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
+# symbol Python binds, where the other overloads stay checked (T4).
+ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {}
+# A Python-only overload accepted: (module, dotted name, `PyOverload.params`) -> ACCEPTED rule.
+# Two overloads of one arity differ by their annotations (G2: `setWarmStart(bool)`).
+ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {}
+# A type-erased Poly -> the bound classes it wraps, which C++ converts into it through the
+# Poly's converting constructors (R8). A Python overload typed by an alternative stands for
+# the Poly-typed C++ parameter.
+POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {}
 
 
 @dataclass(frozen=True, order=True)
@@ -463,6 +480,21 @@ def _inherited_from_bound(
     return False
 
 
+def _unbound_rule(
+    module: str,
+    name: str,
+    sym: CppSymbol,
+    cpp: Mapping[str, CppSymbol],
+    py: PyApi,
+    stub_roots: Sequence[Path],
+) -> str | None:
+    """The ACCEPTED rule for a C++ symbol Python does not bind, or None (a gap)."""
+    instances = TEMPLATE_INSTANCES.get((module, name))
+    if instances and all(_py_member(i, py, stub_roots) for i in instances):
+        return TEMPLATE_INSTANCE_RULE
+    return ACCEPTED_SYMBOLS.get((module, name))
+
+
 def match(
     module: str,
     cpp: dict[str, CppSymbol],
@@ -519,7 +551,7 @@ def match(
             dunder = PROTOCOL_MEMBERS.get(leaf)
             if dunder and _py_member(f"{_renamed(owner, alias)}.{dunder}", api, stub_roots):
                 covered += 1  # the dunder's own row names the rule
-            elif rule := ACCEPTED_SYMBOLS.get((module, name)):
+            elif rule := _unbound_rule(module, name, sym, cpp, api, stub_roots):
                 accepted.append(Accepted(name, rule, sym.location))
             elif name in elsewhere:
                 accepted.append(Accepted(name, "bound-in-other-module", sym.location))
@@ -543,6 +575,7 @@ def match(
         covered += ok
 
     deviations: list[Deviation] = []
+    instance_of = {i for (m, _), insts in TEMPLATE_INSTANCES.items() if m == module for i in insts}
     for name, ps in py.symbols.items():
         where = f"{stub_rel}:{ps.line}"
         rule = ACCEPTED_SYMBOLS.get((module, name))
@@ -552,6 +585,9 @@ def match(
         own = cpp.get(cname)
         if own is not None and _inherited_from_bound(own, py, stub_roots, bound):
             own = None
+        if name in instance_of:
+            accepted.append(Accepted(name, TEMPLATE_INSTANCE_RULE, where))
+            continue
         if ps.enum_alias:
             found = None  # a second name for an enum value, even if C++ has it unscoped
         elif (
