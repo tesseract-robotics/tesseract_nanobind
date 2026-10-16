@@ -13,6 +13,7 @@
 - **The binding audit states its coverage** — the report names every binding module it does not audit, with the reason; a binding module in neither table fails the run. Header ownership supports several prefixes per module and nested prefixes; the planning and trajopt bindings now parse ([#256]).
 - **`InstructionsTrajectory(program)` keeps `program` alive** — it stores references into the program; built from a temporary (`InstructionsTrajectory(make_program())`) it read freed memory once the program was collected ([#281]).
 - **`TimeParameterization.compute` names `Environment` in its signature** — the stub said `"tesseract::environment::Environment"`; the module now imports `tesseract_environment` first ([#277]).
+- **`rescaleTimings(program, scalings)`** — rescales each sub-composite's timing in place; a `scalings` list that is not `len(program)` long raises `ValueError` (upstream only asserts) ([#279]).
 - **`ISPCompositeProfile.minimum_time_delta`** is bound ([#280]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
@@ -466,6 +467,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
 [#277]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/277
+[#279]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/279
 [#280]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/280
 [#281]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/281
 [trajopt#618]: https://github.com/tesseract-robotics/trajopt/issues/618
