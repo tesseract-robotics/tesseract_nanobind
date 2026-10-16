@@ -459,20 +459,22 @@ NB_MODULE(_tesseract_task_composer, m) {
     // ========== TaskComposerExecutor (abstract base) ==========
     // run(node, data_storage, dotgraph, name) builds the context from a data storage, as
     // upstream's TaskComposerServer::run(node, data_storage, dotgraph, executor_name) does.
+    // The future runs `node` in the executor's threads, so it keeps the node alive: a node
+    // dropped before wait() was a use-after-free.
     executor
         .def("getName", &tp::TaskComposerExecutor::getName)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
             nb::gil_scoped_release release;
             return self.run(node, context);
-        }, "node"_a, "context"_a)
+        }, "node"_a, "context"_a, nb::keep_alive<0, 2>())
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             nb::gil_scoped_release release;
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
             return self.run(node, context);
-        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
+        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run", nb::keep_alive<0, 2>())
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
 
@@ -527,14 +529,14 @@ NB_MODULE(_tesseract_task_composer, m) {
                        std::shared_ptr<tp::TaskComposerContext> context) {
             nb::gil_scoped_release release;
             return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
-        }, "node"_a, "context"_a)
+        }, "node"_a, "context"_a, nb::keep_alive<0, 2>())
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             nb::gil_scoped_release release;
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
             return static_cast<tp::TaskComposerExecutor&>(self).run(node, context);
-        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
+        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run", nb::keep_alive<0, 2>())
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount);
 
