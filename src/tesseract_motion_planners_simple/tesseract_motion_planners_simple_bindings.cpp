@@ -59,7 +59,9 @@ namespace {
 // Python error, or one of the named errors below) there before upstream's catch sees it, and solve
 // rethrows it once upstream returns and the GIL is held again. A solve not started from Python (a
 // task-composer worker) leaves the slot unarmed and keeps upstream's failed response; nothing is
-// stored on such a thread.
+// stored on such a thread. The last error stored wins, and solve raises it only for a failed
+// response: a solve nested in an override through the MotionPlanner base is unarmed, stores into
+// the enclosing slot, and its failure may be one the override handled.
 struct PendingGenerateError {
     bool armed{ false };
     std::exception_ptr error;
@@ -81,7 +83,7 @@ public:
     ArmedSolve(const ArmedSolve&) = delete;
     ArmedSolve& operator=(const ArmedSolve&) = delete;
 
-    // The first error a generate override raised during this solve, or null.
+    // The last error a generate override raised during this solve, or null.
     std::exception_ptr take() { return std::exchange(pending_generate_error.error, nullptr); }
 
 private:
@@ -134,11 +136,11 @@ public:
                                                "index " + std::to_string(i));
             return instructions;
         } catch (const nb::python_error&) {
-            if (pending_generate_error.armed && !pending_generate_error.error)
+            if (pending_generate_error.armed)
                 pending_generate_error.error = std::current_exception();
             throw;
         } catch (const std::invalid_argument&) {
-            if (pending_generate_error.armed && !pending_generate_error.error)
+            if (pending_generate_error.armed)
                 pending_generate_error.error = std::current_exception();
             throw;
         }
@@ -233,7 +235,8 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
                     nb::gil_scoped_release release;
                     response = self.solve(request);
                 }
-                if (std::exception_ptr error = armed.take())
+                std::exception_ptr error = armed.take();
+                if (error && !response.successful)
                     std::rethrow_exception(error);
                 return response;
             },

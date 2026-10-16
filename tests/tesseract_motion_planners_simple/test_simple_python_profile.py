@@ -33,7 +33,7 @@ from tesseract_robotics.tesseract_command_language import (
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, JointState, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import JointGroup, KinematicGroup
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import (
     JointGroupInstructionInfo,
     KinematicGroupInstructionInfo,
@@ -225,6 +225,46 @@ def test_generate_exception_propagates_from_solve(irb2400_env, manip_info):
     # the error is consumed: the next solve on the same planner and thread is unaffected
     response = planner.solve(_request(irb2400_env, manip_info, EchoProfile()))
     assert response.successful, response.message
+
+
+def test_handled_nested_error_is_not_raised(irb2400_env, manip_info):
+    """A nested solve through the MotionPlanner base fails and the override handles it."""
+    seen = []
+
+    class Outer(SimplePlannerMoveProfile):
+        def generate(
+            self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+        ):
+            nested = MotionPlanner.solve(
+                SimpleMotionPlanner(PLANNER_NAME),
+                _request(irb2400_env, manip_info, RaisingProfile()),
+            )
+            seen.append(nested.successful)
+            return [base_instruction]
+
+    response = SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, Outer()))
+    assert seen == [False]
+    assert response.successful, response.message
+
+
+def test_last_generate_error_is_raised(irb2400_env, manip_info):
+    """After a handled nested failure, the override's own error is the one raised."""
+
+    class OuterError(Exception):
+        pass
+
+    class Outer(SimplePlannerMoveProfile):
+        def generate(
+            self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+        ):
+            MotionPlanner.solve(
+                SimpleMotionPlanner(PLANNER_NAME),
+                _request(irb2400_env, manip_info, RaisingProfile()),
+            )
+            raise OuterError("the outer override's own")
+
+    with pytest.raises(OuterError, match="outer override"):
+        SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, Outer()))
 
 
 def test_generate_without_override_fails_the_plan(irb2400_env, manip_info):
