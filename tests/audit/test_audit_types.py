@@ -1,15 +1,15 @@
 """Contract tests of overload matching by parameter type (#247): scripts/audit_types.py and
-its use in scripts/audit_bindings.py.
+its use in scripts/audit_match.py.
 
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
 import ast
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
+
+from tests.audit._load import audit, load
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -17,17 +17,7 @@ FIXTURE_INCLUDE = FIXTURES / "include"
 TYPED_PREFIX = ("tesseract/typed/",)
 
 
-def _load(name):
-    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module  # dataclasses resolve annotations via sys.modules
-    spec.loader.exec_module(module)
-    return module
-
-
-types = _load("audit_types")
-_load("audit_ownership")
-audit = _load("audit_bindings")
+types = load("audit_types")
 COVERAGE = audit.Coverage(audited=("typed",), unaudited={}, total=1)
 
 
