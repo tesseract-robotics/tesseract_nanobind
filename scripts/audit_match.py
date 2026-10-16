@@ -161,6 +161,23 @@ ACCEPTED = {
     "derives the profile key from its template argument; Python passes the key to the bound "
     "`getProfile(key, ns, name)` (`profile.getKey()`, or `ProfileType.createKey()` once bound), "
     "which returns the registered profile class, and checks `hasProfile` for the default.",
+    "free-function-as-method": "A free predicate whose only parameter is `const T&` is bound as "
+    "a method of `T` (`isWaitInstruction(const InstructionPoly&)` → "
+    "`InstructionPoly.isWaitInstruction()`), beside `T`'s member predicates of the same shape "
+    "(`isMoveInstruction`).",
+    "type-index": "`getType()` returns a `std::type_index`, which has no Python form; the bound "
+    "`is…()` predicates and `as…()` casts answer the same question by name.",
+    "type-erasure-interface": "The abstract `…Interface` of a type-erased `…Poly` is its C++ "
+    "extension point (pure virtuals, a protected `equals`, cereal registration); Python holds "
+    "the concrete classes and their Polys, and reaches the stored object through the bound casts "
+    "(`InstructionPoly.as…`, and the waypoint casts), not through the accessor that returns the "
+    "interface by reference.",
+    "algorithm-internal-namespace": "`time_parameterization::totg::{Path, PathSegment, PathData, "
+    "Trajectory}` are the implementation classes of the bound `TimeOptimalTrajectoryGeneration`; "
+    "Python reaches them through `compute`.",
+    "reference-setter": "C++ assigns through a getter that returns a non-const reference "
+    "(`getWaypoint() = wp`); Python cannot assign to a returned reference, so a `set…` method "
+    "assigns through it.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -209,6 +226,11 @@ ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {}
 # Poly's converting constructors (R8). A Python overload typed by an alternative stands for
 # the Poly-typed C++ parameter.
 POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {}
+# Rules whose overload-level `absent_ok` also accepts a symbol Python does not bind at all,
+# when every overload carries it, or that `CppSymbol.absent_ok` names for a field.
+# (`yaml-node` and `serialization-default-ctor` do not: they name one overload of a symbol
+# whose other overloads must be bound.)
+WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index"})
 
 
 class UnknownAcceptedRuleError(LookupError):
@@ -513,6 +535,31 @@ def _inherited_from_bound(
     return False
 
 
+def _whole_symbol_rule(sym: CppSymbol) -> str | None:
+    """The rule accepting an entirely unbound symbol through its structural `absent_ok`: the
+    symbol's own (fields), or the one `WHOLE_SYMBOL_ABSENT_OK` rule every overload carries.
+    Overloads carrying two different rules stay a gap: no single justification covers them."""
+    if sym.absent_ok in WHOLE_SYMBOL_ABSENT_OK:
+        return sym.absent_ok
+    rules = {ov.absent_ok for ov in sym.overloads}
+    if sym.overloads and len(rules) == 1 and rules <= WHOLE_SYMBOL_ABSENT_OK:
+        return next(iter(rules))
+    return None
+
+
+def _bound_as_method(name: str, sym: CppSymbol, py: PyApi, stub_roots: Sequence[Path]) -> bool:
+    """A free function whose every overload takes one class `T` and is bound as `T.name` (T7)."""
+    if "." in name or sym.kind is not Kind.FUNCTION or not sym.overloads:
+        return False
+    for ov in sym.overloads:
+        if ov.arity != Arity(1, 1) or len(ov.params) != 1:
+            return False
+        classes = [k[1] for k in ov.params[0] or () if k is not None and k[0] == "class"]
+        if not any(_py_member(f"{c}.{name}", py, stub_roots) for c in classes):
+            return False
+    return True
+
+
 def _unbound_rule(
     module: str,
     name: str,
@@ -525,7 +572,11 @@ def _unbound_rule(
     instances = TEMPLATE_INSTANCES.get((module, name))
     if instances and all(_py_member(i, py, stub_roots) for i in instances):
         return TEMPLATE_INSTANCE_RULE
-    return ACCEPTED_SYMBOLS.get((module, name))
+    if rule := ACCEPTED_SYMBOLS.get((module, name)) or _whole_symbol_rule(sym):
+        return rule
+    if _bound_as_method(name, sym, py, stub_roots):
+        return "free-function-as-method"
+    return None
 
 
 def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
