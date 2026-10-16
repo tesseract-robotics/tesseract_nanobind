@@ -223,17 +223,23 @@ def test_cpp_overload_accepted_by_table(poly_report):
     assert "Shelf.place" not in open_names(poly_report)
 
 
-def _yaml_node_place(monkeypatch):
+# A structural `absent_ok` with no premise: G3's `yaml-node` premise (a covered str/path
+# sibling) would reject a fake YAML overload inside `_absent_ok_accepts`.
+STRUCTURAL_RULE = "serialization-default-ctor"
+
+
+def _structural_place(monkeypatch):
     """`audit_tu` with the 3-ary `Shelf.place` carrying a structural `absent_ok`, and the
     overload table naming the same overload."""
     real = match_.cpp_api
 
     def cpp_api(*args, **kwargs):
         cpp = real(*args, **kwargs)
-        cpp["Shelf.place"].overloads = [
-            dataclasses.replace(ov, absent_ok="yaml-node") if str(ov.arity) == "3" else ov
-            for ov in cpp["Shelf.place"].overloads
-        ]
+        if "Shelf.place" in cpp:
+            cpp["Shelf.place"].overloads = [
+                dataclasses.replace(ov, absent_ok=STRUCTURAL_RULE) if str(ov.arity) == "3" else ov
+                for ov in cpp["Shelf.place"].overloads
+            ]
         return cpp
 
     monkeypatch.setattr(match_, "cpp_api", cpp_api)
@@ -245,19 +251,19 @@ def _yaml_node_place(monkeypatch):
 
 def test_absent_ok_wins_over_the_table(monkeypatch):
     """Control: a structural `absent_ok` accepts first, so the table entry does not fire."""
-    _yaml_node_place(monkeypatch)
+    _structural_place(monkeypatch)
     pairs = accepted_pairs(audit_poly())
-    assert ("Shelf.place", "yaml-node") in pairs
+    assert ("Shelf.place", STRUCTURAL_RULE) in pairs
     assert ("Shelf.place", FIXTURE_OVERLOAD_RULE) not in pairs
 
 
 def test_failed_absent_ok_falls_through_to_the_table(monkeypatch):
     """G3/G4 contract: when `_absent_ok_accepts` says no, the overload tables still apply."""
-    _yaml_node_place(monkeypatch)
+    _structural_place(monkeypatch)
     monkeypatch.setattr(match_, "_absent_ok_accepts", lambda ov, sym, ps: False)
     pairs = accepted_pairs(audit_poly())
     assert ("Shelf.place", FIXTURE_OVERLOAD_RULE) in pairs
-    assert ("Shelf.place", "yaml-node") not in pairs
+    assert ("Shelf.place", STRUCTURAL_RULE) not in pairs
 
 
 def test_overload_table_entry_with_an_unknown_rule_raises(monkeypatch):
