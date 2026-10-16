@@ -339,6 +339,21 @@ def test_instructions_trajectory_raises_after_program_append(method):
         getattr(traj, method)(*_TRAJECTORY_CALLS[method])
 
 
+_INDEX_METHODS = ["getPosition", "getVelocity", "getAcceleration", "getTimeFromStart", "setData"]
+
+
+@pytest.mark.parametrize("method", _INDEX_METHODS)
+@pytest.mark.parametrize("index", [11, -1])
+def test_instructions_trajectory_index_out_of_range_raises(method, index):
+    # Upstream indexes a std::vector unchecked: out of range was undefined behaviour.
+    # Negative indices are rejected, not wrapped (upstream takes a size_t).
+    traj = InstructionsTrajectory(_abb_program())
+    assert traj.size() == 11
+    args = (index, *_TRAJECTORY_CALLS[method][1:])
+    with pytest.raises(IndexError, match=f"index {index} out of range for 11"):
+        getattr(traj, method)(*args)
+
+
 def test_instructions_trajectory_raises_after_program_clear():
     program = _abb_program()
     traj = InstructionsTrajectory(program)
