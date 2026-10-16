@@ -11,7 +11,8 @@ from tests.audit._load import audit
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
-BASES_CPP = FIXTURES / "bases_bindings.cpp"
+BASES = FIXTURES / "bases"  # own stub root: its class names stay out of other fixtures
+BASES_CPP = BASES / "bases_bindings.cpp"
 
 
 @pytest.fixture(scope="module")
@@ -19,11 +20,11 @@ def bases_report():
     return audit.audit_tu(
         "bases",
         BASES_CPP,
-        FIXTURES / "_bases.pyi",
-        FIXTURES / "package_init.py",
+        BASES / "_bases.pyi",
+        BASES / "bases_init.py",
         ("tesseract/bases/",),
         (FIXTURE_INCLUDE,),
-        stub_roots=(FIXTURES,),
+        stub_roots=(BASES,),
     )
 
 
@@ -59,7 +60,7 @@ def test_missing_bound_base_is_a_gap_at_the_cpp_class(bases_report):
 def test_stub_base_that_is_no_cpp_ancestor_is_a_deviation_at_the_stub(bases_report):
     """T5-3: Loner claims Runner; C++ Loner has no base."""
     row = next(d for d in bases_report.deviations if d.name == "Loner(Runner)")
-    assert row.location.startswith("tests/audit/fixtures/_bases.pyi:")
+    assert row.location.startswith("tests/audit/fixtures/bases/_bases.pyi:")
 
 
 def test_nearest_bound_ancestor_through_an_unbound_intermediate_is_enough(bases_report):
