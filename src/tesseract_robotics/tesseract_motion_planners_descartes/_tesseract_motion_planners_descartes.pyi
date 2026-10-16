@@ -205,6 +205,29 @@ def cast_DescartesPlanProfileD(profile: DescartesMoveProfileD) -> tesseract_robo
     Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)
     """
 
+def sampleToolAxis(tool_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], resolution: float, minimum: float, maximum: float) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
+    """
+    Given a tool pose create samples from [minimum, maximum] around the provided axis.
+    """
+
+def sampleToolXAxis(tool_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, resolution: float, minimum: float, maximum: float) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
+    """
+    Given a tool pose create samples from [minimum, maximum] around the x axis.
+    """
+
+def sampleToolYAxis(tool_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, resolution: float, minimum: float, maximum: float) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
+    """
+    Given a tool pose create samples from [minimum, maximum] around the y axis.
+    """
+
+def sampleToolZAxis(tool_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, resolution: float, minimum: float, maximum: float) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
+    """
+    Given a tool pose create samples from [minimum, maximum] around the z axis.
+    """
+
+def sampleFixed(tool_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
+    """This will return the tool pose as the only sample."""
+
 class DescartesMotionPlannerD:
     def __init__(self, name: str) -> None: ...
 
