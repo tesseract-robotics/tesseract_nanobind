@@ -20,7 +20,7 @@ from tesseract_robotics.tesseract_common import (
     ManipulatorInfo,
 )
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptCompositeProfile,
@@ -404,3 +404,78 @@ class TestTrajOptIfoptPlanner:
 
         assert response.successful, f"Planning failed: {response.message}"
         assert response.results is not None
+
+
+START_POS = np.array([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0])
+END_POS = np.array([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0])
+
+
+def _joint_move(joint_names, position):
+    """A FREESPACE MoveInstructionPoly to a constrained joint waypoint."""
+    waypoint = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joint_names, position))
+    return MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(waypoint, MoveInstructionType_FREESPACE, "DEFAULT")
+    )
+
+
+def _interpolated_program(t_env, manip_info, joint_names):
+    """START_POS -> END_POS, interpolated as in the planning tests above."""
+    t_env.setState(joint_names, START_POS)
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(manip_info)
+    program.appendMoveInstruction(_joint_move(joint_names, START_POS))
+    program.appendMoveInstruction(_joint_move(joint_names, END_POS))
+    return generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
+
+
+def _smoothing_composite_profile(n_joints):
+    """Velocity, acceleration and jerk smoothing (upstream enables velocity only)."""
+    profile = TrajOptIfoptDefaultCompositeProfile()
+    profile.smooth_velocities = True
+    profile.smooth_accelerations = True
+    profile.smooth_jerks = True
+    profile.velocity_coeff = np.ones(n_joints)
+    profile.acceleration_coeff = np.ones(n_joints)
+    profile.jerk_coeff = np.ones(n_joints)
+    return profile
+
+
+def _request(t_env, manip_info, joint_names, solver_profile):
+    profiles = ProfileDictionary()
+    ProfileDictionary_addTrajOptIfoptPlanProfile(
+        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", TrajOptIfoptDefaultPlanProfile()
+    )
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(
+        profiles,
+        TRAJOPT_IFOPT_NAMESPACE,
+        "DEFAULT",
+        _smoothing_composite_profile(len(joint_names)),
+    )
+    ProfileDictionary_addTrajOptIfoptSolverProfile(
+        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
+    )
+    request = PlannerRequest()
+    request.instructions = _interpolated_program(t_env, manip_info, joint_names)
+    request.env = t_env
+    request.profiles = profiles
+    return request
+
+
+class TestTrajOptIfoptMotionPlannerBase:
+    """`TrajOptIfoptMotionPlanner` is a `MotionPlanner` (gh-299)."""
+
+    def test_isinstance(self):
+        assert isinstance(TrajOptIfoptMotionPlanner("x"), MotionPlanner)
+
+    def test_base_solve_dispatches(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        planner = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE)
+        via_base = MotionPlanner.solve(
+            planner, _request(t_env, manip_info, joint_names, TrajOptIfoptOSQPSolverProfile())
+        )
+        direct = planner.solve(
+            _request(t_env, manip_info, joint_names, TrajOptIfoptOSQPSolverProfile())
+        )
+        assert via_base.successful, via_base.message
+        assert via_base.message == direct.message
+        assert len(via_base.results) == len(direct.results)

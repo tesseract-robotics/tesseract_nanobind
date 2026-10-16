@@ -14,6 +14,7 @@
 
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
+#include <tesseract/motion_planners/planner.h>
 
 // tesseract_common (Profile and ProfileDictionary moved here in 0.33)
 #include <tesseract/common/profile.h>
@@ -195,7 +196,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     // Import tesseract_collision for CollisionCheckConfig
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
-    // Import MotionPlanner base type for clone() return type
+    // Import MotionPlanner base type (DescartesMotionPlannerD's base)
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
 
     // VectorIsometry3d (tool-pose samplers) and Environment (profile hooks)
@@ -327,13 +328,9 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
           "This will return the tool pose as the only sample.");
 
     // ========== DescartesMotionPlanner<double> ==========
-    nb::class_<tp::DescartesMotionPlanner<double>>(m, "DescartesMotionPlannerD")
-        .def(nb::init<std::string>(), "name"_a)
-        .def("getName", &tp::DescartesMotionPlanner<double>::getName)
-        // Release GIL during solve - Descartes uses OpenMP internally but that's safe
-        // as long as we use a single OpenMP runtime (conda's llvm-openmp, not Homebrew's)
-        .def("solve", &tp::DescartesMotionPlanner<double>::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
-        .def("terminate", &tp::DescartesMotionPlanner<double>::terminate)
-        .def("clear", &tp::DescartesMotionPlanner<double>::clear)
-        .def("clone", [](const tp::DescartesMotionPlanner<double>& self) { return self.clone(); });
+    // getName/solve/terminate/clear/clone are MotionPlanner's. Its solve releases the GIL:
+    // Descartes uses OpenMP internally, safe as long as one OpenMP runtime is loaded (conda's
+    // llvm-openmp, not Homebrew's).
+    nb::class_<tp::DescartesMotionPlanner<double>, tp::MotionPlanner>(m, "DescartesMotionPlannerD")
+        .def(nb::init<std::string>(), "name"_a);
 }

@@ -22,7 +22,7 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
 from tesseract_robotics.tesseract_motion_planners_descartes import DescartesMotionPlannerD
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 
-planner = DescartesMotionPlannerD()
+planner = DescartesMotionPlannerD("DescartesMotionPlannerTask")
 
 request = PlannerRequest()
 request.env = env
@@ -31,6 +31,9 @@ request.profiles = profiles
 
 response = planner.solve(request)
 ```
+
+`DescartesMotionPlannerD` is a `tesseract_motion_planners.MotionPlanner`: `getName`, `solve`,
+`terminate`, `clear` and `clone` are the base class's, and `solve` releases the GIL.
 
 ## Profiles
 

@@ -28,7 +28,7 @@ from tesseract_robotics.tesseract_common import (
     VectorIsometry3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesDefaultPlanProfileD,
@@ -350,6 +350,20 @@ def _cartesian_move(pose, manip_info, profile="TEST_PROFILE"):
     return MoveInstructionPoly_wrap_MoveInstruction(instruction)
 
 
+def _fixed_pose_program(manip_info, profile="TEST_PROFILE"):
+    """The two fixed Cartesian poses of the planning tests above, as one program."""
+    program = CompositeInstruction()
+    program.setManipulatorInfo(manip_info)
+    for y in (-0.2, 0.2):
+        pose = (
+            Isometry3d.Identity()
+            * Translation3d(0.8, y, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+        )
+        program.appendMoveInstruction(_cartesian_move(pose, manip_info, profile))
+    return program
+
+
 class TestDescartesStateSample:
     """`DescartesStateSampleD(state)` defaults the cost to 0 (gh-310)."""
 
@@ -427,3 +441,33 @@ class TestDescartesToolPoseSamplers:
         assert len(samples) == len(expected) == 5
         for sample, other in zip(samples, expected, strict=True):
             np.testing.assert_allclose(sample.matrix, other.matrix)
+
+
+class TestDescartesMotionPlannerBase:
+    """`DescartesMotionPlannerD` is a `MotionPlanner` (gh-299)."""
+
+    def test_isinstance(self):
+        assert isinstance(DescartesMotionPlannerD("x"), MotionPlanner)
+
+    def test_base_solve_dispatches(self, abb_irb2400_environment):
+        env, manip_info, _ = abb_irb2400_environment
+        program = generateInterpolatedProgram(
+            _fixed_pose_program(manip_info), env, 3.14, 1.0, 3.14, 10
+        )
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            DESCARTES_DEFAULT_NAMESPACE,
+            "TEST_PROFILE",
+            cast_DescartesMoveProfileD(DescartesDefaultMoveProfileD()),
+        )
+        request = PlannerRequest()
+        request.instructions = program
+        request.env = env
+        request.profiles = profiles
+
+        planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
+        via_base = MotionPlanner.solve(planner, request)
+        direct = planner.solve(request)
+        assert via_base.successful, via_base.message
+        assert via_base.message == direct.message
+        assert len(via_base.results) == len(direct.results)
