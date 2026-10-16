@@ -7,6 +7,7 @@ import numpy
 from numpy.typing import NDArray
 
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
+import tesseract_robotics.tesseract_environment._tesseract_environment
 
 
 class InstructionsTrajectory:
@@ -144,7 +145,7 @@ class ISPMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_co
 class TimeParameterization:
     def getName(self) -> str: ...
 
-    def compute(self, composite_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: "tesseract::environment::Environment", profiles: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary) -> bool: ...
+    def compute(self, composite_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, profiles: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary) -> bool: ...
 
 class TimeOptimalTrajectoryGeneration(TimeParameterization):
     def __init__(self, name: str = 'TOTG') -> None: ...

@@ -215,3 +215,12 @@ class TestConstantTCPSpeedCompositeProfile:
         p.max_velocity_scaling_factor = 0.5
         assert p.max_translational_velocity == pytest.approx(0.123)
         assert p.max_velocity_scaling_factor == pytest.approx(0.5)
+
+
+# ---------------------------------------------------------------------------
+# #277: the stub names Environment, not the C++ type
+# ---------------------------------------------------------------------------
+
+
+def test_compute_signature_names_python_environment():
+    assert "tesseract::" not in TimeParameterization.compute.__doc__

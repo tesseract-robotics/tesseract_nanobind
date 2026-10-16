@@ -11,6 +11,7 @@
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
 - **Command-language bindings complete** — instruction UUIDs as canonical strings (`getUUID`/`setUUID`/`getParentUUID`/`setParentUUID`/`regenerateUUID` on the nine instruction types, [#262]); `copy.copy`/`copy.deepcopy` on the waypoints, instructions and Polys ([#263]); `WaypointPoly`, `MoveInstructionPoly` and `InstructionPoly` built from the types they wrap, the full `MoveInstruction` (path profile, `manipulator_info`) and five-argument `StateWaypoint` constructors ([#264]); profile overrides ([#265]); `createChild`/`isChild`, `create*Waypoint`, `isLinear`/`isFreespace`/`isCircular` ([#266]); tolerances, `setSeed`, effort on the waypoint Polys ([#267]); `as*` casts returning references on the waypoint and move-instruction Polys ([#268]); `CompositeInstruction` `insert`, `__delitem__`, `pop_back`, `front`/`back`/`at` and capacity members ([#269]), traversal (`flatten`, `getFirst/Last(Move)Instruction`, counts, `moveFilter`, [#270]) and `getUserData`/`setUserData` ([#271]); `ProfileDictionary.addProfile` for several names, `getProfileEntry`, `getAllProfileEntries` ([#272]); the `utils.h` functions (`toJointTrajectory`, joint-position helpers, `clampToJointLimits`, `makeTimeMonotonicallyIncreasing`, `toDelimitedFile`, [#274]; `validateSeedStructure` is not bound: declared in `utils.h`, not defined in tesseract 0.35.0).
 - **The binding audit states its coverage** — the report names every binding module it does not audit, with the reason; a binding module in neither table fails the run. Header ownership supports several prefixes per module and nested prefixes; the planning and trajopt bindings now parse ([#256]).
+- **`TimeParameterization.compute` names `Environment` in its signature** — the stub said `"tesseract::environment::Environment"`; the module now imports `tesseract_environment` first ([#277]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
@@ -462,6 +463,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
+[#277]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/277
 [trajopt#618]: https://github.com/tesseract-robotics/trajopt/issues/618
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
