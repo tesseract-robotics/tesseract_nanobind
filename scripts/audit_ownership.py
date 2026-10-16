@@ -81,34 +81,56 @@ UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
         ("tesseract/task_composer/planning/",),
     ),
 }
-# Headers under a prefix that are not Python API, as fnmatch patterns on the path below the
-# prefix (`*` also matches `/`). A header the binding #includes directly is audited anyway.
-UNAUDITED_HEADERS = {
-    "test_suite/*": "gtest and Google Benchmark sources installed for plugin authors' tests.",
-    "*_impl.hpp": "cereal implementation fragment, valid only after its `cereal_serialization.h`.",
-    "bullet/*": "Bullet backend internals, loaded as a contact manager plugin; Python reaches "
-    "them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.",
-    "fcl/*": "FCL backend internals, loaded as a contact manager plugin; Python reaches them "
-    "through the `DiscreteContactManager` interface.",
-    "bullet/convex_decomposition_hacd.h": "Declared but not built in 0.35.0: no HACD symbol in any collision library and no CMake target.",
-    # Patterns match below every module prefix; these four exist only under tesseract/common.
-    "cereal_make_array.h": "cereal text-I/O helper for serialization, not API.",
-    "serialization_extensions.h": "Macros and SFINAE checks behind `TESSERACT_CLASS_EXTENSION`, not API.",
-    "sfinae_utils.h": "Compile-time member-detection templates, not API.",
-    "unit_test_utils.h": "gtest serialization helpers for plugin authors' tests.",
-    "environment_cache.h": "No consumer: only `fwd.h` names `EnvironmentCache`, and no installed tesseract library uses it.",
-    "environment_monitor.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
-    "environment_monitor_interface.h": "Abstract ROS-side interface; no implementation in the installed tesseract libraries.",
+# Patterns that apply below every owning prefix.
+ANY_PREFIX = "*"
+# Headers under a prefix that are not Python API: owning prefix (or `ANY_PREFIX`) -> {fnmatch
+# pattern on the path below that prefix (`*` also matches `/`): reason}. A header is matched
+# only against the patterns of the longest prefix that holds it, so a parent's pattern never
+# hides a nested module's header. A header the binding #includes directly is audited anyway.
+UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
+    ANY_PREFIX: {
+        "test_suite/*": "gtest and Google Benchmark sources installed for plugin authors' tests.",
+        "*_impl.hpp": "cereal implementation fragment, valid only after its "
+        "`cereal_serialization.h`.",
+    },
+    "tesseract/collision/": {
+        "bullet/*": "Bullet backend internals, loaded as a contact manager plugin; Python reaches "
+        "them through the `DiscreteContactManager`/`ContinuousContactManager` interfaces.",
+        "fcl/*": "FCL backend internals, loaded as a contact manager plugin; Python reaches them "
+        "through the `DiscreteContactManager` interface.",
+        "bullet/convex_decomposition_hacd.h": "Declared but not built in 0.35.0: no HACD symbol "
+        "in any collision library and no CMake target.",
+    },
+    "tesseract/common/": {
+        "cereal_make_array.h": "cereal text-I/O helper for serialization, not API.",
+        "serialization_extensions.h": "Macros and SFINAE checks behind "
+        "`TESSERACT_CLASS_EXTENSION`, not API.",
+        "sfinae_utils.h": "Compile-time member-detection templates, not API.",
+        "unit_test_utils.h": "gtest serialization helpers for plugin authors' tests.",
+    },
+    "tesseract/environment/": {
+        "environment_cache.h": "No consumer: only `fwd.h` names `EnvironmentCache`, and no "
+        "installed tesseract library uses it.",
+        "environment_monitor.h": "Abstract ROS-side interface; no implementation in the "
+        "installed tesseract libraries.",
+        "environment_monitor_interface.h": "Abstract ROS-side interface; no implementation in "
+        "the installed tesseract libraries.",
+    },
     # Kinematics solver plugins, loaded by `KinematicsPluginFactory`; Python reaches them
-    # through `ForwardKinematics`/`InverseKinematics`. `kdl/*` also matches
-    # `state_solver/kdl/*`, whose `KDLStateSolver` stays audited: the binding includes it.
-    "ikfast/*": "IKFast solver plugin template, loaded by `KinematicsPluginFactory`.",
-    "kdl/*": "KDL solver plugins, loaded by `KinematicsPluginFactory`.",
-    "opw/*": "OPW solver plugin, loaded by `KinematicsPluginFactory`.",
-    "ur/*": "Universal Robots solver plugin, loaded by `KinematicsPluginFactory`.",
-    "rep_*": "Robot-with-external-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
-    "rop_*": "Robot-on-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
-    "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to `OFKTStateSolver`.",
+    # through `ForwardKinematics`/`InverseKinematics`.
+    "tesseract/kinematics/": {
+        "ikfast/*": "IKFast solver plugin template, loaded by `KinematicsPluginFactory`.",
+        "kdl/*": "KDL solver plugins, loaded by `KinematicsPluginFactory`.",
+        "opw/*": "OPW solver plugin, loaded by `KinematicsPluginFactory`.",
+        "ur/*": "Universal Robots solver plugin, loaded by `KinematicsPluginFactory`.",
+        "rep_*": "Robot-with-external-positioner solver plugin, loaded by "
+        "`KinematicsPluginFactory`.",
+        "rop_*": "Robot-on-positioner solver plugin, loaded by `KinematicsPluginFactory`.",
+    },
+    "tesseract/state_solver/": {
+        "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to "
+        "`OFKTStateSolver`.",
+    },
 }
 # Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
 # UNAUDITED_HEADERS. Never audited, not even when the binding #includes one directly: such an
@@ -146,6 +168,10 @@ class ConflictingCoverageError(ValueError):
 
 class UnauditedModuleError(LookupError):
     """The module is listed in UNAUDITED_MODULES; the message carries the reason."""
+
+
+class UnknownPrefixError(LookupError):
+    """An `UNAUDITED_HEADERS` key is neither `ANY_PREFIX` nor any module's header prefix."""
 
 
 def binding_modules() -> list[str]:
@@ -289,14 +315,30 @@ def is_third_party(below: str) -> bool:
     return any(fnmatch.fnmatchcase(below, pattern) for pattern in THIRD_PARTY_HEADERS)
 
 
+def check_unaudited_keys() -> None:
+    """Every `UNAUDITED_HEADERS` key is `ANY_PREFIX` or a module's prefix. Not cached: the
+    tables are small, and a cache would miss a key added after the first call.
+
+    Raises:
+        UnknownPrefixError: a key that is no module's prefix (a typo would silently audit).
+    """
+    known = {p for ps in owner_prefixes().values() for p in ps} | {ANY_PREFIX}
+    if unknown := sorted(set(UNAUDITED_HEADERS) - known):
+        raise UnknownPrefixError(f"UNAUDITED_HEADERS keys that are no module's prefix: {unknown}")
+
+
 def is_unaudited(spelling: str, prefixes: tuple[str, ...]) -> bool:
-    """Whether `UNAUDITED_HEADERS` or `THIRD_PARTY_HEADERS` match the header's path below the
-    longest of `prefixes` that holds it."""
+    """Whether `THIRD_PARTY_HEADERS`, or the `UNAUDITED_HEADERS` patterns of the longest of
+    `prefixes` that holds the header and of `ANY_PREFIX`, match its path below that prefix.
+
+    Raises:
+        UnknownPrefixError: see `check_unaudited_keys`.
+    """
+    check_unaudited_keys()
     prefix = longest_prefix(spelling, prefixes)
     below = spelling if prefix is None else spelling.removeprefix(prefix)
-    return is_third_party(below) or any(
-        fnmatch.fnmatchcase(below, pattern) for pattern in UNAUDITED_HEADERS
-    )
+    patterns = {**UNAUDITED_HEADERS[ANY_PREFIX], **UNAUDITED_HEADERS.get(prefix or "", {})}
+    return is_third_party(below) or any(fnmatch.fnmatchcase(below, p) for p in patterns)
 
 
 check_prefixes()
