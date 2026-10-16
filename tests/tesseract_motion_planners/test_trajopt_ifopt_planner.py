@@ -12,12 +12,10 @@ from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
-    InstructionPoly_as_CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
 )
@@ -307,17 +305,17 @@ class TestTrajOptIfoptPlanner:
 
         # Create instructions
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
         )
 
         # Create program
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instr))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(end_instr))
+        program.push_back(MoveInstructionPoly(start_instr))
+        program.push_back(MoveInstructionPoly(end_instr))
 
         # Interpolate program
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
@@ -367,16 +365,16 @@ class TestTrajOptIfoptPlanner:
         wp1 = JointWaypoint(joint_names, start_pos)
         wp2 = JointWaypoint(joint_names, end_pos)
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
         )
 
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instr))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(end_instr))
+        program.push_back(MoveInstructionPoly(start_instr))
+        program.push_back(MoveInstructionPoly(end_instr))
 
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
@@ -429,10 +427,8 @@ END_POS = np.array([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0])
 
 def _joint_move(joint_names, position):
     """A FREESPACE MoveInstructionPoly to a constrained joint waypoint."""
-    waypoint = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joint_names, position))
-    return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(waypoint, MoveInstructionType.FREESPACE, "DEFAULT")
-    )
+    waypoint = JointWaypointPoly(JointWaypoint(joint_names, position))
+    return MoveInstructionPoly(MoveInstruction(waypoint, MoveInstructionType.FREESPACE, "DEFAULT"))
 
 
 def _interpolated_program(t_env, manip_info, joint_names):
@@ -440,8 +436,8 @@ def _interpolated_program(t_env, manip_info, joint_names):
     t_env.setState(joint_names, START_POS)
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(_joint_move(joint_names, START_POS))
-    program.appendMoveInstruction(_joint_move(joint_names, END_POS))
+    program.push_back(_joint_move(joint_names, START_POS))
+    program.push_back(_joint_move(joint_names, END_POS))
     return generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
 
@@ -450,9 +446,9 @@ def _move_instructions(composite):
     moves = []
     for instruction in composite:
         if instruction.isCompositeInstruction():
-            moves.extend(_move_instructions(InstructionPoly_as_CompositeInstruction(instruction)))
+            moves.extend(_move_instructions(instruction.asCompositeInstruction()))
         elif instruction.isMoveInstruction():
-            moves.append(InstructionPoly_as_MoveInstructionPoly(instruction))
+            moves.append(instruction.asMoveInstruction())
     return moves
 
 

@@ -11,10 +11,10 @@ This example demonstrates:
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
 )
@@ -112,19 +112,19 @@ def main():
         * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
     )
     start_instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+        CartesianWaypointPoly(wp1),
         MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     plan_f1 = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+        CartesianWaypointPoly(wp2),
         MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+    program.push_back(MoveInstructionPoly(start_instruction))
+    program.push_back(MoveInstructionPoly(plan_f1))
 
     # --8<-- [start:plan_and_animate]
     # OMPL planning

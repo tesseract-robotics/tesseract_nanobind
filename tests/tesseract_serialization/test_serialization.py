@@ -15,11 +15,10 @@ import numpy as np
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
-    WaypointPoly_as_JointWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
@@ -51,11 +50,9 @@ def make_test_program():
     ]
 
     for pos in positions:
-        wp = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joint_names, pos))
-        mi = MoveInstructionPoly_wrap_MoveInstruction(
-            MoveInstruction(wp, MoveInstructionType.FREESPACE)
-        )
-        program.appendMoveInstruction(mi)
+        wp = JointWaypointPoly(JointWaypoint(joint_names, pos))
+        mi = MoveInstructionPoly(MoveInstruction(wp, MoveInstructionType.FREESPACE))
+        program.push_back(mi)
 
     return program
 
@@ -112,8 +109,8 @@ class TestCompositeInstructionSerialization:
         orig_inst = original[0].asMoveInstruction()
         rest_inst = restored[0].asMoveInstruction()
 
-        orig_wp = WaypointPoly_as_JointWaypointPoly(orig_inst.getWaypoint())
-        rest_wp = WaypointPoly_as_JointWaypointPoly(rest_inst.getWaypoint())
+        orig_wp = orig_inst.getWaypoint().asJointWaypoint()
+        rest_wp = rest_inst.getWaypoint().asJointWaypoint()
 
         np.testing.assert_array_almost_equal(orig_wp.getPosition(), rest_wp.getPosition())
         assert orig_wp.getNames() == rest_wp.getNames()

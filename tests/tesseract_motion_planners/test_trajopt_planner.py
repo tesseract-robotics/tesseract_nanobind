@@ -8,16 +8,14 @@ import pytest
 import tesseract_robotics.tesseract_motion_planners_trajopt as trajopt
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -205,20 +203,20 @@ class TestTrajOptPlanning:
         )
 
         start_instruction = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1),
+            JointWaypointPoly(wp1),
             MoveInstructionType.FREESPACE,
             "TEST_PROFILE",
         )
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+            CartesianWaypointPoly(wp2),
             MoveInstructionType.FREESPACE,
             "TEST_PROFILE",
         )
 
         program = CompositeInstruction("TEST_PROFILE")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         # Interpolate the program first (TrajOpt requires a seed trajectory)
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
@@ -253,10 +251,10 @@ class TestTrajOptPlanning:
         count = 0
         for instr in results:
             if instr.isMoveInstruction():
-                move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+                move_instr = instr.asMoveInstruction()
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
-                    state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+                    state_wp = wp.asStateWaypoint()
                     assert len(state_wp.getNames()) == 7  # 7 joints for IIWA
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 7
@@ -272,20 +270,20 @@ class TestTrajOptPlanning:
         wp2 = JointWaypoint(joint_names, np.array([0.5, 0, 0, -1.0, 0, 0, 0], dtype=np.float64))
 
         start_instruction = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1),
+            JointWaypointPoly(wp1),
             MoveInstructionType.FREESPACE,
             "COLLISION_TEST",
         )
         plan_f1 = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2),
+            JointWaypointPoly(wp2),
             MoveInstructionType.FREESPACE,
             "COLLISION_TEST",
         )
 
         program = CompositeInstruction("COLLISION_TEST")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
@@ -331,10 +329,8 @@ def _joint_request(env, manip_info, joint_names, profile_name):
     program.setManipulatorInfo(manip_info)
     for q in ([0, 0, 0, -1.0, 0, 0, 0], [0.5, 0, 0, -1.0, 0, 0, 0]):
         wp = JointWaypoint(joint_names, np.array(q, dtype=np.float64))
-        instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp), MoveInstructionType.FREESPACE, profile_name
-        )
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(instr))
+        instr = MoveInstruction(JointWaypointPoly(wp), MoveInstructionType.FREESPACE, profile_name)
+        program.push_back(MoveInstructionPoly(instr))
     request = PlannerRequest()
     request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
     request.env = env

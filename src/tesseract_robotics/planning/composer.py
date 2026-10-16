@@ -35,9 +35,7 @@ if TYPE_CHECKING:
 
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -658,13 +656,13 @@ class TaskComposer:
             if not instr.isMoveInstruction():
                 continue
 
-            move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+            move_instr = instr.asMoveInstruction()
             wp = move_instr.getWaypoint()
 
             if not wp.isStateWaypoint():
                 continue
 
-            state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+            state_wp = wp.asStateWaypoint()
 
             # Extract optional velocity/acceleration/time if available
             #

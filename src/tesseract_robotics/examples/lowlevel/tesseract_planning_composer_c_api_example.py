@@ -168,7 +168,7 @@ def main():
     # WHY iterate result: PlanningResult wraps the raw CompositeInstruction
     # and provides TrajectoryPoint objects with numpy arrays for positions,
     # velocities, accelerations, and timestamps. Much easier than manual
-    # InstructionPoly_as_MoveInstructionPoly() + WaypointPoly_as_StateWaypointPoly().
+    # instr.asMoveInstruction().getWaypoint().asStateWaypoint() per instruction.
     print(f"\nTrajectory has {len(result)} waypoints:")
     for i, point in enumerate(result.trajectory):
         # WHY point.time: FreespacePipeline includes time parameterization,

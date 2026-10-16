@@ -18,12 +18,11 @@ from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
-    WaypointPoly_as_StateWaypointPoly,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
@@ -156,11 +155,11 @@ class TestInstructionsTrajectory:
         for pos in positions:
             wp = StateWaypoint(joint_names, pos)
             mi = MoveInstruction(
-                StateWaypointPoly_wrap_StateWaypoint(wp),
+                StateWaypointPoly(wp),
                 MoveInstructionType.FREESPACE,
                 "DEFAULT",
             )
-            program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
+            program.push_back(MoveInstructionPoly(mi))
 
         assert len(program) == 3
 
@@ -244,10 +243,8 @@ def _move(position, time=None):
     swp = StateWaypoint(ABB_JOINTS, np.asarray(position, dtype=np.float64))
     if time is not None:
         swp.setTime(time)
-    return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(swp), MoveInstructionType.FREESPACE, "DEFAULT"
-        )
+    return MoveInstructionPoly(
+        MoveInstruction(StateWaypointPoly(swp), MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 
@@ -267,7 +264,7 @@ def _abb_program(num=10, span=1.0):
         p = np.zeros(6)
         p[0] = i * span / num
         p[1] = 0.5 * i * span / num
-        program.appendMoveInstruction(_move(p))
+        program.push_back(_move(p))
     return program
 
 
@@ -305,7 +302,7 @@ def test_compute_signature_names_python_environment():
 def test_instructions_trajectory_keeps_program_alive():
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(_manipulator_info())
-    program.appendMoveInstruction(_move(np.zeros(6)))
+    program.push_back(_move(np.zeros(6)))
     refs = sys.getrefcount(program)
     traj = InstructionsTrajectory(program)
     assert sys.getrefcount(program) == refs + 1
@@ -334,7 +331,7 @@ def test_instructions_trajectory_raises_after_program_append(method):
     traj = InstructionsTrajectory(program)
     # 5 appends: without the guard the read returned stale values, with no error
     for i in range(5):
-        program.appendMoveInstruction(_move(np.full(6, 2.0 + i)))
+        program.push_back(_move(np.full(6, 2.0 + i)))
     with pytest.raises(StaleTrajectoryError, match="build a new InstructionsTrajectory"):
         getattr(traj, method)(*_TRAJECTORY_CALLS[method])
 
@@ -355,8 +352,8 @@ def test_instructions_trajectory_stale_read_does_not_crash(appends):
     code = f"""
 import numpy as np
 from tesseract_robotics.tesseract_command_language import (
-    CompositeInstruction, MoveInstruction, MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType, StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
+    CompositeInstruction, MoveInstruction, MoveInstructionPoly,
+    MoveInstructionType, StateWaypoint, StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     InstructionsTrajectory, StaleTrajectoryError,
@@ -365,17 +362,17 @@ from tesseract_robotics.tesseract_time_parameterization import (
 def move(x):
     p = np.zeros(6)
     p[0] = x
-    swp = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint([f"joint_{{i}}" for i in range(1, 7)], p))
-    return MoveInstructionPoly_wrap_MoveInstruction(
+    swp = StateWaypointPoly(StateWaypoint([f"joint_{{i}}" for i in range(1, 7)], p))
+    return MoveInstructionPoly(
         MoveInstruction(swp, MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 program = CompositeInstruction("DEFAULT")
 for i in range(11):
-    program.appendMoveInstruction(move(0.2 * i))
+    program.push_back(move(0.2 * i))
 traj = InstructionsTrajectory(program)
 for i in range({appends}):
-    program.appendMoveInstruction(move(10.0 + i))
+    program.push_back(move(10.0 + i))
 try:
     traj.getPosition(0)
 except StaleTrajectoryError:
@@ -396,7 +393,7 @@ def test_instructions_trajectory_unmutated_program_reads_and_writes_through():
     np.testing.assert_array_equal(traj.getVelocity(3), velocity)
     assert traj.getTimeFromStart(3) == 7.0
     # setData wrote into the user's program, not a copy
-    waypoint = WaypointPoly_as_StateWaypointPoly(program[3].asMoveInstruction().getWaypoint())
+    waypoint = program[3].asMoveInstruction().getWaypoint().asStateWaypoint()
     assert waypoint.getTime() == 7.0
     assert InstructionsTrajectory(program).getTimeFromStart(3) == 7.0
 
@@ -404,7 +401,7 @@ def test_instructions_trajectory_unmutated_program_reads_and_writes_through():
 def test_instructions_trajectory_rebuilt_after_append_works():
     program = _abb_program()
     InstructionsTrajectory(program)
-    program.appendMoveInstruction(_move(np.full(6, 2.0)))
+    program.push_back(_move(np.full(6, 2.0)))
     traj = InstructionsTrajectory(program)
     assert traj.size() == 12
     np.testing.assert_array_equal(traj.getPosition(11), np.full(6, 2.0))
@@ -435,7 +432,7 @@ def _two_segment_program():
         segment = CompositeInstruction("DEFAULT")
         segment.setManipulatorInfo(_manipulator_info())
         for t in times:
-            segment.appendMoveInstruction(_move(np.full(6, 0.1 * t), time=t))
+            segment.push_back(_move(np.full(6, 0.1 * t), time=t))
         program.push_back(segment)
     return program
 

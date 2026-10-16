@@ -22,14 +22,12 @@ import numpy as np
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -112,12 +110,12 @@ def main():
     # functions. This is required because the Python bindings do not support
     # implicit conversion from CartesianWaypoint to CartesianWaypointPoly.
     start_instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+        CartesianWaypointPoly(wp1),
         MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     plan_f1 = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+        CartesianWaypointPoly(wp2),
         MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
@@ -127,8 +125,8 @@ def main():
     # implicit conversion from MoveInstruction to MoveInstructionPoly.
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+    program.push_back(MoveInstructionPoly(start_instruction))
+    program.push_back(MoveInstructionPoly(plan_f1))
 
     # Initialize the OMPL planner for RRTConnect algorithm
     plan_profile = OMPLRealVectorPlanProfile()
@@ -205,10 +203,10 @@ def main():
     # Print out the resulting waypoints
     for instr in trajopt_results:
         assert instr.isMoveInstruction()
-        move_instr1 = InstructionPoly_as_MoveInstructionPoly(instr)
+        move_instr1 = instr.asMoveInstruction()
         wp1 = move_instr1.getWaypoint()
         assert wp1.isStateWaypoint()
-        wp = WaypointPoly_as_StateWaypointPoly(wp1)
+        wp = wp1.asStateWaypoint()
         print(f"Joint Positions: {wp.getPosition().flatten()} time: {wp.getTime()}")
 
     # Visualize if viewer available

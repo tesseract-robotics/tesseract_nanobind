@@ -23,7 +23,7 @@ Joint-space target (specific joint values).
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    StateWaypoint, StateWaypointPoly, StateWaypointPoly_wrap_StateWaypoint
+    StateWaypoint, StateWaypointPoly,
 )
 import numpy as np
 
@@ -34,7 +34,7 @@ joint_values = np.array([0.0, -0.5, 0.5, 0.0, 0.5, 0.0])
 wp = StateWaypoint(joint_names, joint_values)
 
 # Wrap in polymorphic type (required for instructions)
-wp_poly = StateWaypointPoly_wrap_StateWaypoint(wp)
+wp_poly = StateWaypointPoly(wp)
 
 # Access values
 print(f"Names: {wp.getNames()}")
@@ -47,7 +47,7 @@ Cartesian-space target (pose).
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    CartesianWaypoint, CartesianWaypointPoly, CartesianWaypointPoly_wrap_CartesianWaypoint
+    CartesianWaypoint, CartesianWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import Isometry3d
 import numpy as np
@@ -65,7 +65,7 @@ wp = CartesianWaypoint(pose)
 wp.setSeed(seed_state)  # StateWaypointPoly
 
 # Wrap in polymorphic type
-wp_poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
+wp_poly = CartesianWaypointPoly(wp)
 ```
 
 ### JointWaypoint
@@ -74,14 +74,14 @@ Named joint positions (subset of joints).
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    JointWaypoint, JointWaypointPoly, JointWaypointPoly_wrap_JointWaypoint
+    JointWaypoint, JointWaypointPoly,
 )
 
 names = ["joint_1", "joint_3"]
 values = np.array([0.5, -0.5])
 
 wp = JointWaypoint(names, values)
-wp_poly = JointWaypointPoly_wrap_JointWaypoint(wp)
+wp_poly = JointWaypointPoly(wp)
 ```
 
 ## Instructions
@@ -92,7 +92,7 @@ Single motion command.
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    MoveInstruction, MoveInstructionPoly, MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstruction, MoveInstructionPoly,
     MoveInstructionType
 )
 
@@ -103,7 +103,7 @@ instr = MoveInstruction(wp_poly, MoveInstructionType.FREESPACE, "DEFAULT")
 instr = MoveInstruction(wp_poly, MoveInstructionType.LINEAR, "my_profile")
 
 # Wrap in polymorphic type
-instr_poly = MoveInstructionPoly_wrap_MoveInstruction(instr)
+instr_poly = MoveInstructionPoly(instr)
 
 # Access properties
 print(f"Profile: {instr.getProfile()}")
@@ -125,7 +125,7 @@ Container for multiple instructions.
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    CompositeInstruction, CompositeInstructionOrder
+    CompositeInstruction, CompositeInstructionOrder,
 )
 
 # Create program
@@ -140,8 +140,8 @@ manip_info.working_frame = "base_link"
 program.setManipulatorInfo(manip_info)
 
 # Add instructions
-program.appendMoveInstruction(move1)
-program.appendMoveInstruction(move2)
+program.push_back(move1)
+program.push_back(move2)
 
 # push_back accepts either a single Instruction or a nested CompositeInstruction
 # (0.35+) so raster-style programs can be built the same way they are in C++:
@@ -319,18 +319,19 @@ ProfileDictionary_addOMPLProfile(profiles, "DEFAULT", ompl_profile)
 
 ## Type Erasure Helpers
 
-The command language uses type erasure. Use these functions to wrap/unwrap types:
+The command language uses type erasure. The Poly constructors wrap a concrete type; the
+`as…()` methods unwrap it.
 
 ### Wrapping (concrete → polymorphic)
 
 ```python
 # Waypoints
-StateWaypointPoly_wrap_StateWaypoint(wp)
-CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-JointWaypointPoly_wrap_JointWaypoint(wp)
+StateWaypointPoly(wp)
+CartesianWaypointPoly(wp)
+JointWaypointPoly(wp)
 
 # Instructions
-MoveInstructionPoly_wrap_MoveInstruction(instr)
+MoveInstructionPoly(instr)
 
 # AnyPoly (for data storage; import from tesseract_task_composer)
 AnyPoly_wrap_CompositeInstruction(program)
@@ -347,33 +348,35 @@ removes the need for an explicit wrap call.
 
 ```python
 # Waypoints
-WaypointPoly_as_StateWaypointPoly(wp_poly)
-WaypointPoly_as_CartesianWaypointPoly(wp_poly)
-WaypointPoly_as_JointWaypointPoly(wp_poly)
+wp_poly.asStateWaypoint()
+wp_poly.asCartesianWaypoint()
+wp_poly.asJointWaypoint()
 
 # Instructions
-InstructionPoly_as_MoveInstructionPoly(instr_poly)
-InstructionPoly_as_WaitInstruction(instr_poly)
-InstructionPoly_as_TimerInstruction(instr_poly)
-InstructionPoly_as_SetAnalogInstruction(instr_poly)
-InstructionPoly_as_SetDigitalInstruction(instr_poly)
-InstructionPoly_as_SetToolInstruction(instr_poly)
+instr_poly.asMoveInstruction()
+instr_poly.asWaitInstruction()
+instr_poly.asTimerInstruction()
+instr_poly.asSetAnalogInstruction()
+instr_poly.asSetDigitalInstruction()
+instr_poly.asSetToolInstruction()
 
 # AnyPoly (import from tesseract_task_composer)
 AnyPoly_as_CompositeInstruction(any_poly)
 ```
 
-These free functions mirror the `as*Instruction` methods on `InstructionPoly`
-and raise `RuntimeError` when the underlying type does not match.
+`wp_poly.as…Waypoint()` returns a reference into the waypoint: an edit through it
+changes the waypoint, and `copy.copy(wp_poly.asJointWaypoint())` gives an independent
+copy. `instr_poly.as…Instruction()` returns a copy. Each raises `RuntimeError` when
+the stored type does not match.
 
 ## Complete Example
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
-    CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
+    StateWaypoint, StateWaypointPoly,
+    CartesianWaypoint, CartesianWaypointPoly,
     MoveInstruction, MoveInstructionType,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     CompositeInstruction,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo, Isometry3d
@@ -388,18 +391,18 @@ goal_mat[:3, 3] = [0.5, 0.2, 0.3]
 goal_pose = Isometry3d(goal_mat)
 
 # Create waypoints
-start_wp = StateWaypointPoly_wrap_StateWaypoint(
+start_wp = StateWaypointPoly(
     StateWaypoint(joint_names, start_joints)
 )
-goal_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(
+goal_wp = CartesianWaypointPoly(
     CartesianWaypoint(goal_pose)
 )
 
 # Create instructions (wrap in MoveInstructionPoly before appending)
-start_instr = MoveInstructionPoly_wrap_MoveInstruction(
+start_instr = MoveInstructionPoly(
     MoveInstruction(start_wp, MoveInstructionType.FREESPACE, "DEFAULT")
 )
-goal_instr = MoveInstructionPoly_wrap_MoveInstruction(
+goal_instr = MoveInstructionPoly(
     MoveInstruction(goal_wp, MoveInstructionType.LINEAR, "DEFAULT")
 )
 
@@ -412,8 +415,8 @@ manip_info.tcp_frame = "tool0"
 manip_info.working_frame = "base_link"
 program.setManipulatorInfo(manip_info)
 
-program.appendMoveInstruction(start_instr)
-program.appendMoveInstruction(goal_instr)
+program.push_back(start_instr)
+program.push_back(goal_instr)
 
 # Program is ready for TaskComposer
 ```

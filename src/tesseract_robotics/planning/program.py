@@ -38,15 +38,15 @@ from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
 
@@ -438,8 +438,8 @@ class MotionProgram:
         # Add each target as a move instruction
         for target in self._targets:
             instruction = self._target_to_instruction(target, joint_names)
-            wrapped = MoveInstructionPoly_wrap_MoveInstruction(instruction)
-            program.appendMoveInstruction(wrapped)
+            wrapped = MoveInstructionPoly(instruction)
+            program.push_back(wrapped)
 
         return program
 
@@ -454,17 +454,17 @@ class MotionProgram:
 
         if isinstance(target, CartesianTarget):
             waypoint = target.to_waypoint()
-            wrapped_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(waypoint)
+            wrapped_wp = CartesianWaypointPoly(waypoint)
             return MoveInstruction(wrapped_wp, move_type, profile)
 
         elif isinstance(target, JointTarget):
             waypoint = target.to_waypoint(joint_names)
-            wrapped_wp = JointWaypointPoly_wrap_JointWaypoint(waypoint)
+            wrapped_wp = JointWaypointPoly(waypoint)
             return MoveInstruction(wrapped_wp, move_type, profile)
 
         elif isinstance(target, StateTarget):
             waypoint = target.to_waypoint(joint_names)
-            wrapped_wp = StateWaypointPoly_wrap_StateWaypoint(waypoint)
+            wrapped_wp = StateWaypointPoly(waypoint)
             return MoveInstruction(wrapped_wp, move_type, profile)
 
         else:

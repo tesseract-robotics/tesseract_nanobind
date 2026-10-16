@@ -23,8 +23,6 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     TimerInstructionType,
     WaitInstructionType,
-    WaypointPoly_as_CartesianWaypointPoly,
-    WaypointPoly_as_JointWaypointPoly,
 )
 
 from .errors import EmptyProgramError, UncoordinatedTargetError, UnsupportedInstructionError
@@ -140,7 +138,7 @@ def _lower_move(move: MoveInstructionPoly, layout: ExternalAxisLayout | None) ->
     move_type = move.getMoveType()
 
     if waypoint.isCartesianWaypoint():
-        cart = WaypointPoly_as_CartesianWaypointPoly(waypoint)
+        cart = waypoint.asCartesianWaypoint()
         pose = Pose(cart.getTransform().matrix)
         if move_type == MoveInstructionType.LINEAR:
             kind = MoveKind.LINEAR
@@ -157,7 +155,7 @@ def _lower_move(move: MoveInstructionPoly, layout: ExternalAxisLayout | None) ->
         return CartesianMove(pose=pose, kind=kind, profile=profile, seed_joints=_seed_joints(cart))
 
     if waypoint.isJointWaypoint():
-        joint = WaypointPoly_as_JointWaypointPoly(waypoint)
+        joint = waypoint.asJointWaypoint()
         positions = _to_tuple(joint.getPosition())
         if layout is None:
             return JointMove(joints=positions, profile=profile)

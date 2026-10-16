@@ -13,20 +13,17 @@ from tesseract_robotics.tesseract_collision import (
 )
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     InstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
-    WaypointPoly_as_CartesianWaypointPoly,
-    WaypointPoly_as_JointWaypointPoly,
-    WaypointPoly_as_StateWaypointPoly,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -127,12 +124,12 @@ class TestOMPLPlanning:
 
         # Create instructions
         start_instruction = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+            CartesianWaypointPoly(wp1),
             MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
+            CartesianWaypointPoly(wp2),
             MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
@@ -140,8 +137,8 @@ class TestOMPLPlanning:
         # Create program
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         # Setup OMPL planner - use helper function for cross-module profile registration
         plan_profile = OMPLRealVectorPlanProfile()
@@ -202,14 +199,14 @@ class TestSimplePlanner:
         )
 
         mi = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
+            CartesianWaypointPoly(wp1),
             MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
+        program.push_back(MoveInstructionPoly(mi))
 
         # First solve with OMPL to get a valid result - use helper function
         plan_profile = OMPLRealVectorPlanProfile()
@@ -244,17 +241,15 @@ def _irb2400_manip_info():
 
 
 def _joint_move(names, values):
-    wp = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(names, values))
-    return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT")
-    )
+    wp = JointWaypointPoly(JointWaypoint(names, values))
+    return MoveInstructionPoly(MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT"))
 
 
 def _joint_program(*states, names=IRB2400_JOINTS):
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(_irb2400_manip_info())
     for q in states:
-        program.appendMoveInstruction(_joint_move(names, q))
+        program.push_back(_joint_move(names, q))
     return program
 
 
@@ -304,7 +299,7 @@ class TestFormatProgram:
         reversed_names = list(reversed(IRB2400_JOINTS))
         program = _joint_program(IRB2400_END[::-1].copy(), names=reversed_names)
         assert formatProgram(program, abb_irb2400_environment) is True
-        wp = WaypointPoly_as_JointWaypointPoly(program[0].asMoveInstruction().getWaypoint())
+        wp = program[0].asMoveInstruction().getWaypoint().asJointWaypoint()
         assert list(wp.getNames()) == IRB2400_JOINTS
         np.testing.assert_allclose(wp.getPosition(), IRB2400_END)
 
@@ -317,11 +312,9 @@ def _state_program(*states):
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(_irb2400_manip_info())
     for q in states:
-        wp = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(IRB2400_JOINTS, q))
-        program.appendMoveInstruction(
-            MoveInstructionPoly_wrap_MoveInstruction(
-                MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT")
-            )
+        wp = StateWaypointPoly(StateWaypoint(IRB2400_JOINTS, q))
+        program.push_back(
+            MoveInstructionPoly(MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT"))
         )
     return program
 
@@ -388,17 +381,15 @@ class TestAssignSolution:
 
     @staticmethod
     def _cartesian_move():
-        wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(Isometry3d.Identity()))
-        return MoveInstructionPoly_wrap_MoveInstruction(
-            MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT")
-        )
+        wp = CartesianWaypointPoly(CartesianWaypoint(Isometry3d.Identity()))
+        return MoveInstructionPoly(MoveInstruction(wp, MoveInstructionType.FREESPACE, "DEFAULT"))
 
     def test_replaces_waypoint_with_state(self):
         mi = self._cartesian_move()
         MotionPlanner.assignSolution(mi, IRB2400_JOINTS, IRB2400_END, False)
         wp = mi.getWaypoint()
         assert wp.isStateWaypoint()
-        swp = WaypointPoly_as_StateWaypointPoly(wp)
+        swp = wp.asStateWaypoint()
         assert list(swp.getNames()) == IRB2400_JOINTS
         np.testing.assert_allclose(swp.getPosition(), IRB2400_END)
 
@@ -407,7 +398,7 @@ class TestAssignSolution:
         MotionPlanner.assignSolution(mi, IRB2400_JOINTS, IRB2400_END, True)
         wp = mi.getWaypoint()
         assert wp.isCartesianWaypoint()
-        seed = WaypointPoly_as_CartesianWaypointPoly(wp).getSeed()
+        seed = wp.asCartesianWaypoint().getSeed()
         np.testing.assert_allclose(seed.position, IRB2400_END)
 
 
@@ -419,9 +410,9 @@ def _waypoint_positions(composite):
             continue
         wp = instruction.asMoveInstruction().getWaypoint()
         if wp.isStateWaypoint():
-            yield WaypointPoly_as_StateWaypointPoly(wp).getPosition()
+            yield wp.asStateWaypoint().getPosition()
         else:
-            yield WaypointPoly_as_JointWaypointPoly(wp).getPosition()
+            yield wp.asJointWaypoint().getPosition()
 
 
 class TestMotionPlannerBase:

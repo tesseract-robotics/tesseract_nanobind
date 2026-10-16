@@ -2,11 +2,6 @@ import json
 
 import numpy as np
 
-from tesseract_robotics.tesseract_command_language import (
-    InstructionPoly_as_MoveInstructionPoly,
-    WaypointPoly_as_JointWaypointPoly,
-    WaypointPoly_as_StateWaypointPoly,
-)
 from tesseract_robotics.tesseract_common import Quaterniond
 
 
@@ -20,15 +15,15 @@ def tesseract_trajectory_to_list(tesseract_trajectory):
     joint_names = None
     for i in range(len(tesseract_trajectory)):
         instr = tesseract_trajectory[i]
-        instr_m = InstructionPoly_as_MoveInstructionPoly(instr)
+        instr_m = instr.asMoveInstruction()
         wp = instr_m.getWaypoint()
 
         if wp.isStateWaypoint():
-            state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+            state_wp = wp.asStateWaypoint()
             joint_names = list(state_wp.getNames())
             break
         elif wp.isJointWaypoint():
-            joint_wp = WaypointPoly_as_JointWaypointPoly(wp)
+            joint_wp = wp.asJointWaypoint()
             joint_names = list(joint_wp.getNames())
             break
 
@@ -38,15 +33,15 @@ def tesseract_trajectory_to_list(tesseract_trajectory):
     trajectory2 = []
     for i in range(len(tesseract_trajectory)):
         instr = tesseract_trajectory[i]
-        instr_m = InstructionPoly_as_MoveInstructionPoly(instr)
+        instr_m = instr.asMoveInstruction()
         wp = instr_m.getWaypoint()
 
         # Handle each waypoint based on its type
         if wp.isStateWaypoint():
-            state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+            state_wp = wp.asStateWaypoint()
             trajectory2.append(state_wp.getPosition().flatten().tolist() + [state_wp.getTime()])
         elif wp.isJointWaypoint():
-            joint_wp = WaypointPoly_as_JointWaypointPoly(wp)
+            joint_wp = wp.asJointWaypoint()
             # JointWaypoint doesn't have time, use index as pseudo-time
             trajectory2.append(joint_wp.getPosition().flatten().tolist() + [float(i)])
         else:

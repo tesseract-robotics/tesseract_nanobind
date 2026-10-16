@@ -84,19 +84,19 @@ The **Command Language** describes motion tasks:
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
-    CartesianWaypoint, CartesianWaypointPoly_wrap_CartesianWaypoint,
-    MoveInstruction, MoveInstructionType, MoveInstructionPoly_wrap_MoveInstruction,
+    StateWaypoint, StateWaypointPoly,
+    CartesianWaypoint, CartesianWaypointPoly,
+    MoveInstruction, MoveInstructionType, MoveInstructionPoly,
     CompositeInstruction
 )
 
 # Create a joint-space waypoint
-joint_wp = StateWaypointPoly_wrap_StateWaypoint(
+joint_wp = StateWaypointPoly(
     StateWaypoint(joint_names, joint_values)
 )
 
 # Create a Cartesian waypoint
-cart_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(
+cart_wp = CartesianWaypointPoly(
     CartesianWaypoint(target_pose)
 )
 
@@ -106,8 +106,8 @@ move2 = MoveInstruction(cart_wp, MoveInstructionType.LINEAR, "DEFAULT")
 
 # Combine into a program (instructions are wrapped in the polymorphic type, see below)
 program = CompositeInstruction("DEFAULT")
-program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move1))
-program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move2))
+program.push_back(MoveInstructionPoly(move1))
+program.push_back(MoveInstructionPoly(move2))
 ```
 
 ## Planners
@@ -295,17 +295,15 @@ are needed to create and cast instructions and waypoints:
 ```python
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
-    InstructionPoly_as_MoveInstructionPoly,
-    WaypointPoly_as_StateWaypointPoly,
+    CartesianWaypointPoly,
 )
 
 # Wrap a waypoint in the polymorphic type
-cart_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
+cart_wp = CartesianWaypointPoly(CartesianWaypoint(pose))
 
 # Cast back to concrete types: first instruction of the program built above
-move_instr = InstructionPoly_as_MoveInstructionPoly(program[0])
-state_wp = WaypointPoly_as_StateWaypointPoly(move_instr.getWaypoint())
+move_instr = program[0].asMoveInstruction()
+state_wp = move_instr.getWaypoint().asStateWaypoint()
 ```
 
 `ProfileDictionary` has similar accessor functions per type:

@@ -13,10 +13,10 @@ from tesseract_robotics.planning.profiles import (
 )
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
 )
@@ -137,15 +137,15 @@ def abb_irb2400_request():
             * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
         )
         return MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
+            CartesianWaypointPoly(wp),
             MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(cartesian(-0.3)))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(cartesian(0.3)))
+    program.push_back(MoveInstructionPoly(cartesian(-0.3)))
+    program.push_back(MoveInstructionPoly(cartesian(0.3)))
 
     request = PlannerRequest()
     request.instructions = program

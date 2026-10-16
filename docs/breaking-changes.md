@@ -25,6 +25,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `tesseract_command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
 | Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
+| Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -261,6 +262,37 @@ from any planner module, including a Python subclass of a trampolined profile.
 | --- | --- |
 | `mi.assignCartesianWaypoint(wp)` (also `assignJointWaypoint`, `assignStateWaypoint`) | `mi.setWaypoint(wp)` |
 | `ProfileDictionary_addProfile(d, ns, name, profile)` | `d.addProfile(ns, name, profile)` |
+
+### SWIG-era Poly helpers and `appendMoveInstruction` removed
+
+`tesseract_command_language` kept 15 Python-only names from the SWIG bindings (#328). Each
+duplicated a constructor or method; C++ has none of them. Importing one raises `ImportError`,
+calling `appendMoveInstruction` raises `AttributeError`.
+
+| before | after |
+| --- | --- |
+| `CartesianWaypointPoly_wrap_CartesianWaypoint(wp)` | `CartesianWaypointPoly(wp)` |
+| `JointWaypointPoly_wrap_JointWaypoint(wp)` | `JointWaypointPoly(wp)` |
+| `StateWaypointPoly_wrap_StateWaypoint(wp)` | `StateWaypointPoly(wp)` |
+| `MoveInstructionPoly_wrap_MoveInstruction(mi)` | `MoveInstructionPoly(mi)` |
+| `InstructionPoly_as_MoveInstructionPoly(ip)` | `ip.asMoveInstruction()` |
+| `InstructionPoly_as_CompositeInstruction(ip)` | `ip.asCompositeInstruction()` |
+| `InstructionPoly_as_WaitInstruction(ip)` (also `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) | `ip.asWaitInstruction()` (`asTimerInstruction()`, …) |
+| `WaypointPoly_as_CartesianWaypointPoly(wp)` | `wp.asCartesianWaypoint()` |
+| `WaypointPoly_as_JointWaypointPoly(wp)` | `wp.asJointWaypoint()` |
+| `WaypointPoly_as_StateWaypointPoly(wp)` | `wp.asStateWaypoint()` |
+| `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
+
+**Reference, not copy.** `WaypointPoly_as_*` returned a copy of the stored waypoint;
+`wp.as…Waypoint()` returns a reference into it. An edit through the result now changes the
+waypoint, and so the program that holds it:
+
+```python
+mi.getWaypoint().asCartesianWaypoint().setTransform(target)  # edits mi
+snapshot = copy.copy(mi.getWaypoint().asCartesianWaypoint())  # an independent copy
+```
+
+`InstructionPoly.as…()` returns a copy, as the helpers did.
 
 ## 0.35.0.9
 

@@ -35,18 +35,15 @@ import numpy as np
 from tesseract_robotics.tesseract_command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     CompositeInstructionOrder,
-    InstructionPoly_as_CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
-    WaypointPoly_as_StateWaypointPoly,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -103,7 +100,7 @@ def _cartesian_waypoint(y: float) -> CartesianWaypoint:
 
 def _freespace_move(waypoint: CartesianWaypoint, description: str) -> MoveInstruction:
     instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(waypoint),
+        CartesianWaypointPoly(waypoint),
         MoveInstructionType.FREESPACE,
         DEFAULT_PROFILE_KEY,
     )
@@ -116,10 +113,10 @@ def _raster_segment() -> CompositeInstruction:
     segment = CompositeInstruction(DEFAULT_PROFILE_KEY)
     segment.setDescription("raster_segment")
     for y in RASTER_YS[1:]:
-        segment.appendMoveInstruction(
-            MoveInstructionPoly_wrap_MoveInstruction(
+        segment.push_back(
+            MoveInstructionPoly(
                 MoveInstruction(
-                    CartesianWaypointPoly_wrap_CartesianWaypoint(_cartesian_waypoint(y)),
+                    CartesianWaypointPoly(_cartesian_waypoint(y)),
                     MoveInstructionType.LINEAR,
                     DEFAULT_PROFILE_KEY,
                 )
@@ -137,16 +134,16 @@ def _transitions() -> CompositeInstruction:
     """
     transition_from_start = CompositeInstruction(DEFAULT_PROFILE_KEY)
     transition_from_start.setDescription("transition_from_start")
-    transition_from_start.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
+    transition_from_start.push_back(
+        MoveInstructionPoly(
             _freespace_move(_cartesian_waypoint(RASTER_YS[0]), "transition_from_end_plan")
         )
     )
 
     transition_from_end = CompositeInstruction(DEFAULT_PROFILE_KEY)
     transition_from_end.setDescription("transition_from_end")
-    transition_from_end.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
+    transition_from_end.push_back(
+        MoveInstructionPoly(
             _freespace_move(_cartesian_waypoint(RASTER_YS[0]), "transition_from_end_plan")
         )
     )
@@ -164,9 +161,9 @@ def _iter_move_instructions(composite):
     """Depth-first MoveInstructionPoly iteration over nested composites."""
     for instruction in composite:
         if instruction.isCompositeInstruction():
-            yield from _iter_move_instructions(InstructionPoly_as_CompositeInstruction(instruction))
+            yield from _iter_move_instructions(instruction.asCompositeInstruction())
         elif instruction.isMoveInstruction():
-            yield InstructionPoly_as_MoveInstructionPoly(instruction)
+            yield instruction.asMoveInstruction()
 
 
 def main():
@@ -196,7 +193,7 @@ def main():
     program = CompositeInstruction(DEFAULT_PROFILE_KEY, manip_info)
 
     start_instruction = MoveInstruction(
-        StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(joint_names, np.zeros(6))),
+        StateWaypointPoly(StateWaypoint(joint_names, np.zeros(6))),
         MoveInstructionType.FREESPACE,
         DEFAULT_PROFILE_KEY,
     )
@@ -204,11 +201,9 @@ def main():
 
     from_start = CompositeInstruction(DEFAULT_PROFILE_KEY)
     from_start.setDescription("from_start")
-    from_start.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-    from_start.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
-            _freespace_move(_cartesian_waypoint(RASTER_YS[0]), "from_start_plan")
-        )
+    from_start.push_back(MoveInstructionPoly(start_instruction))
+    from_start.push_back(
+        MoveInstructionPoly(_freespace_move(_cartesian_waypoint(RASTER_YS[0]), "from_start_plan"))
     )
     program.push_back(from_start)
 
@@ -220,10 +215,8 @@ def main():
 
     to_end = CompositeInstruction(DEFAULT_PROFILE_KEY)
     to_end.setDescription("to_end")
-    to_end.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
-            _freespace_move(_cartesian_waypoint(RASTER_YS[0]), "to_end_plan")
-        )
+    to_end.push_back(
+        MoveInstructionPoly(_freespace_move(_cartesian_waypoint(RASTER_YS[0]), "to_end_plan"))
     )
     program.push_back(to_end)
 
@@ -274,7 +267,7 @@ def main():
     for move in trajopt_moves:
         waypoint = move.getWaypoint()
         if waypoint.isStateWaypoint():
-            state = WaypointPoly_as_StateWaypointPoly(waypoint)
+            state = waypoint.asStateWaypoint()
             print(f"  {np.array2string(state.getPosition().flatten(), precision=3)}")
 
     if TesseractViewer is not None:

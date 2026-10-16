@@ -33,7 +33,7 @@ RuntimeError: TypeErasureBase, tried to cast 'tesseract_planning::JointWaypointP
 
 The tesseract_command_language uses type-erased "Poly" types (WaypointPoly, InstructionPoly, etc.) for runtime polymorphism. These require careful handling:
 
-- Use helper functions like `WaypointPoly_as_StateWaypointPoly()` to cast between types
+- Cast with the Poly methods: `instr.asMoveInstruction()`, `wp.asStateWaypoint()`, …
 - Check waypoint type with `isStateWaypoint()`, `isJointWaypoint()`, etc. before casting
 - Type casts will throw RuntimeError if the underlying type doesn't match
 
@@ -51,23 +51,16 @@ This is an RTTI issue where `typeid()` in Python bindings generates different `t
 - `as<T>()` template instantiated in Python binding module creates different `typeid(T)` than the one stored in the type erasure
 - BUT: `isMoveInstruction()` works because both `getType()` and `typeid(MoveInstructionPoly)` are generated within the C++ library
 
-**Solution:** Use `getInterface().recover()` to get the underlying `void*` pointer, then cast:
-
-```cpp
-m.def("InstructionPoly_as_MoveInstructionPoly", [](tp::InstructionPoly& ip) -> tp::MoveInstructionPoly {
-    if (!ip.isMoveInstruction())
-        throw std::runtime_error("InstructionPoly is not a MoveInstruction");
-    auto* ptr = static_cast<tp::MoveInstructionPoly*>(ip.getInterface().recover());
-    return *ptr;  // Copy
-}, "instruction"_a);
-```
+**Solution:** The RTTI visibility fix (`CXX_VISIBILITY_PRESET=default`) makes `as<T>()` work
+across the boundary, so the bindings call it directly.
 
 **Working Methods:**
-- `InstructionPoly_as_MoveInstructionPoly(instr)` - helper function
-- `instr.asMoveInstruction()` - method on InstructionPoly
-- `WaypointPoly_as_JointWaypointPoly(wp)` - for JointWaypoint extraction
-- `WaypointPoly_as_StateWaypointPoly(wp)` - for StateWaypoint extraction
-- `WaypointPoly_as_CartesianWaypointPoly(wp)` - for CartesianWaypoint extraction
+- `instr.asMoveInstruction()` (also `asCompositeInstruction`, `asWaitInstruction`, …) - a copy of
+  the stored instruction
+- `wp.asJointWaypoint()`, `wp.asStateWaypoint()`, `wp.asCartesianWaypoint()` - a reference into
+  the waypoint: edits reach it. `copy.copy(wp.asJointWaypoint())` when a copy is meant
+
+The SWIG-era helpers `InstructionPoly_as_*` and `WaypointPoly_as_*` are removed (#328).
 
 ## CompositeInstruction.flatten() - Not Needed
 

@@ -32,6 +32,17 @@
 
 - **`assign*Waypoint` and `ProfileDictionary_addProfile` removed** — `MoveInstruction` and `MoveInstructionPoly` lose `assignCartesianWaypoint`, `assignJointWaypoint` and `assignStateWaypoint`, SWIG-era copies of `setWaypoint` (C++ 0.33 removed them); `tesseract_command_language.ProfileDictionary_addProfile(d, ns, name, p)` is gone, since `d.addProfile(ns, name, p)` takes every module's profiles. Nothing in the repository called them ([#276]).
 
+- **SWIG-era Poly helpers and `appendMoveInstruction` removed** — the 14 module functions `CartesianWaypointPoly_wrap_CartesianWaypoint`, `JointWaypointPoly_wrap_JointWaypoint`, `StateWaypointPoly_wrap_StateWaypoint`, `MoveInstructionPoly_wrap_MoveInstruction`, `InstructionPoly_as_*` (7) and `WaypointPoly_as_*` (3), and `CompositeInstruction.appendMoveInstruction`, duplicated a constructor or method; C++ has none of them. Every in-repo caller moved to the native form. `wp.as…Waypoint()` returns a reference into the waypoint where `WaypointPoly_as_*` returned a copy: edits through it reach the program; `copy.copy(wp.as…Waypoint())` is the copy ([#328]).
+
+  | before | after |
+  | --- | --- |
+  | `CartesianWaypointPoly_wrap_CartesianWaypoint(wp)` (also `Joint…`, `State…`) | `CartesianWaypointPoly(wp)` |
+  | `MoveInstructionPoly_wrap_MoveInstruction(mi)` | `MoveInstructionPoly(mi)` |
+  | `InstructionPoly_as_MoveInstructionPoly(ip)` | `ip.asMoveInstruction()` |
+  | `InstructionPoly_as_CompositeInstruction(ip)` (also `Wait`, `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) | `ip.asCompositeInstruction()` (`asWaitInstruction()`, …) |
+  | `WaypointPoly_as_CartesianWaypointPoly(wp)` (also `Joint…`, `State…`) | `wp.asCartesianWaypoint()` (a reference) |
+  | `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -703,3 +714,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
 [#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275
 [#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276
+[#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328

@@ -16,8 +16,8 @@ The high-level API abstracts three major pain points of the raw C++ bindings:
    High-level: Robot.from_tesseract_support("abb_irb2400")
 
 2. Poly-Type Wrapping (MotionProgram class)
-   Low-level: Manual wrapping with CartesianWaypointPoly_wrap_CartesianWaypoint(),
-              MoveInstructionPoly_wrap_MoveInstruction(), AnyPoly_wrap_*(), etc.
+   Low-level: Manual wrapping with CartesianWaypointPoly(),
+              MoveInstructionPoly(), AnyPoly_wrap_*(), etc.
    High-level: program.move_to(CartesianTarget(pose)) - wrapping is automatic
 
 3. Obstacle Creation (create_obstacle helper)
@@ -209,8 +209,8 @@ def main():
     # 6. Motion Program - Fluent builder API
     # =========================================================================
     # WHY: The low-level C++ bindings require explicit poly-type wrapping:
-    #   CartesianWaypointPoly_wrap_CartesianWaypoint(waypoint)
-    #   MoveInstructionPoly_wrap_MoveInstruction(instruction)
+    #   CartesianWaypointPoly(waypoint)
+    #   MoveInstructionPoly(instruction)
     # This is because C++ templates don't translate directly to Python.
     # MotionProgram handles all wrapping internally via to_composite_instruction().
     print("\n6. Building motion program...")
