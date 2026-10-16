@@ -590,13 +590,17 @@ def test_third_party_header_patterns_rendered_with_reasons(fixture_report):
 
 def test_hacd_header_has_its_own_reason():
     """Q1: declared but not built in 0.35.0, stated apart from the Bullet internals."""
-    assert "not built" in audit.UNAUDITED_HEADERS.get("bullet/convex_decomposition_hacd.h", "")
+    collision = audit.UNAUDITED_HEADERS["tesseract/collision/"]
+    assert "not built" in collision["bullet/convex_decomposition_hacd.h"]
 
 
 def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
+    """TF-1: each pattern is shown below its prefix, `*/` for `ANY_PREFIX`."""
     text = audit.render_markdown([fixture_report], PROV, COVERAGE)
-    for pattern, reason in audit.UNAUDITED_HEADERS.items():
-        assert f"`{pattern}`: {reason}" in text
+    for key, patterns in audit.UNAUDITED_HEADERS.items():
+        shown = "*/" if key == audit.ANY_PREFIX else key
+        for pattern, reason in patterns.items():
+            assert f"`{shown}{pattern}`: {reason}" in text
 
 
 def test_limitations_describe_type_matching(fixture_report):

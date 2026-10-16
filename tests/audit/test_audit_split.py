@@ -101,7 +101,7 @@ def test_cli_defines_only_main():
 # `_gap_arity` joins this set when #251 lands (0b plan Task 0 table).
 REPORT = {
     "REPORT_PATH", "LIMITATION", "_git", "libclang_version", "provenance", "_table",
-    "render_markdown", "to_json",
+    "render_markdown", "to_json", "_unaudited_patterns",
 }  # fmt: skip
 
 
