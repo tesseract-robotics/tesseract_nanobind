@@ -582,6 +582,27 @@ def _is_ctor(m: ci.Cursor, record: ci.Cursor) -> bool:
     )
 
 
+# A reference to a template type parameter, as a forwarding ctor template takes it.
+REFERENCE_TYPE_KINDS = frozenset({ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE})
+
+
+def _is_forwarding_ctor_template(m: ci.Cursor) -> bool:
+    """`m` is a constructor template that takes any type: every parameter is `T`, `const T&`
+    or `T&&` for one of `m`'s own template type parameters (`template <T> AnyPoly(T&&)`).
+    Python names one function per instance (`AnyPoly_wrap_CompositeInstruction`), so the
+    overload is absent by design (template-instance-name)."""
+    if m.kind != ci.CursorKind.FUNCTION_TEMPLATE or not _is_ctor(m, m.semantic_parent):
+        return False
+    own = {c.spelling for c in m.get_children() if c.kind == ci.CursorKind.TEMPLATE_TYPE_PARAMETER}
+    params = [p for p in m.get_children() if p.kind == ci.CursorKind.PARM_DECL]
+
+    def bare(t: ci.Type) -> str:
+        t = t.get_pointee() if t.kind in REFERENCE_TYPE_KINDS else t
+        return t.spelling.removeprefix("const ")
+
+    return bool(params) and all(bare(p.type) in own for p in params)
+
+
 def _member(m: ci.Cursor, record: ci.Cursor) -> tuple[str, Kind] | None:
     """Leaf name and kind of a public, non-deprecated method, operator or field of `record`
     that the audit compares, else None: the one member filter for a class's own members and
@@ -642,6 +663,8 @@ def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload
         absent_ok = "type-index"
     if any(_names_unbound_dependency(p.type) for p in params):
         absent_ok = UNBOUND_DEPENDENCY
+    if _is_forwarding_ctor_template(c):
+        absent_ok = "template-instance-name"
     if any(_is_yaml_node(p) for p in params):
         absent_ok = "yaml-node"
     raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
