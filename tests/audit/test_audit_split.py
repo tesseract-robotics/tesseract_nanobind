@@ -27,7 +27,7 @@ def defined_names(module: str) -> set[str]:
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
 # audit_types, audit_ownership, audit_parse, audit_stub, audit_match, audit_report, audit_bindings.
-EXPECTED_SCRIPTS = ("audit_types", "audit_ownership", "audit_parse", "audit_match")
+EXPECTED_SCRIPTS = ("audit_types", "audit_ownership", "audit_parse", "audit_stub", "audit_match")
 
 
 def test_every_script_is_loaded_once():
@@ -62,3 +62,17 @@ PARSE = {
 def test_parse_defines_exactly():
     assert defined_names("audit_parse") == PARSE
     assert not defined_names("audit_match") & PARSE
+
+
+STUB = {
+    "StubMissingError", "load_stub", "ENUM_BASES", "DUNDER_OPERATORS", "NOT_AN_OVERLOAD",
+    "TRY_IMPORT", "PyOverload", "PySymbol", "QuotedType", "Deviation", "Accepted", "PyApi",
+    "rel", "_decorators", "_is_setter", "_py_arity", "_py_param_nodes", "_function_kind",
+    "_annotations", "_quoted_names", "_enum_member", "py_api", "_catches_import_error",
+    "INIT_HOOKS", "init_findings", "init_accepted",
+}  # fmt: skip
+
+
+def test_stub_defines_exactly():
+    assert defined_names("audit_stub") == STUB
+    assert not defined_names("audit_match") & STUB
