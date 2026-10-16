@@ -64,7 +64,7 @@ PARSE = {
     "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
     "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
     "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",
-    "_is_reference_wrapper_vector",  # #256 group 1
+    "TYPE_INDEX", "_is_reference_wrapper_vector",  # #256 group 1
 }  # fmt: skip
 
 
@@ -114,8 +114,9 @@ MATCH = {
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
     # #256 group 1
     "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
-    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "UnknownAcceptedRuleError",
-    "_check_rule_keys", "_absent_ok_accepts", "_unbound_rule", "_uncovered_rule",
+    "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "WHOLE_SYMBOL_ABSENT_OK",
+    "UnknownAcceptedRuleError", "_check_rule_keys", "_absent_ok_accepts", "_whole_symbol_rule",
+    "_bound_as_method", "_unbound_rule", "_uncovered_rule",
 }  # fmt: skip
 
 
