@@ -1,11 +1,14 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
 
 import gc
+import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import numpy as np
 import pytest
+import scipy.sparse
 
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
@@ -31,6 +34,7 @@ from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerR
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    ProfileDictionary_addTrajOptIfoptMoveProfile,
     ProfileDictionary_addTrajOptIfoptPlanProfile,
     ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptCartesianWaypointConfig,
@@ -42,9 +46,11 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
+    TrajOptIfoptProfileReturnTypeError,
     TrajOptIfoptSolverProfile,
     TrajOptIfoptTermInfos,
     TrajOptIfoptWaypointInfo,
+    TrajOptIfoptWaypointInfoWithoutNodeError,
     createCollisionConstraints,
     createJointVelocityConstraint,
 )
@@ -884,3 +890,372 @@ class TestTrajOptIfoptProfileFromYaml:
     def test_wrong_value_type_raises_the_constructor_error(self):
         with pytest.raises(RuntimeError, match="Failed to parse yaml config"):
             TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: not-a-bool\n")
+
+
+# ---- Python-authored profiles (gh-340) -------------------------------------
+
+
+class _ZeroCost(ti.ConstraintSet):
+    """A one-row squared cost that is always zero; counts `getValues` calls."""
+
+    def __init__(self):
+        super().__init__("python_zero_cost", 1)
+        self.value_calls = 0
+
+    def getValues(self):
+        self.value_calls += 1
+        return np.zeros(1)
+
+    def getBounds(self):
+        return [ti.Bounds(0.0, 0.0)]
+
+    def getJacobian(self):
+        return scipy.sparse.csr_matrix((1, self.getVariables().getRows()))
+
+    def update(self):
+        return self.getRows()
+
+    def getCoefficients(self):
+        return np.ones(1)
+
+
+class _ProfileError(Exception):
+    """Raised by a Python profile hook; a type no binding translates to."""
+
+
+class _DelegatingMoveProfile(TrajOptIfoptMoveProfile):
+    def __init__(self):
+        super().__init__()
+        self.indices = []
+        self._inner = TrajOptIfoptDefaultMoveProfile()
+        self._inner.joint_cost_config.enabled = False
+        self._inner.joint_constraint_config.enabled = True
+
+    def create(self, move_instruction, composite_manip_info, env, index):
+        self.indices.append(index)
+        return self._inner.create(move_instruction, composite_manip_info, env, index)
+
+
+class _AddingCompositeProfile(TrajOptIfoptCompositeProfile):
+    """The smoothing profile's terms plus one Python cost."""
+
+    def __init__(self, n_joints):
+        super().__init__()
+        self.cost = _ZeroCost()
+        self.seen = None
+        self._inner = _smoothing_composite_profile(n_joints)
+
+    def create(self, composite_manip_info, env, nodes, fixed_indices):
+        self.seen = (len(nodes), list(fixed_indices))
+        terms = self._inner.create(composite_manip_info, env, nodes, fixed_indices)
+        terms.squared_costs = [*terms.squared_costs, self.cost]
+        return terms
+
+
+def _python_profile_request(t_env, manip_info, joint_names, move=None, composite=None):
+    request = _request(t_env, manip_info, joint_names, TrajOptIfoptOSQPSolverProfile())
+    if move is not None:
+        ProfileDictionary_addTrajOptIfoptMoveProfile(
+            request.profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", move
+        )
+    if composite is not None:
+        ProfileDictionary_addTrajOptIfoptCompositeProfile(
+            request.profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite
+        )
+    return request
+
+
+# s: a child loads an environment and runs one TrajOpt-Ifopt solve (the task-composer child also
+# loads the pipeline plugins, about 5 s); generous for a loaded CI runner
+CHILD_TIMEOUT_S = 300.0
+
+_CHILD_PREAMBLE = textwrap.dedent(
+    """
+    import gc
+
+    import numpy as np
+    import scipy.sparse
+
+    from tesseract_robotics import trajopt_ifopt as ti
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        TrajOptIfoptCompositeProfile,
+        TrajOptIfoptDefaultCompositeProfile,
+        TrajOptIfoptDefaultMoveProfile,
+        TrajOptIfoptMoveProfile,
+    )
+
+    released = []
+
+    class ZeroCost(ti.ConstraintSet):
+        def __init__(self):
+            super().__init__("python_zero_cost", 1)
+            self.value_calls = 0
+
+        def __del__(self):
+            released.append(self.value_calls)
+
+        def getValues(self):
+            self.value_calls += 1
+            return np.zeros(1)
+
+        def getBounds(self):
+            return [ti.Bounds(0.0, 0.0)]
+
+        def getJacobian(self):
+            return scipy.sparse.csr_matrix((1, self.getVariables().getRows()))
+
+        def update(self):
+            return self.getRows()
+
+        def getCoefficients(self):
+            return np.ones(1)
+    """
+)
+
+# The planning API runs TrajOptIfoptPipeline on the task composer's worker threads: the Python
+# composite profile's create, the Python cost's calls and, once the result is dropped, the
+# cost's release all happen off the main thread.
+_TASK_COMPOSER_RELEASE = textwrap.dedent(
+    """
+    from tesseract_robotics.planning import (
+        JointTarget,
+        MotionProgram,
+        Robot,
+        TaskComposer,
+        create_trajopt_ifopt_default_profiles,
+    )
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    )
+
+    class AddingComposite(TrajOptIfoptCompositeProfile):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+            self._inner = TrajOptIfoptDefaultCompositeProfile()
+
+        def create(self, composite_manip_info, env, nodes, fixed_indices):
+            self.calls += 1
+            terms = self._inner.create(composite_manip_info, env, nodes, fixed_indices)
+            terms.squared_costs = [*terms.squared_costs, ZeroCost()]
+            return terms
+
+    robot = Robot.from_tesseract_support("abb_irb2400")
+    program = (
+        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+        .move_to(JointTarget([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        .move_to(JointTarget([0.5, 0.2, -0.3, 0.4, 0.6, -0.2]))
+    )
+    profiles = create_trajopt_ifopt_default_profiles()
+    composite = AddingComposite()
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(
+        profiles, "TrajOptIfoptMotionPlannerTask", "DEFAULT", composite
+    )
+    composer = TaskComposer.from_config()
+    result = composer.plan(robot, program, pipeline="TrajOptIfoptPipeline", profiles=profiles)
+    assert result.successful, result.message
+    assert composite.calls == 1, composite.calls
+    del result, profiles, composite
+    gc.collect()
+    assert len(released) == 1 and released[0] > 0, released
+    print("OK")
+    """
+)
+
+# A move profile that keeps its waypoint info would keep a Node the planner has taken; the
+# trampoline refuses such an info before the planner moves the node out.
+_KEPT_WAYPOINT_INFO = textwrap.dedent(
+    """
+    from pathlib import Path
+
+    from tesseract_robotics.tesseract_command_language import (
+        CompositeInstruction,
+        JointWaypoint,
+        JointWaypointPoly_wrap_JointWaypoint,
+        MoveInstruction,
+        MoveInstructionPoly_wrap_MoveInstruction,
+        MoveInstructionType_FREESPACE,
+        ProfileDictionary,
+    )
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.tesseract_environment import Environment
+    from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+    from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        ProfileDictionary_addTrajOptIfoptCompositeProfile,
+        ProfileDictionary_addTrajOptIfoptMoveProfile,
+        ProfileDictionary_addTrajOptIfoptSolverProfile,
+        TrajOptIfoptMotionPlanner,
+        TrajOptIfoptOSQPSolverProfile,
+        TrajOptIfoptWaypointInfoInUseError,
+    )
+
+    class Keeper(TrajOptIfoptMoveProfile):
+        def __init__(self, keep):
+            super().__init__()
+            self.keep = keep
+            self.kept = []
+            self._inner = TrajOptIfoptDefaultMoveProfile()
+
+        def create(self, move_instruction, composite_manip_info, env, index):
+            info = self._inner.create(move_instruction, composite_manip_info, env, index)
+            if self.keep == "info":
+                self.kept.append(info)
+            elif self.keep == "node":
+                self.kept.append(info.node)
+            return info
+
+    locator = GeneralResourceLocator()
+    support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
+    env = Environment()
+    assert env.init(
+        Path(locator.locateResource(support + ".urdf").getFilePath()),
+        Path(locator.locateResource(support + ".srdf").getFilePath()),
+        locator,
+    )
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    joints = list(env.getJointGroup("manipulator").getJointNames())
+
+    def move(position):
+        return MoveInstructionPoly_wrap_MoveInstruction(
+            MoveInstruction(
+                JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.array(position))),
+                MoveInstructionType_FREESPACE,
+                "DEFAULT",
+            )
+        )
+
+    for keep in ("info", "node"):
+        program = CompositeInstruction("DEFAULT")
+        program.setManipulatorInfo(manip_info)
+        program.appendMoveInstruction(move([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]))
+        program.appendMoveInstruction(move([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0]))
+        profiles = ProfileDictionary()
+        keeper = Keeper(keep)
+        ns = "TrajOptIfoptMotionPlannerTask"
+        ProfileDictionary_addTrajOptIfoptMoveProfile(profiles, ns, "DEFAULT", keeper)
+        ProfileDictionary_addTrajOptIfoptCompositeProfile(
+            profiles, ns, "DEFAULT", TrajOptIfoptDefaultCompositeProfile()
+        )
+        ProfileDictionary_addTrajOptIfoptSolverProfile(
+            profiles, ns, "DEFAULT", TrajOptIfoptOSQPSolverProfile()
+        )
+        request = PlannerRequest()
+        request.env = env
+        request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 5)
+        request.profiles = profiles
+        try:
+            TrajOptIfoptMotionPlanner(ns).solve(request)
+        except TrajOptIfoptWaypointInfoInUseError as error:
+            assert "create" in str(error), str(error)
+        else:
+            raise AssertionError(f"keeping the {keep} was not refused")
+        del request, profiles
+        gc.collect()
+        # what the override kept is still whole: the planner never took its node
+        if keep == "info":
+            assert keeper.kept[0].node.getName() == "Node_0"
+        else:
+            assert keeper.kept[0].getName() == "Node_0"
+    print("OK")
+    """
+)
+
+
+def _run_child(body):
+    proc = subprocess.run(
+        [sys.executable, "-c", _CHILD_PREAMBLE + body],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=CHILD_TIMEOUT_S,
+    )
+    traceback_at = proc.stderr.find("Traceback")
+    assert proc.returncode == 0, (
+        f"child died (rc={proc.returncode}, SIGSEGV is -11/139): "
+        f"{proc.stderr[traceback_at:] if traceback_at >= 0 else proc.stderr}"
+    )
+    assert "OK" in proc.stdout.splitlines(), proc.stdout
+
+
+class TestTrajOptIfoptPythonProfiles:
+    """Python subclasses of the move and composite profiles plan (gh-340)."""
+
+    def test_python_composite_profile_adds_a_constraint_set(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        composite = _AddingCompositeProfile(len(joint_names))
+        request = _python_profile_request(t_env, manip_info, joint_names, composite=composite)
+        n_moves = len(_move_instructions(request.instructions))
+        response = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+        assert response.successful, response.message
+        assert composite.seen == (n_moves, [0, n_moves - 1])
+        assert composite.cost.value_calls > 0
+
+    def test_python_move_profile_plans(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        move = _DelegatingMoveProfile()
+        request = _python_profile_request(t_env, manip_info, joint_names, move=move)
+        n_moves = len(_move_instructions(request.instructions))
+        response = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+        assert response.successful, response.message
+        assert move.indices == list(range(n_moves))
+
+    def test_move_create_exception_propagates(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+
+        class Raising(TrajOptIfoptMoveProfile):
+            def create(self, move_instruction, composite_manip_info, env, index):
+                raise _ProfileError("from move create")
+
+        request = _python_profile_request(t_env, manip_info, joint_names, move=Raising())
+        with pytest.raises(_ProfileError, match="from move create"):
+            TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    def test_composite_create_exception_propagates(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+
+        class Raising(TrajOptIfoptCompositeProfile):
+            def create(self, composite_manip_info, env, nodes, fixed_indices):
+                raise _ProfileError("from composite create")
+
+        request = _python_profile_request(t_env, manip_info, joint_names, composite=Raising())
+        with pytest.raises(_ProfileError, match="from composite create"):
+            TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    def test_move_create_without_a_node_raises(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+
+        class NoNode(TrajOptIfoptMoveProfile):
+            def create(self, move_instruction, composite_manip_info, env, index):
+                return TrajOptIfoptWaypointInfo()
+
+        request = _python_profile_request(t_env, manip_info, joint_names, move=NoNode())
+        with pytest.raises(TrajOptIfoptWaypointInfoWithoutNodeError, match="node"):
+            TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    def test_move_create_wrong_return_type_raises(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+
+        class WrongType(TrajOptIfoptMoveProfile):
+            def create(self, move_instruction, composite_manip_info, env, index):
+                return None
+
+        request = _python_profile_request(t_env, manip_info, joint_names, move=WrongType())
+        with pytest.raises(TrajOptIfoptProfileReturnTypeError, match="TrajOptIfoptWaypointInfo"):
+            TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    def test_hook_without_override_raises(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+
+        class Bare(TrajOptIfoptCompositeProfile):
+            pass
+
+        request = _python_profile_request(t_env, manip_info, joint_names, composite=Bare())
+        with pytest.raises(RuntimeError, match="pure virtual"):
+            TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    def test_kept_waypoint_info_is_refused(self):
+        _run_child(_KEPT_WAYPOINT_INFO)
+
+    def test_python_constraint_set_released_after_task_composer_solve(self):
+        _run_child(_TASK_COMPOSER_RELEASE)

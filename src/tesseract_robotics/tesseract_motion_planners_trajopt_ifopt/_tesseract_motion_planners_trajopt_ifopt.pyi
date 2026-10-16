@@ -14,6 +14,19 @@ import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 import tesseract_robotics.trajopt_sqp._trajopt_sqp
 
 
+class TrajOptIfoptProfileReturnTypeError(TypeError):
+    """A Python TrajOpt-Ifopt profile's create returned the wrong type."""
+
+class TrajOptIfoptWaypointInfoWithoutNodeError(ValueError):
+    """
+    A Python TrajOptIfoptMoveProfile.create returned a waypoint info without a node.
+    """
+
+class TrajOptIfoptWaypointInfoInUseError(ValueError):
+    """
+    A Python TrajOptIfoptMoveProfile.create returned a waypoint info still referenced elsewhere.
+    """
+
 class TrajOptIfoptCartesianWaypointConfig:
     def __init__(self) -> None: ...
 
@@ -148,6 +161,8 @@ class TrajOptIfoptWaypointInfo:
     def fixed(self, arg: bool, /) -> None: ...
 
 class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
+    def __init__(self) -> None: ...
+
     def getKey(self) -> int: ...
 
     @staticmethod
@@ -160,6 +175,8 @@ class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tes
 TrajOptIfoptPlanProfile: TypeAlias = TrajOptIfoptMoveProfile
 
 class TrajOptIfoptCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
+    def __init__(self) -> None: ...
+
     def getKey(self) -> int: ...
 
     @staticmethod
