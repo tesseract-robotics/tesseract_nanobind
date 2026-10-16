@@ -1,43 +1,22 @@
-"""Contract tests of scripts/audit_bindings.py.
+"""Contract tests of the binding API audit (scripts/audit_*.py).
 
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 The default env ignores this directory via `addopts`.
 """
 
 import ast
-import importlib.util
 import json
 import re
-import sys
 from pathlib import Path
 
 import pytest
+
+from tests.audit._load import audit
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
 
-# audit_bindings imports its sibling audit_types, which a script run finds next to it.
-_types_spec = importlib.util.spec_from_file_location(
-    "audit_types", REPO_ROOT / "scripts" / "audit_types.py"
-)
-_types = importlib.util.module_from_spec(_types_spec)
-sys.modules["audit_types"] = _types
-_types_spec.loader.exec_module(_types)
-
-_own_spec = importlib.util.spec_from_file_location(
-    "audit_ownership", REPO_ROOT / "scripts" / "audit_ownership.py"
-)
-_own = importlib.util.module_from_spec(_own_spec)
-sys.modules["audit_ownership"] = _own
-_own_spec.loader.exec_module(_own)
-
-_spec = importlib.util.spec_from_file_location(
-    "audit_bindings", REPO_ROOT / "scripts" / "audit_bindings.py"
-)
-audit = importlib.util.module_from_spec(_spec)
-sys.modules["audit_bindings"] = audit  # dataclasses resolve annotations via sys.modules
-_spec.loader.exec_module(audit)
 
 FIRST_PASS = ("tesseract_collision", "tesseract_common", "tesseract_environment")
 
