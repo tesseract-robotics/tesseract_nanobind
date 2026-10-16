@@ -9,11 +9,18 @@ from numpy.typing import NDArray
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_environment._tesseract_environment
+import tesseract_robotics.tesseract_kinematics._tesseract_kinematics
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
+import tesseract_robotics.tesseract_state_solver._tesseract_state_solver
 
 
 class SimpleMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str = 'SIMPLE') -> None: ...
+
+    def solve(self, request: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerRequest) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerResponse:
+        """
+        Plan `request`. An exception a Python profile's generate raises propagates from here.
+        """
 
 def generateInterpolatedProgram(instructions: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.15, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction:
     """Generate an interpolated program from a composite instruction"""
@@ -47,7 +54,163 @@ def getInterpolatedInstructions(poses: tesseract_robotics.tesseract_common._tess
     Cartesian move instructions for the columns of `states` after the first, seeded with those states; the last is `base_instruction` itself.
     """
 
+class JointGroupInstructionInfo:
+    """
+    A move instruction resolved against a joint group (no inverse kinematics)
+    """
+
+    def __init__(self, plan_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo) -> None: ...
+
+    @property
+    def instruction(self) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly:
+        """The move instruction this info describes (not a copy)"""
+
+    @property
+    def manip(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup: ...
+
+    @property
+    def working_frame(self) -> str: ...
+
+    @working_frame.setter
+    def working_frame(self, arg: str, /) -> None: ...
+
+    @property
+    def working_frame_transform(self) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
+
+    @working_frame_transform.setter
+    def working_frame_transform(self, arg: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, /) -> None: ...
+
+    @property
+    def tcp_frame(self) -> str: ...
+
+    @tcp_frame.setter
+    def tcp_frame(self, arg: str, /) -> None: ...
+
+    @property
+    def tcp_offset(self) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
+
+    @tcp_offset.setter
+    def tcp_offset(self, arg: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, /) -> None: ...
+
+    @property
+    def has_cartesian_waypoint(self) -> bool: ...
+
+    @has_cartesian_waypoint.setter
+    def has_cartesian_waypoint(self, arg: bool, /) -> None: ...
+
+    def calcCartesianPose(self, jp: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], in_world: bool = True) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+        """The tool pose at joint state `jp`, in world or in the working frame."""
+
+    def extractCartesianPose(self, in_world: bool = True) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+        """The Cartesian waypoint's pose, in world or in the working frame."""
+
+    def extractJointPosition(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """The joint or state waypoint's position."""
+
+class KinematicGroupInstructionInfo:
+    """
+    A move instruction resolved against a kinematic group (with inverse kinematics)
+    """
+
+    def __init__(self, plan_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo) -> None: ...
+
+    @property
+    def instruction(self) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly:
+        """The move instruction this info describes (not a copy)"""
+
+    @property
+    def manip(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup: ...
+
+    @property
+    def working_frame(self) -> str: ...
+
+    @working_frame.setter
+    def working_frame(self, arg: str, /) -> None: ...
+
+    @property
+    def working_frame_transform(self) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
+
+    @working_frame_transform.setter
+    def working_frame_transform(self, arg: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, /) -> None: ...
+
+    @property
+    def tcp_frame(self) -> str: ...
+
+    @tcp_frame.setter
+    def tcp_frame(self, arg: str, /) -> None: ...
+
+    @property
+    def tcp_offset(self) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d: ...
+
+    @tcp_offset.setter
+    def tcp_offset(self, arg: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, /) -> None: ...
+
+    @property
+    def has_cartesian_waypoint(self) -> bool: ...
+
+    @has_cartesian_waypoint.setter
+    def has_cartesian_waypoint(self, arg: bool, /) -> None: ...
+
+    def calcCartesianPose(self, jp: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], in_world: bool = True) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+        """The tool pose at joint state `jp`, in world or in the working frame."""
+
+    def extractCartesianPose(self, in_world: bool = True) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+        """The Cartesian waypoint's pose, in world or in the working frame."""
+
+    def extractJointPosition(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """The joint or state waypoint's position."""
+
+@overload
+def interpolateJointJointWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, linear_steps: int, freespace_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateJointJointWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateJointJointWaypoint(prev: JointGroupInstructionInfo, base: JointGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateJointCartWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, linear_steps: int, freespace_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateJointCartWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateJointCartWaypoint(prev: JointGroupInstructionInfo, base: JointGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateCartJointWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, linear_steps: int, freespace_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateCartJointWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateCartJointWaypoint(prev: JointGroupInstructionInfo, base: JointGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateCartCartWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, linear_steps: int, freespace_steps: int, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateCartCartWaypoint(prev: KinematicGroupInstructionInfo, base: KinematicGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def interpolateCartCartWaypoint(prev: JointGroupInstructionInfo, base: JointGroupInstructionInfo, state_lvs_length: float, translation_lvs_length: float, rotation_lvs_length: float, min_steps: int, max_steps: int, scene_state: tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]: ...
+
+@overload
+def getClosestJointSolution(info: KinematicGroupInstructionInfo, seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """
+    The inverse-kinematics solution for `info`'s Cartesian waypoint closest to `seed`.
+    """
+
+@overload
+def getClosestJointSolution(info1: KinematicGroupInstructionInfo, info2: KinematicGroupInstructionInfo, seed: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tuple[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
+    """
+    The pair of inverse-kinematics solutions, one per Cartesian waypoint, closest to each other, as `(solution1, solution2)`.
+    """
+
 class SimplePlannerMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
+    def __init__(self) -> None: ...
+
     @staticmethod
     def createKey() -> int:
         """The key every simple-planner move profile registers under."""
