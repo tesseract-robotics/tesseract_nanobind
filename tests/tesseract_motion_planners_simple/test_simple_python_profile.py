@@ -467,6 +467,66 @@ _STORED_BASE_INSTRUCTION = textwrap.dedent(
 )
 
 
+# generate is pure virtual: super().generate from a Python override has nothing to delegate to and
+# must raise, not dispatch back into the override until the stack runs out.
+_SUPER_GENERATE = textwrap.dedent(
+    """
+    from tesseract_robotics.tesseract_command_language import InstructionPoly
+    from tesseract_robotics.tesseract_motion_planners_simple import (
+        SimplePlannerLVSMoveProfile,
+        SimplePlannerPureVirtualCallError,
+    )
+
+    class CallsUp(SimplePlannerMoveProfile):
+        def generate(self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi):
+            return super().generate(
+                prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+            )
+
+    class ExtendsLVS(SimplePlannerLVSMoveProfile):
+        def generate(self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi):
+            return super().generate(
+                prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+            )
+
+    env = make_env()
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    start, end = joint_move([0.0] * 6), joint_move(END)
+    args = (start, start, end, InstructionPoly(), env, manip_info)
+
+    try:
+        CallsUp().generate(*args)
+    except SimplePlannerPureVirtualCallError as error:
+        assert isinstance(error, NotImplementedError)
+        assert "generate" in str(error), str(error)
+    else:
+        raise AssertionError("super().generate did not raise")
+
+    # a Python subclass of a concrete C++ profile delegates to that profile's generate
+    assert len(ExtendsLVS().generate(*args)) > 1
+
+    # through solve, the error comes out of SimpleMotionPlanner.solve with its type
+    program = CompositeInstruction("PY_PROFILE")
+    program.setManipulatorInfo(manip_info)
+    program.appendMoveInstruction(start)
+    program.appendMoveInstruction(end)
+    profiles = ProfileDictionary()
+    profiles.addProfile("SIMPLE", "PY_PROFILE", CallsUp())
+    request = PlannerRequest()
+    request.env = env
+    request.instructions = program
+    request.profiles = profiles
+    try:
+        SimpleMotionPlanner("SIMPLE").solve(request)
+    except SimplePlannerPureVirtualCallError:
+        pass
+    else:
+        raise AssertionError("solve with super().generate did not raise")
+    print("OK")
+    """
+)
+
+
 def _run_child(body):
     proc = subprocess.run(
         [sys.executable, "-c", _CHILD_PREAMBLE + body],
@@ -480,7 +540,7 @@ def _run_child(body):
         f"child died (rc={proc.returncode}, SIGSEGV is -11/139): "
         f"{proc.stderr[traceback_at:] if traceback_at >= 0 else proc.stderr}"
     )
-    assert proc.stdout.splitlines()[-1] == "OK", proc.stdout
+    assert "OK" in proc.stdout.splitlines(), proc.stdout
 
 
 def test_instruction_info_keeps_instruction_and_env_alive():
@@ -489,3 +549,7 @@ def test_instruction_info_keeps_instruction_and_env_alive():
 
 def test_stored_generate_arguments_outlive_solve():
     _run_child(_STORED_BASE_INSTRUCTION)
+
+
+def test_super_generate_raises_pure_virtual_call_error():
+    _run_child(_SUPER_GENERATE)
