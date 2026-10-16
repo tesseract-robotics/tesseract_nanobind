@@ -16,6 +16,8 @@
 #include <tesseract/time_parameterization/isp/iterative_spline_parameterization_profiles.h>
 #include <tesseract/time_parameterization/kdl/constant_tcp_speed_parameterization.h>
 #include <tesseract/time_parameterization/kdl/constant_tcp_speed_parameterization_profiles.h>
+#include <tesseract/time_parameterization/ruckig/ruckig_trajectory_smoothing.h>
+#include <tesseract/time_parameterization/ruckig/ruckig_trajectory_smoothing_profiles.h>
 #include <tesseract/time_parameterization/utils.h>
 
 // tesseract_command_language
@@ -122,6 +124,21 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     // ========== ConstantTCPSpeedParameterization ==========
     nb::class_<tp::ConstantTCPSpeedParameterization, tp::TimeParameterization>(m, "ConstantTCPSpeedParameterization")
         .def(nb::init<std::string>(), "name"_a = "ConstantTCPSpeed");
+
+    // ========== RuckigTrajectorySmoothingCompositeProfile ==========
+    nb::class_<tp::RuckigTrajectorySmoothingCompositeProfile, tc::Profile>(m, "RuckigTrajectorySmoothingCompositeProfile")
+        .def(nb::init<>())
+        .def(nb::init<double, double>(), "duration_extension_fraction"_a, "max_duration_extension_factor"_a)
+        .def_rw("duration_extension_fraction", &tp::RuckigTrajectorySmoothingCompositeProfile::duration_extension_fraction)
+        .def_rw("max_duration_extension_factor", &tp::RuckigTrajectorySmoothingCompositeProfile::max_duration_extension_factor)
+        .def_rw("override_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::override_limits)
+        .def_rw("velocity_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::velocity_limits)
+        .def_rw("acceleration_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::acceleration_limits)
+        .def_rw("jerk_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::jerk_limits);
+
+    // ========== RuckigTrajectorySmoothing ==========
+    nb::class_<tp::RuckigTrajectorySmoothing, tp::TimeParameterization>(m, "RuckigTrajectorySmoothing")
+        .def(nb::init<std::string>(), "name"_a = "RuckigTrajectorySmoothing");
 
     // ========== Utilities ==========
     m.def("rescaleTimings", [](tcl::CompositeInstruction& program, std::vector<double> scalings) {

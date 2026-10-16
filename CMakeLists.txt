@@ -356,7 +356,7 @@ else()
 endif()
 
 # Find and add tesseract_time_parameterization
-find_package(tesseract_planning REQUIRED COMPONENTS time_parameterization time_parameterization_isp time_parameterization_totg time_parameterization_kdl)
+find_package(tesseract_planning REQUIRED COMPONENTS time_parameterization time_parameterization_isp time_parameterization_totg time_parameterization_kdl time_parameterization_ruckig)
 
 add_tesseract_nanobind_extension(
   tesseract_time_parameterization
@@ -364,6 +364,7 @@ add_tesseract_nanobind_extension(
   tesseract::time_parameterization_isp
   tesseract::time_parameterization_totg
   tesseract::time_parameterization_kdl
+  tesseract::time_parameterization_ruckig
   tesseract::time_parameterization
   tesseract::command_language
   tesseract::common
