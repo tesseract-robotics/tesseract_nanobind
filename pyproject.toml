@@ -306,6 +306,7 @@ python-clang = { version = "==22.1.8", build = "default_hccd1708_2" }
 # lib/clang/22/include: the builtin headers (stdarg.h, stddef.h) libclang expects in its
 # resource dir; python-clang/libclang do not ship them.
 clang-22 = "==22.1.8"
+ty = ">=0.0.89,<0.0.90"
 
 [tool.pixi.feature.audit.tasks]
 audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff each binding's C++ API against its committed stub; writes docs/developer/binding-api-audit.md" }
