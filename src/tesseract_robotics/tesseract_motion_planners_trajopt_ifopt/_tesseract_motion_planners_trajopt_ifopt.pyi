@@ -9,6 +9,9 @@ from numpy.typing import NDArray
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_environment._tesseract_environment
+from tesseract_robotics.tesseract_motion_planners._profile_overrides import (
+    __init_subclass__ as __init_subclass__
+)
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 import tesseract_robotics.trajopt_sqp._trajopt_sqp

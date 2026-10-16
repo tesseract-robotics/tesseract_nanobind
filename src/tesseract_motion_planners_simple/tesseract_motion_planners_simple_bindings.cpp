@@ -55,13 +55,14 @@ namespace {
 
 // SimpleMotionPlanner::solve catches the std::exception a profile's generate throws and returns
 // a failed response carrying only its text (simple_motion_planner.cpp:101-112, tesseract_planning
-// 0.35.0). The Python-facing solve arms this thread's slot, the trampoline stores the Python
-// error there before upstream's catch sees it, and solve raises it once upstream returns. A solve
-// not started from Python (a task-composer worker) leaves the slot unarmed and keeps upstream's
-// failed response; nothing is stored on such a thread.
+// 0.35.0). The Python-facing solve arms this thread's slot, the trampoline stores the error (a
+// Python error, or one of the named errors below) there before upstream's catch sees it, and solve
+// rethrows it once upstream returns and the GIL is held again. A solve not started from Python (a
+// task-composer worker) leaves the slot unarmed and keeps upstream's failed response; nothing is
+// stored on such a thread.
 struct PendingGenerateError {
     bool armed{ false };
-    std::unique_ptr<nb::python_error> error;
+    std::exception_ptr error;
 };
 thread_local PendingGenerateError pending_generate_error;
 
@@ -71,7 +72,7 @@ class ArmedSolve {
 public:
     ArmedSolve() : saved_armed_(pending_generate_error.armed), saved_error_(std::move(pending_generate_error.error)) {
         pending_generate_error.armed = true;
-        pending_generate_error.error.reset();
+        pending_generate_error.error = nullptr;
     }
     ~ArmedSolve() {
         pending_generate_error.armed = saved_armed_;
@@ -81,11 +82,21 @@ public:
     ArmedSolve& operator=(const ArmedSolve&) = delete;
 
     // The first error a generate override raised during this solve, or null.
-    std::unique_ptr<nb::python_error> take() { return std::move(pending_generate_error.error); }
+    std::exception_ptr take() { return std::exchange(pending_generate_error.error, nullptr); }
 
 private:
     bool saved_armed_;
-    std::unique_ptr<nb::python_error> saved_error_;
+    std::exception_ptr saved_error_;
+};
+
+// generate returned an empty list: upstream reads its back() (simple_motion_planner.cpp:261, :270).
+struct EmptyGenerateError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// generate returned a null MoveInstructionPoly, which upstream would plan as a success.
+struct NullInstructionError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
 };
 
 // super().generate(...) from a Python override: generate is pure virtual, so the base binding
@@ -110,13 +121,25 @@ public:
                                                    const tc::ManipulatorInfo& global_manip_info) const override {
         nb::detail::ticket t(nb_trampoline, "generate", true);
         try {
-            return nb::cast<std::vector<tcl::MoveInstructionPoly>>(nb_trampoline.base().attr(t.key)(
+            auto instructions = nb::cast<std::vector<tcl::MoveInstructionPoly>>(nb_trampoline.base().attr(t.key)(
                 nb::cast(prev_instruction, nb::rv_policy::copy), nb::cast(prev_seed, nb::rv_policy::copy),
                 nb::cast(base_instruction, nb::rv_policy::copy), nb::cast(next_instruction, nb::rv_policy::copy),
                 env, nb::cast(global_manip_info, nb::rv_policy::copy)));
-        } catch (nb::python_error& e) {
+            if (instructions.empty())
+                throw EmptyGenerateError("SimplePlannerMoveProfile.generate returned an empty list; it must end "
+                                         "with base_instruction");
+            for (std::size_t i = 0; i < instructions.size(); ++i)
+                if (instructions[i].isNull())
+                    throw NullInstructionError("SimplePlannerMoveProfile.generate returned a null instruction at "
+                                               "index " + std::to_string(i));
+            return instructions;
+        } catch (const nb::python_error&) {
             if (pending_generate_error.armed && !pending_generate_error.error)
-                pending_generate_error.error = std::make_unique<nb::python_error>(e);
+                pending_generate_error.error = std::current_exception();
+            throw;
+        } catch (const std::invalid_argument&) {
+            if (pending_generate_error.armed && !pending_generate_error.error)
+                pending_generate_error.error = std::current_exception();
             throw;
         }
     }
@@ -178,6 +201,10 @@ void def_lvs_interpolators(nb::module_& m) {
 NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.doc() = "tesseract_motion_planners_simple Python bindings";
     register_python_error_translator();  // SimplePlannerMoveProfile trampoline
+    nb::exception<EmptyGenerateError>(m, "SimplePlannerEmptyGenerateError", PyExc_ValueError)
+        .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned an empty list.";
+    nb::exception<NullInstructionError>(m, "SimplePlannerNullInstructionError", PyExc_ValueError)
+        .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned a null MoveInstructionPoly.";
     nb::exception<PureVirtualCallError>(m, "SimplePlannerPureVirtualCallError", PyExc_NotImplementedError)
         .attr("__doc__") = "super().generate(...) from a Python SimplePlannerMoveProfile: the base is pure virtual.";
 
@@ -206,8 +233,8 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
                     nb::gil_scoped_release release;
                     response = self.solve(request);
                 }
-                if (std::unique_ptr<nb::python_error> error = armed.take())
-                    throw nb::python_error(std::move(*error));
+                if (std::exception_ptr error = armed.take())
+                    std::rethrow_exception(error);
                 return response;
             },
             "request"_a,

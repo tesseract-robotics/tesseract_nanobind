@@ -36,6 +36,8 @@ __all__ = [
     "getClosestJointSolution",
     "SimplePlannerMoveProfile",
     "SimplePlannerPureVirtualCallError",
+    "SimplePlannerEmptyGenerateError",
+    "SimplePlannerNullInstructionError",
     "SimplePlannerCompositeProfile",
     "SimplePlannerFixedSizeMoveProfile",
     "SimplePlannerFixedSizeAssignMoveProfile",
