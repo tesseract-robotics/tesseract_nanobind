@@ -210,6 +210,7 @@ class Kind(str, Enum):
     FAIL_LOUD = "fail-loud"
     HEADER = "header"
     UNPARSEABLE_HEADER = "unparseable header"
+    BASE = "base"  # a stub base class vs the bound C++ bases (T5)
 
 
 @dataclass(frozen=True)
