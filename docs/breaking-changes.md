@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | 7 TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable | [A stable key, or `id()`](#trajopt-ifopt-and-descartes-profiles-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -23,6 +24,26 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
+
+## Unreleased
+
+### TrajOpt-Ifopt and Descartes profiles compare by value and are unhashable
+
+These classes bind `__eq__`/`__ne__` from their C++ `operator==` and set `__hash__ = None`, as the
+[0.35.0.9 value types](#value-types-compare-by-value-and-are-unhashable) do (#261):
+
+| module | classes |
+| --- | --- |
+| `tesseract_motion_planners_trajopt_ifopt` | `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile` |
+| `tesseract_motion_planners_descartes` | `DescartesDefaultMoveProfileD`, `DescartesLadderGraphSolverProfileD` |
+
+`hash(profile)`, `{profile}` and `d[profile] = …` raise `TypeError: unhashable type`. Key on the
+profile's name in the `ProfileDictionary`, or on `id(profile)` where identity is what you mean:
+
+| before | after |
+| --- | --- |
+| `seen = {profile}` | `seen = {profile_name}` |
+| `cache[profile] = result` | `cache[id(profile)] = result` (keep `profile` alive) |
 
 ## 0.35.0.9
 

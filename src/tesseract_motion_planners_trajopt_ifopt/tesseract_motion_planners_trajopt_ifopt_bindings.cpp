@@ -59,22 +59,27 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     nb::module_::import_("tesseract_robotics.trajopt_sqp._trajopt_sqp");
 
     // ========== TrajOptIfoptCartesianWaypointConfig ==========
-    nb::class_<tp::TrajOptIfoptCartesianWaypointConfig>(m, "TrajOptIfoptCartesianWaypointConfig")
+    nb::class_<tp::TrajOptIfoptCartesianWaypointConfig> cart_wp_config(m, "TrajOptIfoptCartesianWaypointConfig");
+    cart_wp_config
         .def(nb::init<>())
         .def_rw("enabled", &tp::TrajOptIfoptCartesianWaypointConfig::enabled)
         .def_rw("use_tolerance_override", &tp::TrajOptIfoptCartesianWaypointConfig::use_tolerance_override)
         .def_rw("lower_tolerance", &tp::TrajOptIfoptCartesianWaypointConfig::lower_tolerance)
         .def_rw("upper_tolerance", &tp::TrajOptIfoptCartesianWaypointConfig::upper_tolerance)
         .def_rw("coeff", &tp::TrajOptIfoptCartesianWaypointConfig::coeff);
+    bind_value_equality(cart_wp_config);
 
     // ========== TrajOptIfoptJointWaypointConfig ==========
-    nb::class_<tp::TrajOptIfoptJointWaypointConfig>(m, "TrajOptIfoptJointWaypointConfig")
+    nb::class_<tp::TrajOptIfoptJointWaypointConfig> joint_wp_config(m, "TrajOptIfoptJointWaypointConfig");
+    joint_wp_config
         .def(nb::init<>())
         .def_rw("enabled", &tp::TrajOptIfoptJointWaypointConfig::enabled)
         .def_rw("use_tolerance_override", &tp::TrajOptIfoptJointWaypointConfig::use_tolerance_override)
         .def_rw("lower_tolerance", &tp::TrajOptIfoptJointWaypointConfig::lower_tolerance)
         .def_rw("upper_tolerance", &tp::TrajOptIfoptJointWaypointConfig::upper_tolerance)
         .def_rw("coeff", &tp::TrajOptIfoptJointWaypointConfig::coeff);
+    bind_value_equality(joint_wp_config);
+
 
     // ========== TrajOptIfoptMoveProfile (base, was TrajOptIfoptPlanProfile) ==========
     nb::class_<tp::TrajOptIfoptMoveProfile, tc::Profile>(m, "TrajOptIfoptMoveProfile")
@@ -99,12 +104,15 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def("getKey", &tp::TrajOptIfoptSolverProfile::getKey);
 
     // ========== TrajOptIfoptDefaultMoveProfile (was TrajOptIfoptDefaultPlanProfile) ==========
-    nb::class_<tp::TrajOptIfoptDefaultMoveProfile, tp::TrajOptIfoptMoveProfile>(m, "TrajOptIfoptDefaultMoveProfile")
+    nb::class_<tp::TrajOptIfoptDefaultMoveProfile, tp::TrajOptIfoptMoveProfile> default_move_profile(
+        m, "TrajOptIfoptDefaultMoveProfile");
+    default_move_profile
         .def(nb::init<>())
         .def_rw("cartesian_cost_config", &tp::TrajOptIfoptDefaultMoveProfile::cartesian_cost_config)
         .def_rw("cartesian_constraint_config", &tp::TrajOptIfoptDefaultMoveProfile::cartesian_constraint_config)
         .def_rw("joint_cost_config", &tp::TrajOptIfoptDefaultMoveProfile::joint_cost_config)
         .def_rw("joint_constraint_config", &tp::TrajOptIfoptDefaultMoveProfile::joint_constraint_config);
+    bind_value_equality(default_move_profile);
 
     // SWIG-compatible alias
     m.attr("TrajOptIfoptDefaultPlanProfile") = m.attr("TrajOptIfoptDefaultMoveProfile");
@@ -117,7 +125,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // many rows per timestep, one per worst link pair, so QP size stops tracking
     // contact count. Unbound they are unreachable and the planner silently runs on
     // C++ defaults: no margins, no buffers, no modify_collision_objects scoping.
-    nb::class_<tp::TrajOptIfoptDefaultCompositeProfile, tp::TrajOptIfoptCompositeProfile>(m, "TrajOptIfoptDefaultCompositeProfile")
+    nb::class_<tp::TrajOptIfoptDefaultCompositeProfile, tp::TrajOptIfoptCompositeProfile> default_composite_profile(
+        m, "TrajOptIfoptDefaultCompositeProfile");
+    default_composite_profile
         .def(nb::init<>())
         .def_rw("collision_cost_config", &tp::TrajOptIfoptDefaultCompositeProfile::collision_cost_config)
         .def_rw("collision_constraint_config", &tp::TrajOptIfoptDefaultCompositeProfile::collision_constraint_config)
@@ -127,12 +137,15 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("acceleration_coeff", &tp::TrajOptIfoptDefaultCompositeProfile::acceleration_coeff)
         .def_rw("smooth_jerks", &tp::TrajOptIfoptDefaultCompositeProfile::smooth_jerks)
         .def_rw("jerk_coeff", &tp::TrajOptIfoptDefaultCompositeProfile::jerk_coeff);
+    bind_value_equality(default_composite_profile);
 
     // ========== TrajOptIfoptOSQPSolverProfile ==========
     // qp_settings is a unique_ptr<OsqpEigen::Settings>; expose setters that forward into it
     // (same pattern as trajopt_sqp.OSQPEigenSolver). Defaults via setDefaultOSQPSettings:
     // polish=true, warmStart=true, adaptiveRho=true, maxIter=8192, absTol=1e-4, relTol=1e-6
-    nb::class_<tp::TrajOptIfoptOSQPSolverProfile, tp::TrajOptIfoptSolverProfile>(m, "TrajOptIfoptOSQPSolverProfile")
+    nb::class_<tp::TrajOptIfoptOSQPSolverProfile, tp::TrajOptIfoptSolverProfile> osqp_solver_profile(
+        m, "TrajOptIfoptOSQPSolverProfile");
+    osqp_solver_profile
         .def(nb::init<>())
         .def("setPolish", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
             self.qp_settings->setPolish(v); }, "polish"_a,
@@ -160,6 +173,8 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def("setVerbosity", [](tp::TrajOptIfoptOSQPSolverProfile& self, bool v) {
             self.qp_settings->setVerbosity(v); }, "verbose"_a,
             "Enable OSQP console output (default: false)");
+    // operator== also compares qp_settings, through upstream's free OsqpEigen::Settings operator==.
+    bind_value_equality(osqp_solver_profile);
 
     // Helper to add TrajOptIfopt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptIfoptMoveProfile", [](tc::ProfileDictionary& dict,

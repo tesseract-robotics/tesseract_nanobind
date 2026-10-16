@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable** — `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile`, `DescartesDefaultMoveProfileD` and `DescartesLadderGraphSolverProfileD` bind `__eq__`/`__ne__` from the C++ `operator==` and set `__hash__ = None`; `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
+
 ### Changes
 
 - **TrajOpt-Ifopt and Descartes planners are `MotionPlanner`s** — `TrajOptIfoptMotionPlanner` and `DescartesMotionPlannerD` derive from `tesseract_motion_planners.MotionPlanner`; `getName`/`solve`/`terminate`/`clear`/`clone` are the base's (its `solve` releases the GIL) ([#299]).
@@ -553,6 +557,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [@johnwason]: https://github.com/johnwason
 [@marip8]: https://github.com/marip8
 [@seonixx]: https://github.com/seonixx
+[#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#299]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/299
 [#300]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/300
 [#310]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/310
