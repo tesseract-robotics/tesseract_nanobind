@@ -7,6 +7,8 @@ The mechanisms' fixture tests are in `test_audit_command_language.py`.
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
+from collections import Counter
+
 import pytest
 
 from tests.audit._load import audit, load
@@ -59,6 +61,15 @@ TP_PROFILES = {
     "IterativeSplineParameterizationMoveProfile": "ISPMoveProfile",
     "ConstantTCPSpeedParameterizationCompositeProfile": "ConstantTCPSpeedCompositeProfile",
 }
+# The `InstructionPoly::as<T>()` instances the binding names (cl-core rows 106-112).
+INSTRUCTION_POLY_AS = tuple(
+    f"InstructionPoly.as{t}Instruction"
+    for t in ("Move", "Composite", "Wait", "Timer", "SetAnalog", "SetDigital", "SetTool")
+)
+# R11: the `std::vector` members with no Python form (cl-core rows 6-10, 27, 29, 35).
+VECTOR_FORWARDING_LEAVES = (
+    "crbegin", "crend", "data", "emplace", "emplace_back", "rbegin", "rend", "swap",
+)  # fmt: skip
 
 
 @pytest.fixture(scope="module")
@@ -98,8 +109,9 @@ def test_g1_module_is_audited(module):
 
 
 def test_profile_headers_are_audited_with_command_language(g1_reports):
-    """`tesseract/common/profile*.h` are under tesseract_common's prefix, but only the
-    command-language binding includes them: it audits them (`header_auditor`)."""
+    """`tesseract/common/profile*.h` are under tesseract_common's prefix, but its binding does
+    not include them; `header_auditor` gives them to the first includer by name, the command
+    language."""
     gaps = {g.symbol for g in g1_reports[CL].gaps}
     assert {"Profile.createKey", "ProfileDictionary.getAllProfileEntries"} <= gaps
 
@@ -110,11 +122,20 @@ def test_cereal_serialization_header_is_delegated_to_serialization(g1_reports):
     }
 
 
-def test_inherited_value_equality_rows_on_the_concrete_types(g1_reports):
-    """0b A (members inherited from an unbound base): each concrete type inherits
-    `operator==`/`operator!=` from its unbound `…Interface`; 20 gaps, binding-fix
-    `00-value-equality.md` (cl-core rows 144-163)."""
-    interface_header = {
+def test_value_equality_rows_are_exactly_the_polys_and_the_concrete_types(g1_reports):
+    """Every `__eq__`/`__ne__` gap of the command language, binding-fix `00-value-equality.md`:
+    the six Polys' own operators (cl-poly rows 2, 3, 15, 17, 27, 28, 39, 41, 64, 65, 73, 78),
+    and the ten concrete types' operators inherited from their unbound `…Interface` (0b A,
+    cl-core rows 144-163)."""
+    eq_line = {
+        # The Polys declare their own `operator==`.
+        "CartesianWaypointPoly": ("cartesian_waypoint_poly.h", 304),
+        "InstructionPoly": ("instruction_poly.h", 240),
+        "JointWaypointPoly": ("joint_waypoint_poly.h", 309),
+        "MoveInstructionPoly": ("move_instruction_poly.h", 467),
+        "StateWaypointPoly": ("state_waypoint_poly.h", 330),
+        "WaypointPoly": ("waypoint_poly.h", 197),
+        # The concrete types inherit their interface's.
         "CartesianWaypoint": ("cartesian_waypoint_poly.h", 136),
         "JointWaypoint": ("joint_waypoint_poly.h", 148),
         "StateWaypoint": ("state_waypoint_poly.h", 158),
@@ -123,14 +144,15 @@ def test_inherited_value_equality_rows_on_the_concrete_types(g1_reports):
     }
     expected = {
         (f"{c}.{dunder}", f"{CL_PREFIX}poly/{header}:{line + offset}")
-        for c, (header, line) in interface_header.items()
+        for c, (header, line) in eq_line.items()
         for dunder, offset in (("__eq__", 0), ("__ne__", 1))
     }
     rows = {
         (g.symbol, g.location)
         for g in g1_reports[CL].gaps
-        if g.symbol.partition(".")[0] in CONCRETE and g.symbol.endswith(("__eq__", "__ne__"))
+        if g.symbol.endswith((".__eq__", ".__ne__"))
     }
+    assert len(expected) == 32
     assert rows == expected
 
 
@@ -139,8 +161,8 @@ def test_inherited_value_equality_rows_on_the_concrete_types(g1_reports):
 
 def test_real_instruction_poly_as_accepted(g1_reports):
     report = g1_reports[CL]
-    names = ["InstructionPoly.as", *audit.TEMPLATE_INSTANCES[(CL, "InstructionPoly.as")]]
-    assert len(names) == 8
+    assert set(audit.TEMPLATE_INSTANCES[(CL, "InstructionPoly.as")]) == set(INSTRUCTION_POLY_AS)
+    names = ["InstructionPoly.as", *INSTRUCTION_POLY_AS]
     for name in names:
         assert (name, "template-instance-name") in accepted_pairs(report)
     assert not set(names) & open_names(report)
@@ -226,12 +248,11 @@ def test_algorithm_internal_classes_are_in_the_totg_namespace():
 # Task 6: R11 vector-forwarding-no-python-form, R9 clone-as-copy.
 
 
-@pytest.mark.parametrize(
-    "leaf", ["crbegin", "crend", "data", "emplace", "emplace_back", "rbegin", "rend", "swap"]
-)
+@pytest.mark.parametrize("leaf", VECTOR_FORWARDING_LEAVES)
 def test_real_composite_instruction_vector_members_accepted(g1_reports, leaf):
-    pair = (f"CompositeInstruction.{leaf}", "vector-forwarding-no-python-form")
-    assert pair in accepted_pairs(g1_reports[CL])
+    name = f"CompositeInstruction.{leaf}"
+    assert (name, "vector-forwarding-no-python-form") in accepted_pairs(g1_reports[CL])
+    assert name not in open_names(g1_reports[CL])
 
 
 @pytest.mark.parametrize(
@@ -281,9 +302,64 @@ def test_real_poly_alternative_overloads_accepted(g1_reports):
 
 
 def test_real_move_instruction_ctors_stay_binding_fix(g1_reports):
-    """g1/03: `manipulator_info` and the `path_profile` overload are unbound."""
-    gaps = {(g.symbol, g.kind) for g in g1_reports[CL].gaps}
-    assert ("MoveInstruction.__init__", audit.Kind.CONSTRUCTOR) in gaps
+    """g1/03: `manipulator_info` and the `path_profile` overload are unbound: two constructor
+    gaps (cl-core rows 37, 38; their arity column may change with #251). The Python overloads
+    per waypoint alternative are accepted, not deviations (cl-core rows 121-126)."""
+    report = g1_reports[CL]
+    ctor_gaps = [
+        g
+        for g in report.gaps
+        if g.symbol == "MoveInstruction.__init__" and g.kind is audit.Kind.CONSTRUCTOR
+    ]
+    assert len(ctor_gaps) == 2
+    assert "MoveInstruction.__init__" not in {d.name for d in report.deviations}
+
+
+# Every row the group 1 rules accept, exactly: the 47 NEW command-language rows of the
+# cl-core and cl-poly ledgers, and the 5 NEW time-parameterization rows.
+
+G1_ACCEPTED = {
+    CL: Counter(
+        {
+            **{
+                (f"is{t}Instruction", "free-function-as-method"): 1
+                for t in ("SetAnalog", "SetDigital", "SetTool", "Timer", "Wait")
+            },
+            **{(f"{poly}.getType", "type-index"): 1 for poly in POLY_INTERFACES},
+            **{(i, "type-erasure-interface"): 1 for i in POLY_INTERFACES.values()},
+            **{
+                (f"{poly}.get{poly.removesuffix('Poly')}", "type-erasure-interface"): 1
+                for poly in POLY_INTERFACES
+            },
+            ("MoveInstruction.setWaypoint", "reference-setter"): 1,
+            ("MoveInstructionPoly.setWaypoint", "reference-setter"): 1,
+            **{
+                (f"CompositeInstruction.{leaf}", "vector-forwarding-no-python-form"): 1
+                for leaf in VECTOR_FORWARDING_LEAVES
+            },
+            ("ProfileDictionary.getProfile", "profile-key-template"): 1,
+            ("CompositeInstruction.push_back", "poly-alternative-overloads"): 7,
+            ("MoveInstruction.__init__", "poly-alternative-overloads"): 6,
+        }
+    ),
+    TP: Counter(
+        {
+            ("InstructionsTrajectory.__init__", "reference-wrapper-view"): 1,
+            **{
+                (c, "algorithm-internal-namespace"): 1
+                for c in ("Path", "PathSegment", "PathData", "Trajectory")
+            },
+        }
+    ),
+}
+
+
+@pytest.mark.parametrize("module", G1)
+def test_g1_rules_accept_exactly_the_ledger_rows(g1_reports, module):
+    rows = Counter((a.symbol, a.rule) for a in g1_reports[module].accepted if a.rule in G1_RULES)
+    assert G1_ACCEPTED[CL].total() == 47
+    assert G1_ACCEPTED[TP].total() == 5
+    assert rows == G1_ACCEPTED[module]
 
 
 # Task 8, C1 (rename; the binding side is #329): the binding's `nb::class_` maps each
