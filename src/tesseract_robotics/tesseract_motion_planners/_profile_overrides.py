@@ -10,8 +10,6 @@ subclass is refused when the class statement runs.
 
 from __future__ import annotations
 
-from typing import Any
-
 
 class ProfileOverrideNotDispatchedError(TypeError):
     """A Python subclass of a concrete profile defines a hook the planner never calls on it."""
@@ -29,7 +27,7 @@ def refuse_hook_overrides(concrete: type, hooks: tuple[str, ...], instead: str) 
         ProfileOverrideNotDispatchedError: at class definition, from the installed hook.
     """
 
-    def __init_subclass__(cls: type, **kwargs: Any) -> None:
+    def __init_subclass__(cls: type, **kwargs: object) -> None:
         overridden = sorted(hook for hook in hooks if hook in cls.__dict__)
         if overridden:
             raise ProfileOverrideNotDispatchedError(
@@ -39,4 +37,8 @@ def refuse_hook_overrides(concrete: type, hooks: tuple[str, ...], instead: str) 
             )
         super(concrete, cls).__init_subclass__(**kwargs)  # type: ignore[misc]
 
+    # Named as the class's own method, so the stub generator renders it in the class instead of
+    # importing a private helper.
+    __init_subclass__.__module__ = concrete.__module__
+    __init_subclass__.__qualname__ = f"{concrete.__qualname__}.__init_subclass__"
     concrete.__init_subclass__ = classmethod(__init_subclass__)  # type: ignore[method-assign,assignment]
