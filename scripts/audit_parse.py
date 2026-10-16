@@ -85,6 +85,8 @@ PARSE_OPTIONS = (
     ci.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
     | ci.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
 )
+# `bound_classes` reads the NB_MODULE body, which PARSE_OPTIONS skips: same record, all bodies.
+BODY_PARSE_OPTIONS = ci.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
 # The first 20 diagnostics locate a missing -I or define; the count reports the rest.
 MAX_REPORTED_DIAGNOSTICS = 20
 
@@ -102,7 +104,11 @@ class HeaderParseError(RuntimeError):
 
 
 def parse_tu(
-    cpp: Path, extra_include_dirs: Sequence[Path] = (), unsaved: str | None = None
+    cpp: Path,
+    extra_include_dirs: Sequence[Path] = (),
+    unsaved: str | None = None,
+    *,
+    bodies: bool = False,
 ) -> ci.TranslationUnit:
     """Parse one binding translation unit.
 
@@ -110,6 +116,7 @@ def parse_tu(
         cpp: The binding `.cpp`, or the name of a synthetic TU.
         extra_include_dirs: Searched before `INCLUDE_DIRS` (test fixtures).
         unsaved: Source text of `cpp` that exists only in memory (a synthetic TU).
+        bodies: Keep function bodies (`BODY_PARSE_OPTIONS`), for `bound_classes`.
 
     Returns:
         The translation unit, free of error diagnostics.
@@ -119,7 +126,8 @@ def parse_tu(
     """
     args = [*PARSE_ARGS, *(f"-I{d}" for d in (*extra_include_dirs, *INCLUDE_DIRS))]
     files = [(str(cpp), unsaved)] if unsaved is not None else None
-    tu = ci.Index.create().parse(str(cpp), args=args, unsaved_files=files, options=PARSE_OPTIONS)
+    options = BODY_PARSE_OPTIONS if bodies else PARSE_OPTIONS
+    tu = ci.Index.create().parse(str(cpp), args=args, unsaved_files=files, options=options)
     errors = [d for d in tu.diagnostics if d.severity >= ci.Diagnostic.Error]
     if errors:
         shown = "\n".join(str(d) for d in errors[:MAX_REPORTED_DIAGNOSTICS])
@@ -253,6 +261,7 @@ class CppSymbol:
     kind: Kind
     location: str
     overloads: list[CppOverload] = field(default_factory=list)
+    qualified: str = ""  # `audit_types.qualified_path`, for Kind.CLASS and Kind.ENUM
 
 
 def header_rel(path: Path) -> str:
@@ -560,14 +569,14 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
-        add(name, Kind.ENUM, c)
+        add(name, Kind.ENUM, c).qualified = audit_types.qualified_path(c)
         for e in c.get_children():
             if e.kind == ci.CursorKind.ENUM_CONSTANT_DECL:
                 add(f"{name}.{e.spelling}", Kind.ENUMERATOR, e)
 
     def add_record(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
-        add(name, Kind.CLASS, c)
+        add(name, Kind.CLASS, c).qualified = audit_types.qualified_path(c)
         # An abstract class cannot be constructed from Python: no __init__ to audit.
         abstract = c.is_abstract_record()
         declares_ctor = False
@@ -658,3 +667,74 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
 def decl_names(tu: ci.TranslationUnit) -> frozenset[str]:
     """Spelling of every declaration in the TU: what a Python name may resolve to."""
     return frozenset(c.spelling for c in tu.cursor.walk_preorder() if c.kind.is_declaration())
+
+
+# Canonical spellings of the nanobind constructions that bind a C++ type to a Python name.
+NB_CLASS_TEMPLATES = ("nanobind::class_<", "nanobind::enum_<")
+NB_CLASS_CTORS = frozenset({"class_", "enum_"})
+NB_MODULE_SCOPE = "nanobind::module_"
+# NB_MODULE(name, m) defines `PyInit_<name>`; a TU parsed without bodies only declares it.
+NB_MODULE_INIT_PREFIX = "PyInit_"
+
+
+class SkippedBodiesError(ValueError):
+    """`bound_classes` got a TU parsed without function bodies: NB_MODULE's body is empty."""
+
+
+def _in_main_file(c: ci.Cursor, main: Path) -> bool:
+    return c.location.file is not None and Path(c.location.file.name).resolve() == main
+
+
+def _scope_type(arg: ci.Cursor) -> str:
+    """Canonical type of the scope a construction binds into, under nanobind's `handle`
+    conversion: `nanobind::module_` for a top-level class, a `class_<…>` for a nested one."""
+    for c in arg.walk_preorder():
+        spelling = c.type.get_canonical().spelling.removeprefix("const ")
+        if spelling.startswith((NB_MODULE_SCOPE, *NB_CLASS_TEMPLATES)):
+            return spelling
+    return ""
+
+
+def bound_classes(tu: ci.TranslationUnit) -> dict[str, str]:
+    """Top-level Python class name -> qualified C++ class, as the binding's `nb::class_` and
+    `nb::enum_` constructions in the TU's main file say (`TOTGCompositeProfile` ->
+    `tesseract::time_parameterization::TimeOptimalTrajectoryGenerationCompositeProfile`).
+
+    A template instance maps to its template (`Planner<double>` -> `…::Planner`), as
+    `cpp_api` keys it. Nested classes (bound into a `class_`, not the module) are skipped.
+
+    Raises:
+        SkippedBodiesError: `tu` was parsed without function bodies (`parse_tu(bodies=True)`).
+    """
+    main = Path(tu.spelling).resolve()
+    out: dict[str, str] = {}
+    # Walk only the main file's top-level declarations: the headers' bodies are most of a TU.
+    own = (
+        c
+        for top in tu.cursor.get_children()
+        if _in_main_file(top, main)
+        for c in top.walk_preorder()
+    )
+    for c in own:
+        if (
+            c.kind == ci.CursorKind.FUNCTION_DECL
+            and c.spelling.startswith(NB_MODULE_INIT_PREFIX)
+            and not c.is_definition()
+            and c.get_definition() is None
+        ):
+            raise SkippedBodiesError(f"{tu.spelling}: parsed without bodies; NB_MODULE is empty")
+        if c.kind != ci.CursorKind.CALL_EXPR or c.spelling not in NB_CLASS_CTORS:
+            continue
+        t = c.type.get_canonical()
+        if not t.spelling.startswith(NB_CLASS_TEMPLATES):
+            continue
+        args = list(c.get_arguments())
+        if len(args) < 2 or not _scope_type(args[0]).startswith(NB_MODULE_SCOPE):
+            continue
+        literal = next(
+            (a for a in args[1].walk_preorder() if a.kind == ci.CursorKind.STRING_LITERAL), None
+        )
+        decl = t.get_template_argument_type(0).get_canonical().get_declaration()
+        if literal is not None and decl.kind != ci.CursorKind.NO_DECL_FOUND:
+            out[literal.spelling.strip('"')] = audit_types.qualified_path(decl)
+    return out
