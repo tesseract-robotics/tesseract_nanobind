@@ -27,24 +27,16 @@ from tesseract_robotics.tesseract_common import (
 )
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_motion_planners_descartes import (
+    DescartesDefaultMoveProfileD,
+    DescartesDefaultPlanProfileD,
+    DescartesEdgeEvaluatorD,
+    DescartesMotionPlannerD,
+    DescartesMoveProfileD,
+    cast_DescartesMoveProfileD,
+    cast_DescartesPlanProfileD,
+)
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-
-# Descartes imports - skip tests if not available
-try:
-    from tesseract_robotics.tesseract_motion_planners_descartes import (
-        DescartesDefaultMoveProfileD,
-        DescartesDefaultPlanProfileD,
-        DescartesEdgeEvaluatorD,
-        DescartesMotionPlannerD,
-        DescartesMoveProfileD,
-        cast_DescartesMoveProfileD,
-        cast_DescartesPlanProfileD,
-    )
-
-    DESCARTES_AVAILABLE = True
-except ImportError:
-    DESCARTES_AVAILABLE = False
-
 
 DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 
