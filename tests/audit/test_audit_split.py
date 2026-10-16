@@ -135,6 +135,8 @@ MATCH = {
     "_bound_as_method", "_unbound_rule", "_uncovered_rule",
     # G2 (T10, R15)
     "K_ENUMERATOR", "CAMEL_BOUNDARY", "k_enumerator_python_name", "_k_alias",
+    # G3 T1: the yaml-node premise.
+    "YAML_TEXT_KEYS", "_yaml_sibling",
 }  # fmt: skip
 
 
