@@ -5,6 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
@@ -19,7 +21,8 @@ from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     ManipulatorInfo,
 )
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
+from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
@@ -36,7 +39,10 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptSolverProfile,
+    createCollisionConstraints,
+    createJointVelocityConstraint,
 )
+from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 from tesseract_robotics.trajopt_sqp import SQPParameters
 
@@ -464,6 +470,88 @@ def _request(t_env, manip_info, joint_names, solver_profile):
     request.env = t_env
     request.profiles = profiles
     return request
+
+
+class TestTrajOptIfoptConstraintFactories:
+    """The planner's term factories from trajopt_ifopt_utils.h (gh-309)."""
+
+    def test_joint_velocity_constraint_matches_hand_built(self, kuka_iiwa_environment):
+        t_env, _, joint_names = kuka_iiwa_environment
+        manip = t_env.getKinematicGroup("manipulator")
+        states = [START_POS, 0.5 * (START_POS + END_POS), END_POS]
+        nodes = ti.createNodesVariables(
+            "trajectory", joint_names, states, ti.toBounds(manip.getLimits().joint_limits)
+        )
+        variables = [node.getVar("joints") for node in nodes.getNodes()]
+        target = np.zeros(len(joint_names))
+        coeffs = np.ones(len(joint_names))
+
+        factory_built = createJointVelocityConstraint(target, variables, coeffs)
+        hand_built = ti.JointVelConstraint(target, variables, coeffs, "Velocity")
+        problem = tsqp.TrajOptQPProblem(nodes)
+        problem.addConstraintSet(factory_built)
+        problem.addConstraintSet(hand_built)
+        problem.setup()
+
+        np.testing.assert_array_equal(factory_built.getValues(), hand_built.getValues())
+        np.testing.assert_array_equal(factory_built.getCoefficients(), hand_built.getCoefficients())
+        assert [(b.getLower(), b.getUpper()) for b in factory_built.getBounds()] == [
+            (b.getLower(), b.getUpper()) for b in hand_built.getBounds()
+        ]
+
+    def test_empty_variables_are_rejected(self):
+        with pytest.raises(ValueError, match="vars is empty"):
+            createJointVelocityConstraint(np.zeros(7), [], np.ones(7))
+
+    def test_collision_constraints_flag_the_colliding_step(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        manip = t_env.getKinematicGroup("manipulator")
+        # An obstacle cube centred on the tool at END_POS: that step collides, START_POS does not.
+        obstacle = Link("obstacle")
+        collision = Collision()
+        collision.geometry = Box(0.1, 0.1, 0.1)
+        obstacle.addCollision(collision)
+        joint = Joint("obstacle_joint")
+        joint.type = JointType.FIXED
+        joint.parent_link_name = "base_link"
+        joint.child_link_name = "obstacle"
+        joint.parent_to_joint_origin_transform = manip.calcFwdKin(END_POS)["tool0"]
+        assert t_env.applyCommand(AddLinkCommand(obstacle, joint))
+
+        nodes = ti.createNodesVariables(
+            "trajectory",
+            joint_names,
+            [START_POS, END_POS],
+            ti.toBounds(manip.getLimits().joint_limits),
+        )
+        variables = [node.getVar("joints") for node in nodes.getNodes()]
+        config = TrajOptCollisionConfig(0.05, 20.0)
+
+        constraints = createCollisionConstraints(variables, t_env, manip_info, config, [], False)
+        assert len(constraints) == 2  # DISCRETE: one set per unfixed step
+        problem = tsqp.TrajOptQPProblem(nodes)
+        for constraint in constraints:
+            problem.addConstraintSet(constraint)
+        problem.setup()
+
+        free, colliding = constraints
+        assert np.all(free.getValues() <= 0.0)
+        assert np.max(colliding.getValues()) > 0.0
+
+    def test_fixed_steps_get_no_collision_constraint(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        manip = t_env.getKinematicGroup("manipulator")
+        nodes = ti.createNodesVariables(
+            "trajectory",
+            joint_names,
+            [START_POS, END_POS, START_POS],
+            ti.toBounds(manip.getLimits().joint_limits),
+        )
+        variables = [node.getVar("joints") for node in nodes.getNodes()]
+        constraints = createCollisionConstraints(
+            variables, t_env, manip_info, TrajOptCollisionConfig(0.05, 20.0), [0, 2], False
+        )
+        assert len(constraints) == 1
 
 
 class TestTrajOptIfoptMotionPlannerBase:
