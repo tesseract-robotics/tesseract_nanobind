@@ -27,7 +27,14 @@ def defined_names(module: str) -> set[str]:
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
 # audit_types, audit_ownership, audit_parse, audit_stub, audit_match, audit_report, audit_bindings.
-EXPECTED_SCRIPTS = ("audit_types", "audit_ownership", "audit_parse", "audit_stub", "audit_match")
+EXPECTED_SCRIPTS = (
+    "audit_types",
+    "audit_ownership",
+    "audit_parse",
+    "audit_stub",
+    "audit_match",
+    "audit_bindings",
+)
 
 
 def test_every_script_is_loaded_once():
@@ -76,3 +83,9 @@ STUB = {
 def test_stub_defines_exactly():
     assert defined_names("audit_stub") == STUB
     assert not defined_names("audit_match") & STUB
+
+
+def test_cli_defines_only_main():
+    # `resolve_module` stays in audit_match: `audit_module` calls it, and audit_match must not
+    # import the CLI (layer order).
+    assert defined_names("audit_bindings") == {"main"}

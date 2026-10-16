@@ -95,7 +95,7 @@ def test_unaudited_module_raises_with_its_reason():
 
 def test_main_checks_coverage_before_parsing(monkeypatch):
     # Patch the modules that read the names: `audit` is a combined copy (Review Focus 1).
-    cli = load("audit_match")  # audit_bindings from Task 5 on
+    cli = load("audit_bindings")
     real = cli.binding_modules
     monkeypatch.setattr(cli, "binding_modules", lambda: [*real(), "tesseract_new"])
     monkeypatch.setattr(
