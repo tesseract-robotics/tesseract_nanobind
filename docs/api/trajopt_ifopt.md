@@ -12,8 +12,8 @@ The `JointPosition` class from 0.33 is removed. Variables now use a three-level 
 
 A single variable — typically one joint value at one waypoint. `Var(index, name, value, bounds)`
 and `Var(index, identifier, names, values, bounds)` build a standalone one (no parent `Node`) at
-`index` of the decision vector. It works in the joint and Cartesian constraints, which read only
-its index and values; the collision constraints raise `VarNotInVariableSetError` on it (below).
+`index` of the decision vector. It belongs to no variable set, so a constraint built on it
+raises `VarNotInVariableSetError` when linked (below); a collision constraint already when built.
 
 ### Node
 
@@ -22,8 +22,11 @@ Groups multiple `Var`s per waypoint (e.g., joints + velocities at one waypoint).
 ### NodesVariables
 
 Container of `Node`s. Passed to `TrajOptQPProblem`. `NodesVariables(name, nodes)` takes
-ownership of the `Node`s: after the call the Python `Node` objects are unusable, and each `Var`
-reports its `Node` (`Var.getParent()`) and the `Node` its set (`Node.getParent()`).
+ownership of the `Node`s: after the call the caller's `Node` objects are unusable (read the nodes
+back with `getNode` / `getNodes`), and each `Var` reports its `Node` (`Var.getParent()`) and the
+`Node` its set (`Node.getParent()`). A `Node` given twice, or one already in a set, raises
+`NodeOwnershipError`. A `Var` or `Node` read out of a set keeps the set alive, as does a handed-over
+`Node`, so a `Var` taken from a `Node` before the handover stays valid after the set is dropped.
 
 ```python
 from tesseract_robotics.trajopt_ifopt import Bounds, Node, NodesVariables
@@ -125,7 +128,10 @@ unless there is one bound per row (trajopt checks with `assert` only).
 never defines it, so it is not bound. Nor are the `list[Bounds]` constructors of
 `JointVelConstraint`, `JointAccelConstraint` and `JointJerkConstraint`, for the same reason.
 
-The collision constraints read the variable set's hash through `var.getParent().getParent()`.
+A constraint writes its Jacobian columns at its `Var`s' indices, so linking it to a variable set
+(`linkWithVariables`, or `TrajOptQPProblem.addConstraintSet` / `addCostSet`) raises
+`VarNotInVariableSetError` unless every `Var` it was built on is in that set; the constraint stays
+unlinked. The collision constraints read the variable set's hash through `var.getParent().getParent()`.
 They raise `VarNotInVariableSetError` (a `ValueError`) at construction for a `Var` that is not in
 a `NodesVariables`; upstream would dereference null on the first `update()`.
 

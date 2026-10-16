@@ -34,7 +34,14 @@ class VarSizeMismatchError(ValueError):
     """toTrajArray over Vars of different sizes."""
 
 class VarNotInVariableSetError(ValueError):
-    """A collision constraint built on a Var that is not in a NodesVariables."""
+    """
+    A constraint linked to a variable set that does not hold its Vars, or a collision constraint built on a Var that is not in a NodesVariables.
+    """
+
+class NodeOwnershipError(ValueError):
+    """
+    A Node handed to NodesVariables that is in a variable set already, or twice.
+    """
 
 class BoundsType(enum.Enum):
     UNBOUNDED = 0
@@ -166,9 +173,7 @@ class Var:
         """Get the identifier for the variable segment"""
 
     def getParent(self) -> Node | None:
-        """
-        The Node holding this variable, or None for a standalone Var. The Node belongs to its NodesVariables: use it only while that set is alive
-        """
+        """The Node holding this variable, or None for a standalone Var"""
 
     def getIndex(self) -> int:
         """Get the starting index of this variable segment"""
@@ -197,7 +202,7 @@ class Node:
 
     def getParent(self) -> NodesVariables | None:
         """
-        The NodesVariables holding this node, or None before it is handed to one. Use it only while that set is alive
+        The NodesVariables holding this node, or None before it is handed to one
         """
 
     @overload
@@ -229,7 +234,7 @@ class Node:
 class NodesVariables(Variables):
     def __init__(self, variable_name: str, nodes: Sequence[Node]) -> None:
         """
-        Create the variable set from its nodes, in order; takes ownership of the nodes
+        Create the variable set from its nodes, in order; takes ownership of the nodes, which become unusable through the caller's references (read them back with getNode / getNodes). Raises NodeOwnershipError for a Node given twice or already in a set
         """
 
     def getNode(self, opt_idx: int) -> Node:

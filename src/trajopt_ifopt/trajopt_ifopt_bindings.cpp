@@ -118,13 +118,118 @@ struct VarSizeMismatchError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
-// The collision constraints key their contact cache on the variable set's hash and read it through
+// A constraint writes its Jacobian columns at its Vars' indices into a matrix as wide as the linked
+// variable set, unchecked: a Var outside that set (standalone, or from another set) puts columns
+// out of range. Linking rejects it (VarCheckedConstraint below). The collision constraints also
+// key their contact cache on the set's hash and read it through
 // position_var->getParent()->getParent() unchecked (discrete_collision_constraint.cpp:69,
-// trajopt 0.35.0): a Var outside a NodesVariables (standalone, or in a Node not handed over yet)
-// dereferences null on the first update().
+// trajopt 0.35.0), so they reject a Var outside any NodesVariables already when built.
 struct VarNotInVariableSetError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
+
+// NodesVariables(name, nodes) takes each Node over from its Python object
+struct NodeOwnershipError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// A built-in constraint, plus the Vars it was built on, checked when it is linked to a variable
+// set: from linkWithVariables, and from TrajOptQPProblem.addConstraintSet / addCostSet, which link
+// in C++. The constraints keep their Vars private, so the binding keeps its own reference.
+// ConstraintSet::linkWithVariables stores the set, then calls the private virtual
+// initVariableDependedQuantities, a no-op that no built-in constraint overrides (trajopt 0.35.0).
+template <class Constraint>
+class VarCheckedConstraint final : public Constraint {
+public:
+    template <class... Args>
+    explicit VarCheckedConstraint(std::vector<std::shared_ptr<const ti::Var>> vars, Args&&... args)
+        : Constraint(std::forward<Args>(args)...), vars_(std::move(vars)) {}
+
+    const std::vector<std::shared_ptr<const ti::Var>>& vars() const { return vars_; }
+
+private:
+    void initVariableDependedQuantities(const ti::Variables::Ptr& variables) override {
+        for (const auto& var : vars_) {
+            if (var->getParent() != nullptr && var->getParent()->getParent() == variables.get())
+                continue;
+            this->variables_.reset();  // leave the constraint unlinked, not linked to the wrong set
+            throw VarNotInVariableSetError(
+                "linkWithVariables: constraint set '" + this->getName() + "' uses Var '" +
+                var->getIdentifier() + "', which is not in variable set '" + variables->getName() +
+                "'; take its Vars from the set it is linked to (or added to a problem with)");
+        }
+    }
+
+    std::vector<std::shared_ptr<const ti::Var>> vars_;
+};
+
+using CartPosConstraintBinding = VarCheckedConstraint<ti::CartPosConstraint>;
+using JointPosConstraintBinding = VarCheckedConstraint<ti::JointPosConstraint>;
+using JointVelConstraintBinding = VarCheckedConstraint<ti::JointVelConstraint>;
+using JointAccelConstraintBinding = VarCheckedConstraint<ti::JointAccelConstraint>;
+using JointJerkConstraintBinding = VarCheckedConstraint<ti::JointJerkConstraint>;
+using CartLineConstraintBinding = VarCheckedConstraint<ti::CartLineConstraint>;
+using InverseKinematicsConstraintBinding = VarCheckedConstraint<ti::InverseKinematicsConstraint>;
+using DiscreteCollisionConstraintBinding = VarCheckedConstraint<ti::DiscreteCollisionConstraint>;
+using DiscreteCollisionConstraintDBinding = VarCheckedConstraint<ti::DiscreteCollisionConstraintD>;
+using DiscreteCollisionNumericalConstraintBinding = VarCheckedConstraint<ti::DiscreteCollisionNumericalConstraint>;
+using ContinuousCollisionConstraintBinding = VarCheckedConstraint<ti::ContinuousCollisionConstraint>;
+using ContinuousCollisionConstraintDBinding = VarCheckedConstraint<ti::ContinuousCollisionConstraintD>;
+using ContinuousCollisionNumericalConstraintBinding =
+    VarCheckedConstraint<ti::ContinuousCollisionNumericalConstraint>;
+
+// Var -> Node -> NodesVariables are raw C++ pointers, so the Python objects carry the lifetimes:
+// a Var read from a Node keeps that Node's Python object alive (keep_alive<0,1>), a Node read from
+// a set keeps the set's, and a Node handed over to a set keeps the set alive (NodesVariables
+// __init__). With that chain, the Node a Var's getParent() reaches is alive.
+//
+// Handing a Node to NodesVariables relinquishes its Python object, as nanobind's unique_ptr caster
+// does, but nanobind keeps that object in its instance map until the caller drops it, and returns
+// it for the same pointer: unusable. So the set's getters return the Node's registered object only
+// when it is usable, and otherwise a fresh reference to the Node that keeps owner alive.
+nb::object node_object(const ti::Node* node, nb::handle owner) {
+    if (node == nullptr)
+        return nb::none();
+    nb::object found = nb::find(node);
+    if (found.is_valid() && nb::inst_ready(found))
+        return found;
+    return nb::inst_reference(nb::type<ti::Node>(), const_cast<ti::Node*>(node), owner);
+}
+
+// NodesVariables takes its Nodes by unique_ptr. All are checked before any is taken over, so a
+// rejected call leaves every Node with its caller.
+std::vector<std::unique_ptr<ti::Node>> take_over_nodes(const std::vector<nb::handle>& nodes) {
+    std::set<PyObject*> seen;
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        const nb::handle h = nodes[i];
+        if (!nb::isinstance<ti::Node>(h))
+            throw nb::type_error(("NodesVariables: nodes[" + std::to_string(i) + "] is not a Node").c_str());
+        const auto [ready, owned] = nb::inst_state(h);
+        if (!ready)
+            throw NodeOwnershipError("NodesVariables: nodes[" + std::to_string(i) +
+                                     "] was handed to a variable set already");
+        const std::string name = nb::inst_ptr<ti::Node>(h)->getName();
+        if (!owned)
+            throw NodeOwnershipError("NodesVariables: nodes[" + std::to_string(i) + "] '" + name +
+                                     "' belongs to a variable set; build a new Node");
+        if (!seen.insert(h.ptr()).second)
+            throw NodeOwnershipError("NodesVariables: Node '" + name + "' appears twice in nodes");
+    }
+    std::vector<std::unique_ptr<ti::Node>> owned_nodes;
+    owned_nodes.reserve(nodes.size());
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        if (!nb::detail::nb_type_relinquish_ownership(nodes[i].ptr(), true)) {
+            for (std::size_t j = 0; j < i; ++j)
+                nb::detail::nb_type_restore_ownership(nodes[j].ptr(), true);
+            for (auto& node : owned_nodes)
+                node.release();  // back with their Python objects
+            throw NodeOwnershipError("NodesVariables: nodes[" + std::to_string(i) +
+                                     "] cannot be taken over from Python");
+        }
+        owned_nodes.emplace_back(nb::inst_ptr<ti::Node>(nodes[i]));
+    }
+    return owned_nodes;
+}
 
 const std::shared_ptr<const ti::Var>& require_in_variable_set(const std::shared_ptr<const ti::Var>& var,
                                                               const char* caller, const char* arg) {
@@ -246,7 +351,10 @@ NB_MODULE(_trajopt_ifopt, m) {
     nb::exception<VarSizeMismatchError>(m, "VarSizeMismatchError", PyExc_ValueError)
         .attr("__doc__") = "toTrajArray over Vars of different sizes.";
     nb::exception<VarNotInVariableSetError>(m, "VarNotInVariableSetError", PyExc_ValueError)
-        .attr("__doc__") = "A collision constraint built on a Var that is not in a NodesVariables.";
+        .attr("__doc__") = "A constraint linked to a variable set that does not hold its Vars, or a collision "
+                           "constraint built on a Var that is not in a NodesVariables.";
+    nb::exception<NodeOwnershipError>(m, "NodeOwnershipError", PyExc_ValueError)
+        .attr("__doc__") = "A Node handed to NodesVariables that is in a variable set already, or twice.";
 
     // ConstraintSet's trampoline is called from _trajopt_sqp (TrajOptQPProblem, the solver)
     register_python_error_translator();
@@ -344,8 +452,8 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get the coefficient vector");
 
     // ========== Var (variable segment) ==========
-    // A standalone Var (no parent Node) works in the joint and Cartesian constraints, which read
-    // only its index and values; the collision constraints reject it (VarNotInVariableSetError).
+    // A standalone Var (no parent Node) has no variable set: a constraint built on it raises
+    // VarNotInVariableSetError when linked, and a collision constraint already when built.
     nb::class_<ti::Var>(m, "Var")
         .def("__init__",
              [](ti::Var* self, Eigen::Index index, std::string name, double value, ti::Bounds bounds) {
@@ -364,10 +472,10 @@ NB_MODULE(_trajopt_ifopt, m) {
              "outside bounds are clamped into them")
         .def("getIdentifier", &ti::Var::getIdentifier,
              "Get the identifier for the variable segment")
-        .def("getParent", &ti::Var::getParent, nb::rv_policy::reference,
+        .def("getParent",
+             [](nb::pointer_and_handle<ti::Var> self) { return node_object(self.p->getParent(), self.h); },
              nb::sig("def getParent(self) -> Node | None"),
-             "The Node holding this variable, or None for a standalone Var. The Node belongs to "
-             "its NodesVariables: use it only while that set is alive")
+             "The Node holding this variable, or None for a standalone Var")
         .def("getIndex", &ti::Var::getIndex,
              "Get the starting index of this variable segment")
         .def("size", &ti::Var::size,
@@ -390,23 +498,23 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Create a node with an optional name")
         .def("getName", &ti::Node::getName,
              "Get the name of this node")
+        // No keep_alive: a Node in a set keeps the set alive already, and tying the set back to the
+        // Node would be a cycle the garbage collector cannot see.
         .def("getParent", &ti::Node::getParent, nb::rv_policy::reference,
              nb::sig("def getParent(self) -> NodesVariables | None"),
-             "The NodesVariables holding this node, or None before it is handed to one. Use it "
-             "only while that set is alive")
+             "The NodesVariables holding this node, or None before it is handed to one")
         .def("addVar",
              nb::overload_cast<const std::string&, double, ti::Bounds>(&ti::Node::addVar),
-             "name"_a, "value"_a, "bounds"_a = ti::NoBound,
+             "name"_a, "value"_a, "bounds"_a = ti::NoBound, nb::keep_alive<0, 1>(),
              "Add a scalar variable to this node")
         .def("addVar",
              nb::overload_cast<const std::string&, const std::vector<std::string>&,
                                const Eigen::VectorXd&, const std::vector<ti::Bounds>&>(&ti::Node::addVar),
-             "name"_a, "child_names"_a, "values"_a, "bounds"_a,
+             "name"_a, "child_names"_a, "values"_a, "bounds"_a, nb::keep_alive<0, 1>(),
              "Add a vector-valued variable to this node")
         .def("hasVar", &ti::Node::hasVar, "name"_a,
              "Check whether this node has a variable by name")
-        .def("getVar", &ti::Node::getVar, "name"_a,
-             nb::rv_policy::reference_internal,
+        .def("getVar", &ti::Node::getVar, "name"_a, nb::keep_alive<0, 1>(),
              "Get a variable by name")
         .def("getValues", &ti::Node::getValues,
              "Get all variable values as a single vector")
@@ -419,17 +527,36 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     // ========== NodesVariables (main variable container, replaces JointPosition) ==========
     // The constructor takes each Node by unique_ptr: the Python Node objects hand over ownership
-    // and become unusable. Moving the Nodes instead would leave each Var's parent pointer on the
-    // moved-from Python object.
+    // and become unusable (take_over_nodes). Moving the Nodes instead would leave each Var's parent
+    // pointer on the moved-from Python object. Each handed-over object keeps the set alive, so a
+    // Var read from the Node before the handover keeps its parent chain.
     nb::class_<ti::NodesVariables, ti::Variables>(m, "NodesVariables")
-        .def(nb::init<std::string, std::vector<std::unique_ptr<ti::Node>>>(),
+        .def("__init__",
+             [](nb::pointer_and_handle<ti::NodesVariables> self, std::string variable_name,
+                const std::vector<nb::handle>& nodes) {
+                 new (self.p) ti::NodesVariables(std::move(variable_name), take_over_nodes(nodes));
+                 for (const nb::handle node : nodes)
+                     nb::detail::keep_alive(node.ptr(), self.h.ptr());
+             },
              "variable_name"_a, "nodes"_a,
-             "Create the variable set from its nodes, in order; takes ownership of the nodes")
-        .def("getNode", &ti::NodesVariables::getNode, "opt_idx"_a,
-             nb::rv_policy::reference_internal,
+             nb::sig("def __init__(self, variable_name: str, nodes: collections.abc.Sequence[Node]) -> None"),
+             "Create the variable set from its nodes, in order; takes ownership of the nodes, which "
+             "become unusable through the caller's references (read them back with getNode / "
+             "getNodes). Raises NodeOwnershipError for a Node given twice or already in a set")
+        .def("getNode",
+             [](nb::pointer_and_handle<ti::NodesVariables> self, std::size_t opt_idx) {
+                 return node_object(self.p->getNode(opt_idx).get(), self.h);
+             },
+             "opt_idx"_a, nb::sig("def getNode(self, opt_idx: int) -> Node"),
              "Get node based on index")
-        .def("getNodes", &ti::NodesVariables::getNodes,
-             nb::rv_policy::reference_internal,
+        .def("getNodes",
+             [](nb::pointer_and_handle<ti::NodesVariables> self) {
+                 nb::list nodes;
+                 for (const auto& node : self.p->getNodes())
+                     nodes.append(node_object(node.get(), self.h));
+                 return nodes;
+             },
+             nb::sig("def getNodes(self) -> list[Node]"),
              "Get all nodes")
         .def("getDim", &ti::NodesVariables::getDim,
              "Get the dimensions of every node");
@@ -547,8 +674,8 @@ NB_MODULE(_trajopt_ifopt, m) {
     // kKeepAsIs leaves such a row as a single [lb, ub] row instead - the form to pass
     // when reading back an asymmetric band. Equality and one-sided bounds are unaffected
     // either way.
-    nb::class_<ti::CartPosConstraint, ti::ConstraintSet>(m, "CartPosConstraint")
-        .def("__init__", [](ti::CartPosConstraint* self,
+    nb::class_<CartPosConstraintBinding, ti::ConstraintSet>(m, "CartPosConstraint")
+        .def("__init__", [](CartPosConstraintBinding* self,
                             std::shared_ptr<const ti::Var> position_var,
                             std::shared_ptr<const tesseract::kinematics::JointGroup> manip,
                             std::string source_frame,
@@ -557,7 +684,7 @@ NB_MODULE(_trajopt_ifopt, m) {
                             const Eigen::Isometry3d& target_frame_offset,
                             const std::string& name,
                             ti::RangeBoundHandling range_bound_handling) {
-                 new (self) ti::CartPosConstraint(position_var, manip,
+                 new (self) CartPosConstraintBinding({position_var}, position_var, manip,
                      std::move(source_frame), std::move(target_frame),
                      source_frame_offset, target_frame_offset,
                      name, range_bound_handling);
@@ -568,7 +695,7 @@ NB_MODULE(_trajopt_ifopt, m) {
              "name"_a = "CartPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create Cartesian position constraint")
-        .def("__init__", [](ti::CartPosConstraint* self,
+        .def("__init__", [](CartPosConstraintBinding* self,
                             std::shared_ptr<const ti::Var> position_var,
                             const Eigen::VectorXd& coeffs,
                             const std::vector<ti::Bounds>& bounds,
@@ -579,7 +706,7 @@ NB_MODULE(_trajopt_ifopt, m) {
                             const Eigen::Isometry3d& target_frame_offset,
                             const std::string& name,
                             ti::RangeBoundHandling range_bound_handling) {
-                 new (self) ti::CartPosConstraint(position_var, coeffs, bounds, manip,
+                 new (self) CartPosConstraintBinding({position_var}, position_var, coeffs, bounds, manip,
                      std::move(source_frame), std::move(target_frame),
                      source_frame_offset, target_frame_offset,
                      name, range_bound_handling);
@@ -595,7 +722,7 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("calcValues", &ti::CartPosConstraint::calcValues, "joint_vals"_a,
              "Calculate error values for given joint values")
         .def("calcJacobianBlock",
-             [](const ti::CartPosConstraint& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
+             [](const CartPosConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
                  // CartPosConstraint does not expose its manipulator; it reserves
                  // n_dof * rows non-zeros (cartesian_position_constraint.cpp:136, trajopt 0.35.0).
                  // With every axis weighted zero there are no rows and nothing reads joint_vals.
@@ -618,13 +745,18 @@ NB_MODULE(_trajopt_ifopt, m) {
                 "If true, use numeric differentiation (default: true)");
 
     // ========== JointPosConstraint ==========
-    nb::class_<ti::JointPosConstraint, ti::ConstraintSet>(m, "JointPosConstraint")
-        .def(nb::init<const Eigen::VectorXd&, const std::shared_ptr<const ti::Var>&,
-                      const Eigen::VectorXd&, std::string, ti::RangeBoundHandling>(),
+    nb::class_<JointPosConstraintBinding, ti::ConstraintSet>(m, "JointPosConstraint")
+        .def("__init__",
+             [](JointPosConstraintBinding* self, const Eigen::VectorXd& target,
+                const std::shared_ptr<const ti::Var>& position_var, const Eigen::VectorXd& coeffs,
+                std::string name, ti::RangeBoundHandling range_bound_handling) {
+                 new (self) JointPosConstraintBinding({position_var}, target, position_var, coeffs,
+                                                      std::move(name), range_bound_handling);
+             },
              "target"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
              "Create joint position constraint with target values")
-        .def("__init__", [](ti::JointPosConstraint* self,
+        .def("__init__", [](JointPosConstraintBinding* self,
                             const std::vector<ti::Bounds>& bounds,
                             const std::shared_ptr<const ti::Var>& position_var,
                             const Eigen::VectorXd& coeffs,
@@ -641,8 +773,8 @@ NB_MODULE(_trajopt_ifopt, m) {
                      per_joint = Eigen::VectorXd::Ones(n_dof);
                  else if (coeffs.size() == 1)
                      per_joint = Eigen::VectorXd::Constant(n_dof, coeffs(0));
-                 new (self) ti::JointPosConstraint(bounds, position_var, per_joint,
-                                                   std::move(name), range_bound_handling);
+                 new (self) JointPosConstraintBinding({position_var}, bounds, position_var, per_joint,
+                                                      std::move(name), range_bound_handling);
              },
              "bounds"_a, "position_var"_a, "coeffs"_a, "name"_a = "JointPos",
              "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
@@ -654,13 +786,13 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get current constraint values");
 
     // ========== JointVelConstraint ==========
-    nb::class_<ti::JointVelConstraint, ti::ConstraintSet>(m, "JointVelConstraint")
+    nb::class_<JointVelConstraintBinding, ti::ConstraintSet>(m, "JointVelConstraint")
         .def("__init__",
-             [](ti::JointVelConstraint* self, const Eigen::VectorXd& targets,
+             [](JointVelConstraintBinding* self, const Eigen::VectorXd& targets,
                 const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
                 const Eigen::VectorXd& coeffs, std::string name) {
-                 new (self) ti::JointVelConstraint(
-                     targets, require_non_null(position_vars, "JointVelConstraint", "position_vars", "a Var"),
+                 new (self) JointVelConstraintBinding(
+                     position_vars, targets, require_non_null(position_vars, "JointVelConstraint", "position_vars", "a Var"),
                      coeffs, std::move(name));
              },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointVel",
@@ -669,13 +801,13 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get current constraint values");
 
     // ========== JointAccelConstraint ==========
-    nb::class_<ti::JointAccelConstraint, ti::ConstraintSet>(m, "JointAccelConstraint")
+    nb::class_<JointAccelConstraintBinding, ti::ConstraintSet>(m, "JointAccelConstraint")
         .def("__init__",
-             [](ti::JointAccelConstraint* self, const Eigen::VectorXd& targets,
+             [](JointAccelConstraintBinding* self, const Eigen::VectorXd& targets,
                 const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
                 const Eigen::VectorXd& coeffs, std::string name) {
-                 new (self) ti::JointAccelConstraint(
-                     targets, require_non_null(position_vars, "JointAccelConstraint", "position_vars", "a Var"),
+                 new (self) JointAccelConstraintBinding(
+                     position_vars, targets, require_non_null(position_vars, "JointAccelConstraint", "position_vars", "a Var"),
                      coeffs, std::move(name));
              },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointAccel",
@@ -798,20 +930,20 @@ NB_MODULE(_trajopt_ifopt, m) {
              "dynamic_environment"_a = false);
 
     // ========== DiscreteCollisionConstraint ==========
-    nb::class_<ti::DiscreteCollisionConstraint, ti::ConstraintSet>(m, "DiscreteCollisionConstraint")
-        .def("__init__", [](ti::DiscreteCollisionConstraint* self,
+    nb::class_<DiscreteCollisionConstraintBinding, ti::ConstraintSet>(m, "DiscreteCollisionConstraint")
+        .def("__init__", [](DiscreteCollisionConstraintBinding* self,
                             std::shared_ptr<ti::DiscreteCollisionEvaluator> eval,
                             const std::shared_ptr<const ti::Var>& var,
                             int max_num_cnt, bool fixed_sparsity, std::string name) {
-                 new (self) ti::DiscreteCollisionConstraint(
-                     std::move(eval), require_in_variable_set(var, "DiscreteCollisionConstraint", "position_var"),
+                 new (self) DiscreteCollisionConstraintBinding(
+                     {var}, std::move(eval), require_in_variable_set(var, "DiscreteCollisionConstraint", "position_var"),
                      max_num_cnt, fixed_sparsity, std::move(name));
              },
              "collision_evaluator"_a, "position_var"_a,
              "max_num_cnt"_a = 1, "fixed_sparsity"_a = false,
              "name"_a = "DiscreteCollision")
         .def("getValues", &ti::DiscreteCollisionConstraint::getValues)
-        .def("setBounds", &set_bounds_checked<ti::DiscreteCollisionConstraint>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<DiscreteCollisionConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("getCollisionEvaluator", &ti::DiscreteCollisionConstraint::getCollisionEvaluator);
 
@@ -861,8 +993,8 @@ NB_MODULE(_trajopt_ifopt, m) {
              "dynamic_environment"_a = false);
 
     // ========== ContinuousCollisionConstraint ==========
-    nb::class_<ti::ContinuousCollisionConstraint, ti::ConstraintSet>(m, "ContinuousCollisionConstraint")
-        .def("__init__", [](ti::ContinuousCollisionConstraint* self,
+    nb::class_<ContinuousCollisionConstraintBinding, ti::ConstraintSet>(m, "ContinuousCollisionConstraint")
+        .def("__init__", [](ContinuousCollisionConstraintBinding* self,
                             std::shared_ptr<ti::ContinuousCollisionEvaluator> eval,
                             std::shared_ptr<const ti::Var> var0,
                             std::shared_ptr<const ti::Var> var1,
@@ -871,38 +1003,38 @@ NB_MODULE(_trajopt_ifopt, m) {
                  std::array<std::shared_ptr<const ti::Var>, 2> vars = {
                      require_in_variable_set(var0, "ContinuousCollisionConstraint", "position_var0"),
                      require_in_variable_set(var1, "ContinuousCollisionConstraint", "position_var1")};
-                 new (self) ti::ContinuousCollisionConstraint(eval, vars, fixed0, fixed1, max_num_cnt, fixed_sparsity, name);
+                 new (self) ContinuousCollisionConstraintBinding({vars[0], vars[1]}, eval, vars, fixed0, fixed1, max_num_cnt, fixed_sparsity, name);
              },
              "collision_evaluator"_a, "position_var0"_a, "position_var1"_a,
              "fixed0"_a = false, "fixed1"_a = false,
              "max_num_cnt"_a = 1, "fixed_sparsity"_a = false,
              "name"_a = "LVSCollision")
         .def("getValues", &ti::ContinuousCollisionConstraint::getValues)
-        .def("setBounds", &set_bounds_checked<ti::ContinuousCollisionConstraint>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<ContinuousCollisionConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("getCollisionEvaluator", &ti::ContinuousCollisionConstraint::getCollisionEvaluator);
 
     // ========== DiscreteCollisionConstraintD ==========
     // The TrajOpt-Ifopt planner's discrete collision term: one row per contact, recounted by
     // update(), so it has no max_num_cnt / fixed_sparsity.
-    nb::class_<ti::DiscreteCollisionConstraintD, ti::ConstraintSet>(m, "DiscreteCollisionConstraintD")
-        .def("__init__", [](ti::DiscreteCollisionConstraintD* self,
+    nb::class_<DiscreteCollisionConstraintDBinding, ti::ConstraintSet>(m, "DiscreteCollisionConstraintD")
+        .def("__init__", [](DiscreteCollisionConstraintDBinding* self,
                             std::shared_ptr<ti::DiscreteCollisionEvaluator> eval,
                             const std::shared_ptr<const ti::Var>& var, std::string name) {
-                 new (self) ti::DiscreteCollisionConstraintD(
-                     std::move(eval), require_in_variable_set(var, "DiscreteCollisionConstraintD", "position_var"),
+                 new (self) DiscreteCollisionConstraintDBinding(
+                     {var}, std::move(eval), require_in_variable_set(var, "DiscreteCollisionConstraintD", "position_var"),
                      std::move(name));
              },
              "collision_evaluator"_a, "position_var"_a, "name"_a = "DiscreteCollision",
              "Create a discrete collision constraint with one row per contact (rows change on update())")
         .def("getValues", &ti::DiscreteCollisionConstraintD::getValues)
-        .def("setBounds", &set_bounds_checked<ti::DiscreteCollisionConstraintD>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<DiscreteCollisionConstraintDBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("getCollisionEvaluator", &ti::DiscreteCollisionConstraintD::getCollisionEvaluator);
 
     // ========== ContinuousCollisionConstraintD ==========
-    nb::class_<ti::ContinuousCollisionConstraintD, ti::ConstraintSet>(m, "ContinuousCollisionConstraintD")
-        .def("__init__", [](ti::ContinuousCollisionConstraintD* self,
+    nb::class_<ContinuousCollisionConstraintDBinding, ti::ConstraintSet>(m, "ContinuousCollisionConstraintD")
+        .def("__init__", [](ContinuousCollisionConstraintDBinding* self,
                             std::shared_ptr<ti::ContinuousCollisionEvaluator> eval,
                             std::shared_ptr<const ti::Var> var0,
                             std::shared_ptr<const ti::Var> var1,
@@ -910,19 +1042,19 @@ NB_MODULE(_trajopt_ifopt, m) {
                  std::array<std::shared_ptr<const ti::Var>, 2> vars = {
                      require_in_variable_set(var0, "ContinuousCollisionConstraintD", "position_var0"),
                      require_in_variable_set(var1, "ContinuousCollisionConstraintD", "position_var1")};
-                 new (self) ti::ContinuousCollisionConstraintD(eval, vars, fixed0, fixed1, name);
+                 new (self) ContinuousCollisionConstraintDBinding({vars[0], vars[1]}, eval, vars, fixed0, fixed1, name);
              },
              "collision_evaluator"_a, "position_var0"_a, "position_var1"_a,
              "fixed0"_a = false, "fixed1"_a = false, "name"_a = "LVSCollision",
              "Create a continuous collision constraint with one row per contact (rows change on update())")
         .def("getValues", &ti::ContinuousCollisionConstraintD::getValues)
-        .def("setBounds", &set_bounds_checked<ti::ContinuousCollisionConstraintD>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<ContinuousCollisionConstraintDBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("getCollisionEvaluator", &ti::ContinuousCollisionConstraintD::getCollisionEvaluator);
 
     // ========== ContinuousCollisionNumericalConstraint ==========
-    nb::class_<ti::ContinuousCollisionNumericalConstraint, ti::ConstraintSet>(m, "ContinuousCollisionNumericalConstraint")
-        .def("__init__", [](ti::ContinuousCollisionNumericalConstraint* self,
+    nb::class_<ContinuousCollisionNumericalConstraintBinding, ti::ConstraintSet>(m, "ContinuousCollisionNumericalConstraint")
+        .def("__init__", [](ContinuousCollisionNumericalConstraintBinding* self,
                             std::shared_ptr<ti::ContinuousCollisionEvaluator> eval,
                             std::shared_ptr<const ti::Var> var0,
                             std::shared_ptr<const ti::Var> var1,
@@ -931,7 +1063,7 @@ NB_MODULE(_trajopt_ifopt, m) {
                  std::array<std::shared_ptr<const ti::Var>, 2> vars = {
                      require_in_variable_set(var0, "ContinuousCollisionNumericalConstraint", "position_var0"),
                      require_in_variable_set(var1, "ContinuousCollisionNumericalConstraint", "position_var1")};
-                 new (self) ti::ContinuousCollisionNumericalConstraint(eval, vars, fixed0, fixed1,
+                 new (self) ContinuousCollisionNumericalConstraintBinding({vars[0], vars[1]}, eval, vars, fixed0, fixed1,
                                                                        max_num_cnt, fixed_sparsity, name);
              },
              "collision_evaluator"_a, "position_var0"_a, "position_var1"_a,
@@ -940,18 +1072,18 @@ NB_MODULE(_trajopt_ifopt, m) {
              "name"_a = "LVSCollision",
              "Create continuous collision constraint with numerical jacobians")
         .def("getValues", &ti::ContinuousCollisionNumericalConstraint::getValues)
-        .def("setBounds", &set_bounds_checked<ti::ContinuousCollisionNumericalConstraint>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<ContinuousCollisionNumericalConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("getCollisionEvaluator", &ti::ContinuousCollisionNumericalConstraint::getCollisionEvaluator);
 
     // ========== JointJerkConstraint ==========
-    nb::class_<ti::JointJerkConstraint, ti::ConstraintSet>(m, "JointJerkConstraint")
+    nb::class_<JointJerkConstraintBinding, ti::ConstraintSet>(m, "JointJerkConstraint")
         .def("__init__",
-             [](ti::JointJerkConstraint* self, const Eigen::VectorXd& targets,
+             [](JointJerkConstraintBinding* self, const Eigen::VectorXd& targets,
                 const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
                 const Eigen::VectorXd& coeffs, std::string name) {
-                 new (self) ti::JointJerkConstraint(
-                     targets, require_non_null(position_vars, "JointJerkConstraint", "position_vars", "a Var"),
+                 new (self) JointJerkConstraintBinding(
+                     position_vars, targets, require_non_null(position_vars, "JointJerkConstraint", "position_vars", "a Var"),
                      coeffs, std::move(name));
              },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointJerk",
@@ -999,20 +1131,24 @@ NB_MODULE(_trajopt_ifopt, m) {
                 "DOF indices to constrain: default {0,1,2,3,4,5}");
 
     // ========== CartLineConstraint ==========
-    nb::class_<ti::CartLineConstraint, ti::ConstraintSet>(m, "CartLineConstraint")
-        .def(nb::init<ti::CartLineInfo, std::shared_ptr<const ti::Var>,
-                      const Eigen::VectorXd&, std::string>(),
+    nb::class_<CartLineConstraintBinding, ti::ConstraintSet>(m, "CartLineConstraint")
+        .def("__init__",
+             [](CartLineConstraintBinding* self, ti::CartLineInfo info, std::shared_ptr<const ti::Var> position_var,
+                const Eigen::VectorXd& coeffs, std::string name) {
+                 new (self) CartLineConstraintBinding({position_var}, std::move(info), position_var, coeffs,
+                                                      std::move(name));
+             },
              "info"_a, "position_var"_a, "coeffs"_a, "name"_a = "CartLine",
              "Create Cartesian line constraint")
         .def("getValues", &ti::CartLineConstraint::getValues,
              "Get current constraint values")
-        .def("setBounds", &set_bounds_checked<ti::CartLineConstraint>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<CartLineConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("getLine", &ti::CartLineConstraint::getLine,
              "The line's two end poses (target_frame_offset1, target_frame_offset2)")
         .def("getInfo", &ti::CartLineConstraint::getInfo, nb::rv_policy::reference_internal,
              "The constraint's CartLineInfo")
-        .def("getJacobian", [](const ti::CartLineConstraint& self) {
+        .def("getJacobian", [](const CartLineConstraintBinding& self) {
                  require_linked(self);
                  require_six_indices(self, "getJacobian");
                  return jacobian_checked(self);
@@ -1020,7 +1156,7 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError "
              "unless all 6 indices are set (#237)")
         .def("calcJacobianBlock",
-             [](const ti::CartLineConstraint& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
+             [](const CartLineConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
                  require_linked(self, "calcJacobianBlock");
                  require_six_indices(self, "calcJacobianBlock");
                  return jacobian_block_checked(self, joint_vals, self.getInfo().manip->numJoints());
@@ -1037,13 +1173,13 @@ NB_MODULE(_trajopt_ifopt, m) {
                 "If true, use numeric differentiation (default: true)");
 
     // ========== DiscreteCollisionNumericalConstraint ==========
-    nb::class_<ti::DiscreteCollisionNumericalConstraint, ti::ConstraintSet>(m, "DiscreteCollisionNumericalConstraint")
-        .def("__init__", [](ti::DiscreteCollisionNumericalConstraint* self,
+    nb::class_<DiscreteCollisionNumericalConstraintBinding, ti::ConstraintSet>(m, "DiscreteCollisionNumericalConstraint")
+        .def("__init__", [](DiscreteCollisionNumericalConstraintBinding* self,
                             std::shared_ptr<ti::DiscreteCollisionEvaluator> eval,
                             const std::shared_ptr<const ti::Var>& var,
                             int max_num_cnt, bool fixed_sparsity, std::string name) {
-                 new (self) ti::DiscreteCollisionNumericalConstraint(
-                     std::move(eval),
+                 new (self) DiscreteCollisionNumericalConstraintBinding(
+                     {var}, std::move(eval),
                      require_in_variable_set(var, "DiscreteCollisionNumericalConstraint", "position_var"),
                      max_num_cnt, fixed_sparsity, std::move(name));
              },
@@ -1052,11 +1188,11 @@ NB_MODULE(_trajopt_ifopt, m) {
              "name"_a = "DiscreteCollisionNumerical",
              "Create discrete collision constraint with numerical jacobians")
         .def("getValues", &ti::DiscreteCollisionNumericalConstraint::getValues)
-        .def("setBounds", &set_bounds_checked<ti::DiscreteCollisionNumericalConstraint>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<DiscreteCollisionNumericalConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("calcValues", &ti::DiscreteCollisionNumericalConstraint::calcValues, "joint_vals"_a)
         .def("calcJacobianBlock",
-             [](const ti::DiscreteCollisionNumericalConstraint& self,
+             [](const DiscreteCollisionNumericalConstraintBinding& self,
                 const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
                  return jacobian_block_checked(
                      self, joint_vals, self.getCollisionEvaluator()->getJointGroup().numJoints());
@@ -1087,17 +1223,21 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def_rw("tcp_offset", &ti::InverseKinematicsInfo::tcp_offset, "TCP offset (not currently used)");
 
     // ========== InverseKinematicsConstraint ==========
-    nb::class_<ti::InverseKinematicsConstraint, ti::ConstraintSet>(m, "InverseKinematicsConstraint")
-        .def(nb::init<const Eigen::Isometry3d&, ti::InverseKinematicsInfo::ConstPtr,
-                      std::shared_ptr<const ti::Var>,
-                      std::shared_ptr<const ti::Var>,
-                      std::string>(),
+    nb::class_<InverseKinematicsConstraintBinding, ti::ConstraintSet>(m, "InverseKinematicsConstraint")
+        .def("__init__",
+             [](InverseKinematicsConstraintBinding* self, const Eigen::Isometry3d& target_pose,
+                ti::InverseKinematicsInfo::ConstPtr kinematic_info, std::shared_ptr<const ti::Var> constraint_var,
+                std::shared_ptr<const ti::Var> seed_var, std::string name) {
+                 new (self) InverseKinematicsConstraintBinding({constraint_var, seed_var}, target_pose,
+                                                               std::move(kinematic_info), constraint_var,
+                                                               seed_var, std::move(name));
+             },
              "target_pose"_a, "kinematic_info"_a, "constraint_var"_a, "seed_var"_a,
              "name"_a = "InverseKinematics",
              "Create IK constraint (constraint_var constrained to IK solution seeded from seed_var)")
         .def("getValues", &ti::InverseKinematicsConstraint::getValues,
              "Get current constraint values")
-        .def("setBounds", &set_bounds_checked<ti::InverseKinematicsConstraint>, "bounds"_a,
+        .def("setBounds", &set_bounds_checked<InverseKinematicsConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
         .def("setTargetPose", &ti::InverseKinematicsConstraint::setTargetPose, "target_pose"_a,
              "Set the target pose the IK solution is computed for")
