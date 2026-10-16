@@ -174,8 +174,9 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
     // Bound after the configurators so the stub names them; the element type is
     // shared_ptr<const OMPLPlannerConfigurator>, cast to the bound derived class.
     solver_config.def_rw("planners", &tp::OMPLSolverConfig::planners,
-        "Planner configurators, one parallel planner each. The list is copied on access: "
-        "assign a new list (or use addPlanner/clearPlanners) to change it.");
+        "Planner configurators, one parallel planner each. The list is copied on access; its "
+        "configurators are shared with the config, so editing one edits the config. Assign a "
+        "new list (or use addPlanner/clearPlanners) to change which planners it holds.");
 
     // ========== OMPLMoveProfile (base, was OMPLPlanProfile) ==========
     // createSimpleSetup / createStateExtractor stay unbound: they take or return OMPL types.
@@ -201,7 +202,11 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         .def_rw("collision_check_config", &tp::OMPLRealVectorMoveProfile::collision_check_config,
             "The collision check configuration");
     bind_value_equality(real_vector_move_profile);
-    bind_from_yaml(real_vector_move_profile);
+    bind_from_yaml(real_vector_move_profile,
+        "Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that "
+        "struct's own defaults, so fields left out lose the profile's values. This is per "
+        "struct; here `solver_config:` starts with no planners (OMPLSolverConfig() holds "
+        "none).");
 
     // SWIG-compatible alias
     m.attr("OMPLRealVectorPlanProfile") = m.attr("OMPLRealVectorMoveProfile");

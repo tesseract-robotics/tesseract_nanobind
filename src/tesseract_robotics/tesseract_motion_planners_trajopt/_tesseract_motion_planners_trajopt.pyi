@@ -140,6 +140,8 @@ class TrajOptDefaultMoveProfile(TrajOptMoveProfile):
     def from_yaml(config: str) -> TrajOptDefaultMoveProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `cartesian_cost_config:` and `joint_cost_config:` come back enabled (the waypoint config default), where the profile's are disabled.
         """
 
 TrajOptDefaultPlanProfile: TypeAlias = TrajOptDefaultMoveProfile
@@ -226,6 +228,8 @@ class TrajOptDefaultCompositeProfile(TrajOptCompositeProfile):
     def from_yaml(config: str) -> TrajOptDefaultCompositeProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `collision_cost_config:` and `collision_constraint_config:` start from TrajOptCollisionConfig() defaults.
         """
 
 class BasicTrustRegionSQPParameters:
@@ -606,6 +610,8 @@ class TrajOptOSQPSolverProfile(TrajOptSolverProfile):
     def from_yaml(config: str) -> TrajOptOSQPSolverProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        `settings:` and `opt_params:` are merged into the profile's values: keys left out keep them (`settings: {max_iter: 321}` keeps eps_abs 1e-4). This is per struct; other profiles' from_yaml may replace a nested sub-config instead.
         """
 
 def ProfileDictionary_addTrajOptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptMoveProfile) -> None:

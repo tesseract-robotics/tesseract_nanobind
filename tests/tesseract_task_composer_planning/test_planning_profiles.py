@@ -352,5 +352,5 @@ class TestFromYaml:
             cls.from_yaml("key: [")
 
     def test_wrong_value_type_raises(self):
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="Failed to parse yaml config"):
             MinLengthProfile.from_yaml("min_length: abc\n")
