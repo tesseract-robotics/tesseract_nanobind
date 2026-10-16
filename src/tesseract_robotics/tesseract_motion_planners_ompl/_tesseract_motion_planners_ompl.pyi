@@ -1,5 +1,6 @@
 """tesseract_motion_planners_ompl Python bindings"""
 
+from collections.abc import Sequence
 import enum
 from typing import TypeAlias
 
@@ -45,8 +46,20 @@ class OMPLSolverConfig:
     def clearPlanners(self) -> None:
         """Clear all planners"""
 
-    def getNumPlanners(self) -> int:
-        """Get number of planners (threads)"""
+    def __eq__(self, arg: OMPLSolverConfig, /) -> bool: ...
+
+    def __ne__(self, arg: OMPLSolverConfig, /) -> bool: ...
+
+    __hash__: None = None
+
+    @property
+    def planners(self) -> list[OMPLPlannerConfigurator]:
+        """
+        Planner configurators, one parallel planner each. The list is copied on access: assign a new list (or use addPlanner/clearPlanners) to change it.
+        """
+
+    @planners.setter
+    def planners(self, arg: Sequence[OMPLPlannerConfigurator], /) -> None: ...
 
 class OMPLPlannerType(enum.Enum):
     SBL = 0
@@ -80,6 +93,165 @@ class OMPLPlannerType(enum.Enum):
 class OMPLPlannerConfigurator:
     def getType(self) -> OMPLPlannerType: ...
 
+class SBLConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+class ESTConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+    @property
+    def goal_bias(self) -> float: ...
+
+    @goal_bias.setter
+    def goal_bias(self, arg: float, /) -> None: ...
+
+class LBKPIECE1Configurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+    @property
+    def border_fraction(self) -> float: ...
+
+    @border_fraction.setter
+    def border_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def min_valid_path_fraction(self) -> float: ...
+
+    @min_valid_path_fraction.setter
+    def min_valid_path_fraction(self, arg: float, /) -> None: ...
+
+class BKPIECE1Configurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+    @property
+    def border_fraction(self) -> float: ...
+
+    @border_fraction.setter
+    def border_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def failed_expansion_score_factor(self) -> float: ...
+
+    @failed_expansion_score_factor.setter
+    def failed_expansion_score_factor(self, arg: float, /) -> None: ...
+
+    @property
+    def min_valid_path_fraction(self) -> float: ...
+
+    @min_valid_path_fraction.setter
+    def min_valid_path_fraction(self, arg: float, /) -> None: ...
+
+class KPIECE1Configurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+    @property
+    def goal_bias(self) -> float: ...
+
+    @goal_bias.setter
+    def goal_bias(self, arg: float, /) -> None: ...
+
+    @property
+    def border_fraction(self) -> float: ...
+
+    @border_fraction.setter
+    def border_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def failed_expansion_score_factor(self) -> float: ...
+
+    @failed_expansion_score_factor.setter
+    def failed_expansion_score_factor(self, arg: float, /) -> None: ...
+
+    @property
+    def min_valid_path_fraction(self) -> float: ...
+
+    @min_valid_path_fraction.setter
+    def min_valid_path_fraction(self, arg: float, /) -> None: ...
+
+class BiTRRTConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+    @property
+    def temp_change_factor(self) -> float: ...
+
+    @temp_change_factor.setter
+    def temp_change_factor(self, arg: float, /) -> None: ...
+
+    @property
+    def cost_threshold(self) -> float: ...
+
+    @cost_threshold.setter
+    def cost_threshold(self, arg: float, /) -> None: ...
+
+    @property
+    def init_temperature(self) -> float: ...
+
+    @init_temperature.setter
+    def init_temperature(self, arg: float, /) -> None: ...
+
+    @property
+    def frontier_threshold(self) -> float: ...
+
+    @frontier_threshold.setter
+    def frontier_threshold(self, arg: float, /) -> None: ...
+
+    @property
+    def frontier_node_ratio(self) -> float: ...
+
+    @frontier_node_ratio.setter
+    def frontier_node_ratio(self, arg: float, /) -> None: ...
+
+class RRTConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def range(self) -> float: ...
+
+    @range.setter
+    def range(self, arg: float, /) -> None: ...
+
+    @property
+    def goal_bias(self) -> float: ...
+
+    @goal_bias.setter
+    def goal_bias(self, arg: float, /) -> None: ...
+
 class RRTConnectConfigurator(OMPLPlannerConfigurator):
     def __init__(self) -> None: ...
 
@@ -110,7 +282,7 @@ class RRTstarConfigurator(OMPLPlannerConfigurator):
     @delay_collision_checking.setter
     def delay_collision_checking(self, arg: bool, /) -> None: ...
 
-class SBLConfigurator(OMPLPlannerConfigurator):
+class TRRTConfigurator(OMPLPlannerConfigurator):
     def __init__(self) -> None: ...
 
     @property
@@ -119,8 +291,86 @@ class SBLConfigurator(OMPLPlannerConfigurator):
     @range.setter
     def range(self, arg: float, /) -> None: ...
 
+    @property
+    def goal_bias(self) -> float: ...
+
+    @goal_bias.setter
+    def goal_bias(self, arg: float, /) -> None: ...
+
+    @property
+    def temp_change_factor(self) -> float: ...
+
+    @temp_change_factor.setter
+    def temp_change_factor(self, arg: float, /) -> None: ...
+
+    @property
+    def init_temperature(self) -> float: ...
+
+    @init_temperature.setter
+    def init_temperature(self, arg: float, /) -> None: ...
+
+    @property
+    def frontier_threshold(self) -> float: ...
+
+    @frontier_threshold.setter
+    def frontier_threshold(self, arg: float, /) -> None: ...
+
+    @property
+    def frontier_node_ratio(self) -> float: ...
+
+    @frontier_node_ratio.setter
+    def frontier_node_ratio(self, arg: float, /) -> None: ...
+
+class PRMConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def max_nearest_neighbors(self) -> int: ...
+
+    @max_nearest_neighbors.setter
+    def max_nearest_neighbors(self, arg: int, /) -> None: ...
+
+class PRMstarConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+class LazyPRMstarConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+class SPARSConfigurator(OMPLPlannerConfigurator):
+    def __init__(self) -> None: ...
+
+    @property
+    def max_failures(self) -> int: ...
+
+    @max_failures.setter
+    def max_failures(self, arg: int, /) -> None: ...
+
+    @property
+    def dense_delta_fraction(self) -> float: ...
+
+    @dense_delta_fraction.setter
+    def dense_delta_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def sparse_delta_fraction(self) -> float: ...
+
+    @sparse_delta_fraction.setter
+    def sparse_delta_fraction(self, arg: float, /) -> None: ...
+
+    @property
+    def stretch_factor(self) -> float: ...
+
+    @stretch_factor.setter
+    def stretch_factor(self, arg: float, /) -> None: ...
+
 class OMPLMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int: ...
+
+    def createSolverConfig(self) -> OMPLSolverConfig:
+        """The solver config the planner uses for this profile"""
 
 OMPLPlanProfile: TypeAlias = OMPLMoveProfile
 
@@ -148,6 +398,18 @@ class OMPLRealVectorMoveProfile(OMPLMoveProfile):
     @collision_check_config.setter
     def collision_check_config(self, arg: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig, /) -> None: ...
 
+    def __eq__(self, arg: OMPLRealVectorMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: OMPLRealVectorMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> OMPLRealVectorMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 OMPLRealVectorPlanProfile: TypeAlias = OMPLRealVectorMoveProfile
 
 def OMPLMoveProfile_as_ProfileConstPtr(profile: OMPLMoveProfile) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
@@ -164,18 +426,8 @@ def ProfileDictionary_addOMPLMoveProfile(dict: tesseract_robotics.tesseract_comm
 def ProfileDictionary_addOMPLProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: OMPLMoveProfile) -> None:
     """Add OMPL plan profile to ProfileDictionary (legacy alias)"""
 
-class OMPLMotionPlanner:
+class OMPLMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...
-
-    def getName(self) -> str: ...
-
-    def solve(self, request: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerRequest) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerResponse: ...
-
-    def terminate(self) -> bool: ...
-
-    def clear(self) -> None: ...
-
-    def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...
 
 def RNG_setSeed(seed: int) -> None:
     """
