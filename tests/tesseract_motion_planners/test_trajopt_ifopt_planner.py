@@ -37,6 +37,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptMoveProfile,
     ProfileDictionary_addTrajOptIfoptPlanProfile,
     ProfileDictionary_addTrajOptIfoptSolverProfile,
+    ProfileOverrideNotDispatchedError,
     TrajOptIfoptCartesianWaypointConfig,
     TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
@@ -1189,10 +1190,6 @@ _SUPER_CREATE = textwrap.dedent(
         def create(self, composite_manip_info, env, nodes, fixed_indices):
             return super().create(composite_manip_info, env, nodes, fixed_indices)
 
-    class ExtendsDefault(TrajOptIfoptDefaultMoveProfile):
-        def create(self, move_instruction, composite_manip_info, env, index):
-            return super().create(move_instruction, composite_manip_info, env, index)
-
     locator = GeneralResourceLocator()
     support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
     env = Environment()
@@ -1221,8 +1218,6 @@ _SUPER_CREATE = textwrap.dedent(
             assert "create" in str(error), str(error)
         else:
             raise AssertionError("super().create did not raise")
-    # a Python subclass of a concrete C++ profile delegates to that profile's create
-    assert ExtendsDefault().create(move, manip_info, env, 0).node is not None
     print("OK")
     """
 )
@@ -1328,3 +1323,29 @@ class TestTrajOptIfoptPythonProfiles:
 
     def test_python_constraint_set_released_after_task_composer_solve(self):
         _run_child(_TASK_COMPOSER_RELEASE)
+
+
+class TestTrajOptIfoptConcreteProfileOverrides:
+    """A hook override on a concrete profile is refused, not silently ignored (gh-340)."""
+
+    @pytest.mark.parametrize(
+        ("concrete", "hook", "base"),
+        [
+            (TrajOptIfoptDefaultMoveProfile, "create", "TrajOptIfoptMoveProfile"),
+            (TrajOptIfoptDefaultCompositeProfile, "create", "TrajOptIfoptCompositeProfile"),
+            (TrajOptIfoptOSQPSolverProfile, "create", "fields"),
+            (TrajOptIfoptOSQPSolverProfile, "createOptimizationCallbacks", "callbacks"),
+        ],
+    )
+    def test_hook_override_raises(self, concrete, hook, base):
+        with pytest.raises(ProfileOverrideNotDispatchedError, match=base):
+            type("Overrides", (concrete,), {hook: lambda self, *args: None})
+
+    def test_subclass_without_hooks_is_allowed(self):
+        class Configured(TrajOptIfoptDefaultCompositeProfile):
+            pass
+
+        assert isinstance(Configured(), TrajOptIfoptCompositeProfile)
+
+    def test_abstract_base_override_is_allowed(self):
+        assert issubclass(_AddingCompositeProfile, TrajOptIfoptCompositeProfile)

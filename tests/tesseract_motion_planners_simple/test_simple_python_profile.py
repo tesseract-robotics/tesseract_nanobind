@@ -37,8 +37,15 @@ from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import (
     JointGroupInstructionInfo,
     KinematicGroupInstructionInfo,
+    ProfileOverrideNotDispatchedError,
     SimpleMotionPlanner,
+    SimplePlannerFixedSizeAssignMoveProfile,
+    SimplePlannerFixedSizeAssignNoIKMoveProfile,
     SimplePlannerFixedSizeMoveProfile,
+    SimplePlannerLVSAssignMoveProfile,
+    SimplePlannerLVSAssignNoIKMoveProfile,
+    SimplePlannerLVSMoveProfile,
+    SimplePlannerLVSNoIKMoveProfile,
     SimplePlannerMoveProfile,
     getClosestJointSolution,
     interpolateCartCartWaypoint,
@@ -473,17 +480,10 @@ _SUPER_GENERATE = textwrap.dedent(
     """
     from tesseract_robotics.tesseract_command_language import InstructionPoly
     from tesseract_robotics.tesseract_motion_planners_simple import (
-        SimplePlannerLVSMoveProfile,
         SimplePlannerPureVirtualCallError,
     )
 
     class CallsUp(SimplePlannerMoveProfile):
-        def generate(self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi):
-            return super().generate(
-                prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
-            )
-
-    class ExtendsLVS(SimplePlannerLVSMoveProfile):
         def generate(self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi):
             return super().generate(
                 prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
@@ -501,9 +501,6 @@ _SUPER_GENERATE = textwrap.dedent(
         assert "generate" in str(error), str(error)
     else:
         raise AssertionError("super().generate did not raise")
-
-    # a Python subclass of a concrete C++ profile delegates to that profile's generate
-    assert len(ExtendsLVS().generate(*args)) > 1
 
     # through solve, the error comes out of SimpleMotionPlanner.solve with its type
     program = CompositeInstruction("PY_PROFILE")
@@ -553,3 +550,47 @@ def test_stored_generate_arguments_outlive_solve():
 
 def test_super_generate_raises_pure_virtual_call_error():
     _run_child(_SUPER_GENERATE)
+
+
+# ---- overrides on concrete profiles ----------------------------------------
+
+_CONCRETE_MOVE_PROFILES = [
+    SimplePlannerFixedSizeMoveProfile,
+    SimplePlannerFixedSizeAssignMoveProfile,
+    SimplePlannerFixedSizeAssignNoIKMoveProfile,
+    SimplePlannerLVSMoveProfile,
+    SimplePlannerLVSNoIKMoveProfile,
+    SimplePlannerLVSAssignMoveProfile,
+    SimplePlannerLVSAssignNoIKMoveProfile,
+]
+
+
+@pytest.mark.parametrize("concrete", _CONCRETE_MOVE_PROFILES)
+def test_generate_override_on_concrete_profile_raises(concrete):
+    # the planner would call the C++ generate: these classes have no Python dispatch
+    with pytest.raises(ProfileOverrideNotDispatchedError, match="SimplePlannerMoveProfile"):
+
+        class Overrides(concrete):
+            def generate(self, *args):
+                return []
+
+
+@pytest.mark.parametrize("concrete", _CONCRETE_MOVE_PROFILES)
+def test_concrete_profile_subclass_without_hooks_is_allowed(concrete):
+    class Configured(concrete):
+        def describe(self):
+            return "configured"
+
+    class Deeper(Configured):
+        pass
+
+    assert Deeper().describe() == "configured"
+    with pytest.raises(ProfileOverrideNotDispatchedError):
+
+        class DeeperOverride(Configured):
+            def generate(self, *args):
+                return []
+
+
+def test_override_error_is_a_type_error():
+    assert issubclass(ProfileOverrideNotDispatchedError, TypeError)
