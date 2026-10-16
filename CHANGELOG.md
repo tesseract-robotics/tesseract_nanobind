@@ -568,7 +568,6 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [@johnwason]: https://github.com/johnwason
 [@marip8]: https://github.com/marip8
 [@seonixx]: https://github.com/seonixx
-[#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#262]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/262
 [#263]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/263
 [#264]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/264
