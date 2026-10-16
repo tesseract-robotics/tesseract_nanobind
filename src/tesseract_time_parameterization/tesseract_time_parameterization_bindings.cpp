@@ -68,6 +68,16 @@ public:
         return trajectory_;
     }
 
+    // checked(), then `i` against size(): upstream indexes its vector unchecked. Negative
+    // indices are rejected, not wrapped (upstream casts `i` to size_t).
+    tp::InstructionsTrajectory& checkedAt(Eigen::Index i) {
+        auto& trajectory = checked();
+        if (i < 0 || i >= trajectory.size())
+            throw nb::index_error(("InstructionsTrajectory: index " + std::to_string(i) +
+                                   " out of range for " + std::to_string(trajectory.size()) + " waypoints").c_str());
+        return trajectory;
+    }
+
 private:
     // The filter upstream's InstructionsTrajectory(program) flattens with
     static bool moveFilter(const tcl::InstructionPoly& i, const tcl::CompositeInstruction&) {
@@ -100,20 +110,21 @@ NB_MODULE(_tesseract_time_parameterization, m) {
              "in `program`, every method raises `StaleTrajectoryError`: build a new\n"
              "trajectory. Each call re-flattens `program`, O(number of instructions).\n\n"
              "Raises:\n"
-             "    StaleTrajectoryError: on any method call after `program` changed (a `RuntimeError`).")
+             "    StaleTrajectoryError: on any method call after `program` changed (a `RuntimeError`).\n"
+             "    IndexError: an index method got `i` outside `[0, size())`; negative `i` is not wrapped.")
         .def("getPosition", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
-            return std::as_const(self.checked()).getPosition(i);
+            return std::as_const(self.checkedAt(i)).getPosition(i);
         }, "i"_a)
         .def("getVelocity", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
-            return std::as_const(self.checked()).getVelocity(i);
+            return std::as_const(self.checkedAt(i)).getVelocity(i);
         }, "i"_a)
         .def("getAcceleration", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
-            return std::as_const(self.checked()).getAcceleration(i);
+            return std::as_const(self.checkedAt(i)).getAcceleration(i);
         }, "i"_a)
-        .def("getTimeFromStart", [](GIT& self, Eigen::Index i) { return self.checked().getTimeFromStart(i); }, "i"_a)
+        .def("getTimeFromStart", [](GIT& self, Eigen::Index i) { return self.checkedAt(i).getTimeFromStart(i); }, "i"_a)
         .def("setData", [](GIT& self, Eigen::Index i, const Eigen::VectorXd& velocity,
                            const Eigen::VectorXd& acceleration, double time) {
-            self.checked().setData(i, velocity, acceleration, time);
+            self.checkedAt(i).setData(i, velocity, acceleration, time);
         }, "i"_a, "velocity"_a, "acceleration"_a, "time"_a)
         .def("size", [](GIT& self) { return self.checked().size(); })
         .def("dof", [](GIT& self) { return self.checked().dof(); })

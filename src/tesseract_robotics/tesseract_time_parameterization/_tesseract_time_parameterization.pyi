@@ -27,6 +27,7 @@ class InstructionsTrajectory:
 
         Raises:
             StaleTrajectoryError: on any method call after `program` changed (a `RuntimeError`).
+            IndexError: an index method got `i` outside `[0, size())`; negative `i` is not wrapped.
         """
 
     def getPosition(self, i: int) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...
