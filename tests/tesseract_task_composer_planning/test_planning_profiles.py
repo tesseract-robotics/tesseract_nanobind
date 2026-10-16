@@ -1,7 +1,17 @@
 """Tests for tesseract_task_composer planning-node profile bindings."""
 
+from pathlib import Path
+
+import numpy as np
 import pytest
 
+import tesseract_robotics.tesseract_motion_planners_trajopt as trajopt
+import tesseract_robotics.tesseract_task_composer_planning as tcp_module
+from tesseract_robotics.tesseract_collision import CollisionCheckConfig
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    BasicTrustRegionSQPParameters,
+    TrajOptJointWaypointConfig,
+)
 from tesseract_robotics.tesseract_task_composer_planning import (
     ContactCheckProfile,
     FixStateBoundsProfile,
@@ -11,6 +21,7 @@ from tesseract_robotics.tesseract_task_composer_planning import (
     ProfileSwitchProfile,
     UpsampleTrajectoryProfile,
 )
+from tesseract_robotics.trajopt_ifopt import CollisionCoeffData
 
 # ---- MinLengthProfile ------------------------------------------------------
 
@@ -192,3 +203,154 @@ class TestContactCheckProfile:
         # Verify the bound struct members are accessible
         assert p.contact_manager_config is not None
         assert p.collision_check_config is not None
+
+
+# ---- FixStateCollisionProfile TrajOpt fields (#326) ------------------------
+
+
+class TestFixStateCollisionProfileTrajOptFields:
+    def test_opt_params_round_trip(self):
+        p = FixStateCollisionProfile()
+        p.opt_params.max_iter = 7
+        assert p.opt_params.max_iter == 7
+        assert isinstance(p.opt_params, BasicTrustRegionSQPParameters)
+
+    @pytest.mark.parametrize(
+        "field", ["trajopt_joint_constraint_config", "trajopt_joint_cost_config"]
+    )
+    def test_joint_waypoint_config_round_trip(self, field):
+        p = FixStateCollisionProfile()
+        cfg = getattr(p, field)
+        assert isinstance(cfg, TrajOptJointWaypointConfig)
+        cfg.coeff = np.array([3.0])
+        assert np.array_equal(getattr(p, field).coeff, [3.0])
+
+    @pytest.mark.parametrize("field", ["collision_constraint_coeff", "collision_cost_coeff"])
+    def test_collision_coeff_round_trip(self, field):
+        p = FixStateCollisionProfile()
+        coeff = getattr(p, field)
+        assert isinstance(coeff, CollisionCoeffData)
+        coeff.setDefaultCollisionCoeff(42.0)
+        assert getattr(p, field).getDefaultCollisionCoeff() == 42.0
+
+    def test_osqp_settings_round_trip(self):
+        p = FixStateCollisionProfile()
+        s = p.osqp_settings
+        assert isinstance(s, trajopt.OSQPSettings)
+        s.max_iter = 123
+        p.osqp_settings = s
+        assert p.osqp_settings.max_iter == 123
+
+    def test_stub_names_imported_types(self):
+        stub = (
+            Path(tcp_module.__file__).parent / "_tesseract_task_composer_planning.pyi"
+        ).read_text()
+        assert "tesseract_motion_planners_trajopt" in stub
+        assert '"sco::' not in stub
+        assert '"trajopt_common::' not in stub
+        assert '"tesseract::motion_planners::' not in stub
+
+
+# ---- value equality (#261) --------------------------------------------------
+
+# (class, mutate): mutate changes one bound field so two instances differ.
+TCP_VALUE_TYPES = [
+    (
+        ContactCheckProfile,
+        lambda p: setattr(p.collision_check_config, "longest_valid_segment_length", 0.123),
+    ),
+    (FixStateBoundsProfile, lambda p: setattr(p, "max_deviation_global", 0.5)),
+    (FixStateCollisionProfile, lambda p: setattr(p, "jiggle_factor", 0.5)),
+    (KinematicLimitsCheckProfile, lambda p: setattr(p, "check_velocity", False)),
+    (MinLengthProfile, lambda p: setattr(p, "min_length", 99)),
+    (ProfileSwitchProfile, lambda p: setattr(p, "return_value", 7)),
+    (UpsampleTrajectoryProfile, lambda p: setattr(p, "longest_valid_segment_length", 0.7)),
+]
+
+
+class TestValueEquality:
+    @pytest.mark.parametrize(("cls", "mutate"), TCP_VALUE_TYPES)
+    def test_equality(self, cls, mutate):
+        a, b = cls(), cls()
+        assert a == b
+        assert not (a != b)
+        mutate(b)
+        assert a != b
+        assert not (a == b)
+
+    @pytest.mark.parametrize(("cls", "mutate"), TCP_VALUE_TYPES)
+    def test_unhashable(self, cls, mutate):
+        with pytest.raises(TypeError):
+            hash(cls())
+
+
+# ---- createKey (#273) -------------------------------------------------------
+
+TCP_PROFILES = [cls for cls, _ in TCP_VALUE_TYPES]
+
+
+class TestCreateKey:
+    @pytest.mark.parametrize("cls", TCP_PROFILES)
+    def test_create_key_matches_get_key(self, cls):
+        assert cls.createKey() == cls().getKey()
+
+    def test_keys_differ(self):
+        assert len({cls.createKey() for cls in TCP_PROFILES}) == len(TCP_PROFILES)
+
+
+# ---- from_yaml (#331) -------------------------------------------------------
+
+
+def _replace_collision_check_config(profile, **fields):
+    # A YAML key replaces the whole sub-struct, starting from that struct's own defaults
+    # (upstream `n.as<CollisionCheckConfig>()`): type DISCRETE, not the profile's LVS_DISCRETE.
+    config = CollisionCheckConfig()
+    for name, value in fields.items():
+        setattr(config, name, value)
+    profile.collision_check_config = config
+
+
+TCP_YAML = [
+    (
+        ContactCheckProfile,
+        "collision_check_config:\n  longest_valid_segment_length: 0.123\n",
+        lambda p: _replace_collision_check_config(p, longest_valid_segment_length=0.123),
+    ),
+    (
+        FixStateBoundsProfile,
+        "max_deviation_global: 0.5\n",
+        lambda p: setattr(p, "max_deviation_global", 0.5),
+    ),
+    (FixStateCollisionProfile, "jiggle_factor: 0.5\n", lambda p: setattr(p, "jiggle_factor", 0.5)),
+    (
+        KinematicLimitsCheckProfile,
+        "check_velocity: false\n",
+        lambda p: setattr(p, "check_velocity", False),
+    ),
+    (MinLengthProfile, "min_length: 99\n", lambda p: setattr(p, "min_length", 99)),
+    (ProfileSwitchProfile, "return_value: 7\n", lambda p: setattr(p, "return_value", 7)),
+    (
+        UpsampleTrajectoryProfile,
+        "longest_valid_segment_length: 0.7\n",
+        lambda p: setattr(p, "longest_valid_segment_length", 0.7),
+    ),
+]
+
+
+class TestFromYaml:
+    @pytest.mark.parametrize(("cls", "config", "mutate"), TCP_YAML)
+    def test_one_field(self, cls, config, mutate):
+        expected = cls()
+        mutate(expected)
+        profile = cls.from_yaml(config)
+        assert profile == expected
+        assert profile != cls()
+
+    @pytest.mark.parametrize("cls", TCP_PROFILES)
+    def test_malformed_yaml_raises_value_error(self, cls):
+        with pytest.raises(ValueError):
+            cls.from_yaml("key: [")
+
+    def test_wrong_value_type_raises(self):
+        with pytest.raises(RuntimeError):
+            MinLengthProfile.from_yaml("min_length: abc\n")

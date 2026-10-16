@@ -5,15 +5,10 @@
  * The task classes themselves are constructed via YAML + TaskComposerPluginFactory;
  * only their *profiles* need to be tunable from Python, so just the profiles
  * are bound here.
- *
- * FixStateCollisionProfile has members of type OSQPSettings,
- * sco::BasicTrustRegionSQPParameters, trajopt_common::CollisionCoeffData, and
- * TrajOptJointWaypointConfig that are not currently exposed to Python. Those
- * members are skipped; users who need to tune them should build the profile
- * in C++ or configure via YAML. Simple scalar / enum fields are exposed.
  */
 
 #include "tesseract_nb.h"
+#include "tesseract_nb_yaml.h"
 #include <nanobind/stl/vector.h>
 
 #include <tesseract/common/profile.h>
@@ -36,14 +31,22 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
     // Import tesseract_collision for ContactManagerConfig / CollisionCheckConfig
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
+    // FixStateCollisionProfile's TrajOpt correction fields: TrajOptJointWaypointConfig,
+    // BasicTrustRegionSQPParameters and OSQPSettings (planner module), CollisionCoeffData (trajopt_ifopt)
+    nb::module_::import_("tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt");
+    nb::module_::import_("tesseract_robotics.trajopt_ifopt._trajopt_ifopt");
 
     // ===== ContactCheckProfile =====
-    nb::class_<tp::ContactCheckProfile, tc::Profile>(m, "ContactCheckProfile")
+    nb::class_<tp::ContactCheckProfile, tc::Profile> contact_check(m, "ContactCheckProfile");
+    contact_check
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "longest_valid_segment_length"_a, "contact_distance"_a)
         .def_rw("contact_manager_config", &tp::ContactCheckProfile::contact_manager_config)
-        .def_rw("collision_check_config", &tp::ContactCheckProfile::collision_check_config);
+        .def_rw("collision_check_config", &tp::ContactCheckProfile::collision_check_config)
+        .def_static("createKey", &tc::Profile::createKey<tp::ContactCheckProfile>);
+    bind_value_equality(contact_check);
+    bind_from_yaml(contact_check);
 
     // ===== FixStateBoundsProfile =====
     nb::class_<tp::FixStateBoundsProfile, tc::Profile> fix_state_bounds(m, "FixStateBoundsProfile");
@@ -58,11 +61,12 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("mode", &tp::FixStateBoundsProfile::mode)
         .def_rw("max_deviation_global", &tp::FixStateBoundsProfile::max_deviation_global)
         .def_rw("upper_bounds_reduction", &tp::FixStateBoundsProfile::upper_bounds_reduction)
-        .def_rw("lower_bounds_reduction", &tp::FixStateBoundsProfile::lower_bounds_reduction);
+        .def_rw("lower_bounds_reduction", &tp::FixStateBoundsProfile::lower_bounds_reduction)
+        .def_static("createKey", &tc::Profile::createKey<tp::FixStateBoundsProfile>);
+    bind_value_equality(fix_state_bounds);
+    bind_from_yaml(fix_state_bounds);
 
     // ===== FixStateCollisionProfile =====
-    // Heavy trajopt-typed members (opt_params, osqp_settings, coeff data,
-    // trajopt waypoint configs) are not bound — build those in C++ or YAML.
     nb::class_<tp::FixStateCollisionProfile, tc::Profile> fix_state_collision(m, "FixStateCollisionProfile");
     nb::enum_<tp::FixStateCollisionProfile::Settings>(fix_state_collision, "Settings")
         .value("START_ONLY", tp::FixStateCollisionProfile::Settings::START_ONLY)
@@ -85,32 +89,63 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("contact_manager_config", &tp::FixStateCollisionProfile::contact_manager_config)
         .def_rw("collision_check_config", &tp::FixStateCollisionProfile::collision_check_config)
         .def_rw("sampling_attempts", &tp::FixStateCollisionProfile::sampling_attempts)
-        .def_rw("update_workspace", &tp::FixStateCollisionProfile::update_workspace);
+        .def_rw("update_workspace", &tp::FixStateCollisionProfile::update_workspace)
+        .def_rw("trajopt_joint_constraint_config", &tp::FixStateCollisionProfile::trajopt_joint_constraint_config,
+                "Joint waypoint constraint config of the TrajOpt correction solve")
+        .def_rw("trajopt_joint_cost_config", &tp::FixStateCollisionProfile::trajopt_joint_cost_config,
+                "Joint waypoint cost config of the TrajOpt correction solve")
+        .def_rw("collision_constraint_coeff", &tp::FixStateCollisionProfile::collision_constraint_coeff,
+                "Collision constraint coefficients of the TrajOpt correction solve")
+        .def_rw("collision_cost_coeff", &tp::FixStateCollisionProfile::collision_cost_coeff,
+                "Collision cost coefficients of the TrajOpt correction solve")
+        .def_rw("opt_params", &tp::FixStateCollisionProfile::opt_params,
+                "Optimization parameters of the TrajOpt correction solve")
+        .def_rw("osqp_settings", &tp::FixStateCollisionProfile::osqp_settings,
+                "OSQP settings of the TrajOpt correction solve")
+        .def_static("createKey", &tc::Profile::createKey<tp::FixStateCollisionProfile>);
+    bind_value_equality(fix_state_collision);
+    bind_from_yaml(fix_state_collision);
 
     // ===== KinematicLimitsCheckProfile =====
-    nb::class_<tp::KinematicLimitsCheckProfile, tc::Profile>(m, "KinematicLimitsCheckProfile")
+    nb::class_<tp::KinematicLimitsCheckProfile, tc::Profile> kinematic_limits_check(m, "KinematicLimitsCheckProfile");
+    kinematic_limits_check
         .def(nb::init<bool, bool, bool>(),
              "check_position"_a = true,
              "check_velocity"_a = true,
              "check_acceleration"_a = true)
         .def_rw("check_position", &tp::KinematicLimitsCheckProfile::check_position)
         .def_rw("check_velocity", &tp::KinematicLimitsCheckProfile::check_velocity)
-        .def_rw("check_acceleration", &tp::KinematicLimitsCheckProfile::check_acceleration);
+        .def_rw("check_acceleration", &tp::KinematicLimitsCheckProfile::check_acceleration)
+        .def_static("createKey", &tc::Profile::createKey<tp::KinematicLimitsCheckProfile>);
+    bind_value_equality(kinematic_limits_check);
+    bind_from_yaml(kinematic_limits_check);
 
     // ===== MinLengthProfile =====
-    nb::class_<tp::MinLengthProfile, tc::Profile>(m, "MinLengthProfile")
+    nb::class_<tp::MinLengthProfile, tc::Profile> min_length(m, "MinLengthProfile");
+    min_length
         .def(nb::init<>())
         .def(nb::init<long>(), "min_length"_a)
-        .def_rw("min_length", &tp::MinLengthProfile::min_length);
+        .def_rw("min_length", &tp::MinLengthProfile::min_length)
+        .def_static("createKey", &tc::Profile::createKey<tp::MinLengthProfile>);
+    bind_value_equality(min_length);
+    bind_from_yaml(min_length);
 
     // ===== ProfileSwitchProfile =====
-    nb::class_<tp::ProfileSwitchProfile, tc::Profile>(m, "ProfileSwitchProfile")
+    nb::class_<tp::ProfileSwitchProfile, tc::Profile> profile_switch(m, "ProfileSwitchProfile");
+    profile_switch
         .def(nb::init<int>(), "return_value"_a = 1)
-        .def_rw("return_value", &tp::ProfileSwitchProfile::return_value);
+        .def_rw("return_value", &tp::ProfileSwitchProfile::return_value)
+        .def_static("createKey", &tc::Profile::createKey<tp::ProfileSwitchProfile>);
+    bind_value_equality(profile_switch);
+    bind_from_yaml(profile_switch);
 
     // ===== UpsampleTrajectoryProfile =====
-    nb::class_<tp::UpsampleTrajectoryProfile, tc::Profile>(m, "UpsampleTrajectoryProfile")
+    nb::class_<tp::UpsampleTrajectoryProfile, tc::Profile> upsample_trajectory(m, "UpsampleTrajectoryProfile");
+    upsample_trajectory
         .def(nb::init<>())
         .def(nb::init<double>(), "longest_valid_segment_length"_a)
-        .def_rw("longest_valid_segment_length", &tp::UpsampleTrajectoryProfile::longest_valid_segment_length);
+        .def_rw("longest_valid_segment_length", &tp::UpsampleTrajectoryProfile::longest_valid_segment_length)
+        .def_static("createKey", &tc::Profile::createKey<tp::UpsampleTrajectoryProfile>);
+    bind_value_equality(upsample_trajectory);
+    bind_from_yaml(upsample_trajectory);
 }
