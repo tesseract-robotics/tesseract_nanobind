@@ -77,7 +77,6 @@ def test_g4_modules_are_audited():
         ("AnyWrapper", "type-erasure-interface"),
         ("AnyPoly.get", "type-erasure-interface"),
         ("AnyPoly.getType", "type-index"),  # structural (G1 R3)
-        ("AnyPoly.getTypeName", "type-index"),
         ("FutureStatus", "std-library-enum"),
         ("TaskComposerFuture.waitUntil", "clock-deadline"),
         ("TaskComposerNode.dump", "dot-dump-hook"),
@@ -100,14 +99,17 @@ def test_core_factory_interfaces_accepted(core_reports, module, symbol):
 
 
 def test_any_poly_rows_left_are_value_equality_only(g4_reports):
-    """What remains of AnyPoly is `__eq__`/`__ne__` (g1/00-value-equality.md)."""
+    """What remains of AnyPoly: `__eq__`/`__ne__` (g1/00-value-equality.md), `getTypeName` (I-tc-15)."""
     report = g4_reports[TC]
     prefixes = ("AnyPoly", "AnyInterface", "AnyWrapper")
     assert {g.symbol for g in report.gaps if g.symbol.startswith(prefixes)} == {
         "AnyPoly.__eq__",
         "AnyPoly.__ne__",
     }
-    assert not [d for d in report.deviations if d.name.startswith("AnyPoly")]
+    # getTypeName returns a mangled name: binding-fix I-tc-15, not type-index (premise fails).
+    assert {d.name for d in report.deviations if d.name.startswith(prefixes)} == {
+        "AnyPoly.getTypeName"
+    }
     assert "AnyPoly.operator=" not in {g.symbol for g in report.gaps}  # T12 (G3)
 
 
