@@ -1,2 +1,2 @@
-// Audit contract fixture TU: inherited members (A) and stub base classes (T5), #256.
+// Audit contract fixture TU: members inherited from an unbound base (A), #256.
 #include <tesseract/inherit/shapes.h>
