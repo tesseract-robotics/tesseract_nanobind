@@ -38,6 +38,17 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
     "tesseract_task_composer_planning": ("tesseract/task_composer/planning/",),
     "tesseract_time_parameterization": ("tesseract/time_parameterization/",),
     "tesseract_urdf": ("tesseract/urdf/",),
+    "tesseract_motion_planners": ("tesseract/motion_planners/",),
+    "tesseract_motion_planners_simple": ("tesseract/motion_planners/simple/",),
+    "tesseract_motion_planners_ompl": ("tesseract/motion_planners/ompl/",),
+    # Classic TrajOpt: its SQP layer (`trajopt_sco/`) and problem description (`trajopt/`)
+    # are reached only through this planner (spec D2).
+    "tesseract_motion_planners_trajopt": (
+        "tesseract/motion_planners/trajopt/",
+        "trajopt_sco/",
+        "trajopt/",
+    ),
+    "tesseract_motion_planners_trajopt_ifopt": ("tesseract/motion_planners/trajopt_ifopt/",),
     # trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h).
     "trajopt_ifopt": ("trajopt_ifopt/", "trajopt_common/"),
     "trajopt_sqp": ("trajopt_sqp/",),
@@ -47,26 +58,6 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
 # binding module is in exactly one of the two tables (`check_coverage`).
 UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
     "ompl_base": ("To be removed (#258); binds OMPL, not tesseract.", ()),
-    "tesseract_motion_planners": (
-        "Not yet audited: #256 group 3.",
-        ("tesseract/motion_planners/",),
-    ),
-    "tesseract_motion_planners_simple": (
-        "Not yet audited: #256 group 3.",
-        ("tesseract/motion_planners/simple/",),
-    ),
-    "tesseract_motion_planners_ompl": (
-        "Not yet audited: #256 group 3.",
-        ("tesseract/motion_planners/ompl/",),
-    ),
-    "tesseract_motion_planners_trajopt": (
-        "Not yet audited: #256 group 3.",
-        ("tesseract/motion_planners/trajopt/", "trajopt_sco/", "trajopt/"),
-    ),
-    "tesseract_motion_planners_trajopt_ifopt": (
-        "Not yet audited: #256 group 3.",
-        ("tesseract/motion_planners/trajopt_ifopt/",),
-    ),
     "tesseract_motion_planners_descartes": (
         "Not yet audited: #256 group 3.",
         ("tesseract/motion_planners/descartes/", "descartes_light/"),
