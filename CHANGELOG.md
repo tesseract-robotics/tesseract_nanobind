@@ -12,7 +12,7 @@
 - **Time-parameterization profiles compare by value and are unhashable** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` bind `__eq__`/`__ne__` from the C++ `operator==` (identity before) and set `__hash__ = None`, as #169 did for collision, common and environment: `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
 - **The seven simple-planner move profiles compare by value and are unhashable** — `SimplePlannerFixedSize{,Assign,AssignNoIK}MoveProfile` and `SimplePlannerLVS{,NoIK,Assign,AssignNoIK}MoveProfile` bind the C++ `operator==`; `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
 
-- **`OMPLSolverConfig.getNumPlanners()` removed; `planners` is readable** — `solver_config.planners` binds the configurator list, so Python sees which planners a profile holds, not only how many. The list is copied on access: assign a new list, or use `addPlanner` / `clearPlanners`, which stay as the in-place mutators ([#302]).
+- **`OMPLSolverConfig.getNumPlanners()` removed; `planners` is readable** — `solver_config.planners` binds the configurator list, so Python sees which planners a profile holds, not only how many. The list is copied on access; its configurators are shared with the config, so `cfg.planners[0].range = 0.5` edits the config. To change which planners it holds, assign a new list, or use `addPlanner` / `clearPlanners`, which stay as the in-place mutators ([#302]).
 
   | before | after |
   | --- | --- |

@@ -140,8 +140,9 @@ profiles with the same fields are `==`, and `hash()`, `set` members and `dict` k
 ### `OMPLSolverConfig.getNumPlanners()` removed
 
 `OMPLSolverConfig.planners` is bound (#302), so the count is `len(cfg.planners)`. The list is
-copied on access: `cfg.planners.append(x)` changes the copy. Assign a new list, or use
-`addPlanner` / `clearPlanners`, which change it in place.
+copied on access; its configurators are shared with the config. `cfg.planners.append(x)`
+changes the copy, but `cfg.planners[0].range = 0.5` edits the config. Assign a new list, or
+use `addPlanner` / `clearPlanners`, which change it in place.
 
 | before | after |
 | --- | --- |
