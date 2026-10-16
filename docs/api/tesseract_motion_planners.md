@@ -118,9 +118,9 @@ changed = formatProgram(program, env)
 
 ### toToolpath
 
-TCP poses of a program in each instruction's working frame. Takes a `CompositeInstruction`,
-`MoveInstructionPoly` or `InstructionPoly`; returns a list with one `VectorIsometry3d` per
-sub-composite (one for a flat program).
+World-frame TCP poses of a program; the working frame in the `ManipulatorInfo` does not
+change them. Takes a `CompositeInstruction`, `MoveInstructionPoly` or `InstructionPoly`;
+returns a list with one `VectorIsometry3d` per sub-composite (one for a flat program).
 
 ```python
 from tesseract_robotics.tesseract_motion_planners import toToolpath
