@@ -32,12 +32,21 @@ public:
 };
 
 // T1: sibling exists in C++ but is unbound: the YAML overload is a gap.
-class Orphan
+class UnboundSibling
 {
 public:
-  Orphan();
-  Orphan(const YAML::Node& config);
-  Orphan(const std::string& config);
+  UnboundSibling();
+  UnboundSibling(const YAML::Node& config);
+  UnboundSibling(const std::string& config);
+};
+
+// T1: a bound text sibling that differs at another position is no sibling: a gap.
+class Mismatched
+{
+public:
+  Mismatched();
+  Mismatched(const YAML::Node& config, int n);
+  Mismatched(const std::string& config, double x);
 };
 
 // T1: a YAML-text sibling on a base class (`from_yaml`, C6 6a) does not cover a derived
@@ -79,22 +88,22 @@ public:
 
 // T13: constructor template of a class template.
 template <class T>
-struct Box
+struct CtorTemplateBox
 {
-  Box();
+  CtorTemplateBox();
   template <class U>
-  explicit Box(const U& u);
+  explicit CtorTemplateBox(const U& u);
 };
-using BoxD = Box<double>;
+using CtorTemplateBoxD = CtorTemplateBox<double>;
 
 // T12: no operator= is ever a row; other operators keep theirs.
-struct Holder
+struct AssignHolder
 {
-  Holder();
-  Holder& operator=(int value);  // converting assignment: never a row
+  AssignHolder();
+  AssignHolder& operator=(int value);  // converting assignment: never a row
   template <class T>
-  Holder& operator=(T&& value);               // templated assignment: never a row
-  bool operator==(const Holder& rhs) const;   // still a row: no __eq__ in the stub
-  Holder operator+(const Holder& rhs) const;  // still a row: no __add__ in the stub
+  AssignHolder& operator=(T&& value);                     // templated assignment: never a row
+  bool operator==(const AssignHolder& rhs) const;          // still a row: no __eq__ in the stub
+  AssignHolder operator+(const AssignHolder& rhs) const;  // still a row: no __add__ in the stub
 };
 }  // namespace tesseract::planner
