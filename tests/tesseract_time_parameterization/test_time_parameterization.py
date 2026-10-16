@@ -8,6 +8,7 @@ Tests cover:
 """
 
 import gc
+import subprocess
 import sys
 
 import numpy as np
@@ -22,6 +23,7 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
+    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
@@ -34,6 +36,7 @@ from tesseract_robotics.tesseract_time_parameterization import (
     RuckigTrajectorySmoothing,
     RuckigTrajectorySmoothingCompositeProfile,
     ScalingsLengthError,
+    StaleTrajectoryError,
     TimeOptimalTrajectoryGeneration,
     TimeParameterization,
     TOTGCompositeProfile,
@@ -309,6 +312,102 @@ def test_instructions_trajectory_keeps_program_alive():
     del traj
     gc.collect()
     assert sys.getrefcount(program) == refs
+
+
+# Every bound method of InstructionsTrajectory, with arguments for a 6-dof program.
+_TRAJECTORY_CALLS = {
+    "getPosition": (0,),
+    "getVelocity": (0,),
+    "getAcceleration": (0,),
+    "getTimeFromStart": (0,),
+    "setData": (0, np.zeros(6), np.zeros(6), 1.0),
+    "size": (),
+    "dof": (),
+    "empty": (),
+    "isTimeStrictlyIncreasing": (),
+}
+
+
+@pytest.mark.parametrize("method", sorted(_TRAJECTORY_CALLS))
+def test_instructions_trajectory_raises_after_program_append(method):
+    program = _abb_program()
+    traj = InstructionsTrajectory(program)
+    # 5 appends: without the guard the read returned stale values, with no error
+    for i in range(5):
+        program.appendMoveInstruction(_move(np.full(6, 2.0 + i)))
+    with pytest.raises(StaleTrajectoryError, match="build a new InstructionsTrajectory"):
+        getattr(traj, method)(*_TRAJECTORY_CALLS[method])
+
+
+def test_instructions_trajectory_raises_after_program_clear():
+    program = _abb_program()
+    traj = InstructionsTrajectory(program)
+    program.clear()
+    with pytest.raises(StaleTrajectoryError):
+        traj.getPosition(0)
+    assert issubclass(StaleTrajectoryError, RuntimeError)
+
+
+@pytest.mark.parametrize("appends", [50, 20000])
+def test_instructions_trajectory_stale_read_does_not_crash(appends):
+    # Without the guard these read freed memory: a RuntimeError at 50, SIGSEGV at 20000.
+    # Subprocess so a crash fails this test instead of killing the worker.
+    code = f"""
+import numpy as np
+from tesseract_robotics.tesseract_command_language import (
+    CompositeInstruction, MoveInstruction, MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType_FREESPACE, StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
+)
+from tesseract_robotics.tesseract_time_parameterization import (
+    InstructionsTrajectory, StaleTrajectoryError,
+)
+
+def move(x):
+    p = np.zeros(6)
+    p[0] = x
+    swp = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint([f"joint_{{i}}" for i in range(1, 7)], p))
+    return MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(swp, MoveInstructionType_FREESPACE, "DEFAULT")
+    )
+
+program = CompositeInstruction("DEFAULT")
+for i in range(11):
+    program.appendMoveInstruction(move(0.2 * i))
+traj = InstructionsTrajectory(program)
+for i in range({appends}):
+    program.appendMoveInstruction(move(10.0 + i))
+try:
+    traj.getPosition(0)
+except StaleTrajectoryError:
+    print("stale")
+"""
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "stale"
+
+
+def test_instructions_trajectory_unmutated_program_reads_and_writes_through():
+    program = _abb_program()
+    traj = InstructionsTrajectory(program)
+    np.testing.assert_allclose(traj.getPosition(3), [0.3, 0.15, 0.0, 0.0, 0.0, 0.0])
+    velocity = np.full(6, 0.25)
+    traj.setData(3, velocity, np.full(6, 0.5), 7.0)
+    # Same instructions, same addresses: no error, the written values are read back
+    np.testing.assert_array_equal(traj.getVelocity(3), velocity)
+    assert traj.getTimeFromStart(3) == 7.0
+    # setData wrote into the user's program, not a copy
+    waypoint = WaypointPoly_as_StateWaypointPoly(program[3].asMoveInstruction().getWaypoint())
+    assert waypoint.getTime() == 7.0
+    assert InstructionsTrajectory(program).getTimeFromStart(3) == 7.0
+
+
+def test_instructions_trajectory_rebuilt_after_append_works():
+    program = _abb_program()
+    InstructionsTrajectory(program)
+    program.appendMoveInstruction(_move(np.full(6, 2.0)))
+    traj = InstructionsTrajectory(program)
+    assert traj.size() == 12
+    np.testing.assert_array_equal(traj.getPosition(11), np.full(6, 2.0))
 
 
 # ---------------------------------------------------------------------------
