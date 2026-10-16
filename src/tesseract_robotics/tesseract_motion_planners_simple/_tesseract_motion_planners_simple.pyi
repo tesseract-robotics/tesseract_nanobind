@@ -14,6 +14,11 @@ import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.tesseract_state_solver._tesseract_state_solver
 
 
+class SimplePlannerPureVirtualCallError(NotImplementedError):
+    """
+    super().generate(...) from a Python SimplePlannerMoveProfile: the base is pure virtual.
+    """
+
 class SimpleMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str = 'SIMPLE') -> None: ...
 

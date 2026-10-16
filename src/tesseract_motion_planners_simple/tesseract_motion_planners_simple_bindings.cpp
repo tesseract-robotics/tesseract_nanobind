@@ -88,6 +88,12 @@ private:
     std::unique_ptr<nb::python_error> saved_error_;
 };
 
+// super().generate(...) from a Python override: generate is pure virtual, so the base binding
+// has nothing to call; virtual dispatch would land in the override again and recurse.
+struct PureVirtualCallError : std::logic_error {
+    using std::logic_error::logic_error;
+};
+
 // Python subclasses of SimplePlannerMoveProfile. generate's instruction and manipulator-info
 // arguments are const references into the planner's working data; they go to Python as copies,
 // so an override that stores one holds no dangling reference. env is a shared_ptr and is passed
@@ -172,6 +178,8 @@ void def_lvs_interpolators(nb::module_& m) {
 NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.doc() = "tesseract_motion_planners_simple Python bindings";
     register_python_error_translator();  // SimplePlannerMoveProfile trampoline
+    nb::exception<PureVirtualCallError>(m, "SimplePlannerPureVirtualCallError", PyExc_NotImplementedError)
+        .attr("__doc__") = "super().generate(...) from a Python SimplePlannerMoveProfile: the base is pure virtual.";
 
     // Modules defining the types this one names, imported first so the stubs resolve them.
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
@@ -303,12 +311,25 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .def(nb::init<>())
         .def_static("createKey", &tc::Profile::createKey<tp::SimplePlannerMoveProfile>,
                     "The key every simple-planner move profile registers under.")
-        .def("generate", &tp::SimplePlannerMoveProfile::generate,
+        .def("generate",
+             [](const tp::SimplePlannerMoveProfile& self, const tcl::MoveInstructionPoly& prev_instruction,
+                const tcl::MoveInstructionPoly& prev_seed, const tcl::MoveInstructionPoly& base_instruction,
+                const tcl::InstructionPoly& next_instruction, const std::shared_ptr<const te::Environment>& env,
+                const tc::ManipulatorInfo& global_manip_info) {
+                 // Only a direct Python subclass is built on the trampoline; a Python subclass of a
+                 // concrete C++ profile is not, and delegates to that profile's generate.
+                 if (dynamic_cast<const PySimplePlannerMoveProfile*>(&self) != nullptr)
+                     throw PureVirtualCallError(
+                         "SimplePlannerMoveProfile.generate is pure virtual: a Python profile cannot "
+                         "delegate to it with super().generate(...)");
+                 nb::gil_scoped_release release;
+                 return self.generate(prev_instruction, prev_seed, base_instruction, next_instruction, env,
+                                      global_manip_info);
+             },
              "prev_instruction"_a, "prev_seed"_a, "base_instruction"_a, "next_instruction"_a, "env"_a,
              "global_manip_info"_a,
              "The move instructions the simple planner emits for `base_instruction`, ending with it. "
-             "`next_instruction` is a null InstructionPoly for the last move.",
-             nb::call_guard<nb::gil_scoped_release>());
+             "`next_instruction` is a null InstructionPoly for the last move.");
 
     // ========== SimplePlannerCompositeProfile ==========
     nb::class_<tp::SimplePlannerCompositeProfile, tc::Profile>(m, "SimplePlannerCompositeProfile")

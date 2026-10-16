@@ -14,6 +14,7 @@ __all__ = [
     "interpolateCartCartWaypoint",
     "getClosestJointSolution",
     "SimplePlannerMoveProfile",
+    "SimplePlannerPureVirtualCallError",
     "SimplePlannerCompositeProfile",
     "SimplePlannerFixedSizeMoveProfile",
     "SimplePlannerFixedSizeAssignMoveProfile",
