@@ -89,10 +89,27 @@ def test_k_prefix_rejects_non_mechanical_names(solver_report):
 # R13: `unbound-dependency-type`, third-party half.
 
 
+# The 10 core modules and the group 1 modules: no binding of theirs includes OsqpEigen.
+CORE_AND_G1 = (
+    "tesseract_collision",
+    "tesseract_common",
+    "tesseract_environment",
+    "tesseract_geometry",
+    "tesseract_kinematics",
+    "tesseract_scene_graph",
+    "tesseract_serialization",
+    "tesseract_srdf",
+    "tesseract_state_solver",
+    "tesseract_urdf",
+    "tesseract_command_language",
+    "tesseract_time_parameterization",
+)
+
+
 @pytest.fixture(scope="module")
-def core_reports():
-    """Every audited module's report: none of them includes an unbound dependency."""
-    return {m: audit.audit_module(m) for m in own.AUDITED_HEADER_PREFIX}
+def core_and_g1_reports():
+    """The core and group 1 reports: R13 must not change any of their rows."""
+    return {m: audit.audit_module(m) for m in CORE_AND_G1}
 
 
 def test_third_party_typed_members_are_accepted(solver_report):
@@ -117,8 +134,19 @@ def test_solver_fixture_rows_exact(solver_report):
         ("Status.NLP_CONVERGED", audit.Kind.ENUMERATOR),
         ("Engine.tune", audit.Kind.OVERLOAD),  # tune(n: int) matches no C++ overload's types
     }
+    assert {(a.symbol, a.rule) for a in solver_report.accepted} == {
+        ("Status.kRunning", "k-prefix-enumerator"),
+        ("Status.RUNNING", "k-prefix-enumerator"),
+        ("Status.kQPSolveFailed", "k-prefix-enumerator"),
+        ("Status.QP_SOLVE_FAILED", "k-prefix-enumerator"),
+        ("Engine.setDefaults", "unbound-dependency-type"),
+        ("Engine.settings_", "unbound-dependency-type"),
+        ("Engine.tune", "unbound-dependency-type"),
+    }
+    # Shift, Engine, their __init__s, Engine.warmStart, Status, and Shift's two in-place operators
+    assert solver_report.covered == 8
 
 
-def test_unbound_dependency_changes_no_core_row(core_reports):
-    for report in core_reports.values():
+def test_unbound_dependency_changes_no_core_row(core_and_g1_reports):
+    for report in core_and_g1_reports.values():
         assert "unbound-dependency-type" not in {a.rule for a in report.accepted}
