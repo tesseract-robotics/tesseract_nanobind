@@ -471,8 +471,8 @@ def test_prefixed_descartes_names_accepted(descartes_report, python):
 
 def test_bound_classes_resolve_descartes_instances_to_cpp_api_names():
     """0b's index must name the same qualified class `cpp_api` records for the template."""
+    bound = audit.bound_index(DESCARTES)  # cached; parsed with function bodies
     tu = audit.parse_tu(own.binding_source(DESCARTES))
-    bound = audit.bound_classes(tu)
     prefixes = own.owner_prefixes()
     cpp = audit.cpp_api(tu, audit.audited_headers(tu, DESCARTES, prefixes, audit.INCLUDE_DIRS))
     for cpp_name, python in DESCARTES_RENAMES:
