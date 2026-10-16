@@ -157,6 +157,10 @@ OPERATOR_DUNDERS = {
     "operator bool": "__bool__",
     "operator()": "__call__",
     "operator*": "__mul__",  # Eigen's is a member template; libclang still spells it so (M13)
+    # Bound as in-place operators; a void C++ operator is bound by a lambda returning self
+    # (trajopt_ifopt Bounds).
+    "operator+=": "__iadd__",
+    "operator-=": "__isub__",
 }
 # `operator<<(std::ostream&, const T&)` is bound as `T.__str__`; libclang spells the stream
 # parameter's canonical declaration so.
