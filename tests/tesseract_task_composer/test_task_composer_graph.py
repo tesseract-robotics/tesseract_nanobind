@@ -117,6 +117,16 @@ class TestFuture:
         assert duplicate.context is future.context
         assert copy.copy(future).context is future.context
 
+    def test_future_keeps_node_alive(self, factory, executor, make_storage):
+        """The executor runs the node after run() returns: dropping it before wait() was a
+        use-after-free (a bus error)."""
+        node = factory.createTaskComposerNode(PIPELINE)
+        future = executor.run(node, make_storage(node))
+        del node
+        gc.collect()
+        future.wait()
+        assert future.context.isSuccessful()
+
     def test_clear_invalidates(self, factory, executor, make_storage):
         node = factory.createTaskComposerNode(PIPELINE)
         future = executor.run(node, make_storage(node))

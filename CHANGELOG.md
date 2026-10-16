@@ -15,6 +15,10 @@
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
 - **The binding audit states its coverage** — the report names every binding module it does not audit, with the reason; a binding module in neither table fails the run. Header ownership supports several prefixes per module and nested prefixes; the planning and trajopt bindings now parse ([#256]).
 
+### Fixed
+
+- **`TaskComposerExecutor.run` keeps the node alive until the run ends** — the executor runs the node in its own threads after `run` returns, but the future held no reference to it, so a node dropped before `wait()` (`future = executor.run(factory.createTaskComposerNode(name), storage)`) was freed under the running task: a bus error or segfault. Both `run` overloads, on `TaskComposerExecutor` and `TaskflowTaskComposerExecutor`, now tie the node's lifetime to the returned future.
+
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
 ### Breaking changes
