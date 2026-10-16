@@ -9,9 +9,6 @@ from numpy.typing import NDArray
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_environment._tesseract_environment
-from tesseract_robotics.tesseract_motion_planners._profile_overrides import (
-    __init_subclass__ as __init_subclass__
-)
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 import tesseract_robotics.trajopt_sqp._trajopt_sqp
@@ -260,6 +257,9 @@ class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
 
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
+
 TrajOptIfoptDefaultPlanProfile: TypeAlias = TrajOptIfoptDefaultMoveProfile
 
 class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
@@ -325,6 +325,9 @@ class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
 
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
+
 class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def __init__(self) -> None: ...
 
@@ -367,6 +370,9 @@ class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
+
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
 
 def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
     """Add TrajOptIfopt move profile to ProfileDictionary"""

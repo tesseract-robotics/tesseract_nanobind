@@ -10,9 +10,6 @@ import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_environment._tesseract_environment
 import tesseract_robotics.tesseract_kinematics._tesseract_kinematics
-from tesseract_robotics.tesseract_motion_planners._profile_overrides import (
-    __init_subclass__ as __init_subclass__
-)
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.tesseract_state_solver._tesseract_state_solver
 
@@ -270,6 +267,9 @@ class SimplePlannerFixedSizeMoveProfile(SimplePlannerMoveProfile):
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
 
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
+
 class SimplePlannerFixedSizeAssignMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, freespace_steps: int = 10, linear_steps: int = 10) -> None: ...
 
@@ -297,6 +297,9 @@ class SimplePlannerFixedSizeAssignMoveProfile(SimplePlannerMoveProfile):
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
 
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
+
 class SimplePlannerFixedSizeAssignNoIKMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, freespace_steps: int = 10, linear_steps: int = 10) -> None: ...
 
@@ -323,6 +326,9 @@ class SimplePlannerFixedSizeAssignNoIKMoveProfile(SimplePlannerMoveProfile):
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
+
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
 
 class SimplePlannerLVSMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
@@ -369,6 +375,9 @@ class SimplePlannerLVSMoveProfile(SimplePlannerMoveProfile):
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
 
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
+
 class SimplePlannerLVSNoIKMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
 
@@ -413,6 +422,9 @@ class SimplePlannerLVSNoIKMoveProfile(SimplePlannerMoveProfile):
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
+
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
 
 class SimplePlannerLVSAssignMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
@@ -459,6 +471,9 @@ class SimplePlannerLVSAssignMoveProfile(SimplePlannerMoveProfile):
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
 
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
+
 class SimplePlannerLVSAssignNoIKMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
 
@@ -503,3 +518,6 @@ class SimplePlannerLVSAssignNoIKMoveProfile(SimplePlannerMoveProfile):
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
         """
+
+    @classmethod
+    def __init_subclass__(cls: type, **kwargs: object) -> None: ...
