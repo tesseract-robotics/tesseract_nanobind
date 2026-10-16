@@ -266,6 +266,9 @@ class CppSymbol:
     overloads: list[CppOverload] = field(default_factory=list)
     qualified: str = ""  # `audit_types.qualified_path`, for Kind.CLASS and Kind.ENUM
     inherited_from: str | None = None  # `record_path` of the base declaring an inherited member
+    # ACCEPTED rule under which leaving the whole symbol unbound is accepted, for symbols
+    # without overloads (fields); read through `WHOLE_SYMBOL_ABSENT_OK`
+    absent_ok: str | None = None
 
 
 def header_rel(path: Path) -> str:
@@ -461,6 +464,10 @@ def _is_yaml_node(parm: ci.Cursor) -> bool:
     return t.spelling.removeprefix("const ") == YAML_NODE
 
 
+# libclang's canonical spelling of the `getType()` result of every tesseract Poly (R3).
+TYPE_INDEX = "std::type_index"
+
+
 def _is_reference_wrapper_vector(parm: ci.Cursor) -> bool:
     """`std::vector<std::reference_wrapper<T>>`, by value or reference, T const or not."""
     t = parm.type.get_canonical()
@@ -591,6 +598,8 @@ def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload
     arity = Arity(n - n_default, n)
     void = c.result_type.kind == ci.TypeKind.VOID
     absent_ok = nullary_absent_ok if arity.hi == 0 else None
+    if c.result_type.get_canonical().spelling == TYPE_INDEX:
+        absent_ok = "type-index"
     if any(_is_yaml_node(p) for p in params):
         absent_ok = "yaml-node"
     raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
