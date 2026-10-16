@@ -27,6 +27,7 @@ from audit_ownership import (
 from audit_parse import (
     INCLUDE_DIRS,
     STRINGSTREAM,
+    UNBOUND_DEPENDENCY,
     Arity,
     CppOverload,
     CppSymbol,
@@ -201,6 +202,10 @@ ACCEPTED = {
     "the `k` (`kLowerBound` → `LOWER_BOUND`, `kQPSolveFailed` → `QP_SOLVE_FAILED`), the Python "
     "enum convention every tesseract enum follows; an enumerator bound under any other name stays "
     "a gap and a deviation.",
+    UNBOUND_DEPENDENCY: "A parameter, return or field typed by a third-party library that no "
+    "module binds (`OsqpEigen::Settings`, `OsqpEigen::Solver`) has no Python form; the owning "
+    "object exposes what Python needs instead, such as `OSQPEigenSolver`'s `set…` forwarders "
+    "into its OSQP settings (`setPolish`, `setWarmStart(bool)`, `setMaxIteration`, …).",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -253,7 +258,7 @@ POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {}
 # when every overload carries it, or that `CppSymbol.absent_ok` names for a field.
 # (`yaml-node` and `serialization-default-ctor` do not: they name one overload of a symbol
 # whose other overloads must be bound.)
-WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index"})
+WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index", UNBOUND_DEPENDENCY})
 # std::vector members with no Python form, on a class that forwards the vector interface (R11).
 VECTOR_FORWARDING_MEMBERS = frozenset(
     {"data", "emplace", "emplace_back", "swap", "rbegin", "rend", "crbegin", "crend"}
