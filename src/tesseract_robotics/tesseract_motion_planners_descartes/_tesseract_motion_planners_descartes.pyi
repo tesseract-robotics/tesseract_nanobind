@@ -10,6 +10,7 @@ import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_environment._tesseract_environment
+import tesseract_robotics.tesseract_kinematics._tesseract_kinematics
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 
 
@@ -105,6 +106,9 @@ class DescartesMoveProfileD(tesseract_robotics.tesseract_command_language._tesse
     @staticmethod
     def createKey() -> int:
         """The key every Descartes move profile carries"""
+
+    def createKinematicGroup(self, manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup:
+        """The kinematic group for `manip_info`'s manipulator and IK solver"""
 
     def createWaypointSampler(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> DescartesWaypointSamplerD: ...
 
