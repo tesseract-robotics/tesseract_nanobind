@@ -7,6 +7,8 @@
 
 #include "tesseract_nb.h"
 
+#include <utility>
+
 // tesseract_time_parameterization
 #include <tesseract/time_parameterization/time_parameterization.h>
 #include <tesseract/time_parameterization/instructions_trajectory.h>
@@ -38,6 +40,45 @@ struct ScalingsLengthError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
+struct StaleTrajectoryError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// InstructionsTrajectory stores references from program.flatten() (instructions_trajectory.cpp):
+// appending to `program` can reallocate its instruction vector and leave them dangling, so a
+// later read returns stale values, throws, or crashes. The guard records the addresses of the
+// flattened move instructions and re-flattens `program` before every call; comparing addresses
+// never dereferences the stored references.
+class GuardedInstructionsTrajectory {
+public:
+    explicit GuardedInstructionsTrajectory(tcl::CompositeInstruction& program)
+        : program_(program), trajectory_(program) {
+        for (const auto& instruction : program.flatten(moveFilter))
+            addresses_.push_back(&instruction.get());
+    }
+
+    tp::InstructionsTrajectory& checked() {
+        const auto flat = std::as_const(program_).flatten(moveFilter);
+        bool same = flat.size() == addresses_.size();
+        for (std::size_t k = 0; same && k < flat.size(); ++k)
+            same = &flat[k].get() == addresses_[k];
+        if (!same)
+            throw StaleTrajectoryError("the program changed after this InstructionsTrajectory was built "
+                                       "and its references into it are stale; build a new InstructionsTrajectory");
+        return trajectory_;
+    }
+
+private:
+    // The filter upstream's InstructionsTrajectory(program) flattens with
+    static bool moveFilter(const tcl::InstructionPoly& i, const tcl::CompositeInstruction&) {
+        return i.isMoveInstruction();
+    }
+
+    tcl::CompositeInstruction& program_;  // kept alive by keep_alive<1, 2>
+    tp::InstructionsTrajectory trajectory_;
+    std::vector<const tcl::InstructionPoly*> addresses_;
+};
+
 NB_MODULE(_tesseract_time_parameterization, m) {
     m.doc() = "tesseract_time_parameterization Python bindings";
 
@@ -47,22 +88,37 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
 
     // ========== InstructionsTrajectory ==========
-    nb::class_<tp::InstructionsTrajectory>(m, "InstructionsTrajectory")
+    nb::exception<StaleTrajectoryError>(m, "StaleTrajectoryError", PyExc_RuntimeError)
+        .attr("__doc__") = "The program changed after the InstructionsTrajectory was built; build a new one.";
+    using GIT = GuardedInstructionsTrajectory;
+    nb::class_<GIT>(m, "InstructionsTrajectory")
         // Holds references into `program`: keep it alive as long as the trajectory
         .def(nb::init<tcl::CompositeInstruction&>(), "program"_a, nb::keep_alive<1, 2>(),
              "Build a trajectory view over the move instructions of `program`.\n\n"
-             "The trajectory keeps `program` alive but holds references into its instruction\n"
-             "vector: do not append, insert or erase instructions in `program` while the\n"
-             "trajectory is in use, or it reads freed memory.")
-        .def("getPosition", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getPosition, nb::const_), "i"_a)
-        .def("getVelocity", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getVelocity, nb::const_), "i"_a)
-        .def("getAcceleration", nb::overload_cast<Eigen::Index>(&tp::InstructionsTrajectory::getAcceleration, nb::const_), "i"_a)
-        .def("getTimeFromStart", &tp::InstructionsTrajectory::getTimeFromStart, "i"_a)
-        .def("setData", &tp::InstructionsTrajectory::setData, "i"_a, "velocity"_a, "acceleration"_a, "time"_a)
-        .def("size", &tp::InstructionsTrajectory::size)
-        .def("dof", &tp::InstructionsTrajectory::dof)
-        .def("empty", &tp::InstructionsTrajectory::empty)
-        .def("isTimeStrictlyIncreasing", &tp::InstructionsTrajectory::isTimeStrictlyIncreasing);
+             "The trajectory keeps `program` alive and reads and writes its waypoints in place\n"
+             "(`setData` changes `program`). Once instructions are appended, inserted or erased\n"
+             "in `program`, every method raises `StaleTrajectoryError`: build a new\n"
+             "trajectory. Each call re-flattens `program`, O(number of instructions).\n\n"
+             "Raises:\n"
+             "    StaleTrajectoryError: on any method call after `program` changed (a `RuntimeError`).")
+        .def("getPosition", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
+            return std::as_const(self.checked()).getPosition(i);
+        }, "i"_a)
+        .def("getVelocity", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
+            return std::as_const(self.checked()).getVelocity(i);
+        }, "i"_a)
+        .def("getAcceleration", [](GIT& self, Eigen::Index i) -> const Eigen::VectorXd& {
+            return std::as_const(self.checked()).getAcceleration(i);
+        }, "i"_a)
+        .def("getTimeFromStart", [](GIT& self, Eigen::Index i) { return self.checked().getTimeFromStart(i); }, "i"_a)
+        .def("setData", [](GIT& self, Eigen::Index i, const Eigen::VectorXd& velocity,
+                           const Eigen::VectorXd& acceleration, double time) {
+            self.checked().setData(i, velocity, acceleration, time);
+        }, "i"_a, "velocity"_a, "acceleration"_a, "time"_a)
+        .def("size", [](GIT& self) { return self.checked().size(); })
+        .def("dof", [](GIT& self) { return self.checked().dof(); })
+        .def("empty", [](GIT& self) { return self.checked().empty(); })
+        .def("isTimeStrictlyIncreasing", [](GIT& self) { return self.checked().isTimeStrictlyIncreasing(); });
 
     // ========== TimeOptimalTrajectoryGenerationCompositeProfile ==========
     auto totg_composite_profile = nb::class_<tp::TimeOptimalTrajectoryGenerationCompositeProfile, tc::Profile>(m, "TOTGCompositeProfile")

@@ -10,14 +10,23 @@ import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_environment._tesseract_environment
 
 
+class StaleTrajectoryError(RuntimeError):
+    """
+    The program changed after the InstructionsTrajectory was built; build a new one.
+    """
+
 class InstructionsTrajectory:
     def __init__(self, program: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction) -> None:
         """
         Build a trajectory view over the move instructions of `program`.
 
-        The trajectory keeps `program` alive but holds references into its instruction
-        vector: do not append, insert or erase instructions in `program` while the
-        trajectory is in use, or it reads freed memory.
+        The trajectory keeps `program` alive and reads and writes its waypoints in place
+        (`setData` changes `program`). Once instructions are appended, inserted or erased
+        in `program`, every method raises `StaleTrajectoryError`: build a new
+        trajectory. Each call re-flattens `program`, O(number of instructions).
+
+        Raises:
+            StaleTrajectoryError: on any method call after `program` changed (a `RuntimeError`).
         """
 
     def getPosition(self, i: int) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]: ...

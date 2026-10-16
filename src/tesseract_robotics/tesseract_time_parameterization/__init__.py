@@ -14,4 +14,5 @@ __all__ = [
     "RuckigTrajectorySmoothing",
     "rescaleTimings",
     "ScalingsLengthError",
+    "StaleTrajectoryError",
 ]
