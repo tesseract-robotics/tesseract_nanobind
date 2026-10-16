@@ -124,6 +124,9 @@ def test_cli_defines_only_main():
 REPORT = {
     "REPORT_PATH", "LIMITATION", "_git", "libclang_version", "provenance", "_table",
     "render_markdown", "to_json", "_unaudited_patterns",
+    # D10 outcome ledger
+    "LEDGER_PATH", "ISSUE_REF", "LEDGER_FIELDS", "NO_OUTCOME", "MalformedLedgerError",
+    "LedgerEntry", "_unique_keys", "_ledger_entry", "load_ledger", "_issue_cell", "_with_outcome",
 }  # fmt: skip
 
 

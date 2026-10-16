@@ -57,6 +57,7 @@ MALFORMED = {
     "empty reason": json.dumps({"m": {"s": {"wont_fix": ""}}}),
     "reason not a string": json.dumps({"m": {"s": {"wont_fix": 1}}}),
     "whitespace-only reason": json.dumps({"m": {"s": {"wont_fix": "  "}}}),
+    "reason splits a table cell": json.dumps({"m": {"s": {"wont_fix": "a | b"}}}),
     "issue not a string": json.dumps({"m": {"s": {"issue": 163}}}),
     "top level not an object": json.dumps([]),
     "duplicate symbol": '{"m": {"s": {"issue": "#1"}, "s": {"issue": "#2"}}}',
