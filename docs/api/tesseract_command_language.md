@@ -262,6 +262,37 @@ for i in range(len(program)):
 `as*Instruction` raises `RuntimeError` if the underlying type does not match —
 always guard with the matching `is*Instruction` predicate.
 
+### Traversal into child composites
+
+`flatten`, `getFirst/LastInstruction`, `getFirst/LastMoveInstruction` and the counts
+descend into child composites. They return references into the program: an edit
+through a returned instruction changes the program, and the returned objects keep it
+alive. A filter is any callable `filter(instruction, parent) -> bool`; `moveFilter`
+keeps move instructions.
+
+```python
+from tesseract_robotics.tesseract_command_language import moveFilter, toJointTrajectory
+
+moves = program.flatten(moveFilter)        # every move, at any depth
+first = program.getFirstMoveInstruction()  # MoveInstructionPoly, or None
+trajectory = toJointTrajectory(program)    # tesseract_common.JointTrajectory
+```
+
+`toJointTrajectory`, `getJointPosition`, `formatJointPosition`, `clampToJointLimits`
+and the other functions of `tesseract/command_language/utils.h` take a `WaypointPoly`.
+The in-place ones (`formatJointPosition`, `setJointPosition`, `clampToJointLimits`)
+edit the `WaypointPoly` passed in, for example `move.getWaypoint()`.
+
+### Equality, UUIDs and copies
+
+Waypoints, instructions and their Polys compare by value (`==`) and are unhashable.
+Every instruction carries a UUID and a parent UUID, read and set as canonical strings
+(`getUUID`, `setUUID`, `getParentUUID`, `setParentUUID`, `regenerateUUID`; a malformed
+string raises `ValueError`). `MoveInstruction` equality compares both UUIDs, so two
+move instructions built separately from the same arguments are unequal until the
+UUIDs are copied over. `copy.copy` and `copy.deepcopy` copy any of these types;
+both give an independent copy that keeps the UUIDs.
+
 ## Profiles
 
 ### ProfileDictionary

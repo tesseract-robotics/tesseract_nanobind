@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | 16 command-language waypoint, instruction and Poly types compare by value and are unhashable | [A stable key, or `id()`](#command-language-types-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -23,6 +24,28 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
+
+## Unreleased
+
+### Command-language types compare by value and are unhashable
+
+The command-language waypoints, instructions and Polys compared by identity: two
+`JointWaypoint(["a"], [1.0])` were unequal. They now bind `__eq__`/`__ne__` from the C++
+operators and set `__hash__ = None`, as the collision, common and environment types did in
+0.35.0.9 (#261): `CartesianWaypoint`, `JointWaypoint`, `StateWaypoint`, `WaypointPoly`,
+`CartesianWaypointPoly`, `JointWaypointPoly`, `StateWaypointPoly`, `InstructionPoly`,
+`MoveInstructionPoly`, `MoveInstruction`, `CompositeInstruction`, `WaitInstruction`,
+`TimerInstruction`, `SetAnalogInstruction`, `SetDigitalInstruction`, `SetToolInstruction`.
+
+`hash(obj)`, `{obj}` and `d[obj] = …` now raise `TypeError: unhashable type`. Every instruction
+has a UUID, which is the natural key; `MoveInstruction` equality also compares it, so two moves
+built separately are unequal until the UUIDs match:
+
+| before | after |
+| --- | --- |
+| `seen = {move}` | `seen = {move.getUUID()}` |
+| `cache[waypoint] = result` | `cache[id(waypoint)] = result` (keep `waypoint` alive) |
+| `move in done` meant identity | `any(m is move for m in done)`; `in` now compares values |
 
 ## 0.35.0.9
 
