@@ -1,4 +1,6 @@
 # Audit contract fixture (#256 T5): stub base classes vs the bound C++ bases (runners.h).
+import bases_remote._bases_remote
+
 class Runner:
     def go(self) -> None: ...
 
@@ -23,3 +25,6 @@ class PlannerD:
     def go(self) -> None: ...
     @property
     def value(self) -> float: ...
+
+class RemoteRunner(bases_remote._bases_remote.Runner):
+    def __init__(self) -> None: ...
