@@ -15,6 +15,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `OSQPEigenSolver.update*` raise `QPSizeError` on a wrong-length vector | [Size by `init()`](#osqpeigensolver-updates-check-sizes) |
 | Unreleased | 16 command-language waypoint, instruction and Poly types compare by value and are unhashable | [A stable key, or `id()`](#command-language-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` compare by value and are unhashable | [A stable key, or `id()`](#time-parameterization-profiles-compare-by-value-and-are-unhashable) |
+| Unreleased | The seven simple-planner move profiles compare by value and are unhashable | [A stable key, or `id()`](#simple-planner-move-profiles-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -120,6 +121,18 @@ types did in 0.35.0.9. The new `RuckigTrajectorySmoothingCompositeProfile` behav
 | --- | --- |
 | `{TOTGCompositeProfile(): …}`, `set_of_profiles.add(p)` | key by name, e.g. `{"DEFAULT": p}`, or by `id(p)` |
 | `p == q` (identity) | `p is q` |
+
+### Simple-planner move profiles compare by value and are unhashable
+
+`SimplePlannerFixedSize{,Assign,AssignNoIK}MoveProfile` and
+`SimplePlannerLVS{,NoIK,Assign,AssignNoIK}MoveProfile` bind the C++ `operator==` (#261): two
+profiles with the same fields are `==`, and `hash()`, `set` members and `dict` keys raise
+`TypeError`, as for the [value types in 0.35.0.9](#value-types-compare-by-value-and-are-unhashable).
+
+| before | after |
+| --- | --- |
+| `{profile: name}` | `{id(profile): name}`, or key by the profile name |
+| `profile in seen_set` (identity) | `any(p is profile for p in seen)` |
 
 ## 0.35.0.9
 
