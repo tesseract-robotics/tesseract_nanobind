@@ -14,6 +14,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
 | Unreleased | `OSQPEigenSolver.update*` raise `QPSizeError` on a wrong-length vector | [Size by `init()`](#osqpeigensolver-updates-check-sizes) |
+| Unreleased | The seven simple-planner move profiles compare by value and are unhashable | [A stable key, or `id()`](#simple-planner-move-profiles-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -108,6 +109,18 @@ qualifies once its `Node` is handed to `NodesVariables`:
 and raise `QPSizeError` (a `ValueError`) unless the vector has `init()`'s `num_vars` (gradient)
 or `num_cnts` (bounds) entries (#283). trajopt checked with `assert` only and read past a short
 vector. Call `init(num_vars, num_cnts)` with the QP's size before the updates.
+
+### Simple-planner move profiles compare by value and are unhashable
+
+`SimplePlannerFixedSize{,Assign,AssignNoIK}MoveProfile` and
+`SimplePlannerLVS{,NoIK,Assign,AssignNoIK}MoveProfile` bind the C++ `operator==` (#261): two
+profiles with the same fields are `==`, and `hash()`, `set` members and `dict` keys raise
+`TypeError`, as for the [value types in 0.35.0.9](#value-types-compare-by-value-and-are-unhashable).
+
+| before | after |
+| --- | --- |
+| `{profile: name}` | `{id(profile): name}`, or key by the profile name |
+| `profile in seen_set` (identity) | `any(p is profile for p in seen)` |
 
 ## 0.35.0.9
 
