@@ -8,6 +8,9 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `OMPLSolverConfig.getNumPlanners()` removed | [`len(cfg.planners)`](#omplsolverconfiggetnumplanners-removed) |
+| Unreleased | OMPL, TrajOpt and task-composer planning value types compare by value and are unhashable | [A stable key, or `id()`](#planner-value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `create_ompl_planner_configurators` raises `ValueError` on a keyword none of the requested planners has | [Drop the keyword](#create_ompl_planner_configurators-rejects-unused-keywords) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -23,6 +26,45 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
+
+## Unreleased
+
+### `OMPLSolverConfig.getNumPlanners()` removed
+
+`OMPLSolverConfig.planners` is bound (#302), so the count is `len(cfg.planners)`. The list is
+copied on access: `cfg.planners.append(x)` changes the copy. Assign a new list, or use
+`addPlanner` / `clearPlanners`, which change it in place.
+
+| before | after |
+| --- | --- |
+| `cfg.getNumPlanners()` | `len(cfg.planners)` |
+
+### Planner value types compare by value and are unhashable
+
+As for collision, common and environment in 0.35.0.9, these classes bind the C++ `operator==`
+and set `__hash__ = None` (#261). `hash()`, `set` members and `dict` keys raise `TypeError`:
+
+| module | classes |
+| --- | --- |
+| `tesseract_motion_planners_ompl` | `OMPLSolverConfig`, `OMPLRealVectorMoveProfile` |
+| `tesseract_motion_planners_trajopt` | `TrajOptCartesianWaypointConfig`, `TrajOptJointWaypointConfig`, `TrajOptDefaultMoveProfile`, `TrajOptDefaultCompositeProfile`, `TrajOptOSQPSolverProfile`, `BasicTrustRegionSQPParameters` (and the new `OSQPSettings`) |
+| `tesseract_task_composer_planning` | `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, `UpsampleTrajectoryProfile` |
+
+Key on a field, or on `id(obj)` where identity is meant, as in
+[the 0.35.0.9 entry](#value-types-compare-by-value-and-are-unhashable).
+`OMPLSolverConfig` compares `planners` by count only (upstream `ompl_solver_config.cpp`), so two
+configs holding different configurator types of the same number are equal.
+
+### `create_ompl_planner_configurators` rejects unused keywords
+
+The helper accepts every `OMPLPlannerType` name (#301) and sets each keyword on the requested
+configurators that have that field. It used to ignore a keyword no configurator used; now it
+raises `ValueError` naming the keyword. A keyword that fits at least one requested planner is
+still accepted (`goal_bias` with `["RRTConnect", "RRTstar"]` sets it on the RRTstar ones).
+
+| before | after |
+| --- | --- |
+| `create_ompl_planner_configurators(["RRTConnect"], goal_bias=0.1)` | `create_ompl_planner_configurators(["RRTConnect"])` |
 
 ## 0.35.0.9
 
