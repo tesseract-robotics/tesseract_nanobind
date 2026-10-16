@@ -75,7 +75,8 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def_rw("velocity_limits", &tp::IterativeSplineParameterizationCompositeProfile::velocity_limits)
         .def_rw("acceleration_limits", &tp::IterativeSplineParameterizationCompositeProfile::acceleration_limits)
         .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_velocity_scaling_factor)
-        .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_acceleration_scaling_factor);
+        .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_acceleration_scaling_factor)
+        .def_rw("minimum_time_delta", &tp::IterativeSplineParameterizationCompositeProfile::minimum_time_delta);
 
     // ========== IterativeSplineParameterizationMoveProfile ==========
     nb::class_<tp::IterativeSplineParameterizationMoveProfile, tc::Profile>(m, "ISPMoveProfile")
