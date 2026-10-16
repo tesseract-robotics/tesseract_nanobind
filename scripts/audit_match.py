@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -195,6 +196,11 @@ ACCEPTED = {
     "(`push_back(MoveInstructionPoly)`, `MoveInstruction(CartesianWaypointPoly, …)`), so the stub "
     "names the types a caller passes; C++ converts each alternative through the Poly's "
     "converting constructor.",
+    # Group 2 (trajopt).
+    "k-prefix-enumerator": "trajopt's `kCamelCase` enumerators are bound in `UPPER_SNAKE` without "
+    "the `k` (`kLowerBound` → `LOWER_BOUND`, `kQPSolveFailed` → `QP_SOLVE_FAILED`), the Python "
+    "enum convention every tesseract enum follows; an enumerator bound under any other name stays "
+    "a gap and a deviation.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -573,6 +579,29 @@ def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
     return ov.absent_ok is not None
 
 
+# trajopt's enumerator style: `k` + CamelCase (`kLowerBound`); bound as UPPER_SNAKE (R15).
+K_ENUMERATOR = re.compile(r"k[A-Z][A-Za-z0-9]*")
+# Word boundaries in CamelCase, an acronym run kept whole: `QPSolveFailed` → `QP|Solve|Failed`.
+CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
+
+def k_enumerator_python_name(leaf: str) -> str | None:
+    """The mechanical Python name of a `kCamelCase` enumerator, or None if `leaf` is not one.
+
+    `kLowerBound` → `LOWER_BOUND`, `kQPSolveFailed` → `QP_SOLVE_FAILED`.
+    """
+    if not K_ENUMERATOR.fullmatch(leaf):
+        return None
+    return CAMEL_BOUNDARY.sub("_", leaf[1:]).upper()
+
+
+def _k_alias(name: str) -> str | None:
+    """The dotted Python name a `kCamelCase` enumerator `name` is bound under (R15)."""
+    owner, _, leaf = name.rpartition(".")
+    alias = k_enumerator_python_name(leaf)
+    return None if alias is None else f"{owner}.{alias}"
+
+
 def _whole_symbol_rule(sym: CppSymbol) -> str | None:
     """The rule accepting an entirely unbound symbol through its structural `absent_ok`: the
     symbol's own (fields), or the one `WHOLE_SYMBOL_ABSENT_OK` rule every overload carries.
@@ -698,6 +727,12 @@ def match(
         found = _binding_stub(name, stub_rel, stub_roots)
         if found is not None and _same_class(bound(found[0]).get(name), sym.qualified):
             elsewhere[name] = found[1]
+    # Python enumerator name -> its `kCamelCase` C++ enumerator (R15).
+    k_aliases = {
+        k_alias: name
+        for name, sym in cpp.items()
+        if sym.kind is Kind.ENUMERATOR and (k_alias := _k_alias(name)) is not None
+    }
     for name, sym in cpp.items():
         top, dot, _ = name.partition(".")
         api = elsewhere.get(top, py) if dot else py
@@ -713,6 +748,8 @@ def match(
                 covered += 1  # the dunder's own row names the rule
             elif rule := _unbound_rule(module, name, sym, cpp, api, stub_roots):
                 accepted.append(Accepted(name, rule, sym.location))
+            elif sym.kind is Kind.ENUMERATOR and _k_alias(name) in api.symbols:
+                accepted.append(Accepted(name, "k-prefix-enumerator", sym.location))
             elif name in elsewhere:
                 accepted.append(Accepted(name, "bound-in-other-module", sym.location))
             else:
@@ -747,6 +784,9 @@ def match(
             own = None
         if name in instance_of:
             accepted.append(Accepted(name, TEMPLATE_INSTANCE_RULE, where))
+            continue
+        if ps.kind is Kind.ENUMERATOR and name in k_aliases:
+            accepted.append(Accepted(name, "k-prefix-enumerator", where))
             continue
         if ps.enum_alias:
             found = None  # a second name for an enum value, even if C++ has it unscoped
