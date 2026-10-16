@@ -517,7 +517,7 @@ def test_unparseable_header_row_locates_its_first_error(fixture_report):
 
 
 def test_limitations_name_unparseable_headers(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert "`unparseable header`" in text
 
 
@@ -582,7 +582,7 @@ def test_third_party_header_never_audited_even_when_included_directly(fixture_re
 
 
 def test_third_party_header_patterns_rendered_with_reasons(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert audit.THIRD_PARTY_HEADERS
     for pattern, reason in audit.THIRD_PARTY_HEADERS.items():
         assert f"`{pattern}`: {reason}" in text
@@ -596,7 +596,7 @@ def test_hacd_header_has_its_own_reason():
 
 def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
     """TF-1: each pattern is shown below its prefix, `*/` for `ANY_PREFIX`."""
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     for key, patterns in audit.UNAUDITED_HEADERS.items():
         shown = "*/" if key == audit.ANY_PREFIX else key
         for pattern, reason in patterns.items():
@@ -605,7 +605,7 @@ def test_unaudited_header_patterns_rendered_with_reasons(fixture_report):
 
 def test_limitations_describe_type_matching(fixture_report):
     """#247: overloads match by arity and parameter type; unknown types fall back to arity."""
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert "Overloads are matched by arity and parameter type" in text
     assert "`type fallbacks`" in text
 
@@ -685,7 +685,7 @@ def test_scene_graph_joint_type_operator_is_not_a_free_function(core_reports):
 
 
 def test_new_accepted_rules_rendered_with_reasons(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     for rule in (
         "container-protocol",
         "iterator-pair",
@@ -824,11 +824,12 @@ def test_bytes_resource_byte_buffer_ctor_accepted(real_reports):
 
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
 COVERAGE = audit.Coverage(audited=("fixture",), unaudited={"other": "Not yet audited."}, total=2)
+NO_LEDGER: dict = {}  # these report tests check rendering, not outcomes
 
 
 def test_report_states_coverage_first(fixture_report):
     """#256: the report names its coverage before any per-module result."""
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert "1 of 2 binding modules audited." in text
     assert "| other | Not yet audited. |" in text
     assert text.index("binding modules audited") < text.index("| module | covered |")
@@ -836,12 +837,12 @@ def test_report_states_coverage_first(fixture_report):
 
 def test_quoted_names_heading_is_scoped(fixture_report):
     """#256: no statement of the report is scoped wider than what it audited."""
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert "Quoted C++ names in the stubs of audited modules" in text
 
 
 def test_json_has_coverage(fixture_report):
-    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE))
+    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE, NO_LEDGER))
     assert data["coverage"] == {"audited": ["fixture"], "unaudited": {"other": "Not yet audited."}}
 
 
@@ -855,15 +856,15 @@ def test_coverage_of_the_real_tables():
 def test_render_lists_delegated_headers(fixture_report):
     """Phase C: a header audited with another module is named in its owner's section, with
     whether that module is audited yet, so no header is silently dropped."""
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert "| `tesseract/fixture/shared.h` | other | not yet: Not yet audited. |" in text
-    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE))
+    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE, NO_LEDGER))
     assert data["modules"]["fixture"]["delegated"] == {"tesseract/fixture/shared.h": "other"}
 
 
 def test_render_is_deterministic_and_sorted(fixture_report):
-    a = audit.render_markdown([fixture_report], PROV, COVERAGE)
-    b = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    a = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
+    b = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert a == b
     assert "abc1234" in a and "==0.35.0" in a
     gaps = a[a.index("### Gaps") : a.index("### Deviations")]
@@ -873,12 +874,12 @@ def test_render_is_deterministic_and_sorted(fixture_report):
 
 
 def test_render_conclusion_precedes_tables(fixture_report):
-    text = audit.render_markdown([fixture_report], PROV, COVERAGE)
+    text = audit.render_markdown([fixture_report], PROV, COVERAGE, NO_LEDGER)
     assert text.index("| fixture |") < text.index("### Gaps")
 
 
 def test_json_roundtrip(fixture_report):
-    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE))
+    data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE, NO_LEDGER))
     assert data["provenance"] == PROV
     module = data["modules"]["fixture"]
     assert {g["symbol"] for g in module["gaps"]} == {

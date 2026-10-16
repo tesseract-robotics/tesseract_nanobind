@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
-from collections.abc import Sequence
-from dataclasses import asdict
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
 
 import clang.cindex as ci
 import tomllib
-from audit_match import ModuleReport
+from audit_match import Gap, ModuleReport
 from audit_ownership import (
     ANY_PREFIX,
     REPO_ROOT,
@@ -19,9 +22,14 @@ from audit_ownership import (
     committed_stub,
 )
 from audit_rules import ACCEPTED
-from audit_stub import rel
+from audit_stub import Deviation, QuotedType, rel
 
 REPORT_PATH = REPO_ROOT / "docs" / "developer" / "binding-api-audit.md"
+# Committed outcome of every open row (#256, D10): {module: {row key: entry}}.
+LEDGER_PATH = REPO_ROOT / "scripts" / "audit_ledger.json"
+ISSUE_REF = re.compile(r"#\d+")
+LEDGER_FIELDS = frozenset({"issue", "wont_fix"})
+NO_OUTCOME = "—"  # issue column of an open row the ledger has no entry for
 LIMITATION = (
     "Python member names are checked against every declaration in the TU, so a "
     "Python-only member that shares a common C++ name (`size`, `clear`) is not flagged. "
@@ -36,6 +44,83 @@ LIMITATION = (
     "A header the binding never includes that does not compile on its own is listed as "
     "`unparseable header`, at its first error, and its API is not checked."
 )
+
+
+class MalformedLedgerError(ValueError):
+    """The ledger is not `{module: {symbol: {"issue": "#NNN"} | {"wont_fix": reason}}}`."""
+
+
+@dataclass(frozen=True)
+class LedgerEntry:
+    """The outcome of one open row: an issue reference or a won't-fix reason, never both."""
+
+    issue: str | None
+    wont_fix: str | None
+
+
+def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """A JSON object's pairs as a dict; a repeated key would silently drop an entry."""
+    out: dict[str, Any] = {}
+    for k, v in pairs:
+        if k in out:
+            raise MalformedLedgerError(f"duplicate key {k!r}")
+        out[k] = v
+    return out
+
+
+def _ledger_entry(where: str, raw: object) -> LedgerEntry:
+    if not isinstance(raw, dict):
+        raise MalformedLedgerError(f"{where}: entry is not an object")
+    if set(raw) - LEDGER_FIELDS or len(raw) != 1:
+        raise MalformedLedgerError(
+            f"{where}: needs exactly one of issue, wont_fix; has {sorted(raw)}"
+        )
+    issue, reason = raw.get("issue"), raw.get("wont_fix")
+    if "issue" in raw and not (isinstance(issue, str) and ISSUE_REF.fullmatch(issue)):
+        raise MalformedLedgerError(f"{where}: issue {issue!r} is not #NNN")
+    if "wont_fix" in raw and not (isinstance(reason, str) and reason.strip()):
+        raise MalformedLedgerError(f"{where}: wont_fix {reason!r} is not a non-empty reason")
+    if "wont_fix" in raw and "|" in reason:
+        raise MalformedLedgerError(
+            f"{where}: wont_fix {reason!r} has a `|` (splits the table cell)"
+        )
+    return LedgerEntry(issue=issue, wont_fix=reason)
+
+
+def load_ledger(path: Path = LEDGER_PATH) -> Mapping[str, Mapping[str, LedgerEntry]]:
+    """The committed outcome ledger, validated.
+
+    Raises:
+        MalformedLedgerError: not JSON, a repeated key, or a module or entry of the wrong shape.
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_keys)
+    except json.JSONDecodeError as e:
+        raise MalformedLedgerError(f"{path}: {e}") from e
+    if not isinstance(raw, dict):
+        raise MalformedLedgerError(f"{path}: top level is not an object")
+    out: dict[str, dict[str, LedgerEntry]] = {}
+    for module, entries in raw.items():
+        if not isinstance(entries, dict):
+            raise MalformedLedgerError(f"{path}: {module} is not an object")
+        out[module] = {s: _ledger_entry(f"{module}.{s}", e) for s, e in entries.items()}
+    return out
+
+
+def _issue_cell(entry: LedgerEntry | None) -> str:
+    """The `issue` column: `#NNN`, `won't fix: <reason>`, or `—` for a row with no outcome."""
+    if entry is None:
+        return NO_OUTCOME
+    return entry.issue if entry.issue is not None else f"won't fix: {entry.wont_fix}"
+
+
+def _with_outcome(row: Gap | Deviation | QuotedType, entry: LedgerEntry | None) -> dict[str, Any]:
+    """A report row as JSON, with its ledger outcome (`null` fields when it has none)."""
+    return {
+        **asdict(row),
+        "issue": entry.issue if entry is not None else None,
+        "wont_fix": entry.wont_fix if entry is not None else None,
+    }
 
 
 def _git(*args: str) -> str:
@@ -85,8 +170,16 @@ def _unaudited_patterns() -> list[tuple[str, str]]:
     )
 
 
-def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Coverage) -> str:
-    """The mkdocs report page: provenance, coverage, conclusion, then per-module tables."""
+def render_markdown(
+    reports: list[ModuleReport],
+    prov: dict[str, str],
+    cov: Coverage,
+    ledger: Mapping[str, Mapping[str, LedgerEntry]],
+) -> str:
+    """The mkdocs report page: provenance, coverage, conclusion, then per-module tables.
+
+    Each open row (gap, deviation, quoted name) shows its `ledger` outcome in an `issue` column.
+    """
     out = [
         "# Binding API audit",
         "",
@@ -111,9 +204,15 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Cove
         "`nb::module_::import_`):",
         "",
         *_table(
-            ("module", "Python name", "annotation", "stub:line"),
+            ("module", "Python name", "annotation", "stub:line", "issue"),
             [
-                (r.module, f"`{q.name}`", f"`{q.annotation}`", q.location)
+                (
+                    r.module,
+                    f"`{q.name}`",
+                    f"`{q.annotation}`",
+                    q.location,
+                    _issue_cell(ledger.get(r.module, {}).get(q.annotation)),
+                )
                 for r in reports
                 for q in r.quoted
             ],
@@ -133,15 +232,34 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Cove
         "",
     ]
     for r in reports:
+        outcomes = ledger.get(r.module, {})
         out += [f"## {r.module}", "", "### Gaps", ""]
         out += _table(
-            ("C++ symbol", "kind", "header:line", "missing overload (arity)"),
-            [(f"`{g.symbol}`", g.kind.value, g.location, g.arity) for g in r.gaps],
+            ("C++ symbol", "kind", "header:line", "missing overload (arity)", "issue"),
+            [
+                (
+                    f"`{g.symbol}`",
+                    g.kind.value,
+                    g.location,
+                    g.arity,
+                    _issue_cell(outcomes.get(g.symbol)),
+                )
+                for g in r.gaps
+            ],
         )
         out += ["### Deviations", ""]
         out += _table(
-            ("Python name", "kind", "stub:line", "arity"),
-            [(f"`{d.name}`", d.kind.value, d.location, d.arity) for d in r.deviations],
+            ("Python name", "kind", "stub:line", "arity", "issue"),
+            [
+                (
+                    f"`{d.name}`",
+                    d.kind.value,
+                    d.location,
+                    d.arity,
+                    _issue_cell(outcomes.get(d.name)),
+                )
+                for d in r.deviations
+            ],
         )
         out += ["### Accepted", ""]
         out += _table(
@@ -163,15 +281,24 @@ def render_markdown(reports: list[ModuleReport], prov: dict[str, str], cov: Cove
     return "\n".join(out).rstrip() + "\n"
 
 
-def to_json(reports: list[ModuleReport], prov: dict[str, str], cov: Coverage) -> str:
-    """Same data as the page, for issue drafting."""
+def to_json(
+    reports: list[ModuleReport],
+    prov: dict[str, str],
+    cov: Coverage,
+    ledger: Mapping[str, Mapping[str, LedgerEntry]],
+) -> str:
+    """Same data as the page, for issue drafting; open rows carry `issue` and `wont_fix`."""
     modules = {
         r.module: {
             "covered": r.covered,
-            "gaps": [asdict(g) for g in r.gaps],
-            "deviations": [asdict(d) for d in r.deviations],
+            "gaps": [_with_outcome(g, ledger.get(r.module, {}).get(g.symbol)) for g in r.gaps],
+            "deviations": [
+                _with_outcome(d, ledger.get(r.module, {}).get(d.name)) for d in r.deviations
+            ],
             "accepted": [asdict(a) for a in r.accepted],
-            "quoted": [asdict(q) for q in r.quoted],
+            "quoted": [
+                _with_outcome(q, ledger.get(r.module, {}).get(q.annotation)) for q in r.quoted
+            ],
             "delegated": r.delegated,
             "type_fallbacks": r.type_fallbacks,
         }

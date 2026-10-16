@@ -19,6 +19,7 @@ TYPED_PREFIX = ("tesseract/typed/",)
 
 types = load("audit_types")
 COVERAGE = audit.Coverage(audited=("typed",), unaudited={}, total=1)
+NO_LEDGER: dict = {}  # these report tests check rendering, not outcomes
 
 
 @pytest.fixture(scope="module")
@@ -171,7 +172,7 @@ def test_type_fallbacks_counted(typed_report):
 
 def test_report_renders_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    text = audit.render_markdown([typed_report], prov, COVERAGE)
+    text = audit.render_markdown([typed_report], prov, COVERAGE, NO_LEDGER)
     assert (
         "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |"
         in text
@@ -182,4 +183,4 @@ def test_report_renders_type_fallbacks(typed_report):
 
 def test_json_has_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE)
+    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE, NO_LEDGER)
