@@ -17,6 +17,7 @@
 - **Ruckig jerk-limited smoothing** — `RuckigTrajectorySmoothing` and `RuckigTrajectorySmoothingCompositeProfile` (`duration_extension_fraction`, `max_duration_extension_factor`, `override_limits`, `velocity_limits`, `acceleration_limits`, `jerk_limits`) are bound; the module links `tesseract::time_parameterization_ruckig` ([#278]).
 - **`rescaleTimings(program, scalings)`** — rescales each sub-composite's timing in place; a `scalings` list that is not `len(program)` long raises `ValueError` (upstream only asserts) ([#279]).
 - **`ISPCompositeProfile.minimum_time_delta`** is bound ([#280]).
+- **`createKey()` on the time-parameterization profiles** — a static `X.createKey()` returns the `ProfileDictionary` key `X().getKey()` without building a profile, on all five profile classes ([#273]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
@@ -469,6 +470,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
 [#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
+[#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273
 [#277]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/277
 [#278]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/278
 [#279]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/279
