@@ -196,10 +196,12 @@ tick (trust-region shrinking can drive the box to zero):
 
 ## Warm-Starting
 
-Between solver steps, update `NodesVariables` with the previous solution:
+Between solver steps, set the previous solution through the problem. `problem.setVariables`
+writes the variables, then updates every component and recounts the dynamic rows;
+`NodesVariables.setVariables` only writes them. A wrong length raises `VariablesSizeError`:
 
 ```python
-nodes_variables.setVariables(trajectory.flatten())
+problem.setVariables(trajectory.flatten())
 solver.init(problem)
 solver.stepSQPSolver()
 ```
