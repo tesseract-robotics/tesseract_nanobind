@@ -8,7 +8,7 @@ from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # Import order: each script imports only the ones before it.
-SCRIPTS = ("audit_types", "audit_ownership", "audit_match")
+SCRIPTS = ("audit_types", "audit_ownership", "audit_parse", "audit_match")
 
 
 class DuplicateNameError(RuntimeError):
