@@ -139,13 +139,13 @@ NB_MODULE(_tesseract_motion_planners, m) {
     m.def("toToolpath",
           nb::overload_cast<const tcl::CompositeInstruction&, const te::Environment&>(&tp::toToolpath),
           "ci"_a, "env"_a,
-          "TCP poses of a program in the working frame, one VectorIsometry3d per sub-composite.");
+          "World-frame TCP poses of a program, one VectorIsometry3d per sub-composite.");
     m.def("toToolpath",
           nb::overload_cast<const tcl::MoveInstructionPoly&, const te::Environment&>(&tp::toToolpath),
-          "mi"_a, "env"_a, "TCP pose of a move instruction in its working frame.");
+          "mi"_a, "env"_a, "World-frame TCP pose of a move instruction.");
     m.def("toToolpath",
           nb::overload_cast<const tcl::InstructionPoly&, const te::Environment&>(&tp::toToolpath),
-          "instruction"_a, "env"_a, "TCP poses of a composite or move instruction.");
+          "instruction"_a, "env"_a, "World-frame TCP poses of a composite or move instruction.");
 
     m.def("contactCheckProgram", &contact_check_program<tcol::ContinuousContactManager>,
           "manager"_a, "state_solver"_a, "program"_a, "config"_a,
@@ -174,7 +174,7 @@ NB_MODULE(_tesseract_motion_planners, m) {
               return tp::getRobotConfig<double>(joint_group, base_link, tcp_frame, joint_values, sign_correction);
           },
           "joint_group"_a, "base_link"_a, "tcp_frame"_a, "joint_values"_a,
-          "sign_correction"_a = Eigen::Vector2i::Ones(),
+          "sign_correction"_a.sig("[1, 1]") = Eigen::Vector2i::Ones(),
           "Configuration of a six-axis arm. The last six joint values are the arm's; "
           "`sign_correction` flips the sign of joint 3 and joint 5 for the manufacturer's convention.");
 
