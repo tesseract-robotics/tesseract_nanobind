@@ -18,6 +18,9 @@ TypeKey = tuple | None
 # Class name -> the names of all its (transitive) base classes, from the TU.
 Ancestors = Mapping[str, frozenset[str]]
 NO_ANCESTORS: Ancestors = MappingProxyType({})
+# Qualified class -> the qualified classes of its direct public bases, from the TU (T5).
+Bases = Mapping[str, tuple[str, ...]]
+NO_BASES: Bases = MappingProxyType({})
 
 RECORD_KINDS = frozenset(
     {ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_TEMPLATE}
@@ -321,6 +324,30 @@ def class_ancestors(tu: ci.TranslationUnit) -> dict[str, frozenset[str]]:
         return frozenset(found)
 
     return {name: closure(name) for name in direct}
+
+
+def public_bases(tu: ci.TranslationUnit) -> dict[str, tuple[str, ...]]:
+    """Every class defined in the TU (by `qualified_path`) -> its direct public bases, in
+    declaration order; `()` for a class without one. A template instance base names its
+    template (`Planner<double>` -> `…::Planner`), as `bound_classes` does."""
+    out: dict[str, tuple[str, ...]] = {}
+    for c in tu.cursor.walk_preorder():
+        if c.kind not in RECORD_KINDS or not c.is_definition():
+            continue
+        bases: list[str] = []
+        for b in c.get_children():
+            if (
+                b.kind != ci.CursorKind.CXX_BASE_SPECIFIER
+                or b.access_specifier != ci.AccessSpecifier.PUBLIC
+            ):
+                continue
+            decl = b.type.get_canonical().get_declaration()
+            if decl.kind not in RECORD_KINDS:
+                decl = b.referenced  # a dependent base: the template itself
+            if decl is not None and decl.kind in RECORD_KINDS:
+                bases.append(qualified_path(decl))
+        out.setdefault(qualified_path(c), tuple(bases))
+    return out
 
 
 def _compare(cpp: TypeKey, py: TypeKey, ancestors: Ancestors) -> bool | None:

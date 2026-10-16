@@ -44,6 +44,7 @@ from audit_parse import (
 )
 from audit_stub import (
     DUNDER_OPERATORS,
+    ENUM_BASES,
     NOT_AN_OVERLOAD,
     Accepted,
     Deviation,
@@ -57,7 +58,7 @@ from audit_stub import (
     py_api,
     rel,
 )
-from audit_types import NO_ANCESTORS, Ancestors, TypeKey
+from audit_types import NO_ANCESTORS, NO_BASES, Ancestors, Bases, TypeKey
 
 
 class PrefixMismatchError(ValueError):
@@ -444,6 +445,7 @@ def match(
     stub_roots: Sequence[Path] = (SRC,),
     ancestors: Ancestors = NO_ANCESTORS,
     bound: BoundLookup = no_bound,
+    bases: Bases = NO_BASES,
 ) -> ModuleReport:
     """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`,
     C++ class ancestry (`audit_types.class_ancestors`) lets a subclass bind a base parameter.
@@ -451,7 +453,8 @@ def match(
     Classes are identified by qualified C++ name through `bound` (module -> its
     `bound_classes`): a class this module binds under another Python name is compared as that
     name, and a class another stub declares under its leaf is bound there only if that
-    module's binding does not demonstrably bind a different class under it.
+    module's binding does not demonstrably bind a different class under it. `bases`
+    (`audit_types.public_bases`) checks each bound class's stub bases (`_base_rows`).
     """
     gaps: list[Gap] = []
     accepted: list[Accepted] = []
@@ -552,6 +555,9 @@ def match(
         elif rule:
             accepted.append(Accepted(name, rule, where))
 
+    base_gaps, base_deviations = _base_rows(module, cpp, py, stub_rel, stub_roots, bound, bases)
+    gaps += base_gaps
+    deviations += base_deviations
     return ModuleReport(
         module,
         covered,
@@ -561,6 +567,93 @@ def match(
         py.quoted,
         type_fallbacks=fallbacks,
     )
+
+
+def _stub_base(expr: str, module: str) -> tuple[str, str]:
+    """(module, class) a stub base expression names: `pkg.mod._mod.Outer.Inner` ->
+    (`mod`, `Outer.Inner`); a bare name is a class of `module`."""
+    parts = expr.split(".")
+    private = [i for i, p in enumerate(parts) if p.startswith("_")]
+    if not private:
+        return module, expr
+    i = private[-1]
+    return parts[i].removeprefix("_"), ".".join(parts[i + 1 :])
+
+
+def _base_rows(
+    module: str,
+    cpp: dict[str, CppSymbol],
+    py: PyApi,
+    stub_rel: str,
+    stub_roots: Sequence[Path],
+    bound: BoundLookup,
+    bases: Bases,
+) -> tuple[list[Gap], list[Deviation]]:
+    """Stub base classes vs the bound C++ bases (T5), for each class the stub binds.
+
+    Expected are the nearest *bound* C++ ancestors (an unbound intermediate is looked
+    through); one the stub omits is a gap `D(B)` at the C++ class. A stub base that is no C++
+    ancestor at all is a deviation `D(S)` at the stub class. Bases are compared by qualified
+    class: a stub base resolves through `bound` of its module, and only a name the index does
+    not know falls back to the leaf (positive evidence only, as for classes).
+    """
+    own = bound(module)
+    renamed = {q: p for p, q in own.items()}
+
+    def py_name(q: str) -> str:
+        return renamed.get(q, q.rpartition("::")[2])
+
+    def is_bound(q: str) -> bool:
+        p = py_name(q)
+        sym = py.symbols.get(p)
+        if sym is not None and sym.kind is Kind.CLASS:
+            return _same_class(own.get(p), q)
+        found = _binding_stub(p, stub_rel, stub_roots)
+        return found is not None and _same_class(bound(found[0]).get(p), q)
+
+    def nearest(q: str, seen: set[str]) -> list[str]:
+        out: list[str] = []
+        for b in bases.get(q, ()):
+            if b not in seen:
+                seen.add(b)
+                out += [b] if is_bound(b) else nearest(b, seen)
+        return out
+
+    def all_ancestors(q: str) -> set[str]:
+        found: set[str] = set()
+        todo = list(bases.get(q, ()))
+        while todo:
+            b = todo.pop()
+            if b not in found:
+                found.add(b)
+                todo.extend(bases.get(b, ()))
+        return found
+
+    def names(expr: str, q: str) -> bool:
+        mod, cls = _stub_base(expr, module)
+        known = bound(mod).get(cls)
+        return known == q if known is not None else cls == py_name(q)
+
+    gaps: list[Gap] = []
+    deviations: list[Deviation] = []
+    for name, sym in cpp.items():
+        top = name.partition(".")[0]
+        pname = renamed.get(cpp[top].qualified, top) + name[len(top) :] if top in cpp else name
+        ps = py.symbols.get(pname)
+        if sym.kind is not Kind.CLASS or ps is None or ps.kind is not Kind.CLASS:
+            continue
+        stub = [e for e in ps.bases if e != "object" and e not in ENUM_BASES]
+        for b in nearest(sym.qualified, set()):
+            if not any(names(e, b) for e in stub):
+                gaps.append(Gap(f"{pname}({py_name(b)})", Kind.BASE, sym.location))
+        ancestors = all_ancestors(sym.qualified)
+        for e in stub:
+            if not any(names(e, a) for a in ancestors):
+                where = f"{stub_rel}:{ps.line}"
+                deviations.append(
+                    Deviation(f"{pname}({_stub_base(e, module)[1]})", Kind.BASE, where)
+                )
+    return gaps, deviations
 
 
 def unincluded_header_gaps(
@@ -694,6 +787,7 @@ def audit_tu(
         stub_roots,
         audit_types.class_ancestors(tu),
         bound,
+        audit_types.public_bases(tu),
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}
     report.gaps = sorted(
