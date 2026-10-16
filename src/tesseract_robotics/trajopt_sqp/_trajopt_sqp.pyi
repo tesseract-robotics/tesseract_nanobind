@@ -11,6 +11,11 @@ import scipy.sparse
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
 
+class QPProblemExpiredError(RuntimeError):
+    """
+    A QPProblemView used after the SQPCallback call it was passed to returned.
+    """
+
 class VariablesSizeError(ValueError):
     """QPProblem.setVariables with a vector that is not getNumNLPVars() long."""
 
@@ -647,13 +652,22 @@ class TrajOptQPProblem(QPProblem):
 
     def print(self) -> None: ...
 
+class QPProblemView(QPProblem):
+    """
+    The problem an SQPCallback receives from a solve whose problem has no Python object (one a
+    planner built in C++). Valid only during that call; afterwards every method raises
+    QPProblemExpiredError.
+    """
+
 class SQPCallback:
     """Base class for SQP optimization callbacks"""
 
     def __init__(self) -> None: ...
 
     def execute(self, problem: QPProblem, sqp_results: SQPResults) -> bool:
-        """Called during SQP. Return false to stop optimization."""
+        """
+        Called during SQP. Return false to stop optimization. problem is valid only during the call: a problem passed to solve() from Python arrives as that object; one a planner built in C++ arrives as a QPProblemView, which raises QPProblemExpiredError once the call has returned. sqp_results is a copy the callback may keep.
+        """
 
 class TrustRegionSQPSolver:
     """

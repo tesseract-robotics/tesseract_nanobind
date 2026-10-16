@@ -133,6 +133,7 @@
 - **`calcForwardNumJac` raises `NumericalJacobianSizeError`** (a `ValueError`) when `f` returns a different length at a perturbed `x`; trajopt read past the shorter vector ([#295]).
 - **`CartPosConstraint.calcJacobianBlock` takes its joint count from its `Var`** — it divided `getNonZeros()` by `getRows()`, and accepted any length with every axis weighted zero ([#289]).
 - **`TaskComposerExecutor.run` keeps the node alive until the run ends** — the executor runs the node in its own threads after `run` returns, but the future held no reference to it, so a node dropped before `wait()` (`future = executor.run(factory.createTaskComposerNode(name), storage)`) was freed under the running task: a bus error or segfault. Both `run` overloads, on `TaskComposerExecutor` and `TaskflowTaskComposerExecutor`, now tie the node's lifetime to the returned future.
+- **A stored `SQPCallback` problem can't outlive the call** — a problem with no Python object (one `TrajOptIfoptMotionPlanner` builds in C++) reaches a Python callback as a `QPProblemView`; once the call returns, every method on it raises `QPProblemExpiredError` (a `RuntimeError`). A callback that kept the problem used to read freed memory after `solve()` returned. A problem passed to `solve()` from Python still arrives as that object ([#308]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
@@ -616,6 +617,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#326]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/326
 [#331]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/331
 [#339]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/339
+[#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [trajopt#618]: https://github.com/tesseract-robotics/trajopt/issues/618
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
@@ -725,7 +727,6 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#305]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/305
 [#332]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/332
 [#333]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/333
-[#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [#309]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/309
 [#310]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/310
 [#311]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/311
