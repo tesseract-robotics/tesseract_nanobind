@@ -122,6 +122,10 @@ def test_make_time_monotonically_increasing():
     program = _program(times=(0.0, 1.0, 0.5))
     makeTimeMonotonicallyIncreasing(program)
     assert _times(program) == pytest.approx([0.0, 1.0, 1.5])
+    # A repeated time is left as it is.
+    program = _program(times=(0.0, 1.0, 1.0))
+    makeTimeMonotonicallyIncreasing(program)
+    assert _times(program) == pytest.approx([0.0, 1.0, 1.0])
 
 
 def test_to_delimited_file(tmp_path):

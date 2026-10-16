@@ -43,7 +43,7 @@
 namespace tp = tesseract::command_language;
 namespace tc = tesseract::common;
 
-// list.__delitem__ index: negative counts from the end; out of range raises IndexError.
+// list.__getitem__/__delitem__ index: negative counts from the end; out of range raises IndexError.
 static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
     const auto n = static_cast<Py_ssize_t>(size);
     const Py_ssize_t j = i < 0 ? i + n : i;
@@ -888,9 +888,8 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getInstructionCount", &tp::CompositeInstruction::getInstructionCount,
              "locate_filter"_a = nb::none(), "process_child_composites"_a = true)
         .def("__len__", &tp::CompositeInstruction::size)
-        .def("__getitem__", [](tp::CompositeInstruction& self, std::size_t i) -> tp::InstructionPoly& {
-            if (i >= self.size()) throw std::out_of_range("Index out of range");
-            return self[i];
+        .def("__getitem__", [](tp::CompositeInstruction& self, Py_ssize_t i) -> tp::InstructionPoly& {
+            return self[normalize_index(i, self.size())];
         }, nb::rv_policy::reference_internal)
         .def("__iter__", [](tp::CompositeInstruction& self) {
             return nb::make_iterator(nb::type<tp::CompositeInstruction>(), "iterator", self.begin(), self.end());
@@ -988,7 +987,8 @@ NB_MODULE(_tesseract_command_language, m) {
           "Write the joint positions of every move instruction to `file_path`; True on success.");
     // validateSeedStructure: declared in utils.h, defined nowhere upstream (0.35.0), so not bound.
     m.def("makeTimeMonotonicallyIncreasing", &tp::makeTimeMonotonicallyIncreasing, "composite_instructions"_a,
-          "Make the state-waypoint times strictly increasing across the whole program, in place.");
+          "A time that drops below the previous one starts a new segment appended after it; "
+          "repeated times are left as they are; in place.");
 
     // Python-side convertibility: lets any API accepting an InstructionPoly
     // (push_back, setInstructions, function parameters) be called with a

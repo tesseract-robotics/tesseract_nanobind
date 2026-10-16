@@ -1212,5 +1212,5 @@ def toDelimitedFile(composite_instructions: CompositeInstruction, file_path: str
 
 def makeTimeMonotonicallyIncreasing(composite_instructions: CompositeInstruction) -> None:
     """
-    Make the state-waypoint times strictly increasing across the whole program, in place.
+    A time that drops below the previous one starts a new segment appended after it; repeated times are left as they are; in place.
     """
