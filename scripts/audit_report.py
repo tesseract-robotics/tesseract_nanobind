@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 import clang.cindex as ci
 import tomllib
-from audit_match import ACCEPTED, ModuleReport
+from audit_match import ModuleReport
 from audit_ownership import (
     ANY_PREFIX,
     REPO_ROOT,
@@ -18,6 +18,7 @@ from audit_ownership import (
     Coverage,
     committed_stub,
 )
+from audit_rules import ACCEPTED
 from audit_stub import rel
 
 REPORT_PATH = REPO_ROOT / "docs" / "developer" / "binding-api-audit.md"
