@@ -80,6 +80,16 @@ def test_delitem_out_of_range():
         del _composite(2)[2]
 
 
+def test_getitem_negative_index():
+    c = _composite(3)
+    assert c[-1].asWaitInstruction().getWaitTime() == 2.0
+    assert c[-3].asWaitInstruction().getWaitTime() == 0.0
+    with pytest.raises(IndexError):
+        c[-4]
+    with pytest.raises(IndexError):
+        c[3]
+
+
 def test_pop_back():
     c = _composite(2)
     c.pop_back()
