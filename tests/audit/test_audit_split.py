@@ -111,6 +111,10 @@ MATCH = {
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
+    # G1 (g1-mech): the overload table and the absent_ok predicate.
+    "ACCEPTED_CPP_OVERLOADS", "_absent_ok_accepts",
+    # G3 T1: the yaml-node premise.
+    "YAML_TEXT_KEYS", "_yaml_sibling",
 }  # fmt: skip
 
 
