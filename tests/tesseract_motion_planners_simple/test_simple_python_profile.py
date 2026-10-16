@@ -707,3 +707,19 @@ def test_concrete_profile_subclass_without_hooks_is_allowed(concrete):
 
 def test_override_error_is_a_type_error():
     assert issubclass(ProfileOverrideNotDispatchedError, TypeError)
+
+
+def test_planner_never_runs_a_concrete_profile_override():
+    """The review's probe: before the refusal, this override ran zero times and the plan succeeded."""
+    with pytest.raises(
+        ProfileOverrideNotDispatchedError, match="SimplePlannerFixedSizeMoveProfile"
+    ):
+
+        class Mine(SimplePlannerFixedSizeMoveProfile):
+            def __init__(self):
+                super().__init__(5, 4)
+                self.calls = 0
+
+            def generate(self, prev, seed, base, nxt, env, mi):
+                self.calls += 1
+                return [base]
