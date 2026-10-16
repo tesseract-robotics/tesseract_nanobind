@@ -8,6 +8,7 @@ Tests cover:
 """
 
 import gc
+import sys
 
 import numpy as np
 import pytest
@@ -286,3 +287,15 @@ def test_instructions_trajectory_keeps_program_alive():
     del junk
     gc.collect()
     np.testing.assert_array_equal(traj.getPosition(0), first)
+
+
+# ---------------------------------------------------------------------------
+# #280: ISPCompositeProfile.minimum_time_delta
+# ---------------------------------------------------------------------------
+
+
+def test_isp_composite_profile_minimum_time_delta():
+    profile = ISPCompositeProfile()
+    assert profile.minimum_time_delta == sys.float_info.epsilon
+    profile.minimum_time_delta = 1e-3
+    assert profile.minimum_time_delta == 1e-3
