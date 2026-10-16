@@ -13,11 +13,13 @@ import sys
 import numpy as np
 import pytest
 
+from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType_FREESPACE,
+    ProfileDictionary,
     StateWaypoint,
     StateWaypointPoly_wrap_StateWaypoint,
 )
@@ -29,6 +31,8 @@ from tesseract_robotics.tesseract_time_parameterization import (
     ISPCompositeProfile,
     ISPMoveProfile,
     IterativeSplineParameterization,
+    RuckigTrajectorySmoothing,
+    RuckigTrajectorySmoothingCompositeProfile,
     TimeOptimalTrajectoryGeneration,
     TimeParameterization,
     TOTGCompositeProfile,
@@ -227,6 +231,10 @@ class TestConstantTCPSpeedCompositeProfile:
 
 ABB_JOINTS = [f"joint_{i}" for i in range(1, 7)]
 
+# Relative slack on Ruckig's jerk bound when it is checked by finite differences of the
+# waypoint accelerations: Ruckig meets the limit exactly, so this only absorbs float rounding.
+JERK_RELATIVE_TOLERANCE = 1e-6
+
 
 def _move(position, time=None):
     swp = StateWaypoint(ABB_JOINTS, np.asarray(position, dtype=np.float64))
@@ -259,9 +267,21 @@ def _abb_program(num=10, span=1.0):
     return program
 
 
+@pytest.fixture(scope="module")
+def abb_env():
+    return Robot.from_tesseract_support("abb_irb2400").env
+
+
 def _times(program):
     traj = InstructionsTrajectory(program)
     return np.array([traj.getTimeFromStart(i) for i in range(traj.size())])
+
+
+def _max_jerk(program):
+    """Largest joint jerk, by finite differences of the waypoint accelerations."""
+    traj = InstructionsTrajectory(program)
+    acc = np.array([traj.getAcceleration(i) for i in range(traj.size())])
+    return (np.abs(np.diff(acc, axis=0)) / np.diff(_times(program))[:, None]).max()
 
 
 # ---------------------------------------------------------------------------
@@ -340,3 +360,57 @@ def test_rescale_timings_wrong_length_raises():
     program = _two_segment_program()
     with pytest.raises(ValueError, match="scalings"):
         rescaleTimings(program, [1.0])
+
+
+# ---------------------------------------------------------------------------
+# #278: RuckigTrajectorySmoothing
+# ---------------------------------------------------------------------------
+
+
+class TestRuckigTrajectorySmoothing:
+    def test_profile_defaults(self):
+        profile = RuckigTrajectorySmoothingCompositeProfile()
+        assert profile.duration_extension_fraction == 1.1
+        assert profile.max_duration_extension_factor == 10
+        assert profile.override_limits is False
+
+    def test_profile_constructor(self):
+        profile = RuckigTrajectorySmoothingCompositeProfile(1.5, 4.0)
+        assert profile.duration_extension_fraction == 1.5
+        assert profile.max_duration_extension_factor == 4.0
+
+    def test_profile_limits_round_trip(self):
+        profile = RuckigTrajectorySmoothingCompositeProfile()
+        for name, bound in (
+            ("velocity_limits", 1.0),
+            ("acceleration_limits", 2.0),
+            ("jerk_limits", 30.0),
+        ):
+            limits = np.column_stack((-np.full(6, bound), np.full(6, bound)))
+            setattr(profile, name, limits)
+            np.testing.assert_array_equal(getattr(profile, name), limits)
+
+    def test_is_time_parameterization(self):
+        smoothing = RuckigTrajectorySmoothing()
+        assert isinstance(smoothing, TimeParameterization)
+        assert smoothing.getName() == "RuckigTrajectorySmoothing"
+
+    def test_compute_respects_jerk_limit(self, abb_env):
+        program = _abb_program()
+        profiles = ProfileDictionary()
+        profiles.addProfile("TOTG", "DEFAULT", TOTGCompositeProfile())
+        assert TimeOptimalTrajectoryGeneration().compute(program, abb_env, profiles)
+        # TOTG limits velocity and acceleration only: its output exceeds the jerk limit below,
+        # so the bound checked at the end is Ruckig's doing.
+        jerk_max = 5.0
+        assert _max_jerk(program) > jerk_max
+
+        ruckig_profile = RuckigTrajectorySmoothingCompositeProfile()
+        ruckig_profile.override_limits = True
+        ruckig_profile.velocity_limits = np.column_stack((-np.full(6, 2.0), np.full(6, 2.0)))
+        ruckig_profile.acceleration_limits = np.column_stack((-np.full(6, 4.0), np.full(6, 4.0)))
+        ruckig_profile.jerk_limits = np.column_stack((-np.full(6, jerk_max), np.full(6, jerk_max)))
+        profiles.addProfile("RuckigTrajectorySmoothing", "DEFAULT", ruckig_profile)
+        assert RuckigTrajectorySmoothing().compute(program, abb_env, profiles)
+
+        assert _max_jerk(program) <= jerk_max * (1.0 + JERK_RELATIVE_TOLERANCE)
