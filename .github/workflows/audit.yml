@@ -1,0 +1,47 @@
+name: Binding audit
+
+# No `paths:` filter, as in docs.yml and for the same reason: the audit's inputs are the
+# binding TUs and everything they #include (headers come through pixi.lock), the committed
+# stubs and package __init__.py files, the audit scripts, their tests and the report. A
+# filter is a hand-kept copy of that set; once it drifts, a change stops being audited
+# without any failure. The job takes about 10 minutes with the env cached.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
+      with:
+        pixi-version: v0.70.1
+        environments: audit
+        cache: true
+        # Same rule as the wheel workflows: a lock that drifts from pyproject.toml fails
+        # here instead of silently re-solving to other header versions.
+        locked: true
+
+    # tests/audit (fixtures and the real binding TUs): the contract tests of the audit.
+    - name: Contract tests
+      run: pixi run -e audit audit-test
+
+    # The committed report must be what the audit generates from this tree. The provenance
+    # line carries the stubs' last-commit SHA, which on a PR merge ref is the synthetic merge
+    # commit, so that one line is ignored (git diff -I, git >= 2.30); every row is compared.
+    - name: Report is current
+      run: |
+        pixi run -e audit audit-bindings
+        git diff --exit-code -I '^tesseract-robotics `' -- docs/developer/binding-api-audit.md
