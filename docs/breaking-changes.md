@@ -10,6 +10,10 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 |---|---|---|
 | Unreleased | 16 command-language waypoint, instruction and Poly types compare by value and are unhashable | [A stable key, or `id()`](#command-language-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` compare by value and are unhashable | [A stable key, or `id()`](#time-parameterization-profiles-compare-by-value-and-are-unhashable) |
+| Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
+| Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | The collision constraints raise `VarNotInVariableSetError` on a `Var` outside a `NodesVariables` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
+| Unreleased | `OSQPEigenSolver.update*` raise `QPSizeError` on a wrong-length vector | [Size by `init()`](#osqpeigensolver-updates-check-sizes) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -59,6 +63,51 @@ types did in 0.35.0.9. The new `RuckigTrajectorySmoothingCompositeProfile` behav
 | --- | --- |
 | `{TOTGCompositeProfile(): …}`, `set_of_profiles.add(p)` | key by name, e.g. `{"DEFAULT": p}`, or by `id(p)` |
 | `p == q` (identity) | `p is q` |
+
+### `setPairCollisionCoeff` and `getPairCollisionCoeff` removed
+
+`trajopt_ifopt.CollisionCoeffData` bound two copies of its setter and getter under names C++ does
+not have (#298). Call the C++ names:
+
+| before | after |
+| --- | --- |
+| `data.setPairCollisionCoeff(a, b, c)` | `data.setCollisionCoeff(a, b, c)` |
+| `data.getPairCollisionCoeff(a, b)` | `data.getCollisionCoeff(a, b)` |
+
+### trajopt value types compare by value and are unhashable
+
+`trajopt_ifopt.CollisionCoeffData`, `trajopt_ifopt.TrajOptCollisionConfig` and
+`trajopt_sqp.SQPParameters` bind `__eq__`/`__ne__` from their C++ `operator==` and set
+`__hash__ = None` (#261), as the 0.35.0.9 collision, common and environment types did.
+`CollisionCoeffData() == CollisionCoeffData()` was `False`. `hash(obj)`, `{obj}` and `d[obj] = …`
+now raise `TypeError: unhashable type`:
+
+| before | after |
+| --- | --- |
+| `seen = {config}` | `seen = {id(config)}` |
+| `cache[params] = result` | key on the fields you vary, e.g. `cache[params.max_iterations] = result` |
+
+### Collision constraints need a `Var` in a variable set
+
+trajopt's collision constraints key their contact cache on the variable set's hash, which they
+read through `var.getParent().getParent()` without a check: a `Var` outside a `NodesVariables`
+dereferenced null on the first `update()`. `DiscreteCollisionConstraint`,
+`DiscreteCollisionConstraintD`, `DiscreteCollisionNumericalConstraint`,
+`ContinuousCollisionConstraint`, `ContinuousCollisionConstraintD` and
+`ContinuousCollisionNumericalConstraint` now raise `VarNotInVariableSetError` (a `ValueError`) at
+construction (#297). A `Var` from `createNodesVariables` always qualifies; one from `Node.addVar`
+qualifies once its `Node` is handed to `NodesVariables`:
+
+| before | after |
+| --- | --- |
+| `var = node.addVar(...)`; `DiscreteCollisionConstraint(evaluator, var)`; `NodesVariables("t", [node])` | `var = node.addVar(...)`; `NodesVariables("t", [node])`; `DiscreteCollisionConstraint(evaluator, var)` |
+
+### `OSQPEigenSolver` updates check sizes
+
+`updateGradient`, `updateLowerBound`, `updateUpperBound` and `updateBounds` now sit on `QPSolver`
+and raise `QPSizeError` (a `ValueError`) unless the vector has `init()`'s `num_vars` (gradient)
+or `num_cnts` (bounds) entries (#283). trajopt checked with `assert` only and read past a short
+vector. Call `init(num_vars, num_cnts)` with the QP's size before the updates.
 
 ## 0.35.0.9
 

@@ -6,6 +6,10 @@
 
 - **Command-language types compare by value and are unhashable** — the 16 waypoint, instruction and Poly types bind `__eq__`/`__ne__` from the C++ operators and set `__hash__ = None`; `hash()`, `set` members and `dict` keys raise `TypeError`. `MoveInstruction` equality includes both UUIDs ([#261]; [breaking changes](docs/breaking-changes.md#command-language-types-compare-by-value-and-are-unhashable)).
 - **Time-parameterization profiles compare by value and are unhashable** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` bind `__eq__`/`__ne__` from the C++ `operator==` (identity before) and set `__hash__ = None`, as #169 did for collision, common and environment: `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
+- **`CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed** — copies of `setCollisionCoeff` / `getCollisionCoeff` under names C++ does not have. Call the C++ names ([#298]).
+- **`CollisionCoeffData`, `TrajOptCollisionConfig` and `SQPParameters` compare by value and are unhashable** — `==` compared identity; `hash()`, `set` members and `dict` keys now raise `TypeError` ([#261](https://github.com/tesseract-robotics/tesseract_nanobind/issues/261)).
+- **The collision constraints reject a `Var` outside a variable set** — `DiscreteCollisionConstraint`, `DiscreteCollisionNumericalConstraint`, `ContinuousCollisionConstraint` and the new collision classes raise `VarNotInVariableSetError` (a `ValueError`) at construction when the `Var` is not in a `NodesVariables`. trajopt reads the set's hash through the `Var`'s parent pointers unchecked, so such a constraint dereferenced null on its first `update()`. A `Var` from `Node.addVar` qualifies once its `Node` is handed to `NodesVariables` ([#297]).
+- **`OSQPEigenSolver`'s update methods check sizes** — `updateGradient`, `updateLowerBound`, `updateUpperBound` and `updateBounds` raise `QPSizeError` (a `ValueError`) on a vector whose length is not the `init()` size; trajopt indexed past it ([#283]).
 
 ### Changes
 
@@ -18,6 +22,21 @@
 - **`rescaleTimings(program, scalings)`** — rescales each sub-composite's timing in place; a `scalings` list that is not `len(program)` long raises the new `ScalingsLengthError` (a `ValueError`; upstream only asserts) ([#279]).
 - **`ISPCompositeProfile.minimum_time_delta`** is bound ([#280]).
 - **`createKey()` on the time-parameterization profiles** — a static `X.createKey()` returns the `ProfileDictionary` key `X().getKey()` without building a profile, on all five profile classes ([#273]).
+- **trajopt_ifopt names its tesseract types** — the extension imports `tesseract_kinematics` and `tesseract_environment`, so its signatures and stub name `JointGroup`, `KinematicGroup` and `Environment` instead of quoted C++ names ([#285]).
+- **The planner's collision constraints** — `DiscreteCollisionConstraintD`, `ContinuousCollisionConstraintD` (one row per contact) and `ContinuousCollisionNumericalConstraint` are bound; `trajopt_ifopt` and `trajopt_sqp` drop `__all__`, so the star import re-exports every bound name, `toString` included ([#291], [#284]).
+- **Collision evaluator queries** — `calcCollisions` / `calcCollisionData` return a `CollisionCacheData`; `getGradient`, `calcGradientData` and `getJointGroup` are bound on the two evaluator bases, with the `trajopt_common` result structs (`LinkGradientResults`, `GradientResults`, `LinkMaxError`, `GradientResultsSet`, `CollisionCacheData`) ([#292]).
+- **`Bounds += s` / `Bounds -= s`** shift both limits and reclassify the bounds type; the name keeps the `Bounds` ([#286]).
+- **`Component.getValues` / `getBounds`, `Differentiable.getJacobian` and `Differentiable.Mode`** are bound on the bases ([#287]).
+- **Constraint accessors** — `setBounds` on every constraint that declares it (raises `BoundsSizeError` unless one bound per row), `CartLineConstraint.getLine` / `getInfo`, `InverseKinematicsConstraint.setTargetPose` / `getKinematicInfo` ([#288]).
+- **`calcJacobianBlock(joint_vals)`** on `CartPosConstraint`, `CartLineConstraint` and `DiscreteCollisionNumericalConstraint`: the Jacobian at given joint values, sized like `getJacobian()`; raises `JointValuesSizeError` on a wrong length. `InverseKinematicsConstraint.calcJacobianBlock` stays unbound: trajopt 0.35.0 declares it but does not define it ([#289]).
+- **`CartLineInfo(...)` / `InverseKinematicsInfo(...)` field constructors**, with the C++ defaults as overloads. The `list[Bounds]` constructors of `JointVel` / `JointAccel` / `JointJerkConstraint` stay unbound: trajopt 0.35.0 declares them but does not define them ([#290]).
+- **`CollisionCoeffData.getCollisionCoeffPairData` / `getPairsWithZeroCoeff`** ([#293]).
+- **`getClosestValidPoint`, `calcBoundsErrors`, `calcBoundsViolations`** ([#294]).
+- **`calcNumericalConstraintGradient(variables, constraint_set)` and `calcForwardNumJac(f, x, epsilon)`** check an analytic Jacobian, a Python `ConstraintSet`'s included ([#295]).
+- **`toTrajArray(vars)` / `toJointTrajectory(vars)`**; the online SQP example reads its warm start with `toTrajArray` ([#296]).
+- **`NodesVariables(name, nodes)` and the `Var` constructors** — Python builds variable sets with several vars or per-node bounds; the `Node`s hand over ownership. `Var.getParent` / `Node.getParent` ([#297]).
+- **`QPProblem` convex model and `setVariables`** — `getHessian`, `getGradient`, `getConstraintMatrix`, `getBoundsLower`, `getBoundsUpper`, `getConstraintMeritCoeff`, and `setVariables(x)`, which raises `VariablesSizeError` unless `len(x) == getNumNLPVars()` ([#282]).
+- **`QPSolver` update interface** — `updateHessianMatrix`, `updateGradient`, `updateLowerBound`, `updateUpperBound`, `updateBounds`, `updateLinearConstraintsMatrix` and `setWarmStart(problem)` on the base; `OSQPEigenSolver.setWarmStart` takes a `bool` (the OSQP option) or a `QPProblem` ([#283]).
 
 ## [0.35.0.9] - 2026-10-15 — TrajOptQPProblem + value equality + named planning frames + binding audit
 
@@ -476,6 +495,23 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#279]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/279
 [#280]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/280
 [#281]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/281
+[#282]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/282
+[#283]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/283
+[#284]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/284
+[#285]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/285
+[#286]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/286
+[#287]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/287
+[#288]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/288
+[#289]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/289
+[#290]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/290
+[#291]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/291
+[#292]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/292
+[#293]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/293
+[#294]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/294
+[#295]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/295
+[#296]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/296
+[#297]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/297
+[#298]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/298
 [trajopt#618]: https://github.com/tesseract-robotics/trajopt/issues/618
 [tesseract#1381]: https://github.com/tesseract-robotics/tesseract/issues/1381
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
