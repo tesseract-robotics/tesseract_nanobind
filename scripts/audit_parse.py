@@ -569,9 +569,12 @@ def _owned_headers(tu: ci.TranslationUnit) -> frozenset[Path]:
 
 def _is_ctor(m: ci.Cursor, record: ci.Cursor) -> bool:
     """`m` constructs `record`. A constructor template (`template <class It> T(It, It)`) is a
-    FUNCTION_TEMPLATE spelled like the class; it is a constructor, not a method named after it."""
+    FUNCTION_TEMPLATE spelled like the class; it is a constructor, not a method named after it.
+    libclang spells a class template's ctor template with its parameters (`State<FloatType>`, T13).
+    """
     return m.kind == ci.CursorKind.CONSTRUCTOR or (
-        m.kind == ci.CursorKind.FUNCTION_TEMPLATE and m.spelling == record.spelling
+        m.kind == ci.CursorKind.FUNCTION_TEMPLATE
+        and m.spelling.partition("<")[0] == record.spelling
     )
 
 
