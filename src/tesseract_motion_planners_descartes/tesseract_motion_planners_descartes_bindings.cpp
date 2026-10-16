@@ -10,6 +10,8 @@
 
 #include "tesseract_nb.h"
 
+#include <sstream>
+
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
 
@@ -206,6 +208,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     nb::class_<dl::StateSample<double>>(m, "DescartesStateSampleD")
         .def(nb::init<>())
         .def(nb::init<std::shared_ptr<const dl::State<double>>, double>(), "state"_a, "cost"_a)
+        .def(nb::init<std::shared_ptr<const dl::State<double>>>(), "state"_a, "A sample with cost 0")
         .def_rw("state", &dl::StateSample<double>::state)
         .def_rw("cost", &dl::StateSample<double>::cost);
 
@@ -219,7 +222,13 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     nb::class_<dl::WaypointSampler<double>, PyWaypointSamplerD>(m, "DescartesWaypointSamplerD")
         .def(nb::init<>())
         .def("sample", &dl::WaypointSampler<double>::sample,
-             "Return the list of valid state samples for this waypoint");
+             "Return the list of valid state samples for this waypoint")
+        // upstream's print(); a Python subclass that defines __str__ keeps its own
+        .def("__str__", [](const dl::WaypointSampler<double>& self) {
+            std::stringstream ss;
+            self.print(ss);
+            return ss.str();
+        });
 
     // ========== descartes_light::StateEvaluator<double> ==========
     nb::class_<dl::StateEvaluator<double>, PyStateEvaluatorD>(m, "DescartesStateEvaluatorD")

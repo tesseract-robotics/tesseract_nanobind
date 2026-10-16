@@ -33,6 +33,10 @@ class DescartesStateSampleD:
     @overload
     def __init__(self, state: DescartesStateD, cost: float) -> None: ...
 
+    @overload
+    def __init__(self, state: DescartesStateD) -> None:
+        """A sample with cost 0"""
+
     @property
     def state(self) -> DescartesStateD: ...
 
@@ -56,6 +60,8 @@ class DescartesWaypointSamplerD:
 
     def sample(self) -> list[DescartesStateSampleD]:
         """Return the list of valid state samples for this waypoint"""
+
+    def __str__(self) -> str: ...
 
 class DescartesStateEvaluatorD:
     def __init__(self) -> None: ...

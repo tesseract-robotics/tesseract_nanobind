@@ -58,6 +58,19 @@ profile = DescartesLadderGraphSolverProfileD()
 
 # Graph construction and search settings
 ```
+## Inspecting the samplers
+
+The move profile's `create*` hooks return what the planner builds for one waypoint. `str()` on
+the waypoint sampler shows its working frame, TCP frame, target pose and TCP offset:
+
+```python
+sampler = DescartesDefaultMoveProfileD().createWaypointSampler(move, manip_info, env)
+print(sampler)          # Working Frame: base_link, TCP Frame: tool0 ...
+samples = sampler.sample()   # list[DescartesStateSampleD], one per IK solution
+```
+
+`DescartesStateSampleD(state)` builds a sample with cost 0, as `DescartesStateSampleD(state, 0.0)`.
+
 
 ## How It Works
 
