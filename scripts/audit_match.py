@@ -37,6 +37,7 @@ from audit_parse import (
     direct_include_spellings,
     foreign_headers,
     header_rel,
+    own_header_lines,
     parse_tu,
     prefix_headers,
 )
@@ -403,6 +404,32 @@ def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
     return any(o in cpp and o not in py.symbols for o in owners)
 
 
+def _inherited_from_bound(
+    sym: CppSymbol, api: PyApi, stub_roots: Sequence[Path], bound: BoundLookup
+) -> bool:
+    """`sym` is inherited from a class that `api` or a stub under `stub_roots` binds (A).
+
+    That class's own rows audit the member. A stub's module is its stem without the `_`;
+    its `bound` names the class's Python name. A name `bound` does not know counts as the
+    class (positive evidence only, as for classes bound elsewhere).
+    """
+    base = sym.inherited_from
+    if base is None:
+        return False
+    if base in api.symbols:
+        return True
+    for root in stub_roots:
+        for stub in _stubs_under(root):
+            renamed = bound(stub.stem.removeprefix("_"))
+            names = {p for p, q in renamed.items() if q == base or q.endswith(f"::{base}")}
+            if base not in renamed:
+                names.add(base)
+            symbols = _stub_py_api(stub).symbols
+            if any(n in symbols and symbols[n].kind is Kind.CLASS for n in names):
+                return True
+    return False
+
+
 def match(
     module: str,
     cpp: dict[str, CppSymbol],
@@ -433,6 +460,8 @@ def match(
         api = elsewhere.get(top, py) if dot else py
         if _ancestor_missing(name, cpp, api):
             continue  # the missing class is the one row
+        if _inherited_from_bound(sym, api, stub_roots, bound):
+            continue  # the bound base audits it; a missing stub base edge is T5's row
         ps = _py_member(name, api, stub_roots)
         if ps is None:
             owner, _, leaf = name.rpartition(".")
@@ -467,6 +496,10 @@ def match(
         where = f"{stub_rel}:{ps.line}"
         rule = ACCEPTED_SYMBOLS.get((module, name))
         owner, _, leaf = name.rpartition(".")
+        # A member inherited from a bound base is that base's: reported there, not here.
+        own = cpp.get(name)
+        if own is not None and _inherited_from_bound(own, py, stub_roots, bound):
+            own = None
         if ps.enum_alias:
             found = None  # a second name for an enum value, even if C++ has it unscoped
         elif (
@@ -476,7 +509,7 @@ def match(
         ):
             accepted.append(Accepted(name, "value-equality-unhashable", where))
             continue
-        elif ps.kind is Kind.PROTOCOL and name not in cpp:
+        elif ps.kind is Kind.PROTOCOL and own is None:
             proto = _protocol_rule(name, cpp, tu_names)
             if proto:
                 accepted.append(Accepted(name, proto, where))
@@ -494,9 +527,9 @@ def match(
             else:
                 deviations.append(Deviation(name, ps.kind, where))
             continue
-        if name in cpp and cpp[name].overloads:
+        if own is not None and own.overloads:
             for p in ps.overloads:
-                if not any(_cover(ov, [p], ancestors) is not None for ov in cpp[name].overloads):
+                if not any(_cover(ov, [p], ancestors) is not None for ov in own.overloads):
                     deviations.append(
                         Deviation(name, Kind.OVERLOAD, f"{stub_rel}:{p.line}", str(p.arity))
                     )
@@ -564,10 +597,7 @@ def _header_gaps(
         f"#include <{spelling}>\n" for spelling in sorted(headers.values())
     )
     tu = parse_tu(synthetic, extra_include_dirs, unsaved=text)
-    lines: dict[str, list[int]] = {}
-    for sym in cpp_api(tu, frozenset(headers)).values():
-        path, line = sym.location.rsplit(":", 1)
-        lines.setdefault(path, []).append(int(line))
+    lines = own_header_lines(cpp_api(tu, frozenset(headers)))
     gaps = []
     for h, spelling in headers.items():
         found = lines.get(header_rel(h))

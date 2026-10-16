@@ -64,6 +64,8 @@ PARSE = {
     "_is_eigen_ref_of_non_const", "_is_out_param", "_out_param_type", "_is_raw_buffer",
     "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
     "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",
+    "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
+    "_base_definition", "_overload", "own_header_lines",
 }  # fmt: skip
 
 
@@ -111,7 +113,7 @@ MATCH = {
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
     "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module", "BoundLookup",
-    "no_bound",
+    "no_bound", "_inherited_from_bound",
 }  # fmt: skip
 
 
