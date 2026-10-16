@@ -55,7 +55,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def("isTimeStrictlyIncreasing", &tp::InstructionsTrajectory::isTimeStrictlyIncreasing);
 
     // ========== TimeOptimalTrajectoryGenerationCompositeProfile ==========
-    nb::class_<tp::TimeOptimalTrajectoryGenerationCompositeProfile, tc::Profile>(m, "TOTGCompositeProfile")
+    auto totg_composite_profile = nb::class_<tp::TimeOptimalTrajectoryGenerationCompositeProfile, tc::Profile>(m, "TOTGCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double, double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a,
@@ -67,9 +67,10 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def_rw("max_acceleration_scaling_factor", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::max_acceleration_scaling_factor)
         .def_rw("path_tolerance", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::path_tolerance)
         .def_rw("min_angle_change", &tp::TimeOptimalTrajectoryGenerationCompositeProfile::min_angle_change);
+    bind_value_equality(totg_composite_profile);
 
     // ========== IterativeSplineParameterizationCompositeProfile ==========
-    nb::class_<tp::IterativeSplineParameterizationCompositeProfile, tc::Profile>(m, "ISPCompositeProfile")
+    auto isp_composite_profile = nb::class_<tp::IterativeSplineParameterizationCompositeProfile, tc::Profile>(m, "ISPCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
@@ -80,14 +81,16 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_velocity_scaling_factor)
         .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationCompositeProfile::max_acceleration_scaling_factor)
         .def_rw("minimum_time_delta", &tp::IterativeSplineParameterizationCompositeProfile::minimum_time_delta);
+    bind_value_equality(isp_composite_profile);
 
     // ========== IterativeSplineParameterizationMoveProfile ==========
-    nb::class_<tp::IterativeSplineParameterizationMoveProfile, tc::Profile>(m, "ISPMoveProfile")
+    auto isp_move_profile = nb::class_<tp::IterativeSplineParameterizationMoveProfile, tc::Profile>(m, "ISPMoveProfile")
         .def(nb::init<>())
         .def(nb::init<double, double>(),
              "max_velocity_scaling_factor"_a, "max_acceleration_scaling_factor"_a)
         .def_rw("max_velocity_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_velocity_scaling_factor)
         .def_rw("max_acceleration_scaling_factor", &tp::IterativeSplineParameterizationMoveProfile::max_acceleration_scaling_factor);
+    bind_value_equality(isp_move_profile);
 
     // ========== TimeParameterization (base) ==========
     // Note: 0.33 API change - now uses profiles and Environment
@@ -105,7 +108,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def(nb::init<std::string>(), "name"_a = "ISP");
 
     // ========== ConstantTCPSpeedParameterizationCompositeProfile ==========
-    nb::class_<tp::ConstantTCPSpeedParameterizationCompositeProfile, tc::Profile>(m, "ConstantTCPSpeedCompositeProfile")
+    auto constant_tcp_speed_composite_profile = nb::class_<tp::ConstantTCPSpeedParameterizationCompositeProfile, tc::Profile>(m, "ConstantTCPSpeedCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double, double, double, double, double>(),
              "max_translational_velocity"_a,
@@ -120,13 +123,14 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def_rw("max_rotational_acceleration", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_rotational_acceleration)
         .def_rw("max_velocity_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_velocity_scaling_factor)
         .def_rw("max_acceleration_scaling_factor", &tp::ConstantTCPSpeedParameterizationCompositeProfile::max_acceleration_scaling_factor);
+    bind_value_equality(constant_tcp_speed_composite_profile);
 
     // ========== ConstantTCPSpeedParameterization ==========
     nb::class_<tp::ConstantTCPSpeedParameterization, tp::TimeParameterization>(m, "ConstantTCPSpeedParameterization")
         .def(nb::init<std::string>(), "name"_a = "ConstantTCPSpeed");
 
     // ========== RuckigTrajectorySmoothingCompositeProfile ==========
-    nb::class_<tp::RuckigTrajectorySmoothingCompositeProfile, tc::Profile>(m, "RuckigTrajectorySmoothingCompositeProfile")
+    auto ruckig_composite_profile = nb::class_<tp::RuckigTrajectorySmoothingCompositeProfile, tc::Profile>(m, "RuckigTrajectorySmoothingCompositeProfile")
         .def(nb::init<>())
         .def(nb::init<double, double>(), "duration_extension_fraction"_a, "max_duration_extension_factor"_a)
         .def_rw("duration_extension_fraction", &tp::RuckigTrajectorySmoothingCompositeProfile::duration_extension_fraction)
@@ -135,6 +139,7 @@ NB_MODULE(_tesseract_time_parameterization, m) {
         .def_rw("velocity_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::velocity_limits)
         .def_rw("acceleration_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::acceleration_limits)
         .def_rw("jerk_limits", &tp::RuckigTrajectorySmoothingCompositeProfile::jerk_limits);
+    bind_value_equality(ruckig_composite_profile);
 
     // ========== RuckigTrajectorySmoothing ==========
     nb::class_<tp::RuckigTrajectorySmoothing, tp::TimeParameterization>(m, "RuckigTrajectorySmoothing")
