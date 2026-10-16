@@ -75,6 +75,27 @@ def test_cpp_api_sets_qualified_on_classes_and_enums():
     assert cpp["LongWidgetName.size"].qualified == ""
 
 
+def test_cpp_api_is_the_same_on_a_tu_with_function_bodies():
+    """One TU may feed both `cpp_api` and `bound_classes`: bodies add no API symbol."""
+    cpp = audit.binding_source("tesseract_time_parameterization")
+    plain, bodies = audit.parse_tu(cpp), audit.parse_tu(cpp, bodies=True)
+
+    def owned(tu):
+        return frozenset(
+            Path(i.include.name).resolve()
+            for i in tu.get_includes()
+            if "tesseract/time_parameterization/" in i.include.name
+        )
+
+    assert owned(plain) and owned(plain) == owned(bodies)
+    assert audit.cpp_api(plain, owned(plain)) == audit.cpp_api(bodies, owned(bodies))
+    fixture = FIXTURES / "identity_bindings.cpp"
+    header = frozenset({(FIXTURE_INCLUDE / "tesseract" / "identity" / "widgets.h").resolve()})
+    assert audit.cpp_api(audit.parse_tu(fixture, (FIXTURE_INCLUDE,)), header) == audit.cpp_api(
+        audit.parse_tu(fixture, (FIXTURE_INCLUDE,), bodies=True), header
+    )
+
+
 def _widget_cpp():
     method = [audit.CppOverload(audit.Arity(0, 0), (), f"{HERE}:3")]
     return {
@@ -144,6 +165,16 @@ def test_same_leaf_different_class_is_not_bound_elsewhere():
     """TF-mp-plan-2: sco::Var is not trajopt_ifopt::Var."""
     report = _snapshot("a::Snapshot", {"snapshot_owner": {"Snapshot": "b::Snapshot"}})
     assert ("Snapshot", audit.Kind.CLASS) in {(g.symbol, g.kind) for g in report.gaps}
+
+
+def test_own_rename_wins_over_a_leaf_hit_in_another_stub():
+    """T3 rule 2: `_renamed_elsewhere.pyi` declares `class LongWidgetName`, but this module binds
+    `tesseract::w::LongWidgetName` as `Widget`: its members are compared against `Widget`."""
+    assert (RENAMED / "_renamed_elsewhere.pyi").is_file()
+    report = _renamed_report()
+    accepted = {(a.symbol, a.rule) for a in report.accepted}
+    assert ("LongWidgetName", "bound-in-other-module") not in accepted
+    assert "LongWidgetName.color" in {g.symbol for g in report.gaps}
 
 
 @pytest.mark.parametrize("bound", [{"snapshot_owner": {"Snapshot": "a::Snapshot"}}, {}])

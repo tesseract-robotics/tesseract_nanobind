@@ -54,4 +54,8 @@ struct Planner : Runner  // Planner<double> bound as PlannerD without its base: 
   void go() override;
   T value;
 };
+struct SubPlanner : Planner<double>  // stub base PlannerD resolves through the own index: no row
+{
+  SubPlanner();
+};
 }  // namespace tesseract::bases
