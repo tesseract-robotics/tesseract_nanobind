@@ -6,6 +6,7 @@ import functools
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 
 import audit_types
 from audit_ownership import (
@@ -186,6 +187,11 @@ ACCEPTED = {
     "clone-as-copy": "`__copy__`/`__deepcopy__` bind the C++ copy constructor and return the "
     "concrete type; `clone()`, which returns the `unique_ptr<…Interface>` of the type erasure, "
     "is then covered by `__deepcopy__`.",
+    "poly-alternative-overloads": "A parameter typed as a type-erased Poly (`InstructionPoly`, "
+    "`WaypointPoly`) is also bound once per alternative the Poly wraps "
+    "(`push_back(MoveInstructionPoly)`, `MoveInstruction(CartesianWaypointPoly, …)`), so the stub "
+    "names the types a caller passes; C++ converts each alternative through the Poly's "
+    "converting constructor.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -485,6 +491,21 @@ def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
     return any(o in cpp and o not in py.symbols for o in owners)
 
 
+def poly_ancestors(ancestors: Ancestors) -> Ancestors:
+    """`ancestors` with each Poly added to the ancestors of its alternatives (T9)."""
+    out = {k: set(v) for k, v in ancestors.items()}
+    for poly, alternatives in POLY_ALTERNATIVES.items():
+        for alt in alternatives:
+            out.setdefault(alt, set()).add(poly)
+    return MappingProxyType({k: frozenset(v) for k, v in out.items()})
+
+
+def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
+    """Whether the overload's structural `absent_ok` accepts leaving it unbound. When it does
+    not, the overload falls through to `ACCEPTED_CPP_OVERLOADS` and the later rules."""
+    return ov.absent_ok is not None
+
+
 def _whole_symbol_rule(sym: CppSymbol) -> str | None:
     """The rule accepting an entirely unbound symbol through its structural `absent_ok`: the
     symbol's own (fields), or the one `WHOLE_SYMBOL_ABSENT_OK` rule every overload carries.
@@ -536,12 +557,6 @@ def _unbound_rule(
     return None
 
 
-def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
-    """Whether the overload's structural `absent_ok` accepts leaving it unbound. When it does
-    not, the overload falls through to `ACCEPTED_CPP_OVERLOADS` and the later rules."""
-    return ov.absent_ok is not None
-
-
 def _uncovered_rule(
     module: str,
     name: str,
@@ -549,12 +564,16 @@ def _uncovered_rule(
     sym: CppSymbol,
     ps: PySymbol,
     ancestors: Ancestors,
+    with_polys: Ancestors,
 ) -> str | None:
     """The ACCEPTED rule for a C++ overload no Python overload covers, or None (a gap).
 
-    Order: the structural `absent_ok` (`_absent_ok_accepts`); `ACCEPTED_CPP_OVERLOADS`; a
-    reference-wrapper view beside a covered sibling (R4); a derived-element container sibling.
+    Order: a Poly alternative's overload covers it; the structural `absent_ok`
+    (`_absent_ok_accepts`); `ACCEPTED_CPP_OVERLOADS`; a reference-wrapper view beside a covered
+    sibling (R4); a derived-element container sibling.
     """
+    if _cover(ov, ps.overloads, with_polys) is not None:
+        return "poly-alternative-overloads"
     if _absent_ok_accepts(ov, sym, ps):
         return ov.absent_ok
     if rule := ACCEPTED_CPP_OVERLOADS.get((module, name, str(ov.arity))):
@@ -583,6 +602,7 @@ def match(
     accepted: list[Accepted] = []
     covered = 0
     fallbacks = 0
+    with_polys = poly_ancestors(ancestors)
     # Top-level classes this stub lacks but another extension binds: their members are
     # compared against that extension's stub (#232).
     elsewhere = {
@@ -613,7 +633,9 @@ def match(
         ok = True
         for ov in sym.overloads:
             how = _cover(ov, ps.overloads, ancestors)
-            if how is None and (rule := _uncovered_rule(module, name, ov, sym, ps, ancestors)):
+            if how is None and (
+                rule := _uncovered_rule(module, name, ov, sym, ps, ancestors, with_polys)
+            ):
                 accepted.append(Accepted(name, rule, ov.location))
             elif how is None:
                 gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity)))
@@ -665,7 +687,9 @@ def match(
                 at = f"{stub_rel}:{p.line}"
                 if any(_cover(ov, [p], ancestors) is not None for ov in cpp[name].overloads):
                     continue
-                if py_rule := ACCEPTED_PY_OVERLOADS.get((module, name, p.params)):
+                if any(_cover(ov, [p], with_polys) is not None for ov in cpp[name].overloads):
+                    accepted.append(Accepted(name, "poly-alternative-overloads", at))
+                elif py_rule := ACCEPTED_PY_OVERLOADS.get((module, name, p.params)):
                     accepted.append(Accepted(name, py_rule, at))
                 else:
                     deviations.append(Deviation(name, Kind.OVERLOAD, at, str(p.arity)))
