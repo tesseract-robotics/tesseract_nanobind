@@ -96,13 +96,20 @@ struct EmptyGenerateError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
+// generate returned something other than a list of MoveInstructionPoly. Its own type, not
+// nb::type_error: solve's dispatcher catches only this module's types (see the translator note in
+// tesseract_nb.h), and the error is rethrown from there.
+struct ProfileReturnTypeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 // generate returned a null MoveInstructionPoly, which upstream would plan as a success.
 struct NullInstructionError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
-// super().generate(...) from a Python override: generate is pure virtual, so the base binding
-// has nothing to call; virtual dispatch would land in the override again and recurse.
+// generate is pure virtual: raised for super().generate(...) from a Python override (the base
+// binding has nothing to call) and for a Python subclass that does not override it.
 struct PureVirtualCallError : std::logic_error {
     using std::logic_error::logic_error;
 };
@@ -121,12 +128,22 @@ public:
                                                    const tcl::InstructionPoly& next_instruction,
                                                    const std::shared_ptr<const te::Environment>& env,
                                                    const tc::ManipulatorInfo& global_manip_info) const override {
-        nb::detail::ticket t(nb_trampoline, "generate", true);
+        // Everything, the ticket included, inside the try: each failure is stored in the slot
+        // before upstream's catch turns it into message text.
         try {
-            auto instructions = nb::cast<std::vector<tcl::MoveInstructionPoly>>(nb_trampoline.base().attr(t.key)(
+            nb::detail::ticket t(nb_trampoline, "generate", false);
+            if (!t.key.is_valid())
+                throw PureVirtualCallError("SimplePlannerMoveProfile.generate is pure virtual: a Python subclass "
+                                           "must override it");
+            nb::object result = nb_trampoline.base().attr(t.key)(
                 nb::cast(prev_instruction, nb::rv_policy::copy), nb::cast(prev_seed, nb::rv_policy::copy),
                 nb::cast(base_instruction, nb::rv_policy::copy), nb::cast(next_instruction, nb::rv_policy::copy),
-                env, nb::cast(global_manip_info, nb::rv_policy::copy)));
+                env, nb::cast(global_manip_info, nb::rv_policy::copy));
+            std::vector<tcl::MoveInstructionPoly> instructions;
+            if (!nb::try_cast(result, instructions))
+                throw ProfileReturnTypeError("SimplePlannerMoveProfile.generate must return a list of "
+                                             "MoveInstructionPoly, not " +
+                                             std::string(nb::type_name(result.type()).c_str()));
             if (instructions.empty())
                 throw EmptyGenerateError("SimplePlannerMoveProfile.generate returned an empty list; it must end "
                                          "with base_instruction");
@@ -135,11 +152,7 @@ public:
                     throw NullInstructionError("SimplePlannerMoveProfile.generate returned a null instruction at "
                                                "index " + std::to_string(i));
             return instructions;
-        } catch (const nb::python_error&) {
-            if (pending_generate_error.armed)
-                pending_generate_error.error = std::current_exception();
-            throw;
-        } catch (const std::invalid_argument&) {
+        } catch (const std::exception&) {
             if (pending_generate_error.armed)
                 pending_generate_error.error = std::current_exception();
             throw;
@@ -207,8 +220,10 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned an empty list.";
     nb::exception<NullInstructionError>(m, "SimplePlannerNullInstructionError", PyExc_ValueError)
         .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned a null MoveInstructionPoly.";
+    nb::exception<ProfileReturnTypeError>(m, "SimplePlannerProfileReturnTypeError", PyExc_TypeError)
+        .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned the wrong type.";
     nb::exception<PureVirtualCallError>(m, "SimplePlannerPureVirtualCallError", PyExc_NotImplementedError)
-        .attr("__doc__") = "super().generate(...) from a Python SimplePlannerMoveProfile: the base is pure virtual.";
+        .attr("__doc__") = "generate is pure virtual: super().generate(...), or a Python profile without it.";
 
     // Modules defining the types this one names, imported first so the stubs resolve them.
     nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");

@@ -47,6 +47,8 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
     SimplePlannerLVSMoveProfile,
     SimplePlannerLVSNoIKMoveProfile,
     SimplePlannerMoveProfile,
+    SimplePlannerProfileReturnTypeError,
+    SimplePlannerPureVirtualCallError,
     getClosestJointSolution,
     interpolateCartCartWaypoint,
     interpolateCartJointWaypoint,
@@ -267,15 +269,33 @@ def test_last_generate_error_is_raised(irb2400_env, manip_info):
         SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, Outer()))
 
 
-def test_generate_without_override_fails_the_plan(irb2400_env, manip_info):
+def test_generate_without_override_raises(irb2400_env, manip_info):
     class NoGenerate(SimplePlannerMoveProfile):
         pass
 
-    response = SimpleMotionPlanner(PLANNER_NAME).solve(
-        _request(irb2400_env, manip_info, NoGenerate())
+    with pytest.raises(SimplePlannerPureVirtualCallError, match="generate"):
+        SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, NoGenerate()))
+
+
+@pytest.mark.parametrize("result", [None, 3, [None], ["not an instruction"]])
+def test_generate_wrong_return_type_raises(irb2400_env, manip_info, result):
+    class WrongType(SimplePlannerMoveProfile):
+        def generate(
+            self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+        ):
+            return result
+
+    with pytest.raises(SimplePlannerProfileReturnTypeError, match="list of MoveInstructionPoly"):
+        SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, WrongType()))
+
+
+def test_generate_errors_fail_the_plan_through_the_base_solve(irb2400_env, manip_info):
+    """Unarmed (the MotionPlanner base binding): upstream's failed response, as for C++."""
+    response = MotionPlanner.solve(
+        SimpleMotionPlanner(PLANNER_NAME), _request(irb2400_env, manip_info, RaisingProfile())
     )
     assert not response.successful
-    assert "generate" in response.message
+    assert "from generate" in response.message
 
 
 def test_python_profile_matches_cpp_profile(irb2400_env, manip_info):

@@ -22,9 +22,12 @@ class SimplePlannerNullInstructionError(ValueError):
     A Python SimplePlannerMoveProfile.generate returned a null MoveInstructionPoly.
     """
 
+class SimplePlannerProfileReturnTypeError(TypeError):
+    """A Python SimplePlannerMoveProfile.generate returned the wrong type."""
+
 class SimplePlannerPureVirtualCallError(NotImplementedError):
     """
-    super().generate(...) from a Python SimplePlannerMoveProfile: the base is pure virtual.
+    generate is pure virtual: super().generate(...), or a Python profile without it.
     """
 
 class SimpleMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
