@@ -84,3 +84,41 @@ def test_k_prefix_accepts_both_sides_of_a_mechanical_pair(solver_report):
 def test_k_prefix_rejects_non_mechanical_names(solver_report):
     assert "Status.kConverged" in {g.symbol for g in solver_report.gaps}
     assert "Status.NLP_CONVERGED" in {d.name for d in solver_report.deviations}
+
+
+# R13: `unbound-dependency-type`, third-party half.
+
+
+@pytest.fixture(scope="module")
+def core_reports():
+    """Every audited module's report: none of them includes an unbound dependency."""
+    return {m: audit.audit_module(m) for m in own.AUDITED_HEADER_PREFIX}
+
+
+def test_third_party_typed_members_are_accepted(solver_report):
+    accepted = {(a.symbol, a.rule) for a in solver_report.accepted}
+    assert ("Engine.setDefaults", "unbound-dependency-type") in accepted
+    assert ("Engine.settings_", "unbound-dependency-type") in accepted
+
+
+def test_third_party_overload_of_a_bound_method_is_accepted(solver_report):
+    # Engine.tune(n) is bound; its C++ overload takes vendor::Settings first.
+    assert ("Engine.tune", "unbound-dependency-type") in {
+        (a.symbol, a.rule) for a in solver_report.accepted
+    }
+    assert "Engine.tune" not in {g.symbol for g in solver_report.gaps}
+
+
+def test_solver_fixture_rows_exact(solver_report):
+    assert {(g.symbol, g.kind) for g in solver_report.gaps} == {
+        ("Status.kConverged", audit.Kind.ENUMERATOR),
+    }
+    assert {(d.name, d.kind) for d in solver_report.deviations} == {
+        ("Status.NLP_CONVERGED", audit.Kind.ENUMERATOR),
+        ("Engine.tune", audit.Kind.OVERLOAD),  # tune(n: int) matches no C++ overload's types
+    }
+
+
+def test_unbound_dependency_changes_no_core_row(core_reports):
+    for report in core_reports.values():
+        assert "unbound-dependency-type" not in {a.rule for a in report.accepted}
