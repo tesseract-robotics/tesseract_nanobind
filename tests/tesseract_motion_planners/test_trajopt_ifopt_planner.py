@@ -1,5 +1,6 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
 
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,8 @@ from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
+    InstructionPoly_as_CompositeInstruction,
+    InstructionPoly_as_MoveInstructionPoly,
     JointWaypoint,
     JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
@@ -39,6 +42,8 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptSolverProfile,
+    TrajOptIfoptTermInfos,
+    TrajOptIfoptWaypointInfo,
     createCollisionConstraints,
     createJointVelocityConstraint,
 )
@@ -439,6 +444,17 @@ def _interpolated_program(t_env, manip_info, joint_names):
     return generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
 
+def _move_instructions(composite):
+    """The move instructions of `composite` in order, as the planner flattens them."""
+    moves = []
+    for instruction in composite:
+        if instruction.isCompositeInstruction():
+            moves.extend(_move_instructions(InstructionPoly_as_CompositeInstruction(instruction)))
+        elif instruction.isMoveInstruction():
+            moves.append(InstructionPoly_as_MoveInstructionPoly(instruction))
+    return moves
+
+
 def _smoothing_composite_profile(n_joints):
     """Velocity, acceleration and jerk smoothing (upstream enables velocity only)."""
     profile = TrajOptIfoptDefaultCompositeProfile()
@@ -572,6 +588,109 @@ class TestTrajOptIfoptMotionPlannerBase:
         assert via_base.successful, via_base.message
         assert via_base.message == direct.message
         assert len(via_base.results) == len(direct.results)
+
+
+class TestTrajOptIfoptProfileHooks:
+    """The profiles' `create` hooks and the structs they return (gh-339)."""
+
+    @staticmethod
+    def _move_profile():
+        profile = TrajOptIfoptDefaultMoveProfile()
+        profile.joint_cost_config.enabled = False
+        profile.joint_constraint_config.enabled = True
+        return profile
+
+    def test_move_profile_create(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 3
+        )
+        assert isinstance(info, TrajOptIfoptWaypointInfo)
+        assert isinstance(info.term_infos, TrajOptIfoptTermInfos)
+        assert info.fixed is True  # constrained, untoleranced joint waypoint
+        assert info.node.getName() == "Node_3"
+        np.testing.assert_array_equal(info.node.getVar("position").value(), START_POS)
+        assert len(info.term_infos.constraints) == 1
+        assert len(info.term_infos.squared_costs) == 0
+        assert len(info.term_infos.absolute_costs) == 0
+        assert len(info.term_infos.hinge_costs) == 0
+
+    def test_node_keeps_waypoint_info_alive(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        node = (
+            self._move_profile()
+            .create(_joint_move(joint_names, START_POS), manip_info, t_env, 5)
+            .node
+        )
+        gc.collect()
+        assert node.getName() == "Node_5"
+        np.testing.assert_array_equal(node.getVar("position").value(), START_POS)
+
+    def test_node_is_read_only(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 0
+        )
+        with pytest.raises(AttributeError):
+            info.node = ti.Node("other")
+
+    def test_term_set_outlives_waypoint_info(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 0
+        )
+        constraint = info.term_infos.constraints[0]
+        del info
+        gc.collect()
+        assert len(constraint.getCoefficients()) == len(joint_names)
+
+    def test_default_waypoint_info_has_no_node(self):
+        info = TrajOptIfoptWaypointInfo()
+        assert info.node is None
+        assert info.fixed is False
+
+    def test_composite_profile_create(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        program = _interpolated_program(t_env, manip_info, joint_names)
+        moves = _move_instructions(program)
+        move_profile = self._move_profile()
+        infos = [move_profile.create(move, manip_info, t_env, i) for i, move in enumerate(moves)]
+        nodes = [info.node for info in infos]
+        fixed = [i for i, info in enumerate(infos) if info.fixed]
+        assert fixed == [0, len(moves) - 1]
+
+        composite = _smoothing_composite_profile(len(joint_names))
+        terms = composite.create(manip_info, t_env, nodes, fixed)
+
+        # The planner adds these sets as they are; the factories build the same sets.
+        variables = [node.getVar("position") for node in nodes]
+        expected_constraints = createCollisionConstraints(
+            variables, t_env, manip_info, composite.collision_constraint_config, fixed, False
+        )
+        expected_hinge = createCollisionConstraints(
+            variables, t_env, manip_info, composite.collision_cost_config, fixed, False
+        )
+        assert len(terms.constraints) == len(expected_constraints) == len(moves) - 2
+        assert len(terms.hinge_costs) == len(expected_hinge) == len(moves) - 2
+        assert len(terms.squared_costs) == 3  # velocity, acceleration, jerk smoothing
+        assert len(terms.absolute_costs) == 0
+
+    def test_composite_profile_rejects_none_node(self, kuka_iiwa_environment):
+        t_env, manip_info, _ = kuka_iiwa_environment
+        with pytest.raises(TypeError, match=r"nodes\[0\] is None"):
+            TrajOptIfoptDefaultCompositeProfile().create(manip_info, t_env, [None], [])
+
+    def test_solver_profile_create(self):
+        profile = TrajOptIfoptOSQPSolverProfile()
+        profile.opt_params.max_iterations = 7
+        solver = profile.create()
+        assert isinstance(solver, tsqp.TrustRegionSQPSolver)
+        assert solver.params.max_iterations == 7
+
+    def test_hooks_on_base_classes(self):
+        assert "create" in TrajOptIfoptMoveProfile.__dict__
+        assert "create" in TrajOptIfoptCompositeProfile.__dict__
+        assert "create" in TrajOptIfoptSolverProfile.__dict__
 
 
 class TestTrajOptIfoptValueEquality:
