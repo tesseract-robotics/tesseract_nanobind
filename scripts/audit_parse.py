@@ -593,6 +593,9 @@ def _member(m: ci.Cursor, record: ci.Cursor) -> tuple[str, Kind] | None:
         or m.is_deleted_method()
         or m.is_copy_assignment_operator_method()
         or m.is_move_assignment_operator_method()
+        # Python has no assignment operator: copy, move, converting and templated
+        # operator= alike (T12)
+        or m.spelling == "operator="
     ):
         return None
     kind = Kind.OPERATOR if m.spelling.startswith("operator") else Kind.METHOD
