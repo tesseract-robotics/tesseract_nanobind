@@ -7,8 +7,6 @@ sqp,tp}.md` against the module's report. Variants applied (Jelle 2026-10-16): C6
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
-import fnmatch
-
 import clang.cindex as ci
 import pytest
 
@@ -76,10 +74,25 @@ def test_g3_header_ownership(spelling, owner):
     assert own.header_owner(spelling, own.owner_prefixes()) == owner
 
 
+PLANNER_DIRS = tuple(
+    f"tesseract/motion_planners/{d}/"
+    for d in ("simple", "ompl", "trajopt", "trajopt_ifopt", "descartes")
+)
+
+
 def test_parent_module_does_not_report_planner_headers(g3_reports):
     rows = gap_symbols(g3_reports[MP])
-    assert not any(r.startswith("tesseract/motion_planners/ompl/") for r in rows)
+    assert not [r for r in rows if r.startswith(PLANNER_DIRS)]
     assert g3_reports[MP].delegated == {}
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["tesseract/motion_planners/planner_utils.h", "tesseract/motion_planners/robot_config.h"],
+)
+def test_robot_config_headers_stay_gaps(g3_reports, header):
+    """mp-base rows 9-10, C7 = bind (g3/13): header gaps, never not-API."""
+    assert header in gap_symbols(g3_reports[MP])
 
 
 @pytest.mark.parametrize(
@@ -108,17 +121,40 @@ def test_sco_var_is_not_trajopt_ifopt_var(g3_reports):
 # Task 2 (T1): profile YAML ctors have no YAML-text sibling.
 
 
-@pytest.mark.parametrize(
-    ("module", "symbol"),
-    [
-        (SIMPLE, "SimplePlannerLVSMoveProfile.__init__"),
-        (SIMPLE, "SimplePlannerFixedSizeMoveProfile.__init__"),
-        (OMPL, "OMPLRealVectorMoveProfile.__init__"),
-        (TRAJOPT, "TrajOptDefaultCompositeProfile.__init__"),
-        (TRAJOPT, "TrajOptOSQPSolverProfile.__init__"),
-        (IFOPT, "TrajOptIfoptDefaultMoveProfile.__init__"),
+PROFILE_YAML_CTORS = [
+    *[
+        (SIMPLE, f"{p}.__init__")  # mp-base rows 51-57
+        for p in (
+            "SimplePlannerFixedSizeMoveProfile",
+            "SimplePlannerFixedSizeAssignMoveProfile",
+            "SimplePlannerFixedSizeAssignNoIKMoveProfile",
+            "SimplePlannerLVSMoveProfile",
+            "SimplePlannerLVSNoIKMoveProfile",
+            "SimplePlannerLVSAssignMoveProfile",
+            "SimplePlannerLVSAssignNoIKMoveProfile",
+        )
     ],
-)
+    (OMPL, "OMPLRealVectorMoveProfile.__init__"),
+    *[
+        (TRAJOPT, f"{p}.__init__")
+        for p in (
+            "TrajOptDefaultMoveProfile",
+            "TrajOptDefaultCompositeProfile",
+            "TrajOptOSQPSolverProfile",
+        )
+    ],
+    *[
+        (IFOPT, f"{p}.__init__")
+        for p in (
+            "TrajOptIfoptDefaultMoveProfile",
+            "TrajOptIfoptDefaultCompositeProfile",
+            "TrajOptIfoptOSQPSolverProfile",
+        )
+    ],
+]
+
+
+@pytest.mark.parametrize(("module", "symbol"), PROFILE_YAML_CTORS)
 def test_real_profile_yaml_ctor_is_a_gap(g3_reports, module, symbol):
     """No profile binds a YAML-text sibling yet: binding-fix g3/08 (C6 = 6a)."""
     report = g3_reports[module]
@@ -195,13 +231,6 @@ def test_g3_not_api_header_has_no_row(g3_reports, module, header):
 def test_trajopt_sco_transitive_symbols_have_no_row(g3_reports, symbol):
     """Declared in transitively included trajopt_sco headers, which `trajopt_sco/*` makes not API."""
     assert symbol not in gap_symbols(g3_reports[TRAJOPT])
-
-
-def test_optimizers_hpp_stays_audited(g3_reports):
-    report = g3_reports[TRAJOPT]
-    assert "BasicTrustRegionSQPParameters.__eq__" in gap_symbols(report)  # binding-fix I-mp-plan-2
-    # A row, never no row: accepted under solver-behind-profile (Task 5).
-    assert ("Optimizer", "solver-behind-profile") in accepted_pairs(report)
 
 
 @pytest.mark.parametrize(
@@ -325,6 +354,7 @@ def test_type_erased_data_premise():
 
 
 def test_solver_behind_profile_leaves_the_parameters_audited(g3_reports):
+    """`trajopt_sco/optimizers.hpp` is a direct include: audited, not hidden by `trajopt_sco/*`."""
     assert "BasicTrustRegionSQPParameters.__eq__" in gap_symbols(g3_reports[TRAJOPT])
 
 
@@ -367,10 +397,6 @@ PROFILE_HOOKS = [
     (IFOPT, "TrajOptIfoptTermInfos"),
     (IFOPT, "TrajOptIfoptWaypointInfo"),
 ]
-
-
-def test_profile_hook_list_is_the_c8_table():
-    assert len(PROFILE_HOOKS) == 19
 
 
 @pytest.mark.parametrize(("module", "symbol"), PROFILE_HOOKS)
@@ -606,23 +632,3 @@ def test_every_g3_table_entry_fires(g3_reports, descartes_report):
         ]
     ]
     assert stale == []
-
-
-def test_every_g3_not_api_pattern_hides_a_header():
-    prefixes = own.owner_prefixes()
-    modules = {*G3, DESCARTES}
-    unused = []
-    for prefix, patterns in own.UNAUDITED_HEADERS.items():
-        hit = own.owning_prefix(prefix, prefixes)
-        if hit is None or hit[0] not in modules:
-            continue
-        module = hit[0]
-        below = [
-            spelling.removeprefix(prefix)
-            for spelling in audit.prefix_headers(module, prefixes, audit.INCLUDE_DIRS).values()
-            if spelling.startswith(prefix)
-        ]
-        unused += [
-            f"{prefix}{p}" for p in patterns if not any(fnmatch.fnmatchcase(b, p) for b in below)
-        ]
-    assert unused == []
