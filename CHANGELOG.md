@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Time-parameterization profiles compare by value and are unhashable** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` bind `__eq__`/`__ne__` from the C++ `operator==` (identity before) and set `__hash__ = None`, as #169 did for collision, common and environment: `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -462,6 +466,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
+[#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#277]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/277
 [#278]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/278
 [#279]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/279

@@ -414,3 +414,31 @@ class TestRuckigTrajectorySmoothing:
         assert RuckigTrajectorySmoothing().compute(program, abb_env, profiles)
 
         assert _max_jerk(program) <= jerk_max * (1.0 + JERK_RELATIVE_TOLERANCE)
+
+
+# ---------------------------------------------------------------------------
+# #261: value equality on the profiles
+# ---------------------------------------------------------------------------
+
+# (class, field, value that differs from the default)
+PROFILE_FIELD_CHANGES = [
+    (TOTGCompositeProfile, "path_tolerance", 0.05),
+    (ISPCompositeProfile, "add_points", False),
+    (ISPMoveProfile, "max_velocity_scaling_factor", 0.5),
+    (ConstantTCPSpeedCompositeProfile, "max_translational_velocity", 0.5),
+    (RuckigTrajectorySmoothingCompositeProfile, "duration_extension_fraction", 1.5),
+]
+
+
+@pytest.mark.parametrize(
+    ("cls", "field", "value"), PROFILE_FIELD_CHANGES, ids=lambda x: getattr(x, "__name__", None)
+)
+def test_profile_value_equality(cls, field, value):
+    a, b = cls(), cls()
+    assert a == b
+    assert not (a != b)
+    setattr(b, field, value)
+    assert a != b
+    assert not (a == b)
+    with pytest.raises(TypeError):
+        hash(a)
