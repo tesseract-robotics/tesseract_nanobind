@@ -22,3 +22,18 @@ def test_package_has_no_all():
     exec("from tesseract_robotics.tesseract_command_language import *", namespace)
     assert "toJointTrajectory" in namespace
     assert "moveFilter" in namespace
+
+
+@pytest.mark.parametrize("cls", ["MoveInstruction", "MoveInstructionPoly"])
+@pytest.mark.parametrize(
+    "name", ["assignCartesianWaypoint", "assignJointWaypoint", "assignStateWaypoint"]
+)
+def test_assign_waypoint_aliases_removed(cls, name):
+    """#276: `setWaypoint(wp)` is the one spelling; C++ 0.33 removed assign*Waypoint."""
+    assert not hasattr(getattr(tcl, cls), name)
+    assert hasattr(getattr(tcl, cls), "setWaypoint")
+
+
+def test_profile_dictionary_add_profile_helper_removed():
+    """#276: `ProfileDictionary.addProfile` takes every module's profiles directly."""
+    assert not hasattr(tcl, "ProfileDictionary_addProfile")

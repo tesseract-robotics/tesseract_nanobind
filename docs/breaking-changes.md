@@ -24,6 +24,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `tesseract_command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
+| Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -247,6 +248,19 @@ now exports every public name of the extension instead of a hand-kept subset.
 | --- | --- |
 | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
 | `from tesseract_robotics.tesseract_command_language import MoveInstructionType_LINEAR` | `from tesseract_robotics.tesseract_command_language import MoveInstructionType` |
+
+### `assign*Waypoint` and `ProfileDictionary_addProfile` removed
+
+Seven Python-only names duplicated a bound method (#276). `assignCartesianWaypoint`,
+`assignJointWaypoint` and `assignStateWaypoint` on `MoveInstruction` and `MoveInstructionPoly`
+did what `setWaypoint` does; C++ 0.33 removed them. `ProfileDictionary_addProfile` worked around
+a cross-module limitation that no longer exists: `ProfileDictionary.addProfile` accepts a profile
+from any planner module, including a Python subclass of a trampolined profile.
+
+| before | after |
+| --- | --- |
+| `mi.assignCartesianWaypoint(wp)` (also `assignJointWaypoint`, `assignStateWaypoint`) | `mi.setWaypoint(wp)` |
+| `ProfileDictionary_addProfile(d, ns, name, profile)` | `d.addProfile(ns, name, profile)` |
 
 ## 0.35.0.9
 

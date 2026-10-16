@@ -429,7 +429,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getWaypoint", [](tp::MoveInstructionPoly& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)
-        // Note: 0.33 removed assignCartesianWaypoint etc. Use setWaypoint instead
         .def("setWaypoint", [](tp::MoveInstructionPoly& self, const tp::CartesianWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a, "Set waypoint from CartesianWaypointPoly")
@@ -439,16 +438,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("setWaypoint", [](tp::MoveInstructionPoly& self, const tp::StateWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a, "Set waypoint from StateWaypointPoly")
-        // SWIG-compatible aliases
-        .def("assignCartesianWaypoint", [](tp::MoveInstructionPoly& self, const tp::CartesianWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignJointWaypoint", [](tp::MoveInstructionPoly& self, const tp::JointWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignStateWaypoint", [](tp::MoveInstructionPoly& self, const tp::StateWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
         .def("getMoveType", &tp::MoveInstructionPoly::getMoveType)
         .def("setMoveType", &tp::MoveInstructionPoly::setMoveType, "move_type"_a)
         .def("getProfile", &tp::MoveInstructionPoly::getProfile, "ns"_a = "")
@@ -585,7 +574,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getWaypoint", [](tp::MoveInstruction& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)
-        // Note: 0.33 removed assign*Waypoint methods - use setWaypoint or direct getWaypoint() assignment
         .def("setWaypoint", [](tp::MoveInstruction& self, const tp::CartesianWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a)
@@ -593,16 +581,6 @@ NB_MODULE(_tesseract_command_language, m) {
             self.getWaypoint() = wp;
         }, "waypoint"_a)
         .def("setWaypoint", [](tp::MoveInstruction& self, const tp::StateWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        // SWIG-compatible aliases
-        .def("assignCartesianWaypoint", [](tp::MoveInstruction& self, const tp::CartesianWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignJointWaypoint", [](tp::MoveInstruction& self, const tp::JointWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignStateWaypoint", [](tp::MoveInstruction& self, const tp::StateWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a)
         .def("getMoveType", &tp::MoveInstruction::getMoveType)
@@ -925,16 +903,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getAllProfileEntries", &tc::ProfileDictionary::getAllProfileEntries,
              "ns -> key -> profile name -> profile. A copy of the maps; the profiles are shared.")
         .def("clear", &tc::ProfileDictionary::clear);
-
-    // Helper function to add profiles from other modules (cross-module inheritance workaround)
-    // This casts Profile::ConstPtr from other modules to the base type
-    m.def("ProfileDictionary_addProfile", [](tc::ProfileDictionary& dict,
-                                              const std::string& ns,
-                                              const std::string& profile_name,
-                                              tc::Profile::ConstPtr profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add a profile to the dictionary (cross-module helper)");
 
     // ========== utils.h ==========
     // WaypointPoly forms only: upstream deletes the template siblings so a typed waypoint is never
