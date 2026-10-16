@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 
 import audit_types
 from audit_ownership import (
@@ -32,6 +33,7 @@ from audit_parse import (
     Kind,
     audited_headers,
     binding_module,
+    bound_classes,
     cpp_api,
     decl_names,
     direct_include_spellings,
@@ -368,13 +370,14 @@ def _py_member(name: str, py: PyApi, stub_roots: Sequence[Path] = (SRC,)) -> PyS
     return None
 
 
-def _binding_stub(name: str, stub_rel: str, stub_roots: Sequence[Path]) -> PyApi | None:
-    """The other extension's stub under `stub_roots` declaring top-level class `name`, or None."""
+def _binding_stub(name: str, stub_rel: str, stub_roots: Sequence[Path]) -> tuple[str, PyApi] | None:
+    """The other extension's module (the stub's stem without `_`) and stub under `stub_roots`
+    declaring top-level class `name`, or None."""
     if "." in name:
         return None
     return next(
         (
-            api
+            (stub.stem.removeprefix("_"), api)
             for root in stub_roots
             for stub in _stubs_under(root)
             if rel(stub) != stub_rel and name in (api := _stub_py_api(stub)).symbols
@@ -383,16 +386,53 @@ def _binding_stub(name: str, stub_rel: str, stub_roots: Sequence[Path]) -> PyApi
     )
 
 
+# Module -> its `bound_classes` (top-level Python class name -> qualified C++ class).
+BoundLookup = Callable[[str], Mapping[str, str]]
+NO_ALIAS: Mapping[str, str] = MappingProxyType({})
+
+
+def no_bound(module: str) -> Mapping[str, str]:
+    """A lookup that knows no binding: classes keep their by-name identity."""
+    return NO_ALIAS
+
+
+@functools.cache
+def _bound_classes_of(cpp: Path, extra_include_dirs: tuple[Path, ...]) -> Mapping[str, str]:
+    """`bound_classes` of one binding source, parsed with bodies once per audit run."""
+    return MappingProxyType(bound_classes(parse_tu(cpp, extra_include_dirs, bodies=True)))
+
+
+@functools.cache
+def bound_index(module: str) -> Mapping[str, str]:
+    """`bound_classes` of a binding module's TU; empty for any other name (a fixture stub)."""
+    if module not in binding_modules():
+        return NO_ALIAS
+    return _bound_classes_of(binding_source(module), ())
+
+
+def _same_class(known: str | None, qualified: str) -> bool:
+    """Positive evidence only: two classes differ when both qualified names are known."""
+    return known is None or not qualified or known == qualified
+
+
+def _renamed(name: str, alias: Mapping[str, str]) -> str:
+    """`name` with its top-level class replaced through `alias` (C++ <-> Python name)."""
+    top, dot, rest = name.partition(".")
+    return alias.get(top, top) + dot + rest
+
+
 @functools.cache
 def _stubs_under(root: Path) -> tuple[Path, ...]:
     """Every extension stub (`_<module>.pyi`) below `root`, listed once per audit run."""
     return tuple(sorted(root.rglob("_*.pyi")))
 
 
-def _ancestor_missing(name: str, cpp: dict[str, CppSymbol], py: PyApi) -> bool:
+def _ancestor_missing(
+    name: str, cpp: dict[str, CppSymbol], py: PyApi, alias: Mapping[str, str] = NO_ALIAS
+) -> bool:
     parts = name.split(".")
     owners = (".".join(parts[:i]) for i in range(1, len(parts)))
-    return any(o in cpp and o not in py.symbols for o in owners)
+    return any(o in cpp and _renamed(o, alias) not in py.symbols for o in owners)
 
 
 def match(
@@ -403,32 +443,49 @@ def match(
     stub_rel: str,
     stub_roots: Sequence[Path] = (SRC,),
     ancestors: Ancestors = NO_ANCESTORS,
+    bound: BoundLookup = no_bound,
 ) -> ModuleReport:
     """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`,
-    C++ class ancestry (`audit_types.class_ancestors`) lets a subclass bind a base parameter."""
+    C++ class ancestry (`audit_types.class_ancestors`) lets a subclass bind a base parameter.
+
+    Classes are identified by qualified C++ name through `bound` (module -> its
+    `bound_classes`): a class this module binds under another Python name is compared as that
+    name, and a class another stub declares under its leaf is bound there only if that
+    module's binding does not demonstrably bind a different class under it.
+    """
     gaps: list[Gap] = []
     accepted: list[Accepted] = []
     covered = 0
     fallbacks = 0
-    # Top-level classes this stub lacks but another extension binds: their members are
-    # compared against that extension's stub (#232).
-    elsewhere = {
-        name: api
+    renamed = {q: p for p, q in bound(module).items()}
+    # Top-level C++ classes this module binds under another Python name: C++ -> Python name.
+    alias = {
+        name: renamed[sym.qualified]
         for name, sym in cpp.items()
-        if sym.kind is Kind.CLASS
-        and name not in py.symbols
-        and (api := _binding_stub(name, stub_rel, stub_roots)) is not None
+        if sym.kind in (Kind.CLASS, Kind.ENUM)
+        and "." not in name
+        and renamed.get(sym.qualified, name) != name
     }
+    unalias = {p: c for c, p in alias.items()}
+    # Top-level classes this stub lacks but another extension binds: their members are
+    # compared against that extension's stub (#232). An own rename wins over a leaf hit there.
+    elsewhere: dict[str, PyApi] = {}
+    for name, sym in cpp.items():
+        if sym.kind is not Kind.CLASS or name in alias or name in py.symbols:
+            continue
+        found = _binding_stub(name, stub_rel, stub_roots)
+        if found is not None and _same_class(bound(found[0]).get(name), sym.qualified):
+            elsewhere[name] = found[1]
     for name, sym in cpp.items():
         top, dot, _ = name.partition(".")
         api = elsewhere.get(top, py) if dot else py
-        if _ancestor_missing(name, cpp, api):
+        if _ancestor_missing(name, cpp, api, alias):
             continue  # the missing class is the one row
-        ps = _py_member(name, api, stub_roots)
+        ps = _py_member(_renamed(name, alias), api, stub_roots)
         if ps is None:
             owner, _, leaf = name.rpartition(".")
             dunder = PROTOCOL_MEMBERS.get(leaf)
-            if dunder and _py_member(f"{owner}.{dunder}", api, stub_roots):
+            if dunder and _py_member(f"{_renamed(owner, alias)}.{dunder}", api, stub_roots):
                 covered += 1  # the dunder's own row names the rule
             elif rule := ACCEPTED_SYMBOLS.get((module, name)):
                 accepted.append(Accepted(name, rule, sym.location))
@@ -458,6 +515,7 @@ def match(
         where = f"{stub_rel}:{ps.line}"
         rule = ACCEPTED_SYMBOLS.get((module, name))
         owner, _, leaf = name.rpartition(".")
+        cname = _renamed(name, unalias)  # the C++ name of a member of a renamed class
         if ps.enum_alias:
             found = None  # a second name for an enum value, even if C++ has it unscoped
         elif (
@@ -467,8 +525,8 @@ def match(
         ):
             accepted.append(Accepted(name, "value-equality-unhashable", where))
             continue
-        elif ps.kind is Kind.PROTOCOL and name not in cpp:
-            proto = _protocol_rule(name, cpp, tu_names)
+        elif ps.kind is Kind.PROTOCOL and cname not in cpp:
+            proto = _protocol_rule(cname, cpp, tu_names)
             if proto:
                 accepted.append(Accepted(name, proto, where))
                 continue
@@ -485,9 +543,9 @@ def match(
             else:
                 deviations.append(Deviation(name, ps.kind, where))
             continue
-        if name in cpp and cpp[name].overloads:
+        if cname in cpp and cpp[cname].overloads:
             for p in ps.overloads:
-                if not any(_cover(ov, [p], ancestors) is not None for ov in cpp[name].overloads):
+                if not any(_cover(ov, [p], ancestors) is not None for ov in cpp[cname].overloads):
                     deviations.append(
                         Deviation(name, Kind.OVERLOAD, f"{stub_rel}:{p.line}", str(p.arity))
                     )
@@ -577,6 +635,7 @@ def audit_tu(
     other_bindings: Sequence[Path] = (),
     stub_roots: Sequence[Path] = (SRC,),
     prefixes: Mapping[str, tuple[str, ...]] | None = None,
+    bound: BoundLookup | None = None,
 ) -> ModuleReport:
     """Audit one translation unit against one stub and package `__init__.py`.
 
@@ -587,6 +646,8 @@ def audit_tu(
     another module's prefix (`prefixes`: module → prefixes, for ownership) that this binding
     #includes and its owner's binding does not is audited here when this module is its auditor.
     Stub base classes bound in other extensions resolve through stubs under `stub_roots`.
+    Class identity (`match`'s `bound`) defaults to this binding's own `bound_classes` and
+    `bound_index` for every other module.
 
     Raises:
         PrefixMismatchError: `prefixes` holds `module` with other prefixes than `prefix`.
@@ -597,6 +658,12 @@ def audit_tu(
             f"{module}: prefix {prefix} disagrees with prefixes[{module!r}] = {prefixes[module]}"
         )
     prefixes = {**(prefixes or {}), module: prefix}
+    if bound is None:
+        own = _bound_classes_of(cpp_path, tuple(extra_include_dirs))
+
+        def bound(m: str) -> Mapping[str, str]:
+            return own if m == module else bound_index(m)
+
     tu = parse_tu(cpp_path, extra_include_dirs)
     direct = audited_headers(tu, module, prefixes, include_dirs)
     other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
@@ -626,6 +693,7 @@ def audit_tu(
         rel(stub_path),
         stub_roots,
         audit_types.class_ancestors(tu),
+        bound,
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}
     report.gaps = sorted(
