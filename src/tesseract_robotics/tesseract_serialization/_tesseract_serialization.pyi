@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_environment._tesseract_environment
 import tesseract_robotics.tesseract_state_solver._tesseract_state_solver
+import tesseract_robotics.tesseract_task_composer._tesseract_task_composer
 
 
 def composite_instruction_to_xml(instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction) -> str:
@@ -68,3 +69,23 @@ def scene_state_to_binary(state: tesseract_robotics.tesseract_state_solver._tess
 
 def scene_state_from_binary(data: Sequence[int]) -> tesseract_robotics.tesseract_state_solver._tesseract_state_solver.SceneState:
     """Deserialize SceneState from binary data."""
+
+def task_composer_log_to_xml(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog) -> str:
+    """
+    Serialize TaskComposerLog to XML string: description, initial data, context and dot graph.
+    """
+
+def task_composer_log_from_xml(xml: str) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
+    """Deserialize TaskComposerLog from XML string."""
+
+def task_composer_log_to_file(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog, path: str) -> bool:
+    """Save TaskComposerLog to XML file."""
+
+def task_composer_log_from_file(path: str) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
+    """Load TaskComposerLog from XML file."""
+
+def task_composer_log_to_binary(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog) -> list[int]:
+    """Serialize TaskComposerLog to binary data."""
+
+def task_composer_log_from_binary(data: Sequence[int]) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
+    """Deserialize TaskComposerLog from binary data."""
