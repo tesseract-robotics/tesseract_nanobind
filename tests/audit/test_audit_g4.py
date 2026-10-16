@@ -19,15 +19,6 @@ CORE_FACTORY_INTERFACES = (
     (COLLISION, "DiscreteContactManagerFactory"),
     (COLLISION, "ContinuousContactManagerFactory"),
 )
-TCP_PROFILES = (
-    "ContactCheckProfile",
-    "FixStateBoundsProfile",
-    "FixStateCollisionProfile",
-    "KinematicLimitsCheckProfile",
-    "MinLengthProfile",
-    "ProfileSwitchProfile",
-    "UpsampleTrajectoryProfile",
-)
 TC_NOT_API = (
     "tesseract/task_composer/task_composer_plugin_factory_utils.h",
     "tesseract/task_composer/task_composer_task_plugin_factory.h",
@@ -37,6 +28,24 @@ TC_NOT_API = (
 )
 TC_PREFIX = "tesseract/task_composer/"
 TCP_PREFIX = "tesseract/task_composer/planning/"
+ANY_POLY_H = "tesseract/common/any_poly.h"
+# Location of each tcp profile's `(YAML::Node, ProfilePluginFactory)` ctor (C6 = 6a: gap rows).
+TCP_PROFILE_YAML_CTORS = {
+    "ContactCheckProfile": "contact_check_profile.h:51",
+    "FixStateBoundsProfile": "fix_state_bounds_profile.h:58",
+    "FixStateCollisionProfile": "fix_state_collision_profile.h:75",
+    "KinematicLimitsCheckProfile": "kinematic_limits_check_profile.h:42",
+    "MinLengthProfile": "min_length_profile.h:52",
+    "ProfileSwitchProfile": "profile_switch_profile.h:47",
+    "UpsampleTrajectoryProfile": "upsample_trajectory_profile.h:49",
+}
+# Header rows left after the not-API patterns: binding-fix I-tc-17, I-tc-19 (ledger tc 110-114).
+TC_HEADER_GAPS = {
+    f"{TC_PREFIX}task_composer_graph.h",
+    f"{TC_PREFIX}task_composer_log.h",
+    f"{TC_PREFIX}task_composer_pipeline.h",
+    f"{TC_PREFIX}task_composer_task.h",
+}
 
 
 @pytest.fixture(scope="module")
@@ -98,8 +107,18 @@ def test_core_factory_interfaces_accepted(core_reports, module, symbol):
     assert symbol not in {g.symbol for g in report.gaps}
 
 
+def test_any_poly_ctor_rules_by_location(g4_reports):
+    """Each AnyPoly ctor gets its own rule; the overload-table key "1" must not hide :121/:138."""
+    accepted = g4_reports[TC].accepted
+    assert sorted((a.rule, a.location) for a in accepted if a.symbol == "AnyPoly.__init__") == [
+        ("template-instance-name", f"{ANY_POLY_H}:121"),
+        ("template-instance-name", f"{ANY_POLY_H}:138"),
+        ("type-erasure-interface", f"{ANY_POLY_H}:115"),
+    ]
+
+
 def test_any_poly_rows_left_are_value_equality_only(g4_reports):
-    """What remains of AnyPoly: `__eq__`/`__ne__` (g1/00-value-equality.md), `getTypeName` (I-tc-15)."""
+    """Left of AnyPoly: `__eq__`/`__ne__` (g1/00-value-equality.md), `getTypeName` (I-tc-15)."""
     report = g4_reports[TC]
     prefixes = ("AnyPoly", "AnyInterface", "AnyWrapper")
     assert {g.symbol for g in report.gaps if g.symbol.startswith(prefixes)} == {
@@ -120,18 +139,19 @@ def test_executor_run_context_overload_still_matched(g4_reports):
 
 
 def test_plugin_factory_yaml_ctor_keeps_yaml_node(g4_reports):
-    """`TaskComposerPluginFactory(YAML::Node, locator)` has a bound `(str, locator)` sibling (T1)."""
+    """`TaskComposerPluginFactory(YAML::Node, locator)` has a bound `(str, locator)` sibling."""
     assert ("TaskComposerPluginFactory.__init__", "yaml-node") in {
         (a.symbol, a.rule) for a in g4_reports[TC].accepted
     }
 
 
-@pytest.mark.parametrize("profile", TCP_PROFILES)
-def test_tcp_profile_yaml_ctor_is_a_gap(g4_reports, profile):
-    """C6 = 6a: no `from_yaml` sibling yet, so the YAML ctor is binding-fix g3/08-profile-yaml.md."""
+@pytest.mark.parametrize(("profile", "where"), TCP_PROFILE_YAML_CTORS.items())
+def test_tcp_profile_yaml_ctor_is_a_gap(g4_reports, profile, where):
+    """C6 = 6a: no `from_yaml` sibling yet; the YAML ctor is binding-fix #331 (g3/08)."""
     report = g4_reports[TCP]
     symbol = f"{profile}.__init__"
-    assert symbol in {g.symbol for g in report.gaps}
+    location = f"{TCP_PREFIX}profiles/{where}"
+    assert (symbol, location) in {(g.symbol, g.location) for g in report.gaps}
     assert (symbol, "yaml-node") not in {(a.symbol, a.rule) for a in report.accepted}
 
 
@@ -143,6 +163,13 @@ def test_tc_not_api_headers_have_no_rows(g4_reports):
     assert f"{TCP_PREFIX}planning_task_composer_plugin_factories.h" not in {
         g.symbol for g in g4_reports[TCP].gaps
     }
+
+
+def test_header_rows_left_exact(g4_reports):
+    """Absence alone would also pass if every header row vanished."""
+    header = audit.Kind.HEADER
+    assert {g.symbol for g in g4_reports[TC].gaps if g.kind == header} == TC_HEADER_GAPS
+    assert {g.symbol for g in g4_reports[TCP].gaps if g.kind == header} == set()
 
 
 def test_tc_patterns_do_not_reach_planning(monkeypatch, g4_reports):
