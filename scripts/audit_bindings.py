@@ -26,7 +26,7 @@ from audit_ownership import (
     check_coverage,
     coverage,
 )
-from audit_report import REPORT_PATH, provenance, render_markdown, to_json
+from audit_report import REPORT_PATH, load_ledger, provenance, render_markdown, to_json
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -39,13 +39,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     check_coverage(binding_modules())
+    ledger = load_ledger()
     modules = sorted(resolve_module(m) for m in args.modules)
     reports = [audit_module(m) for m in modules]
     prov = provenance(modules)
     cov = coverage()
-    REPORT_PATH.write_text(render_markdown(reports, prov, cov), encoding="utf-8")
+    REPORT_PATH.write_text(render_markdown(reports, prov, cov, ledger), encoding="utf-8")
     if args.json:
-        args.json.write_text(to_json(reports, prov, cov), encoding="utf-8")
+        args.json.write_text(to_json(reports, prov, cov, ledger), encoding="utf-8")
     print(f"{len(reports)} modules → {REPORT_PATH.relative_to(REPO_ROOT)}")
     return 0
 
