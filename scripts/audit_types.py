@@ -78,6 +78,18 @@ def record_path(decl: ci.Cursor) -> str:
     return ".".join(reversed(parts))
 
 
+def qualified_path(decl: ci.Cursor) -> str:
+    """`record_path` behind its enclosing namespaces (`trajopt_ifopt::Var`,
+    `tesseract::geometry::PointCloud.Point`): one name per C++ class, unlike the leaf."""
+    namespaces = []
+    parent = decl.semantic_parent
+    while parent is not None and parent.kind != ci.CursorKind.TRANSLATION_UNIT:
+        if parent.kind == ci.CursorKind.NAMESPACE:
+            namespaces.append(parent.spelling)
+        parent = parent.semantic_parent
+    return "::".join([*reversed(namespaces), record_path(decl)])
+
+
 def _top_namespace(decl: ci.Cursor) -> str | None:
     """The outermost namespace of a declaration (`std` for `std::__1::vector`)."""
     top = None
