@@ -417,7 +417,7 @@ class TestRuckigTrajectorySmoothing:
 
 
 # ---------------------------------------------------------------------------
-# #261: value equality on the profiles
+# #261: value equality on the profiles; #273: createKey()
 # ---------------------------------------------------------------------------
 
 # (class, field, value that differs from the default)
@@ -442,3 +442,13 @@ def test_profile_value_equality(cls, field, value):
     assert not (a == b)
     with pytest.raises(TypeError):
         hash(a)
+
+
+@pytest.mark.parametrize("cls", [c for c, _, _ in PROFILE_FIELD_CHANGES], ids=lambda c: c.__name__)
+def test_profile_create_key_matches_instance_key(cls):
+    assert cls.createKey() == cls().getKey()
+
+
+def test_profile_create_keys_distinct():
+    keys = {c.createKey() for c, _, _ in PROFILE_FIELD_CHANGES}
+    assert len(keys) == len(PROFILE_FIELD_CHANGES)
