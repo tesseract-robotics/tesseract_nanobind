@@ -10,6 +10,7 @@
 
 - **TrajOpt-Ifopt and Descartes planners are `MotionPlanner`s** — `TrajOptIfoptMotionPlanner` and `DescartesMotionPlannerD` derive from `tesseract_motion_planners.MotionPlanner`; `getName`/`solve`/`terminate`/`clear`/`clone` are the base's (its `solve` releases the GIL) ([#299]).
 - **The Descartes stub names `Environment`** — the binding imports `tesseract_environment`, so `DescartesMoveProfileD.create*` no longer quote `"tesseract::environment::Environment"` ([#300]).
+- **The TrajOpt-Ifopt term factories** — `createJointPositionConstraint`, `createCollisionConstraints`, `createJointVelocityConstraint`, `createJointAccelerationConstraint`, `createJointJerkConstraint` from `trajopt_ifopt_utils.h`; an empty or `None`-holding `vars` raises ([#309]).
 - **`DescartesStateSampleD(state)` and `str()` on Descartes waypoint samplers** — the one-argument constructor (cost 0) and `__str__` from upstream's `print` ([#310]).
 - **Descartes tool-pose samplers** — `sampleFixed`, `sampleToolAxis`, `sampleToolXAxis`, `sampleToolYAxis`, `sampleToolZAxis`, returning `tesseract_common.VectorIsometry3d` ([#311]).
 - **`createKey()` on the TrajOpt-Ifopt and Descartes profile bases** — `TrajOptIfopt{Move,Composite,Solver}Profile.createKey()` and `Descartes{Move,Solver}ProfileD.createKey()` return the key every profile of that kind carries; subclasses inherit it ([#273]).
@@ -562,5 +563,6 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273
 [#299]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/299
 [#300]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/300
+[#309]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/309
 [#310]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/310
 [#311]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/311

@@ -239,6 +239,41 @@ success. `ITERATION_LIMIT`, `PENALTY_ITERATION_LIMIT`, `OPT_TIME_LIMIT`, `QP_SOL
 and `CALLBACK_STOPPED` each name why it stopped. A run can stop with constraints still
 violated, so check `problem.getExactConstraintViolations()` before using the result.
 
+### The planner's term factories
+
+The planner builds its terms with five factories, bound under their C++ names. A hand-built
+problem that uses them gets the planner's coefficients and sparsity choices:
+
+| Factory | Builds |
+|---|---|
+| `createJointPositionConstraint(joint_waypoint, var, coeffs)` | `JointPosConstraint`: the waypoint's position, or its tolerance band |
+| `createCollisionConstraints(vars, env, manip_info, config, fixed_indices, fixed_sparsity)` | One collision set per unfixed step (`DISCRETE`) or per segment (`LVS_DISCRETE`, `LVS_CONTINUOUS`, `CONTINUOUS`); none for `NONE` |
+| `createJointVelocityConstraint(target, vars, coeffs)` | `JointVelConstraint` |
+| `createJointAccelerationConstraint(target, vars, coeffs)` | `JointAccelConstraint` |
+| `createJointJerkConstraint(target, vars, coeffs)` | `JointJerkConstraint` |
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    createCollisionConstraints,
+    createJointVelocityConstraint,
+)
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract_robotics.trajopt_sqp import CostPenaltyType
+
+vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
+for constraint in createCollisionConstraints(
+    vars_list, env, manip_info, TrajOptCollisionConfig(0.1, 10.0), [0], False
+):
+    problem.addConstraintSet(constraint)
+problem.addCostSet(
+    createJointVelocityConstraint(np.zeros(n_joints), vars_list, np.ones(n_joints)),
+    CostPenaltyType.SQUARED,
+)
+```
+
+An empty `vars` raises `ValueError`, a `None` in it `TypeError`.
+
 ## Python Subclassing
 
 You can subclass `ConstraintSet` from Python to define custom constraints — the

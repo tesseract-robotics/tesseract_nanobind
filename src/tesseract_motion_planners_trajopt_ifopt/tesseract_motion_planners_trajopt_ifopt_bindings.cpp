@@ -25,6 +25,18 @@
 #include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_composite_profile.h>
 #include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h>
 #include <tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_waypoint_config.h>
+#include <tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_utils.h>
+
+// types named by the profile hooks and the term factories
+#include <tesseract/command_language/poly/joint_waypoint_poly.h>
+#include <tesseract/command_language/poly/move_instruction_poly.h>
+#include <tesseract/common/manipulator_info.h>
+#include <tesseract/environment/environment.h>
+#include <trajopt_ifopt/core/constraint_set.h>
+#include <trajopt_ifopt/variable_sets/node.h>
+#include <trajopt_ifopt/variable_sets/var.h>
+#include <trajopt_sqp/sqp_callback.h>
+#include <trajopt_sqp/trust_region_sqp_solver.h>
 
 // trajopt_common for collision config
 #include <trajopt_common/collision_types.h>
@@ -37,6 +49,32 @@
 
 namespace tp = tesseract::motion_planners;
 namespace tc = tesseract::common;
+namespace ti = trajopt_ifopt;
+
+namespace {
+using ConstraintSets = std::vector<std::shared_ptr<ti::ConstraintSet>>;
+using ConstVars = std::vector<std::shared_ptr<const ti::Var>>;
+
+// upstream asserts !vars.empty() and then reads vars.front(); release builds have no assert.
+const ConstVars& require_vars(const ConstVars& vars, const char* caller) {
+    require_non_null(vars, caller, "vars", "Var");
+    if (vars.empty())
+        throw std::invalid_argument(std::string(caller) + ": vars is empty");
+    return vars;
+}
+
+// One read-write list property per TrajOptIfoptTermInfos field. The list is copied on access
+// (assign the whole list); None elements are rejected, upstream dereferences every set.
+template <ConstraintSets tp::TrajOptIfoptTermInfos::*Field>
+void def_term_list(nb::class_<tp::TrajOptIfoptTermInfos>& cls, const char* name) {
+    cls.def_prop_rw(
+        name,
+        [](const tp::TrajOptIfoptTermInfos& self) { return self.*Field; },
+        [name](tp::TrajOptIfoptTermInfos& self, const ConstraintSets& sets) {
+            self.*Field = require_non_null(sets, "TrajOptIfoptTermInfos", name, "ConstraintSet");
+        });
+}
+}  // namespace
 
 NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     m.doc() = "tesseract_motion_planners_trajopt_ifopt Python bindings";
@@ -46,6 +84,10 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
 
     // Import MotionPlanner base type (TrajOptIfoptMotionPlanner's base)
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
+    // Environment, ManipulatorInfo and JointWaypointPoly in the hook and factory signatures
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
 
     // ========== trajopt_common::TrajOptCollisionConfig ==========
     // Owned by the trajopt_ifopt module; import so the composite profile's
@@ -217,6 +259,40 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         dict.addProfile(ns, profile_name, profile);
     }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
     "Add TrajOptIfopt solver profile to ProfileDictionary");
+
+    // ========== Term factories (trajopt_ifopt_utils.h) ==========
+    // The planner's own term set-up; a hand-built TrajOptQPProblem gets the same sets.
+    // copyOSQPEigenSettings takes the unbound OsqpEigen::Settings and stays unbound.
+    m.def("createJointPositionConstraint", &tp::createJointPositionConstraint,
+          "joint_waypoint"_a, "var"_a, "coeffs"_a,
+          "Joint position constraint at a waypoint: equality to its position, or its tolerance band");
+    m.def("createCollisionConstraints",
+          [](const ConstVars& vars, const std::shared_ptr<const tesseract::environment::Environment>& env,
+             const tc::ManipulatorInfo& manip_info, const trajopt_common::TrajOptCollisionConfig& config,
+             const std::vector<int>& fixed_indices, bool fixed_sparsity) {
+              return tp::createCollisionConstraints(require_vars(vars, "createCollisionConstraints"), env,
+                                                    manip_info, config, fixed_indices, fixed_sparsity);
+          },
+          "vars"_a, "env"_a, "manip_info"_a, "config"_a, "fixed_indices"_a, "fixed_sparsity"_a,
+          "Collision constraint sets of config's collision check type: one per unfixed step (DISCRETE)\n"
+          "or one per segment (LVS_DISCRETE, LVS_CONTINUOUS, CONTINUOUS); none for NONE");
+    m.def("createJointVelocityConstraint",
+          [](const Eigen::Ref<const Eigen::VectorXd>& target, const ConstVars& vars, const Eigen::VectorXd& coeffs) {
+              return tp::createJointVelocityConstraint(target, require_vars(vars, "createJointVelocityConstraint"),
+                                                       coeffs);
+          },
+          "target"_a, "vars"_a, "coeffs"_a, "Joint velocity constraint over vars toward target");
+    m.def("createJointAccelerationConstraint",
+          [](const Eigen::Ref<const Eigen::VectorXd>& target, const ConstVars& vars, const Eigen::VectorXd& coeffs) {
+              return tp::createJointAccelerationConstraint(
+                  target, require_vars(vars, "createJointAccelerationConstraint"), coeffs);
+          },
+          "target"_a, "vars"_a, "coeffs"_a, "Joint acceleration constraint over vars toward target");
+    m.def("createJointJerkConstraint",
+          [](const Eigen::Ref<const Eigen::VectorXd>& target, const ConstVars& vars, const Eigen::VectorXd& coeffs) {
+              return tp::createJointJerkConstraint(target, require_vars(vars, "createJointJerkConstraint"), coeffs);
+          },
+          "target"_a, "vars"_a, "coeffs"_a, "Joint jerk constraint over vars toward target");
 
     // ========== TrajOptIfoptMotionPlanner ==========
     // getName/solve/terminate/clear/clone are MotionPlanner's (solve releases the GIL there)
