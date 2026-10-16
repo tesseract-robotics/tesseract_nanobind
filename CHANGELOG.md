@@ -61,6 +61,8 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
   | --- | --- |
   | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
 
+- **`assign*Waypoint` and `ProfileDictionary_addProfile` removed** — `MoveInstruction` and `MoveInstructionPoly` lose `assignCartesianWaypoint`, `assignJointWaypoint` and `assignStateWaypoint`, SWIG-era copies of `setWaypoint` (C++ 0.33 removed them); `tesseract_command_language.ProfileDictionary_addProfile(d, ns, name, p)` is gone, since `d.addProfile(ns, name, p)` takes every module's profiles. Nothing in the repository called them ([#276]).
+
 ### Changes
 
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
@@ -786,3 +788,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#337]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/337
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
 [#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275
+[#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276

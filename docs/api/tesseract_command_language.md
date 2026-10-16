@@ -305,7 +305,7 @@ Container for planner profiles.
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
-    ProfileDictionary, ProfileDictionary_addProfile
+    ProfileDictionary
 )
 
 profiles = ProfileDictionary()
