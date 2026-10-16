@@ -22,7 +22,7 @@ FIXTURE_THIRD_PARTY = "tests/audit/fixtures/include/thirdparty_fixture/"
 @pytest.fixture(scope="module")
 def solver_report():
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(parse, "UNBOUND_DEPENDENCY_ROOTS", (FIXTURE_THIRD_PARTY,), raising=False)
+        mp.setattr(parse, "UNBOUND_DEPENDENCY_ROOTS", (FIXTURE_THIRD_PARTY,))
         return audit.audit_tu(
             "solver",
             FIXTURES / "solver_bindings.cpp",
@@ -143,8 +143,9 @@ def test_solver_fixture_rows_exact(solver_report):
         ("Engine.settings_", "unbound-dependency-type"),
         ("Engine.tune", "unbound-dependency-type"),
     }
-    # Shift, Engine, their __init__s, Engine.warmStart, Status, and Shift's two in-place operators
-    assert solver_report.covered == 8
+    # Shift, Engine, their __init__s, Engine.warmStart, Status, Shift's two in-place operators,
+    # and Engine.tune: a bound name whose only C++ overload is accepted counts as covered.
+    assert solver_report.covered == 9
 
 
 def test_unbound_dependency_changes_no_core_row(core_and_g1_reports):

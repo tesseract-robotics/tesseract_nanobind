@@ -26,6 +26,7 @@ from audit_ownership import (
 from audit_parse import (
     INCLUDE_DIRS,
     STRINGSTREAM,
+    UNBOUND_DEPENDENCY,
     Arity,
     CppOverload,
     CppSymbol,
@@ -154,6 +155,10 @@ ACCEPTED = {
     "the `k` (`kLowerBound` → `LOWER_BOUND`, `kQPSolveFailed` → `QP_SOLVE_FAILED`), the Python "
     "enum convention every tesseract enum follows; an enumerator bound under any other name stays "
     "a gap and a deviation.",
+    UNBOUND_DEPENDENCY: "A parameter, return or field typed by a third-party library that no "
+    "module binds (`OsqpEigen::Settings`, `OsqpEigen::Solver`) has no Python form; the owning "
+    "object exposes what Python needs instead, such as `OSQPEigenSolver`'s `set…` forwarders "
+    "into its OSQP settings (`setPolish`, `setWarmStart(bool)`, `setMaxIteration`, …).",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -425,7 +430,7 @@ def _k_alias(name: str) -> str | None:
 
 
 # Rules that also accept a symbol that is entirely unbound.
-WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index"})
+WHOLE_SYMBOL_ABSENT_OK = frozenset({"type-index", UNBOUND_DEPENDENCY})
 
 
 def _whole_symbol_rule(sym: CppSymbol) -> str | None:

@@ -454,6 +454,31 @@ def _is_yaml_node(parm: ci.Cursor) -> bool:
     return t.spelling.removeprefix("const ") == YAML_NODE
 
 
+# Header roots of third-party libraries the bindings never bind: a type declared under one has
+# no Python form (spec D8). G3 adds `ompl/`; Eigen, std and boost have casters and are absent.
+UNBOUND_DEPENDENCY_ROOTS = ("OsqpEigen/",)
+UNBOUND_DEPENDENCY = "unbound-dependency-type"
+
+
+def _names_unbound_dependency(t: ci.Type) -> bool:
+    """Whether `t`, through pointers, references and template arguments, names a type declared
+    under an `UNBOUND_DEPENDENCY_ROOTS` header (`std::unique_ptr<OsqpEigen::Solver>`)."""
+    t = t.get_canonical()
+    while t.kind in (ci.TypeKind.POINTER, ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
+        t = t.get_pointee().get_canonical()
+    decl = t.get_declaration()
+    if decl.location.file is not None:
+        path = Path(decl.location.file.name).resolve()
+        # `header_rel` spells only the conda and repo trees; the SDK's libc++ is in neither.
+        spelled = path.is_relative_to(CONDA_INCLUDE) or path.is_relative_to(REPO_ROOT)
+        if spelled and header_rel(path).startswith(UNBOUND_DEPENDENCY_ROOTS):
+            return True
+    return any(
+        _names_unbound_dependency(t.get_template_argument_type(i))
+        for i in range(max(0, t.get_num_template_arguments()))
+    )
+
+
 # The key of a `(const uint8_t*, size_t)` pair: one Python `bytes` argument.
 BYTES_KEYS = frozenset({("bytes",)})
 
@@ -540,6 +565,9 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         arity = Arity(n - n_default, n)
         void = c.result_type.kind == ci.TypeKind.VOID
         absent_ok = nullary_absent_ok if arity.hi == 0 else None
+        # Structural rules first, `yaml-node` last: it wins.
+        if any(_names_unbound_dependency(p.type) for p in params):
+            absent_ok = UNBOUND_DEPENDENCY
         if any(_is_yaml_node(p) for p in params):
             absent_ok = "yaml-node"
         raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
@@ -620,7 +648,9 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 else:
                     add_callable(f"{name}.{m.spelling}", Kind.METHOD, m)
             elif m.kind in FIELD_KINDS:
-                add(f"{name}.{m.spelling}", Kind.FIELD, m)
+                sym = add(f"{name}.{m.spelling}", Kind.FIELD, m)
+                if _names_unbound_dependency(m.type):
+                    sym.absent_ok = UNBOUND_DEPENDENCY
             elif m.kind in RECORD_KINDS and m.is_definition():
                 add_record(f"{name}.", m)
             elif m.kind == ci.CursorKind.ENUM_DECL and m.is_definition():
