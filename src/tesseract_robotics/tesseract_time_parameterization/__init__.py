@@ -13,4 +13,5 @@ __all__ = [
     "RuckigTrajectorySmoothingCompositeProfile",
     "RuckigTrajectorySmoothing",
     "rescaleTimings",
+    "ScalingsLengthError",
 ]
