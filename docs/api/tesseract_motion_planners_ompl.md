@@ -126,9 +126,10 @@ is not bound: it takes and returns OMPL types.
 
 `solver_config.planners` is the list of configurators, one parallel planner
 each. The default profile holds two `RRTConnectConfigurator`. The list is
-copied on access: `cfg.planners.append(x)` changes the copy, not `cfg`.
-Assign a new list, or use `addPlanner` / `clearPlanners`, which change it in
-place. `len(cfg.planners)` replaces the removed `getNumPlanners()`.
+copied on access; its configurators are shared with the config.
+`cfg.planners.append(x)` changes the copy, not `cfg`, but
+`cfg.planners[0].range = 0.5` changes the configurator `cfg` holds. Assign a
+new list, or use `addPlanner` / `clearPlanners`, which change it in place. `len(cfg.planners)` replaces the removed `getNumPlanners()`.
 
 ```python
 cfg = profile.solver_config

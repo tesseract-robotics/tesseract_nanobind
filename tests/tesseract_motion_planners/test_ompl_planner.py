@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.tesseract_motion_planners_ompl as ompl
-from tesseract_robotics.planning.profiles import create_ompl_planner_configurators
+from tesseract_robotics.planning.profiles import (
+    UnknownConfiguratorFieldError,
+    UnknownPlannerTypeError,
+    create_ompl_planner_configurators,
+)
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly_wrap_CartesianWaypoint,
@@ -200,16 +204,21 @@ class TestPlannerConfigurators:
         assert all(c.goal_bias == 0.2 for c in cfgs[2:])
 
     def test_create_ompl_planner_configurators_rejects_unknown_planner(self):
-        with pytest.raises(ValueError, match="Unknown planner"):
+        with pytest.raises(UnknownPlannerTypeError, match="Unknown planner"):
             create_ompl_planner_configurators(planners=["NotAPlanner"])
 
     def test_create_ompl_planner_configurators_rejects_unused_kwarg(self):
-        with pytest.raises(ValueError, match="goal_bias"):
+        with pytest.raises(UnknownConfiguratorFieldError, match="goal_bias"):
             create_ompl_planner_configurators(planners=["RRTConnect"], goal_bias=0.2)
+
+    def test_create_ompl_planner_configurators_rejects_method_name(self):
+        # A method is an attribute but not a field: only properties are settable.
+        with pytest.raises(UnknownConfiguratorFieldError, match="getType"):
+            create_ompl_planner_configurators(planners=["RRTConnect"], getType=1)
 
 
 class TestSolverConfigPlanners:
-    """#302: OMPLSolverConfig.planners is a readable, copied list."""
+    """#302: OMPLSolverConfig.planners is a readable list, copied on access; its configurators are shared."""
 
     def test_default_profile_planners(self):
         planners = OMPLRealVectorMoveProfile().solver_config.planners
@@ -235,6 +244,12 @@ class TestSolverConfigPlanners:
         cfg = OMPLSolverConfig()
         cfg.planners.append(RRTConnectConfigurator())
         assert len(cfg.planners) == 0
+
+    def test_configurators_are_shared_with_config(self):
+        # The list is a copy, but its elements are the config's own configurators.
+        prof = OMPLRealVectorMoveProfile()
+        prof.solver_config.planners[0].range = 0.77
+        assert prof.solver_config.planners[0].range == 0.77
 
 
 class TestMotionPlannerBase:

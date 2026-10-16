@@ -55,7 +55,7 @@ class OMPLSolverConfig:
     @property
     def planners(self) -> list[OMPLPlannerConfigurator]:
         """
-        Planner configurators, one parallel planner each. The list is copied on access: assign a new list (or use addPlanner/clearPlanners) to change it.
+        Planner configurators, one parallel planner each. The list is copied on access; its configurators are shared with the config, so editing one edits the config. Assign a new list (or use addPlanner/clearPlanners) to change which planners it holds.
         """
 
     @planners.setter
@@ -408,6 +408,8 @@ class OMPLRealVectorMoveProfile(OMPLMoveProfile):
     def from_yaml(config: str) -> OMPLRealVectorMoveProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `solver_config:` starts with no planners (OMPLSolverConfig() holds none).
         """
 
 OMPLRealVectorPlanProfile: TypeAlias = OMPLRealVectorMoveProfile

@@ -42,6 +42,8 @@ class ContactCheckProfile(tesseract_robotics.tesseract_command_language._tessera
     def from_yaml(config: str) -> ContactCheckProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `collision_check_config:` resets type to DISCRETE and longest_valid_segment_length to 0.005, and `contact_manager_config:` resets default_margin to None.
         """
 
 class FixStateBoundsProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -93,6 +95,8 @@ class FixStateBoundsProfile(tesseract_robotics.tesseract_command_language._tesse
     def from_yaml(config: str) -> FixStateBoundsProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
         """
 
 class FixStateCollisionProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -217,6 +221,8 @@ class FixStateCollisionProfile(tesseract_robotics.tesseract_command_language._te
     def from_yaml(config: str) -> FixStateCollisionProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `collision_check_config:` resets contact_request.type to ALL, and `trajopt_joint_constraint_config:` resets coeff to 5. `contact_manager_config:`, `opt_params:` and `osqp_settings:` keep the profile's defaults.
         """
 
 class KinematicLimitsCheckProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -253,6 +259,8 @@ class KinematicLimitsCheckProfile(tesseract_robotics.tesseract_command_language.
     def from_yaml(config: str) -> KinematicLimitsCheckProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
         """
 
 class MinLengthProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -281,6 +289,8 @@ class MinLengthProfile(tesseract_robotics.tesseract_command_language._tesseract_
     def from_yaml(config: str) -> MinLengthProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
         """
 
 class ProfileSwitchProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -305,6 +315,8 @@ class ProfileSwitchProfile(tesseract_robotics.tesseract_command_language._tesser
     def from_yaml(config: str) -> ProfileSwitchProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
         """
 
 class UpsampleTrajectoryProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -333,4 +345,6 @@ class UpsampleTrajectoryProfile(tesseract_robotics.tesseract_command_language._t
     def from_yaml(config: str) -> UpsampleTrajectoryProfile:
         """
         Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
         """

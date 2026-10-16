@@ -4,7 +4,7 @@
 
 ### Breaking changes
 
-- **`OMPLSolverConfig.getNumPlanners()` removed; `planners` is readable** — `solver_config.planners` binds the configurator list, so Python sees which planners a profile holds, not only how many. The list is copied on access: assign a new list, or use `addPlanner` / `clearPlanners`, which stay as the in-place mutators ([#302]).
+- **`OMPLSolverConfig.getNumPlanners()` removed; `planners` is readable** — `solver_config.planners` binds the configurator list, so Python sees which planners a profile holds, not only how many. The list is copied on access; its configurators are shared with the config, so `cfg.planners[0].range = 0.5` edits the config. To change which planners it holds, assign a new list, or use `addPlanner` / `clearPlanners`, which stay as the in-place mutators ([#302]).
 
   | before | after |
   | --- | --- |

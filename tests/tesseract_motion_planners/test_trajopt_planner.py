@@ -371,10 +371,19 @@ class TestOSQPSettings:
         assert s.check_dualgap == 0
 
     def test_default_constructor_fills_osqp_defaults(self):
+        # osqp_set_default_settings (OSQP 1.x), not trajopt's profile defaults
         s = trajopt.OSQPSettings()
-        assert s.max_iter > 0
-        assert s.eps_abs > 0
-        assert s.rho > 0
+        assert s.max_iter == 4000
+        assert s.eps_abs == 1e-3
+        assert s.eps_rel == 1e-3
+        assert s.polishing == 0
+        profile = trajopt.TrajOptOSQPSolverProfile().settings
+        assert (s.max_iter, s.eps_abs, s.eps_rel, s.polishing) != (
+            profile.max_iter,
+            profile.eps_abs,
+            profile.eps_rel,
+            profile.polishing,
+        )
 
     def test_assign_settings_round_trips(self):
         p = trajopt.TrajOptOSQPSolverProfile()

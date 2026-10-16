@@ -46,7 +46,12 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("collision_check_config", &tp::ContactCheckProfile::collision_check_config)
         .def_static("createKey", &tc::Profile::createKey<tp::ContactCheckProfile>);
     bind_value_equality(contact_check);
-    bind_from_yaml(contact_check);
+    bind_from_yaml(contact_check,
+        "Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that "
+        "struct's own defaults, so fields left out lose the profile's values. This is per "
+        "struct; here `collision_check_config:` resets type to DISCRETE and "
+        "longest_valid_segment_length to 0.005, and `contact_manager_config:` resets "
+        "default_margin to None.");
 
     // ===== FixStateBoundsProfile =====
     nb::class_<tp::FixStateBoundsProfile, tc::Profile> fix_state_bounds(m, "FixStateBoundsProfile");
@@ -64,7 +69,9 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("lower_bounds_reduction", &tp::FixStateBoundsProfile::lower_bounds_reduction)
         .def_static("createKey", &tc::Profile::createKey<tp::FixStateBoundsProfile>);
     bind_value_equality(fix_state_bounds);
-    bind_from_yaml(fix_state_bounds);
+    bind_from_yaml(fix_state_bounds,
+        "No nested sub-configs: every key is a field of the profile itself. Other profiles' "
+        "from_yaml behave per struct.");
 
     // ===== FixStateCollisionProfile =====
     nb::class_<tp::FixStateCollisionProfile, tc::Profile> fix_state_collision(m, "FixStateCollisionProfile");
@@ -104,7 +111,12 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
                 "OSQP settings of the TrajOpt correction solve")
         .def_static("createKey", &tc::Profile::createKey<tp::FixStateCollisionProfile>);
     bind_value_equality(fix_state_collision);
-    bind_from_yaml(fix_state_collision);
+    bind_from_yaml(fix_state_collision,
+        "Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that "
+        "struct's own defaults, so fields left out lose the profile's values. This is per "
+        "struct; here `collision_check_config:` resets contact_request.type to ALL, and "
+        "`trajopt_joint_constraint_config:` resets coeff to 5. `contact_manager_config:`, "
+        "`opt_params:` and `osqp_settings:` keep the profile's defaults.");
 
     // ===== KinematicLimitsCheckProfile =====
     nb::class_<tp::KinematicLimitsCheckProfile, tc::Profile> kinematic_limits_check(m, "KinematicLimitsCheckProfile");
@@ -118,7 +130,9 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("check_acceleration", &tp::KinematicLimitsCheckProfile::check_acceleration)
         .def_static("createKey", &tc::Profile::createKey<tp::KinematicLimitsCheckProfile>);
     bind_value_equality(kinematic_limits_check);
-    bind_from_yaml(kinematic_limits_check);
+    bind_from_yaml(kinematic_limits_check,
+        "No nested sub-configs: every key is a field of the profile itself. Other profiles' "
+        "from_yaml behave per struct.");
 
     // ===== MinLengthProfile =====
     nb::class_<tp::MinLengthProfile, tc::Profile> min_length(m, "MinLengthProfile");
@@ -128,7 +142,9 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("min_length", &tp::MinLengthProfile::min_length)
         .def_static("createKey", &tc::Profile::createKey<tp::MinLengthProfile>);
     bind_value_equality(min_length);
-    bind_from_yaml(min_length);
+    bind_from_yaml(min_length,
+        "No nested sub-configs: every key is a field of the profile itself. Other profiles' "
+        "from_yaml behave per struct.");
 
     // ===== ProfileSwitchProfile =====
     nb::class_<tp::ProfileSwitchProfile, tc::Profile> profile_switch(m, "ProfileSwitchProfile");
@@ -137,7 +153,9 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("return_value", &tp::ProfileSwitchProfile::return_value)
         .def_static("createKey", &tc::Profile::createKey<tp::ProfileSwitchProfile>);
     bind_value_equality(profile_switch);
-    bind_from_yaml(profile_switch);
+    bind_from_yaml(profile_switch,
+        "No nested sub-configs: every key is a field of the profile itself. Other profiles' "
+        "from_yaml behave per struct.");
 
     // ===== UpsampleTrajectoryProfile =====
     nb::class_<tp::UpsampleTrajectoryProfile, tc::Profile> upsample_trajectory(m, "UpsampleTrajectoryProfile");
@@ -147,5 +165,7 @@ NB_MODULE(_tesseract_task_composer_planning, m) {
         .def_rw("longest_valid_segment_length", &tp::UpsampleTrajectoryProfile::longest_valid_segment_length)
         .def_static("createKey", &tc::Profile::createKey<tp::UpsampleTrajectoryProfile>);
     bind_value_equality(upsample_trajectory);
-    bind_from_yaml(upsample_trajectory);
+    bind_from_yaml(upsample_trajectory,
+        "No nested sub-configs: every key is a field of the profile itself. Other profiles' "
+        "from_yaml behave per struct.");
 }

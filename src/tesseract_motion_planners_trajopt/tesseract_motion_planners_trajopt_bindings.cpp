@@ -110,7 +110,11 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         .def_rw("joint_cost_config", &tp::TrajOptDefaultMoveProfile::joint_cost_config)
         .def_rw("joint_constraint_config", &tp::TrajOptDefaultMoveProfile::joint_constraint_config);
     bind_value_equality(default_move_profile);
-    bind_from_yaml(default_move_profile);
+    bind_from_yaml(default_move_profile,
+        "Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that "
+        "struct's own defaults, so fields left out lose the profile's values. This is per "
+        "struct; here `cartesian_cost_config:` and `joint_cost_config:` come back enabled "
+        "(the waypoint config default), where the profile's are disabled.");
 
     // SWIG-compatible alias
     m.attr("TrajOptDefaultPlanProfile") = m.attr("TrajOptDefaultMoveProfile");
@@ -139,7 +143,11 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
                     "length where both are positive, else the positive one, else 0.01 * extent,\n"
                     "with extent = ||upper - lower||.");
     bind_value_equality(default_composite_profile);
-    bind_from_yaml(default_composite_profile);
+    bind_from_yaml(default_composite_profile,
+        "Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that "
+        "struct's own defaults, so fields left out lose the profile's values. This is per "
+        "struct; here `collision_cost_config:` and `collision_constraint_config:` start from "
+        "TrajOptCollisionConfig() defaults.");
 
     // ========== sco::BasicTrustRegionSQPParameters ==========
     nb::class_<sco::BasicTrustRegionSQPParameters> sqp_parameters(m, "BasicTrustRegionSQPParameters");
@@ -248,7 +256,10 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         .def_rw("update_workspace", &tp::TrajOptOSQPSolverProfile::update_workspace,
                 "Update the OSQP workspace for subsequent optimizations, instead of recreating it each time");
     bind_value_equality(osqp_solver_profile);
-    bind_from_yaml(osqp_solver_profile);
+    bind_from_yaml(osqp_solver_profile,
+        "`settings:` and `opt_params:` are merged into the profile's values: keys left out "
+        "keep them (`settings: {max_iter: 321}` keeps eps_abs 1e-4). This is per struct; "
+        "other profiles' from_yaml may replace a nested sub-config instead.");
 
     // Helper to add TrajOpt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptMoveProfile", [](tc::ProfileDictionary& dict,

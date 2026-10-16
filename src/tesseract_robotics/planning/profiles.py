@@ -11,10 +11,27 @@ Also provides helpers for:
 
 from __future__ import annotations
 
+import inspect
 import os
 from typing import Any
 
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
+
+
+class UnknownPlannerTypeError(ValueError):
+    """A planner name is not an `OMPLPlannerType` member."""
+
+
+class UnknownConfiguratorFieldError(ValueError):
+    """A keyword argument is a field of none of the requested OMPL configurators."""
+
+
+def _is_configurator_field(cls: type, key: str) -> bool:
+    """Whether `key` is a bound data field (a property) of configurator class `cls`.
+
+    Methods such as `getType` are attributes too, so `hasattr` would accept them.
+    """
+    return isinstance(inspect.getattr_static(cls, key, None), property)
 
 
 def _get_cpu_count() -> int:
@@ -514,8 +531,9 @@ def create_ompl_planner_configurators(
         List of configured OMPLPlannerConfigurator instances.
 
     Raises:
-        ValueError: A planner name is not an `OMPLPlannerType`, or a keyword
-            argument is a field of none of the requested configurators.
+        UnknownPlannerTypeError: A planner name is not an `OMPLPlannerType`.
+        UnknownConfiguratorFieldError: A keyword argument is a field of none of
+            the requested configurators.
 
     Example:
         ```python
@@ -545,19 +563,21 @@ def create_ompl_planner_configurators(
     planner_types = ompl.OMPLPlannerType.__members__
     unknown = [name for name in planners if name not in planner_types]
     if unknown:
-        raise ValueError(f"Unknown planner: {unknown}. Supported: {', '.join(planner_types)}")
+        raise UnknownPlannerTypeError(
+            f"Unknown planner: {unknown}. Supported: {', '.join(planner_types)}"
+        )
 
     classes = [getattr(ompl, f"{name}Configurator") for name in planners]
-    unused = [key for key in kwargs if not any(hasattr(cls, key) for cls in classes)]
+    unused = [key for key in kwargs if not any(_is_configurator_field(cls, key) for cls in classes)]
     if unused:
-        raise ValueError(f"{unused} is not a field of any of {planners}")
+        raise UnknownConfiguratorFieldError(f"{unused} is not a field of any of {planners}")
 
     configurators = []
     for cls in classes:
         for _ in range(num_planners):
             cfg = cls()
             for key, value in kwargs.items():
-                if hasattr(cls, key):
+                if _is_configurator_field(cls, key):
                     setattr(cfg, key, value)
             configurators.append(cfg)
 
