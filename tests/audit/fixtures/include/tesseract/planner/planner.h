@@ -40,6 +40,21 @@ public:
   Orphan(const std::string& config);
 };
 
+// T1: a YAML-text sibling on a base class (`from_yaml`, C6 6a) does not cover a derived
+// class's YAML ctor: ctors are never inherited, and `from_yaml` is per profile class.
+class BaseProfile
+{
+public:
+  BaseProfile();
+};
+
+class DerivedProfile : public BaseProfile
+{
+public:
+  DerivedProfile();
+  DerivedProfile(const YAML::Node& config);
+};
+
 // Task 4 (R13): third-party and not-API types in parameters, returns and fields.
 class Configurator
 {
