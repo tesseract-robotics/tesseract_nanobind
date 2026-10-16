@@ -919,6 +919,13 @@ def test_members_inherited_from_another_module_stub_are_not_gaps(fixture_report)
     assert {"LostRunner.go", "LostRunner.__call__"} <= gaps
 
 
+def test_base_rows_count_once_in_the_main_fixture(fixture_report):
+    """T5: FastRunner, RemoteRunner (cross-module base, no index entry: leaf) and LostRunner
+    name their bound C++ base Runner, so no base row."""
+    rows = {g.symbol for g in fixture_report.gaps} | {d.name for d in fixture_report.deviations}
+    assert not {r for r in rows if r.endswith("(Runner)")}
+
+
 BOUND_ELSEWHERE = FIXTURES / "bound_elsewhere"
 
 
