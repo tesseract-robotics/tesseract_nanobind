@@ -1,6 +1,7 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
 
 import gc
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -532,7 +533,9 @@ class TestTrajOptIfoptSolverCallbacks:
         # every SQP iteration the solver reached called the callback at least once
         assert set(range(1, max(callback.iterations) + 1)) <= set(callback.iterations)
 
-    def test_callback_returning_false_is_called_each_iteration(self, kuka_iiwa_environment):
+    def test_callback_returning_false_called_once_per_iteration_up_to_max(
+        self, kuka_iiwa_environment
+    ):
         # Whether False stops the solve is upstream's (trajopt 0.35.0 keeps iterating, see
         # docs/user-guide/low-level-sqp.md); the binding guarantees the calls and their arguments.
         t_env, manip_info, joint_names = kuka_iiwa_environment
@@ -540,7 +543,14 @@ class TestTrajOptIfoptSolverCallbacks:
 
         class Recorder(SQPCallback):
             def execute(self, problem, sqp_results):
-                seen.append((problem, sqp_results))
+                # `problem` is valid only during the call: check it here, never keep it.
+                seen.append(
+                    (
+                        sqp_results.overall_iteration,
+                        isinstance(problem, tsqp.QPProblem),
+                        isinstance(sqp_results, tsqp.SQPResults),
+                    )
+                )
                 return False
 
         max_iterations = 5
@@ -552,14 +562,12 @@ class TestTrajOptIfoptSolverCallbacks:
             _request(t_env, manip_info, joint_names, solver_profile)
         )
 
-        iterations = [r.overall_iteration for _, r in seen]
+        iterations = [iteration for iteration, _, _ in seen]
         assert iterations, "the planner never called the Python callback"
         # one call per SQP iteration the solver reached, never past max_iterations
         assert iterations == sorted(set(iterations))
         assert 1 <= iterations[0] and iterations[-1] <= max_iterations
-        for problem, sqp_results in seen:
-            assert isinstance(problem, tsqp.QPProblem)
-            assert isinstance(sqp_results, tsqp.SQPResults)
+        assert all(is_problem and is_results for _, is_problem, is_results in seen)
 
 
 class TestTrajOptIfoptConstraintFactories:
@@ -691,11 +699,13 @@ class TestTrajOptIfoptProfileHooks:
 
     def test_node_keeps_waypoint_info_alive(self, kuka_iiwa_environment):
         t_env, manip_info, joint_names = kuka_iiwa_environment
-        node = (
-            self._move_profile()
-            .create(_joint_move(joint_names, START_POS), manip_info, t_env, 5)
-            .node
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 5
         )
+        refs = sys.getrefcount(info)
+        node = info.node
+        assert sys.getrefcount(info) == refs + 1
+        del info
         gc.collect()
         assert node.getName() == "Node_5"
         np.testing.assert_array_equal(node.getVar("position").value(), START_POS)
@@ -717,6 +727,33 @@ class TestTrajOptIfoptProfileHooks:
         del info
         gc.collect()
         assert len(constraint.getCoefficients()) == len(joint_names)
+
+    def test_python_constraint_set_survives_term_infos(self):
+        class Tagged(ti.ConstraintSet):
+            def __init__(self):
+                super().__init__("tagged", 1)
+                self.tag = "mine"
+
+            def getValues(self):
+                return np.zeros(1)
+
+            def getBounds(self):
+                return [ti.Bounds(0.0, 0.0)]
+
+            def fillJacobianBlock(self, var_set, jac_block):
+                pass
+
+        infos = TrajOptIfoptTermInfos()
+        infos.constraints = [Tagged()]
+        gc.collect()
+        constraint = infos.constraints[0]
+        assert type(constraint) is Tagged
+        assert constraint.tag == "mine"
+        del infos
+        gc.collect()
+        assert type(constraint) is Tagged
+        assert constraint.tag == "mine"
+        np.testing.assert_array_equal(constraint.getValues(), np.zeros(1))
 
     def test_default_waypoint_info_has_no_node(self):
         info = TrajOptIfoptWaypointInfo()
