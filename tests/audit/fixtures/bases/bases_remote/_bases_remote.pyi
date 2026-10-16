@@ -1,0 +1,3 @@
+# Audit contract fixture (#256 T5): another module's stub binding a class under the leaf Runner.
+class Runner:
+    def go(self) -> None: ...
