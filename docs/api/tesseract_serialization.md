@@ -15,6 +15,7 @@ archive formats:
 | `CompositeInstruction` | `composite_instruction_to_xml` / `composite_instruction_from_xml` | `composite_instruction_to_binary` / `composite_instruction_from_binary` | `composite_instruction_to_file` / `composite_instruction_from_file` |
 | `Environment` | `environment_to_xml` / `environment_from_xml` | `environment_to_binary` / `environment_from_binary` | `environment_to_file` / `environment_from_file` |
 | `SceneState` | `scene_state_to_xml` / `scene_state_from_xml` | `scene_state_to_binary` / `scene_state_from_binary` | `scene_state_to_file` / `scene_state_from_file` |
+| `TaskComposerLog` | `task_composer_log_to_xml` / `task_composer_log_from_xml` | `task_composer_log_to_binary` / `task_composer_log_from_binary` | `task_composer_log_to_file` / `task_composer_log_from_file` |
 
 The `*_to_file` / `*_from_file` helpers auto-detect the format from the path
 suffix (`.xml` vs `.bin`).

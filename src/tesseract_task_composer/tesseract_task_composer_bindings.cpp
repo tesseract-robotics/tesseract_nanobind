@@ -24,6 +24,7 @@
 #include <tesseract/task_composer/task_composer_future.h>
 #include <tesseract/task_composer/task_composer_graph.h>
 #include <tesseract/task_composer/task_composer_keys.h>
+#include <tesseract/task_composer/task_composer_log.h>
 #include <tesseract/task_composer/task_composer_node.h>
 #include <tesseract/task_composer/task_composer_node_info.h>
 #include <tesseract/task_composer/task_composer_node_ports.h>
@@ -712,6 +713,28 @@ NB_MODULE(_tesseract_task_composer, m) {
         }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a, nb::keep_alive<0, 1>(), nb::keep_alive<0, 2>())
         .def("getWorkerCount", &Server::getWorkerCount, "name"_a)
         .def("getTaskCount", &Server::getTaskCount, "name"_a);
+
+    // ========== TaskComposerLog ==========
+    // A run recorded for replay. Upstream operator== dereferences `context` unconditionally, so a
+    // log without one (the constructor leaves it null) would crash; compare the pointers' presence
+    // first.
+    auto log_equal = [](const tp::TaskComposerLog& a, const tp::TaskComposerLog& b) {
+        if (a.context == nullptr || b.context == nullptr)
+            return a.context == b.context && a.description == b.description && a.initial_data == b.initial_data &&
+                   a.dotgraph == b.dotgraph;
+        return a == b;
+    };
+    auto log = nb::class_<tp::TaskComposerLog>(m, "TaskComposerLog")
+        .def(nb::init<std::string>(), "desc"_a = "")
+        .def_rw("description", &tp::TaskComposerLog::description)
+        .def_rw("initial_data", &tp::TaskComposerLog::initial_data)
+        .def_rw("context", &tp::TaskComposerLog::context, nb::for_setter(nb::arg("value").none()))
+        .def_rw("dotgraph", &tp::TaskComposerLog::dotgraph)
+        .def("__eq__", log_equal, nb::is_operator())
+        .def("__ne__", [log_equal](const tp::TaskComposerLog& a, const tp::TaskComposerLog& b) {
+            return !log_equal(a, b);
+        }, nb::is_operator());
+    log.attr("__hash__") = nb::none();
 
     // ========== AnyPoly ==========
     // Bind AnyPoly class for type-erased data storage
