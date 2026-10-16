@@ -576,8 +576,11 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
         for m in c.get_children():
             # A constructor template (`template <class It> T(It, It)`) is a FUNCTION_TEMPLATE
             # spelled like the class; it is a constructor, not a method named after the class.
+            # libclang spells a class template's ctor template with its parameters
+            # (`State<FloatType>`, T13)
             is_ctor = m.kind == ci.CursorKind.CONSTRUCTOR or (
-                m.kind == ci.CursorKind.FUNCTION_TEMPLATE and m.spelling == c.spelling
+                m.kind == ci.CursorKind.FUNCTION_TEMPLATE
+                and m.spelling.partition("<")[0] == c.spelling
             )
             if is_ctor:
                 declares_ctor = True
