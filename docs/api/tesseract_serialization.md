@@ -19,9 +19,14 @@ archive formats:
 
 The `*_to_file` / `*_from_file` helpers always write and read XML, whatever the
 path suffix: there is no format detection. For a binary file, write the bytes of
-`*_to_binary` yourself. `task_composer_log_to_file` / `task_composer_log_from_file`
-take a `str` or an `os.PathLike` (`pathlib.Path`); the other `*_file` helpers take
-a `str`.
+`*_to_binary` yourself.
+
+`task_composer_log_to_file` / `task_composer_log_from_file` take a `str` or an
+`os.PathLike` (`pathlib.Path`), write and read exactly that path (upstream appends
+`.tclx` to a path without a suffix; these do not), and raise `OSError`
+(`FileNotFoundError`, `PermissionError`, ...) when the file cannot be written or read;
+`task_composer_log_to_file` returns `None`. The other `*_file` helpers take a `str`
+and return `True` as upstream does.
 
 !!! warning "A `TaskComposerLog` holding planner profiles cannot be serialized"
     The planner profile types (TrajOpt, OMPL, Descartes, ...) are not registered

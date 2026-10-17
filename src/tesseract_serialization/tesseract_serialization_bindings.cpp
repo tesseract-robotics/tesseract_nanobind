@@ -6,6 +6,9 @@
  * recursively handles all nested types - only root entry points needed.
  */
 
+#include <cerrno>
+#include <fstream>
+#include <sstream>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/string.h>
@@ -225,19 +228,38 @@ NB_MODULE(_tesseract_serialization, m)
         nb::arg("xml"),
         "Deserialize TaskComposerLog from XML string.");
 
+    // Upstream's toArchiveFileXML appends `.tclx` to a path without a suffix and ignores a file
+    // that fails to open (an ofstream does not throw); fromArchiveFileXML only asserts the open.
+    // Write and read exactly `path` instead, raising OSError as saveDotgraph does.
     m.def("task_composer_log_to_file",
         [](const TaskComposerLog& log, const std::filesystem::path& path) {
-            return Serialization::toArchiveFileXML(log, path.string());
+            const std::string xml = Serialization::toArchiveStringXML(log);
+            errno = 0;
+            std::ofstream out(path);
+            if (out) out << xml;
+            if (out) out.close();
+            if (!out) {
+                PyErr_SetFromErrnoWithFilename(PyExc_OSError, path.string().c_str());
+                throw nb::python_error();
+            }
         },
         nb::arg("log"), nb::arg("path"),
-        "Save TaskComposerLog to XML file.");
+        "Save TaskComposerLog as XML to `path`, as named. Raises OSError if it cannot be written.");
 
     m.def("task_composer_log_from_file",
         [](const std::filesystem::path& path) {
-            return Serialization::fromArchiveFileXML<TaskComposerLog>(path.string());
+            errno = 0;
+            std::ifstream in(path);
+            if (!in) {
+                PyErr_SetFromErrnoWithFilename(PyExc_OSError, path.string().c_str());
+                throw nb::python_error();
+            }
+            std::ostringstream xml;
+            xml << in.rdbuf();
+            return Serialization::fromArchiveStringXML<TaskComposerLog>(xml.str());
         },
         nb::arg("path"),
-        "Load TaskComposerLog from XML file.");
+        "Load TaskComposerLog from the XML file `path`. Raises OSError if it cannot be read.");
 
     m.def("task_composer_log_to_binary",
         [](const TaskComposerLog& log) {
