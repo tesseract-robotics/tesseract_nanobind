@@ -29,7 +29,7 @@ def test_bound_classes_reads_each_top_level_construction():
     """Renames, template instances, enums and listed bases; the nested `Part` is skipped."""
     tu = audit.parse_tu(FIXTURES / "identity_bindings.cpp", (FIXTURE_INCLUDE,), bodies=True)
     assert audit.bound_classes(tu) == {
-        "Widget": "tesseract::identity::LongWidgetName",
+        "Gizmo": "tesseract::identity::LongWidgetName",
         "GadgetD": "tesseract::identity::Gadget",
         "Color": "tesseract::identity::Color",
         "Derived": "tesseract::identity::Derived",
@@ -110,7 +110,7 @@ def _widget_cpp():
 def _renamed_report(**kw):
     stub = RENAMED / "_renamed.pyi"
     py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
-    bound = {"renamed": {"Widget": "tesseract::w::LongWidgetName"}}
+    bound = {"renamed": {"Gizmo": "tesseract::w::LongWidgetName"}}
     return audit.match(
         "renamed", _widget_cpp(), frozenset({"size", "color"}), py, audit.rel(stub),
         stub_roots=(RENAMED,), bound=lambda m: bound.get(m, {}), **kw,
@@ -120,19 +120,19 @@ def _renamed_report(**kw):
 def test_renamed_class_members_are_compared_against_the_python_class():
     report = _renamed_report()
     assert {g.symbol for g in report.gaps} == {"LongWidgetName.color"}
-    assert {d.name for d in report.deviations} == {"Widget"}  # the rename itself stays visible
-    assert report.covered == 2  # LongWidgetName as Widget, LongWidgetName.size as Widget.size
+    assert {d.name for d in report.deviations} == {"Gizmo"}  # the rename itself stays visible
+    assert report.covered == 2  # LongWidgetName as Gizmo, LongWidgetName.size as Gizmo.size
 
 
 def test_renamed_class_accepted_by_rule(monkeypatch):
-    monkeypatch.setitem(audit.ACCEPTED_SYMBOLS, ("renamed", "Widget"), "template-instance-name")
+    monkeypatch.setitem(audit.ACCEPTED_SYMBOLS, ("renamed", "Gizmo"), "template-instance-name")
     report = _renamed_report()
     assert not report.deviations
-    assert ("Widget", "template-instance-name") in {(a.symbol, a.rule) for a in report.accepted}
+    assert ("Gizmo", "template-instance-name") in {(a.symbol, a.rule) for a in report.accepted}
 
 
 def test_renamed_class_python_only_overload_is_a_deviation():
-    """The deviation loop maps `Widget.size` back to `LongWidgetName.size` to compare overloads."""
+    """The deviation loop maps `Gizmo.size` back to `LongWidgetName.size` to compare overloads."""
     cpp = _widget_cpp()
     unary = [audit.CppOverload(audit.Arity(1, 1), (), f"{HERE}:3")]
     cpp["LongWidgetName.size"] = audit.CppSymbol(
@@ -140,12 +140,12 @@ def test_renamed_class_python_only_overload_is_a_deviation():
     )
     stub = RENAMED / "_renamed.pyi"
     py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
-    bound = {"renamed": {"Widget": "tesseract::w::LongWidgetName"}}
+    bound = {"renamed": {"Gizmo": "tesseract::w::LongWidgetName"}}
     report = audit.match(
         "renamed", cpp, frozenset({"size", "color"}), py, audit.rel(stub),
         stub_roots=(RENAMED,), bound=lambda m: bound.get(m, {}),
     )  # fmt: skip
-    assert ("Widget.size", audit.Kind.OVERLOAD) in {(d.name, d.kind) for d in report.deviations}
+    assert ("Gizmo.size", audit.Kind.OVERLOAD) in {(d.name, d.kind) for d in report.deviations}
 
 
 def _snapshot(qualified, bound):
@@ -169,7 +169,7 @@ def test_same_leaf_different_class_is_not_bound_elsewhere():
 
 def test_own_rename_wins_over_a_leaf_hit_in_another_stub():
     """T3 rule 2: `_renamed_elsewhere.pyi` declares `class LongWidgetName`, but this module binds
-    `tesseract::w::LongWidgetName` as `Widget`: its members are compared against `Widget`."""
+    `tesseract::w::LongWidgetName` as `Gizmo`: its members are compared against `Gizmo`."""
     assert (RENAMED / "_renamed_elsewhere.pyi").is_file()
     report = _renamed_report()
     accepted = {(a.symbol, a.rule) for a in report.accepted}

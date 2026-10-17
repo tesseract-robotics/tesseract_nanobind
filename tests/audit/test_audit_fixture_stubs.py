@@ -16,8 +16,8 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SAME_LEAF_PAIRS = {
     # I7: RemoteRunner's stub base is `fixture_remote._fixture_remote.Runner`.
     ("Runner", frozenset({"_fixture.pyi", "fixture_remote/_fixture_remote.pyi"})),
-    # T5: `bases_remote` binds another `Runner` under the leaf of the bases fixture's own.
-    ("Runner", frozenset({"bases/_bases.pyi", "bases/bases_remote/_bases_remote.pyi"})),
+    # T5: `bases_remote` binds another `Jogger` under the leaf of the bases fixture's own.
+    ("Jogger", frozenset({"bases/_bases.pyi", "bases/bases_remote/_bases_remote.pyi"})),
 }
 
 

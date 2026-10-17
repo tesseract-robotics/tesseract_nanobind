@@ -14,13 +14,13 @@ SHAPES = (FIXTURE_INCLUDE / "tesseract" / "inherit" / "shapes.h").resolve()
 SHAPES_REL = "tesseract/inherit/shapes.h"
 
 A_GAPS = {
-    ("Square.__eq__", "operator"), ("Square.__ne__", "operator"), ("Square.sides", "method"),
-    ("Square.area", "field"), ("Circle.__ne__", "operator"), ("Circle.sides", "method"),
-    ("Circle.area", "field"), ("Exposer.area", "field"),
+    ("Tile.__eq__", "operator"), ("Tile.__ne__", "operator"), ("Tile.sides", "method"),
+    ("Tile.area", "field"), ("Disc.__ne__", "operator"), ("Disc.sides", "method"),
+    ("Disc.area", "field"), ("Exposer.area", "field"),
 }  # fmt: skip
 CLASS_GAPS = {("Shape", "class"), ("Middle", "class")}
 # Shape's members, where every inherited row points (A1).
-SQUARE_LINES = {"Square.__eq__": 9, "Square.__ne__": 10, "Square.sides": 11, "Square.area": 12}
+TILE_LINES = {"Tile.__eq__": 9, "Tile.__ne__": 10, "Tile.sides": 11, "Tile.area": 12}
 
 
 def _rows(report):
@@ -48,29 +48,29 @@ def shapes_cpp():
 
 
 def test_inherited_symbol_records_its_base_and_the_base_keeps_its_own(shapes_cpp):
-    assert shapes_cpp["Square.__eq__"].inherited_from == "Shape"
-    assert len(shapes_cpp["Square.__eq__"].overloads) == 1
+    assert shapes_cpp["Tile.__eq__"].inherited_from == "Shape"
+    assert len(shapes_cpp["Tile.__eq__"].overloads) == 1
     assert shapes_cpp["Shape.__eq__"].inherited_from is None  # USR trap: base keeps its member
     assert len(shapes_cpp["Shape.__eq__"].overloads) == 1
-    assert shapes_cpp["Circle.__eq__"].inherited_from is None  # own declaration hides the base's
+    assert shapes_cpp["Disc.__eq__"].inherited_from is None  # own declaration hides the base's
 
 
 def test_inherited_through_an_unbound_intermediate_records_the_declaring_base(shapes_cpp):
-    assert shapes_cpp["DeepRunner.laps"].inherited_from == "Runner"
-    assert shapes_cpp["DeepRunner.depth"].inherited_from == "Middle"
-    assert shapes_cpp["DeepRunner.go"].inherited_from is None  # own override hides Runner::go
+    assert shapes_cpp["DeepSprinter.laps"].inherited_from == "Sprinter"
+    assert shapes_cpp["DeepSprinter.depth"].inherited_from == "Middle"
+    assert shapes_cpp["DeepSprinter.go"].inherited_from is None  # own override hides Sprinter::go
 
 
 def test_private_base_and_protected_members_are_not_inherited(shapes_cpp):
-    assert not {n for n in shapes_cpp if n.startswith("Hidden.") and n != "Hidden.__init__"}
+    assert not {n for n in shapes_cpp if n.startswith("Concealed.") and n != "Concealed.__init__"}
     assert not {n for n in shapes_cpp if n.endswith(".equals")}
 
 
 def test_filtered_base_members_are_not_inherited(shapes_cpp):
     """A9: copy assignment, deleted, deprecated and cereal-hook members of the base."""
-    square = {n for n in shapes_cpp if n.startswith("Square.")}
-    assert not {n for n in square if n.endswith(("operator=", ".reset", ".legacy", ".serialize"))}
-    assert square == {"Square.__init__", *SQUARE_LINES}
+    tile = {n for n in shapes_cpp if n.startswith("Tile.")}
+    assert not {n for n in tile if n.endswith(("operator=", ".reset", ".legacy", ".serialize"))}
+    assert tile == {"Tile.__init__", *TILE_LINES}
 
 
 def test_inherited_members_of_an_unbound_base_are_gaps(inherit_report):
@@ -78,18 +78,18 @@ def test_inherited_members_of_an_unbound_base_are_gaps(inherit_report):
 
 
 def test_inherited_gap_is_located_at_the_base_member(inherit_report):
-    where = {g.symbol: g.location for g in inherit_report.gaps if g.symbol in SQUARE_LINES}
-    assert where.keys() == SQUARE_LINES.keys()
-    for name, line in SQUARE_LINES.items():
+    where = {g.symbol: g.location for g in inherit_report.gaps if g.symbol in TILE_LINES}
+    assert where.keys() == TILE_LINES.keys()
+    for name, line in TILE_LINES.items():
         assert where[name].endswith(f"{SHAPES_REL}:{line}"), where[name]
 
 
-def test_bound_hidden_and_bound_base_members_are_no_rows(inherit_report):
+def test_bound_concealed_and_bound_base_members_are_no_rows(inherit_report):
     gaps = {g.symbol for g in inherit_report.gaps}
-    assert "Circle.__eq__" not in gaps  # A2: declared and bound
+    assert "Disc.__eq__" not in gaps  # A2: declared and bound
     assert not {g for g in gaps if g.startswith("Hexagon.")}  # A3: bound on the derived class
-    assert "SlowRunner.laps" not in gaps  # A6: base Runner is bound, it audits laps
-    assert "DeepRunner.depth" not in gaps  # A7: inherited from unbound Middle, bound here
+    assert "SlowSprinter.laps" not in gaps  # A6: base Sprinter is bound, it audits laps
+    assert "DeepSprinter.depth" not in gaps  # A7: inherited from unbound Middle, bound here
     assert not {"Remote", "Courier.ping"} & gaps  # A11: base bound in another extension's stub
 
 
@@ -97,7 +97,7 @@ def test_python_only_overload_of_an_inherited_bound_member_is_reported_once(inhe
     """A8 (RESULTS.md Finding 1): the deviation belongs to the bound base, not to each subclass
     whose stub re-declares the member."""
     rows = {(d.name, d.kind.value) for d in inherit_report.deviations if d.kind.value != "base"}
-    assert rows == {("Runner.laps", "overload")}
+    assert rows == {("Sprinter.laps", "overload")}
 
 
 def test_own_header_lines_ignores_inherited_symbols():

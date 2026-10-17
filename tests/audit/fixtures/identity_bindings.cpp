@@ -7,7 +7,7 @@ namespace ti = tesseract::identity;
 
 NB_MODULE(_identity, m)
 {
-  auto widget = nb::class_<ti::LongWidgetName>(m, "Widget");
+  auto widget = nb::class_<ti::LongWidgetName>(m, "Gizmo");
   nb::class_<ti::LongWidgetName::Part>(widget, "Part");
   nb::class_<ti::Gadget<double>>(m, "GadgetD");
   nb::enum_<ti::Color>(m, "Color");
