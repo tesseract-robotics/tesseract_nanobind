@@ -78,7 +78,7 @@ PARSE = {
     # G4 (forwarding ctor templates)
     "REFERENCE_TYPE_KINDS", "_is_forwarding_ctor_template",
     # G3 (R13's not-API half)
-    "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES",
+    "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES", "no_bound_class",
 }  # fmt: skip
 
 

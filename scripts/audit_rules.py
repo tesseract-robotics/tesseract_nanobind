@@ -75,7 +75,8 @@ ACCEPTED = {
     "yaml-node": "An overload taking a `YAML::Node` has no Python form (no Python type converts "
     "to one). It is accepted when a bound sibling overload of the same symbol takes a config file "
     "path or YAML text in that position and loads the same config, or the class binds a static "
-    "`from_yaml(text: str)` that parses the text and calls this constructor.",
+    "`from_yaml(text: str)` that parses the text and calls this constructor (supplying a "
+    "default `ProfilePluginFactory` where the constructor takes one).",
     "derived-element-container": "An overload taking a container of a derived class only upcasts "
     "into its base-element sibling (`CompoundMesh(vector<ConvexMesh>)` → "
     "`CompoundMesh(vector<PolygonMesh>)`, compound_mesh.cpp:59-63); Python passes a list of any "

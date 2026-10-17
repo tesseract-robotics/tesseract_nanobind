@@ -101,6 +101,34 @@ def test_not_api_half_needs_an_unaudited_header(monkeypatch):
     assert {"Hooks.createTerm", "Hooks.callbacks"} <= {g.symbol for g in report.gaps}
 
 
+def test_bound_type_in_a_not_api_header_stays_a_gap(monkeypatch):
+    """A type some module binds has a Python form, whatever header declares it (no R13)."""
+    monkeypatch.setattr(parse, "UNBOUND_DEPENDENCY_ROOTS", (FIXTURE_THIRD_PARTY,))
+    monkeypatch.setattr(parse, "UNBOUND_DEPENDENCY_NAMESPACES", FIXTURE_NAMESPACES)
+    monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "planner", PLANNER_PREFIX)
+    monkeypatch.setitem(own.UNAUDITED_HEADERS, PLANNER_PREFIX[0], FIXTURE_NOT_API)
+    elsewhere = {
+        "Term": "tesseract::planner::internal::Term",  # internal/*: not API
+        "Planner": "vendorfwd::Planner",  # third-party namespace
+        "State": "vendor::State",  # third-party root
+    }
+    report = audit.audit_tu(
+        "planner",
+        PLANNER / "planner_bindings.cpp",
+        PLANNER / "_planner.pyi",
+        PLANNER / "planner_init.py",
+        PLANNER_PREFIX,
+        (FIXTURE_INCLUDE,),
+        stub_roots=(PLANNER,),
+        bound=lambda m: elsewhere if m == "tesseract_common" else {},
+    )
+    gaps = {g.symbol for g in report.gaps}
+    assert {"Hooks.createTerm", "Hooks.callbacks", "ForwardHooks.create"} <= gaps
+    assert "Hooks.createStateExtractor" in gaps
+    # Unbound third-party types stay accepted.
+    assert ("Configurator.create", "unbound-dependency-type") in accepted_pairs(report)
+
+
 def test_header_is_unaudited_reads_the_owning_prefix(monkeypatch):
     monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "planner", PLANNER_PREFIX)
     monkeypatch.setitem(own.UNAUDITED_HEADERS, PLANNER_PREFIX[0], FIXTURE_NOT_API)
@@ -127,6 +155,8 @@ def test_planner_fixture_rows_exact(planner_report):
         ("Mismatched.__init__", audit.Kind.CONSTRUCTOR, "2"),
         ("DerivedProfile.__init__", audit.Kind.CONSTRUCTOR, "1"),
         ("IntYamlProfile.__init__", audit.Kind.CONSTRUCTOR, "1"),
+        ("MethodYamlProfile.__init__", audit.Kind.CONSTRUCTOR, "1"),
+        ("ForeignYamlProfile.__init__", audit.Kind.CONSTRUCTOR, "1"),
         ("Hooks.on_step", audit.Kind.FIELD, audit.NOT_AN_OVERLOAD),
         ("Hooks.makeConfigurator", audit.Kind.METHOD, audit.NOT_AN_OVERLOAD),
         ("AssignHolder.__eq__", audit.Kind.OPERATOR, audit.NOT_AN_OVERLOAD),
@@ -136,6 +166,8 @@ def test_planner_fixture_rows_exact(planner_report):
     assert {d.name for d in planner_report.deviations} == {
         "BaseProfile.from_yaml",
         "IntYamlProfile.from_yaml",
+        "MethodYamlProfile.from_yaml",
+        "ForeignYamlProfile.from_yaml",
     }
 
 
@@ -157,8 +189,16 @@ def test_from_yaml_needs_a_str_parameter(planner_report):
     assert "IntYamlProfile.from_yaml" in {d.name for d in planner_report.deviations}
 
 
+@pytest.mark.parametrize("cls", ["MethodYamlProfile", "ForeignYamlProfile"])
+def test_from_yaml_must_be_a_static_factory_of_its_class(planner_report, cls):
+    """An instance `from_yaml(self, text)`, or one returning another class, constructs nothing."""
+    assert (f"{cls}.__init__", "1") in {(g.symbol, g.arity) for g in planner_report.gaps}
+    assert f"{cls}.from_yaml" in {d.name for d in planner_report.deviations}
+
+
 def test_yaml_node_text_states_the_from_yaml_premise():
     assert "from_yaml" in audit.ACCEPTED["yaml-node"]
+    assert "ProfilePluginFactory" in audit.ACCEPTED["yaml-node"]
 
 
 # Task 10: a parameter typed by a renamed class matches the Python class's name.
@@ -166,9 +206,9 @@ def test_yaml_node_text_states_the_from_yaml_premise():
 RENAMED_PARAMS = FIXTURES / "renamed_params"
 
 
-def _renamed_params_report():
+def _renamed_params_report(param=frozenset({("class", "State")})):
     here = "tests/audit/fixtures/renamed_params/evaluator.h"
-    state = frozenset({("class", "State")})
+    state = param
 
     def method(params):
         return [audit.CppOverload(audit.Arity(1, 1), (), f"{here}:9", params=params)]
@@ -211,6 +251,15 @@ def _renamed_params_report():
         stub_roots=(RENAMED_PARAMS,),
         bound=lambda m: bound.get(m, {}),
     )
+
+
+def test_renamed_class_for_another_class_still_deviates():
+    """`StateD` is `State`, so it does not stand for an `Evaluator` parameter."""
+    report = _renamed_params_report(param=frozenset({("class", "Evaluator")}))
+    assert ("Evaluator.evaluate", "1") in {(g.symbol, g.arity) for g in report.gaps}
+    assert ("EvaluatorD.evaluate", audit.Kind.OVERLOAD) in {
+        (d.name, d.kind) for d in report.deviations
+    }
 
 
 def test_renamed_class_parameter_matches_its_python_name():
