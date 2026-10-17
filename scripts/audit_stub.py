@@ -120,7 +120,7 @@ def _function_kind(node: ast.FunctionDef, in_class: bool) -> Kind:
     return Kind.METHOD if in_class else Kind.FUNCTION
 
 
-def _annotations(node: ast.AST) -> list[ast.expr]:
+def _annotations(node: ast.FunctionDef | ast.AnnAssign) -> list[ast.expr]:
     if isinstance(node, ast.AnnAssign):
         return [node.annotation]
     a = node.args
@@ -208,9 +208,14 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                         )
             else:
                 continue
-            for ann in _annotations(node) if not isinstance(node, ast.Assign) else []:
+            if isinstance(node, ast.FunctionDef):
+                owner = name
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                owner = prefix + node.target.id
+            else:
+                continue
+            for ann in _annotations(node):
                 for q in _quoted_names(ann):
-                    owner = name if isinstance(node, ast.FunctionDef) else prefix + node.target.id
                     quoted.append(QuotedType(owner, q, f"{stub_rel}:{node.lineno}"))
 
     visit(tree.body, "", False)
