@@ -1427,10 +1427,67 @@ class TestFailureMessage:
     """
 
     @staticmethod
-    def _info(name, status_code, status_message):
+    def _info(name, status_code, status_message, aborted=False):
         from types import SimpleNamespace
 
-        return SimpleNamespace(name=name, status_code=status_code, status_message=status_message)
+        return SimpleNamespace(
+            name=name, status_code=status_code, status_message=status_message, aborted=aborted
+        )
+
+    # TaskComposerNode::run (tesseract_planning 0.35.0): an exception becomes status_code -1 with
+    # "Exception thrown: " + what() + " (Abort Triggered)"; every node that runs after the abort
+    # records status_code 0, "Aborted", aborted=True, without running.
+    PYTHON_EXCEPTION = (
+        "Exception thrown: Traceback (most recent call last):\n"
+        '  File "profile.py", line 29, in create\n'
+        '    raise RuntimeError("from worker create")\n'
+        "\n"
+        "RuntimeError: from worker create\n"
+        " (Abort Triggered)"
+    )
+
+    def _exception_run(self):
+        return [
+            self._info("MinLengthTask", 1, "Successful"),
+            self._info("TrajOptIfoptMotionPlannerTask", -1, self.PYTHON_EXCEPTION),
+            # Observed on 0.35.0: the skipped ErrorTask sets aborted; the composites above it don't
+            self._info("ErrorTask", 0, "Aborted", aborted=True),
+            self._info("MotionPlanningTask", 0, "Aborted"),
+            self._info("TrajOptIfoptPipeline", 0, "Aborted"),
+        ]
+
+    def test_an_exception_is_reported_with_its_last_line(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        infos = self._exception_run()
+        assert _failure_message(infos, infos[1]) == (
+            "TrajOptIfoptMotionPlannerTask: Exception thrown: RuntimeError: from worker create"
+        )
+
+    def test_a_one_line_exception_keeps_its_text(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        infos = [self._info("SomeTask", -1, "Exception thrown: bad index (Abort Triggered)")]
+        assert _failure_message(infos) == "SomeTask: Exception thrown: bad index"
+
+    def test_exceptions_come_before_failed_nodes(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        infos = [
+            self._info("ContactCheckTask", 0, "Found 2 contacts"),
+            *self._exception_run(),
+        ]
+        assert _failure_message(infos) == (
+            "TrajOptIfoptMotionPlannerTask: Exception thrown: RuntimeError: from worker create; "
+            "ContactCheckTask: Found 2 contacts"
+        )
+
+    def test_skip_records_after_an_abort_are_not_reported(self):
+        from tesseract_robotics.planning.composer import _failure_message
+
+        skipped = [info for info in self._exception_run() if info.status_message == "Aborted"]
+        aborting = self._info("ErrorTask", 0, "Error (Abort Triggered)")
+        assert _failure_message(skipped, aborting) == "ErrorTask: Error (Abort Triggered)"
 
     def _failed_run(self):
         from tesseract_robotics.planning.composer import ABORT_PROPAGATION_MESSAGE
@@ -1498,6 +1555,21 @@ class TestFailureMessage:
         assert not result.successful
         assert result.message.startswith("TrajOptMotionPlannerTask: "), result.message
         assert "Abort Triggered" not in result.message
+
+    def test_a_real_exception_is_reported(self, composer):
+        """An unknown TCP link: the TrajOpt-Ifopt planner throws, and the pipeline aborts."""
+        robot = Robot.from_tesseract_support("abb_irb2400")
+        program = (
+            MotionProgram("manipulator", tcp_frame="no_such_link", working_frame="base_link")
+            .move_to(JointTarget([0.0] * 6))
+            .move_to(CartesianTarget(Pose.from_xyz_quat([0.8, 0.0, 0.8], [0, 1.0, 0, 0])))
+        )
+        result = composer.plan(robot, program, pipeline="TrajOptIfoptPipeline")
+        assert not result.successful
+        assert result.message == (
+            "TrajOptIfoptMotionPlannerTask: Exception thrown: "
+            "Source Link name 'no_such_link' provided does not exist."
+        )
 
 
 class TestProfileCreation:

@@ -158,34 +158,64 @@ ABORT_PROPAGATION_MESSAGE = "Error (Abort Triggered)"
 FAILED_STATUS_CODE = 0
 
 
+# TaskComposerNode::run (tesseract_planning 0.35.0, task_composer_node.cpp:127-134, :149-150): an
+# exception from a node becomes status_code -1, "Exception thrown: " + what(), and the abort it
+# triggers appends " (Abort Triggered)".
+EXCEPTION_STATUS_CODE = -1
+ABORT_TRIGGERED_SUFFIX = " (Abort Triggered)"
+EXCEPTION_PREFIX = "Exception thrown: "
+# A node skipped after the abort records "Aborted" (task_composer_node.cpp:101-111, aborted=True);
+# the pipeline and the composites above it report "Aborted" too, with aborted left False (0.35.0).
+ABORTED_MESSAGE = "Aborted"
+
+
+def _exception_message(status_message: str) -> str:
+    """``"Exception thrown: <last line>"``: a Python exception's text is a whole traceback."""
+    text = status_message.removesuffix(ABORT_TRIGGERED_SUFFIX).removeprefix(EXCEPTION_PREFIX)
+    lines = [line for line in text.splitlines() if line.strip()]
+    return EXCEPTION_PREFIX + (lines[-1].strip() if lines else "")
+
+
 def _failure_message(infos, aborting=None) -> str:
     """Name the node that failed, not the ErrorTask a pipeline routes every failure into.
 
     When a node fails, the pipeline triggers an abort, and its ErrorTask, the pipeline itself and each
-    composite on the way up all report "Error (Abort Triggered)". The informative message — a planner
-    that ran out of iterations, a contact check that found a collision — is on the node that failed.
-    Reporting the aborting node alone returned "ErrorTask: Error (Abort Triggered)" for a TrajOpt
-    solve that had ended at OPT_SCO_ITERATION_LIMIT.
+    composite on the way up all report "Error (Abort Triggered)". The informative message — an
+    exception a node threw, a planner that ran out of iterations, a contact check that found a
+    collision — is on the node that failed. Reporting the aborting node alone returned
+    "ErrorTask: Error (Abort Triggered)" for a TrajOpt solve that had ended at
+    OPT_SCO_ITERATION_LIMIT. Nodes skipped after the abort, and the composites above them, record
+    "Aborted"; they are not reported.
 
     Args:
         infos: The failed run's ``TaskComposerNodeInfo`` objects (``name``, ``status_code``,
-            ``status_message``).
+            ``status_message``, ``aborted``).
         aborting: The aborting node's info, ``getInfo(getAbortingNode())`` (``None`` when no node
             aborted), reported when no node carries a specific message.
 
     Returns:
-        ``"<node>: <message>"`` for every failed node with a specific message, sorted by node and
-        joined with ``"; "``; else the aborting node's message; else ``"Planning failed"``.
+        ``"<node>: <message>"`` for every node that threw (the exception's last line), then every
+        failed node with a specific message, each group sorted by node and joined with ``"; "``;
+        else the aborting node's message; else ``"Planning failed"``.
     """
-    specific = sorted(
-        f"{info.name}: {info.status_message}"
+    ran = [
+        info
         for info in infos
+        if info.status_message and not info.aborted and info.status_message != ABORTED_MESSAGE
+    ]
+    exceptions = sorted(
+        f"{info.name}: {_exception_message(info.status_message)}"
+        for info in ran
+        if info.status_code == EXCEPTION_STATUS_CODE
+    )
+    failed = sorted(
+        f"{info.name}: {info.status_message}"
+        for info in ran
         if info.status_code == FAILED_STATUS_CODE
-        and info.status_message
         and info.status_message != ABORT_PROPAGATION_MESSAGE
     )
-    if specific:
-        return "; ".join(specific)
+    if exceptions or failed:
+        return "; ".join(exceptions + failed)
     if aborting is not None and aborting.status_message:
         return f"{aborting.name}: {aborting.status_message}"
     return "Planning failed"
