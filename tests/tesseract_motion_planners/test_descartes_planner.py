@@ -440,8 +440,8 @@ class TestDescartesToolPoseSamplers:
     def test_sample_tool_fixed_axes(self, sampler, axis):
         expected = sampleToolAxis(self.POSE, np.array(axis), 0.5, -1.0, 1.0)
         samples = sampler(self.POSE, 0.5, -1.0, 1.0)
-        assert len(samples) == len(expected) == 5
-        for sample, other in zip(samples, expected, strict=True):
+        assert len(samples) == len(expected) == 5  # zip(strict=True) is 3.10+; the floor is 3.9
+        for sample, other in zip(samples, expected):
             np.testing.assert_allclose(sample.matrix, other.matrix)
 
 

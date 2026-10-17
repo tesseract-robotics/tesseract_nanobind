@@ -452,8 +452,8 @@ class TestMotionPlannerBase:
         assert via_base.successful and direct.successful
         via_base_positions = list(_waypoint_positions(via_base.results))
         direct_positions = list(_waypoint_positions(direct.results))
-        assert len(via_base_positions) == len(direct_positions) > 0
-        for a, b in zip(via_base_positions, direct_positions, strict=True):
+        assert len(via_base_positions) == len(direct_positions) > 0  # zip(strict=True) is 3.10+
+        for a, b in zip(via_base_positions, direct_positions):
             np.testing.assert_allclose(a, b)
 
 
