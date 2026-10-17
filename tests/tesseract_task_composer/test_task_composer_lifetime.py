@@ -357,6 +357,89 @@ future = executor.run(node, make_storage(node))
         assert "NESTED TASKS 0" in out, out
 
 
+class TestServerTaskReplacement:
+    """A by-name server run uses the server's own task, which upstream gives no way to hold:
+    replacing it mid-run (loadConfig, addTask with the same name) freed it under the run."""
+
+    def test_load_config_mid_run_raises(self):
+        out = _run("""
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+futures = [server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor") for _ in range(4)]
+for load in (lambda: server.loadConfig(config_path, GeneralResourceLocator()),
+             lambda: server.loadConfig(config_path.read_text(), GeneralResourceLocator())):
+    try:
+        load()
+    except TaskComposerServerBusyError as e:
+        print("BUSY", "TrajOptPipeline" in str(e))
+for future in futures:
+    future.wait()
+print("SUCCESS", all(future.context.isSuccessful() for future in futures))
+""")
+        assert out.count("BUSY True") == 2, out
+        assert "SUCCESS True" in out, out
+
+    def test_add_task_with_the_running_name_raises(self):
+        out = _run("""
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
+try:
+    server.addTask(factory.createTaskComposerNode("TrajOptPipeline"))
+except TaskComposerServerBusyError as e:
+    print("BUSY", "TrajOptPipeline" in str(e))
+future.wait()
+print("SUCCESS", future.context.isSuccessful())
+""")
+        assert "BUSY True" in out, out
+        assert "SUCCESS True" in out, out
+
+    def test_add_task_with_another_name_mid_run_succeeds(self):
+        out = _run("""
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
+other = factory.createTaskComposerNode("OMPLPipeline")
+other.setName("AnotherTask")
+server.addTask(other)
+future.wait()
+print("SUCCESS", future.context.isSuccessful(), server.hasTask("AnotherTask"))
+""")
+        assert "SUCCESS True True" in out, out
+
+    def test_load_config_after_wait_succeeds(self):
+        out = _run("""
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
+future.wait()
+server.loadConfig(config_path, GeneralResourceLocator())
+server.addTask(factory.createTaskComposerNode("TrajOptPipeline"))
+print("RELOADED", future.context.isSuccessful())
+""")
+        assert "RELOADED True" in out, out
+
+    def test_node_run_does_not_block_reload(self):
+        """A run of a caller-owned node uses no server task."""
+        out = _run("""
+import time
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = server.run(node, make_storage(node), False, "TaskflowExecutor")
+server.loadConfig(config_path, GeneralResourceLocator())
+future.wait()
+print("SUCCESS", future.context.isSuccessful())
+""")
+        assert "SUCCESS True" in out, out
+
+
 _CONTAINER = """
 import gc
 from tesseract_robotics.tesseract_task_composer import (
