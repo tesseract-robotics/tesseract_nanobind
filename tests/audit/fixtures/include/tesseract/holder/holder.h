@@ -39,4 +39,19 @@ public:
 private:
   std::unique_ptr<AnyHolderInterface> impl_;
 };
+
+// Not forwarding: the parameter names the class's template parameter, or points to the ctor's.
+template <typename T>
+class AnyBox
+{
+public:
+  template <typename U>
+  AnyBox(const T& value);  // T is AnyBox's, not the ctor template's own
+
+  template <typename U>
+  AnyBox(U* value);  // a pointer, not a reference
+
+private:
+  T value_;
+};
 }  // namespace tesseract::holder
