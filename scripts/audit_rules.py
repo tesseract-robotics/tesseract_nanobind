@@ -251,6 +251,7 @@ TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
 # symbol Python binds, where the other overloads stay checked (T4).
 ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
+    ("tesseract_command_language", "ProfileDictionary.getProfile", "2-3"): "profile-key-template",
     # Group 2 (trajopt).
     ("trajopt_ifopt", "ContinuousCollisionConstraint.__init__", "3-7"): "split-var-pair",
     # tesseract_task_composer (#256 group 4). any_poly.h:115 `AnyPoly(const AnyInterface&)`: the
