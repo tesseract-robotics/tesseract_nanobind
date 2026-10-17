@@ -80,6 +80,16 @@ UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
 }
 # Patterns that apply below every owning prefix.
 ANY_PREFIX = "*"
+# Built-in task-composer node plugins (C19, not API).
+NODES_NOT_API = (
+    "Built-in task plugins, created by name from the task-composer YAML through "
+    "`TaskComposerPluginFactory.createTaskComposerNode`; Python tunes them through their profiles."
+)
+# A `*_plugin_factories.h` header (#256 group 4).
+PLUGIN_ANCHOR = (
+    "`PLUGIN_ANCHOR_DECL` link anchor only: keeps a plugin library's factory symbols exported; "
+    "no declarations."
+)
 # Headers under a prefix that are not Python API: owning prefix (or `ANY_PREFIX`) -> {fnmatch
 # pattern on the path below that prefix (`*` also matches `/`): reason}. A header is matched
 # only against the patterns of the longest prefix that holds it, so a parent's pattern never
@@ -127,6 +137,23 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
     "tesseract/state_solver/": {
         "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to "
         "`OFKTStateSolver`.",
+    },
+    "tesseract/task_composer/": {
+        "task_composer_plugin_factory_utils.h": "`TaskComposerTaskFactory<T>` and "
+        "`TaskComposerExecutorFactoryImpl<T>` are templates a C++ plugin library instantiates; "
+        "Python creates nodes and executors through `TaskComposerPluginFactory`.",
+        "task_composer_task_plugin_factory.h": PLUGIN_ANCHOR,
+        "*_plugin_factories.h": PLUGIN_ANCHOR,
+        "taskflow/taskflow_task_composer_future.h": "Taskflow implementation of "
+        "`TaskComposerFuture`; its constructor takes `tf::Taskflow` internals, and Python receives "
+        "it through the `TaskComposerFuture` that `TaskComposerExecutor.run` returns.",
+        "yaml_utils.h": "`loadSubTask`, `loadSubTaskConfig` and `validateSubTask` parse a node's "
+        "`YAML::Node` config inside C++ node constructors; every function takes a `YAML::Node`.",
+        "nodes/*": NODES_NOT_API,
+    },
+    "tesseract/task_composer/planning/": {
+        "*_plugin_factories.h": PLUGIN_ANCHOR,
+        "nodes/*": NODES_NOT_API,
     },
 }
 # Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
