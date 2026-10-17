@@ -37,6 +37,20 @@ class TestPathAndYamlConstructors:
         with pytest.raises(TaskComposerConfigError, match="is YAML text"):
             TaskComposerPluginFactory(str(config_path), GeneralResourceLocator())
 
+    @pytest.mark.parametrize("text", ["", "~", "[1, 2]", "foo: bar"])
+    @pytest.mark.parametrize("caller", ["init", "loadConfig", "server"])
+    def test_text_without_plugins_key_raises(self, caller, text):
+        """Empty, null, list and unrelated YAML loaded silently as an empty config (#337)."""
+        load = {
+            "init": lambda: TaskComposerPluginFactory(text, GeneralResourceLocator()),
+            "loadConfig": lambda: TaskComposerPluginFactory().loadConfig(
+                text, GeneralResourceLocator()
+            ),
+            "server": lambda: TaskComposerServer().loadConfig(text, GeneralResourceLocator()),
+        }[caller]
+        with pytest.raises(TaskComposerConfigError, match="task_composer_plugins"):
+            load()
+
     def test_config_error_is_a_value_error(self):
         assert issubclass(TaskComposerConfigError, ValueError)
 
