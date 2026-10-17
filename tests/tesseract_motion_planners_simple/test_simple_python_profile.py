@@ -31,7 +31,12 @@ from tesseract_robotics.tesseract_command_language import (
     WaypointPoly_as_JointWaypointPoly,
     WaypointPoly_as_StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, JointState, ManipulatorInfo
+from tesseract_robotics.tesseract_common import (
+    GeneralResourceLocator,
+    Isometry3d,
+    JointState,
+    ManipulatorInfo,
+)
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import JointGroup, KinematicGroup
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
@@ -40,9 +45,11 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
     KinematicGroupInstructionInfo,
     ProfileOverrideNotDispatchedError,
     SimpleMotionPlanner,
+    SimplePlannerEmptyGenerateError,
     SimplePlannerFixedSizeAssignMoveProfile,
     SimplePlannerFixedSizeAssignNoIKMoveProfile,
     SimplePlannerFixedSizeMoveProfile,
+    SimplePlannerGenerateMismatchError,
     SimplePlannerLVSAssignMoveProfile,
     SimplePlannerLVSAssignNoIKMoveProfile,
     SimplePlannerLVSMoveProfile,
@@ -308,16 +315,61 @@ def test_generate_without_override_raises(irb2400_env, manip_info):
         SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, NoGenerate()))
 
 
-@pytest.mark.parametrize("result", [None, 3, [None], ["not an instruction"]])
-def test_generate_wrong_return_type_raises(irb2400_env, manip_info, result):
+@pytest.mark.parametrize(
+    ("result", "named"),
+    [
+        (None, "not NoneType"),
+        (3, "not int"),
+        ([None], "element 0 is NoneType"),
+        (["not an instruction"], "element 0 is str"),
+        ((), None),  # a tuple is a sequence: empty, so the empty-list check applies
+    ],
+)
+def test_generate_wrong_return_type_raises(irb2400_env, manip_info, result, named):
     class WrongType(SimplePlannerMoveProfile):
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
             return result
 
-    with pytest.raises(SimplePlannerProfileReturnTypeError, match="list of MoveInstructionPoly"):
-        SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, WrongType()))
+    request = _request(irb2400_env, manip_info, WrongType())
+    if named is None:
+        with pytest.raises(SimplePlannerEmptyGenerateError):
+            SimpleMotionPlanner(PLANNER_NAME).solve(request)
+        return
+    with pytest.raises(
+        SimplePlannerProfileReturnTypeError, match="list of MoveInstructionPoly"
+    ) as error:
+        SimpleMotionPlanner(PLANNER_NAME).solve(request)
+    assert named in str(error.value)
+
+
+def _set_cartesian_waypoint(instruction):
+    instruction.setWaypoint(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(Isometry3d.Identity()))
+    )
+
+
+# upstream asserts these in debug builds only (simple_motion_planner.cpp:250-253)
+@pytest.mark.parametrize(
+    ("change", "field"),
+    [
+        (lambda i: i.setMoveType(MoveInstructionType_LINEAR), "move type"),
+        (_set_cartesian_waypoint, "waypoint type"),
+        (lambda i: i.setProfile("OTHER"), "profile"),
+        (lambda i: i.setPathProfile("OTHER"), "path profile"),
+    ],
+)
+def test_generate_last_instruction_must_match_base(irb2400_env, manip_info, change, field):
+    class Changes(SimplePlannerMoveProfile):
+        def generate(
+            self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+        ):
+            change(base_instruction)  # a copy: the planner's own instruction is unchanged
+            return [base_instruction]
+
+    with pytest.raises(SimplePlannerGenerateMismatchError, match=field):
+        SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, Changes()))
 
 
 def test_generate_errors_fail_the_plan_through_the_base_solve(irb2400_env, manip_info):

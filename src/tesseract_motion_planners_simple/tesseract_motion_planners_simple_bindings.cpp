@@ -115,6 +115,27 @@ struct ProfileReturnTypeError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
+// What is wrong with a generate result that is not a list of MoveInstructionPoly: the first element
+// that is not one, or else the result's own type. Called with the GIL held.
+std::string describe_wrong_result(nb::handle result) {
+    if (nb::isinstance<nb::sequence>(result) && !nb::isinstance<nb::str>(result)) {
+        std::size_t index = 0;
+        for (nb::handle element : result) {
+            if (!nb::isinstance<tcl::MoveInstructionPoly>(element))
+                return "element " + std::to_string(index) + " is " +
+                       std::string(nb::type_name(element.type()).c_str());
+            ++index;
+        }
+    }
+    return "not " + std::string(nb::type_name(result.type()).c_str());
+}
+
+// The last instruction generate returned differs from base_instruction in a field upstream requires
+// unchanged: move type, waypoint type, profile or path profile.
+struct GenerateMismatchError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 // generate returned a null MoveInstructionPoly, which upstream would plan as a success.
 struct NullInstructionError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
@@ -158,8 +179,7 @@ public:
             std::vector<tcl::MoveInstructionPoly> instructions;
             if (!nb::try_cast(result, instructions))
                 throw ProfileReturnTypeError("SimplePlannerMoveProfile.generate must return a list of "
-                                             "MoveInstructionPoly, not " +
-                                             std::string(nb::type_name(result.type()).c_str()));
+                                             "MoveInstructionPoly: " + describe_wrong_result(result));
             if (instructions.empty())
                 throw EmptyGenerateError("SimplePlannerMoveProfile.generate returned an empty list; it must end "
                                          "with base_instruction");
@@ -167,6 +187,21 @@ public:
                 if (instructions[i].isNull())
                     throw NullInstructionError("SimplePlannerMoveProfile.generate returned a null instruction at "
                                                "index " + std::to_string(i));
+            // upstream asserts these in debug builds only (simple_motion_planner.cpp:250-253)
+            const tcl::MoveInstructionPoly& last = instructions.back();
+            const char* field = nullptr;
+            if (last.getMoveType() != base_instruction.getMoveType())
+                field = "move type";
+            else if (last.getWaypoint().getType() != base_instruction.getWaypoint().getType())
+                field = "waypoint type";
+            else if (last.getProfile() != base_instruction.getProfile())
+                field = "profile";
+            else if (last.getPathProfile() != base_instruction.getPathProfile())
+                field = "path profile";
+            if (field != nullptr)
+                throw GenerateMismatchError(std::string("SimplePlannerMoveProfile.generate: the last instruction's ") +
+                                            field + " differs from base_instruction's; the list must end with "
+                                            "base_instruction");
             return instructions;
         } catch (const std::exception&) {
             if (armed)
@@ -236,6 +271,8 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
         .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned an empty list.";
     nb::exception<NullInstructionError>(m, "SimplePlannerNullInstructionError", PyExc_ValueError)
         .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned a null MoveInstructionPoly.";
+    nb::exception<GenerateMismatchError>(m, "SimplePlannerGenerateMismatchError", PyExc_ValueError)
+        .attr("__doc__") = "A Python generate's last instruction differs from base_instruction in a field upstream requires unchanged.";
     nb::exception<ProfileReturnTypeError>(m, "SimplePlannerProfileReturnTypeError", PyExc_TypeError)
         .attr("__doc__") = "A Python SimplePlannerMoveProfile.generate returned the wrong type.";
     nb::exception<PureVirtualCallError>(m, "SimplePlannerPureVirtualCallError", PyExc_NotImplementedError)
