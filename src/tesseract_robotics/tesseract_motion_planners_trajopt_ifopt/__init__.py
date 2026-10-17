@@ -48,6 +48,7 @@ __all__ = [
     "TrajOptIfoptJointWaypointConfig",
     "TrajOptIfoptMotionPlanner",
     "TrajOptIfoptMoveProfile",
+    "TrajOptIfoptNodeLayoutChangedError",
     "TrajOptIfoptOSQPSolverProfile",
     "TrajOptIfoptPlanProfile",
     "TrajOptIfoptProfileReturnTypeError",

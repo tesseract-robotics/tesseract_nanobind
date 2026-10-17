@@ -98,6 +98,13 @@ struct WaypointInfoInUseError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
+// A Python composite profile's create changed the planner's nodes: their variables (addVar), which
+// the planner laid the problem out from before create, or their values (setVariables), which it
+// would overwrite with its own seed.
+struct NodeLayoutChangedError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 // super().create(...) from a Python override: both hooks are pure virtual, so the base binding
 // has nothing to call.
 struct PureVirtualCallError : std::logic_error {
@@ -147,9 +154,27 @@ public:
                                      const std::shared_ptr<const te::Environment>& env,
                                      const std::vector<std::shared_ptr<const ti::Node>>& nodes,
                                      const std::vector<int>& fixed_indices) const override {
+        // The nodes reach Python as Node, without the const; record them to check them after.
+        std::vector<Eigen::VectorXd> before;
+        before.reserve(nodes.size());
+        for (const auto& node : nodes)
+            before.push_back(node->getValues());
         nb::detail::ticket t(nb_trampoline, "create", true);
         nb::object result = nb_trampoline.base().attr(t.key)(
             nb::cast(composite_manip_info, nb::rv_policy::copy), env, nodes, fixed_indices);
+        for (std::size_t i = 0; i < nodes.size(); ++i) {
+            const Eigen::VectorXd after = nodes[i]->getValues();
+            if (after.size() != before[i].size())
+                throw NodeLayoutChangedError(
+                    "TrajOptIfoptCompositeProfile.create changed node " + std::to_string(i) + " from " +
+                    std::to_string(before[i].size()) + " to " + std::to_string(after.size()) +
+                    " variables; the nodes are read-only, the planner laid the problem out from them");
+            // exact: any write is a change, and the planner would overwrite it with its seed
+            if ((after.array() != before[i].array()).any())
+                throw NodeLayoutChangedError(
+                    "TrajOptIfoptCompositeProfile.create changed the values of node " + std::to_string(i) +
+                    "; the nodes are read-only, the planner seeds them itself");
+        }
         if (!nb::isinstance<tp::TrajOptIfoptTermInfos>(result))
             throw ProfileReturnTypeError("TrajOptIfoptCompositeProfile.create must return a TrajOptIfoptTermInfos");
         // A copy: the sets are shared_ptrs, and a Python set's deleter takes the GIL to release it.
@@ -164,6 +189,8 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
 
     nb::exception<PureVirtualCallError>(m, "TrajOptIfoptPureVirtualCallError", PyExc_NotImplementedError)
         .attr("__doc__") = "super().create(...) from a Python TrajOpt-Ifopt profile: the base is pure virtual.";
+    nb::exception<NodeLayoutChangedError>(m, "TrajOptIfoptNodeLayoutChangedError", PyExc_ValueError)
+        .attr("__doc__") = "A Python TrajOptIfoptCompositeProfile.create changed the planner's nodes (variables or values).";
     nb::exception<ProfileReturnTypeError>(m, "TrajOptIfoptProfileReturnTypeError", PyExc_TypeError)
         .attr("__doc__") = "A Python TrajOpt-Ifopt profile's create returned the wrong type.";
     nb::exception<WaypointInfoWithoutNodeError>(m, "TrajOptIfoptWaypointInfoWithoutNodeError", PyExc_ValueError)
@@ -283,7 +310,9 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
                                    fixed_indices);
             },
             "composite_manip_info"_a, "env"_a, "nodes"_a, "fixed_indices"_a,
-            "Build the trajectory-wide terms the planner adds over all waypoint nodes");
+            "Build the trajectory-wide terms the planner adds over all waypoint nodes. `nodes` are the "
+            "planner's and read-only: a Python override that adds variables or sets values raises "
+            "TrajOptIfoptNodeLayoutChangedError.");
 
     // ========== TrajOptIfoptSolverProfile (base) ==========
     // No trampoline: create returns a unique_ptr to the concrete TrustRegionSQPSolver, which a
