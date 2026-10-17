@@ -53,11 +53,7 @@ Added `optimize` and `max_solutions` parameters to `create_freespace_pipeline_pr
 profiles = create_freespace_pipeline_profiles(num_planners=8)  # optimize=True
 
 # First-solution mode (shows scaling)
-profiles = create_freespace_pipeline_profiles(
-    num_planners=8,
-    optimize=False,
-    max_solutions=1
-)
+profiles = create_freespace_pipeline_profiles(num_planners=8, optimize=False, max_solutions=1)
 ```
 
 ### When Parallelism Actually Helps

@@ -48,9 +48,8 @@ from tesseract_robotics.tesseract_motion_planners import (
 )
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
-    OMPLRealVectorPlanProfile,
+    OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
-    ProfileDictionary_addOMPLProfile,
     RRTConnectConfigurator,
     SBLConfigurator,
 )
@@ -139,7 +138,7 @@ class TestOMPLMotionPlanner:
         assert planner is not None
 
     def test_plan_profile(self):
-        profile = OMPLRealVectorPlanProfile()
+        profile = OMPLRealVectorMoveProfile()
         assert profile is not None
 
 
@@ -191,9 +190,9 @@ class TestOMPLPlanning:
         program.push_back(MoveInstructionPoly(plan_f1))
 
         # Setup OMPL planner - use helper function for cross-module profile registration
-        plan_profile = OMPLRealVectorPlanProfile()
+        plan_profile = OMPLRealVectorMoveProfile()
         profiles = ProfileDictionary()
-        ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
 
         # Create request
         request = PlannerRequest()
@@ -259,9 +258,9 @@ class TestSimplePlanner:
         program.push_back(MoveInstructionPoly(mi))
 
         # First solve with OMPL to get a valid result - use helper function
-        plan_profile = OMPLRealVectorPlanProfile()
+        plan_profile = OMPLRealVectorMoveProfile()
         profiles = ProfileDictionary()
-        ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
 
         request = PlannerRequest()
         request.instructions = program

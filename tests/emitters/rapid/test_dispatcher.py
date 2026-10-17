@@ -58,7 +58,7 @@ def _move(waypoint_poly, *, profile: str = "P", move_type=MoveInstructionType.LI
     """Build a `MoveInstructionPoly` from a typed waypoint poly.
 
     Uses the 3-arg `MoveInstruction(waypoint, type, profile)` SWIG-compat
-    overload, then wraps via `MoveInstructionPoly_wrap_MoveInstruction` —
+    overload, then wraps via `MoveInstructionPoly` —
     the canonical pattern from the existing `tests/tesseract_command_language`
     test suite.
     """

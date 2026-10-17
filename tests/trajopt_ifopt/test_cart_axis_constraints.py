@@ -118,5 +118,5 @@ def test_sqp_aligns_the_tool_axis(axes: AxisFixture):
 
     solver.solve(problem)
 
-    assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+    assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
     assert np.linalg.norm(align.calcValues(axes.nodes.getValues())) < 1e-3

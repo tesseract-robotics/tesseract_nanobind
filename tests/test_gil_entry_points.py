@@ -148,11 +148,11 @@ def test_time_parameterization_compute_releases_gil(abb_env):  # noqa: F811
     from tesseract_robotics.tesseract_command_language import ProfileDictionary
     from tesseract_robotics.tesseract_time_parameterization import (
         TimeOptimalTrajectoryGeneration,
-        TOTGCompositeProfile,
+        TimeOptimalTrajectoryGenerationCompositeProfile,
     )
 
     profiles = ProfileDictionary()
-    profiles.addProfile("TOTG", "DEFAULT", TOTGCompositeProfile())
+    profiles.addProfile("TOTG", "DEFAULT", TimeOptimalTrajectoryGenerationCompositeProfile())
     totg = TimeOptimalTrajectoryGeneration()
 
     assert_releases_gil(lambda: totg.compute(_abb_program(num=200), abb_env, profiles))

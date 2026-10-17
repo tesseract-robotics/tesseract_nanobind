@@ -48,7 +48,6 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
 )
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
@@ -69,9 +68,7 @@ def add_ifopt_profiles(profiles):
     composite.velocity_coeff = np.ones(1)
     composite.acceleration_coeff = np.ones(1)
     composite.jerk_coeff = np.ones(1)
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "FREESPACE", composite
-    )
+    profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "FREESPACE", composite)
 
 
 def run(

@@ -158,13 +158,13 @@ graph TD
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile (per-waypoint settings)
-plan_profile = TrajOptDefaultPlanProfile()
+plan_profile = TrajOptDefaultMoveProfile()
 plan_profile.cartesian_constraint_config.enabled = True
 plan_profile.cartesian_constraint_config.coeff = [5, 5, 5, 5, 5, 5]  # Position/orientation weights
 
@@ -181,7 +181,7 @@ composite_profile.smooth_accelerations = True
 ### Collision Configuration
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # TrajOptCollisionConfig constructor: (margin, coeff) or default
@@ -261,9 +261,9 @@ profile.collision_constraint_config.collision_check_config.type = CollisionEvalu
 ### Example: Cartesian Pose as Cost vs Constraint
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
+from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultMoveProfile
 
-plan_profile = TrajOptDefaultPlanProfile()
+plan_profile = TrajOptDefaultMoveProfile()
 
 # SOFT: Cartesian cost - "try to reach this pose"
 # Useful when exact pose isn't critical
@@ -357,7 +357,6 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesEdgeEvaluatorD,
     DescartesMoveProfileD,
-    cast_DescartesMoveProfileD,
 )
 
 class WristFlipPenaltyEvaluator(DescartesEdgeEvaluatorD):
@@ -394,8 +393,7 @@ objects with a `.values` attribute that is a 1-D numpy array of joint
 positions in the manipulator's joint order.
 
 Then, register the profile in the `ProfileDictionary` the same way you would a
-C++ profile, using `cast_DescartesMoveProfileD` to coerce it to the
-base `Profile` type:
+C++ profile; `addProfile` takes the Python subclass directly:
 
 ```python
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
@@ -404,11 +402,9 @@ profiles = ProfileDictionary()
 profiles.addProfile(
     "DescartesMotionPlannerTask",          # namespace
     "MY_PROFILE",                          # profile name (referenced by MoveInstruction)
-    cast_DescartesMoveProfileD(MyMoveProfile()),
+    MyMoveProfile(),
 )
 ```
-
-
 
 !!! warning "Threading and the GIL"
     Each call back into Python acquires the GIL, so OpenMP-parallel

@@ -157,7 +157,6 @@ def _count_traj_contacts(robot, manager, joint_names, planning_result) -> int:
 def _trajopt_profiles_with_collision():
     """Default TrajOpt profiles with an OSQP budget that fits a fine octree's QPs."""
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptSolverProfile,
         TrajOptOSQPSolverProfile,
     )
 
@@ -165,7 +164,7 @@ def _trajopt_profiles_with_collision():
     solver = TrajOptOSQPSolverProfile()
     solver.settings.max_iter = COLLISION_AWARE_OSQP_MAX_ITER
     for name in TRAJOPT_PROFILE_NAMES:
-        ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, solver)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, solver)
     return profiles
 
 
@@ -180,10 +179,6 @@ def _trajopt_profiles_without_collision():
     """
     from tesseract_robotics.planning.profiles import _create_trajopt_profiles
     from tesseract_robotics.tesseract_command_language import ProfileDictionary
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-    )
     from tesseract_robotics.tesseract_task_composer_planning import ContactCheckProfile
 
     composite, plan = _create_trajopt_profiles()
@@ -192,10 +187,8 @@ def _trajopt_profiles_without_collision():
 
     profiles = ProfileDictionary()
     for name in TRAJOPT_PROFILE_NAMES:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
     # The TrajOptPipeline task graph runs a DiscreteContactCheckTask AFTER the
     # planner, and that task aborts the pipeline if any waypoint is in contact.

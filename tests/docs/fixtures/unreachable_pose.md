@@ -5,7 +5,12 @@ the third block must fail on its own assert.
 
 ```python
 from tesseract_robotics.planning import (
-    CartesianTarget, JointTarget, MotionProgram, Pose, Robot, plan_freespace,
+    CartesianTarget,
+    JointTarget,
+    MotionProgram,
+    Pose,
+    Robot,
+    plan_freespace,
 )
 
 robot = Robot.from_tesseract_support("abb_irb2400")

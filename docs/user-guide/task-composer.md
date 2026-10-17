@@ -317,14 +317,13 @@ For a manual `ProfileDictionary`:
 
 ```python
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLDefaultPlanProfile
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
-)
+from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
+from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultMoveProfile
 
+# addProfile(namespace, profile name, profile): the namespace is the planner task's name
 profiles = ProfileDictionary()
-profiles.addProfile("ompl",    "DEFAULT", OMPLDefaultPlanProfile())
-profiles.addProfile("trajopt", "DEFAULT", TrajOptDefaultPlanProfile())
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", OMPLRealVectorMoveProfile())
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", TrajOptDefaultMoveProfile())
 ```
 
 ## Error Handling

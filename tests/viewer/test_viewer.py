@@ -19,12 +19,12 @@ from tesseract_robotics import tesseract_geometry as tg
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -204,7 +204,7 @@ def _composite(waypoints):
     composite = CompositeInstruction()
     for wp in waypoints:
         move = MoveInstruction(wp, MoveInstructionType.FREESPACE)
-        composite.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move))
+        composite.push_back(MoveInstructionPoly(move))
     return composite
 
 
@@ -240,7 +240,7 @@ def test_update_trajectory_from_composite(viewer, env):
     for q, t in ((np.zeros(6), 0.0), (Q, 1.5)):
         wp = StateWaypoint(JOINT_NAMES, q)
         wp.setTime(t)
-        waypoints.append(StateWaypointPoly_wrap_StateWaypoint(wp))
+        waypoints.append(StateWaypointPoly(wp))
     composite = _composite(waypoints)
     _load_paused(viewer, composite)
     assert viewer._gui_time.max == Trajectory.from_composite(composite).duration_s
@@ -250,8 +250,7 @@ def test_joint_waypoint_composite_plays(viewer, env):
     """Review Focus 4: joint waypoints carry no time; index is time."""
     viewer.update_environment(env)
     waypoints = [
-        JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(JOINT_NAMES, q))
-        for q in (np.zeros(6), Q, np.zeros(6))
+        JointWaypointPoly(JointWaypoint(JOINT_NAMES, q)) for q in (np.zeros(6), Q, np.zeros(6))
     ]
     _load_paused(viewer, _composite(waypoints))
     assert viewer._gui_time.max == 2.0

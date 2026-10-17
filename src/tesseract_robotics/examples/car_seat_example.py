@@ -80,17 +80,11 @@ from tesseract_robotics.tesseract_environment import (
 )
 from tesseract_robotics.tesseract_geometry import createMeshFromResource
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptSolverProfile,
     TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    ProfileDictionary_addTrajOptIfoptMoveProfile,
-    ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
@@ -181,7 +175,7 @@ def create_car_seat_profiles():
     composite.collision_cost_config.collision_margin_buffer = 0.01
 
     # === Plan/Move Profile ===
-    plan = TrajOptDefaultPlanProfile()
+    plan = TrajOptDefaultMoveProfile()
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.joint_cost_config.enabled = False
@@ -194,9 +188,9 @@ def create_car_seat_profiles():
     solver.opt_params.min_trust_box_size = 1e-3
 
     for name in ["DEFAULT", "FREESPACE"]:
-        ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, name, composite)
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
-        ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
+        profiles.addProfile(TRAJOPT_NS, name, composite)
+        profiles.addProfile(TRAJOPT_NS, name, plan)
+        profiles.addProfile(TRAJOPT_NS, name, solver)
 
     return profiles
 
@@ -243,15 +237,9 @@ def create_car_seat_ifopt_profiles():
 
     # C++ names its composite "FREESPACE"; MotionProgram's composite is "DEFAULT".
     for name in ["DEFAULT", "FREESPACE"]:
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptIfoptMoveProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, move
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, move)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver)
 
     return profiles
 

@@ -36,10 +36,8 @@ from tesseract_robotics.planning import (
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
     TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
 )
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -155,12 +153,12 @@ def run():
     # TrajOpt Profile Configuration
     # =========================================================================
     # Two profile types:
-    # - PlanProfile: per-waypoint settings (Cartesian/joint constraints)
+    # - MoveProfile: per-waypoint settings (Cartesian/joint constraints)
     # - CompositeProfile: trajectory-wide settings (collision avoidance)
     profiles = ProfileDictionary()
 
     # --- Plan Profile: Cartesian constraint configuration ---
-    trajopt_plan_profile = TrajOptDefaultPlanProfile()
+    trajopt_plan_profile = TrajOptDefaultMoveProfile()
 
     # Disable joint-space cost (we want Cartesian accuracy, not joint smoothness)
     trajopt_plan_profile.joint_cost_config.enabled = False
@@ -205,12 +203,8 @@ def run():
 
     # Register profiles with TrajOpt namespace
     # "CARTESIAN" profile used by waypoints, "DEFAULT" for trajectory-wide settings
-    ProfileDictionary_addTrajOptPlanProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile
-    )
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
-    )
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile)
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile)
 
     print("Running TrajOpt planner...")
 

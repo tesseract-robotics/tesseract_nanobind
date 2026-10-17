@@ -76,7 +76,6 @@ from tesseract_robotics.planning.profiles import (
     create_trajopt_ifopt_default_profiles,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
     TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
 )
@@ -102,9 +101,7 @@ class Gate(TrajOptIfoptCompositeProfile):
 
 gated_profiles = create_trajopt_ifopt_default_profiles()
 for name in TRAJOPT_PROFILE_NAMES:
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        gated_profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, Gate()
-    )
+    gated_profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, Gate())
 
 
 def gated_storage(node):

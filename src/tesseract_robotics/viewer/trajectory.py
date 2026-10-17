@@ -10,10 +10,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstructionType,
-    WaypointPoly_as_JointWaypointPoly,
-    WaypointPoly_as_StateWaypointPoly,
 )
 
 from .errors import EmptyTrajectoryError, TrajectoryShapeError, UnplannedWaypointError
@@ -121,13 +118,13 @@ class Trajectory:
         move_types: list[MoveInstructionType] = []
         moves = [i for i in composite.flatten() if i.isMoveInstruction()]
         for index, instruction in enumerate(moves):
-            move = InstructionPoly_as_MoveInstructionPoly(instruction)
+            move = instruction.asMoveInstruction()
             wp = move.getWaypoint()
             if wp.isStateWaypoint():
-                state = WaypointPoly_as_StateWaypointPoly(wp)
+                state = wp.asStateWaypoint()
                 names, q, t = _names(state), state.getPosition(), state.getTime()
             elif wp.isJointWaypoint():
-                joint = WaypointPoly_as_JointWaypointPoly(wp)
+                joint = wp.asJointWaypoint()
                 names, q, t = _names(joint), joint.getPosition(), float(index)
             else:
                 raise UnplannedWaypointError(

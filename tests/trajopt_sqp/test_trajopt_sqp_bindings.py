@@ -1509,5 +1509,5 @@ class TestPIQPSolver:
 
         solver.solve(problem)
 
-        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
         assert nodes.getValues()[2] == pytest.approx(2.0, abs=OSQP_ABSOLUTE_TOLERANCE)

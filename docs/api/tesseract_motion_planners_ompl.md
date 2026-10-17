@@ -10,9 +10,8 @@ optimization-based planners may get stuck in local minima.
 ```python
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
-    OMPLPlanProfile, OMPLRealVectorPlanProfile,
+    OMPLMoveProfile, OMPLRealVectorMoveProfile,
     RRTConnectConfigurator, RRTstarConfigurator, SBLConfigurator,
-    ProfileDictionary_addOMPLProfile,
 )
 ```
 
@@ -37,17 +36,17 @@ response = planner.solve(request)
 
 ## Profiles
 
-### OMPLRealVectorPlanProfile
+### OMPLRealVectorMoveProfile
 
 Configure OMPL planning behavior. The profile has three sub-configs:
 `solver_config`, `collision_check_config`, and `contact_manager_config`.
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_ompl import (
-    OMPLRealVectorPlanProfile, RRTConnectConfigurator,
+    OMPLRealVectorMoveProfile, RRTConnectConfigurator,
 )
 
-profile = OMPLRealVectorPlanProfile()
+profile = OMPLRealVectorMoveProfile()
 
 # Solver settings
 profile.solver_config.planning_time = 5.0   # seconds
@@ -149,18 +148,18 @@ that profile (a copy of `solver_config`).
 ```python
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_ompl import (
-    OMPLRealVectorPlanProfile, ProfileDictionary_addOMPLProfile,
+    OMPLRealVectorMoveProfile,
     RRTConnectConfigurator
 )
 
 # Create profile
-profile = OMPLRealVectorPlanProfile()
+profile = OMPLRealVectorMoveProfile()
 profile.solver_config.planning_time = 10.0
 profile.solver_config.addPlanner(RRTConnectConfigurator())
 
 # Add to dictionary (dict, namespace, profile_name, profile)
 profiles = ProfileDictionary()
-ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", profile)
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", profile)
 
 # Use with planner request
 request.profiles = profiles
@@ -172,7 +171,7 @@ it without building a profile:
 
 ```python
 assert profiles.hasProfile(
-    OMPLRealVectorPlanProfile.createKey(), "OMPLMotionPlannerTask", "DEFAULT"
+    OMPLRealVectorMoveProfile.createKey(), "OMPLMotionPlannerTask", "DEFAULT"
 )
 ```
 
@@ -180,20 +179,20 @@ assert profiles.hasProfile(
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_ompl import (
-    OMPLMotionPlanner, OMPLRealVectorPlanProfile,
-    RRTConnectConfigurator, ProfileDictionary_addOMPLProfile
+    OMPLMotionPlanner, OMPLRealVectorMoveProfile,
+    RRTConnectConfigurator,
 )
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
 # Configure OMPL profile
-profile = OMPLRealVectorPlanProfile()
+profile = OMPLRealVectorMoveProfile()
 profile.solver_config.planning_time = 5.0
 profile.solver_config.simplify = True
 profile.solver_config.addPlanner(RRTConnectConfigurator())
 
 profiles = ProfileDictionary()
-ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", profile)
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", profile)
 
 # Create request
 request = PlannerRequest()
