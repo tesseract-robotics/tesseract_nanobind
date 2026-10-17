@@ -278,7 +278,7 @@ class TestNodeUuids:
         node, context = run
         info_map = context.task_infos.getInfoMap()
         out = tmp_path / "graph.dot"
-        assert node.saveDotgraph(str(out), info_map) is True
+        node.saveDotgraph(out, info_map)
         assert out.read_text() == node.getDotgraph(info_map)
 
 
