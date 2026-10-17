@@ -235,6 +235,10 @@ ACCEPTED_SYMBOLS = {
 # name) -> the Python dotted names of its instances. The C++ row is accepted only when every
 # listed instance is bound; each instance is accepted on the Python side (template-instance-name).
 TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("tesseract_command_language", "InstructionPoly.as"): tuple(
+        f"InstructionPoly.as{t}Instruction"
+        for t in ("Move", "Composite", "Wait", "Timer", "SetAnalog", "SetDigital", "SetTool")
+    ),
     # tesseract_task_composer (#256 group 4): `template <T> T& AnyPoly::as()`.
     ("tesseract_task_composer", "AnyPoly.as"): (
         "AnyPoly_as_CompositeInstruction",
