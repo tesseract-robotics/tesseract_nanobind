@@ -228,6 +228,8 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get the coefficient vector");
 
     // ========== Var (variable segment) ==========
+    // getParent stays unbound: it is a raw pointer to the owning Node, which dangles once the
+    // planner's problem is freed, while a Python Var (a shared_ptr) outlives it (#340).
     nb::class_<ti::Var>(m, "Var")
         .def("getIdentifier", &ti::Var::getIdentifier,
              "Get the identifier for the variable segment")
@@ -245,6 +247,8 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Set the variable values from the full decision vector");
 
     // ========== Node (group of related variables) ==========
+    // getParent stays unbound: it is a raw pointer to the NodesVariables, which dangles once the
+    // planner's problem is freed, while a Python Node (a shared_ptr) outlives it (#340).
     nb::class_<ti::Node>(m, "Node")
         .def(nb::init<std::string>(), "node_name"_a = "Node",
              "Create a node with an optional name")
