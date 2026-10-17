@@ -587,8 +587,9 @@ REFERENCE_TYPE_KINDS = frozenset({ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALU
 
 
 def _is_forwarding_ctor_template(m: ci.Cursor) -> bool:
-    """`m` is a constructor template that takes any type: every parameter is `T`, `const T&`
-    or `T&&` for one of `m`'s own template type parameters (`template <T> AnyPoly(T&&)`).
+    """`m` is a constructor template that takes any type: every parameter is `T`, `T&`,
+    `T&&`, `const T`, `const T&` or `const T&&` for one of `m`'s own template type parameters
+    (`template <T> AnyPoly(T&&)`); never a pointer, nor the enclosing class's parameter.
     Python names one function per instance (`AnyPoly_wrap_CompositeInstruction`), so the
     overload is absent by design (template-instance-name)."""
     if m.kind != ci.CursorKind.FUNCTION_TEMPLATE or not _is_ctor(m, m.semantic_parent):
