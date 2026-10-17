@@ -83,7 +83,8 @@ factory.getConfig()                                # the config as a YAML docume
 factory.saveConfig(Path("task_composer_plugins.yaml"))
 ```
 
-A path passed as `str` is parsed as YAML text and raises `ValueError`.
+A path passed as `str` is parsed as YAML text and raises `TaskComposerConfigError` (a
+`ValueError`) naming the text.
 
 `createTaskComposerNode` and `createTaskComposerExecutor` raise `TaskComposerPluginError` (a
 `RuntimeError`) when the name is not configured, listing the configured names, or when its plugin
@@ -172,6 +173,11 @@ status = future.waitFor(5.0)  # FutureStatus.ready / .timeout
 context = future.context
 ```
 
+The run uses the node, the data and the executor after `run` returns. The future (and each
+`copy()` of it) keeps them alive, and dropping a future waits for the run to end, as a C++
+`std::async` future does: `del future` mid-run blocks, with the GIL released, until the run
+finishes. Dropping the node or the executor mid-run is safe.
+
 ### Node infos
 
 Every node that ran records a `TaskComposerNodeInfo` in `context.task_infos`, keyed by node
@@ -187,7 +193,14 @@ for uuid, info in infos.getInfoMap().items():
 
 trajopt = infos.find(lambda i: i.name == "TrajOptMotionPlannerTask")
 aborting = infos.getInfo(infos.getAbortingNode())  # None if nothing aborted
+
+# prune edits every stored info: the callback gets a copy, which is stored when prune returns
+infos.prune(lambda i: setattr(i, "data_storage", TaskComposerDataStorage()))
 ```
+
+`find` and `prune` call back on a snapshot taken before the first call, outside the
+container's lock, so a callback may call into the container. An info kept from a `prune`
+callback is an independent copy: edits made to it after `prune` returns are not stored.
 
 ### Graphs and pipelines
 
@@ -259,7 +272,7 @@ task = factory.createTaskComposerNode("FreespacePipeline")
 
 # Structure only
 dot = task.getDotgraph()             # DOT source as a string
-task.saveDotgraph("pipeline.dot")    # write to file, returns bool
+task.saveDotgraph("pipeline.dot")    # write to file (str or Path); OSError if it cannot
 
 # Annotated with execution results — pass the run's info map:
 # successful nodes render green with execution time, failed/aborted nodes red
