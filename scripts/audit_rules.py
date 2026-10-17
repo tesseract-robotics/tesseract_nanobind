@@ -305,7 +305,18 @@ ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
 # A type-erased Poly -> the bound classes it wraps, which C++ converts into it through the
 # Poly's converting constructors (R8). A Python overload typed by an alternative stands for
 # the Poly-typed C++ parameter.
-POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {}
+POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {
+    "WaypointPoly": ("CartesianWaypointPoly", "JointWaypointPoly", "StateWaypointPoly"),
+    "InstructionPoly": (
+        "MoveInstructionPoly",
+        "CompositeInstruction",
+        "WaitInstruction",
+        "TimerInstruction",
+        "SetAnalogInstruction",
+        "SetDigitalInstruction",
+        "SetToolInstruction",
+    ),
+}
 # Rules whose overload-level `absent_ok` also accepts a symbol Python does not bind at all,
 # when every overload carries it, or that `CppSymbol.absent_ok` names for a field.
 # (`yaml-node` and `serialization-default-ctor` do not: they name one overload of a symbol
