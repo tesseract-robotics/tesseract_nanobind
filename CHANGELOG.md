@@ -4,7 +4,7 @@
 
 ### Breaking changes
 
-- **Command-language types compare by value and are unhashable** — the 16 waypoint, instruction and Poly types bind `__eq__`/`__ne__` from the C++ operators and set `__hash__ = None`; `hash()`, `set` members and `dict` keys raise `TypeError`. `MoveInstruction` equality includes both UUIDs ([#261]; [breaking changes](docs/breaking-changes.md#command-language-types-compare-by-value-and-are-unhashable)).
+- **Command-language types compare by value and are unhashable** — the 16 waypoint, instruction and Poly types bind `__eq__`/`__ne__` from the C++ operators and set `__hash__ = None`; `hash()`, `set` members and `dict` keys raise `TypeError`. `MoveInstruction` equality includes both UUIDs; `docs/breaking-changes.md` has the migration ([#261]).
 - **Time-parameterization profiles compare by value and are unhashable** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` bind `__eq__`/`__ne__` from the C++ `operator==` (identity before) and set `__hash__ = None`, as #169 did for collision, common and environment: `hash()`, `set` members and `dict` keys raise `TypeError` ([#261]).
 - **`CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed** — copies of `setCollisionCoeff` / `getCollisionCoeff` under names C++ does not have. Call the C++ names ([#298]).
 - **`CollisionCoeffData`, `TrajOptCollisionConfig` and `SQPParameters` compare by value and are unhashable** — `==` compared identity; `hash()`, `set` members and `dict` keys now raise `TypeError` ([#261](https://github.com/tesseract-robotics/tesseract_nanobind/issues/261)).
