@@ -89,6 +89,10 @@ ACCEPTED = {
     "views objects owned elsewhere; Python passes the owner to a bound sibling overload, which "
     "builds the same view (`InstructionsTrajectory(program)`). Accepted only when a sibling "
     "overload is covered.",
+    "reference-wrapper-out-param": "`ContactResultMap.flattenWrapperResults` fills a "
+    "`std::vector<std::reference_wrapper<ContactResult>>` with references into the map, which "
+    "have no Python form; `flattenCopyResults` and `flattenMoveResults` return the same results "
+    "(phaseB won't fix, C12).",
     "profile-key-template": "`ProfileDictionary::getProfile<ProfileType>(ns, name, default)` "
     "derives the profile key from its template argument; Python passes the key to the bound "
     "`getProfile(key, ns, name)` (`profile.getKey()`, or `ProfileType.createKey()` once bound), "
@@ -275,6 +279,11 @@ ACCEPTED_SYMBOLS = {
     ("tesseract_kinematics", "InvKinFactory"): "plugin-author-factory-interface",
     ("tesseract_collision", "DiscreteContactManagerFactory"): "plugin-author-factory-interface",
     ("tesseract_collision", "ContinuousContactManagerFactory"): "plugin-author-factory-interface",
+    # C12 (accept by explicit entry): the core reference-wrapper flatten.
+    (
+        "tesseract_collision",
+        "ContactResultMap.flattenWrapperResults",
+    ): "reference-wrapper-out-param",
     # Group 3 (motion planners). R2: type-erased planner payloads.
     ("tesseract_motion_planners", "PlannerRequest.data"): "type-erased-data",
     ("tesseract_motion_planners", "PlannerResponse.data"): "type-erased-data",
