@@ -1,5 +1,5 @@
 # Audit contract fixture (#256 T3 rule 2): another stub binding a class under the C++ leaf
-# LongWidgetName; the own rename (Widget) must win over this leaf hit.
+# LongWidgetName; the own rename (Gizmo) must win over this leaf hit.
 class LongWidgetName:
     def size(self) -> int: ...
     def color(self) -> int: ...

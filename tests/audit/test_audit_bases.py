@@ -46,11 +46,11 @@ def test_public_bases_lists_direct_public_bases_only():
     """Qualified class -> its direct public bases' qualified classes (T3 identity)."""
     bases = audit.public_bases(audit.parse_tu(BASES_CPP, (FIXTURE_INCLUDE,)))
     ns = "tesseract::bases::"
-    assert bases[f"{ns}SlowRunner"] == (f"{ns}Runner",)
-    assert bases[f"{ns}DeepRunner"] == (f"{ns}Middle",)  # direct only: Runner through Middle
+    assert bases[f"{ns}SlowJogger"] == (f"{ns}Jogger",)
+    assert bases[f"{ns}DeepJogger"] == (f"{ns}Middle",)  # direct only: Jogger through Middle
     assert bases[f"{ns}Hidden"] == ()  # private base
     assert bases[f"{ns}Loner"] == ()
-    assert bases[f"{ns}Planner"] == (f"{ns}Runner",)  # the class template's base
+    assert bases[f"{ns}Planner"] == (f"{ns}Jogger",)  # the class template's base
     assert bases[f"{ns}SubPlanner"] == (f"{ns}Planner",)  # a template instance base
 
 
@@ -61,32 +61,32 @@ def test_base_rows_exact(bases_report):
     (`PlannerD` -> `tesseract::bases::Planner`) to the C++ base `Planner<double>`.
     """
     assert _base_rows(bases_report) == (
-        {"SlowRunner(Runner)", "PlannerD(Runner)"},
-        {"Loner(Runner)"},
+        {"SlowJogger(Jogger)", "PlannerD(Jogger)"},
+        {"Loner(Jogger)"},
     )
 
 
 def test_missing_bound_base_is_a_gap_at_the_cpp_class(bases_report):
-    """T5-1: SlowRunner's C++ base Runner is bound; the stub omits it."""
-    row = next(g for g in bases_report.gaps if g.symbol == "SlowRunner(Runner)")
+    """T5-1: SlowJogger's C++ base Jogger is bound; the stub omits it."""
+    row = next(g for g in bases_report.gaps if g.symbol == "SlowJogger(Jogger)")
     assert row.location == "tests/audit/fixtures/include/tesseract/bases/runners.h:12"
 
 
 def test_stub_base_that_is_no_cpp_ancestor_is_a_deviation_at_the_stub(bases_report):
-    """T5-3: Loner claims Runner; C++ Loner has no base."""
-    row = next(d for d in bases_report.deviations if d.name == "Loner(Runner)")
+    """T5-3: Loner claims Jogger; C++ Loner has no base."""
+    row = next(d for d in bases_report.deviations if d.name == "Loner(Jogger)")
     assert row.location == "tests/audit/fixtures/bases/_bases.pyi:14"
 
 
 def test_nearest_bound_ancestor_through_an_unbound_intermediate_is_enough(bases_report):
-    """T5-2: DeepRunner : Middle : Runner, stub says DeepRunner(Runner)."""
+    """T5-2: DeepJogger : Middle : Jogger, stub says DeepJogger(Jogger)."""
     gaps, deviations = _base_rows(bases_report)
-    assert not {r for r in gaps | deviations if r.startswith(("DeepRunner(", "Tagged(", "Hidden("))}
+    assert not {r for r in gaps | deviations if r.startswith(("DeepJogger(", "Tagged(", "Hidden("))}
 
 
 def test_renamed_class_is_checked_under_its_python_name(bases_report):
     """`Planner<double>` is bound as `PlannerD` (T3): the base pass reaches it by that name."""
-    assert "PlannerD(Runner)" in _base_rows(bases_report)[0]
+    assert "PlannerD(Jogger)" in _base_rows(bases_report)[0]
 
 
 def _rows_of(report, cls):
@@ -95,25 +95,25 @@ def _rows_of(report, cls):
 
 
 def test_cross_module_base_without_an_index_entry_compares_by_leaf(bases_report):
-    """`bases_remote` has no binding TU: positive evidence only, leaf `Runner` = C++ `Runner`."""
-    assert not _rows_of(bases_report, "RemoteRunner")
+    """`bases_remote` has no binding TU: positive evidence only, leaf `Jogger` = C++ `Jogger`."""
+    assert not _rows_of(bases_report, "RemoteJogger")
 
 
 def test_cross_module_base_with_the_same_leaf_but_another_class_is_a_gap():
     """Identity, not leaf: a stub base of another class under the same leaf is a gap.
 
-    `bases_remote` binds `Runner` as `other::Runner`, so the stub base
-    `bases_remote._bases_remote.Runner` is not the C++ base `tesseract::bases::Runner`.
+    `bases_remote` binds `Jogger` as `other::Jogger`, so the stub base
+    `bases_remote._bases_remote.Jogger` is not the C++ base `tesseract::bases::Jogger`.
     """
-    index = {**OWN_INDEX, "bases_remote": {"Runner": "other::Runner"}}
+    index = {**OWN_INDEX, "bases_remote": {"Jogger": "other::Jogger"}}
     report = bases_report_with(bound=lambda m: index.get(m, {}))
-    assert ("RemoteRunner(Runner)", audit.Kind.BASE) in {(g.symbol, g.kind) for g in report.gaps}
-    assert ("RemoteRunner(Runner)", audit.Kind.BASE) in {
+    assert ("RemoteJogger(Jogger)", audit.Kind.BASE) in {(g.symbol, g.kind) for g in report.gaps}
+    assert ("RemoteJogger(Jogger)", audit.Kind.BASE) in {
         (d.name, d.kind) for d in report.deviations
     }
 
 
 def test_cross_module_base_with_the_same_class_raises_no_row():
-    index = {**OWN_INDEX, "bases_remote": {"Runner": "tesseract::bases::Runner"}}
+    index = {**OWN_INDEX, "bases_remote": {"Jogger": "tesseract::bases::Jogger"}}
     report = bases_report_with(bound=lambda m: index.get(m, {}))
-    assert not _rows_of(report, "RemoteRunner")
+    assert not _rows_of(report, "RemoteJogger")
