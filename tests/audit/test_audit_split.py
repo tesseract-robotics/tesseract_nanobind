@@ -76,7 +76,7 @@ PARSE = {
     # G2 (R13)
     "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
     # G3 (R13's not-API half)
-    "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES",
+    "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES", "no_bound_class",
 }  # fmt: skip
 
 

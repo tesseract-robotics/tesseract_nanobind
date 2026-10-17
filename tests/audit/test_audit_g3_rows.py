@@ -259,10 +259,8 @@ def test_g3_patterns_are_scoped(spelling):
     ("module", "symbol"),
     [
         (OMPL, "OMPLMoveProfile.createSimpleSetup"),
-        (OMPL, "OMPLMoveProfile.createStateExtractor"),
         (OMPL, "OMPLPlannerConfigurator.create"),
         (OMPL, "OMPLRealVectorMoveProfile.createSimpleSetup"),
-        (OMPL, "OMPLRealVectorMoveProfile.createStateExtractor"),
         (OMPL, "RRTConnectConfigurator.create"),
         (OMPL, "RRTstarConfigurator.create"),
         (OMPL, "SBLConfigurator.create"),
@@ -294,6 +292,9 @@ def test_real_unbound_dependency_rows(g3_reports, module, symbol):
         (IFOPT, "TrajOptIfoptSolverProfile.callbacks"),  # I-sqp-5: trajopt_sqp is audited
         (IFOPT, "TrajOptIfoptSolverProfile.createOptimizationCallbacks"),  # I-sqp-5
         (OMPL, "OMPLSolverConfig.planners"),  # I-mp-plan-3 (g3/04)
+        # `ompl::base::State` is bound by `ompl_base` until #258 removes it: a Python form.
+        (OMPL, "OMPLMoveProfile.createStateExtractor"),
+        (OMPL, "OMPLRealVectorMoveProfile.createStateExtractor"),
     ],
 )
 def test_real_bindable_rows_stay_gaps(g3_reports, module, symbol):

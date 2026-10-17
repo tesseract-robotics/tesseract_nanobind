@@ -506,34 +506,45 @@ UNBOUND_DEPENDENCY_NAMESPACES = ("ompl::",)
 UNBOUND_DEPENDENCY = "unbound-dependency-type"
 
 
-def _names_unbound_dependency(t: ci.Type, not_api: frozenset[Path]) -> bool:
+def no_bound_class(qualified: str) -> bool:
+    """`cpp_api`'s default `is_bound`: no module is known to bind any class."""
+    return False
+
+
+def _names_unbound_dependency(
+    t: ci.Type, not_api: frozenset[Path], is_bound: Callable[[str], bool]
+) -> bool:
     """Whether `t`, through pointers, references, template arguments and `std::function`
     signatures, names a type with no Python form: declared under an `UNBOUND_DEPENDENCY_ROOTS`
     header (`std::unique_ptr<OsqpEigen::Solver>`) or in an `UNBOUND_DEPENDENCY_NAMESPACES`
     namespace (`ompl::base::PlannerPtr`), or in one of `not_api`, the owned not-API
-    headers this TU includes but does not audit (`trajopt::TermInfo`, `_not_api_headers`)."""
+    headers this TU includes but does not audit (`trajopt::TermInfo`, `_not_api_headers`).
+    A class some module binds (`is_bound`, by qualified name; not a template instance) has a
+    Python form wherever it is declared (`sco::BasicTrustRegionSQPParameters`, `ompl::base::State` while #258 is open)."""
     t = t.get_canonical()
     while t.kind in (ci.TypeKind.POINTER, ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
         t = t.get_pointee().get_canonical()
     if t.kind == ci.TypeKind.FUNCTIONPROTO:
-        return _names_unbound_dependency(t.get_result(), not_api) or any(
-            _names_unbound_dependency(a, not_api) for a in t.argument_types()
+        return _names_unbound_dependency(t.get_result(), not_api, is_bound) or any(
+            _names_unbound_dependency(a, not_api, is_bound) for a in t.argument_types()
         )
     decl = t.get_declaration()
-    if decl.kind in RECORD_KINDS and audit_types.qualified_path(decl).startswith(
-        UNBOUND_DEPENDENCY_NAMESPACES
-    ):
-        return True
-    if decl.location.file is not None:
+    qualified = audit_types.qualified_path(decl) if decl.kind in RECORD_KINDS else ""
+    flagged = bool(qualified) and qualified.startswith(UNBOUND_DEPENDENCY_NAMESPACES)
+    if not flagged and decl.location.file is not None:
         path = Path(decl.location.file.name).resolve()
         # `header_rel` spells only the conda and repo trees; the SDK's libc++ is in neither.
         spelled = path.is_relative_to(CONDA_INCLUDE) or path.is_relative_to(REPO_ROOT)
-        if spelled and header_rel(path).startswith(UNBOUND_DEPENDENCY_ROOTS):
-            return True
-        if path in not_api:
-            return True
+        flagged = (spelled and header_rel(path).startswith(UNBOUND_DEPENDENCY_ROOTS)) or (
+            path in not_api
+        )
+    if flagged:
+        # `bound_classes` drops template arguments (`std::vector<Item>` is `std::vector`), so
+        # only a class that is no template instance counts as bound by name. Checked last:
+        # `is_bound` reads every binding's TU on its first call.
+        return not (qualified and t.get_num_template_arguments() <= 0 and is_bound(qualified))
     return any(
-        _names_unbound_dependency(t.get_template_argument_type(i), not_api)
+        _names_unbound_dependency(t.get_template_argument_type(i), not_api, is_bound)
         for i in range(max(0, t.get_num_template_arguments()))
     )
 
@@ -714,8 +725,12 @@ def cpp_api(
     tu: ci.TranslationUnit,
     headers: frozenset[Path],
     prefixes: Mapping[str, tuple[str, ...]] | None = None,
+    is_bound: Callable[[str], bool] = no_bound_class,
 ) -> dict[str, CppSymbol]:
     """The audited C++ API: public, non-deprecated declarations in `headers`.
+
+    `prefixes` (module -> owned prefixes; None: `owner_prefixes`) and `is_bound` (whether some
+    module binds a qualified class) decide R13's `unbound-dependency-type`.
 
     Keys are dotted names within the namespace; operators that a binding maps to a
     dunder are keyed by the dunder, constructors by `__init__`. A class also holds the public
@@ -724,11 +739,10 @@ def cpp_api(
     symbols: dict[str, CppSymbol] = {}
     seen: set[str] = set()
     owned = _owned_headers(tu)
-    # R13: `prefixes` (module -> owned prefixes) decides which not-API patterns apply;
-    # None means every module's (`owner_prefixes`).
     unbound = partial(
         _names_unbound_dependency,
         not_api=_not_api_headers(tu, headers, owner_prefixes() if prefixes is None else prefixes),
+        is_bound=is_bound,
     )
     # Inherited overloads dedupe per (derived class, USR), never through `seen`: the base's
     # own record must keep its members, and each derived class its inherited copy.

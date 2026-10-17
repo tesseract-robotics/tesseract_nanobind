@@ -128,7 +128,7 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
     "tesseract/motion_planners/ompl/": {
         "*_validator.h": "OMPL `StateValidityChecker`/`MotionValidator` subclasses that "
         "`OMPLRealVectorMoveProfile::createSimpleSetup` installs into the `SimpleSetup`; Python "
-        "reaches them only through OMPL types (`ompl_base` is removed, #258).",
+        "reaches them only through OMPL types (`ompl_base` is to be removed, #258).",
         "collision_cost_objective.h": "OMPL `StateCostIntegralObjective` subclass the OMPL "
         "profile installs; it has no Python form without OMPL types.",
         "weighted_real_vector_state_sampler.h": "OMPL `StateSampler` subclass the OMPL profile "
