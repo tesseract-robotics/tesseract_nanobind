@@ -19,6 +19,11 @@ class TrajOptIfoptPureVirtualCallError(NotImplementedError):
     super().create(...) from a Python TrajOpt-Ifopt profile: the base is pure virtual.
     """
 
+class TrajOptIfoptNodeLayoutChangedError(ValueError):
+    """
+    A Python TrajOptIfoptCompositeProfile.create changed the planner's nodes (variables or values).
+    """
+
 class TrajOptIfoptProfileReturnTypeError(TypeError):
     """A Python TrajOpt-Ifopt profile's create returned the wrong type."""
 
@@ -190,7 +195,7 @@ class TrajOptIfoptCompositeProfile(tesseract_robotics.tesseract_command_language
 
     def create(self, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, nodes: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node], fixed_indices: Sequence[int]) -> TrajOptIfoptTermInfos:
         """
-        Build the trajectory-wide terms the planner adds over all waypoint nodes
+        Build the trajectory-wide terms the planner adds over all waypoint nodes. `nodes` are the planner's and read-only: a Python override that adds variables or sets values raises TrajOptIfoptNodeLayoutChangedError.
         """
 
 class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):

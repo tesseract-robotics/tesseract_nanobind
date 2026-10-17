@@ -46,6 +46,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptJointWaypointConfig,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptMoveProfile,
+    TrajOptIfoptNodeLayoutChangedError,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptProfileReturnTypeError,
     TrajOptIfoptSolverProfile,
@@ -1313,6 +1314,28 @@ class TestTrajOptIfoptPythonProfiles:
 
         request = _python_profile_request(t_env, manip_info, joint_names, composite=Bare())
         with pytest.raises(RuntimeError, match="pure virtual"):
+            TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
+
+    @pytest.mark.parametrize("mutation", ["addVar", "setVariables"])
+    def test_composite_create_changing_nodes_raises(self, kuka_iiwa_environment, mutation):
+        # the planner laid its variables out and seeded them before create: a grown node is a
+        # meaningless layout, and changed values would be silently overwritten
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+
+        class Mutating(TrajOptIfoptCompositeProfile):
+            def __init__(self):
+                super().__init__()
+                self._inner = _smoothing_composite_profile(len(joint_names))
+
+            def create(self, composite_manip_info, env, nodes, fixed_indices):
+                if mutation == "addVar":
+                    nodes[1].addVar("extra", ["e0", "e1"], np.ones(2), [ti.Bounds(-1.0, 1.0)] * 2)
+                else:
+                    nodes[1].setVariables(np.full(len(nodes) * len(joint_names), 0.25))
+                return self._inner.create(composite_manip_info, env, nodes, fixed_indices)
+
+        request = _python_profile_request(t_env, manip_info, joint_names, composite=Mutating())
+        with pytest.raises(TrajOptIfoptNodeLayoutChangedError, match="node 1"):
             TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
 
     def test_super_create_raises_pure_virtual_call_error(self):
