@@ -21,6 +21,10 @@ PLAIN_CTOR_LINE = 19  # AnyHolder(const AnyHolderInterface&)
 FORWARDING_LINE = 28  # template <T, enable_if> AnyHolder(T&&)
 CONST_REF_LINE = 34  # template <T, enable_if> AnyHolder(const T&)
 TWO_PARAM_LINE = 37  # template <T> AnyHolder(const T&, int)
+# holder.h lines of AnyBox<T> and its ctor templates (review negatives).
+BOX_LINE = 45  # template <T> class AnyBox
+CLASS_PARAM_LINE = 49  # template <U> AnyBox(const T&): the class's T
+POINTER_LINE = 52  # template <U> AnyBox(U*)
 
 
 @pytest.fixture(scope="module")
@@ -38,18 +42,20 @@ def holder_report():
 
 @pytest.fixture(scope="module")
 def holder_ctors():
-    """`AnyHolder`'s constructors and constructor templates, keyed by holder.h line."""
+    """`AnyHolder`'s and `AnyBox`'s constructors and constructor templates, by holder.h line."""
     tu = audit.parse_tu(HOLDER / "holder_bindings.cpp", (FIXTURE_INCLUDE,))
-    holder = next(
-        c
+    records = {"AnyHolder", "AnyBox"}
+    kinds = {audit.ci.CursorKind.CONSTRUCTOR, audit.ci.CursorKind.FUNCTION_TEMPLATE}
+    return {
+        m.location.line: m
         for c in tu.cursor.walk_preorder()
-        if c.spelling == "AnyHolder"
+        if c.spelling in records
         and c.is_definition()
         and c.location.file is not None
         and c.location.file.name.endswith(HOLDER_HEADER)
-    )
-    kinds = {audit.ci.CursorKind.CONSTRUCTOR, audit.ci.CursorKind.FUNCTION_TEMPLATE}
-    return {m.location.line: m for m in holder.get_children() if m.kind in kinds}
+        for m in c.get_children()
+        if m.kind in kinds
+    }
 
 
 def test_forwarding_ctor_templates_accepted(holder_report):
@@ -65,6 +71,7 @@ def test_forwarding_ctor_templates_accepted(holder_report):
 def test_holder_gaps_exact(holder_report):
     """The plain ctor and the non-forwarding template stay rows; nothing else does."""
     assert sorted((g.symbol, g.kind, g.arity, g.location) for g in holder_report.gaps) == [
+        ("AnyBox", audit.Kind.CLASS, audit.NOT_AN_OVERLOAD, f"{HOLDER_HEADER}:{BOX_LINE}"),
         ("AnyHolder.__init__", audit.Kind.CONSTRUCTOR, "1", f"{HOLDER_HEADER}:{PLAIN_CTOR_LINE}"),
         ("AnyHolder.__init__", audit.Kind.CONSTRUCTOR, "2", f"{HOLDER_HEADER}:{TWO_PARAM_LINE}"),
         (
@@ -82,3 +89,7 @@ def test_is_forwarding_ctor_template_unit(holder_ctors):
     assert audit._is_forwarding_ctor_template(holder_ctors[CONST_REF_LINE])
     assert not audit._is_forwarding_ctor_template(holder_ctors[TWO_PARAM_LINE])
     assert not audit._is_forwarding_ctor_template(holder_ctors[PLAIN_CTOR_LINE])
+    for line in (CLASS_PARAM_LINE, POINTER_LINE):
+        m = holder_ctors[line]
+        assert audit._is_ctor(m, m.semantic_parent)  # rejected by its parameter, not as a non-ctor
+        assert not audit._is_forwarding_ctor_template(m)
