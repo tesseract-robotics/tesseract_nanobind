@@ -242,7 +242,7 @@ def create_trajopt_ifopt_default_profiles(
         profile_names, so an edit applies to every registered name:
 
         composite = profiles.getProfile(
-            TrajOptIfoptDefaultCompositeProfile().getKey(),
+            TrajOptIfoptDefaultCompositeProfile.createKey(),
             TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
             "DEFAULT",
         )
