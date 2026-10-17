@@ -294,8 +294,10 @@ ACCEPTED_SYMBOLS = {
             "toString",
         )
     },
-    # R13, where the type walk stops at an audited aggregate whose payload is not API:
-    # `TrajOptTermInfos`/`TrajOptWaypointInfo` hold `vector<shared_ptr<trajopt::TermInfo>>`.
+    # R13 by explicit entry, where the type walk stops at an audited aggregate whose
+    # payload is not API: `TrajOptTermInfos`/`TrajOptWaypointInfo` hold
+    # `vector<shared_ptr<trajopt::TermInfo>>`, and the four `create` hooks return them,
+    # so the hooks have no Python form either (#339).
     **{
         ("tesseract_motion_planners_trajopt", name): UNBOUND_DEPENDENCY
         for name in (
