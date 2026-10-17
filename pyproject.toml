@@ -303,6 +303,8 @@ docs-build = { cmd = "zensical build --strict", env = { PYTHONPATH = "src" }, de
 # Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding
 # TUs, ast reads the committed stubs. Dev-only: never in the default env or the wheel.
 [tool.pixi.feature.audit.dependencies]
+# The audit scripts read pyproject.toml with tomllib (3.11+).
+python = ">=3.11"
 # libclang Python bindings; pulls libclang 22. Exact build: every python-clang build since
 # 2026-08 (h3fd057f_*, incl. all of 23.1.x) is noarch but depends on __glibc/libgcc, so it
 # cannot install on macOS or Windows. default_hccd1708_2 is the newest portable build.
@@ -317,7 +319,7 @@ audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff
 # -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
-# ty reads requires-python (>=3.9) as the target; the audit scripts need 3.11 (tomllib).
+# ty takes its target from requires-python (>=3.9), not the audit env's pin: name 3.11 here.
 audit-typecheck = { cmd = "ty check --python-version 3.11 scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
 
 [tool.pixi.environments]
