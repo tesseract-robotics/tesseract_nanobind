@@ -285,7 +285,7 @@ class TaskComposerNodeInfo:
 
 class TaskComposerServerBusyError(RuntimeError):
     """
-    TaskComposerServer.loadConfig / addTask would replace a task that a run started by name is still using; wait() for the run's future first.
+    TaskComposerServer.loadConfig / addTask would replace a task that a run or Python can reach (wait() for the runs, del the getTask() results first), or the server is inside loadConfig / addTask and getTask / run cannot reach its tasks.
     """
 
 class TaskComposerPruneConflictError(RuntimeError):
@@ -680,10 +680,13 @@ class TaskComposerServer:
 
     def addTask(self, task: TaskComposerNode) -> None:
         """
-        Add `task` under its name, replacing a task of that name. Raises TaskComposerServerBusyError if a run started by that name is still running.
+        Add `task` under its name, replacing a task of that name. Raises TaskComposerServerBusyError if that task is running or referenced from Python (a getTask() result).
         """
 
-    def getTask(self, name: str) -> TaskComposerNode: ...
+    def getTask(self, name: str) -> TaskComposerNode:
+        """
+        The server's task `name`. While this reference lives, loadConfig and addTask of that name raise TaskComposerServerBusyError: `del` it first.
+        """
 
     def hasTask(self, name: str) -> bool: ...
 
