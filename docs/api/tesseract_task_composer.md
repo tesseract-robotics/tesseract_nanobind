@@ -244,6 +244,12 @@ future = server.run("TrajOptPipeline", data, False, "TaskflowExecutor")
 future.wait()
 ```
 
+A run started by task name uses the server's own task, which the bindings cannot hold. While
+such a run is unfinished, `loadConfig` (which re-creates every task) and `addTask` with that
+task's name raise `TaskComposerServerBusyError` (a `RuntimeError`) naming the task, instead of
+freeing it under the run: `wait()` for the future first. Adding a task under another name, and
+running a node you pass in (`server.run(node, ...)`), are unaffected.
+
 ### TaskComposerLog
 
 Upstream's record of a run for replay: the input data, the finished context and the dot graph.
