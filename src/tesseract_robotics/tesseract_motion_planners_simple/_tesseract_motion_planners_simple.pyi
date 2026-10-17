@@ -22,6 +22,11 @@ class SimplePlannerNullInstructionError(ValueError):
     A Python SimplePlannerMoveProfile.generate returned a null MoveInstructionPoly.
     """
 
+class SimplePlannerGenerateMismatchError(ValueError):
+    """
+    A Python generate's last instruction differs from base_instruction in a field upstream requires unchanged.
+    """
+
 class SimplePlannerProfileReturnTypeError(TypeError):
     """A Python SimplePlannerMoveProfile.generate returned the wrong type."""
 

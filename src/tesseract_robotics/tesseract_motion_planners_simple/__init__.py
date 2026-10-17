@@ -37,6 +37,7 @@ __all__ = [
     "SimplePlannerMoveProfile",
     "SimplePlannerPureVirtualCallError",
     "SimplePlannerProfileReturnTypeError",
+    "SimplePlannerGenerateMismatchError",
     "SimplePlannerEmptyGenerateError",
     "SimplePlannerNullInstructionError",
     "SimplePlannerCompositeProfile",
