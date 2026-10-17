@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 import sysconfig
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import partial
 from pathlib import Path
 
 import audit_types
@@ -18,9 +19,11 @@ from audit_ownership import (
     REPO_ROOT,
     SRC,
     header_auditor,
+    header_is_unaudited,
     header_owner,
     is_third_party,
     is_unaudited,
+    owner_prefixes,
     owning_prefix,
 )
 from audit_types import RECORD_KINDS, TypeKey, record_path
@@ -489,26 +492,48 @@ def _is_reference_wrapper_vector(parm: ci.Cursor) -> bool:
 
 
 # Header roots of third-party libraries the bindings never bind: a type declared under one has
-# no Python form (spec D8). G3 adds `ompl/`; Eigen, std and boost have casters and are absent.
-UNBOUND_DEPENDENCY_ROOTS = ("OsqpEigen/",)
+# no Python form (spec D8). OMPL's include dir is versioned (`include/ompl-1.7/ompl/…`), so its
+# root, as `header_rel` spells it, comes from `versioned_include` (`ompl-1.7/ompl/`, not
+# `ompl/`). Eigen, std and boost have casters and are absent.
+UNBOUND_DEPENDENCY_ROOTS = (
+    "OsqpEigen/",
+    f"{versioned_include('ompl', CONDA_INCLUDE).relative_to(CONDA_INCLUDE).as_posix()}/ompl/",
+)
+# Namespaces of the same libraries, for types an owned header only forward-declares: the
+# tesseract OMPL headers declare `namespace ompl::base { class Planner; }` and never include
+# OMPL, so the declaration such a type resolves to sits in a tesseract header, under no root.
+UNBOUND_DEPENDENCY_NAMESPACES = ("ompl::",)
 UNBOUND_DEPENDENCY = "unbound-dependency-type"
 
 
-def _names_unbound_dependency(t: ci.Type) -> bool:
-    """Whether `t`, through pointers, references and template arguments, names a type declared
-    under an `UNBOUND_DEPENDENCY_ROOTS` header (`std::unique_ptr<OsqpEigen::Solver>`)."""
+def _names_unbound_dependency(t: ci.Type, not_api: frozenset[Path]) -> bool:
+    """Whether `t`, through pointers, references, template arguments and `std::function`
+    signatures, names a type with no Python form: declared under an `UNBOUND_DEPENDENCY_ROOTS`
+    header (`std::unique_ptr<OsqpEigen::Solver>`) or in an `UNBOUND_DEPENDENCY_NAMESPACES`
+    namespace (`ompl::base::PlannerPtr`), or in one of `not_api`, the owned not-API
+    headers this TU includes but does not audit (`trajopt::TermInfo`, `_not_api_headers`)."""
     t = t.get_canonical()
     while t.kind in (ci.TypeKind.POINTER, ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
         t = t.get_pointee().get_canonical()
+    if t.kind == ci.TypeKind.FUNCTIONPROTO:
+        return _names_unbound_dependency(t.get_result(), not_api) or any(
+            _names_unbound_dependency(a, not_api) for a in t.argument_types()
+        )
     decl = t.get_declaration()
+    if decl.kind in RECORD_KINDS and audit_types.qualified_path(decl).startswith(
+        UNBOUND_DEPENDENCY_NAMESPACES
+    ):
+        return True
     if decl.location.file is not None:
         path = Path(decl.location.file.name).resolve()
         # `header_rel` spells only the conda and repo trees; the SDK's libc++ is in neither.
         spelled = path.is_relative_to(CONDA_INCLUDE) or path.is_relative_to(REPO_ROOT)
         if spelled and header_rel(path).startswith(UNBOUND_DEPENDENCY_ROOTS):
             return True
+        if path in not_api:
+            return True
     return any(
-        _names_unbound_dependency(t.get_template_argument_type(i))
+        _names_unbound_dependency(t.get_template_argument_type(i), not_api)
         for i in range(max(0, t.get_num_template_arguments()))
     )
 
@@ -560,6 +585,21 @@ def _befriends_cereal(record: ci.Cursor) -> bool:
 # Header roots of the libraries this project owns (spec D8): only a base declared under one
 # of them contributes inherited members (A), not std, Eigen, ifopt or OMPL bases.
 OWNED_ROOTS = ("tesseract/", "trajopt", "descartes_light/")
+
+
+def _not_api_headers(
+    tu: ci.TranslationUnit, audited: frozenset[Path], prefixes: Mapping[str, tuple[str, ...]]
+) -> frozenset[Path]:
+    """Headers the TU includes, not in `audited`, whose `#include` spelling a module in
+    `prefixes` owns and lists as not API (R13's not-API half). The include spelling, not
+    `header_rel`, is what ownership prefixes match (a fixture header lives in the repo)."""
+    return frozenset(
+        path
+        for c in tu.cursor.get_children()
+        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
+        and (path := Path(c.get_included_file().name).resolve()) not in audited
+        and header_is_unaudited(c.spelling, prefixes)
+    )
 
 
 def _owned_headers(tu: ci.TranslationUnit) -> frozenset[Path]:
@@ -648,8 +688,11 @@ def _base_definition(base: ci.Cursor) -> ci.Cursor | None:
     return definition if definition is not None else base.referenced
 
 
-def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload:
-    """The Python-facing form of one C++ function, method or constructor."""
+def _overload(
+    c: ci.Cursor, unbound: Callable[[ci.Type], bool], nullary_absent_ok: str | None = None
+) -> CppOverload:
+    """The Python-facing form of one C++ function, method or constructor; `unbound` is R13's
+    type test (`_names_unbound_dependency` bound to the TU's audited headers)."""
     params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
     n_default = sum(_has_default(p) for p in params)
     out = tuple(_out_param_type(p) for p in params if _is_out_param(p))
@@ -662,7 +705,7 @@ def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload
     # Structural rules first, `yaml-node` last: it wins.
     if c.result_type.get_canonical().spelling == TYPE_INDEX:
         absent_ok = "type-index"
-    if any(_names_unbound_dependency(p.type) for p in params):
+    if unbound(c.result_type) or any(unbound(p.type) for p in params):
         absent_ok = UNBOUND_DEPENDENCY
     if _is_forwarding_ctor_template(c):
         absent_ok = "template-instance-name"
@@ -691,7 +734,11 @@ def _overload(c: ci.Cursor, nullary_absent_ok: str | None = None) -> CppOverload
     )
 
 
-def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSymbol]:
+def cpp_api(
+    tu: ci.TranslationUnit,
+    headers: frozenset[Path],
+    prefixes: Mapping[str, tuple[str, ...]] | None = None,
+) -> dict[str, CppSymbol]:
     """The audited C++ API: public, non-deprecated declarations in `headers`.
 
     Keys are dotted names within the namespace; operators that a binding maps to a
@@ -701,6 +748,12 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
     symbols: dict[str, CppSymbol] = {}
     seen: set[str] = set()
     owned = _owned_headers(tu)
+    # R13: `prefixes` (module -> owned prefixes) decides which not-API patterns apply;
+    # None means every module's (`owner_prefixes`).
+    unbound = partial(
+        _names_unbound_dependency,
+        not_api=_not_api_headers(tu, headers, owner_prefixes() if prefixes is None else prefixes),
+    )
     # Inherited overloads dedupe per (derived class, USR), never through `seen`: the base's
     # own record must keep its members, and each derived class its inherited copy.
     inherited: set[tuple[str, str]] = set()
@@ -733,7 +786,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
             ov = CppOverload(Arity(0, 0), (), location(c), mapped=mapped)
             add(name, kind, c).overloads.append(ov)
             return
-        add_overload(add(name, kind, c), _overload(c, nullary_absent_ok))
+        add_overload(add(name, kind, c), _overload(c, unbound, nullary_absent_ok))
 
     def add_enum(prefix: str, c: ci.Cursor) -> None:
         name = prefix + c.spelling
@@ -776,7 +829,7 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                 leaf, kind = member
                 if kind is Kind.FIELD:
                     sym = add(f"{name}.{leaf}", kind, m)
-                    if _names_unbound_dependency(m.type):
+                    if unbound(m.type):
                         sym.absent_ok = UNBOUND_DEPENDENCY
                 else:
                     add_callable(f"{name}.{leaf}", kind, m)
@@ -822,8 +875,8 @@ def cpp_api(tu: ci.TranslationUnit, headers: frozenset[Path]) -> dict[str, CppSy
                     ),
                 )
                 if kind is not Kind.FIELD:
-                    add_overload(sym, _overload(m))
-                elif _names_unbound_dependency(m.type):
+                    add_overload(sym, _overload(m, unbound))
+                elif unbound(m.type):
                     sym.absent_ok = UNBOUND_DEPENDENCY
             add_inherited(name, base, hidden | _declared_leaves(base))
 

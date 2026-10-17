@@ -8,6 +8,12 @@
 #include <tesseract/planner/internal/term.h>
 #include <thirdparty_fixture/planning.h>
 
+// Only forward-declared, as tesseract's OMPL headers declare `ompl::base::Planner` (R13).
+namespace vendorfwd
+{
+class Planner;
+}  // namespace vendorfwd
+
 namespace tesseract::planner
 {
 struct PluginFactory
@@ -64,6 +70,22 @@ public:
   DerivedProfile(const YAML::Node& config);
 };
 
+// C6a: YAML ctor whose Python form is a static from_yaml(text).
+class TextProfile
+{
+public:
+  TextProfile();
+  TextProfile(const YAML::Node& config, const PluginFactory& plugin_factory);
+};
+
+// C6a negative: from_yaml takes no text, so it is no YAML-text sibling.
+class IntYamlProfile
+{
+public:
+  IntYamlProfile();
+  IntYamlProfile(const YAML::Node& config);
+};
+
 // Task 4 (R13): third-party and not-API types in parameters, returns and fields.
 class Configurator
 {
@@ -71,6 +93,14 @@ public:
   Configurator();
   vendor::PlannerPtr create(vendor::SpaceInformationPtr si) const;  // third-party param+return
   int getType() const;                                              // bound: covered
+};
+
+// Task 4 (R13): a forward-declared third-party type has no third-party header to match.
+class ForwardHooks
+{
+public:
+  ForwardHooks();
+  std::shared_ptr<vendorfwd::Planner> create() const;
 };
 
 using StateExtractor = std::function<Eigen::VectorXd(const vendor::State*)>;

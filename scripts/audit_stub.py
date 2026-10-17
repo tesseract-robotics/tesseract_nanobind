@@ -40,6 +40,7 @@ class PyOverload:
     line: int
     params: tuple[str, ...] = ()  # parameter annotations, `self` excluded, keyword-only last
     keys: tuple[TypeKey, ...] = ()  # `audit_types.py_key` of each of `params`
+    static: bool = False  # a `@staticmethod` of a class
 
 
 @dataclass
@@ -175,7 +176,8 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                 kind = _function_kind(node, bool(prefix))
                 sym = symbols.setdefault(name, PySymbol(name, kind, node.lineno))
                 if kind is not Kind.FIELD:
-                    bound = bool(prefix) and "staticmethod" not in _decorators(node)
+                    static = "staticmethod" in _decorators(node)
+                    bound = bool(prefix) and not static
                     returns = ast.unparse(node.returns) if node.returns else ""
                     args = _py_param_nodes(node, bound)
                     sym.overloads.append(
@@ -185,6 +187,7 @@ def py_api(tree: ast.Module, stub_rel: str) -> PyApi:
                             node.lineno,
                             tuple(ast.unparse(p.annotation) if p.annotation else "" for p in args),
                             tuple(audit_types.py_key(p.annotation) for p in args),
+                            static=bool(prefix) and static,
                         )
                     )
             elif isinstance(node, (ast.Assign, ast.AnnAssign)):
