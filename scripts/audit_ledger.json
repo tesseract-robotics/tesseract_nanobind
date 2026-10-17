@@ -32,35 +32,11 @@
     "Isometry3d.apply_points": {
       "wont_fix": "Intentional Python-only batched extension (CHANGELOG.md:169)."
     },
-    "JointTrajectory.crbegin": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
-    "JointTrajectory.crend": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
-    "JointTrajectory.data": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
-    "JointTrajectory.emplace": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
-    "JointTrajectory.emplace_back": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
     "JointTrajectory.erase": {
       "issue": "#269"
     },
     "JointTrajectory.insert": {
       "issue": "#269"
-    },
-    "JointTrajectory.rbegin": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
-    "JointTrajectory.rend": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
-    },
-    "JointTrajectory.swap": {
-      "wont_fix": "No Python form (raw pointer, perfect-forwarding template, `swap(std::vector&)` or reverse iterator): Python builds the element and passes it to `push_back`, and `reversed()` walks the sequence."
     },
     "QueryDoubleAttributeRequired": {
       "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
