@@ -79,6 +79,8 @@ PARSE = {
     "REFERENCE_TYPE_KINDS", "_is_forwarding_ctor_template",
     # G3 (R13's not-API half)
     "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES", "no_bound_class",
+    # wave 3 step 4b (the absent_ok rule table)
+    "AbsentOkTest", "ABSENT_OK_RULES",
 }  # fmt: skip
 
 

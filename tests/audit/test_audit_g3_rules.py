@@ -268,3 +268,14 @@ def test_renamed_class_parameter_matches_its_python_name():
     report = _renamed_params_report()
     assert not [g for g in report.gaps if g.symbol.startswith("Evaluator.")]
     assert not [d for d in report.deviations if d.kind is audit.Kind.OVERLOAD]
+
+
+def test_absent_ok_rule_order():
+    """First match wins; the order is the former assignment chain's, reversed (its later
+    rule won). `serialization-default-ctor` is no table rule: it is the nullary baseline."""
+    assert [rule for _, rule in parse.ABSENT_OK_RULES] == [
+        "yaml-node",
+        "template-instance-name",
+        parse.UNBOUND_DEPENDENCY,
+        "type-index",
+    ]
