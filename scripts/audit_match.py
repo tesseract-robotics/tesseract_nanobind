@@ -9,6 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import audit_types
+from audit_bound import bound_classes
 from audit_ownership import (
     AUDITED_HEADER_PREFIX,
     SRC,
@@ -33,7 +34,6 @@ from audit_parse import (
     Kind,
     audited_headers,
     binding_module,
-    bound_classes,
     cpp_api,
     decl_names,
     direct_include_spellings,
