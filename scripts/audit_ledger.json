@@ -3,9 +3,6 @@
     "ContactResultMap.find": {
       "wont_fix": "Returns a C++ iterator; `at` and iteration read a result by key."
     },
-    "ContactResultMap.flattenWrapperResults": {
-      "wont_fix": "A vector of `std::reference_wrapper` has no Python form; `flattenCopyResults` and `flattenMoveResults` cover it."
-    },
     "ContactTestData": {
       "wont_fix": "Internal to the collision checkers (types.h:322)."
     },
