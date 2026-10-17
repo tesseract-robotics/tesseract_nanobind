@@ -283,6 +283,11 @@ class TaskComposerNodeInfo:
 
     __hash__: None = None
 
+class TaskComposerPruneConflictError(RuntimeError):
+    """
+    TaskComposerNodeInfoContainer.prune: an info changed or was removed while prune ran, so the edit of its stale copy was not stored.
+    """
+
 class TaskComposerNodeInfoContainer:
     def __init__(self) -> None: ...
 
@@ -316,7 +321,7 @@ class TaskComposerNodeInfoContainer:
 
     def prune(self, prune_fn: Callable[[TaskComposerNodeInfo], None]) -> None:
         """
-        Call prune_fn(info) on a copy of every stored info, then store the edited copies. prune_fn sees a snapshot taken before the first call, and may call back into the container; edits made to `info` after prune returns are not stored.
+        Call prune_fn(info) on a copy of every stored info, then store the copies it changed. prune_fn sees a snapshot taken before the first call, and may call back into the container. A changed copy is stored only if the stored info is still the one prune_fn was given; if any was changed or removed meanwhile, the other edits are stored and TaskComposerPruneConflictError names the conflicting uuids. Edits made to `info` after prune returns, or before prune_fn raises, are not stored.
         """
 
     def __eq__(self, arg: TaskComposerNodeInfoContainer, /) -> bool: ...
