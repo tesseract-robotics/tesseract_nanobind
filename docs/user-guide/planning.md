@@ -448,6 +448,83 @@ profiles.addProfile(
     failure, so picking compatible IK solutions during Descartes is the
     only reliable solution.
 
+## Profiles from YAML
+
+Every planner profile with a C++ YAML constructor has a static `from_yaml(text)`. It parses the
+YAML text with the profile's own C++ reader, so the keys are the C++ field names. Keys left out
+keep the profile's defaults. Malformed YAML raises `ValueError`; a value of the wrong type raises
+the C++ reader's error.
+
+=== "Simple"
+
+    ```python
+    from tesseract_robotics.tesseract_motion_planners_simple import SimplePlannerLVSMoveProfile
+
+    profile = SimplePlannerLVSMoveProfile.from_yaml("min_steps: 4\n")
+    assert profile == SimplePlannerLVSMoveProfile(min_steps=4)
+    ```
+
+=== "OMPL"
+
+    ```python
+    from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
+
+    profile = OMPLRealVectorMoveProfile.from_yaml("solver_config:\n  planning_time: 3.5\n")
+    assert profile.solver_config.planning_time == 3.5
+    ```
+
+    A nested key replaces that sub-config, built from its own defaults: `solver_config:` starts
+    with no planners, so add them with `profile.solver_config.addPlanner(...)`.
+
+=== "TrajOpt"
+
+    ```python
+    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+        TrajOptDefaultCompositeProfile,
+        TrajOptDefaultMoveProfile,
+        TrajOptOSQPSolverProfile,
+    )
+
+    move = TrajOptDefaultMoveProfile.from_yaml("joint_cost_config:\n  enabled: true\n")
+    composite = TrajOptDefaultCompositeProfile.from_yaml("avoid_singularity_coeff: 7.5\n")
+    solver = TrajOptOSQPSolverProfile.from_yaml("settings:\n  max_iter: 321\n")
+    assert move.joint_cost_config.enabled
+    assert composite.avoid_singularity_coeff == 7.5
+    assert solver.settings.max_iter == 321
+    ```
+
+    `settings:` and `opt_params:` merge into the solver profile's values: keys left out keep them.
+
+=== "TrajOpt-Ifopt"
+
+    ```python
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        TrajOptIfoptDefaultCompositeProfile,
+        TrajOptIfoptOSQPSolverProfile,
+    )
+
+    composite = TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: false\n")
+    solver = TrajOptIfoptOSQPSolverProfile.from_yaml("opt_params:\n  max_iterations: 7\n")
+    assert not composite.smooth_jerks
+    assert solver.opt_params.max_iterations == 7
+    ```
+
+=== "Task composer"
+
+    ```python
+    from tesseract_robotics.tesseract_task_composer_planning import (
+        MinLengthProfile,
+        UpsampleTrajectoryProfile,
+    )
+
+    assert MinLengthProfile.from_yaml("min_length: 99\n").min_length == 99
+    upsample = UpsampleTrajectoryProfile.from_yaml("longest_valid_segment_length: 0.7\n")
+    assert upsample.longest_valid_segment_length == 0.7
+    ```
+
+The Descartes profiles have no YAML constructor upstream, so they have no `from_yaml`. Put a
+loaded profile in a `ProfileDictionary` with `addProfile`, as any other profile.
+
 ## Motion Types
 
 Motion type is set via the `MotionProgram` builder methods:
