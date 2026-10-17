@@ -608,11 +608,11 @@ def match(
         found = _binding_stub(name, stub_rel, stub_roots)
         if found is not None and _same_class(bound(found[0]).get(name), sym.qualified):
             elsewhere[name] = found[1]
-    # Python enumerator name -> its `kCamelCase` C++ enumerator (R15).
+    # Python enumerator name -> its `kCamelCase` C++ enumerator (R15), through a renamed enum.
     k_aliases = {
         k_alias: name
         for name, sym in cpp.items()
-        if sym.kind is Kind.ENUMERATOR and (k_alias := _k_alias(name)) is not None
+        if sym.kind is Kind.ENUMERATOR and (k_alias := _k_alias(_renamed(name, alias))) is not None
     }
     for name, sym in cpp.items():
         top, dot, _ = name.partition(".")
@@ -629,7 +629,7 @@ def match(
                 covered += 1  # the dunder's own row names the rule
             elif rule := _unbound_rule(module, name, sym, cpp, api, stub_roots):
                 accepted.append(Accepted(name, rule, sym.location))
-            elif sym.kind is Kind.ENUMERATOR and _k_alias(name) in api.symbols:
+            elif sym.kind is Kind.ENUMERATOR and _k_alias(_renamed(name, alias)) in api.symbols:
                 accepted.append(Accepted(name, "k-prefix-enumerator", sym.location))
             elif name in elsewhere:
                 accepted.append(Accepted(name, "bound-in-other-module", sym.location))

@@ -12,6 +12,7 @@ from tests.audit._load import audit
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
 RENAMED = FIXTURES / "renamed"
+RENAMED_ENUM = FIXTURES / "renamed_enum"
 BOUND_ELSEWHERE = FIXTURES / "bound_elsewhere"
 HERE = "tests/audit/fixtures/renamed/widget.h"
 
@@ -181,3 +182,34 @@ def test_own_rename_wins_over_a_leaf_hit_in_another_stub():
 def test_same_class_or_no_evidence_stays_bound_elsewhere(bound):
     report = _snapshot("a::Snapshot", bound)
     assert ("Snapshot", "bound-in-other-module") in {(a.symbol, a.rule) for a in report.accepted}
+
+
+def test_renamed_enum_k_prefix_enumerators_are_accepted():
+    """R15 under a rename: C++ `LongPhaseName.kWarmStart` is bound as `Phase.WARM_START`."""
+    here = "tests/audit/fixtures/renamed_enum/phase.h"
+    cpp = {
+        "LongPhaseName": audit.CppSymbol(
+            "LongPhaseName", audit.Kind.ENUM, f"{here}:1", qualified="tesseract::w::LongPhaseName"
+        ),
+        "LongPhaseName.kWarmStart": audit.CppSymbol(
+            "LongPhaseName.kWarmStart", audit.Kind.ENUMERATOR, f"{here}:2"
+        ),
+        "LongPhaseName.kConverged": audit.CppSymbol(
+            "LongPhaseName.kConverged", audit.Kind.ENUMERATOR, f"{here}:3"
+        ),
+    }
+    stub = RENAMED_ENUM / "_renamed_enum.pyi"
+    py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
+    bound = {"renamed_enum": {"Phase": "tesseract::w::LongPhaseName"}}
+    report = audit.match(
+        "renamed_enum", cpp, frozenset(), py, audit.rel(stub),
+        stub_roots=(RENAMED_ENUM,), bound=lambda m: bound.get(m, {}),
+    )  # fmt: skip
+    assert not report.gaps
+    assert {d.name for d in report.deviations} == {"Phase"}  # the rename itself stays visible
+    assert {(a.symbol, a.rule) for a in report.accepted} == {
+        ("LongPhaseName.kWarmStart", "k-prefix-enumerator"),
+        ("LongPhaseName.kConverged", "k-prefix-enumerator"),
+        ("Phase.WARM_START", "k-prefix-enumerator"),
+        ("Phase.CONVERGED", "k-prefix-enumerator"),
+    }
