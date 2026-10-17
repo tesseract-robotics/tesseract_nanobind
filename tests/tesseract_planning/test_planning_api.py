@@ -1707,18 +1707,37 @@ class TestProfileCreation:
     def test_create_time_optimal_parameterization(self):
         """Test TOTG parameterization creation."""
         from tesseract_robotics.planning import create_time_optimal_parameterization
+        from tesseract_robotics.tesseract_time_parameterization import (
+            TimeOptimalTrajectoryGeneration,
+        )
 
-        totg = create_time_optimal_parameterization(path_tolerance=0.05)
-
-        assert totg is not None
+        assert isinstance(create_time_optimal_parameterization(), TimeOptimalTrajectoryGeneration)
 
     def test_create_iterative_spline_parameterization(self):
         """Test ISP parameterization creation."""
         from tesseract_robotics.planning import create_iterative_spline_parameterization
+        from tesseract_robotics.tesseract_time_parameterization import (
+            IterativeSplineParameterization,
+        )
 
-        isp = create_iterative_spline_parameterization(add_points=False)
+        assert isinstance(
+            create_iterative_spline_parameterization(), IterativeSplineParameterization
+        )
 
-        assert isp is not None
+    @pytest.mark.parametrize(
+        ("factory", "keyword"),
+        [
+            ("create_time_optimal_parameterization", "path_tolerance"),
+            ("create_time_optimal_parameterization", "min_angle_change"),
+            ("create_iterative_spline_parameterization", "add_points"),
+        ],
+    )
+    def test_profile_settings_are_not_factory_arguments(self, factory, keyword):
+        """These settings live on the composite profile; the factories used to drop them."""
+        from tesseract_robotics import planning
+
+        with pytest.raises(TypeError, match=keyword):
+            getattr(planning, factory)(**{keyword: 0.05})
 
 
 class TestProgramErrors:

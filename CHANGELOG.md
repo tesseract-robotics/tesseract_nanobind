@@ -75,6 +75,13 @@
 
 - **The viewer times a trajectory with `toJointTrajectory`** — `viewer.util.tesseract_trajectory_to_list` calls `toJointTrajectory` instead of walking the program's top level: a nested program no longer raises, time accumulates across child composites, and joint waypoints count one second each from 1 (was the index from 0). A program with no joint states raises `ValueError` ([#274]).
 
+- **`create_time_optimal_parameterization` and `create_iterative_spline_parameterization` take no arguments** — `path_tolerance`, `min_angle_change` and `add_points` were accepted and silently ignored since 0.33 moved them into the composite profiles. Passing one now raises `TypeError`; set the field on the profile instead.
+
+  | before | after |
+  | --- | --- |
+  | `create_time_optimal_parameterization(path_tolerance=0.05, min_angle_change=0.01)` | `create_time_optimal_parameterization()`, and `TimeOptimalTrajectoryGenerationCompositeProfile().path_tolerance = 0.05` (`.min_angle_change`) |
+  | `create_iterative_spline_parameterization(add_points=False)` | `create_iterative_spline_parameterization()`, and `IterativeSplineParameterizationCompositeProfile().add_points = False` |
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
