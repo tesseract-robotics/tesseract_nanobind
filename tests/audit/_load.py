@@ -25,11 +25,22 @@ class DuplicateNameError(RuntimeError):
     """Two scripts define one name with different objects: a move left a stale copy."""
 
 
+class ScriptLoadError(ImportError):
+    """importlib found no loader for a script path."""
+
+
 def load(name: str) -> ModuleType:
-    """The script `scripts/<name>.py` as module `name`, loaded once per test session."""
+    """The script `scripts/<name>.py` as module `name`, loaded once per test session.
+
+    Raises:
+        ScriptLoadError: importlib has no loader for the script's path.
+    """
     if name in sys.modules:
         return sys.modules[name]
-    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
+    path = REPO_ROOT / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ScriptLoadError(f"no loader for {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module  # dataclasses resolve annotations via sys.modules
     spec.loader.exec_module(module)

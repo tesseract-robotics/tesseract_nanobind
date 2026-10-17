@@ -129,6 +129,10 @@ CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
 # tesseract C++ conda packages. See .github/workflows/wheels-{linux,macos,windows}.yml
 # for the custom CI that installs them via pixi and bundles them into the wheels.
 
+[tool.ty.src]
+# Audit fixtures are deliberately broken stubs and sources (unbound names, bad overrides).
+exclude = ["tests/audit/fixtures/"]
+
 [tool.ruff]
 target-version = "py39"
 line-length = 100
@@ -313,6 +317,8 @@ audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff
 # -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
+# ty reads requires-python (>=3.9) as the target; the audit scripts need 3.11 (tomllib).
+audit-typecheck = { cmd = "ty check --python-version 3.11 scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
