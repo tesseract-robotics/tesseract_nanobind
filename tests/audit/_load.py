@@ -12,6 +12,7 @@ SCRIPTS = (
     "audit_types",
     "audit_ownership",
     "audit_parse",
+    "audit_bound",
     "audit_stub",
     "audit_rules",
     "audit_match",
