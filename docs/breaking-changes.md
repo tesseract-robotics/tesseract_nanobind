@@ -10,6 +10,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 |---|---|---|
 | Unreleased | `TaskComposerPluginFactory(str, locator)` and `TaskComposerServer.loadConfig(str, locator)` read the `str` as YAML text | [A `pathlib.Path`](#taskcomposerpluginfactory-a-str-is-yaml-text) |
 | Unreleased | `createTaskComposerPluginFactory`, `createTaskComposerDataStorage`, `TaskComposerKeys.addKeys`, `TaskComposerDataStorage.getAllData`, `TaskComposerNodeInfoContainer.getAllInfos` / `getAbortingNodeInfo` and the container overloads of `getDotgraph` / `saveDotgraph` removed | [The C++ names](#task-composer-compatibility-helpers-removed) |
+| Unreleased | `TaskComposerNode.saveDotgraph` raises `OSError` instead of returning `False`, and returns `None` | [Catch `OSError`](#taskcomposernodesavedotgraph-raises-oserror) |
 | Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
@@ -36,7 +37,7 @@ The factory bound one constructor, `(config: str, locator)`, and passed the stri
 *path* constructor, while `KinematicsPluginFactory`, `ContactManagersPluginFactory` and
 `Environment.init` read a `str` as content. It now binds both C++ constructors the same way: an
 `os.PathLike` (`pathlib.Path`) is a config file, a `str` is YAML text. A path passed as `str`
-parses as a YAML scalar and raises `ValueError` naming the text. `loadConfig` and the new
+parses as a YAML scalar and raises `TaskComposerConfigError` (a `ValueError`) naming the text. `loadConfig` and the new
 `TaskComposerServer.loadConfig` take the same pair (#337, #323).
 
 | before | after |
@@ -60,6 +61,17 @@ under its own name (#313, #314, #336, #338):
 | `node.getDotgraph(infos)` | `node.getDotgraph(infos.getInfoMap())` |
 | `node.saveDotgraph(path, infos)` | `node.saveDotgraph(path, infos.getInfoMap())` |
 | `tesseract_task_composer.__all__` | the module's attributes (`from … import *` still works) |
+
+### `TaskComposerNode.saveDotgraph` raises `OSError`
+
+`saveDotgraph` returned `False` when the file could not be opened or written, which a caller
+that ignored the result never saw. It now raises `OSError` (`FileNotFoundError` for a missing
+directory) and returns `None`, as `TaskComposerPluginFactory.saveConfig` does, and takes a `str`
+or an `os.PathLike` (#316).
+
+| before | after |
+| --- | --- |
+| `if not node.saveDotgraph(path): ...` | `try: node.saveDotgraph(path)` / `except OSError: ...` |
 
 ### Task-composer value types compare by value and are unhashable
 

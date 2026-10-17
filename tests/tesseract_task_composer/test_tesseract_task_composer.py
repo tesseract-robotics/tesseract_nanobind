@@ -329,8 +329,7 @@ class TestDotgraph:
     def test_save_dotgraph_writes_file(self, pipeline_node, tmp_path):
         node, _ = pipeline_node
         out = tmp_path / "graph.dot"
-        ok = node.saveDotgraph(str(out))
-        assert ok is True
+        assert node.saveDotgraph(out) is None
         assert out.is_file()
         contents = out.read_text()
         assert contents.startswith("digraph TaskComposer {")
@@ -342,17 +341,23 @@ class TestDotgraph:
         node, _ = pipeline_node
         out = tmp_path / "graph_results.dot"
         results = TaskComposerNodeInfoContainer()
-        ok = node.saveDotgraph(str(out), results.getInfoMap())
-        assert ok is True
+        node.saveDotgraph(out, results.getInfoMap())
         assert out.is_file()
         assert out.read_text().startswith("digraph TaskComposer {")
 
-    def test_save_dotgraph_invalid_path_returns_false(self, pipeline_node, tmp_path):
+    def test_save_dotgraph_to_missing_directory_raises(self, pipeline_node, tmp_path):
+        """A file that cannot be written raises OSError, as saveConfig does."""
         node, _ = pipeline_node
         bad = tmp_path / "nonexistent_dir" / "graph.dot"
-        ok = node.saveDotgraph(str(bad))
-        assert ok is False
+        with pytest.raises(FileNotFoundError):
+            node.saveDotgraph(bad)
         assert not bad.exists()
+
+    def test_save_dotgraph_takes_str_path(self, pipeline_node, tmp_path):
+        node, _ = pipeline_node
+        out = tmp_path / "graph.dot"
+        node.saveDotgraph(str(out))
+        assert out.read_text() == node.getDotgraph()
 
 
 class TestAnyPolyDataStorage:
