@@ -173,6 +173,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 - **`NodesVariables(name, nodes)` and the `Var` constructors** — Python builds variable sets with several vars or per-node bounds; the `Node`s hand over ownership. `Var.getParent` / `Node.getParent` ([#297]).
 - **`QPProblem` convex model and `setVariables`** — `getHessian`, `getGradient`, `getConstraintMatrix`, `getBoundsLower`, `getBoundsUpper`, `getConstraintMeritCoeff`, and `setVariables(x)`, which raises `VariablesSizeError` unless `len(x) == getNumNLPVars()` ([#282]).
 - **`QPSolver` update interface** — `updateHessianMatrix`, `updateGradient`, `updateLowerBound`, `updateUpperBound`, `updateBounds`, `updateLinearConstraintsMatrix` and `setWarmStart(problem)` on the base; `OSQPEigenSolver.setWarmStart` takes a `bool` (the OSQP option) or a `QPProblem` ([#283]).
+- **`from_yaml` examples for every planner** — `docs/user-guide/planning.md` gains "Profiles from YAML": one checked example each for the simple, OMPL, TrajOpt, TrajOpt-Ifopt and task-composer planning profiles, with the merge-versus-replace rule for nested configs ([#331]).
 
 ### Fixed
 
