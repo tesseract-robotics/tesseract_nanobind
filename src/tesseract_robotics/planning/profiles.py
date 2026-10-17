@@ -1049,21 +1049,22 @@ def create_time_optimal_parameterization(
         from tesseract_robotics.planning.profiles import (
             create_time_optimal_parameterization
         )
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
         from tesseract_robotics.tesseract_time_parameterization import (
-            InstructionsTrajectory
+            TimeOptimalTrajectoryGenerationCompositeProfile
         )
 
-        # Create time parameterization
-        totg = create_time_optimal_parameterization(path_tolerance=0.05)
+        totg = create_time_optimal_parameterization()
 
-        # Apply to trajectory
-        trajectory = InstructionsTrajectory(program)
-        success = totg.compute(
-            trajectory,
-            velocity_limits,
-            acceleration_limits,
-            jerk_limits
+        # The limits live in the profile, looked up under the parameterization's
+        # name ("TOTG") and the program's profile name
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            totg.getName(), "DEFAULT", TimeOptimalTrajectoryGenerationCompositeProfile()
         )
+
+        # Edits `program` (a CompositeInstruction of StateWaypoints) in place
+        success = totg.compute(program, env, profiles)
 
     Reference:
         Kunz & Stilman, "Time-Optimal Trajectory Generation for Path Following
@@ -1101,21 +1102,22 @@ def create_iterative_spline_parameterization(
         from tesseract_robotics.planning.profiles import (
             create_iterative_spline_parameterization
         )
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
         from tesseract_robotics.tesseract_time_parameterization import (
-            InstructionsTrajectory
+            IterativeSplineParameterizationCompositeProfile
         )
 
-        # Create time parameterization
-        isp = create_iterative_spline_parameterization(add_points=True)
+        isp = create_iterative_spline_parameterization()
 
-        # Apply to trajectory
-        trajectory = InstructionsTrajectory(program)
-        success = isp.compute(
-            trajectory,
-            velocity_limits,
-            acceleration_limits,
-            jerk_limits
+        # The limits live in the profile, looked up under the parameterization's
+        # name ("ISP") and the program's profile name
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            isp.getName(), "DEFAULT", IterativeSplineParameterizationCompositeProfile()
         )
+
+        # Edits `program` (a CompositeInstruction of StateWaypoints) in place
+        success = isp.compute(program, env, profiles)
 
     Note:
         ISP is typically faster to compute than TOTG, but TOTG produces
