@@ -79,11 +79,15 @@ def task_composer_log_to_xml(log: tesseract_robotics.tesseract_task_composer._te
 def task_composer_log_from_xml(xml: str) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
     """Deserialize TaskComposerLog from XML string."""
 
-def task_composer_log_to_file(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog, path: str | os.PathLike) -> bool:
-    """Save TaskComposerLog to XML file."""
+def task_composer_log_to_file(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog, path: str | os.PathLike) -> None:
+    """
+    Save TaskComposerLog as XML to `path`, as named. Raises OSError if it cannot be written.
+    """
 
 def task_composer_log_from_file(path: str | os.PathLike) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
-    """Load TaskComposerLog from XML file."""
+    """
+    Load TaskComposerLog from the XML file `path`. Raises OSError if it cannot be read.
+    """
 
 def task_composer_log_to_binary(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog) -> list[int]:
     """Serialize TaskComposerLog to binary data."""
