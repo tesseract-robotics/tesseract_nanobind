@@ -24,6 +24,7 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstruction,
     MoveInstructionPoly,
     MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType_CIRCULAR,
     MoveInstructionType_FREESPACE,
     MoveInstructionType_LINEAR,
     ProfileDictionary,
@@ -247,6 +248,36 @@ def test_handled_nested_error_is_not_raised(irb2400_env, manip_info):
     response = SimpleMotionPlanner(PLANNER_NAME).solve(_request(irb2400_env, manip_info, Outer()))
     assert seen == [False]
     assert response.successful, response.message
+
+
+def test_handled_nested_error_is_not_raised_for_a_later_cpp_failure(irb2400_env, manip_info):
+    """The nested solve's handled error must not stand in for a later C++ profile's failure."""
+
+    class Outer(SimplePlannerMoveProfile):
+        def generate(
+            self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
+        ):
+            nested = MotionPlanner.solve(
+                SimpleMotionPlanner(PLANNER_NAME),
+                _request(irb2400_env, manip_info, RaisingProfile()),
+            )
+            assert not nested.successful
+            return [base_instruction]
+
+    circular = MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(
+            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, np.full(6, 0.1))),
+            MoveInstructionType_CIRCULAR,
+            "CPP",
+        )
+    )
+    request = _request(irb2400_env, manip_info, Outer())
+    request.instructions.appendMoveInstruction(circular)
+    # upstream's fixed-size profile rejects a circular move: the plan fails for a C++ reason
+    request.profiles.addProfile(PLANNER_NAME, "CPP", SimplePlannerFixedSizeMoveProfile())
+    response = SimpleMotionPlanner(PLANNER_NAME).solve(request)
+    assert not response.successful
+    assert "from generate" not in response.message
 
 
 def test_last_generate_error_is_raised(irb2400_env, manip_info):
@@ -646,7 +677,7 @@ def _run_child(body):
         f"child died (rc={proc.returncode}, SIGSEGV is -11/139): "
         f"{proc.stderr[traceback_at:] if traceback_at >= 0 else proc.stderr}"
     )
-    assert "OK" in proc.stdout.splitlines(), proc.stdout
+    assert proc.stdout.splitlines()[-1] == "OK", proc.stdout
 
 
 def test_instruction_info_keeps_instruction_and_env_alive():
