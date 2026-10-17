@@ -128,6 +128,26 @@ ACCEPTED = {
     "module binds (`OsqpEigen::Settings`, `OsqpEigen::Solver`) has no Python form; the owning "
     "object exposes what Python needs instead, such as `OSQPEigenSolver`'s `set…` forwarders "
     "into its OSQP settings (`setPolish`, `setWarmStart(bool)`, `setMaxIteration`, …).",
+    "parent-back-pointer": "`Var.getParent()` and `Node.getParent()` return a raw `const T*` to "
+    "the owning container; Python reaches a `Var` or `Node` from its owner "
+    "(`NodesVariables.getNodes`, `Node.getVar`), and a bound back-pointer would dangle once the "
+    "owner is collected.",
+    "stdout-printer": "`Component.print(index, tolerance)` writes a table to `std::cout`, which "
+    "bypasses `sys.stdout`; Python reads the same values through the bound `getValues` and "
+    "`getBounds`.",
+    "unimplemented-observer": "`NodesObserver` has no implementation in trajopt 0.35.0 (the "
+    "library exports only its base constructor), so `NodesVariables.addObserver` has nothing to "
+    "register.",
+    "split-var-pair": "`ContinuousCollisionConstraint` takes "
+    "`std::array<std::shared_ptr<const Var>, 2> position_vars`; Python passes the pair as two "
+    "named parameters, `position_var0` and `position_var1`, and the required "
+    "`vars0_fixed`/`vars1_fixed` default to `False`.",
+    "ifopt-problem-only": "An overload taking `trajopt_ifopt::Problem` serves the "
+    "`IfoptQPProblem` path, which is not Python API (`trajopt_sqp/ifopt_qp_problem.h` is "
+    "unaudited); `TrajOptQPProblem` is the bound problem.",
+    "nodes-variables-factory": "`createNodesVariables` builds a `NodesVariables` of one vector "
+    "`Var` per waypoint in one call, the layout every `TrajOptQPProblem` example uses; the C++ "
+    "constructor takes `std::vector<std::unique_ptr<Node>>`, which this factory fills.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -158,6 +178,13 @@ ACCEPTED_SYMBOLS = {
         ("tesseract_scene_graph", tag): "boost-graph-property-tag"
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
+    # Group 2 (trajopt).
+    ("trajopt_ifopt", "Var.getParent"): "parent-back-pointer",
+    ("trajopt_ifopt", "Node.getParent"): "parent-back-pointer",
+    ("trajopt_ifopt", "Component.print"): "stdout-printer",
+    ("trajopt_ifopt", "NodesVariables.addObserver"): "unimplemented-observer",
+    ("trajopt_ifopt", "calcNumericalCostGradient"): "ifopt-problem-only",
+    ("trajopt_ifopt", "createNodesVariables"): "nodes-variables-factory",
 }
 # A C++ member template bound once per instance, under a name Python can spell
 # (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
@@ -168,10 +195,21 @@ TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {}
 TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
 # symbol Python binds, where the other overloads stay checked (T4).
-ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {}
+ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
+    # Group 2 (trajopt).
+    ("trajopt_ifopt", "ContinuousCollisionConstraint.__init__", "3-7"): "split-var-pair",
+}
 # A Python-only overload accepted: (module, dotted name, `PyOverload.params`) -> ACCEPTED rule.
 # Two overloads of one arity differ by their annotations (G2: `setWarmStart(bool)`).
-ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {}
+ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
+    # Group 2 (trajopt).
+    ("trajopt_sqp", "OSQPEigenSolver.setWarmStart", ("bool",)): UNBOUND_DEPENDENCY,
+    (
+        "trajopt_ifopt",
+        "ContinuousCollisionConstraint.__init__",
+        ("ContinuousCollisionEvaluator", "Var", "Var", "bool", "bool", "int", "bool", "str"),
+    ): "split-var-pair",
+}
 # A type-erased Poly -> the bound classes it wraps, which C++ converts into it through the
 # Poly's converting constructors (R8). A Python overload typed by an alternative stands for
 # the Poly-typed C++ parameter.
