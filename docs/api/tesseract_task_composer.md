@@ -244,11 +244,26 @@ future = server.run("TrajOptPipeline", data, False, "TaskflowExecutor")
 future.wait()
 ```
 
-A run started by task name uses the server's own task, which the bindings cannot hold. While
-such a run is unfinished, `loadConfig` (which re-creates every task) and `addTask` with that
-task's name raise `TaskComposerServerBusyError` (a `RuntimeError`) naming the task, instead of
-freeing it under the run: `wait()` for the future first. Adding a task under another name, and
-running a node you pass in (`server.run(node, ...)`), are unaffected.
+The server's tasks cannot be held: upstream exposes them only as `const&`. So a server task is
+never replaced while a run or Python can reach it. `loadConfig` (which re-creates every task) and
+`addTask` with an existing task's name raise `TaskComposerServerBusyError` (a `RuntimeError`)
+naming the task and the reason:
+
+- the task is running: a run by name, `server.run(task, ...)` or `executor.run(task, ...)` with a
+  `getTask()` result is unfinished. `wait()` for its future first;
+- the task is referenced from Python: a `getTask()` result is alive. `del` it first.
+
+```python
+task = server.getTask("TrajOptPipeline")
+future = executor.run(task, data)
+future.wait()
+del task
+server.loadConfig(config, GeneralResourceLocator())  # now allowed
+```
+
+While the server is inside `loadConfig` or `addTask`, where a Python `ResourceLocator` or log
+handler can run, `getTask` and `run` on that server raise the same error. Adding a task under a
+new name, and running a node you built yourself, are unaffected.
 
 ### TaskComposerLog
 

@@ -358,8 +358,9 @@ future = executor.run(node, make_storage(node))
 
 
 class TestServerTaskReplacement:
-    """A by-name server run uses the server's own task, which upstream gives no way to hold:
-    replacing it mid-run (loadConfig, addTask with the same name) freed it under the run."""
+    """A server task cannot be replaced (loadConfig, addTask with its name) while Python or a run
+    can reach it: upstream exposes it only as a `const&`, so the bindings cannot hold it, and
+    replacing it freed it under the run or behind a getTask() reference."""
 
     def test_load_config_mid_run_raises(self):
         out = _run("""
@@ -398,6 +399,131 @@ print("SUCCESS", future.context.isSuccessful())
         assert "BUSY True" in out, out
         assert "SUCCESS True" in out, out
 
+    def test_server_task_run_on_an_executor_blocks_reload(self):
+        """A task reached through getTask and run on any executor (or by server.run(node)) is
+        the server's: reloading freed it under the run."""
+        out = _run("""
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+task = server.getTask("TrajOptPipeline")
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+futures = [executor.run(task, make_storage(task)) for _ in range(2)]
+futures.append(server.run(task, make_storage(task), False, "TaskflowExecutor"))
+del task
+try:
+    server.loadConfig(config_path, GeneralResourceLocator())
+except TaskComposerServerBusyError as e:
+    print("BUSY", "running" in str(e))
+for future in futures:
+    future.wait()
+print("SUCCESS", all(future.context.isSuccessful() for future in futures))
+server.loadConfig(config_path, GeneralResourceLocator())
+print("RELOADED")
+""")
+        assert "BUSY True" in out, out
+        assert "SUCCESS True" in out, out
+        assert "RELOADED" in out, out
+
+    def test_get_task_reference_blocks_reload_until_deleted(self):
+        """With no run at all, a getTask() result dangled after a reload."""
+        out = _run("""
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+task = server.getTask("TrajOptPipeline")
+for replace in (lambda: server.loadConfig(config_path, GeneralResourceLocator()),
+                lambda: server.addTask(factory.createTaskComposerNode("TrajOptPipeline"))):
+    try:
+        replace()
+    except TaskComposerServerBusyError as e:
+        print("BUSY", "referenced from Python" in str(e) and "del" in str(e))
+print("NAME", task.getName())
+del task
+server.loadConfig(config_path, GeneralResourceLocator())
+server.addTask(factory.createTaskComposerNode("TrajOptPipeline"))
+print("RELOADED")
+""")
+        assert out.count("BUSY True") == 2, out
+        assert "NAME TrajOptPipeline" in out, out
+        assert "RELOADED" in out, out
+
+    def test_reload_racing_by_name_runs(self):
+        """A run registered only after releasing the GIL: a reload on another thread could free
+        the task between the lookup and the registration."""
+        out = _run("""
+import threading
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+stop = []
+stats = {"reloads": 0, "busy": 0}
+
+def reload_forever():
+    while not stop:
+        try:
+            server.loadConfig(config_path, GeneralResourceLocator())
+            stats["reloads"] += 1
+        except TaskComposerServerBusyError:
+            stats["busy"] += 1
+
+reloader = threading.Thread(target=reload_forever)
+reloader.start()
+results = []
+for _ in range(15):
+    while True:
+        try:
+            future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
+            break
+        except TaskComposerServerBusyError:
+            pass  # the reloader is mid-load
+    future.wait()
+    results.append(future.context.isSuccessful())
+stop.append(True)
+reloader.join()
+print("SUCCESS", all(results), len(results))
+""")
+        assert "SUCCESS True 15" in out, out
+
+    def test_server_is_busy_while_loading(self, tmp_path):
+        """A Python ResourceLocator runs mid-load (and may switch threads there): getTask and
+        run on the loading server raise instead of reaching a task being replaced."""
+        import yaml
+
+        import tesseract_robotics
+
+        config = yaml.safe_load(tesseract_robotics.get_task_composer_config_path().read_text())
+        included = tmp_path / "plugins.yaml"
+        included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
+        out = _run(f"""
+from tesseract_robotics.tesseract_common import ResourceLocator
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+node = factory.createTaskComposerNode("TrajOptPipeline")
+
+class Reentrant(ResourceLocator):
+    def __init__(self):
+        super().__init__()
+        self.inner = GeneralResourceLocator()
+
+    def locateResource(self, url):
+        for call in (lambda: server.getTask("TrajOptPipeline"),
+                     lambda: server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor"),
+                     lambda: server.run(node, make_storage(node), False, "TaskflowExecutor")):
+            try:
+                call()
+            except TaskComposerServerBusyError:
+                print("BUSY", flush=True)
+        return self.inner.locateResource(url)
+
+server.loadConfig("task_composer_plugins: !include file://{included}", Reentrant())
+print("LOADED", server.hasTask("TrajOptPipeline"))
+""")
+        assert out.count("BUSY") == 3, out
+        assert "LOADED True" in out, out
+
     def test_add_task_with_another_name_mid_run_succeeds(self):
         out = _run("""
 server = TaskComposerServer()
@@ -425,10 +551,9 @@ print("RELOADED", future.context.isSuccessful())
 """)
         assert "RELOADED True" in out, out
 
-    def test_node_run_does_not_block_reload(self):
-        """A run of a caller-owned node uses no server task."""
+    def test_caller_owned_node_run_does_not_block_reload(self):
+        """A run of a node the caller built uses no server task."""
         out = _run("""
-import time
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator())
 node = factory.createTaskComposerNode("TrajOptPipeline")
