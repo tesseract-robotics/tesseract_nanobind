@@ -283,6 +283,11 @@ class TaskComposerNodeInfo:
 
     __hash__: None = None
 
+class TaskComposerServerBusyError(RuntimeError):
+    """
+    TaskComposerServer.loadConfig / addTask would replace a task that a run started by name is still using; wait() for the run's future first.
+    """
+
 class TaskComposerPruneConflictError(RuntimeError):
     """
     TaskComposerNodeInfoContainer.prune: an info changed or was removed while prune ran, so the edit of its stale copy was not stored.
@@ -673,7 +678,10 @@ class TaskComposerServer:
 
     def getAvailableExecutors(self) -> list[str]: ...
 
-    def addTask(self, task: TaskComposerNode) -> None: ...
+    def addTask(self, task: TaskComposerNode) -> None:
+        """
+        Add `task` under its name, replacing a task of that name. Raises TaskComposerServerBusyError if a run started by that name is still running.
+        """
 
     def getTask(self, name: str) -> TaskComposerNode: ...
 

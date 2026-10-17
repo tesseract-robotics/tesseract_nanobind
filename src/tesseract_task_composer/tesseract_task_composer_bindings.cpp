@@ -14,6 +14,7 @@
 #include <boost/uuid/uuid_io.hpp>  // boost::uuids::to_string (prune conflicts)
 #include <yaml-cpp/yaml.h>  // YAML::Emitter for getConfig; YAML::Exception from the text overloads
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>  // std::runtime_error, std::invalid_argument (the named errors)
@@ -233,6 +234,9 @@ struct InFlightRun {
     nb::object owner;
     // A server run's executor: the server owns it, and addExecutor may replace it mid-run.
     std::shared_ptr<tp::TaskComposerExecutor> executor;
+    // A by-name server run's task. The server owns it and upstream exposes no owning accessor,
+    // so it cannot be held: loadConfig / addTask refuse to replace it mid-run instead.
+    std::string task_name;
 };
 
 // Accessed with the GIL held only. Never freed: it outlives module teardown.
@@ -293,15 +297,44 @@ nb::object python_object(const T& value) {
 // Start a run with the GIL released, then hold what it uses until it ends.
 template <typename Run>
 std::unique_ptr<tp::TaskComposerFuture> run_held(nb::object node, nb::object owner, Run&& run,
-                                                 std::shared_ptr<tp::TaskComposerExecutor> executor = nullptr) {
+                                                 std::shared_ptr<tp::TaskComposerExecutor> executor = nullptr,
+                                                 std::string task_name = {}) {
     free_finished_runs();
     std::unique_ptr<tp::TaskComposerFuture> future;
     {
         nb::gil_scoped_release release;
         future = run();
     }
-    in_flight_runs().push_back(std::make_shared<InFlightRun>(InFlightRun{ future->copy(), std::move(node), std::move(owner), std::move(executor) }));
+    in_flight_runs().push_back(std::make_shared<InFlightRun>(InFlightRun{ future->copy(), std::move(node), std::move(owner), std::move(executor), std::move(task_name) }));
     return future;
+}
+
+// loadConfig or addTask would replace (and free) a task that a by-name run of the server uses.
+struct TaskComposerServerBusyError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// Raise TaskComposerServerBusyError if an unfinished by-name run of `server` uses a task that
+// would be replaced: any task (`only` empty, loadConfig), or the task named `only` (addTask).
+void require_tasks_not_running(const char* caller, const tp::TaskComposerServer& server, const std::string& only = {}) {
+    free_finished_runs();
+    const nb::object self = python_object(server);
+    std::vector<std::string> running;
+    for (const auto& run : in_flight_runs()) {
+        if (run->task_name.empty() || !run->owner.is(self) || run->future->ready())
+            continue;
+        if ((only.empty() || run->task_name == only) &&
+            std::find(running.begin(), running.end(), run->task_name) == running.end())
+            running.push_back(run->task_name);
+    }
+    if (running.empty())
+        return;
+    std::string names;
+    for (const auto& name : running)
+        names += (names.empty() ? "'" : ", '") + name + "'";
+    throw TaskComposerServerBusyError(std::string(caller) + ": a run of task " + names +
+                                      " started by name is still running, and replacing the task would free "
+                                      "it under the run; wait() for the run's future first");
 }
 
 // prune found stored infos that changed (or were removed) while its callbacks ran.
@@ -430,6 +463,10 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def_rw("data_storage", &tp::TaskComposerNodeInfo::data_storage)
         .def_rw("aborted", &tp::TaskComposerNodeInfo::aborted);
     bind_value_equality(node_info);
+
+    nb::exception<TaskComposerServerBusyError>(m, "TaskComposerServerBusyError", PyExc_RuntimeError).attr("__doc__") =
+        "TaskComposerServer.loadConfig / addTask would replace a task that a run started by name is "
+        "still using; wait() for the run's future first.";
 
     nb::exception<TaskComposerPruneConflictError>(m, "TaskComposerPruneConflictError", PyExc_RuntimeError)
         .attr("__doc__") =
@@ -882,9 +919,11 @@ NB_MODULE(_tesseract_task_composer, m) {
     nb::class_<Server>(m, "TaskComposerServer")
         .def(nb::init<>())
         .def("loadConfig", [](Server& self, const tesseract_nb::StrictPath& config_path, const tc::ResourceLocator& locator) {
+            require_tasks_not_running("TaskComposerServer.loadConfig", self);
             with_pinned_plugins([&] { self.loadConfig(config_path.value, locator); });
         }, "config_path"_a, "locator"_a)
         .def("loadConfig", [](Server& self, const std::string& config, const tc::ResourceLocator& locator) {
+            require_tasks_not_running("TaskComposerServer.loadConfig", self);
             load_yaml_text("TaskComposerServer.loadConfig", config,
                            [&] { with_pinned_plugins([&] { self.loadConfig(config, locator); }); });
         }, "config"_a, "locator"_a)
@@ -895,8 +934,14 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getExecutor", &Server::getExecutor, "name"_a, nb::keep_alive<0, 1>())
         .def("hasExecutor", &Server::hasExecutor, "name"_a)
         .def("getAvailableExecutors", &Server::getAvailableExecutors)
-        // Upstream's hook for Python wrappers; addTask(unique_ptr) has no Python form.
-        .def("addTask", &Server::addTaskPython, "task"_a)
+        // Upstream's hook for Python wrappers; addTask(unique_ptr) has no Python form. Adding a task
+        // under a name a by-name run is using would free that run's task.
+        .def("addTask", [](Server& self, std::shared_ptr<tp::TaskComposerNode> task) {
+            require_tasks_not_running("TaskComposerServer.addTask", self, task->getName());
+            self.addTaskPython(std::move(task));
+        }, "task"_a,
+           "Add `task` under its name, replacing a task of that name. Raises "
+           "TaskComposerServerBusyError if a run started by that name is still running.")
         .def("getTask", &Server::getTask, "name"_a, nb::rv_policy::reference_internal)
         .def("hasTask", &Server::hasTask, "name"_a)
         .def("getAvailableTasks", &Server::getAvailableTasks)
@@ -909,7 +954,8 @@ NB_MODULE(_tesseract_task_composer, m) {
             const tp::TaskComposerNode& task = self.getTask(task_name);
             data_storage->setName(task_name);
             auto context = std::make_shared<tp::TaskComposerContext>(task_name, std::move(data_storage), dotgraph);
-            return run_held(nb::none(), python_object(self), [&] { return executor->run(task, context); }, executor);
+            return run_held(nb::none(), python_object(self), [&] { return executor->run(task, context); }, executor,
+                            task_name);
         }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("run", [](Server& self, const tp::TaskComposerNode& node, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
