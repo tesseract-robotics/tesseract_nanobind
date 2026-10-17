@@ -304,7 +304,9 @@ class TaskComposerNodeInfoContainer:
         """The uuid of the node that aborted the run; the nil uuid if none did."""
 
     def find(self, search_fn: Callable[[TaskComposerNodeInfo], bool]) -> list[TaskComposerNodeInfo]:
-        """Copies of the infos for which search_fn(info) is true."""
+        """
+        Copies of the infos for which search_fn(info) is true. search_fn sees a snapshot taken before the first call, and may call back into the container.
+        """
 
     def insertInfoMap(self, container: TaskComposerNodeInfoContainer) -> None: ...
 
@@ -314,7 +316,7 @@ class TaskComposerNodeInfoContainer:
 
     def prune(self, prune_fn: Callable[[TaskComposerNodeInfo], None]) -> None:
         """
-        Call prune_fn(info) on every stored info, which it may modify in place. Do not keep `info` past the call.
+        Call prune_fn(info) on a copy of every stored info, then store the edited copies. prune_fn sees a snapshot taken before the first call, and may call back into the container; edits made to `info` after prune returns are not stored.
         """
 
     def __eq__(self, arg: TaskComposerNodeInfoContainer, /) -> bool: ...
@@ -466,9 +468,9 @@ class TaskComposerNode:
         The DOT graph of this node, annotated with the results in `results_map`.
         """
 
-    def saveDotgraph(self, filepath: str, results_map: Mapping[str, TaskComposerNodeInfo] = {}) -> bool:
+    def saveDotgraph(self, filepath: str | os.PathLike, results_map: Mapping[str, TaskComposerNodeInfo] = {}) -> None:
         """
-        Write getDotgraph(results_map) to `filepath`. Returns False if it cannot be written.
+        Write getDotgraph(results_map) to `filepath`. Raises OSError if it cannot be written.
         """
 
 class TaskComposerTask(TaskComposerNode):
@@ -541,6 +543,11 @@ class TaskflowTaskComposerExecutor(TaskComposerExecutor):
 class TaskComposerPluginError(RuntimeError):
     """
     createTaskComposerNode / createTaskComposerExecutor could not create the named plugin: the name is not configured, or its plugin failed to load or build.
+    """
+
+class TaskComposerConfigError(ValueError):
+    """
+    A `str` config passed to TaskComposerPluginFactory or TaskComposerServer is not a loadable task composer config (a `str` is YAML text; pass a pathlib.Path to load a file).
     """
 
 class TaskComposerPluginFactory:

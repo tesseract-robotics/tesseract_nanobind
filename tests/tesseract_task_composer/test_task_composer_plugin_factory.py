@@ -12,6 +12,7 @@ from tesseract_robotics.tesseract_common import (
     TaskComposerPluginInfo,
 )
 from tesseract_robotics.tesseract_task_composer import (
+    TaskComposerConfigError,
     TaskComposerPluginFactory,
     TaskComposerServer,
 )
@@ -33,8 +34,19 @@ class TestPathAndYamlConstructors:
 
     def test_str_path_is_parsed_as_yaml(self, config_path):
         """A path given as `str` is YAML text: it parses as a scalar, not the config mapping."""
-        with pytest.raises(Exception, match="task_composer_plugins|config|YAML|yaml"):
+        with pytest.raises(TaskComposerConfigError, match="is YAML text"):
             TaskComposerPluginFactory(str(config_path), GeneralResourceLocator())
+
+    def test_config_error_is_a_value_error(self):
+        assert issubclass(TaskComposerConfigError, ValueError)
+
+    def test_load_config_str_path_raises_config_error(self, config_path):
+        with pytest.raises(TaskComposerConfigError, match="loadConfig"):
+            TaskComposerPluginFactory().loadConfig(str(config_path), GeneralResourceLocator())
+
+    def test_server_load_config_str_path_raises_config_error(self, config_path):
+        with pytest.raises(TaskComposerConfigError, match="TaskComposerServer.loadConfig"):
+            TaskComposerServer().loadConfig(str(config_path), GeneralResourceLocator())
 
     def test_default_then_load_config_path(self, config_path):
         factory = TaskComposerPluginFactory()
