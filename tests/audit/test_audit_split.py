@@ -77,6 +77,8 @@ PARSE = {
     "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
     # G4 (forwarding ctor templates)
     "REFERENCE_TYPE_KINDS", "_is_forwarding_ctor_template",
+    # G3 (R13's not-API half)
+    "_not_api_headers", "UNBOUND_DEPENDENCY_NAMESPACES",
 }  # fmt: skip
 
 
@@ -127,6 +129,8 @@ RULES = {
     "_check_rule_keys",
     # G2 (T10, R15)
     "K_ENUMERATOR", "CAMEL_BOUNDARY", "k_enumerator_python_name", "_k_alias",
+    # G3 (R32)
+    "EIGEN_VALUE_WRAPPERS",
 }  # fmt: skip
 
 
@@ -152,6 +156,10 @@ MATCH = {
     "_unbound_rule", "_uncovered_rule",
     # G3 T1: the yaml-node premise.
     "YAML_TEXT_KEYS", "_yaml_sibling",
+    # G3 C6 6a: a static `from_yaml(text)` is the YAML-text sibling.
+    "_is_yaml_text_factory", "_stands_for_yaml_ctor",
+    # G3 Task 10: renamed classes in parameter types.
+    "_unaliased_key", "_unaliased_api",
 }  # fmt: skip
 
 

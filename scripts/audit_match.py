@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 
@@ -47,6 +47,7 @@ from audit_rules import (
     ACCEPTED_CPP_OVERLOADS,
     ACCEPTED_PY_OVERLOADS,
     ACCEPTED_SYMBOLS,
+    EIGEN_VALUE_WRAPPERS,
     POLY_ALTERNATIVES,
     PROTOCOL_MEMBERS,
     PROTOCOL_RULES,
@@ -353,6 +354,35 @@ def _same_class(known: str | None, qualified: str) -> bool:
     return known is None or not qualified or known == qualified
 
 
+def _unaliased_key(key: TypeKey, unalias: Mapping[str, str]) -> TypeKey:
+    """`key` with each Python class this module renames spelled by its C++ name, at any depth
+    (`DescartesStateD` -> `State`), so it compares with the C++ parameter keys."""
+    if key is None:
+        return None
+    if key[0] == "class":
+        return ("class", unalias.get(key[1], key[1]))
+    return (key[0], *(k if isinstance(k, str) else _unaliased_key(k, unalias) for k in key[1:]))
+
+
+def _unaliased_api(py: PyApi, unalias: Mapping[str, str]) -> PyApi:
+    """`py` with every overload's parameter keys through `_unaliased_key`."""
+    if not unalias:
+        return py
+    return replace(
+        py,
+        symbols={
+            name: replace(
+                sym,
+                overloads=[
+                    replace(o, keys=tuple(_unaliased_key(k, unalias) for k in o.keys))
+                    for o in sym.overloads
+                ],
+            )
+            for name, sym in py.symbols.items()
+        },
+    )
+
+
 def _renamed(name: str, alias: Mapping[str, str]) -> str:
     """`name` with its top-level class replaced through `alias` (C++ <-> Python name)."""
     top, dot, rest = name.partition(".")
@@ -408,14 +438,36 @@ def poly_ancestors(ancestors: Ancestors) -> Ancestors:
     return MappingProxyType({k: frozenset(v) for k, v in out.items()})
 
 
-def _absent_ok_accepts(ov: CppOverload, sym: CppSymbol, ps: PySymbol) -> bool:
+def _is_yaml_text_factory(ps: PySymbol | None) -> bool:
+    """`ps` is a static `from_yaml` taking one `str`, YAML text: the Python form of its class's
+    `YAML::Node` constructor (C6 6a)."""
+    return ps is not None and any(p.static and p.params == ("str",) for p in ps.overloads)
+
+
+def _stands_for_yaml_ctor(leaf: str, ps: PySymbol, ctor: CppSymbol | None) -> bool:
+    """A Python-only `from_yaml` is the YAML-text form of a `YAML::Node` constructor of its
+    class (C6 6a): a static `from_yaml(text: str)` beside a `yaml-node` constructor overload."""
+    return (
+        leaf == "from_yaml"
+        and _is_yaml_text_factory(ps)
+        and ctor is not None
+        and any(ov.absent_ok == "yaml-node" for ov in ctor.overloads)
+    )
+
+
+def _absent_ok_accepts(
+    ov: CppOverload, sym: CppSymbol, ps: PySymbol, from_yaml: PySymbol | None = None
+) -> bool:
     """Whether the overload's structural `absent_ok` accepts leaving it unbound; `yaml-node`
-    only when its premise holds (T1). When it does not, the overload falls through to
-    `ACCEPTED_CPP_OVERLOADS` and the later rules."""
+    only when its premise holds (T1): a YAML-text sibling overload, or, for a constructor, the
+    class's own static `from_yaml(text)` (`from_yaml`, C6 6a). When it does not, the overload
+    falls through to `ACCEPTED_CPP_OVERLOADS` and the later rules."""
     if ov.absent_ok == "yaml-node":
         # A YAML sibling is declared on the class itself (a ctor, never inherited), so C++
         # ancestry cannot supply one.
-        return _yaml_sibling(ov, sym, ps.overloads, NO_ANCESTORS)
+        return _yaml_sibling(ov, sym, ps.overloads, NO_ANCESTORS) or (
+            sym.kind is Kind.CONSTRUCTOR and _is_yaml_text_factory(from_yaml)
+        )
     return ov.absent_ok is not None
 
 
@@ -459,6 +511,8 @@ def _unbound_rule(
         return TEMPLATE_INSTANCE_RULE
     if rule := ACCEPTED_SYMBOLS.get((module, name)) or _whole_symbol_rule(sym):
         return rule
+    if sym.kind is Kind.OPERATOR and (module, owner) in EIGEN_VALUE_WRAPPERS:
+        return "eigen-value-wrapper"
     if _bound_as_method(name, sym, py, stub_roots):
         return "free-function-as-method"
     if (
@@ -478,6 +532,7 @@ def _uncovered_rule(
     ps: PySymbol,
     ancestors: Ancestors,
     with_polys: Ancestors,
+    from_yaml: PySymbol | None = None,
 ) -> str | None:
     """The ACCEPTED rule for a C++ overload no Python overload covers, or None (a gap).
 
@@ -487,7 +542,7 @@ def _uncovered_rule(
     """
     if _cover(ov, ps.overloads, with_polys) is not None:
         return "poly-alternative-overloads"
-    if _absent_ok_accepts(ov, sym, ps):
+    if _absent_ok_accepts(ov, sym, ps, from_yaml):
         return ov.absent_ok
     if rule := ACCEPTED_CPP_OVERLOADS.get((module, name, str(ov.arity))):
         return rule
@@ -535,6 +590,7 @@ def match(
         and renamed.get(sym.qualified, name) != name
     }
     unalias = {p: c for c, p in alias.items()}
+    py = _unaliased_api(py, unalias)  # parameter types name classes as C++ does
     # Top-level classes this stub lacks but another extension binds: their members are
     # compared against that extension's stub (#232). An own rename wins over a leaf hit there.
     elsewhere: dict[str, PyApi] = {}
@@ -573,10 +629,12 @@ def match(
                 gaps.append(Gap(name, sym.kind, sym.location))
             continue
         ok = True
+        # The class's own static `from_yaml`, never an inherited one (C6 6a).
+        from_yaml = api.symbols.get(f"{_renamed(name, alias).rpartition('.')[0]}.from_yaml")
         for ov in sym.overloads:
             how = _cover(ov, ps.overloads, ancestors)
             if how is None and (
-                rule := _uncovered_rule(module, name, ov, sym, ps, ancestors, with_polys)
+                rule := _uncovered_rule(module, name, ov, sym, ps, ancestors, with_polys, from_yaml)
             ):
                 accepted.append(Accepted(name, rule, ov.location))
             elif how is None:
@@ -629,6 +687,8 @@ def match(
         if found is None:
             if rule:
                 accepted.append(Accepted(name, rule, where))
+            elif _stands_for_yaml_ctor(leaf, ps, cpp.get(f"{_renamed(owner, unalias)}.__init__")):
+                accepted.append(Accepted(name, "yaml-node", where))
             else:
                 deviations.append(Deviation(name, ps.kind, where))
             continue
@@ -868,7 +928,7 @@ def audit_tu(
     included = frozenset(Path(i.include.name).resolve() for i in tu.get_includes())
     report = match(
         module,
-        cpp_api(tu, frozenset(audited) & included),
+        cpp_api(tu, frozenset(audited) & included, prefixes),
         decl_names(tu),
         py_api(load_stub(stub_path), rel(stub_path)),
         rel(stub_path),
