@@ -105,8 +105,8 @@ struct NodeLayoutChangedError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
 
-// super().create(...) from a Python override: both hooks are pure virtual, so the base binding
-// has nothing to call.
+// Both create hooks are pure virtual: raised for super().create(...) from a Python override (the
+// base binding has nothing to call) and for a Python subclass that does not override create.
 struct PureVirtualCallError : std::logic_error {
     using std::logic_error::logic_error;
 };
@@ -123,7 +123,9 @@ public:
                                         const tc::ManipulatorInfo& composite_manip_info,
                                         const std::shared_ptr<const te::Environment>& env,
                                         int index) const override {
-        nb::detail::ticket t(nb_trampoline, "create", true);
+        nb::detail::ticket t(nb_trampoline, "create", false);
+        if (!t.key.is_valid())
+            throw PureVirtualCallError("TrajOptIfoptMoveProfile.create is pure virtual: a Python subclass must override it");
         nb::object result = nb_trampoline.base().attr(t.key)(
             nb::cast(move_instruction, nb::rv_policy::copy), nb::cast(composite_manip_info, nb::rv_policy::copy),
             env, index);
@@ -159,7 +161,9 @@ public:
         before.reserve(nodes.size());
         for (const auto& node : nodes)
             before.push_back(node->getValues());
-        nb::detail::ticket t(nb_trampoline, "create", true);
+        nb::detail::ticket t(nb_trampoline, "create", false);
+        if (!t.key.is_valid())
+            throw PureVirtualCallError("TrajOptIfoptCompositeProfile.create is pure virtual: a Python subclass must override it");
         nb::object result = nb_trampoline.base().attr(t.key)(
             nb::cast(composite_manip_info, nb::rv_policy::copy), env, nodes, fixed_indices);
         for (std::size_t i = 0; i < nodes.size(); ++i) {
@@ -188,7 +192,7 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     register_python_error_translator();  // move and composite profile trampolines
 
     nb::exception<PureVirtualCallError>(m, "TrajOptIfoptPureVirtualCallError", PyExc_NotImplementedError)
-        .attr("__doc__") = "super().create(...) from a Python TrajOpt-Ifopt profile: the base is pure virtual.";
+        .attr("__doc__") = "create is pure virtual: super().create(...), or a Python TrajOpt-Ifopt profile without it.";
     nb::exception<NodeLayoutChangedError>(m, "TrajOptIfoptNodeLayoutChangedError", PyExc_ValueError)
         .attr("__doc__") = "A Python TrajOptIfoptCompositeProfile.create changed the planner's nodes (variables or values).";
     nb::exception<ProfileReturnTypeError>(m, "TrajOptIfoptProfileReturnTypeError", PyExc_TypeError)

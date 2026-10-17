@@ -16,7 +16,7 @@ import tesseract_robotics.trajopt_sqp._trajopt_sqp
 
 class TrajOptIfoptPureVirtualCallError(NotImplementedError):
     """
-    super().create(...) from a Python TrajOpt-Ifopt profile: the base is pure virtual.
+    create is pure virtual: super().create(...), or a Python TrajOpt-Ifopt profile without it.
     """
 
 class TrajOptIfoptNodeLayoutChangedError(ValueError):

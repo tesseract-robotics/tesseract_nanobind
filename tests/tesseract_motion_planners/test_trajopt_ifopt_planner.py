@@ -49,6 +49,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptNodeLayoutChangedError,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptProfileReturnTypeError,
+    TrajOptIfoptPureVirtualCallError,
     TrajOptIfoptSolverProfile,
     TrajOptIfoptTermInfos,
     TrajOptIfoptWaypointInfo,
@@ -1306,14 +1307,14 @@ class TestTrajOptIfoptPythonProfiles:
         with pytest.raises(TrajOptIfoptProfileReturnTypeError, match="TrajOptIfoptWaypointInfo"):
             TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
 
-    def test_hook_without_override_raises(self, kuka_iiwa_environment):
+    @pytest.mark.parametrize("kind", ["move", "composite"])
+    def test_hook_without_override_raises(self, kuka_iiwa_environment, kind):
         t_env, manip_info, joint_names = kuka_iiwa_environment
+        base = TrajOptIfoptMoveProfile if kind == "move" else TrajOptIfoptCompositeProfile
+        bare = type("Bare", (base,), {})()
 
-        class Bare(TrajOptIfoptCompositeProfile):
-            pass
-
-        request = _python_profile_request(t_env, manip_info, joint_names, composite=Bare())
-        with pytest.raises(RuntimeError, match="pure virtual"):
+        request = _python_profile_request(t_env, manip_info, joint_names, **{kind: bare})
+        with pytest.raises(TrajOptIfoptPureVirtualCallError, match="create"):
             TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(request)
 
     @pytest.mark.parametrize("mutation", ["addVar", "setVariables"])
