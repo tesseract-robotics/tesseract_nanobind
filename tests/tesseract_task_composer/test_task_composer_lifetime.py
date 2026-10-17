@@ -79,12 +79,15 @@ class TestFutureLifetime:
     def test_dropped_future_then_dropped_node(self):
         """Discarding the future at once released the node while the executor still ran it."""
         out = _run("""
+import time
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 for _ in range(5):
     node = factory.createTaskComposerNode("TrajOptPipeline")
     executor.run(node, make_storage(node))
     del node
     gc.collect()
+while executor.getTaskCount():
+    time.sleep(0.1)
 print("TASKS", executor.getTaskCount())
 """)
         assert "TASKS 0" in out, out
@@ -120,6 +123,7 @@ print("SUCCESS", duplicate.context.isSuccessful())
     def test_cleared_future_then_dropped_node(self):
         """clear() drops the future's shared state, not its hold on the run."""
         out = _run("""
+import time
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 node = factory.createTaskComposerNode("TrajOptPipeline")
 future = executor.run(node, make_storage(node))
@@ -127,6 +131,8 @@ context = future.context
 future.clear()
 del future, node
 gc.collect()
+while executor.getTaskCount():
+    time.sleep(0.1)
 print("SUCCESS", context.isSuccessful())
 """)
         assert "SUCCESS True" in out, out
@@ -153,6 +159,7 @@ print("SUCCESS", future.context.isSuccessful())
 
     def test_server_dropped_future_then_dropped_node(self):
         out = _run("""
+import time
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator())
 for _ in range(3):
@@ -160,9 +167,120 @@ for _ in range(3):
     server.run(node, make_storage(node), False, "TaskflowExecutor")
     del node
     gc.collect()
+while server.getTaskCount("TaskflowExecutor"):
+    time.sleep(0.1)
 print("TASKS", server.getTaskCount("TaskflowExecutor"))
 """)
         assert "TASKS 0" in out, out
+
+    def test_long_copy_chain(self):
+        """Each copy kept the one it was made from alive: releasing a long chain recursed
+        through every dealloc and overflowed the stack."""
+        out = _run("""
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = executor.run(node, make_storage(node))
+duplicate = future
+for _ in range(200000):
+    duplicate = duplicate.copy()
+duplicate.wait()
+del future, node
+duplicate = None
+print("RELEASED")
+""")
+        assert "RELEASED" in out, out
+
+
+# A Python console_bridge handler: executor workers call it while a run is in flight.
+_WORKER_HANDLER = """
+import threading
+import time
+from tesseract_robotics import tesseract_common
+MAIN = threading.get_ident()
+
+class WorkerHook(tesseract_common.OutputHandler):
+    def __init__(self, hook):
+        super().__init__()
+        self.hook = hook
+        self.fired = False
+
+    def log(self, text, level, filename, line):
+        if threading.get_ident() != MAIN and not self.fired:
+            self.fired = True
+            self.hook()
+"""
+
+
+class TestFutureReleasedOffTheMainThread:
+    """Releasing a future never waits for its run: the last reference can go on an executor
+    worker (a callback, or gc there), where waiting for the run is waiting for itself."""
+
+    def test_last_reference_dropped_on_a_worker(self):
+        out = _run(
+            _WORKER_HANDLER
+            + """
+def drop():
+    globals()["future"] = None
+    print("DROPPED ON WORKER", flush=True)
+
+sys_handler = WorkerHook(drop)
+tesseract_common.useOutputHandler(sys_handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = executor.run(node, make_storage(node))
+del node
+while not sys_handler.fired or executor.getTaskCount():
+    time.sleep(0.1)
+print("TASKS", executor.getTaskCount())
+"""
+        )
+        assert "DROPPED ON WORKER" in out, out
+        assert "TASKS 0" in out, out
+
+    def test_gc_on_a_worker_collects_a_running_future(self):
+        out = _run(
+            _WORKER_HANDLER
+            + """
+def collect():
+    gc.collect()
+    print("COLLECTED ON WORKER", flush=True)
+
+sys_handler = WorkerHook(collect)
+tesseract_common.useOutputHandler(sys_handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+gc.disable()
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+node = factory.createTaskComposerNode("TrajOptPipeline")
+cycle = [executor.run(node, make_storage(node))]
+cycle.append(cycle)
+del cycle, node
+while not sys_handler.fired or executor.getTaskCount():
+    time.sleep(0.1)
+print("TASKS", executor.getTaskCount())
+"""
+        )
+        assert "COLLECTED ON WORKER" in out, out
+        assert "TASKS 0" in out, out
+
+    def test_exit_with_runs_in_flight(self):
+        """Interpreter exit with runs in flight, whose workers call a Python log handler."""
+        out = _run(
+            _WORKER_HANDLER
+            + """
+import sys
+sys.handler = WorkerHook(lambda: None)
+tesseract_common.useOutputHandler(sys.handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+futures = []
+for _ in range(4):
+    node = factory.createTaskComposerNode("TrajOptPipeline")
+    futures.append(executor.run(node, make_storage(node)))
+print("EXITING", flush=True)
+"""
+        )
+        assert "EXITING" in out, out
 
 
 _CONTAINER = """
@@ -222,3 +340,69 @@ print("GREEN", all(i.color == "green" for i in infos.getInfoMap().values()))
             planning=False,
         )
         assert "GREEN True" in out, out
+
+    def test_prune_conflict_raises(self):
+        """An info changed in the container while prune ran is not overwritten by a stale copy."""
+        out = _run(
+            _CONTAINER
+            + """
+from tesseract_robotics.tesseract_task_composer import TaskComposerPruneConflictError
+target = next(iter(infos.getInfoMap()))
+
+def update_then_edit(info):
+    if info.uuid == target:
+        stored = infos.getInfo(info.uuid)
+        stored.name = "concurrent"
+        infos.addInfo(stored)
+        info.name = "stale edit"
+
+try:
+    infos.prune(update_then_edit)
+except TaskComposerPruneConflictError as e:
+    print("CONFLICT", target in str(e))
+print("STORED", infos.getInfo(target).name)
+""",
+            planning=False,
+        )
+        assert "CONFLICT True" in out, out
+        assert "STORED concurrent" in out, out
+
+    def test_unedited_infos_are_not_written_back(self):
+        out = _run(
+            _CONTAINER
+            + """
+target = next(iter(infos.getInfoMap()))
+
+def update_only(info):
+    if info.uuid == target:
+        stored = infos.getInfo(info.uuid)
+        stored.name = "concurrent"
+        infos.addInfo(stored)
+
+infos.prune(update_only)
+print("STORED", infos.getInfo(target).name)
+""",
+            planning=False,
+        )
+        assert "STORED concurrent" in out, out
+
+    def test_prune_edit_of_a_removed_info_raises(self):
+        out = _run(
+            _CONTAINER
+            + """
+from tesseract_robotics.tesseract_task_composer import TaskComposerPruneConflictError
+
+def clear_then_edit(info):
+    infos.clear()
+    info.name = "edited"
+
+try:
+    infos.prune(clear_then_edit)
+except TaskComposerPruneConflictError:
+    print("CONFLICT")
+print("SIZE", len(infos.getInfoMap()))
+""",
+            planning=False,
+        )
+        assert "CONFLICT" in out, out
+        assert "SIZE 0" in out, out

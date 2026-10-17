@@ -11,11 +11,12 @@
 #include <nanobind/stl/optional.h>
 
 #include <boost/core/demangle.hpp>
+#include <boost/uuid/uuid_io.hpp>  // boost::uuids::to_string (prune conflicts)
 #include <yaml-cpp/yaml.h>  // YAML::Emitter for getConfig; YAML::Exception from the text overloads
 
 #include <fstream>
 #include <sstream>
-#include <stdexcept>  // std::runtime_error (TaskComposerPluginError)
+#include <stdexcept>  // std::runtime_error, std::invalid_argument (the named errors)
 
 // tesseract_task_composer core
 #include <tesseract/task_composer/task_composer_context.h>
@@ -200,6 +201,13 @@ struct TaskComposerConfigError : std::invalid_argument {
 template <typename Load>
 void load_yaml_text(const char* caller, const std::string& config, Load&& load) {
     try {
+        // Upstream loads empty, null, list or unrelated YAML as an empty config, silently.
+        const YAML::Node root = YAML::Load(config);
+        if (!root.IsMap() || !root[tc::TaskComposerPluginInfo::CONFIG_KEY])
+            throw TaskComposerConfigError(std::string(caller) + ": `config` is YAML text (pass a pathlib.Path "
+                                          "to load a file) without a top-level `" +
+                                          tc::TaskComposerPluginInfo::CONFIG_KEY + "` mapping; config: '" +
+                                          config.substr(0, 200) + "'");
         load();
     } catch (const YAML::Exception& e) {
         throw TaskComposerConfigError(std::string(caller) + ": `config` is YAML text (pass a pathlib.Path "
@@ -208,58 +216,79 @@ void load_yaml_text(const char* caller, const std::string& config, Load&& load) 
     }
 }
 
-// A future handed to Python. Upstream: a future "must not go out of scope until the process has
-// finished". The run uses the node, the data and the executor, which Python keeps alive only as
-// long as the future object (keep_alive); dropping the future mid-run freed them under the
-// executor's threads. Destroying this future, or a copy, waits for the run to end with the GIL
-// released, as a std::async future does. `run_` is a private copy, so clear() does not end the
-// wait. Python only sees TaskComposerFuture: this class is not bound. Only Python objects own
-// one (run_owning), so it is always destroyed with the GIL held.
-class OwningFuture final : public tp::TaskComposerFuture {
-public:
-    explicit OwningFuture(std::unique_ptr<tp::TaskComposerFuture> future)
-        : tp::TaskComposerFuture(future->context), future_(std::move(future)), run_(future_->copy()) {}
-    OwningFuture(const OwningFuture&) = delete;
-    OwningFuture& operator=(const OwningFuture&) = delete;
-    ~OwningFuture() override {
-        if (!run_->valid())
-            return;
-        nb::gil_scoped_release release;
-        run_->wait();
-    }
-
-    void clear() override { future_->clear(); }
-    bool valid() const override { return future_->valid(); }
-    bool ready() const override { return future_->ready(); }
-    void wait() const override { future_->wait(); }
-    std::future_status waitFor(const std::chrono::duration<double>& duration) const override {
-        return future_->waitFor(duration);
-    }
-    std::future_status
-    waitUntil(const std::chrono::time_point<std::chrono::high_resolution_clock>& abs) const override {
-        return future_->waitUntil(abs);
-    }
-    UPtr copy() const override {
-        auto duplicate = std::make_unique<OwningFuture>(future_->copy());
-        duplicate->context = context;
-        return duplicate;
-    }
-
-private:
-    std::unique_ptr<tp::TaskComposerFuture> future_;
-    std::unique_ptr<tp::TaskComposerFuture> run_;
+// Upstream: a future "must not go out of scope until the process has finished". The executor's
+// threads use the node, the data and the executor after run() returns; Python owns the node and
+// the executor, and a dropped future, node or executor freed them under the run. Every run is
+// held here instead, independent of the Python futures: its own copy of the future (which keeps
+// the taskflow and the context alive; clear() on a Python future does not touch it) and
+// references to the node and to the executor or server running it. Releasing a Python future
+// never waits, so it is safe on an executor worker (a callback, or gc there). Finished runs are
+// freed at the next run(), the rest at interpreter exit (wait_for_runs_at_exit).
+struct InFlightRun {
+    std::unique_ptr<tp::TaskComposerFuture> future;
+    nb::object node;
+    nb::object owner;
 };
 
-// Start a run with the GIL released, and wrap its future with the GIL held again.
+// Accessed with the GIL held only. Never freed: it outlives module teardown.
+std::vector<std::shared_ptr<InFlightRun>>& in_flight_runs() {
+    static auto* runs = new std::vector<std::shared_ptr<InFlightRun>>();
+    return *runs;
+}
+
+// Drop the runs that have finished, releasing their node and executor.
+void free_finished_runs() {
+    auto& runs = in_flight_runs();
+    std::vector<std::shared_ptr<InFlightRun>> finished;
+    auto running = runs.begin();
+    for (auto& run : runs) {
+        if (run->future->ready())
+            finished.push_back(std::move(run));
+        else
+            *running++ = std::move(run);
+    }
+    runs.erase(running, runs.end());
+    // `finished` releases its references here, after the list is consistent again.
+}
+
+// Registered with atexit: wait for every run still in flight with the GIL released (workers may
+// call Python, e.g. a log handler), before the interpreter tears down what they use.
+void wait_for_runs_at_exit() {
+    std::vector<std::shared_ptr<InFlightRun>> runs;
+    runs.swap(in_flight_runs());
+    {
+        nb::gil_scoped_release release;
+        for (const auto& run : runs)
+            run->future->wait();
+    }
+}
+
+// The Python object of a C++ argument that Python passed in.
+template <typename T>
+nb::object python_object(const T& value) {
+    nb::handle found = nb::find(&value);
+    if (!found.is_valid())
+        throw std::logic_error("task composer run: argument has no Python object");
+    return nb::borrow(found);
+}
+
+// Start a run with the GIL released, then hold what it uses until it ends.
 template <typename Run>
-std::unique_ptr<tp::TaskComposerFuture> run_owning(Run&& run) {
+std::unique_ptr<tp::TaskComposerFuture> run_held(nb::object node, nb::object owner, Run&& run) {
+    free_finished_runs();
     std::unique_ptr<tp::TaskComposerFuture> future;
     {
         nb::gil_scoped_release release;
         future = run();
     }
-    return std::make_unique<OwningFuture>(std::move(future));
+    in_flight_runs().push_back(std::make_shared<InFlightRun>(InFlightRun{ future->copy(), std::move(node), std::move(owner) }));
+    return future;
 }
+
+// prune found stored infos that changed (or were removed) while its callbacks ran.
+struct TaskComposerPruneConflictError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 
 // Copies of the stored infos, taken under the container's lock without calling Python: the
 // callbacks of find/prune run outside the lock, so they may re-enter the container (#320).
@@ -276,6 +305,9 @@ std::vector<tp::TaskComposerNodeInfo> snapshot(const tp::TaskComposerNodeInfoCon
 
 NB_MODULE(_tesseract_task_composer, m) {
     m.doc() = "tesseract_task_composer Python bindings";
+
+    // Runs still in flight at exit finish before the interpreter tears down (run_held).
+    nb::module_::import_("atexit").attr("register")(nb::cpp_function(&wait_for_runs_at_exit));
 
     // Import the modules that bind the types this one takes and returns, so nanobind names
     // them in signatures (#312): ResourceLocator and AnyPoly's ProfileDictionary come from
@@ -380,6 +412,11 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def_rw("aborted", &tp::TaskComposerNodeInfo::aborted);
     bind_value_equality(node_info);
 
+    nb::exception<TaskComposerPruneConflictError>(m, "TaskComposerPruneConflictError", PyExc_RuntimeError)
+        .attr("__doc__") =
+        "TaskComposerNodeInfoContainer.prune: an info changed or was removed while prune ran, so "
+        "the edit of its stale copy was not stored.";
+
     // ========== TaskComposerNodeInfoContainer ==========
     auto node_info_container = nb::class_<tp::TaskComposerNodeInfoContainer>(m, "TaskComposerNodeInfoContainer")
         .def(nb::init<>())
@@ -409,25 +446,49 @@ NB_MODULE(_tesseract_task_composer, m) {
         }, "container"_a)
         .def("clear", &tp::TaskComposerNodeInfoContainer::clear)
         // prune_fn gets a Python-owned copy of each stored info (a reference into the container
-        // dangled once the container dropped it); its edits are written back under the lock when
-        // every call has returned. Infos added meanwhile are not visited, removed ones not restored.
+        // dangled once the container dropped it). The changed copies are written back under the
+        // lock when every call has returned, each only if the stored info still equals the copy
+        // prune_fn was given: a stale copy never overwrites an info changed meanwhile.
         .def("prune", [](tp::TaskComposerNodeInfoContainer& self, const nb::callable& prune_fn) {
-            std::map<boost::uuids::uuid, tp::TaskComposerNodeInfo> edited;
+            struct Edit {
+                tp::TaskComposerNodeInfo original;
+                tp::TaskComposerNodeInfo edited;
+                bool stored = false;
+            };
+            std::map<boost::uuids::uuid, Edit> edits;
             for (auto& info : snapshot(self)) {
-                const auto key = info.uuid;
-                nb::object py_info = nb::cast(std::move(info), nb::rv_policy::move);
+                nb::object py_info = nb::cast(info, nb::rv_policy::copy);
                 prune_fn(py_info);
-                edited.emplace(key, nb::cast<const tp::TaskComposerNodeInfo&>(py_info));
+                const auto& edited = nb::cast<const tp::TaskComposerNodeInfo&>(py_info);
+                if (!(edited == info))
+                    edits.emplace(info.uuid, Edit{ info, edited });
             }
-            self.prune([&](tp::TaskComposerNodeInfo& info) {
-                if (auto it = edited.find(info.uuid); it != edited.end())
-                    info = it->second;
+            std::string conflicts;
+            self.prune([&](tp::TaskComposerNodeInfo& stored) {
+                auto it = edits.find(stored.uuid);
+                if (it == edits.end())
+                    return;
+                it->second.stored = true;
+                if (stored == it->second.original)
+                    stored = it->second.edited;
+                else
+                    conflicts += (conflicts.empty() ? "" : ", ") + boost::uuids::to_string(stored.uuid) + " (changed)";
             });
+            for (const auto& [uuid, edit] : edits)
+                if (!edit.stored)
+                    conflicts += (conflicts.empty() ? "" : ", ") + boost::uuids::to_string(uuid) + " (removed)";
+            if (!conflicts.empty())
+                throw TaskComposerPruneConflictError(
+                    "prune: these infos changed or were removed while prune ran, so their edits were "
+                    "not stored (the other edits were): " + conflicts);
         }, "prune_fn"_a,
            nb::sig("def prune(self, prune_fn: collections.abc.Callable[[TaskComposerNodeInfo], None]) -> None"),
-           "Call prune_fn(info) on a copy of every stored info, then store the edited copies. "
+           "Call prune_fn(info) on a copy of every stored info, then store the copies it changed. "
            "prune_fn sees a snapshot taken before the first call, and may call back into the "
-           "container; edits made to `info` after prune returns are not stored.");
+           "container. A changed copy is stored only if the stored info is still the one prune_fn "
+           "was given; if any was changed or removed meanwhile, the other edits are stored and "
+           "TaskComposerPruneConflictError names the conflicting uuids. Edits made to `info` after "
+           "prune returns, or before prune_fn raises, are not stored.");
     // Upstream operator!= holds both shared locks and then calls operator==, which takes them
     // again: a recursive shared lock is undefined behaviour and deadlocks behind a waiting
     // writer. Negate operator== instead, and short-cut self-comparison for the same reason.
@@ -485,9 +546,8 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("wait", &tp::TaskComposerFuture::wait, nb::call_guard<nb::gil_scoped_release>())
         .def("waitFor", &tp::TaskComposerFuture::waitFor, "duration"_a, nb::call_guard<nb::gil_scoped_release>())
         // A second future on the same shared state and context; copy.copy() calls it too.
-        // A copy keeps this future, and so the run's node, data and executor, alive (#315).
-        .def("copy", &tp::TaskComposerFuture::copy, nb::keep_alive<0, 1>())
-        .def("__copy__", &tp::TaskComposerFuture::copy, nb::keep_alive<0, 1>());
+        .def("copy", &tp::TaskComposerFuture::copy)
+        .def("__copy__", &tp::TaskComposerFuture::copy);
 
     // ========== TaskComposerExecutor (abstract base) ==========
     // Declared before TaskComposerNode, whose run() takes one.
@@ -551,21 +611,20 @@ NB_MODULE(_tesseract_task_composer, m) {
     // ========== TaskComposerExecutor (abstract base) ==========
     // run(node, data_storage, dotgraph, name) builds the context from a data storage, as
     // upstream's TaskComposerServer::run(node, data_storage, dotgraph, executor_name) does.
-    // The future runs `node` in the executor's threads, so it keeps the node alive: a node
-    // dropped before wait() was a use-after-free.
+    // The run uses `node` and the executor in the executor's threads: run_held keeps both until
+    // the run ends, whatever happens to the future.
     executor
         .def("getName", &tp::TaskComposerExecutor::getName)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
-            return run_owning([&] { return self.run(node, context); });
-        }, "node"_a, "context"_a, nb::keep_alive<0, 1>(), nb::keep_alive<0, 2>())
+            return run_held(python_object(node), python_object(self), [&] { return self.run(node, context); });
+        }, "node"_a, "context"_a)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
-            return run_owning([&] { return self.run(node, context); });
-        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run", nb::keep_alive<0, 1>(),
-           nb::keep_alive<0, 2>())
+            return run_held(python_object(node), python_object(self), [&] { return self.run(node, context); });
+        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
 
@@ -618,15 +677,16 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getName", &tp::TaskflowTaskComposerExecutor::getName)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
-            return run_owning([&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
-        }, "node"_a, "context"_a, nb::keep_alive<0, 1>(), nb::keep_alive<0, 2>())
+            return run_held(python_object(node), python_object(self),
+                            [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
+        }, "node"_a, "context"_a)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
-            return run_owning([&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
-        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run", nb::keep_alive<0, 1>(),
-           nb::keep_alive<0, 2>())
+            return run_held(python_object(node), python_object(self),
+                            [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
+        }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount);
 
@@ -775,8 +835,9 @@ NB_MODULE(_tesseract_task_composer, m) {
     // ========== TaskComposerServer ==========
     // Upstream's top-level entry point: loads executors and tasks from one config and runs a task
     // by name. loadConfig creates every configured executor and task through the server's own
-    // plugin factory, so it pins the libraries (GH #48), and returned executors, tasks and futures
-    // keep the server alive: their code lives in those libraries and the tasks in the server.
+    // plugin factory, so it pins the libraries (GH #48), and returned executors and tasks keep the
+    // server alive: their code lives in those libraries and the tasks in the server. A run holds the
+    // server (and a passed node) until it ends (run_held).
     using Server = tp::TaskComposerServer;
     nb::class_<Server>(m, "TaskComposerServer")
         .def(nb::init<>())
@@ -798,13 +859,15 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getAvailableTasks", &Server::getAvailableTasks)
         .def("run", [](Server& self, const std::string& task_name, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
-            return run_owning([&] { return self.run(task_name, std::move(data_storage), dotgraph, executor_name); });
-        }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a, nb::keep_alive<0, 1>())
-        // The future runs `node` in the executor's threads: keep the node alive with it.
+            // The server owns the task it runs by name.
+            return run_held(nb::none(), python_object(self),
+                            [&] { return self.run(task_name, std::move(data_storage), dotgraph, executor_name); });
+        }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("run", [](Server& self, const tp::TaskComposerNode& node, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
-            return run_owning([&] { return self.run(node, std::move(data_storage), dotgraph, executor_name); });
-        }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a, nb::keep_alive<0, 1>(), nb::keep_alive<0, 2>())
+            return run_held(python_object(node), python_object(self),
+                            [&] { return self.run(node, std::move(data_storage), dotgraph, executor_name); });
+        }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("getWorkerCount", &Server::getWorkerCount, "name"_a)
         .def("getTaskCount", &Server::getTaskCount, "name"_a);
 
