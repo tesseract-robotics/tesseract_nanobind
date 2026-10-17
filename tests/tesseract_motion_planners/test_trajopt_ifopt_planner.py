@@ -1,6 +1,7 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
 
 import gc
+import os
 import subprocess
 import sys
 import textwrap
@@ -1225,13 +1226,117 @@ _SUPER_CREATE = textwrap.dedent(
 )
 
 
-def _run_child(body):
+# The nodes a composite create receives belong to the planner's NodesVariables, which C++ owns and
+# frees after the solve: getParent must refuse, not return a reference that dangles.
+_KEPT_NODE_PARENT = textwrap.dedent(
+    """
+    from pathlib import Path
+
+    from tesseract_robotics.tesseract_command_language import (
+        CompositeInstruction,
+        JointWaypoint,
+        JointWaypointPoly_wrap_JointWaypoint,
+        MoveInstruction,
+        MoveInstructionPoly_wrap_MoveInstruction,
+        MoveInstructionType_FREESPACE,
+        ProfileDictionary,
+    )
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.tesseract_environment import Environment
+    from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+    from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        ProfileDictionary_addTrajOptIfoptCompositeProfile,
+        ProfileDictionary_addTrajOptIfoptMoveProfile,
+        ProfileDictionary_addTrajOptIfoptSolverProfile,
+        TrajOptIfoptMotionPlanner,
+        TrajOptIfoptOSQPSolverProfile,
+    )
+
+    kept = {}
+
+    class Keeping(TrajOptIfoptCompositeProfile):
+        def __init__(self):
+            super().__init__()
+            self._inner = TrajOptIfoptDefaultCompositeProfile()
+
+        def create(self, composite_manip_info, env, nodes, fixed_indices):
+            kept["node"] = nodes[0]
+            kept["var"] = nodes[0].getVar("position")
+            try:
+                nodes[0].getParent()
+            except ti.NodeParentUnavailableError:
+                kept["refused_during_create"] = True
+            return self._inner.create(composite_manip_info, env, nodes, fixed_indices)
+
+    locator = GeneralResourceLocator()
+    support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
+    env = Environment()
+    assert env.init(
+        Path(locator.locateResource(support + ".urdf").getFilePath()),
+        Path(locator.locateResource(support + ".srdf").getFilePath()),
+        locator,
+    )
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    joints = list(env.getJointGroup("manipulator").getJointNames())
+
+    def move(position):
+        return MoveInstructionPoly_wrap_MoveInstruction(
+            MoveInstruction(
+                JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.array(position))),
+                MoveInstructionType_FREESPACE,
+                "DEFAULT",
+            )
+        )
+
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(manip_info)
+    program.appendMoveInstruction(move([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]))
+    program.appendMoveInstruction(move([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0]))
+    ns = "TrajOptIfoptMotionPlannerTask"
+    profiles = ProfileDictionary()
+    ProfileDictionary_addTrajOptIfoptMoveProfile(
+        profiles, ns, "DEFAULT", TrajOptIfoptDefaultMoveProfile()
+    )
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(profiles, ns, "DEFAULT", Keeping())
+    ProfileDictionary_addTrajOptIfoptSolverProfile(
+        profiles, ns, "DEFAULT", TrajOptIfoptOSQPSolverProfile()
+    )
+    request = PlannerRequest()
+    request.env = env
+    request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 5)
+    request.profiles = profiles
+    response = TrajOptIfoptMotionPlanner(ns).solve(request)
+    assert response.successful, response.message
+    assert kept.get("refused_during_create"), "getParent did not raise inside create"
+    del response, request, profiles
+    gc.collect()
+    # reuse the freed memory, so a dangling read shows as garbage or a crash
+    junk = [bytearray(1 << 16) for _ in range(2000)]
+    for label, call in (
+        ("node.getParent()", lambda: kept["node"].getParent()),
+        ("var.getParent().getParent()", lambda: kept["var"].getParent().getParent()),
+    ):
+        try:
+            call()
+        except ti.NodeParentUnavailableError:
+            pass
+        else:
+            raise AssertionError(label + " did not raise after the solve")
+    assert kept["var"].getParent().getName() == kept["node"].getName()
+    print("OK")
+    """
+)
+
+
+def _run_child(body, env=None):
     proc = subprocess.run(
         [sys.executable, "-c", _CHILD_PREAMBLE + body],
         capture_output=True,
         text=True,
         check=False,
         timeout=CHILD_TIMEOUT_S,
+        env=None if env is None else {**os.environ, **env},
     )
     traceback_at = proc.stderr.find("Traceback")
     assert proc.returncode == 0, (
@@ -1347,6 +1452,10 @@ class TestTrajOptIfoptPythonProfiles:
 
     def test_python_constraint_set_released_after_task_composer_solve(self):
         _run_child(_TASK_COMPOSER_RELEASE)
+
+    def test_kept_node_parent_raises_after_solve(self):
+        # MallocScribble (macOS) fills freed memory, so a read through a dangling parent shows
+        _run_child(_KEPT_NODE_PARENT, env={"MallocScribble": "1"})
 
 
 class TestTrajOptIfoptConcreteProfileOverrides:
