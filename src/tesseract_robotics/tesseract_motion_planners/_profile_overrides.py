@@ -19,6 +19,10 @@ class ProfileOverrideNotDispatchedError(TypeError):
     """A Python subclass of a concrete profile defines a hook the planner never calls on it."""
 
 
+# Public home: tesseract_motion_planners re-exports it, as do the three planner packages.
+ProfileOverrideNotDispatchedError.__module__ = "tesseract_robotics.tesseract_motion_planners"
+
+
 def refuse_hook_overrides(concrete: type, hooks: tuple[str, ...], instead: str) -> None:
     """Make defining any of `hooks` in a Python subclass of `concrete` raise.
 

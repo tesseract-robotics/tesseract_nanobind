@@ -806,3 +806,17 @@ def test_planner_never_runs_a_concrete_profile_override():
             def generate(self, prev, seed, base, nxt, env, mi):
                 self.calls += 1
                 return [base]
+
+
+def test_override_error_lives_in_the_motion_planners_package():
+    import tesseract_robotics.tesseract_motion_planners as core
+    import tesseract_robotics.tesseract_motion_planners_descartes as descartes
+    import tesseract_robotics.tesseract_motion_planners_trajopt_ifopt as trajopt_ifopt
+
+    assert (
+        ProfileOverrideNotDispatchedError.__module__
+        == "tesseract_robotics.tesseract_motion_planners"
+    )
+    assert core.ProfileOverrideNotDispatchedError is ProfileOverrideNotDispatchedError
+    assert descartes.ProfileOverrideNotDispatchedError is ProfileOverrideNotDispatchedError
+    assert trajopt_ifopt.ProfileOverrideNotDispatchedError is ProfileOverrideNotDispatchedError
