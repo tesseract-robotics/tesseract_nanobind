@@ -261,7 +261,7 @@ def test_absent_ok_wins_over_the_table(monkeypatch):
 def test_failed_absent_ok_falls_through_to_the_table(monkeypatch):
     """G3/G4 contract: when `_absent_ok_accepts` says no, the overload tables still apply."""
     _structural_place(monkeypatch)
-    monkeypatch.setattr(match_, "_absent_ok_accepts", lambda ov, sym, ps: False)
+    monkeypatch.setattr(match_, "_absent_ok_accepts", lambda ov, sym, ps, from_yaml=None: False)
     pairs = accepted_pairs(audit_poly())
     assert ("Shelf.place", FIXTURE_OVERLOAD_RULE) in pairs
     assert ("Shelf.place", STRUCTURAL_RULE) not in pairs
