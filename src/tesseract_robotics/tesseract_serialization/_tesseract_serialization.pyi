@@ -1,6 +1,7 @@
 """Tesseract serialization bindings (XML/binary via Cereal)"""
 
 from collections.abc import Sequence
+import os
 
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_environment._tesseract_environment
@@ -78,10 +79,10 @@ def task_composer_log_to_xml(log: tesseract_robotics.tesseract_task_composer._te
 def task_composer_log_from_xml(xml: str) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
     """Deserialize TaskComposerLog from XML string."""
 
-def task_composer_log_to_file(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog, path: str) -> bool:
+def task_composer_log_to_file(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog, path: str | os.PathLike) -> bool:
     """Save TaskComposerLog to XML file."""
 
-def task_composer_log_from_file(path: str) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
+def task_composer_log_from_file(path: str | os.PathLike) -> tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog:
     """Load TaskComposerLog from XML file."""
 
 def task_composer_log_to_binary(log: tesseract_robotics.tesseract_task_composer._tesseract_task_composer.TaskComposerLog) -> list[int]:
