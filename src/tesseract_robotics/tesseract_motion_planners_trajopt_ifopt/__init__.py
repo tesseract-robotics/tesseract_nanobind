@@ -29,4 +29,11 @@ __all__ = [
     "TrajOptIfoptOSQPSolverProfile",
     "TrajOptIfoptPlanProfile",
     "TrajOptIfoptSolverProfile",
+    "TrajOptIfoptTermInfos",
+    "TrajOptIfoptWaypointInfo",
+    "createCollisionConstraints",
+    "createJointAccelerationConstraint",
+    "createJointJerkConstraint",
+    "createJointPositionConstraint",
+    "createJointVelocityConstraint",
 ]

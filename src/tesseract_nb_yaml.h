@@ -14,9 +14,16 @@
 // plugin (#331). Malformed YAML raises ValueError with yaml-cpp's message. The constructor's
 // own errors propagate as is: upstream wraps a bad value (e.g. the wrong type) in a
 // std::runtime_error naming the profile, which reaches Python as RuntimeError.
+// `extra_doc`, if given, is appended to the docstring: a per-profile note, e.g. how its
+// nested sub-configs are read. nanobind copies the docstring, so a temporary is fine.
 template <typename Class>
-void bind_from_yaml(Class& cls) {
+void bind_from_yaml(Class& cls, const char* extra_doc = nullptr) {
     using T = typename Class::Type;
+    std::string doc = "Construct the profile from its YAML config text; malformed YAML raises ValueError.";
+    if (extra_doc != nullptr) {
+        doc += "\n\n";
+        doc += extra_doc;
+    }
     cls.def_static(
         "from_yaml",
         [](const std::string& config) {
@@ -26,5 +33,5 @@ void bind_from_yaml(Class& cls) {
                 throw nb::value_error(e.what());
             }
         },
-        "config"_a, "Construct the profile from its YAML config text; malformed YAML raises ValueError.");
+        "config"_a, doc.c_str());
 }

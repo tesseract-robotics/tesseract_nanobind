@@ -19,32 +19,36 @@ from tesseract_robotics.tesseract_command_language import (
 )
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
+    AngleAxisd,
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
+    VectorIsometry3d,
 )
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
+from tesseract_robotics.tesseract_motion_planners_descartes import (
+    DescartesDefaultMoveProfileD,
+    DescartesDefaultPlanProfileD,
+    DescartesEdgeEvaluatorD,
+    DescartesLadderGraphSolverProfileD,
+    DescartesMotionPlannerD,
+    DescartesMoveProfileD,
+    DescartesSolverProfileD,
+    DescartesStateD,
+    DescartesStateSampleD,
+    DescartesWaypointSamplerD,
+    cast_DescartesMoveProfileD,
+    cast_DescartesPlanProfileD,
+    sampleFixed,
+    sampleToolAxis,
+    sampleToolXAxis,
+    sampleToolYAxis,
+    sampleToolZAxis,
+)
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-
-# Descartes imports - skip tests if not available
-try:
-    from tesseract_robotics.tesseract_motion_planners_descartes import (
-        DescartesDefaultMoveProfileD,
-        DescartesDefaultPlanProfileD,
-        DescartesEdgeEvaluatorD,
-        DescartesMotionPlannerD,
-        DescartesMoveProfileD,
-        cast_DescartesMoveProfileD,
-        cast_DescartesPlanProfileD,
-    )
-
-    DESCARTES_AVAILABLE = True
-except ImportError:
-    DESCARTES_AVAILABLE = False
-
 
 DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 
@@ -335,3 +339,170 @@ class TestPythonEdgeEvaluator:
         assert call_counter["n"] > 0, (
             "Python EdgeEvaluator.evaluate() was never called by the planner"
         )
+
+
+def _cartesian_move(pose, manip_info, profile="TEST_PROFILE"):
+    """A LINEAR MoveInstructionPoly to `pose` carrying `manip_info`."""
+    instruction = MoveInstruction(
+        CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose)),
+        MoveInstructionType_LINEAR,
+        profile,
+    )
+    instruction.setManipulatorInfo(manip_info)
+    return MoveInstructionPoly_wrap_MoveInstruction(instruction)
+
+
+def _fixed_pose_program(manip_info, profile="TEST_PROFILE"):
+    """The two fixed Cartesian poses of the planning tests above, as one program."""
+    program = CompositeInstruction()
+    program.setManipulatorInfo(manip_info)
+    for y in (-0.2, 0.2):
+        pose = (
+            Isometry3d.Identity()
+            * Translation3d(0.8, y, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+        )
+        program.appendMoveInstruction(_cartesian_move(pose, manip_info, profile))
+    return program
+
+
+class TestDescartesStateSample:
+    """`DescartesStateSampleD(state)` defaults the cost to 0 (gh-310)."""
+
+    def test_state_only_constructor(self):
+        state = DescartesStateD(np.array([0.1, 0.2]))
+        sample = DescartesStateSampleD(state)
+        assert sample.cost == 0.0
+        np.testing.assert_array_equal(sample.state.values, state.values)
+
+
+class TestDescartesWaypointSamplerStr:
+    """`str()` on a waypoint sampler shows upstream's `print` (gh-310)."""
+
+    def test_robot_sampler_str(self, abb_irb2400_environment):
+        env, manip_info, _ = abb_irb2400_environment
+        pose = (
+            Isometry3d.Identity()
+            * Translation3d(0.8, -0.2, 0.8)
+            * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+        )
+        sampler = DescartesDefaultMoveProfileD().createWaypointSampler(
+            _cartesian_move(pose, manip_info), manip_info, env
+        )
+        text = str(sampler)
+        assert "Working Frame:" in text
+        assert "TCP Frame:" in text
+
+    def test_python_sampler_keeps_its_own_str(self):
+        class NamedSampler(DescartesWaypointSamplerD):
+            def sample(self):
+                return []
+
+            def __str__(self):
+                return "named"
+
+        assert str(NamedSampler()) == "named"
+
+
+class TestDescartesToolPoseSamplers:
+    """`sampleFixed` and `sampleTool{,X,Y,Z}Axis` (gh-311)."""
+
+    POSE = (
+        Isometry3d.Identity() * Translation3d(0.8, -0.2, 0.8) * Quaterniond.from_xyzw(0, -1.0, 0, 0)
+    )
+
+    def test_sample_fixed(self):
+        samples = sampleFixed(self.POSE)
+        assert type(samples) is VectorIsometry3d
+        assert len(samples) == 1
+        np.testing.assert_array_equal(samples[0].matrix, self.POSE.matrix)
+
+    def test_sample_tool_z_axis(self):
+        # upstream descartes_utils.cpp: angles minimum, minimum + resolution, ... while
+        # angle <= maximum, so -pi, -pi/2, 0, pi/2.
+        samples = sampleToolZAxis(
+            self.POSE, resolution=np.pi / 2, minimum=-np.pi, maximum=np.pi / 2
+        )
+        assert type(samples) is VectorIsometry3d
+        assert len(samples) == 4
+        z_axis = self.POSE.matrix[:3, 2]
+        for sample in samples:
+            np.testing.assert_allclose(sample.translation, self.POSE.translation)
+            np.testing.assert_allclose(sample.matrix[:3, 2], z_axis, atol=1e-12)
+        for sample, angle in ((samples[0], -np.pi), (samples[3], np.pi / 2)):
+            expected = self.POSE * AngleAxisd(angle, np.array([0.0, 0.0, 1.0]))
+            np.testing.assert_allclose(sample.matrix, expected.matrix, atol=1e-12)
+
+    @pytest.mark.parametrize(
+        ("sampler", "axis"),
+        [(sampleToolXAxis, (1.0, 0.0, 0.0)), (sampleToolYAxis, (0.0, 1.0, 0.0))],
+    )
+    def test_sample_tool_fixed_axes(self, sampler, axis):
+        expected = sampleToolAxis(self.POSE, np.array(axis), 0.5, -1.0, 1.0)
+        samples = sampler(self.POSE, 0.5, -1.0, 1.0)
+        assert len(samples) == len(expected) == 5  # zip(strict=True) is 3.10+; the floor is 3.9
+        for sample, other in zip(samples, expected):
+            np.testing.assert_allclose(sample.matrix, other.matrix)
+
+
+class TestDescartesMotionPlannerBase:
+    """`DescartesMotionPlannerD` is a `MotionPlanner` (gh-299)."""
+
+    def test_isinstance(self):
+        assert isinstance(DescartesMotionPlannerD("x"), MotionPlanner)
+
+    def test_base_solve_dispatches(self, abb_irb2400_environment):
+        env, manip_info, _ = abb_irb2400_environment
+        program = generateInterpolatedProgram(
+            _fixed_pose_program(manip_info), env, 3.14, 1.0, 3.14, 10
+        )
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            DESCARTES_DEFAULT_NAMESPACE,
+            "TEST_PROFILE",
+            cast_DescartesMoveProfileD(DescartesDefaultMoveProfileD()),
+        )
+        request = PlannerRequest()
+        request.instructions = program
+        request.env = env
+        request.profiles = profiles
+
+        planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
+        via_base = MotionPlanner.solve(planner, request)
+        direct = planner.solve(request)
+        assert via_base.successful, via_base.message
+        assert via_base.message == direct.message
+        assert len(via_base.results) == len(direct.results)
+
+
+class TestDescartesProfileEquality:
+    """Value `__eq__` on the Descartes profiles; unhashable (gh-261)."""
+
+    def test_default_move_profile(self):
+        a, b = DescartesDefaultMoveProfileD(), DescartesDefaultMoveProfileD()
+        assert a == b
+        b.target_pose_sample_resolution = 0.5
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)
+
+    def test_ladder_graph_solver_profile(self):
+        a, b = DescartesLadderGraphSolverProfileD(), DescartesLadderGraphSolverProfileD()
+        assert a == b
+        b.num_threads = 4
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)
+
+
+class TestDescartesProfileCreateKey:
+    """Static `createKey()` is the key the profile carries (gh-273)."""
+
+    @pytest.mark.parametrize(
+        "cls", [DescartesDefaultMoveProfileD, DescartesLadderGraphSolverProfileD]
+    )
+    def test_create_key_matches_instance_key(self, cls):
+        assert cls.createKey() == cls().getKey()
+
+    def test_move_and_solver_keys_differ(self):
+        assert DescartesMoveProfileD.createKey() != DescartesSolverProfileD.createKey()

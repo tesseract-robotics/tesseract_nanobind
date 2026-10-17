@@ -3,6 +3,9 @@ from tesseract_robotics.tesseract_motion_planners_simple._tesseract_motion_plann
 __all__ = [
     "SimpleMotionPlanner",
     "generateInterpolatedProgram",
+    "interpolate",
+    "interpolate_waypoint",
+    "getInterpolatedInstructions",
     "SimplePlannerMoveProfile",
     "SimplePlannerCompositeProfile",
     "SimplePlannerFixedSizeMoveProfile",

@@ -26,6 +26,8 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 ## TrajOptMotionPlanner
 
+`TrajOptMotionPlanner` derives from `MotionPlanner` (`tesseract_motion_planners`).
+
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptMotionPlanner
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
@@ -91,6 +93,48 @@ profile.velocity_coeff = np.ones(6)
 profile.acceleration_coeff = np.ones(6)
 ```
 
+The composite profile turns a collision config's longest-valid-segment
+fraction and length into the step its collision terms check at. The static
+`computeLongestValidSegmentLength` gives the same number from Python:
+`min(fraction * extent, length)` when both are positive, the positive one
+otherwise, and `0.01 * extent` when neither is, with
+`extent = ||upper - lower||` over the joint limits.
+
+```python
+limits = env.getJointGroup("manipulator").getLimits().joint_limits  # n x 2
+cfg = profile.collision_cost_config.collision_check_config
+step = TrajOptDefaultCompositeProfile.computeLongestValidSegmentLength(
+    limits, cfg.longest_valid_segment_fraction, cfg.longest_valid_segment_length
+)
+```
+
+### TrajOptOSQPSolverProfile
+
+The solver profile holds the SQP parameters (`opt_params`, a
+`BasicTrustRegionSQPParameters`) and the QP solver's `settings`, an
+`OSQPSettings`. A new profile holds trajopt's OSQP defaults
+(`eps_abs=1e-4`, `eps_rel=1e-6`, `max_iter=8192`, polishing and adaptive rho
+on); `OSQPSettings()` on its own holds OSQP's defaults.
+
+```python
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    ProfileDictionary_addTrajOptSolverProfile, TrajOptOSQPSolverProfile,
+)
+
+solver = TrajOptOSQPSolverProfile()
+solver.opt_params.max_iter = 200
+settings = solver.settings
+settings.eps_abs = 1e-5
+settings.time_limit = 0.5
+solver.settings = settings
+
+ProfileDictionary_addTrajOptSolverProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", solver)
+```
+
+`createOptimizationParameters()` returns the SQP parameters the planner uses
+for that profile (a copy of `opt_params`). The OSQP enum fields
+`linsys_solver` and `cg_precond` are not bound.
+
 ## Collision Configuration
 
 ### TrajOptCollisionConfig
@@ -155,6 +199,12 @@ config.lower_tolerance = np.zeros(6)
 config.upper_tolerance = np.zeros(6)
 ```
 
+## Value equality
+
+The waypoint configs, the default move/composite profiles,
+`TrajOptOSQPSolverProfile`, `BasicTrustRegionSQPParameters` and
+`OSQPSettings` compare by value (`==`, `!=`) and are unhashable.
+
 ## Adding Profiles
 
 ```python
@@ -183,6 +233,17 @@ composite_profile.smooth_velocities = True
 profiles = ProfileDictionary()
 ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
 ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
+```
+
+`ProfileDictionary.hasProfile` / `getProfile` take a profile key. Each profile
+kind has one: `TrajOptMoveProfile.createKey()`,
+`TrajOptCompositeProfile.createKey()` and `TrajOptSolverProfile.createKey()`,
+inherited by their concrete profiles.
+
+```python
+composite = profiles.getProfile(
+    TrajOptDefaultCompositeProfile.createKey(), "TrajOptMotionPlannerTask", "DEFAULT"
+)
 ```
 
 ## Complete Example

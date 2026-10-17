@@ -10,8 +10,11 @@
 
 #include "tesseract_nb.h"
 
+#include <sstream>
+
 // tesseract_motion_planners core (for PlannerRequest/Response)
 #include <tesseract/motion_planners/types.h>
+#include <tesseract/motion_planners/planner.h>
 
 // tesseract_common (Profile and ProfileDictionary moved here in 0.33)
 #include <tesseract/common/profile.h>
@@ -22,6 +25,7 @@
 #include <tesseract/motion_planners/descartes/profile/descartes_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_default_move_profile.h>
 #include <tesseract/motion_planners/descartes/profile/descartes_ladder_graph_solver_profile.h>
+#include <tesseract/motion_planners/descartes/descartes_utils.h>
 
 // descartes_light core types (needed for Python-side subclassing)
 #include <descartes_light/types.h>
@@ -41,6 +45,10 @@ namespace tp = tesseract::motion_planners;
 namespace tcl = tesseract::command_language;
 namespace tc = tesseract::common;
 namespace dl = descartes_light;
+
+// tesseract_common binds VectorIsometry3d as an opaque class; without this the stl/vector caster
+// would return the tool-pose samples as a plain list.
+NB_MAKE_OPAQUE(tc::VectorIsometry3d)
 
 // ------------------------------------------------------------------
 // Trampolines so Python can subclass the descartes_light interfaces.
@@ -188,8 +196,12 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     // Import tesseract_collision for CollisionCheckConfig
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
 
-    // Import MotionPlanner base type for clone() return type
+    // Import MotionPlanner base type (DescartesMotionPlannerD's base)
     nb::module_::import_("tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners");
+
+    // VectorIsometry3d (tool-pose samplers) and Environment (profile hooks)
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
 
     // ========== descartes_light::State<double> ==========
     // Python-readable view of a Descartes state. Constructable from a numpy
@@ -206,6 +218,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     nb::class_<dl::StateSample<double>>(m, "DescartesStateSampleD")
         .def(nb::init<>())
         .def(nb::init<std::shared_ptr<const dl::State<double>>, double>(), "state"_a, "cost"_a)
+        .def(nb::init<std::shared_ptr<const dl::State<double>>>(), "state"_a, "A sample with cost 0")
         .def_rw("state", &dl::StateSample<double>::state)
         .def_rw("cost", &dl::StateSample<double>::cost);
 
@@ -219,7 +232,13 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     nb::class_<dl::WaypointSampler<double>, PyWaypointSamplerD>(m, "DescartesWaypointSamplerD")
         .def(nb::init<>())
         .def("sample", &dl::WaypointSampler<double>::sample,
-             "Return the list of valid state samples for this waypoint");
+             "Return the list of valid state samples for this waypoint")
+        // upstream's print(); a Python subclass that defines __str__ keeps its own
+        .def("__str__", [](const dl::WaypointSampler<double>& self) {
+            std::stringstream ss;
+            self.print(ss);
+            return ss.str();
+        });
 
     // ========== descartes_light::StateEvaluator<double> ==========
     nb::class_<dl::StateEvaluator<double>, PyStateEvaluatorD>(m, "DescartesStateEvaluatorD")
@@ -229,13 +248,18 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
 
     // ========== DescartesSolverProfile<double> (base for solver profiles) ==========
     nb::class_<tp::DescartesSolverProfile<double>, tc::Profile>(m, "DescartesSolverProfileD")
-        .def("getKey", &tp::DescartesSolverProfile<double>::getKey);
+        .def("getKey", &tp::DescartesSolverProfile<double>::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::DescartesSolverProfile<double>>,
+            "The key every Descartes solver profile carries");
 
     // ========== DescartesLadderGraphSolverProfile<double> ==========
-    nb::class_<tp::DescartesLadderGraphSolverProfile<double>, tp::DescartesSolverProfile<double>>(m, "DescartesLadderGraphSolverProfileD")
+    nb::class_<tp::DescartesLadderGraphSolverProfile<double>, tp::DescartesSolverProfile<double>> ladder_graph_profile(
+        m, "DescartesLadderGraphSolverProfileD");
+    ladder_graph_profile
         .def(nb::init<>())
         .def_rw("num_threads", &tp::DescartesLadderGraphSolverProfile<double>::num_threads,
             "Number of threads to use during planning (default: 1)");
+    bind_value_equality(ladder_graph_profile);
 
     // Helper to cast DescartesLadderGraphSolverProfileD to Profile
     m.def("cast_DescartesSolverProfileD", [](std::shared_ptr<tp::DescartesLadderGraphSolverProfile<double>> profile) {
@@ -249,6 +273,8 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     nb::class_<tp::DescartesMoveProfile<double>, tc::Profile, PyDescartesMoveProfileD>(m, "DescartesMoveProfileD")
         .def(nb::init<>())
         .def("getKey", &tp::DescartesMoveProfile<double>::getKey)
+        .def_static("createKey", &tc::Profile::createKey<tp::DescartesMoveProfile<double>>,
+            "The key every Descartes move profile carries")
         .def("createWaypointSampler", &tp::DescartesMoveProfile<double>::createWaypointSampler,
              "move_instruction"_a, "composite_manip_info"_a, "env"_a)
         .def("createEdgeEvaluator", &tp::DescartesMoveProfile<double>::createEdgeEvaluator,
@@ -267,7 +293,9 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     m.attr("DescartesPlanProfileD") = m.attr("DescartesMoveProfileD");
 
     // ========== DescartesDefaultMoveProfile<double> (was DescartesDefaultPlanProfile) ==========
-    nb::class_<tp::DescartesDefaultMoveProfile<double>, tp::DescartesMoveProfile<double>>(m, "DescartesDefaultMoveProfileD")
+    nb::class_<tp::DescartesDefaultMoveProfile<double>, tp::DescartesMoveProfile<double>> default_move_profile(
+        m, "DescartesDefaultMoveProfileD");
+    default_move_profile
         .def(nb::init<>())
         .def_rw("target_pose_fixed", &tp::DescartesDefaultMoveProfile<double>::target_pose_fixed)
         .def_rw("target_pose_sample_axis", &tp::DescartesDefaultMoveProfile<double>::target_pose_sample_axis)
@@ -284,6 +312,7 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def_rw("edge_collision_check_config", &tp::DescartesDefaultMoveProfile<double>::edge_collision_check_config)
         .def_rw("use_redundant_joint_solutions", &tp::DescartesDefaultMoveProfile<double>::use_redundant_joint_solutions)
         .def_rw("debug", &tp::DescartesDefaultMoveProfile<double>::debug);
+    bind_value_equality(default_move_profile);
 
     // SWIG-compatible alias
     m.attr("DescartesDefaultPlanProfileD") = m.attr("DescartesDefaultMoveProfileD");
@@ -294,14 +323,24 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
     }, "profile"_a,
     "Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)");
 
+    // ========== Tool-pose samplers (descartes_utils.h) ==========
+    // What DescartesDefaultMoveProfileD's target_pose_sample_* fields drive.
+    m.def("sampleToolAxis", &tp::sampleToolAxis,
+          "tool_pose"_a, "axis"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the provided axis.");
+    m.def("sampleToolXAxis", &tp::sampleToolXAxis, "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the x axis.");
+    m.def("sampleToolYAxis", &tp::sampleToolYAxis, "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the y axis.");
+    m.def("sampleToolZAxis", &tp::sampleToolZAxis, "tool_pose"_a, "resolution"_a, "minimum"_a, "maximum"_a,
+          "Given a tool pose create samples from [minimum, maximum] around the z axis.");
+    m.def("sampleFixed", &tp::sampleFixed, "tool_pose"_a,
+          "This will return the tool pose as the only sample.");
+
     // ========== DescartesMotionPlanner<double> ==========
-    nb::class_<tp::DescartesMotionPlanner<double>>(m, "DescartesMotionPlannerD")
-        .def(nb::init<std::string>(), "name"_a)
-        .def("getName", &tp::DescartesMotionPlanner<double>::getName)
-        // Release GIL during solve - Descartes uses OpenMP internally but that's safe
-        // as long as we use a single OpenMP runtime (conda's llvm-openmp, not Homebrew's)
-        .def("solve", &tp::DescartesMotionPlanner<double>::solve, "request"_a, nb::call_guard<nb::gil_scoped_release>())
-        .def("terminate", &tp::DescartesMotionPlanner<double>::terminate)
-        .def("clear", &tp::DescartesMotionPlanner<double>::clear)
-        .def("clone", [](const tp::DescartesMotionPlanner<double>& self) { return self.clone(); });
+    // getName/solve/terminate/clear/clone are MotionPlanner's. Its solve releases the GIL:
+    // Descartes uses OpenMP internally, safe as long as one OpenMP runtime is loaded (conda's
+    // llvm-openmp, not Homebrew's).
+    nb::class_<tp::DescartesMotionPlanner<double>, tp::MotionPlanner>(m, "DescartesMotionPlannerD")
+        .def(nb::init<std::string>(), "name"_a);
 }

@@ -196,10 +196,12 @@ tick (trust-region shrinking can drive the box to zero):
 
 ## Warm-Starting
 
-Between solver steps, update `NodesVariables` with the previous solution:
+Between solver steps, set the previous solution through the problem. `problem.setVariables`
+writes the variables, then updates every component and recounts the dynamic rows;
+`NodesVariables.setVariables` only writes them. A wrong length raises `VariablesSizeError`:
 
 ```python
-nodes_variables.setVariables(trajectory.flatten())
+problem.setVariables(trajectory.flatten())
 solver.init(problem)
 solver.stepSQPSolver()
 ```
@@ -238,6 +240,110 @@ After `solve`, `solver.getStatus()` returns an `SQPStatus`: `NLP_CONVERGED` is t
 success. `ITERATION_LIMIT`, `PENALTY_ITERATION_LIMIT`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`
 and `CALLBACK_STOPPED` each name why it stopped. A run can stop with constraints still
 violated, so check `problem.getExactConstraintViolations()` before using the result.
+
+## What the TrajOpt-Ifopt planner builds
+
+`TrajOptIfoptMotionPlanner` builds a `TrajOptQPProblem` the same way, from its profiles. Each
+profile's `create` hook is bound, so Python can see the terms the planner would add without
+running a plan:
+
+| Hook | Returns |
+|---|---|
+| `TrajOptIfoptMoveProfile.create(move_instruction, composite_manip_info, env, index)` | `TrajOptIfoptWaypointInfo`: the waypoint's `node`, its `term_infos` and whether it is `fixed` |
+| `TrajOptIfoptCompositeProfile.create(composite_manip_info, env, nodes, fixed_indices)` | `TrajOptIfoptTermInfos` over every waypoint: collision, velocity, acceleration, jerk |
+| `TrajOptIfoptSolverProfile.create(verbose=False)` | the `TrustRegionSQPSolver`, with `opt_params` and `callbacks` applied |
+
+`TrajOptIfoptTermInfos` holds four lists of constraint sets. The planner adds `constraints` with
+`addConstraintSet` and the others with `addCostSet` and the matching penalty type (`SQUARED`,
+`ABSOLUTE`, `HINGE`).
+
+```python
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultMoveProfile,
+)
+
+move_profile = TrajOptIfoptDefaultMoveProfile()
+infos = [move_profile.create(move, manip_info, env, i) for i, move in enumerate(moves)]
+nodes = [info.node for info in infos]
+fixed = [i for i, info in enumerate(infos) if info.fixed]
+
+terms = TrajOptIfoptDefaultCompositeProfile().create(manip_info, env, nodes, fixed)
+len(terms.constraints), len(terms.squared_costs), len(terms.hinge_costs)
+```
+
+`TrajOptIfoptWaypointInfo` owns its `Node`, so `info.node` is read-only and keeps `info`
+alive. A constraint set from `term_infos` is shared and outlives the info. The planner moves
+every node into one `NodesVariables`; Python cannot, so the nodes a hook returns are for
+inspection, and a problem you solve yourself is built over `createNodesVariables(...)`.
+
+### The planner's term factories
+
+The planner builds its terms with five factories, bound under their C++ names. A hand-built
+problem that uses them gets the planner's coefficients and sparsity choices:
+
+| Factory | Builds |
+|---|---|
+| `createJointPositionConstraint(joint_waypoint, var, coeffs)` | `JointPosConstraint`: the waypoint's position, or its tolerance band |
+| `createCollisionConstraints(vars, env, manip_info, config, fixed_indices, fixed_sparsity)` | One collision set per unfixed step (`DISCRETE`) or per segment (`LVS_DISCRETE`, `LVS_CONTINUOUS`, `CONTINUOUS`); none for `NONE` |
+| `createJointVelocityConstraint(target, vars, coeffs)` | `JointVelConstraint` |
+| `createJointAccelerationConstraint(target, vars, coeffs)` | `JointAccelConstraint` |
+| `createJointJerkConstraint(target, vars, coeffs)` | `JointJerkConstraint` |
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    createCollisionConstraints,
+    createJointVelocityConstraint,
+)
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+from tesseract_robotics.trajopt_sqp import CostPenaltyType
+
+vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
+for constraint in createCollisionConstraints(
+    vars_list, env, manip_info, TrajOptCollisionConfig(0.1, 10.0), [0], False
+):
+    problem.addConstraintSet(constraint)
+problem.addCostSet(
+    createJointVelocityConstraint(np.zeros(n_joints), vars_list, np.ones(n_joints)),
+    CostPenaltyType.SQUARED,
+)
+```
+
+An empty `vars` raises `ValueError`, a `None` in it `TypeError`.
+
+### Progress callbacks through the planner
+
+A Python `SQPCallback` set in `TrajOptIfoptSolverProfile.callbacks` is registered on the solver
+the planner builds. `execute` runs once per SQP iteration, with the GIL taken for the call:
+
+```python
+from tesseract_robotics.trajopt_sqp import SQPCallback
+
+
+class Progress(SQPCallback):
+    def execute(self, problem, sqp_results):
+        print(sqp_results.overall_iteration, sqp_results.best_exact_merit)
+        return True
+
+
+solver_profile = TrajOptIfoptOSQPSolverProfile()
+solver_profile.callbacks = [Progress()]  # assign the whole list; it is copied
+```
+
+!!! warning "`problem` is valid only during the call"
+    The planner owns the problem it passes to `execute` and destroys it when the solve ends.
+    Read what you need from `problem` inside the callback; do not store it, or anything
+    taken from it, for use after `execute` returns.
+
+!!! warning "Returning `False` does not stop the solve on trajopt 0.35.0"
+    The callback's `False` reaches the solver, which drops it. In trajopt 0.35.0's
+    `trust_region_sqp_solver.cpp`, `runTrustRegionLoop` returns on `kStoppedByCallback`, but
+    `stepSQPSolver` does not check that status, so `solve` keeps stepping until
+    `opt_params.max_iterations`, and `verifySQPSolverConvergence` can then set `kConverged`.
+    Through `TrajOptIfoptMotionPlanner`, a callback that always returns `False` is called once
+    per iteration up to `max_iterations` and the response can still be successful. To bound a
+    solve, set `opt_params.max_iterations` or `opt_params.max_time`.
 
 ## Python Subclassing
 

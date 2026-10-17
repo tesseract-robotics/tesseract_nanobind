@@ -6,6 +6,8 @@ from typing import overload
 
 import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
+import tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt
+import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
 
 class ContactCheckProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
@@ -26,6 +28,23 @@ class ContactCheckProfile(tesseract_robotics.tesseract_command_language._tessera
 
     @collision_check_config.setter
     def collision_check_config(self, arg: tesseract_robotics.tesseract_collision._tesseract_collision.CollisionCheckConfig, /) -> None: ...
+
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: ContactCheckProfile, /) -> bool: ...
+
+    def __ne__(self, arg: ContactCheckProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> ContactCheckProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `collision_check_config:` resets type to DISCRETE and longest_valid_segment_length to 0.005, and `contact_manager_config:` resets default_margin to None.
+        """
 
 class FixStateBoundsProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self, mode: FixStateBoundsProfile.Settings = FixStateBoundsProfile.Settings.ALL) -> None: ...
@@ -62,6 +81,23 @@ class FixStateBoundsProfile(tesseract_robotics.tesseract_command_language._tesse
 
     @lower_bounds_reduction.setter
     def lower_bounds_reduction(self, arg: float, /) -> None: ...
+
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: FixStateBoundsProfile, /) -> bool: ...
+
+    def __ne__(self, arg: FixStateBoundsProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> FixStateBoundsProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
+        """
 
 class FixStateCollisionProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self, mode: FixStateCollisionProfile.Settings = FixStateCollisionProfile.Settings.ALL) -> None: ...
@@ -130,6 +166,65 @@ class FixStateCollisionProfile(tesseract_robotics.tesseract_command_language._te
     @update_workspace.setter
     def update_workspace(self, arg: bool, /) -> None: ...
 
+    @property
+    def trajopt_joint_constraint_config(self) -> tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.TrajOptJointWaypointConfig:
+        """Joint waypoint constraint config of the TrajOpt correction solve"""
+
+    @trajopt_joint_constraint_config.setter
+    def trajopt_joint_constraint_config(self, arg: tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.TrajOptJointWaypointConfig, /) -> None: ...
+
+    @property
+    def trajopt_joint_cost_config(self) -> tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.TrajOptJointWaypointConfig:
+        """Joint waypoint cost config of the TrajOpt correction solve"""
+
+    @trajopt_joint_cost_config.setter
+    def trajopt_joint_cost_config(self, arg: tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.TrajOptJointWaypointConfig, /) -> None: ...
+
+    @property
+    def collision_constraint_coeff(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData:
+        """Collision constraint coefficients of the TrajOpt correction solve"""
+
+    @collision_constraint_coeff.setter
+    def collision_constraint_coeff(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData, /) -> None: ...
+
+    @property
+    def collision_cost_coeff(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData:
+        """Collision cost coefficients of the TrajOpt correction solve"""
+
+    @collision_cost_coeff.setter
+    def collision_cost_coeff(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.CollisionCoeffData, /) -> None: ...
+
+    @property
+    def opt_params(self) -> tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.BasicTrustRegionSQPParameters:
+        """Optimization parameters of the TrajOpt correction solve"""
+
+    @opt_params.setter
+    def opt_params(self, arg: tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.BasicTrustRegionSQPParameters, /) -> None: ...
+
+    @property
+    def osqp_settings(self) -> tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.OSQPSettings:
+        """OSQP settings of the TrajOpt correction solve"""
+
+    @osqp_settings.setter
+    def osqp_settings(self, arg: tesseract_robotics.tesseract_motion_planners_trajopt._tesseract_motion_planners_trajopt.OSQPSettings, /) -> None: ...
+
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: FixStateCollisionProfile, /) -> bool: ...
+
+    def __ne__(self, arg: FixStateCollisionProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> FixStateCollisionProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `collision_check_config:` resets contact_request.type to ALL, and `trajopt_joint_constraint_config:` resets coeff to 5. `contact_manager_config:`, `opt_params:` and `osqp_settings:` keep the profile's defaults.
+        """
+
 class KinematicLimitsCheckProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self, check_position: bool = True, check_velocity: bool = True, check_acceleration: bool = True) -> None: ...
 
@@ -151,6 +246,23 @@ class KinematicLimitsCheckProfile(tesseract_robotics.tesseract_command_language.
     @check_acceleration.setter
     def check_acceleration(self, arg: bool, /) -> None: ...
 
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: KinematicLimitsCheckProfile, /) -> bool: ...
+
+    def __ne__(self, arg: KinematicLimitsCheckProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> KinematicLimitsCheckProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
+        """
+
 class MinLengthProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     @overload
     def __init__(self) -> None: ...
@@ -164,6 +276,23 @@ class MinLengthProfile(tesseract_robotics.tesseract_command_language._tesseract_
     @min_length.setter
     def min_length(self, arg: int, /) -> None: ...
 
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: MinLengthProfile, /) -> bool: ...
+
+    def __ne__(self, arg: MinLengthProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> MinLengthProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
+        """
+
 class ProfileSwitchProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self, return_value: int = 1) -> None: ...
 
@@ -172,6 +301,23 @@ class ProfileSwitchProfile(tesseract_robotics.tesseract_command_language._tesser
 
     @return_value.setter
     def return_value(self, arg: int, /) -> None: ...
+
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: ProfileSwitchProfile, /) -> bool: ...
+
+    def __ne__(self, arg: ProfileSwitchProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> ProfileSwitchProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
+        """
 
 class UpsampleTrajectoryProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     @overload
@@ -185,3 +331,20 @@ class UpsampleTrajectoryProfile(tesseract_robotics.tesseract_command_language._t
 
     @longest_valid_segment_length.setter
     def longest_valid_segment_length(self, arg: float, /) -> None: ...
+
+    @staticmethod
+    def createKey() -> int: ...
+
+    def __eq__(self, arg: UpsampleTrajectoryProfile, /) -> bool: ...
+
+    def __ne__(self, arg: UpsampleTrajectoryProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> UpsampleTrajectoryProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        No nested sub-configs: every key is a field of the profile itself. Other profiles' from_yaml behave per struct.
+        """

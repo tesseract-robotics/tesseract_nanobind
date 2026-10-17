@@ -1,30 +1,68 @@
 """tesseract_motion_planners_simple Python bindings"""
 
+from collections.abc import Sequence
+from typing import Annotated, overload
+
+import numpy
+from numpy.typing import NDArray
+
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
+import tesseract_robotics.tesseract_common._tesseract_common
+import tesseract_robotics.tesseract_environment._tesseract_environment
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 
 
-class SimpleMotionPlanner:
+class SimpleMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str = 'SIMPLE') -> None: ...
 
-    def getName(self) -> str: ...
-
-    def solve(self, request: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerRequest) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerResponse: ...
-
-    def terminate(self) -> bool: ...
-
-    def clear(self) -> None: ...
-
-    def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...
-
-def generateInterpolatedProgram(instructions: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: "tesseract::environment::Environment", state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.15, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction:
+def generateInterpolatedProgram(instructions: tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.15, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.CompositeInstruction:
     """Generate an interpolated program from a composite instruction"""
 
+@overload
+def interpolate(start: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, stop: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, steps: int) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
+    """
+    Poses from `start` to `stop`: `steps + 1` of them, translation lerped, rotation slerped.
+    """
+
+@overload
+def interpolate(start: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], stop: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], steps: int) -> Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')]:
+    """
+    Joint states from `start` to `stop`, one per column: `steps + 1` columns.
+    """
+
+def interpolate_waypoint(start: tesseract_robotics.tesseract_command_language._tesseract_command_language.WaypointPoly, stop: tesseract_robotics.tesseract_command_language._tesseract_command_language.WaypointPoly, steps: int) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.WaypointPoly]:
+    """
+    Waypoints from `start` to `stop`: `steps + 1` of them, of the start's type.
+    """
+
+@overload
+def getInterpolatedInstructions(joint_names: Sequence[str], states: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')] | Sequence[Sequence[float]], base_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]:
+    """
+    Move instructions for the columns of `states` after the first, each a child of `base_instruction`; the last is `base_instruction` itself.
+    """
+
+@overload
+def getInterpolatedInstructions(poses: tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d, joint_names: Sequence[str], states: Annotated[NDArray[numpy.float64], dict(shape=(None, None), order='F')] | Sequence[Sequence[float]], base_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]:
+    """
+    Cartesian move instructions for the columns of `states` after the first, seeded with those states; the last is `base_instruction` itself.
+    """
+
 class SimplePlannerMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
-    pass
+    @staticmethod
+    def createKey() -> int:
+        """The key every simple-planner move profile registers under."""
+
+    def generate(self, prev_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, prev_seed: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, base_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, next_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.InstructionPoly, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, global_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo) -> list[tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly]:
+        """
+        The move instructions the simple planner emits for `base_instruction`, ending with it. `next_instruction` is a null InstructionPoly for the last move.
+        """
 
 class SimplePlannerCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self) -> None: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key this profile type registers under in a ProfileDictionary."""
 
 class SimplePlannerFixedSizeMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, freespace_steps: int = 10, linear_steps: int = 10) -> None: ...
@@ -41,6 +79,18 @@ class SimplePlannerFixedSizeMoveProfile(SimplePlannerMoveProfile):
     @linear_steps.setter
     def linear_steps(self, arg: int, /) -> None: ...
 
+    def __eq__(self, arg: SimplePlannerFixedSizeMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerFixedSizeMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerFixedSizeMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 class SimplePlannerFixedSizeAssignMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, freespace_steps: int = 10, linear_steps: int = 10) -> None: ...
 
@@ -56,6 +106,18 @@ class SimplePlannerFixedSizeAssignMoveProfile(SimplePlannerMoveProfile):
     @linear_steps.setter
     def linear_steps(self, arg: int, /) -> None: ...
 
+    def __eq__(self, arg: SimplePlannerFixedSizeAssignMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerFixedSizeAssignMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerFixedSizeAssignMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 class SimplePlannerFixedSizeAssignNoIKMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, freespace_steps: int = 10, linear_steps: int = 10) -> None: ...
 
@@ -70,6 +132,18 @@ class SimplePlannerFixedSizeAssignNoIKMoveProfile(SimplePlannerMoveProfile):
 
     @linear_steps.setter
     def linear_steps(self, arg: int, /) -> None: ...
+
+    def __eq__(self, arg: SimplePlannerFixedSizeAssignNoIKMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerFixedSizeAssignNoIKMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerFixedSizeAssignNoIKMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 class SimplePlannerLVSMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
@@ -104,6 +178,18 @@ class SimplePlannerLVSMoveProfile(SimplePlannerMoveProfile):
     @max_steps.setter
     def max_steps(self, arg: int, /) -> None: ...
 
+    def __eq__(self, arg: SimplePlannerLVSMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerLVSMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerLVSMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 class SimplePlannerLVSNoIKMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
 
@@ -136,6 +222,18 @@ class SimplePlannerLVSNoIKMoveProfile(SimplePlannerMoveProfile):
 
     @max_steps.setter
     def max_steps(self, arg: int, /) -> None: ...
+
+    def __eq__(self, arg: SimplePlannerLVSNoIKMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerLVSNoIKMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerLVSNoIKMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 class SimplePlannerLVSAssignMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
@@ -170,6 +268,18 @@ class SimplePlannerLVSAssignMoveProfile(SimplePlannerMoveProfile):
     @max_steps.setter
     def max_steps(self, arg: int, /) -> None: ...
 
+    def __eq__(self, arg: SimplePlannerLVSAssignMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerLVSAssignMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerLVSAssignMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 class SimplePlannerLVSAssignNoIKMoveProfile(SimplePlannerMoveProfile):
     def __init__(self, state_longest_valid_segment_length: float = 0.08726646259971647, translation_longest_valid_segment_length: float = 0.1, rotation_longest_valid_segment_length: float = 0.08726646259971647, min_steps: int = 1, max_steps: int = 2147483647) -> None: ...
 
@@ -202,3 +312,15 @@ class SimplePlannerLVSAssignNoIKMoveProfile(SimplePlannerMoveProfile):
 
     @max_steps.setter
     def max_steps(self, arg: int, /) -> None: ...
+
+    def __eq__(self, arg: SimplePlannerLVSAssignNoIKMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: SimplePlannerLVSAssignNoIKMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> SimplePlannerLVSAssignNoIKMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """

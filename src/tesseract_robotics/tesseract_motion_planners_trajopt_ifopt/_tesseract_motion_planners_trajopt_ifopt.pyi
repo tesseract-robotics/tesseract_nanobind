@@ -7,6 +7,8 @@ import numpy
 from numpy.typing import NDArray
 
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
+import tesseract_robotics.tesseract_common._tesseract_common
+import tesseract_robotics.tesseract_environment._tesseract_environment
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 import tesseract_robotics.trajopt_sqp._trajopt_sqp
@@ -45,6 +47,12 @@ class TrajOptIfoptCartesianWaypointConfig:
     @coeff.setter
     def coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptIfoptCartesianWaypointConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptCartesianWaypointConfig, /) -> bool: ...
+
+    __hash__: None = None
+
 class TrajOptIfoptJointWaypointConfig:
     def __init__(self) -> None: ...
 
@@ -78,13 +86,90 @@ class TrajOptIfoptJointWaypointConfig:
     @coeff.setter
     def coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptIfoptJointWaypointConfig, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptJointWaypointConfig, /) -> bool: ...
+
+    __hash__: None = None
+
+class TrajOptIfoptTermInfos:
+    """
+    Constraint and cost sets a TrajOpt-Ifopt profile adds to the planner's problem
+    """
+
+    def __init__(self) -> None: ...
+
+    @property
+    def constraints(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @constraints.setter
+    def constraints(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+    @property
+    def squared_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @squared_costs.setter
+    def squared_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+    @property
+    def absolute_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @absolute_costs.setter
+    def absolute_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+    @property
+    def hinge_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
+
+    @hinge_costs.setter
+    def hinge_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
+
+class TrajOptIfoptWaypointInfo:
+    """
+    What a TrajOpt-Ifopt move profile builds for one waypoint: its variables and terms
+    """
+
+    def __init__(self) -> None: ...
+
+    @property
+    def term_infos(self) -> TrajOptIfoptTermInfos: ...
+
+    @term_infos.setter
+    def term_infos(self, arg: TrajOptIfoptTermInfos, /) -> None: ...
+
+    @property
+    def node(self, /) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node | None:
+        """The waypoint's variable node (owned by this object), or None"""
+
+    @property
+    def fixed(self) -> bool:
+        """Whether the waypoint is fixed (no collision terms at this step)"""
+
+    @fixed.setter
+    def fixed(self, arg: bool, /) -> None: ...
+
 class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key every TrajOpt-Ifopt move profile carries"""
+
+    def create(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, index: int) -> TrajOptIfoptWaypointInfo:
+        """Build the waypoint info the planner adds for this move instruction"""
 
 TrajOptIfoptPlanProfile: TypeAlias = TrajOptIfoptMoveProfile
 
 class TrajOptIfoptCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key every TrajOpt-Ifopt composite profile carries"""
+
+    def create(self, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, nodes: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node], fixed_indices: Sequence[int]) -> TrajOptIfoptTermInfos:
+        """
+        Build the trajectory-wide terms the planner adds over all waypoint nodes
+        """
 
 class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     @property
@@ -93,7 +178,23 @@ class TrajOptIfoptSolverProfile(tesseract_robotics.tesseract_command_language._t
     @opt_params.setter
     def opt_params(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPParameters, /) -> None: ...
 
+    @property
+    def callbacks(self) -> list[tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPCallback]:
+        """SQP callbacks registered on the solver, called once per SQP iteration"""
+
+    @callbacks.setter
+    def callbacks(self, arg: Sequence[tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPCallback], /) -> None: ...
+
+    def createOptimizationCallbacks(self) -> list[tesseract_robotics.trajopt_sqp._trajopt_sqp.SQPCallback]: ...
+
     def getKey(self) -> int: ...
+
+    @staticmethod
+    def createKey() -> int:
+        """The key every TrajOpt-Ifopt solver profile carries"""
+
+    def create(self, verbose: bool = False) -> tesseract_robotics.trajopt_sqp._trajopt_sqp.TrustRegionSQPSolver:
+        """Build the TrustRegionSQPSolver the planner solves with"""
 
 class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
     def __init__(self) -> None: ...
@@ -121,6 +222,18 @@ class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
 
     @joint_constraint_config.setter
     def joint_constraint_config(self, arg: TrajOptIfoptJointWaypointConfig, /) -> None: ...
+
+    def __eq__(self, arg: TrajOptIfoptDefaultMoveProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptDefaultMoveProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptDefaultMoveProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
 
 TrajOptIfoptDefaultPlanProfile: TypeAlias = TrajOptIfoptDefaultMoveProfile
 
@@ -175,6 +288,18 @@ class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
     @jerk_coeff.setter
     def jerk_coeff(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], /) -> None: ...
 
+    def __eq__(self, arg: TrajOptIfoptDefaultCompositeProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptDefaultCompositeProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptDefaultCompositeProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def __init__(self) -> None: ...
 
@@ -206,6 +331,18 @@ class TrajOptIfoptOSQPSolverProfile(TrajOptIfoptSolverProfile):
     def setVerbosity(self, verbose: bool) -> None:
         """Enable OSQP console output (default: false)"""
 
+    def __eq__(self, arg: TrajOptIfoptOSQPSolverProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptOSQPSolverProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptOSQPSolverProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+        """
+
 def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
     """Add TrajOptIfopt move profile to ProfileDictionary"""
 
@@ -218,15 +355,25 @@ def ProfileDictionary_addTrajOptIfoptCompositeProfile(dict: tesseract_robotics.t
 def ProfileDictionary_addTrajOptIfoptSolverProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptSolverProfile) -> None:
     """Add TrajOptIfopt solver profile to ProfileDictionary"""
 
-class TrajOptIfoptMotionPlanner:
+def createJointPositionConstraint(joint_waypoint: tesseract_robotics.tesseract_command_language._tesseract_command_language.JointWaypointPoly, var: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
+    """
+    Joint position constraint at a waypoint: equality to its position, or its tolerance band
+    """
+
+def createCollisionConstraints(vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, config: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, fixed_indices: Sequence[int], fixed_sparsity: bool) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]:
+    """
+    Collision constraint sets of config's collision check type: one per unfixed step (DISCRETE)
+    or one per segment (LVS_DISCRETE, LVS_CONTINUOUS, CONTINUOUS); none for NONE
+    """
+
+def createJointVelocityConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
+    """Joint velocity constraint over vars toward target"""
+
+def createJointAccelerationConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
+    """Joint acceleration constraint over vars toward target"""
+
+def createJointJerkConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
+    """Joint jerk constraint over vars toward target"""
+
+class TrajOptIfoptMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...
-
-    def getName(self) -> str: ...
-
-    def solve(self, request: tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerRequest) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.PlannerResponse: ...
-
-    def terminate(self) -> bool: ...
-
-    def clear(self) -> None: ...
-
-    def clone(self) -> tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner: ...

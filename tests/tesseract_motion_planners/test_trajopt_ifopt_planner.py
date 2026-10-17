@@ -1,13 +1,19 @@
 """Tests for tesseract_motion_planners_trajopt_ifopt bindings."""
 
+import gc
+import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
+    InstructionPoly_as_CompositeInstruction,
+    InstructionPoly_as_MoveInstructionPoly,
     JointWaypoint,
     JointWaypointPoly_wrap_JointWaypoint,
     MoveInstruction,
@@ -19,21 +25,32 @@ from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     ManipulatorInfo,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
+from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
+from tesseract_robotics.tesseract_geometry import Box
+from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptCompositeProfile,
     ProfileDictionary_addTrajOptIfoptPlanProfile,
     ProfileDictionary_addTrajOptIfoptSolverProfile,
+    TrajOptIfoptCartesianWaypointConfig,
+    TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptDefaultPlanProfile,
+    TrajOptIfoptJointWaypointConfig,
     TrajOptIfoptMotionPlanner,
+    TrajOptIfoptMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
     TrajOptIfoptSolverProfile,
+    TrajOptIfoptTermInfos,
+    TrajOptIfoptWaypointInfo,
+    createCollisionConstraints,
+    createJointVelocityConstraint,
 )
+from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.trajopt_sqp import SQPParameters
+from tesseract_robotics.trajopt_sqp import SQPCallback, SQPParameters
 
 TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
@@ -404,3 +421,466 @@ class TestTrajOptIfoptPlanner:
 
         assert response.successful, f"Planning failed: {response.message}"
         assert response.results is not None
+
+
+START_POS = np.array([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0])
+END_POS = np.array([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0])
+
+
+def _joint_move(joint_names, position):
+    """A FREESPACE MoveInstructionPoly to a constrained joint waypoint."""
+    waypoint = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joint_names, position))
+    return MoveInstructionPoly_wrap_MoveInstruction(
+        MoveInstruction(waypoint, MoveInstructionType_FREESPACE, "DEFAULT")
+    )
+
+
+def _interpolated_program(t_env, manip_info, joint_names):
+    """START_POS -> END_POS, interpolated as in the planning tests above."""
+    t_env.setState(joint_names, START_POS)
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(manip_info)
+    program.appendMoveInstruction(_joint_move(joint_names, START_POS))
+    program.appendMoveInstruction(_joint_move(joint_names, END_POS))
+    return generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
+
+
+def _move_instructions(composite):
+    """The move instructions of `composite` in order, as the planner flattens them."""
+    moves = []
+    for instruction in composite:
+        if instruction.isCompositeInstruction():
+            moves.extend(_move_instructions(InstructionPoly_as_CompositeInstruction(instruction)))
+        elif instruction.isMoveInstruction():
+            moves.append(InstructionPoly_as_MoveInstructionPoly(instruction))
+    return moves
+
+
+def _smoothing_composite_profile(n_joints):
+    """Velocity, acceleration and jerk smoothing (upstream enables velocity only)."""
+    profile = TrajOptIfoptDefaultCompositeProfile()
+    profile.smooth_velocities = True
+    profile.smooth_accelerations = True
+    profile.smooth_jerks = True
+    profile.velocity_coeff = np.ones(n_joints)
+    profile.acceleration_coeff = np.ones(n_joints)
+    profile.jerk_coeff = np.ones(n_joints)
+    return profile
+
+
+def _request(t_env, manip_info, joint_names, solver_profile):
+    profiles = ProfileDictionary()
+    ProfileDictionary_addTrajOptIfoptPlanProfile(
+        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", TrajOptIfoptDefaultPlanProfile()
+    )
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(
+        profiles,
+        TRAJOPT_IFOPT_NAMESPACE,
+        "DEFAULT",
+        _smoothing_composite_profile(len(joint_names)),
+    )
+    ProfileDictionary_addTrajOptIfoptSolverProfile(
+        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
+    )
+    request = PlannerRequest()
+    request.instructions = _interpolated_program(t_env, manip_info, joint_names)
+    request.env = t_env
+    request.profiles = profiles
+    return request
+
+
+class _RecordingCallback(SQPCallback):
+    """Records the SQP iteration of every call; returns `keep_going`."""
+
+    def __init__(self, keep_going=True):
+        super().__init__()
+        self.keep_going = keep_going
+        self.iterations = []
+
+    def execute(self, problem, sqp_results):
+        self.iterations.append(sqp_results.overall_iteration)
+        return self.keep_going
+
+
+class TestTrajOptIfoptSolverCallbacks:
+    """`TrajOptIfoptSolverProfile.callbacks` reach the planner's solver (gh-308)."""
+
+    def test_create_optimization_callbacks_returns_assigned_list(self):
+        callback = _RecordingCallback()
+        profile = TrajOptIfoptOSQPSolverProfile()
+        profile.callbacks = [callback]
+        callbacks = profile.createOptimizationCallbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] is callback
+
+    def test_none_callback_is_rejected(self):
+        profile = TrajOptIfoptOSQPSolverProfile()
+        with pytest.raises(TypeError, match=r"callbacks\[0\] is None"):
+            profile.callbacks = [None]
+
+    def test_callback_called_every_iteration(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        callback = _RecordingCallback()
+        solver_profile = TrajOptIfoptOSQPSolverProfile()
+        solver_profile.callbacks = [callback]
+
+        response = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(
+            _request(t_env, manip_info, joint_names, solver_profile)
+        )
+
+        assert response.successful, response.message
+        assert callback.iterations, "the planner never called the Python callback"
+        # every SQP iteration the solver reached called the callback at least once
+        assert set(range(1, max(callback.iterations) + 1)) <= set(callback.iterations)
+
+    def test_callback_returning_false_called_once_per_iteration_up_to_max(
+        self, kuka_iiwa_environment
+    ):
+        # Whether False stops the solve is upstream's (trajopt 0.35.0 keeps iterating, see
+        # docs/user-guide/low-level-sqp.md); the binding guarantees the calls and their arguments.
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        seen = []
+
+        class Recorder(SQPCallback):
+            def execute(self, problem, sqp_results):
+                # `problem` is valid only during the call: check it here, never keep it.
+                seen.append(
+                    (
+                        sqp_results.overall_iteration,
+                        isinstance(problem, tsqp.QPProblem),
+                        isinstance(sqp_results, tsqp.SQPResults),
+                    )
+                )
+                return False
+
+        max_iterations = 5
+        solver_profile = TrajOptIfoptOSQPSolverProfile()
+        solver_profile.opt_params.max_iterations = max_iterations
+        solver_profile.callbacks = [Recorder()]
+
+        TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(
+            _request(t_env, manip_info, joint_names, solver_profile)
+        )
+
+        iterations = [iteration for iteration, _, _ in seen]
+        assert iterations, "the planner never called the Python callback"
+        # one call per SQP iteration the solver reached, never past max_iterations
+        assert iterations == sorted(set(iterations))
+        assert 1 <= iterations[0] and iterations[-1] <= max_iterations
+        assert all(is_problem and is_results for _, is_problem, is_results in seen)
+
+
+class TestTrajOptIfoptConstraintFactories:
+    """The planner's term factories from trajopt_ifopt_utils.h (gh-309)."""
+
+    def test_joint_velocity_constraint_matches_hand_built(self, kuka_iiwa_environment):
+        t_env, _, joint_names = kuka_iiwa_environment
+        manip = t_env.getKinematicGroup("manipulator")
+        states = [START_POS, 0.5 * (START_POS + END_POS), END_POS]
+        nodes = ti.createNodesVariables(
+            "trajectory", joint_names, states, ti.toBounds(manip.getLimits().joint_limits)
+        )
+        variables = [node.getVar("joints") for node in nodes.getNodes()]
+        target = np.zeros(len(joint_names))
+        coeffs = np.ones(len(joint_names))
+
+        factory_built = createJointVelocityConstraint(target, variables, coeffs)
+        hand_built = ti.JointVelConstraint(target, variables, coeffs, "Velocity")
+        problem = tsqp.TrajOptQPProblem(nodes)
+        problem.addConstraintSet(factory_built)
+        problem.addConstraintSet(hand_built)
+        problem.setup()
+
+        np.testing.assert_array_equal(factory_built.getValues(), hand_built.getValues())
+        np.testing.assert_array_equal(factory_built.getCoefficients(), hand_built.getCoefficients())
+        assert [(b.getLower(), b.getUpper()) for b in factory_built.getBounds()] == [
+            (b.getLower(), b.getUpper()) for b in hand_built.getBounds()
+        ]
+
+    def test_empty_variables_are_rejected(self):
+        with pytest.raises(ValueError, match="vars is empty"):
+            createJointVelocityConstraint(np.zeros(7), [], np.ones(7))
+
+    def test_collision_constraints_flag_the_colliding_step(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        manip = t_env.getKinematicGroup("manipulator")
+        # An obstacle cube centred on the tool at END_POS: that step collides, START_POS does not.
+        obstacle = Link("obstacle")
+        collision = Collision()
+        collision.geometry = Box(0.1, 0.1, 0.1)
+        obstacle.addCollision(collision)
+        joint = Joint("obstacle_joint")
+        joint.type = JointType.FIXED
+        joint.parent_link_name = "base_link"
+        joint.child_link_name = "obstacle"
+        joint.parent_to_joint_origin_transform = manip.calcFwdKin(END_POS)["tool0"]
+        assert t_env.applyCommand(AddLinkCommand(obstacle, joint))
+
+        nodes = ti.createNodesVariables(
+            "trajectory",
+            joint_names,
+            [START_POS, END_POS],
+            ti.toBounds(manip.getLimits().joint_limits),
+        )
+        variables = [node.getVar("joints") for node in nodes.getNodes()]
+        config = TrajOptCollisionConfig(0.05, 20.0)
+
+        constraints = createCollisionConstraints(variables, t_env, manip_info, config, [], False)
+        assert len(constraints) == 2  # DISCRETE: one set per unfixed step
+        problem = tsqp.TrajOptQPProblem(nodes)
+        for constraint in constraints:
+            problem.addConstraintSet(constraint)
+        problem.setup()
+
+        free, colliding = constraints
+        assert np.all(free.getValues() <= 0.0)
+        assert np.max(colliding.getValues()) > 0.0
+
+    def test_fixed_steps_get_no_collision_constraint(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        manip = t_env.getKinematicGroup("manipulator")
+        nodes = ti.createNodesVariables(
+            "trajectory",
+            joint_names,
+            [START_POS, END_POS, START_POS],
+            ti.toBounds(manip.getLimits().joint_limits),
+        )
+        variables = [node.getVar("joints") for node in nodes.getNodes()]
+        constraints = createCollisionConstraints(
+            variables, t_env, manip_info, TrajOptCollisionConfig(0.05, 20.0), [0, 2], False
+        )
+        assert len(constraints) == 1
+
+
+class TestTrajOptIfoptMotionPlannerBase:
+    """`TrajOptIfoptMotionPlanner` is a `MotionPlanner` (gh-299)."""
+
+    def test_isinstance(self):
+        assert isinstance(TrajOptIfoptMotionPlanner("x"), MotionPlanner)
+
+    def test_base_solve_dispatches(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        planner = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE)
+        via_base = MotionPlanner.solve(
+            planner, _request(t_env, manip_info, joint_names, TrajOptIfoptOSQPSolverProfile())
+        )
+        direct = planner.solve(
+            _request(t_env, manip_info, joint_names, TrajOptIfoptOSQPSolverProfile())
+        )
+        assert via_base.successful, via_base.message
+        assert via_base.message == direct.message
+        assert len(via_base.results) == len(direct.results)
+
+
+class TestTrajOptIfoptProfileHooks:
+    """The profiles' `create` hooks and the structs they return (gh-339)."""
+
+    @staticmethod
+    def _move_profile():
+        profile = TrajOptIfoptDefaultMoveProfile()
+        profile.joint_cost_config.enabled = False
+        profile.joint_constraint_config.enabled = True
+        return profile
+
+    def test_move_profile_create(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 3
+        )
+        assert isinstance(info, TrajOptIfoptWaypointInfo)
+        assert isinstance(info.term_infos, TrajOptIfoptTermInfos)
+        assert info.fixed is True  # constrained, untoleranced joint waypoint
+        assert info.node.getName() == "Node_3"
+        np.testing.assert_array_equal(info.node.getVar("position").value(), START_POS)
+        assert len(info.term_infos.constraints) == 1
+        assert len(info.term_infos.squared_costs) == 0
+        assert len(info.term_infos.absolute_costs) == 0
+        assert len(info.term_infos.hinge_costs) == 0
+
+    def test_node_keeps_waypoint_info_alive(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 5
+        )
+        refs = sys.getrefcount(info)
+        node = info.node
+        assert sys.getrefcount(info) == refs + 1
+        del info
+        gc.collect()
+        assert node.getName() == "Node_5"
+        np.testing.assert_array_equal(node.getVar("position").value(), START_POS)
+
+    def test_node_is_read_only(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 0
+        )
+        with pytest.raises(AttributeError):
+            info.node = ti.Node("other")
+
+    def test_term_set_outlives_waypoint_info(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        info = self._move_profile().create(
+            _joint_move(joint_names, START_POS), manip_info, t_env, 0
+        )
+        constraint = info.term_infos.constraints[0]
+        del info
+        gc.collect()
+        assert len(constraint.getCoefficients()) == len(joint_names)
+
+    def test_python_constraint_set_survives_term_infos(self):
+        class Tagged(ti.ConstraintSet):
+            def __init__(self):
+                super().__init__("tagged", 1)
+                self.tag = "mine"
+
+            def getValues(self):
+                return np.zeros(1)
+
+            def getBounds(self):
+                return [ti.Bounds(0.0, 0.0)]
+
+            def fillJacobianBlock(self, var_set, jac_block):
+                pass
+
+        infos = TrajOptIfoptTermInfos()
+        infos.constraints = [Tagged()]
+        gc.collect()
+        constraint = infos.constraints[0]
+        assert type(constraint) is Tagged
+        assert constraint.tag == "mine"
+        del infos
+        gc.collect()
+        assert type(constraint) is Tagged
+        assert constraint.tag == "mine"
+        np.testing.assert_array_equal(constraint.getValues(), np.zeros(1))
+
+    def test_default_waypoint_info_has_no_node(self):
+        info = TrajOptIfoptWaypointInfo()
+        assert info.node is None
+        assert info.fixed is False
+
+    def test_composite_profile_create(self, kuka_iiwa_environment):
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        program = _interpolated_program(t_env, manip_info, joint_names)
+        moves = _move_instructions(program)
+        move_profile = self._move_profile()
+        infos = [move_profile.create(move, manip_info, t_env, i) for i, move in enumerate(moves)]
+        nodes = [info.node for info in infos]
+        fixed = [i for i, info in enumerate(infos) if info.fixed]
+        assert fixed == [0, len(moves) - 1]
+
+        composite = _smoothing_composite_profile(len(joint_names))
+        terms = composite.create(manip_info, t_env, nodes, fixed)
+
+        # The planner adds these sets as they are; the factories build the same sets.
+        variables = [node.getVar("position") for node in nodes]
+        expected_constraints = createCollisionConstraints(
+            variables, t_env, manip_info, composite.collision_constraint_config, fixed, False
+        )
+        expected_hinge = createCollisionConstraints(
+            variables, t_env, manip_info, composite.collision_cost_config, fixed, False
+        )
+        assert len(terms.constraints) == len(expected_constraints) == len(moves) - 2
+        assert len(terms.hinge_costs) == len(expected_hinge) == len(moves) - 2
+        assert len(terms.squared_costs) == 3  # velocity, acceleration, jerk smoothing
+        assert len(terms.absolute_costs) == 0
+
+    def test_composite_profile_rejects_none_node(self, kuka_iiwa_environment):
+        t_env, manip_info, _ = kuka_iiwa_environment
+        with pytest.raises(TypeError, match=r"nodes\[0\] is None"):
+            TrajOptIfoptDefaultCompositeProfile().create(manip_info, t_env, [None], [])
+
+    def test_solver_profile_create(self):
+        profile = TrajOptIfoptOSQPSolverProfile()
+        profile.opt_params.max_iterations = 7
+        solver = profile.create()
+        assert isinstance(solver, tsqp.TrustRegionSQPSolver)
+        assert solver.params.max_iterations == 7
+
+    def test_hooks_on_base_classes(self):
+        assert "create" in TrajOptIfoptMoveProfile.__dict__
+        assert "create" in TrajOptIfoptCompositeProfile.__dict__
+        assert "create" in TrajOptIfoptSolverProfile.__dict__
+
+
+class TestTrajOptIfoptValueEquality:
+    """Value `__eq__` on configs and profiles; unhashable (gh-261)."""
+
+    @pytest.mark.parametrize(
+        ("cls", "mutate"),
+        [
+            (TrajOptIfoptCartesianWaypointConfig, lambda x: setattr(x, "enabled", not x.enabled)),
+            (TrajOptIfoptJointWaypointConfig, lambda x: setattr(x, "enabled", not x.enabled)),
+            (
+                TrajOptIfoptDefaultMoveProfile,
+                lambda x: setattr(x.joint_cost_config, "enabled", not x.joint_cost_config.enabled),
+            ),
+            (
+                TrajOptIfoptDefaultCompositeProfile,
+                lambda x: setattr(x, "smooth_jerks", not x.smooth_jerks),
+            ),
+            (TrajOptIfoptOSQPSolverProfile, lambda x: setattr(x.opt_params, "max_iterations", 7)),
+            (TrajOptIfoptOSQPSolverProfile, lambda x: x.setPolish(False)),
+        ],
+    )
+    def test_equality(self, cls, mutate):
+        a, b = cls(), cls()
+        assert a == b
+        mutate(b)
+        assert a != b
+        with pytest.raises(TypeError):
+            hash(a)
+
+
+class TestTrajOptIfoptProfileCreateKey:
+    """Static `createKey()` is the key the profile carries (gh-273)."""
+
+    @pytest.mark.parametrize(
+        "cls",
+        [
+            TrajOptIfoptDefaultMoveProfile,
+            TrajOptIfoptDefaultCompositeProfile,
+            TrajOptIfoptOSQPSolverProfile,
+        ],
+    )
+    def test_create_key_matches_instance_key(self, cls):
+        assert cls.createKey() == cls().getKey()
+
+    def test_keys_differ_between_profile_kinds(self):
+        keys = {
+            TrajOptIfoptMoveProfile.createKey(),
+            TrajOptIfoptCompositeProfile.createKey(),
+            TrajOptIfoptSolverProfile.createKey(),
+        }
+        assert len(keys) == 3
+
+
+class TestTrajOptIfoptProfileFromYaml:
+    """`from_yaml` reads a profile with the C++ YAML constructor (gh-331)."""
+
+    def test_move_profile(self):
+        expected = TrajOptIfoptDefaultMoveProfile()
+        expected.joint_cost_config.enabled = not expected.joint_cost_config.enabled
+        text = f"joint_cost_config:\n  enabled: {str(expected.joint_cost_config.enabled).lower()}\n"
+        assert TrajOptIfoptDefaultMoveProfile.from_yaml(text) == expected
+
+    def test_composite_profile(self):
+        expected = TrajOptIfoptDefaultCompositeProfile()
+        expected.smooth_jerks = not expected.smooth_jerks
+        text = f"smooth_jerks: {str(expected.smooth_jerks).lower()}\n"
+        assert TrajOptIfoptDefaultCompositeProfile.from_yaml(text) == expected
+
+    def test_osqp_solver_profile(self):
+        expected = TrajOptIfoptOSQPSolverProfile()
+        expected.opt_params.max_iterations = 7
+        text = "opt_params:\n  max_iterations: 7\n"
+        assert TrajOptIfoptOSQPSolverProfile.from_yaml(text) == expected
+
+    def test_malformed_yaml_raises_value_error(self):
+        with pytest.raises(ValueError):
+            TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: [true")
+
+    def test_wrong_value_type_raises_the_constructor_error(self):
+        with pytest.raises(RuntimeError, match="Failed to parse yaml config"):
+            TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: not-a-bool\n")
