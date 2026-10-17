@@ -223,11 +223,14 @@ void load_yaml_text(const char* caller, const std::string& config, Load&& load) 
 // the taskflow and the context alive; clear() on a Python future does not touch it) and
 // references to the node and to the executor or server running it. Releasing a Python future
 // never waits, so it is safe on an executor worker (a callback, or gc there). Finished runs are
-// freed at the next run(), the rest at interpreter exit (wait_for_runs_at_exit).
+// freed at the next run() and when a future is waited on or found ready, the rest at interpreter
+// exit (wait_for_runs_at_exit).
 struct InFlightRun {
     std::unique_ptr<tp::TaskComposerFuture> future;
     nb::object node;
     nb::object owner;
+    // A server run's executor: the server owns it, and addExecutor may replace it mid-run.
+    std::shared_ptr<tp::TaskComposerExecutor> executor;
 };
 
 // Accessed with the GIL held only. Never freed: it outlives module teardown.
@@ -248,18 +251,30 @@ void free_finished_runs() {
             *running++ = std::move(run);
     }
     runs.erase(running, runs.end());
-    // `finished` releases its references here, after the list is consistent again.
+    {
+        // The last reference to an executor joins its workers, which may wait for the GIL in a
+        // Python callback.
+        nb::gil_scoped_release release;
+        for (auto& run : finished)
+            run->executor.reset();
+    }
+    // `finished` releases its Python references here, after the list is consistent again.
 }
 
 // Registered with atexit: wait for every run still in flight with the GIL released (workers may
 // call Python, e.g. a log handler), before the interpreter tears down what they use.
+// Worker callbacks or other threads may start runs while it waits: repeat until none is left.
 void wait_for_runs_at_exit() {
-    std::vector<std::shared_ptr<InFlightRun>> runs;
-    runs.swap(in_flight_runs());
-    {
+    while (!in_flight_runs().empty()) {
+        std::vector<std::shared_ptr<InFlightRun>> runs;
+        runs.swap(in_flight_runs());
         nb::gil_scoped_release release;
-        for (const auto& run : runs)
+        for (auto& run : runs) {
             run->future->wait();
+            run->executor.reset();
+        }
+        nb::gil_scoped_acquire acquire;
+        runs.clear();
     }
 }
 
@@ -274,14 +289,15 @@ nb::object python_object(const T& value) {
 
 // Start a run with the GIL released, then hold what it uses until it ends.
 template <typename Run>
-std::unique_ptr<tp::TaskComposerFuture> run_held(nb::object node, nb::object owner, Run&& run) {
+std::unique_ptr<tp::TaskComposerFuture> run_held(nb::object node, nb::object owner, Run&& run,
+                                                 std::shared_ptr<tp::TaskComposerExecutor> executor = nullptr) {
     free_finished_runs();
     std::unique_ptr<tp::TaskComposerFuture> future;
     {
         nb::gil_scoped_release release;
         future = run();
     }
-    in_flight_runs().push_back(std::make_shared<InFlightRun>(InFlightRun{ future->copy(), std::move(node), std::move(owner) }));
+    in_flight_runs().push_back(std::make_shared<InFlightRun>(InFlightRun{ future->copy(), std::move(node), std::move(owner), std::move(executor) }));
     return future;
 }
 
@@ -542,9 +558,30 @@ NB_MODULE(_tesseract_task_composer, m) {
             [](tp::TaskComposerFuture& self, std::shared_ptr<tp::TaskComposerContext> v) { self.context = v; })
         .def("clear", &tp::TaskComposerFuture::clear)
         .def("valid", &tp::TaskComposerFuture::valid)
-        .def("ready", &tp::TaskComposerFuture::ready)
-        .def("wait", &tp::TaskComposerFuture::wait, nb::call_guard<nb::gil_scoped_release>())
-        .def("waitFor", &tp::TaskComposerFuture::waitFor, "duration"_a, nb::call_guard<nb::gil_scoped_release>())
+        // A finished run's node and executor are released as soon as its future is seen done.
+        .def("ready", [](const tp::TaskComposerFuture& self) {
+            const bool ready = self.ready();
+            if (ready)
+                free_finished_runs();
+            return ready;
+        })
+        .def("wait", [](const tp::TaskComposerFuture& self) {
+            {
+                nb::gil_scoped_release release;
+                self.wait();
+            }
+            free_finished_runs();
+        })
+        .def("waitFor", [](const tp::TaskComposerFuture& self, const std::chrono::duration<double>& duration) {
+            std::future_status status;
+            {
+                nb::gil_scoped_release release;
+                status = self.waitFor(duration);
+            }
+            if (status == std::future_status::ready)
+                free_finished_runs();
+            return status;
+        }, "duration"_a)
         // A second future on the same shared state and context; copy.copy() calls it too.
         .def("copy", &tp::TaskComposerFuture::copy)
         .def("__copy__", &tp::TaskComposerFuture::copy);
@@ -848,7 +885,10 @@ NB_MODULE(_tesseract_task_composer, m) {
             load_yaml_text("TaskComposerServer.loadConfig", config,
                            [&] { with_pinned_plugins([&] { self.loadConfig(config, locator); }); });
         }, "config"_a, "locator"_a)
-        .def("addExecutor", &Server::addExecutor, "executor"_a)
+        // Replacing an executor destroys the old one when nothing else holds it, which joins its
+        // workers: they may wait for the GIL in a Python callback. A run holds its executor
+        // (run_held), so a replaced executor is never destroyed mid-run.
+        .def("addExecutor", &Server::addExecutor, "executor"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("getExecutor", &Server::getExecutor, "name"_a, nb::keep_alive<0, 1>())
         .def("hasExecutor", &Server::hasExecutor, "name"_a)
         .def("getAvailableExecutors", &Server::getAvailableExecutors)
@@ -861,12 +901,14 @@ NB_MODULE(_tesseract_task_composer, m) {
                        bool dotgraph, const std::string& executor_name) {
             // The server owns the task it runs by name.
             return run_held(nb::none(), python_object(self),
-                            [&] { return self.run(task_name, std::move(data_storage), dotgraph, executor_name); });
+                            [&] { return self.run(task_name, std::move(data_storage), dotgraph, executor_name); },
+                            self.getExecutor(executor_name));
         }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("run", [](Server& self, const tp::TaskComposerNode& node, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
             return run_held(python_object(node), python_object(self),
-                            [&] { return self.run(node, std::move(data_storage), dotgraph, executor_name); });
+                            [&] { return self.run(node, std::move(data_storage), dotgraph, executor_name); },
+                            self.getExecutor(executor_name));
         }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("getWorkerCount", &Server::getWorkerCount, "name"_a)
         .def("getTaskCount", &Server::getTaskCount, "name"_a);
