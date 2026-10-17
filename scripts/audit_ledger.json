@@ -12,12 +12,6 @@
     "ContinuousContactManager.setCollisionObjectsTransformCast": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174)"
     },
-    "ContinuousContactManagerFactory": {
-      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
-    },
-    "DiscreteContactManagerFactory": {
-      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
-    },
     "tesseract/collision/common.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
     },
@@ -233,12 +227,6 @@
     }
   },
   "tesseract_kinematics": {
-    "FwdKinFactory": {
-      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
-    },
-    "InvKinFactory": {
-      "wont_fix": "Abstract plugin-author interface, loaded from a shared library by boost_plugin_loader; a Python subclass cannot be a plugin."
-    },
     "JointGroup.calcJacobianWithPoint": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212)"
     },
