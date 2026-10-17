@@ -3,11 +3,14 @@
 import copy
 import datetime
 import gc
+import sys
+import time
 import uuid
 
 import pytest
 
 from tesseract_robotics.tesseract_task_composer import (
+    FutureStatus,
     TaskComposerContext,
     TaskComposerDataStorage,
     TaskComposerGraph,
@@ -126,6 +129,23 @@ class TestFuture:
         gc.collect()
         future.wait()
         assert future.context.isSuccessful()
+
+    @pytest.mark.parametrize("finish", ["wait", "waitFor", "ready"])
+    def test_finished_run_releases_node_and_executor(self, factory, make_storage, finish):
+        """The bindings hold a run's node and executor until it ends; waiting on (or polling)
+        the finished future releases them, not only the next run()."""
+        executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+        node = factory.createTaskComposerNode(PIPELINE)
+        node_refs, executor_refs = sys.getrefcount(node), sys.getrefcount(executor)
+        future = executor.run(node, make_storage(node))
+        if finish == "wait":
+            future.wait()
+        elif finish == "waitFor":
+            assert future.waitFor(datetime.timedelta(seconds=60)) == FutureStatus.ready
+        else:
+            while not future.ready():
+                time.sleep(0.05)
+        assert (sys.getrefcount(node), sys.getrefcount(executor)) == (node_refs, executor_refs)
 
     def test_clear_invalidates(self, factory, executor, make_storage):
         node = factory.createTaskComposerNode(PIPELINE)

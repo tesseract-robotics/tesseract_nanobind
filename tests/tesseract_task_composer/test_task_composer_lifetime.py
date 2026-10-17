@@ -283,6 +283,80 @@ print("EXITING", flush=True)
         assert "EXITING" in out, out
 
 
+class TestServerAndExitDrain:
+    """Server runs hold the executor they run on; the exit drain catches runs started during it."""
+
+    def test_executor_replaced_mid_run(self):
+        """addExecutor replaced the running executor with the GIL held: its destructor joined
+        workers blocked on the GIL in a Python log handler (a deadlock), and a run that survived
+        the join lost its executor."""
+        out = _run(
+            _WORKER_HANDLER
+            + """
+handler = WorkerHook(lambda: None)
+tesseract_common.useOutputHandler(handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+name = "TaskflowExecutor"
+node = factory.createTaskComposerNode("TrajOptPipeline")
+futures = [server.run(node, make_storage(node), False, name) for _ in range(2)]
+futures.append(server.run("TrajOptPipeline", make_storage(node), False, name))
+server.addExecutor(factory.createTaskComposerExecutor(name))
+for future in futures:
+    future.wait()
+print("SUCCESS", all(future.context.isSuccessful() for future in futures))
+tesseract_common.restorePreviousOutputHandler()
+"""
+        )
+        assert "SUCCESS True" in out, out
+
+    def test_run_started_during_exit_drain_finishes(self):
+        """A worker callback that starts a run while the exit drain waits: the drain repeats
+        until no run is left, so the run is not cut off by interpreter teardown."""
+        out = _run(
+            """
+import atexit
+report = {}
+atexit.register(lambda: print("NESTED TASKS", report["executor"].getTaskCount(), flush=True))
+"""
+            + _PREAMBLE
+            + _WORKER_HANDLER
+            + """
+exiting = []
+atexit.register(lambda: exiting.append(True))
+from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+# One worker, four runs: the nested runs outlast the run the drain is waiting for.
+nested = TaskflowTaskComposerExecutor("nested", 1)
+report["executor"] = nested
+nested_node = factory.createTaskComposerNode("TrajOptPipeline")
+nested_storage = make_storage(nested_node)
+
+class StartAtExit(tesseract_common.OutputHandler):
+    def __init__(self):
+        super().__init__()
+        self.started = False
+
+    def log(self, text, level, filename, line):
+        if exiting and not self.started and threading.get_ident() != MAIN:
+            self.started = True
+            for _ in range(4):
+                nested.run(nested_node, nested_storage)
+            print("NESTED STARTED", flush=True)
+
+handler = StartAtExit()
+tesseract_common.useOutputHandler(handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = executor.run(node, make_storage(node))
+""",
+            planning=False,
+        )
+        assert "NESTED STARTED" in out, out
+        assert "NESTED TASKS 0" in out, out
+
+
 _CONTAINER = """
 import gc
 from tesseract_robotics.tesseract_task_composer import (

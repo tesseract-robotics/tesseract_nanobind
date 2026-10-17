@@ -176,8 +176,11 @@ context = future.context
 
 The run uses the node, the data and the executor after `run` returns. The bindings hold them
 until the run ends, independent of the future: dropping the future, the node or the executor
-mid-run is safe and never blocks, and a finished run's node and executor are released at the
-next `run`. At interpreter exit, runs still in flight are waited for (an `atexit` hook).
+mid-run is safe and never blocks. A finished run's node and executor are released when a future
+is seen done (`wait()`, `waitFor()` returning `FutureStatus.ready`, `ready()` returning `True`)
+or at the next `run`. A server run also holds the executor it runs on, so
+`TaskComposerServer.addExecutor` may replace it mid-run. At interpreter exit, runs still in
+flight, including runs started while waiting, are waited for (an `atexit` hook).
 
 ### Node infos
 
