@@ -247,8 +247,8 @@ def py_key(node: ast.expr | None) -> TypeKey:
     if len(members) > 1:
         if any(_dotted(m) == "os.PathLike" for m in members):
             return ("path",)
-        keys = [py_key(m) for m in members]
-        if None in keys:
+        keys = [k for k in map(py_key, members) if k is not None]
+        if len(keys) < len(members):
             return None
         # tesseract_nb.h spells an Eigen argument's input as the array or a sequence of numbers
         # (nested for a matrix): one C++ type, keyed as the array.

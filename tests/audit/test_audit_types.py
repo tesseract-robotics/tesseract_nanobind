@@ -53,7 +53,9 @@ def test_every_mapping_rule_gives_the_stub_key(typed_cpp, typed_py):
     """Each C++ parameter of `kinds` maps to the key of the annotation nanobind writes for it."""
     [cpp] = typed_cpp["kinds"].overloads
     [py] = typed_py.symbols["kinds"].overloads
-    names = [a.arg for a in ast.parse((FIXTURES / "_typed.pyi").read_text()).body[-1].args.args]
+    kinds = ast.parse((FIXTURES / "_typed.pyi").read_text()).body[-1]
+    assert isinstance(kinds, ast.FunctionDef)
+    names = [a.arg for a in kinds.args.args]
     assert len(cpp.params) == len(py.keys) == len(names)
     mismatched = [
         (name, sorted(c, key=repr) if c else c, p)

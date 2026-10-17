@@ -50,7 +50,7 @@ def test_combined_namespace_rejects_two_definitions_of_one_name():
     from tests.audit._load import DuplicateNameError, combine
 
     a, b = type(sys)("a"), type(sys)("b")
-    a.x, b.x = object(), object()
+    vars(a)["x"], vars(b)["x"] = object(), object()
     with pytest.raises(DuplicateNameError, match="x"):
         combine([a, b])
 

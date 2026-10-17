@@ -153,7 +153,9 @@ def _upcasts_to(
     for d in derived or ():
         for b in base or ():
             if (
-                d[0] == b[0] == "seq"
+                d is not None
+                and b is not None
+                and d[0] == b[0] == "seq"
                 and d[1] is not None
                 and b[1] is not None
                 and d[1][0] == b[1][0] == "class"
@@ -911,12 +913,14 @@ def audit_tu(
         def bound(m: str) -> Mapping[str, str]:
             return own if m == module else bound_index(m)
 
+    # Narrowed once: the closure below would see the parameter's Optional type.
+    lookup: BoundLookup = bound
     modules = (module, *binding_modules())
 
     @functools.cache
     def bound_anywhere(qualified: str) -> bool:
         """Some binding module (or this TU) binds the class: it has a Python form (R13)."""
-        return any(qualified in bound(m).values() for m in modules)
+        return any(qualified in lookup(m).values() for m in modules)
 
     tu = parse_tu(cpp_path, extra_include_dirs)
     direct = audited_headers(tu, module, prefixes, include_dirs)
@@ -947,7 +951,7 @@ def audit_tu(
         rel(stub_path),
         stub_roots,
         audit_types.class_ancestors(tu),
-        bound,
+        lookup,
         audit_types.public_bases(tu),
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}

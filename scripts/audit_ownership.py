@@ -326,7 +326,9 @@ def header_auditor(includers: Iterable[str]) -> str:
 def owning_prefix(spelling: str, prefixes: Mapping[str, tuple[str, ...]]) -> tuple[str, str] | None:
     """(module, prefix) of the longest prefix holding the header, or None."""
     hits = [(m, p) for m, ps in prefixes.items() for p in ps if spelling.startswith(p)]
-    return max(hits, key=lambda mp: len(mp[1]), default=None)
+    if not hits:
+        return None
+    return max(hits, key=lambda mp: len(mp[1]))
 
 
 def longest_prefix(spelling: str, prefixes: Iterable[str]) -> str | None:
