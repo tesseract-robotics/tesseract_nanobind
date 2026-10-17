@@ -80,7 +80,7 @@ def _ledger_entry(where: str, raw: object) -> LedgerEntry:
         raise MalformedLedgerError(f"{where}: issue {issue!r} is not #NNN")
     if "wont_fix" in raw and not (isinstance(reason, str) and reason.strip()):
         raise MalformedLedgerError(f"{where}: wont_fix {reason!r} is not a non-empty reason")
-    if "wont_fix" in raw and "|" in reason:
+    if isinstance(reason, str) and "|" in reason:
         raise MalformedLedgerError(
             f"{where}: wont_fix {reason!r} has a `|` (splits the table cell)"
         )
