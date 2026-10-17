@@ -21,6 +21,21 @@ BINDING_GLOB = "*/*_bindings.cpp"
 # module because binding TUs also include other components' headers (spec amendment A2).
 # A module may own several prefixes; a header belongs to the module with the longest
 # matching prefix (`owning_prefix`), so a nested prefix is never its parent's.
+# The core modules audited before #256.
+CORE_MODULES = frozenset(
+    {
+        "tesseract_collision",
+        "tesseract_common",
+        "tesseract_environment",
+        "tesseract_geometry",
+        "tesseract_kinematics",
+        "tesseract_scene_graph",
+        "tesseract_serialization",
+        "tesseract_srdf",
+        "tesseract_state_solver",
+        "tesseract_urdf",
+    }
+)
 AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
     "tesseract_collision": ("tesseract/collision/",),
     "tesseract_command_language": ("tesseract/command_language/",),
