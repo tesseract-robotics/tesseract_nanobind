@@ -225,6 +225,8 @@ void load_yaml_text(const char* caller, const std::string& config, Load&& load) 
 // never waits, so it is safe on an executor worker (a callback, or gc there). Finished runs are
 // freed at the next run() and when a future is waited on or found ready, the rest at interpreter
 // exit (wait_for_runs_at_exit).
+// Freeing a run may destroy the executor it holds (one the server replaced): its Python
+// references are dropped with the GIL held, the C++ executor without it (free_finished_runs).
 struct InFlightRun {
     std::unique_ptr<tp::TaskComposerFuture> future;
     nb::object node;
@@ -251,14 +253,15 @@ void free_finished_runs() {
             *running++ = std::move(run);
     }
     runs.erase(running, runs.end());
-    {
-        // The last reference to an executor joins its workers, which may wait for the GIL in a
-        // Python callback.
-        nb::gil_scoped_release release;
-        for (auto& run : finished)
-            run->executor.reset();
+    // Python references go with the GIL held, after the list is consistent again.
+    for (auto& run : finished) {
+        run->node = nb::object();
+        run->owner = nb::object();
     }
-    // `finished` releases its Python references here, after the list is consistent again.
+    // The last reference to a C++-held executor joins its workers, which may wait for the GIL in
+    // a Python callback: release it without the GIL.
+    nb::gil_scoped_release release;
+    finished.clear();
 }
 
 // Registered with atexit: wait for every run still in flight with the GIL released (workers may
