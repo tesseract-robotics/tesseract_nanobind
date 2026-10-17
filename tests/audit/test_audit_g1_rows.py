@@ -294,29 +294,35 @@ def test_poly_alternatives_convert_through_a_poly_constructor(cl_tu, poly):
 
 
 def test_real_poly_alternative_overloads_accepted(g1_reports):
+    """`MoveInstruction.__init__`: the 6 Python overloads per waypoint alternative (cl-core rows
+    121-126) and the C++ ctor `move_instruction.h:71` (cl-core row 37), which those overloads
+    cover at arity 2-3."""
     report = g1_reports[CL]
     rows = [(a.symbol, a.rule) for a in report.accepted if a.rule == "poly-alternative-overloads"]
     assert rows.count(("CompositeInstruction.push_back", "poly-alternative-overloads")) == 7
-    assert rows.count(("MoveInstruction.__init__", "poly-alternative-overloads")) == 6
+    assert rows.count(("MoveInstruction.__init__", "poly-alternative-overloads")) == 7
     assert "CompositeInstruction.push_back" not in {d.name for d in report.deviations}
 
 
 def test_real_move_instruction_ctors_stay_binding_fix(g1_reports):
-    """g1/03: `manipulator_info` and the `path_profile` overload are unbound: two constructor
-    gaps (cl-core rows 37, 38; their arity column may change with #251). The Python overloads
-    per waypoint alternative are accepted, not deviations (cl-core rows 121-126)."""
+    """g1/03 (#264): the `path_profile` overload is unbound, one constructor gap (cl-core row
+    38). The `(waypoint, type, profile, manipulator_info)` ctor (row 37) is covered at arity
+    2-3 through the waypoint alternatives and accepted (R8); its unbound trailing
+    `manipulator_info` returns as a gap once #251 lands. The Python overloads per waypoint
+    alternative are accepted, not deviations (cl-core rows 121-126)."""
     report = g1_reports[CL]
     ctor_gaps = [
         g
         for g in report.gaps
         if g.symbol == "MoveInstruction.__init__" and g.kind is audit.Kind.CONSTRUCTOR
     ]
-    assert len(ctor_gaps) == 2
+    assert [g.location for g in ctor_gaps] == ["tesseract/command_language/move_instruction.h:84"]
     assert "MoveInstruction.__init__" not in {d.name for d in report.deviations}
 
 
 # Every row the group 1 rules accept, exactly: the 47 NEW command-language rows of the
-# cl-core and cl-poly ledgers, and the 5 NEW time-parameterization rows.
+# cl-core and cl-poly ledgers plus cl-core row 37 (covered through the waypoint alternatives
+# until #251), and the 5 NEW time-parameterization rows.
 
 G1_ACCEPTED = {
     CL: Counter(
@@ -339,7 +345,7 @@ G1_ACCEPTED = {
             },
             ("ProfileDictionary.getProfile", "profile-key-template"): 1,
             ("CompositeInstruction.push_back", "poly-alternative-overloads"): 7,
-            ("MoveInstruction.__init__", "poly-alternative-overloads"): 6,
+            ("MoveInstruction.__init__", "poly-alternative-overloads"): 7,
         }
     ),
     TP: Counter(
@@ -357,7 +363,7 @@ G1_ACCEPTED = {
 @pytest.mark.parametrize("module", G1)
 def test_g1_rules_accept_exactly_the_ledger_rows(g1_reports, module):
     rows = Counter((a.symbol, a.rule) for a in g1_reports[module].accepted if a.rule in G1_RULES)
-    assert G1_ACCEPTED[CL].total() == 47
+    assert G1_ACCEPTED[CL].total() == 48
     assert G1_ACCEPTED[TP].total() == 5
     assert rows == G1_ACCEPTED[module]
 
