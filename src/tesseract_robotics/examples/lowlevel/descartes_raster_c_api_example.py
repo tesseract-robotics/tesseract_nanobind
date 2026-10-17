@@ -57,13 +57,11 @@ from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesMotionPlannerD,
-    cast_DescartesMoveProfileD,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptSolverProfile,
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
     TrajOptMotionPlanner,
@@ -235,13 +233,11 @@ def main():
     profiles.addProfile(
         DESCARTES_DEFAULT_NAMESPACE,
         DEFAULT_PROFILE_KEY,
-        cast_DescartesMoveProfileD(descartes_move_profile),
+        descartes_move_profile,
     )
     profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, DEFAULT_PROFILE_KEY, trajopt_move_profile)
     profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, DEFAULT_PROFILE_KEY, trajopt_composite_profile)
-    ProfileDictionary_addTrajOptSolverProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, DEFAULT_PROFILE_KEY, trajopt_solver_profile
-    )
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, DEFAULT_PROFILE_KEY, trajopt_solver_profile)
 
     request = PlannerRequest()
     request.instructions = interpolated_program

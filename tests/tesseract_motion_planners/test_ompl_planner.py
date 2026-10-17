@@ -35,7 +35,6 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLPlannerType,
     OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
-    ProfileDictionary_addOMPLMoveProfile,
     RRTConnectConfigurator,
     RRTstarConfigurator,
     SBLConfigurator,
@@ -155,7 +154,7 @@ def abb_irb2400_request():
 
 def _with_profile(request: PlannerRequest, profile: OMPLRealVectorMoveProfile) -> PlannerRequest:
     profiles = ProfileDictionary()
-    ProfileDictionary_addOMPLMoveProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", profile)
+    profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", profile)
     request.profiles = profiles
     return request
 

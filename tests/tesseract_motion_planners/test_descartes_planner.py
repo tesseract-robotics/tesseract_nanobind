@@ -29,7 +29,6 @@ from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
-    DescartesDefaultPlanProfileD,
     DescartesEdgeEvaluatorD,
     DescartesLadderGraphSolverProfileD,
     DescartesMotionPlannerD,
@@ -38,8 +37,6 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesStateD,
     DescartesStateSampleD,
     DescartesWaypointSamplerD,
-    cast_DescartesMoveProfileD,
-    cast_DescartesPlanProfileD,
     sampleFixed,
     sampleToolAxis,
     sampleToolXAxis,
@@ -79,14 +76,14 @@ class TestDescartesProfiles:
     """Test Descartes profile types."""
 
     def test_default_plan_profile(self):
-        profile = DescartesDefaultPlanProfileD()
+        profile = DescartesDefaultMoveProfileD()
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
 
     def test_default_plan_profile_attributes(self):
-        """Test DescartesDefaultPlanProfileD attributes."""
-        profile = DescartesDefaultPlanProfileD()
+        """Test DescartesDefaultMoveProfileD attributes."""
+        profile = DescartesDefaultMoveProfileD()
 
         # Test pose sampling attributes
         profile.target_pose_fixed = False
@@ -119,7 +116,7 @@ class TestDescartesProfiles:
 
     def test_default_plan_profile_contact_manager_config(self):
         """vertex_contact_manager_config / edge_contact_manager_config round-trip."""
-        profile = DescartesDefaultPlanProfileD()
+        profile = DescartesDefaultMoveProfileD()
 
         # Both fields are exposed and return a ContactManagerConfig.
         assert isinstance(profile.vertex_contact_manager_config, ContactManagerConfig)
@@ -208,9 +205,9 @@ class TestDescartesPlanning:
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
         # Setup Descartes profiles
-        plan_profile = DescartesDefaultPlanProfileD()
+        plan_profile = DescartesDefaultMoveProfileD()
         # Use cast helper to convert to Profile for ProfileDictionary
-        plan_profile_base = cast_DescartesPlanProfileD(plan_profile)
+        plan_profile_base = plan_profile
 
         profiles = ProfileDictionary()
         profiles.addProfile(DESCARTES_DEFAULT_NAMESPACE, "TEST_PROFILE", plan_profile_base)
@@ -323,7 +320,7 @@ class TestPythonEdgeEvaluator:
         profiles.addProfile(
             DESCARTES_DEFAULT_NAMESPACE,
             "PY_EDGE_PROFILE",
-            cast_DescartesMoveProfileD(py_profile),
+            py_profile,
         )
 
         planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
@@ -458,7 +455,7 @@ class TestDescartesMotionPlannerBase:
         profiles.addProfile(
             DESCARTES_DEFAULT_NAMESPACE,
             "TEST_PROFILE",
-            cast_DescartesMoveProfileD(DescartesDefaultMoveProfileD()),
+            DescartesDefaultMoveProfileD(),
         )
         request = PlannerRequest()
         request.instructions = program

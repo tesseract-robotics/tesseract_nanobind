@@ -92,9 +92,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         // Every TrajOpt move profile shares the key of this base (TrajOptMoveProfile()'s constructor).
         .def_static("createKey", &tc::Profile::createKey<tp::TrajOptMoveProfile>);
 
-    // SWIG-compatible alias
-    m.attr("TrajOptPlanProfile") = m.attr("TrajOptMoveProfile");
-
     // ========== TrajOptCompositeProfile (base) ==========
     // create() stays unbound: it returns classic TrajOpt trajopt::TermInfo objects.
     nb::class_<tp::TrajOptCompositeProfile, tc::Profile>(m, "TrajOptCompositeProfile")
@@ -115,9 +112,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         "struct's own defaults, so fields left out lose the profile's values. This is per "
         "struct; here `cartesian_cost_config:` and `joint_cost_config:` come back enabled "
         "(the waypoint config default), where the profile's are disabled.");
-
-    // SWIG-compatible alias
-    m.attr("TrajOptDefaultPlanProfile") = m.attr("TrajOptDefaultMoveProfile");
 
     // ========== TrajOptDefaultCompositeProfile ==========
     // Note: contact_test_type, longest_valid_segment_fraction/length removed in 0.33
@@ -260,42 +254,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         "`settings:` and `opt_params:` are merged into the profile's values: keys left out "
         "keep them (`settings: {max_iter: 321}` keeps eps_abs 1e-4). This is per struct; "
         "other profiles' from_yaml may replace a nested sub-config instead.");
-
-    // Helper to add TrajOpt move profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptMoveProfile", [](tc::ProfileDictionary& dict,
-                                                         const std::string& ns,
-                                                         const std::string& profile_name,
-                                                         std::shared_ptr<tp::TrajOptMoveProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOpt move profile to ProfileDictionary");
-
-    // SWIG-compatible alias
-    m.def("ProfileDictionary_addTrajOptPlanProfile", [](tc::ProfileDictionary& dict,
-                                                         const std::string& ns,
-                                                         const std::string& profile_name,
-                                                         std::shared_ptr<tp::TrajOptMoveProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOpt plan profile to ProfileDictionary (legacy alias)");
-
-    // Helper to add TrajOpt composite profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptCompositeProfile", [](tc::ProfileDictionary& dict,
-                                                              const std::string& ns,
-                                                              const std::string& profile_name,
-                                                              std::shared_ptr<tp::TrajOptCompositeProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOpt composite profile to ProfileDictionary");
-
-    // Helper to add TrajOpt solver profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptSolverProfile", [](tc::ProfileDictionary& dict,
-                                                           const std::string& ns,
-                                                           const std::string& profile_name,
-                                                           std::shared_ptr<tp::TrajOptSolverProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOpt solver profile to ProfileDictionary");
 
     // ========== TrajOptMotionPlanner ==========
     // getName / solve (GIL released) / terminate / clear / clone come from MotionPlanner

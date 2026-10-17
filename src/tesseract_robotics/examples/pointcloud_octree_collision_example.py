@@ -159,10 +159,6 @@ def _trajopt_profiles_without_collision():
         _create_trajopt_profiles,
     )
     from tesseract_robotics.tesseract_command_language import ProfileDictionary
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-    )
     from tesseract_robotics.tesseract_task_composer_planning import ContactCheckProfile
 
     composite, plan = _create_trajopt_profiles()
@@ -171,10 +167,8 @@ def _trajopt_profiles_without_collision():
 
     profiles = ProfileDictionary()
     for name in TRAJOPT_PROFILE_NAMES:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
     # The TrajOptPipeline task graph runs a DiscreteContactCheckTask AFTER the
     # planner, and that task aborts the pipeline if any waypoint is in contact.

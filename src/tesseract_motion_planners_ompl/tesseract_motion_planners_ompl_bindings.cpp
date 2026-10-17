@@ -187,9 +187,6 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         .def("createSolverConfig", &tp::OMPLMoveProfile::createSolverConfig,
             "The solver config the planner uses for this profile");
 
-    // SWIG-compatible alias
-    m.attr("OMPLPlanProfile") = m.attr("OMPLMoveProfile");
-
     // ========== OMPLRealVectorMoveProfile (was OMPLRealVectorPlanProfile) ==========
     nb::class_<tp::OMPLRealVectorMoveProfile, tp::OMPLMoveProfile> real_vector_move_profile(
         m, "OMPLRealVectorMoveProfile");
@@ -207,37 +204,6 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
         "struct's own defaults, so fields left out lose the profile's values. This is per "
         "struct; here `solver_config:` starts with no planners (OMPLSolverConfig() holds "
         "none).");
-
-    // SWIG-compatible alias
-    m.attr("OMPLRealVectorPlanProfile") = m.attr("OMPLRealVectorMoveProfile");
-
-    // Helper to convert OMPLMoveProfile to Profile::ConstPtr for ProfileDictionary
-    m.def("OMPLMoveProfile_as_ProfileConstPtr", [](std::shared_ptr<tp::OMPLMoveProfile> profile) -> tc::Profile::ConstPtr {
-        return profile;
-    }, "profile"_a, "Convert OMPLMoveProfile to Profile::ConstPtr for use with ProfileDictionary.addProfile");
-
-    // Legacy alias
-    m.def("OMPLPlanProfile_as_ProfileConstPtr", [](std::shared_ptr<tp::OMPLMoveProfile> profile) -> tc::Profile::ConstPtr {
-        return profile;
-    }, "profile"_a, "Convert OMPLPlanProfile to Profile::ConstPtr (legacy alias)");
-
-    // Helper to add OMPL move profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addOMPLMoveProfile", [](tc::ProfileDictionary& dict,
-                                                  const std::string& ns,
-                                                  const std::string& profile_name,
-                                                  std::shared_ptr<tp::OMPLMoveProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add OMPL move profile to ProfileDictionary");
-
-    // Legacy alias
-    m.def("ProfileDictionary_addOMPLProfile", [](tc::ProfileDictionary& dict,
-                                                  const std::string& ns,
-                                                  const std::string& profile_name,
-                                                  std::shared_ptr<tp::OMPLMoveProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add OMPL plan profile to ProfileDictionary (legacy alias)");
 
     // ========== OMPLMotionPlanner ==========
     // getName / solve (GIL released) / terminate / clear / clone come from MotionPlanner

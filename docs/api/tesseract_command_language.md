@@ -304,17 +304,17 @@ both give an independent copy that keeps the UUIDs.
 Container for planner profiles.
 
 ```python
-from tesseract_robotics.tesseract_command_language import (
-    ProfileDictionary
-)
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
 
 profiles = ProfileDictionary()
 
-# Add profiles (type-specific functions)
-from tesseract_robotics.tesseract_motion_planners_ompl import (
-    ProfileDictionary_addOMPLProfile
+# addProfile(namespace, profile name, profile) takes a profile from any planner module
+ompl_profile = OMPLRealVectorMoveProfile()
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", ompl_profile)
+assert profiles.hasProfile(
+    OMPLRealVectorMoveProfile.createKey(), "OMPLMotionPlannerTask", "DEFAULT"
 )
-ProfileDictionary_addOMPLProfile(profiles, "DEFAULT", ompl_profile)
 ```
 
 ## Type Erasure Helpers

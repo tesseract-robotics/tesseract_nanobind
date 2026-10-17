@@ -107,14 +107,11 @@ from tesseract_robotics.planning import (
     Robot,
     TaskComposer,
 )
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    CollisionEvaluatorType,
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptSolverProfile,
     TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
 
@@ -201,7 +198,7 @@ def create_profiles():
     # Plan profile: Cartesian constraint with yaw (rz) freedom
     # coeff = [x, y, z, rx, ry, rz] weights for pose error
     # CRITICAL: coeff[5]=0 allows yaw rotation freedom for auxiliary axes
-    plan = TrajOptDefaultPlanProfile()
+    plan = TrajOptDefaultMoveProfile()
     plan.joint_cost_config.enabled = False
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
@@ -220,9 +217,9 @@ def create_profiles():
     solver.opt_params.min_approx_improve = 1e-3
     solver.opt_params.min_trust_box_size = 1e-3
 
-    ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, "CARTESIAN", plan)
-    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
-    ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, "DEFAULT", solver)
+    profiles.addProfile(TRAJOPT_NS, "CARTESIAN", plan)
+    profiles.addProfile(TRAJOPT_NS, "DEFAULT", composite)
+    profiles.addProfile(TRAJOPT_NS, "DEFAULT", solver)
     return profiles
 
 

@@ -61,15 +61,13 @@ from tesseract_robotics.tesseract_common import Isometry3d  # noqa: E402
 
 # TrajOpt-specific profile types (C++ bindings)
 from tesseract_robotics.tesseract_motion_planners_trajopt import (  # noqa: E402
-    ProfileDictionary_addTrajOptCompositeProfile,  # Register composite profile
-    ProfileDictionary_addTrajOptPlanProfile,  # Register plan profile
-    TrajOptCollisionConfig,  # Collision checking config (0.33 API)
     TrajOptDefaultCompositeProfile,  # Trajectory-wide settings (collision)
-    TrajOptDefaultPlanProfile,  # Per-waypoint settings (constraint/cost)
+    TrajOptDefaultMoveProfile,  # Per-waypoint settings (constraint/cost)
 )
 
 # Low-level scene graph for link manipulation
 from tesseract_robotics.tesseract_scene_graph import Joint, JointType  # noqa: E402
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig  # noqa: E402
 
 # TrajOpt planner namespace for profile registration
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -115,7 +113,7 @@ def create_pick_and_place_profiles():
 
     # ==== PLAN PROFILE (per-waypoint) ====
     # Applied to each Cartesian waypoint in LINEAR moves
-    plan_profile = TrajOptDefaultPlanProfile()
+    plan_profile = TrajOptDefaultMoveProfile()
 
     # Disable joint-space cost (we want pure Cartesian precision)
     plan_profile.joint_cost_config.enabled = False
@@ -153,13 +151,9 @@ def create_pick_and_place_profiles():
 
     # ==== REGISTER PROFILES ====
     # "CARTESIAN" profile used by linear_to() moves
-    ProfileDictionary_addTrajOptPlanProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", plan_profile
-    )
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", plan_profile)
     # "DEFAULT" composite profile applies to all trajectories
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", composite_profile
-    )
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", composite_profile)
 
     return profiles
 

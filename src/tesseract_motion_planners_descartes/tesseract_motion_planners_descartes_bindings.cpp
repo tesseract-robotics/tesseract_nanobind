@@ -261,12 +261,6 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
             "Number of threads to use during planning (default: 1)");
     bind_value_equality(ladder_graph_profile);
 
-    // Helper to cast DescartesLadderGraphSolverProfileD to Profile
-    m.def("cast_DescartesSolverProfileD", [](std::shared_ptr<tp::DescartesLadderGraphSolverProfile<double>> profile) {
-        return std::static_pointer_cast<tc::Profile>(profile);
-    }, "profile"_a,
-    "Cast DescartesLadderGraphSolverProfileD to Profile for use with ProfileDictionary");
-
     // ========== DescartesMoveProfile<double> (base, was DescartesPlanProfile) ==========
     // Python users may subclass this and override createWaypointSampler/
     // createEdgeEvaluator/createStateEvaluator to plug in custom logic.
@@ -281,16 +275,6 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
              "move_instruction"_a, "composite_manip_info"_a, "env"_a)
         .def("createStateEvaluator", &tp::DescartesMoveProfile<double>::createStateEvaluator,
              "move_instruction"_a, "composite_manip_info"_a, "env"_a);
-
-    // Helper to cast a Python (or C++) DescartesMoveProfileD subclass to Profile
-    // for ProfileDictionary insertion.
-    m.def("cast_DescartesMoveProfileD", [](std::shared_ptr<tp::DescartesMoveProfile<double>> profile) {
-        return std::static_pointer_cast<tc::Profile>(profile);
-    }, "profile"_a,
-    "Cast a DescartesMoveProfileD (including Python subclasses) to Profile for use with ProfileDictionary");
-
-    // SWIG-compatible alias
-    m.attr("DescartesPlanProfileD") = m.attr("DescartesMoveProfileD");
 
     // ========== DescartesDefaultMoveProfile<double> (was DescartesDefaultPlanProfile) ==========
     nb::class_<tp::DescartesDefaultMoveProfile<double>, tp::DescartesMoveProfile<double>> default_move_profile(
@@ -313,15 +297,6 @@ NB_MODULE(_tesseract_motion_planners_descartes, m) {
         .def_rw("use_redundant_joint_solutions", &tp::DescartesDefaultMoveProfile<double>::use_redundant_joint_solutions)
         .def_rw("debug", &tp::DescartesDefaultMoveProfile<double>::debug);
     bind_value_equality(default_move_profile);
-
-    // SWIG-compatible alias
-    m.attr("DescartesDefaultPlanProfileD") = m.attr("DescartesDefaultMoveProfileD");
-
-    // Legacy alias for cast_DescartesMoveProfileD
-    m.def("cast_DescartesPlanProfileD", [](std::shared_ptr<tp::DescartesMoveProfile<double>> profile) {
-        return std::static_pointer_cast<tc::Profile>(profile);
-    }, "profile"_a,
-    "Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)");
 
     // ========== Tool-pose samplers (descartes_utils.h) ==========
     // What DescartesDefaultMoveProfileD's target_pose_sample_* fields drive.

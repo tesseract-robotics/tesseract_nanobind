@@ -1,7 +1,7 @@
 """tesseract_motion_planners_descartes Python bindings"""
 
 from collections.abc import Sequence
-from typing import Annotated, TypeAlias, overload
+from typing import Annotated, overload
 
 import numpy
 from numpy.typing import NDArray
@@ -92,11 +92,6 @@ class DescartesLadderGraphSolverProfileD(DescartesSolverProfileD):
 
     __hash__: None = None
 
-def cast_DescartesSolverProfileD(profile: DescartesLadderGraphSolverProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
-    """
-    Cast DescartesLadderGraphSolverProfileD to Profile for use with ProfileDictionary
-    """
-
 class DescartesMoveProfileD(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self) -> None: ...
 
@@ -111,13 +106,6 @@ class DescartesMoveProfileD(tesseract_robotics.tesseract_command_language._tesse
     def createEdgeEvaluator(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> DescartesEdgeEvaluatorD: ...
 
     def createStateEvaluator(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment) -> DescartesStateEvaluatorD: ...
-
-def cast_DescartesMoveProfileD(profile: DescartesMoveProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
-    """
-    Cast a DescartesMoveProfileD (including Python subclasses) to Profile for use with ProfileDictionary
-    """
-
-DescartesPlanProfileD: TypeAlias = DescartesMoveProfileD
 
 class DescartesDefaultMoveProfileD(DescartesMoveProfileD):
     def __init__(self) -> None: ...
@@ -217,13 +205,6 @@ class DescartesDefaultMoveProfileD(DescartesMoveProfileD):
     def __ne__(self, arg: DescartesDefaultMoveProfileD, /) -> bool: ...
 
     __hash__: None = None
-
-DescartesDefaultPlanProfileD: TypeAlias = DescartesDefaultMoveProfileD
-
-def cast_DescartesPlanProfileD(profile: DescartesMoveProfileD) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
-    """
-    Cast a DescartesMoveProfileD to Profile (legacy alias of cast_DescartesMoveProfileD)
-    """
 
 def sampleToolAxis(tool_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], resolution: float, minimum: float, maximum: float) -> tesseract_robotics.tesseract_common._tesseract_common.VectorIsometry3d:
     """

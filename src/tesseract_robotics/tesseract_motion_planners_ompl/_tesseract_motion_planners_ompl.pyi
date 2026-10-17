@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 import enum
-from typing import TypeAlias
 
 import tesseract_robotics.tesseract_collision._tesseract_collision
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
@@ -372,8 +371,6 @@ class OMPLMoveProfile(tesseract_robotics.tesseract_command_language._tesseract_c
     def createSolverConfig(self) -> OMPLSolverConfig:
         """The solver config the planner uses for this profile"""
 
-OMPLPlanProfile: TypeAlias = OMPLMoveProfile
-
 class OMPLRealVectorMoveProfile(OMPLMoveProfile):
     def __init__(self) -> None: ...
 
@@ -411,22 +408,6 @@ class OMPLRealVectorMoveProfile(OMPLMoveProfile):
 
         Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `solver_config:` starts with no planners (OMPLSolverConfig() holds none).
         """
-
-OMPLRealVectorPlanProfile: TypeAlias = OMPLRealVectorMoveProfile
-
-def OMPLMoveProfile_as_ProfileConstPtr(profile: OMPLMoveProfile) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
-    """
-    Convert OMPLMoveProfile to Profile::ConstPtr for use with ProfileDictionary.addProfile
-    """
-
-def OMPLPlanProfile_as_ProfileConstPtr(profile: OMPLMoveProfile) -> tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile:
-    """Convert OMPLPlanProfile to Profile::ConstPtr (legacy alias)"""
-
-def ProfileDictionary_addOMPLMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: OMPLMoveProfile) -> None:
-    """Add OMPL move profile to ProfileDictionary"""
-
-def ProfileDictionary_addOMPLProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: OMPLMoveProfile) -> None:
-    """Add OMPL plan profile to ProfileDictionary (legacy alias)"""
 
 class OMPLMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...

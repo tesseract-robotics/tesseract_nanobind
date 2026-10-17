@@ -6,14 +6,16 @@
 
 The cross-module inheritance for Profile types now works. We use `nb::class_<DerivedProfile, BaseProfile>` in nanobind to register the base class relationship, and nanobind's module import mechanism loads the base type from `tesseract_command_language`.
 
-**Solution:** Use helper functions like `ProfileDictionary_addOMPLProfile()` from the OMPL module:
+**Solution:** `ProfileDictionary.addProfile` takes a profile from any planner module. The
+per-module `ProfileDictionary_add*Profile` helpers are removed (#334):
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import ProfileDictionary_addOMPLProfile
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
 
-plan_profile = OMPLRealVectorPlanProfile()
+plan_profile = OMPLRealVectorMoveProfile()
 profiles = ProfileDictionary()
-ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", plan_profile)
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", plan_profile)
 ```
 
 ## InstructionsTrajectory and Time Parameterization
@@ -133,15 +135,13 @@ TrajOpt bindings are optional and auto-detected at build time.
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Create profiles
-plan_profile = TrajOptDefaultPlanProfile()
+plan_profile = TrajOptDefaultMoveProfile()
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.smooth_velocities = True
 
@@ -154,8 +154,8 @@ composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollision
 
 # Register profiles
 profiles = ProfileDictionary()
-ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
-ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
 
 # Solve
 planner = TrajOptMotionPlanner("TrajOptMotionPlannerTask")
@@ -236,21 +236,19 @@ input_key = task.getInputKeys().get("program")
 
 ## TrajOpt Profile Configuration (0.33 API)
 
-### TrajOptDefaultPlanProfile
+### TrajOptDefaultMoveProfile
 
 Configure waypoint-level TrajOpt behavior via config objects:
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile - waypoint constraints
-trajopt_plan_profile = TrajOptDefaultPlanProfile()
+trajopt_plan_profile = TrajOptDefaultMoveProfile()
 trajopt_plan_profile.joint_cost_config.enabled = False
 trajopt_plan_profile.cartesian_cost_config.enabled = False
 trajopt_plan_profile.cartesian_constraint_config.enabled = True
@@ -269,8 +267,8 @@ trajopt_composite_profile.collision_cost_config.collision_check_config.type = Co
 trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 
 # Register profiles
-ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "CARTESIAN", trajopt_plan_profile)
-ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "CARTESIAN", trajopt_plan_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_profile)
 ```
 
 ### 0.33 API Changes Summary

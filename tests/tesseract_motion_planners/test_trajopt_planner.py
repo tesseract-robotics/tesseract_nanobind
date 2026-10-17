@@ -32,13 +32,11 @@ from tesseract_robotics.tesseract_motion_planners_simple import generateInterpol
 try:
     from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-        TrajOptCollisionConfig,
         TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
+        TrajOptDefaultMoveProfile,
         TrajOptMotionPlanner,
     )
+    from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
     TRAJOPT_AVAILABLE = True
 except ImportError:
@@ -80,7 +78,7 @@ class TestTrajOptProfiles:
     """Test TrajOpt profile types."""
 
     def test_default_plan_profile(self):
-        profile = TrajOptDefaultPlanProfile()
+        profile = TrajOptDefaultMoveProfile()
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
@@ -222,17 +220,13 @@ class TestTrajOptPlanning:
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
         # Setup TrajOpt profiles
-        plan_profile = TrajOptDefaultPlanProfile()
+        plan_profile = TrajOptDefaultMoveProfile()
         composite_profile = TrajOptDefaultCompositeProfile()
 
         profiles = ProfileDictionary()
         # Use helper functions for cross-module profile registration
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", plan_profile
-        )
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", composite_profile
-        )
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", plan_profile)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", composite_profile)
 
         # Create planner and request
         test_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
@@ -288,7 +282,7 @@ class TestTrajOptPlanning:
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
         # Setup profiles with collision config
-        plan_profile = TrajOptDefaultPlanProfile()
+        plan_profile = TrajOptDefaultMoveProfile()
         composite_profile = TrajOptDefaultCompositeProfile()
 
         # Configure collision cost (0.33 API)
@@ -303,12 +297,8 @@ class TestTrajOptPlanning:
         composite_profile.smooth_jerks = False
 
         profiles = ProfileDictionary()
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", plan_profile
-        )
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", composite_profile
-        )
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", plan_profile)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", composite_profile)
 
         test_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
 
@@ -339,16 +329,14 @@ def _joint_request(env, manip_info, joint_names, profile_name):
 
 def _trajopt_profiles(profile_name, solver_profile=None):
     profiles = ProfileDictionary()
-    trajopt.ProfileDictionary_addTrajOptMoveProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultMoveProfile()
+    profiles.addProfile(
+        TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultMoveProfile()
     )
-    trajopt.ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultCompositeProfile()
+    profiles.addProfile(
+        TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultCompositeProfile()
     )
     if solver_profile is not None:
-        trajopt.ProfileDictionary_addTrajOptSolverProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, solver_profile
-        )
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, profile_name, solver_profile)
     return profiles
 
 

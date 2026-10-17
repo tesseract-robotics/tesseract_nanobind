@@ -155,13 +155,13 @@ The **Task Composer** orchestrates complex planning tasks:
 
 ```python
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorPlanProfile
+from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
 
 # Profiles are named configurations
 # "DEFAULT" is used if no specific profile is set
 
 # Example: Configure OMPL profile
-ompl_profile = OMPLRealVectorPlanProfile()
+ompl_profile = OMPLRealVectorMoveProfile()
 ompl_profile.solver_config.planning_time = 5.0  # 5 seconds max
 ompl_profile.solver_config.simplify = True
 
@@ -208,7 +208,7 @@ Interpolates between waypoints and checks at discrete points:
 
 ```python
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 # Configured via the collision check config
 collision_config = TrajOptCollisionConfig(margin=0.1, coeff=10.0)
@@ -309,9 +309,8 @@ state_wp = move_instr.getWaypoint().asStateWaypoint()
 `ProfileDictionary` has similar accessor functions per type:
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import ProfileDictionary_addOMPLProfile
 
-ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", ompl_profile)
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", ompl_profile)
 ```
 
 ### Console Bridge Logging

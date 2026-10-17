@@ -80,12 +80,10 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_geometry import Octree, OctreeSubType, PointCloud, createOctree
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptMoveProfile,
-    TrajOptCollisionConfig,
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
 )
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
@@ -160,11 +158,9 @@ def basic_cartesian_trajopt_profiles(joint_count):
     move.joint_constraint_config = joint
 
     profiles = ProfileDictionary()
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "cartesian_program", composite
-    )
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "cartesian_program", composite)
     for name in ("RASTER", "freespace_profile"):
-        ProfileDictionary_addTrajOptMoveProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, move)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, move)
     return profiles
 
 

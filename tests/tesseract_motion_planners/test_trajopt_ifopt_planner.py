@@ -28,14 +28,10 @@ from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    ProfileDictionary_addTrajOptIfoptPlanProfile,
-    ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptCartesianWaypointConfig,
     TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
-    TrajOptIfoptDefaultPlanProfile,
     TrajOptIfoptJointWaypointConfig,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptMoveProfile,
@@ -84,7 +80,7 @@ class TestTrajOptIfoptProfiles:
     """Test TrajOptIfopt profile types."""
 
     def test_default_plan_profile(self):
-        profile = TrajOptIfoptDefaultPlanProfile()
+        profile = TrajOptIfoptDefaultMoveProfile()
         assert profile is not None
         assert profile.getKey() is not None
 
@@ -264,20 +260,14 @@ class TestTrajOptIfoptProfiles:
         """Test adding TrajOptIfopt profiles to ProfileDictionary."""
         profiles = ProfileDictionary()
 
-        plan_profile = TrajOptIfoptDefaultPlanProfile()
+        plan_profile = TrajOptIfoptDefaultMoveProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
         solver_profile = TrajOptIfoptOSQPSolverProfile()
 
         # Add profiles using helper functions
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-        )
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
         assert profiles is not None
 
@@ -321,7 +311,7 @@ class TestTrajOptIfoptPlanner:
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
         # Create profiles with proper velocity coefficients
-        plan_profile = TrajOptIfoptDefaultPlanProfile()
+        plan_profile = TrajOptIfoptDefaultMoveProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
         # Initialize coefficients to match DOF count (7 for KUKA IIWA)
         n_joints = len(joint_names)
@@ -331,15 +321,9 @@ class TestTrajOptIfoptPlanner:
         solver_profile = TrajOptIfoptOSQPSolverProfile()
 
         profiles = ProfileDictionary()
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-        )
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
         # Create request
         request = PlannerRequest()
@@ -379,7 +363,7 @@ class TestTrajOptIfoptPlanner:
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
         n_joints = len(joint_names)
-        plan_profile = TrajOptIfoptDefaultPlanProfile()
+        plan_profile = TrajOptIfoptDefaultMoveProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
         composite_profile.velocity_coeff = np.ones(n_joints)
         composite_profile.acceleration_coeff = np.ones(n_joints)
@@ -399,15 +383,9 @@ class TestTrajOptIfoptPlanner:
         solver_profile.opt_params.initial_trust_box_size = 0.1
 
         profiles = ProfileDictionary()
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-        )
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
         request = PlannerRequest()
         request.instructions = interpolated
@@ -466,18 +444,11 @@ def _smoothing_composite_profile(n_joints):
 
 def _request(t_env, manip_info, joint_names, solver_profile):
     profiles = ProfileDictionary()
-    ProfileDictionary_addTrajOptIfoptPlanProfile(
-        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", TrajOptIfoptDefaultPlanProfile()
+    profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", TrajOptIfoptDefaultMoveProfile())
+    profiles.addProfile(
+        TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", _smoothing_composite_profile(len(joint_names))
     )
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        profiles,
-        TRAJOPT_IFOPT_NAMESPACE,
-        "DEFAULT",
-        _smoothing_composite_profile(len(joint_names)),
-    )
-    ProfileDictionary_addTrajOptIfoptSolverProfile(
-        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-    )
+    profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
     request = PlannerRequest()
     request.instructions = _interpolated_program(t_env, manip_info, joint_names)
     request.env = t_env

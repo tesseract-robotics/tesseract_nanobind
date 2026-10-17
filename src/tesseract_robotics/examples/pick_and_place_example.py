@@ -88,10 +88,9 @@ from tesseract_robotics.planning.profiles import create_freespace_pipeline_profi
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    TrajOptCollisionConfig,
     TrajOptDefaultCompositeProfile,
 )
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
@@ -135,7 +134,7 @@ def create_profiles():
     composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
     composite.collision_cost_config.collision_margin_buffer = 0.01
 
-    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
+    profiles.addProfile(TRAJOPT_NS, "DEFAULT", composite)
     return profiles
 
 

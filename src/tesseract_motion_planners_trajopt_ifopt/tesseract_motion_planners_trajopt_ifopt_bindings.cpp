@@ -157,9 +157,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
             "move_instruction"_a, "composite_manip_info"_a, "env"_a, "index"_a,
             "Build the waypoint info the planner adds for this move instruction");
 
-    // SWIG-compatible alias
-    m.attr("TrajOptIfoptPlanProfile") = m.attr("TrajOptIfoptMoveProfile");
-
     // ========== TrajOptIfoptCompositeProfile (base) ==========
     nb::class_<tp::TrajOptIfoptCompositeProfile, tc::Profile>(m, "TrajOptIfoptCompositeProfile")
         .def("getKey", &tp::TrajOptIfoptCompositeProfile::getKey)
@@ -212,9 +209,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
         .def_rw("joint_constraint_config", &tp::TrajOptIfoptDefaultMoveProfile::joint_constraint_config);
     bind_value_equality(default_move_profile);
     bind_from_yaml(default_move_profile);
-
-    // SWIG-compatible alias
-    m.attr("TrajOptIfoptDefaultPlanProfile") = m.attr("TrajOptIfoptDefaultMoveProfile");
 
     // ========== TrajOptIfoptDefaultCompositeProfile ==========
     // Note: longest_valid_segment_fraction/length removed in 0.33, collision config via TrajOptCollisionConfig.
@@ -276,42 +270,6 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // operator== also compares qp_settings, through upstream's free OsqpEigen::Settings operator==.
     bind_value_equality(osqp_solver_profile);
     bind_from_yaml(osqp_solver_profile);
-
-    // Helper to add TrajOptIfopt move profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptIfoptMoveProfile", [](tc::ProfileDictionary& dict,
-                                                              const std::string& ns,
-                                                              const std::string& profile_name,
-                                                              std::shared_ptr<tp::TrajOptIfoptMoveProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOptIfopt move profile to ProfileDictionary");
-
-    // Legacy alias
-    m.def("ProfileDictionary_addTrajOptIfoptPlanProfile", [](tc::ProfileDictionary& dict,
-                                                              const std::string& ns,
-                                                              const std::string& profile_name,
-                                                              std::shared_ptr<tp::TrajOptIfoptMoveProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOptIfopt plan profile to ProfileDictionary (legacy alias)");
-
-    // Helper to add TrajOptIfopt composite profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptIfoptCompositeProfile", [](tc::ProfileDictionary& dict,
-                                                                   const std::string& ns,
-                                                                   const std::string& profile_name,
-                                                                   std::shared_ptr<tp::TrajOptIfoptCompositeProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOptIfopt composite profile to ProfileDictionary");
-
-    // Helper to add TrajOptIfopt solver profile to ProfileDictionary directly
-    m.def("ProfileDictionary_addTrajOptIfoptSolverProfile", [](tc::ProfileDictionary& dict,
-                                                                const std::string& ns,
-                                                                const std::string& profile_name,
-                                                                std::shared_ptr<tp::TrajOptIfoptSolverProfile> profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add TrajOptIfopt solver profile to ProfileDictionary");
 
     // ========== Term factories (trajopt_ifopt_utils.h) ==========
     // The planner's own term set-up; a hand-built TrajOptQPProblem gets the same sets.

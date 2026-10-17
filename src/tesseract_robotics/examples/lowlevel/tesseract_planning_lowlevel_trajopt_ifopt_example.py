@@ -37,7 +37,7 @@ from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
-    OMPLRealVectorPlanProfile,
+    OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
     RRTConnectConfigurator,
 )
@@ -45,11 +45,8 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    ProfileDictionary_addTrajOptIfoptPlanProfile,
-    ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptDefaultCompositeProfile,
-    TrajOptIfoptDefaultPlanProfile,
+    TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptOSQPSolverProfile,
 )
@@ -137,7 +134,7 @@ def main():
     ompl_solver_config.optimize = False
     ompl_solver_config.addPlanner(RRTConnectConfigurator())
 
-    ompl_profile = OMPLRealVectorPlanProfile()
+    ompl_profile = OMPLRealVectorMoveProfile()
     ompl_profile.solver_config = ompl_solver_config
 
     ompl_profiles = ProfileDictionary()
@@ -160,7 +157,7 @@ def main():
     print("Running TrajOptIfopt optimizer...")
 
     # Create profiles with velocity/accel coefficients sized for 6-DOF robot
-    plan_profile = TrajOptIfoptDefaultPlanProfile()
+    plan_profile = TrajOptIfoptDefaultMoveProfile()
     composite_profile = TrajOptIfoptDefaultCompositeProfile()
     composite_profile.velocity_coeff = np.ones(6)
     composite_profile.acceleration_coeff = np.ones(6)
@@ -169,15 +166,9 @@ def main():
     solver_profile.setAdaptiveRhoInterval(OSQP_ADAPTIVE_RHO_INTERVAL)
 
     trajopt_profiles = ProfileDictionary()
-    ProfileDictionary_addTrajOptIfoptPlanProfile(
-        trajopt_profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-    )
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        trajopt_profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-    )
-    ProfileDictionary_addTrajOptIfoptSolverProfile(
-        trajopt_profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-    )
+    trajopt_profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+    trajopt_profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+    trajopt_profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
     trajopt_request = PlannerRequest()
     trajopt_request.instructions = interpolated

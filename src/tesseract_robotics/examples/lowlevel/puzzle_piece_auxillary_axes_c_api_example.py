@@ -37,11 +37,8 @@ from tesseract_robotics.planning import (
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptSolverProfile,
     TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
 
@@ -193,7 +190,7 @@ def main():
     profiles = ProfileDictionary()
 
     # TrajOpt plan profile: waypoint-level constraints
-    trajopt_plan_profile = TrajOptDefaultPlanProfile()
+    trajopt_plan_profile = TrajOptDefaultMoveProfile()
     trajopt_plan_profile.joint_cost_config.enabled = False  # No joint-space costs
     trajopt_plan_profile.cartesian_cost_config.enabled = False  # Using constraints instead
     trajopt_plan_profile.cartesian_constraint_config.enabled = True
@@ -229,15 +226,9 @@ def main():
     trajopt_solver_profile.opt_params.min_trust_box_size = 1e-3
 
     # Register profiles with TrajOpt task namespace
-    ProfileDictionary_addTrajOptPlanProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile
-    )
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
-    )
-    ProfileDictionary_addTrajOptSolverProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_solver_profile
-    )
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile)
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile)
+    profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_solver_profile)
 
     print("Running TrajOpt planner with 9 DOF (7 arm + 2 auxiliary axes)...")
 
