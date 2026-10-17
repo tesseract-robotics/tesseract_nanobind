@@ -24,6 +24,8 @@ PLANNER_PREFIX = ("tesseract/planner/",)
 # The fixture's third-party root, as `header_rel` spells it (relative to the repo).
 FIXTURE_THIRD_PARTY = "tests/audit/fixtures/include/thirdparty_fixture/"
 FIXTURE_NOT_API = {"internal/*": "fixture internals"}
+# The fixture's forward-declared third-party namespace (planner.h `vendorfwd::Planner`).
+FIXTURE_NAMESPACES = ("vendorfwd::",)
 
 
 def _planner_report():
@@ -42,6 +44,7 @@ def _planner_report():
 def planner_report():
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parse, "UNBOUND_DEPENDENCY_ROOTS", (FIXTURE_THIRD_PARTY,))
+        mp.setattr(parse, "UNBOUND_DEPENDENCY_NAMESPACES", FIXTURE_NAMESPACES)
         # An `UNAUDITED_HEADERS` key must be a module's prefix (`UnknownPrefixError`).
         mp.setitem(own.AUDITED_HEADER_PREFIX, "planner", PLANNER_PREFIX)
         mp.setitem(own.UNAUDITED_HEADERS, PLANNER_PREFIX[0], FIXTURE_NOT_API)
@@ -64,6 +67,21 @@ def test_std_function_over_a_third_party_type_accepted(planner_report):
     assert ("Hooks.createStateExtractor", "unbound-dependency-type") in accepted_pairs(
         planner_report
     )
+
+
+def test_forward_declared_third_party_type_accepted_by_namespace(planner_report):
+    """No third-party header declares `vendorfwd::Planner`, only the owned header: its namespace."""
+    assert ("ForwardHooks.create", "unbound-dependency-type") in accepted_pairs(planner_report)
+
+
+def test_forward_declared_type_needs_its_namespace():
+    """Without the namespace entry the forward declaration is an owned type: a gap."""
+    assert "ForwardHooks.create" in {g.symbol for g in _planner_report().gaps}
+
+
+def test_ompl_types_are_identified_by_namespace():
+    """tesseract's OMPL headers only forward-declare OMPL types (`ompl::base::Planner`)."""
+    assert parse.UNBOUND_DEPENDENCY_NAMESPACES == ("ompl::",)
 
 
 def test_not_api_return_and_field_accepted(planner_report):
@@ -105,13 +123,14 @@ def test_ompl_root_is_the_versioned_include():
 def test_planner_fixture_rows_exact(planner_report):
     assert {(g.symbol, g.kind, g.arity) for g in planner_report.gaps} == {
         ("Profile.__init__", audit.Kind.CONSTRUCTOR, "2"),
-        ("Orphan.__init__", audit.Kind.CONSTRUCTOR, "1"),
+        ("UnboundSibling.__init__", audit.Kind.CONSTRUCTOR, "1"),
+        ("Mismatched.__init__", audit.Kind.CONSTRUCTOR, "2"),
         ("DerivedProfile.__init__", audit.Kind.CONSTRUCTOR, "1"),
         ("IntYamlProfile.__init__", audit.Kind.CONSTRUCTOR, "1"),
         ("Hooks.on_step", audit.Kind.FIELD, audit.NOT_AN_OVERLOAD),
         ("Hooks.makeConfigurator", audit.Kind.METHOD, audit.NOT_AN_OVERLOAD),
-        ("Holder.__eq__", audit.Kind.OPERATOR, audit.NOT_AN_OVERLOAD),
-        ("Holder.operator+", audit.Kind.OPERATOR, audit.NOT_AN_OVERLOAD),
+        ("AssignHolder.__eq__", audit.Kind.OPERATOR, audit.NOT_AN_OVERLOAD),
+        ("AssignHolder.operator+", audit.Kind.OPERATOR, audit.NOT_AN_OVERLOAD),
     }
     # A Python-only `from_yaml` is accepted only beside a YAML ctor it can stand for (C6 6a).
     assert {d.name for d in planner_report.deviations} == {
@@ -140,3 +159,63 @@ def test_from_yaml_needs_a_str_parameter(planner_report):
 
 def test_yaml_node_text_states_the_from_yaml_premise():
     assert "from_yaml" in audit.ACCEPTED["yaml-node"]
+
+
+# Task 10: a parameter typed by a renamed class matches the Python class's name.
+
+RENAMED_PARAMS = FIXTURES / "renamed_params"
+
+
+def _renamed_params_report():
+    here = "tests/audit/fixtures/renamed_params/evaluator.h"
+    state = frozenset({("class", "State")})
+
+    def method(params):
+        return [audit.CppOverload(audit.Arity(1, 1), (), f"{here}:9", params=params)]
+
+    def cls(name):
+        return audit.CppSymbol(name, audit.Kind.CLASS, f"{here}:1", qualified=f"dl::{name}")
+
+    def ctor(name):
+        return audit.CppSymbol(
+            f"{name}.__init__",
+            audit.Kind.CONSTRUCTOR,
+            f"{here}:2",
+            [audit.CppOverload(audit.Arity(0, 0), (), f"{here}:2")],
+        )
+
+    cpp = {
+        "State": cls("State"),
+        "State.__init__": ctor("State"),
+        "Evaluator": cls("Evaluator"),
+        "Evaluator.__init__": ctor("Evaluator"),
+        "Evaluator.evaluate": audit.CppSymbol(
+            "Evaluator.evaluate", audit.Kind.METHOD, f"{here}:9", method((state,))
+        ),
+        "Evaluator.evaluateAll": audit.CppSymbol(
+            "Evaluator.evaluateAll",
+            audit.Kind.METHOD,
+            f"{here}:10",
+            method((frozenset({("seq", ("class", "State"))}),)),
+        ),
+    }
+    stub = RENAMED_PARAMS / "_renamed_params.pyi"
+    py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
+    bound = {"renamed_params": {"StateD": "dl::State", "EvaluatorD": "dl::Evaluator"}}
+    return audit.match(
+        "renamed_params",
+        cpp,
+        frozenset({"State", "Evaluator", "evaluate", "evaluateAll"}),
+        py,
+        audit.rel(stub),
+        stub_roots=(RENAMED_PARAMS,),
+        bound=lambda m: bound.get(m, {}),
+    )
+
+
+def test_renamed_class_parameter_matches_its_python_name():
+    """`evaluate(const State&)` is bound as `EvaluatorD.evaluate(state: StateD)`: covered, also
+    inside a container."""
+    report = _renamed_params_report()
+    assert not [g for g in report.gaps if g.symbol.startswith("Evaluator.")]
+    assert not [d for d in report.deviations if d.kind is audit.Kind.OVERLOAD]

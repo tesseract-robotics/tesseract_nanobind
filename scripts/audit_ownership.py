@@ -45,6 +45,11 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
         "trajopt/",
     ),
     "tesseract_motion_planners_trajopt_ifopt": ("tesseract/motion_planners/trajopt_ifopt/",),
+    # descartes_light, the graph-search library behind this planner (spec D2).
+    "tesseract_motion_planners_descartes": (
+        "tesseract/motion_planners/descartes/",
+        "descartes_light/",
+    ),
 }
 # Binding modules the audit does not cover yet: module → (reason, owned prefixes). The prefixes
 # decide header ownership already, so a module moves to AUDITED_HEADER_PREFIX unchanged. Every
@@ -62,10 +67,6 @@ UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
     # trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h).
     "trajopt_ifopt": ("Not yet audited: #256 group 2.", ("trajopt_ifopt/", "trajopt_common/")),
     "trajopt_sqp": ("Not yet audited: #256 group 2.", ("trajopt_sqp/",)),
-    "tesseract_motion_planners_descartes": (
-        "Not yet audited: #256 group 3.",
-        ("tesseract/motion_planners/descartes/", "descartes_light/"),
-    ),
     "tesseract_task_composer": ("Not yet audited: #256 group 4.", ("tesseract/task_composer/",)),
     "tesseract_task_composer_planning": (
         "Not yet audited: #256 group 4.",
@@ -153,6 +154,40 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
         "its cost and constraint terms, JSON marshalling, plot and file callbacks), which "
         "`TrajOptMotionPlanner::createProblem` builds from the profiles; Python configures the "
         "profiles.",
+    },
+    # C25 = not API: the Descartes building blocks stay internal to the default profiles.
+    "descartes_light/": {
+        "bgl/*": "Boost-Graph solver alternatives; tesseract builds only the ladder-graph solver "
+        "(`DescartesLadderGraphSolverProfile::create`).",
+        "solvers/*": "Ladder-graph solver internals, built by `DescartesLadderGraphSolverProfileD` "
+        "inside `DescartesMotionPlannerD.solve`.",
+        "core/solver.h": "The `Solver`/`BuildStatus`/`SearchResult` interface "
+        "`DescartesMotionPlanner::solve` builds and searches; Python configures it through "
+        "`DescartesLadderGraphSolverProfileD.num_threads`.",
+        "edge_evaluators/*": "Concrete descartes_light edge evaluators; Python implements the "
+        "bound `DescartesEdgeEvaluatorD` interface or delegates to "
+        "`DescartesDefaultMoveProfileD.createEdgeEvaluator`.",
+        "state_evaluators/*": "Concrete descartes_light state evaluators; Python implements the "
+        "bound `DescartesStateEvaluatorD` interface or delegates to "
+        "`DescartesDefaultMoveProfileD.createStateEvaluator`.",
+        "samplers/*": "Concrete descartes_light waypoint samplers; Python implements the bound "
+        "`DescartesWaypointSamplerD` interface or delegates to "
+        "`DescartesDefaultMoveProfileD.createWaypointSampler`.",
+    },
+    "tesseract/motion_planners/descartes/": {
+        "descartes_collision.h": "Collision building block behind `DescartesDefaultMoveProfile`'s "
+        "`create*` hooks; Python reaches it through `DescartesDefaultMoveProfileD`.",
+        "descartes_collision_edge_evaluator.h": "Edge evaluator behind "
+        "`DescartesDefaultMoveProfile::createEdgeEvaluator`; Python reaches it through "
+        "`DescartesDefaultMoveProfileD`.",
+        "descartes_robot_sampler.h": "Waypoint sampler behind "
+        "`DescartesDefaultMoveProfile::createWaypointSampler` and its protected "
+        "`createPoseSampler` hook; Python reaches it through `DescartesDefaultMoveProfileD`.",
+        "descartes_vertex_evaluator.h": "Vertex evaluator behind `DescartesDefaultMoveProfile`'s "
+        "protected `createVertexEvaluator` hook; Python reaches it through "
+        "`DescartesDefaultMoveProfileD`.",
+        "yaml_extensions.h": "Does not compile upstream: it names the removed "
+        "`tesseract_planning` namespace (yaml_extensions.h:42).",
     },
 }
 # Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
@@ -362,6 +397,17 @@ def is_unaudited(spelling: str, prefixes: tuple[str, ...]) -> bool:
     below = spelling if prefix is None else spelling.removeprefix(prefix)
     patterns = {**UNAUDITED_HEADERS[ANY_PREFIX], **UNAUDITED_HEADERS.get(prefix or "", {})}
     return is_third_party(below) or any(fnmatch.fnmatchcase(below, p) for p in patterns)
+
+
+def header_is_unaudited(spelling: str, prefixes: Mapping[str, tuple[str, ...]]) -> bool:
+    """Whether a module in `prefixes` (module -> owned prefixes, as `owner_prefixes` returns)
+    owns `spelling` and one of that module's not-API patterns matches it (R13's not-API half).
+
+    Raises:
+        UnknownPrefixError: see `check_unaudited_keys`.
+    """
+    hit = owning_prefix(spelling, prefixes)
+    return hit is not None and is_unaudited(spelling, (hit[1],))
 
 
 check_prefixes()

@@ -63,7 +63,9 @@ ACCEPTED = {
     "template-instance-name": "Python cannot spell a C++ template argument, so each instance of "
     "a function template gets its own function named after the type (`createMeshFromPath<ConvexMesh>` "
     "→ `createConvexMeshFromPath`, `Serialization::toArchiveStringXML<Environment>` → "
-    "`environment_to_xml`).",
+    "`environment_to_xml`); for a library's generic class name, the library prefix plus the "
+    "instance suffix (`descartes_light::State<double>` → `DescartesStateD`), because the generic "
+    "name collides with other bound classes (`ompl_base.State`).",
     "copied-vector-field-mutator": "A `std::vector` field converts to a fresh Python list on each "
     "access, so `obj.field.append(x)` edits a copy; `add…`/`clear…` methods mutate the C++ vector.",
     "boost-graph-property-tag": "Boost Graph property tags (`vertex_link_t`, …) select the "
@@ -72,7 +74,8 @@ ACCEPTED = {
     "Python type once for every module; its members are compared against that module's stub.",
     "yaml-node": "An overload taking a `YAML::Node` has no Python form (no Python type converts "
     "to one). It is accepted when a bound sibling overload of the same symbol takes a config file "
-    "path or YAML text in that position and loads the same config.",
+    "path or YAML text in that position and loads the same config, or the class binds a static "
+    "`from_yaml(text: str)` that parses the text and calls this constructor.",
     "derived-element-container": "An overload taking a container of a derived class only upcasts "
     "into its base-element sibling (`CompoundMesh(vector<ConvexMesh>)` → "
     "`CompoundMesh(vector<PolygonMesh>)`, compound_mesh.cpp:59-63); Python passes a list of any "
@@ -124,10 +127,28 @@ ACCEPTED = {
     "the `k` (`kLowerBound` → `LOWER_BOUND`, `kQPSolveFailed` → `QP_SOLVE_FAILED`), the Python "
     "enum convention every tesseract enum follows; an enumerator bound under any other name stays "
     "a gap and a deviation.",
-    UNBOUND_DEPENDENCY: "A parameter, return or field typed by a third-party library that no "
-    "module binds (`OsqpEigen::Settings`, `OsqpEigen::Solver`) has no Python form; the owning "
-    "object exposes what Python needs instead, such as `OSQPEigenSolver`'s `set…` forwarders "
-    "into its OSQP settings (`setPolish`, `setWarmStart(bool)`, `setMaxIteration`, …).",
+    UNBOUND_DEPENDENCY: "A parameter, return or field typed by a library no module binds "
+    "(`OsqpEigen::Settings`, `ompl::base::SpaceInformationPtr`), or by a type declared only in a "
+    "header this report lists as not API (`trajopt::TermInfo`, `sco::ModelConfig`), has no "
+    "Python form; the owning object exposes what Python needs instead: bound fields, or `set…` "
+    "forwarders such as `OSQPEigenSolver`'s into its OSQP settings (`setPolish`, "
+    "`setWarmStart(bool)`, `setMaxIteration`, …).",
+    # Group 3 (motion planners).
+    "type-erased-data": "`PlannerRequest.data` and `PlannerResponse.data` are "
+    "`std::shared_ptr<void>`: a planner's internal problem, type-erased; Python has no type to "
+    "convert `void` to or from.",
+    "third-party-global": "A module function wraps a process-global of a linked third-party "
+    "library (`RNG_setSeed`/`RNG_getSeed` call `ompl::RNG::setSeed`/`getSeed`); no owned header "
+    "declares it, and Python needs it for reproducible planning (#103, #109).",
+    "solver-behind-profile": "The classic-TrajOpt optimizer (`sco::Optimizer`, "
+    "`BasicTrustRegionSQP`, `BasicTrustRegionSQPMultiThreaded`, `OptResults`, "
+    "`BasicTrustRegionSQPResults`, `OptStatus`, `toString(OptStatus)`) shares "
+    "`trajopt_sco/optimizers.hpp` with the bound `BasicTrustRegionSQPParameters`; "
+    "`TrajOptMotionPlanner.solve` runs it, and Python sets its parameters through "
+    "`TrajOptSolverProfile.opt_params`.",
+    "eigen-value-wrapper": "`descartes_light::State` wraps one Eigen vector, `values`; its "
+    "indexing, call, arithmetic, comma-initializer and conversion operators forward to it, and "
+    "Python does the same on the bound `values` array.",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -158,7 +179,54 @@ ACCEPTED_SYMBOLS = {
         ("tesseract_scene_graph", tag): "boost-graph-property-tag"
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
+    # Group 3 (motion planners). R2: type-erased planner payloads.
+    ("tesseract_motion_planners", "PlannerRequest.data"): "type-erased-data",
+    ("tesseract_motion_planners", "PlannerResponse.data"): "type-erased-data",
+    # R14 (C13 = keep): OMPL's process-global RNG.
+    ("tesseract_motion_planners_ompl", "RNG_setSeed"): "third-party-global",
+    ("tesseract_motion_planners_ompl", "RNG_getSeed"): "third-party-global",
+    # R21: the classic-TrajOpt optimizer in optimizers.hpp, next to the bound parameters.
+    **{
+        ("tesseract_motion_planners_trajopt", name): "solver-behind-profile"
+        for name in (
+            "Optimizer",
+            "BasicTrustRegionSQP",
+            "BasicTrustRegionSQPMultiThreaded",
+            "OptResults",
+            "BasicTrustRegionSQPResults",
+            "OptStatus",
+            "toString",
+        )
+    },
+    # R13, where the type walk stops at an audited aggregate whose payload is not API:
+    # `TrajOptTermInfos`/`TrajOptWaypointInfo` hold `vector<shared_ptr<trajopt::TermInfo>>`.
+    **{
+        ("tesseract_motion_planners_trajopt", name): UNBOUND_DEPENDENCY
+        for name in (
+            "TrajOptMoveProfile.create",
+            "TrajOptDefaultMoveProfile.create",
+            "TrajOptCompositeProfile.create",
+            "TrajOptDefaultCompositeProfile.create",
+            # C3 = 8a: the hook results themselves; their payload is `trajopt::TermInfo`.
+            "TrajOptTermInfos",
+            "TrajOptWaypointInfo",
+        )
+    },
+    # Task 10: descartes_light's generic class names, bound with the library prefix.
+    **{
+        ("tesseract_motion_planners_descartes", name): "template-instance-name"
+        for name in (
+            "DescartesStateD",
+            "DescartesStateSampleD",
+            "DescartesEdgeEvaluatorD",
+            "DescartesWaypointSamplerD",
+            "DescartesStateEvaluatorD",
+        )
+    },
 }
+# Classes that wrap one bound Eigen vector field; their operators forward to it (R32):
+# (module, C++ class).
+EIGEN_VALUE_WRAPPERS = frozenset({("tesseract_motion_planners_descartes", "State")})
 # A C++ member template bound once per instance, under a name Python can spell
 # (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
 # name) -> the Python dotted names of its instances. The C++ row is accepted only when every
