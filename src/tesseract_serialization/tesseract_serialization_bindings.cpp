@@ -7,6 +7,7 @@
  */
 
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <tesseract/common/serialization.h>
@@ -223,15 +224,15 @@ NB_MODULE(_tesseract_serialization, m)
         "Deserialize TaskComposerLog from XML string.");
 
     m.def("task_composer_log_to_file",
-        [](const TaskComposerLog& log, const std::string& path) {
-            return Serialization::toArchiveFileXML(log, path);
+        [](const TaskComposerLog& log, const std::filesystem::path& path) {
+            return Serialization::toArchiveFileXML(log, path.string());
         },
         nb::arg("log"), nb::arg("path"),
         "Save TaskComposerLog to XML file.");
 
     m.def("task_composer_log_from_file",
-        [](const std::string& path) {
-            return Serialization::fromArchiveFileXML<TaskComposerLog>(path);
+        [](const std::filesystem::path& path) {
+            return Serialization::fromArchiveFileXML<TaskComposerLog>(path.string());
         },
         nb::arg("path"),
         "Load TaskComposerLog from XML file.");
