@@ -1227,8 +1227,9 @@ _SUPER_CREATE = textwrap.dedent(
 
 
 # The nodes a composite create receives belong to the planner's NodesVariables, which C++ owns and
-# frees after the solve: getParent must refuse, not return a reference that dangles.
-_KEPT_NODE_PARENT = textwrap.dedent(
+# frees after the solve. A node or var a Python create keeps must refuse to reach that set, not
+# read freed memory. Shared by the two children below: plans once, keeping nodes[0] and its var.
+_KEEP_FROM_CREATE = textwrap.dedent(
     """
     from pathlib import Path
 
@@ -1313,6 +1314,11 @@ _KEPT_NODE_PARENT = textwrap.dedent(
     gc.collect()
     # reuse the freed memory, so a dangling read shows as garbage or a crash
     junk = [bytearray(1 << 16) for _ in range(2000)]
+    """
+)
+
+_KEPT_NODE_PARENT = textwrap.dedent(
+    """
     for label, call in (
         ("node.getParent()", lambda: kept["node"].getParent()),
         ("var.getParent().getParent()", lambda: kept["var"].getParent().getParent()),
@@ -1324,6 +1330,24 @@ _KEPT_NODE_PARENT = textwrap.dedent(
         else:
             raise AssertionError(label + " did not raise after the solve")
     assert kept["var"].getParent().getName() == kept["node"].getName()
+    print("OK")
+    """
+)
+
+# A collision constraint built on a kept var after the solve: its update() reads the variable set.
+_KEPT_VAR_CONSTRAINT_UPDATE = textwrap.dedent(
+    """
+    manip = env.getJointGroup("manipulator")
+    evaluator = ti.SingleTimestepCollisionEvaluator(
+        manip, env, ti.TrajOptCollisionConfig(0.025, 20.0)
+    )
+    constraint = ti.DiscreteCollisionConstraint(evaluator, kept["var"])
+    try:
+        constraint.update()
+    except ti.NodeParentUnavailableError:
+        pass
+    else:
+        raise AssertionError("a constraint on a kept var read the freed variable set")
     print("OK")
     """
 )
@@ -1455,7 +1479,10 @@ class TestTrajOptIfoptPythonProfiles:
 
     def test_kept_node_parent_raises_after_solve(self):
         # MallocScribble (macOS) fills freed memory, so a read through a dangling parent shows
-        _run_child(_KEPT_NODE_PARENT, env={"MallocScribble": "1"})
+        _run_child(_KEEP_FROM_CREATE + _KEPT_NODE_PARENT, env={"MallocScribble": "1"})
+
+    def test_kept_var_constraint_update_raises_after_solve(self):
+        _run_child(_KEEP_FROM_CREATE + _KEPT_VAR_CONSTRAINT_UPDATE, env={"MallocScribble": "1"})
 
 
 class TestTrajOptIfoptConcreteProfileOverrides:
