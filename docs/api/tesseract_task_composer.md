@@ -84,7 +84,8 @@ factory.saveConfig(Path("task_composer_plugins.yaml"))
 ```
 
 A path passed as `str` is parsed as YAML text and raises `TaskComposerConfigError` (a
-`ValueError`) naming the text.
+`ValueError`) naming the text; so does YAML text without a top-level `task_composer_plugins`
+mapping (empty, `~`, a list, an unrelated mapping), which upstream loads as an empty config.
 
 `createTaskComposerNode` and `createTaskComposerExecutor` raise `TaskComposerPluginError` (a
 `RuntimeError`) when the name is not configured, listing the configured names, or when its plugin
@@ -173,10 +174,10 @@ status = future.waitFor(5.0)  # FutureStatus.ready / .timeout
 context = future.context
 ```
 
-The run uses the node, the data and the executor after `run` returns. The future (and each
-`copy()` of it) keeps them alive, and dropping a future waits for the run to end, as a C++
-`std::async` future does: `del future` mid-run blocks, with the GIL released, until the run
-finishes. Dropping the node or the executor mid-run is safe.
+The run uses the node, the data and the executor after `run` returns. The bindings hold them
+until the run ends, independent of the future: dropping the future, the node or the executor
+mid-run is safe and never blocks, and a finished run's node and executor are released at the
+next `run`. At interpreter exit, runs still in flight are waited for (an `atexit` hook).
 
 ### Node infos
 
@@ -199,8 +200,11 @@ infos.prune(lambda i: setattr(i, "data_storage", TaskComposerDataStorage()))
 ```
 
 `find` and `prune` call back on a snapshot taken before the first call, outside the
-container's lock, so a callback may call into the container. An info kept from a `prune`
-callback is an independent copy: edits made to it after `prune` returns are not stored.
+container's lock, so a callback may call into the container. `prune` stores the copies its
+callback changed, each only if the stored info is still the one the callback was given; when one
+was changed or removed meanwhile, the other edits are stored and `TaskComposerPruneConflictError`
+(a `RuntimeError`) names the conflicting uuids. An info kept from a `prune` callback is an
+independent copy: edits made to it after `prune` returns are not stored.
 
 ### Graphs and pipelines
 
