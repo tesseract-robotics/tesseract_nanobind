@@ -63,6 +63,16 @@
   | `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
   | `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
 
+- **Planner-module compatibility names removed: `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the 0.28 `…PlanProfile` names, trajopt's 0.28 re-exports and the packages' `__all__`** — `ProfileDictionary.addProfile(ns, name, profile)` takes a profile from every planner module, including a Python subclass of a trampolined profile, so the 15 helper functions are gone ([#334]). The eight `…PlanProfile` aliases of the 0.33 `…MoveProfile` classes are gone, and so are `TrajOptCollisionConfig` / `CollisionEvaluatorType` in `tesseract_motion_planners_trajopt`. `tesseract_motion_planners_trajopt_ifopt` keeps its config re-exports (`TrajOptCollisionConfig`, `CollisionEvaluatorType`, `SQPParameters`). The six `tesseract_motion_planners*` packages lose their `__all__`; `import *` now exports every public name, e.g. `OMPLRealVectorMoveProfile` and `RNG_setSeed` from the OMPL package, which its old list left out ([#335]).
+
+  | before | after |
+  | --- | --- |
+  | `ProfileDictionary_addTrajOptMoveProfile(pd, ns, name, p)` (all 10 `ProfileDictionary_add…`) | `pd.addProfile(ns, name, p)` |
+  | `OMPLMoveProfile_as_ProfileConstPtr(p)`, `cast_DescartesMoveProfileD(p)` (all 5 casts) | `p` |
+  | `TrajOptDefaultPlanProfile` (all 8 `…PlanProfile` names) | `TrajOptDefaultMoveProfile` |
+  | `from …tesseract_motion_planners_trajopt import TrajOptCollisionConfig` | `from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig` |
+  | `from …tesseract_motion_planners_trajopt import CollisionEvaluatorType` | `from tesseract_robotics.tesseract_collision import CollisionEvaluatorType` |
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -737,3 +747,5 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328
 [#329]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/329
 [#330]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/330
+[#334]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/334
+[#335]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/335

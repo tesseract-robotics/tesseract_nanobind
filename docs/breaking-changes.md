@@ -28,6 +28,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
 | Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
 | Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
+| Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `tesseract_motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -330,6 +331,50 @@ raises nothing, so search for the strings as well as the attributes.
 | `SQPStatus.CALLBACK_STOPPED` | `SQPStatus.STOPPED_BY_CALLBACK` |
 | `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
 | `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
+
+### Planner-module compatibility names removed
+
+The four planner modules kept names from older APIs that C++ does not have (#334, #335).
+They are gone with no deprecation cycle, as in #176 and #214. Importing one raises
+`ImportError`.
+
+**Profile helpers (#334).** Each one either put a profile in a `ProfileDictionary` or upcast it
+to `Profile` so it could go in. `ProfileDictionary.addProfile` takes every planner's profiles
+directly, including a Python subclass of `DescartesMoveProfileD`:
+
+| before | after |
+| --- | --- |
+| `ProfileDictionary_addOMPLProfile(pd, ns, name, p)`, `ProfileDictionary_addOMPLMoveProfile(…)` | `pd.addProfile(ns, name, p)` |
+| `ProfileDictionary_addTrajOpt{Move,Plan,Composite,Solver}Profile(pd, ns, name, p)` | `pd.addProfile(ns, name, p)` |
+| `ProfileDictionary_addTrajOptIfopt{Move,Plan,Composite,Solver}Profile(pd, ns, name, p)` | `pd.addProfile(ns, name, p)` |
+| `OMPLMoveProfile_as_ProfileConstPtr(p)`, `OMPLPlanProfile_as_ProfileConstPtr(p)` | `p` |
+| `cast_DescartesMoveProfileD(p)`, `cast_DescartesPlanProfileD(p)`, `cast_DescartesSolverProfileD(p)` | `p` |
+
+**0.28 profile names (#335).** Tesseract 0.33 renamed the planner move profiles; the old names
+were kept as aliases:
+
+| before | after |
+| --- | --- |
+| `OMPLPlanProfile` | `OMPLMoveProfile` |
+| `OMPLRealVectorPlanProfile` | `OMPLRealVectorMoveProfile` |
+| `TrajOptPlanProfile` | `TrajOptMoveProfile` |
+| `TrajOptDefaultPlanProfile` | `TrajOptDefaultMoveProfile` |
+| `TrajOptIfoptPlanProfile` | `TrajOptIfoptMoveProfile` |
+| `TrajOptIfoptDefaultPlanProfile` | `TrajOptIfoptDefaultMoveProfile` |
+| `DescartesPlanProfileD` | `DescartesMoveProfileD` |
+| `DescartesDefaultPlanProfileD` | `DescartesDefaultMoveProfileD` |
+
+**trajopt's 0.28 re-exports (#335).** `tesseract_motion_planners_trajopt` no longer re-exports
+`TrajOptCollisionConfig` or `CollisionEvaluatorType`. Import them from their own modules,
+`tesseract_robotics.trajopt_ifopt` and `tesseract_robotics.tesseract_collision`.
+`tesseract_motion_planners_trajopt_ifopt` keeps its re-exports (`TrajOptCollisionConfig`,
+`CollisionEvaluatorType`, `SQPParameters`), so its profile fields are still configured from one
+import.
+
+**`__all__` (#335).** The six `tesseract_motion_planners*` packages lose their hand-kept `__all__`.
+`from … import *` now exports every public name of the extension. The OMPL list had named only
+the legacy aliases, so a star import gave `OMPLRealVectorPlanProfile` but not
+`OMPLRealVectorMoveProfile`.
 
 ## 0.35.0.9
 
