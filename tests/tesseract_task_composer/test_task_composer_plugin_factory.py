@@ -213,6 +213,27 @@ class TestServer:
         server.loadConfig(config_path.read_text(), GeneralResourceLocator())
         assert PIPELINE in server.getAvailableTasks()
 
+    @pytest.mark.parametrize("by", ["task_name", "node"])
+    def test_run_on_unknown_executor_raises(self, server, factory, make_storage, by):
+        """Upstream's error, unchanged: the bindings resolve the executor before running."""
+        node = factory.createTaskComposerNode(PIPELINE)
+        target = PIPELINE if by == "task_name" else node
+        with pytest.raises(
+            RuntimeError, match="^Executor with name 'NoSuchExecutor' does not exist!$"
+        ):
+            server.run(target, make_storage(node), False, "NoSuchExecutor")
+
+    def test_run_unknown_task_raises(self, server, factory, make_storage):
+        node = factory.createTaskComposerNode(PIPELINE)
+        with pytest.raises(RuntimeError, match="^Task with name 'NoSuchTask' does not exist!$"):
+            server.run("NoSuchTask", make_storage(node), False, EXECUTOR)
+
+    def test_run_unknown_task_and_executor_names_the_executor(self, server, factory, make_storage):
+        """Upstream checks the executor first."""
+        node = factory.createTaskComposerNode(PIPELINE)
+        with pytest.raises(RuntimeError, match="Executor with name 'NoSuchExecutor'"):
+            server.run("NoSuchTask", make_storage(node), False, "NoSuchExecutor")
+
     def test_run_by_name_matches_planning_task_composer(self, server, make_storage, config_path):
         storage = make_storage(server.getTask(PIPELINE))
         future = server.run(PIPELINE, storage, False, EXECUTOR)

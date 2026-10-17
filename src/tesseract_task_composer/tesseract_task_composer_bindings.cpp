@@ -902,16 +902,23 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getAvailableTasks", &Server::getAvailableTasks)
         .def("run", [](Server& self, const std::string& task_name, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
-            // The server owns the task it runs by name.
-            return run_held(nb::none(), python_object(self),
-                            [&] { return self.run(task_name, std::move(data_storage), dotgraph, executor_name); },
-                            self.getExecutor(executor_name));
+            // Upstream's run(task_name, ...), on an executor resolved once: the executor held is the
+            // one running, even if addExecutor replaces it meanwhile. getExecutor and getTask throw
+            // upstream's errors, the executor's first. The server owns the task.
+            auto executor = self.getExecutor(executor_name);
+            const tp::TaskComposerNode& task = self.getTask(task_name);
+            data_storage->setName(task_name);
+            auto context = std::make_shared<tp::TaskComposerContext>(task_name, std::move(data_storage), dotgraph);
+            return run_held(nb::none(), python_object(self), [&] { return executor->run(task, context); }, executor);
         }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("run", [](Server& self, const tp::TaskComposerNode& node, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
-            return run_held(python_object(node), python_object(self),
-                            [&] { return self.run(node, std::move(data_storage), dotgraph, executor_name); },
-                            self.getExecutor(executor_name));
+            // Upstream's run(node, ...), on an executor resolved once (see above).
+            auto executor = self.getExecutor(executor_name);
+            data_storage->setName(node.getName());
+            auto context = std::make_shared<tp::TaskComposerContext>(node.getName(), std::move(data_storage), dotgraph);
+            return run_held(python_object(node), python_object(self), [&] { return executor->run(node, context); },
+                            executor);
         }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("getWorkerCount", &Server::getWorkerCount, "name"_a)
         .def("getTaskCount", &Server::getTaskCount, "name"_a);
