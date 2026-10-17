@@ -173,7 +173,9 @@ TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {
 TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
 # symbol Python binds, where the other overloads stay checked (T4).
-ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {}
+ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
+    ("tesseract_command_language", "ProfileDictionary.getProfile", "2-3"): "profile-key-template",
+}
 # A Python-only overload accepted: (module, dotted name, `PyOverload.params`) -> ACCEPTED rule.
 # Two overloads of one arity differ by their annotations (G2: `setWarmStart(bool)`).
 ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {}
