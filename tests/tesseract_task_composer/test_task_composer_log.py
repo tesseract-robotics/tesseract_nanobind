@@ -127,14 +127,39 @@ class TestSerialization:
 
     def test_file_round_trip(self, run_log, tmp_path):
         path = tmp_path / "run.tclx"
-        assert task_composer_log_to_file(run_log, path) is True
+        assert task_composer_log_to_file(run_log, path) is None
         _assert_same_log(task_composer_log_from_file(path), run_log)
 
     def test_file_takes_str_path(self, run_log, tmp_path):
         path = tmp_path / "run.bin"
-        assert task_composer_log_to_file(run_log, str(path)) is True
+        task_composer_log_to_file(run_log, str(path))
         assert path.read_text().lstrip().startswith("<?xml")  # XML whatever the suffix
         _assert_same_log(task_composer_log_from_file(str(path)), run_log)
+
+    def test_file_without_suffix_is_written_as_named(self, run_log, tmp_path):
+        """Upstream appends `.tclx` to a path without a suffix; this writes the path given."""
+        path = tmp_path / "run"
+        task_composer_log_to_file(run_log, path)
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["run"]
+        _assert_same_log(task_composer_log_from_file(path), run_log)
+
+    def test_to_file_in_missing_directory_raises(self, run_log, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            task_composer_log_to_file(run_log, tmp_path / "missing" / "run.xml")
+
+    def test_to_file_in_read_only_directory_raises(self, run_log, tmp_path):
+        read_only = tmp_path / "ro"
+        read_only.mkdir()
+        read_only.chmod(0o500)
+        try:
+            with pytest.raises(PermissionError):
+                task_composer_log_to_file(run_log, read_only / "run.xml")
+        finally:
+            read_only.chmod(0o700)
+
+    def test_from_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            task_composer_log_from_file(tmp_path / "missing.xml")
 
     def test_unregistered_profile_type_raises(self, factory, make_storage):
         """Planner profiles are not registered with this module's cereal registry."""
