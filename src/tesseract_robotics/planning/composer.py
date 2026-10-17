@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     ProfileDictionary,
+    moveFilter,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -649,13 +650,10 @@ class TaskComposer:
         return self.plan(robot, program, pipeline="DescartesDPipeline", profiles=profiles)
 
     def _extract_trajectory(self, composite: CompositeInstruction) -> list[TrajectoryPoint]:
-        """Extract trajectory points from CompositeInstruction."""
+        """Extract trajectory points from CompositeInstruction, child composites included."""
         trajectory = []
 
-        for instr in composite:
-            if not instr.isMoveInstruction():
-                continue
-
+        for instr in composite.flatten(moveFilter):
             move_instr = instr.asMoveInstruction()
             wp = move_instr.getWaypoint()
 

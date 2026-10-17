@@ -2,52 +2,26 @@ import json
 
 import numpy as np
 
+from tesseract_robotics.tesseract_command_language import toJointTrajectory
 from tesseract_robotics.tesseract_common import Quaterniond
 
 
 def tesseract_trajectory_to_list(tesseract_trajectory):
-    """Convert a CompositeInstruction trajectory to a list of joint positions.
+    """Convert a CompositeInstruction trajectory to joint names and rows of positions + time.
 
-    Supports both StateWaypointPoly and JointWaypointPoly waypoints.
-    Handles mixed trajectories where some waypoints may be different types.
+    Uses `toJointTrajectory`, so child composites (raster segments) are included and the time
+    accumulates across them. State waypoints keep their time; joint waypoints (and seeded
+    Cartesian waypoints) count one second each.
+
+    Raises:
+        ValueError: the program holds no joint, state or seeded Cartesian waypoint.
     """
-    # Get joint names from first waypoint that has them
-    joint_names = None
-    for i in range(len(tesseract_trajectory)):
-        instr = tesseract_trajectory[i]
-        instr_m = instr.asMoveInstruction()
-        wp = instr_m.getWaypoint()
-
-        if wp.isStateWaypoint():
-            state_wp = wp.asStateWaypoint()
-            joint_names = list(state_wp.getNames())
-            break
-        elif wp.isJointWaypoint():
-            joint_wp = wp.asJointWaypoint()
-            joint_names = list(joint_wp.getNames())
-            break
-
-    if joint_names is None:
-        raise ValueError("No StateWaypoint or JointWaypoint found in trajectory")
-
-    trajectory2 = []
-    for i in range(len(tesseract_trajectory)):
-        instr = tesseract_trajectory[i]
-        instr_m = instr.asMoveInstruction()
-        wp = instr_m.getWaypoint()
-
-        # Handle each waypoint based on its type
-        if wp.isStateWaypoint():
-            state_wp = wp.asStateWaypoint()
-            trajectory2.append(state_wp.getPosition().flatten().tolist() + [state_wp.getTime()])
-        elif wp.isJointWaypoint():
-            joint_wp = wp.asJointWaypoint()
-            # JointWaypoint doesn't have time, use index as pseudo-time
-            trajectory2.append(joint_wp.getPosition().flatten().tolist() + [float(i)])
-        else:
-            raise ValueError(f"Waypoint {i} must be StateWaypoint or JointWaypoint")
-
-    return joint_names, trajectory2
+    states = toJointTrajectory(tesseract_trajectory).states
+    if not states:
+        raise ValueError("tesseract_trajectory holds no joint states to animate")
+    joint_names = list(states[0].joint_names)
+    rows = [state.position.flatten().tolist() + [state.time] for state in states]
+    return joint_names, rows
 
 
 def trajectory_list_to_json(joint_names, trajectory_list, use_time=True, loop_time=20):

@@ -73,6 +73,8 @@
   | `from …tesseract_motion_planners_trajopt import TrajOptCollisionConfig` | `from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig` |
   | `from …tesseract_motion_planners_trajopt import CollisionEvaluatorType` | `from tesseract_robotics.tesseract_collision import CollisionEvaluatorType` |
 
+- **The viewer times a trajectory with `toJointTrajectory`** — `viewer.util.tesseract_trajectory_to_list` calls `toJointTrajectory` instead of walking the program's top level: a nested program no longer raises, time accumulates across child composites, and joint waypoints count one second each from 1 (was the index from 0). A program with no joint states raises `ValueError` ([#274]).
+
 ### Changes
 
 - **Docs build with Zensical** — the site builds with `zensical build --strict` instead of MkDocs + Material for MkDocs (maintenance ends 5 November 2026; MkDocs 2.0 drops plugins). `mkdocs.yml` is read unchanged and renders the same 54 pages; strict mode now also fails on broken anchors. Zensical and `mkdocstrings>=1` need Python ≥3.11, so the docs tooling moves out of the default pixi feature into a `docs` env (Python 3.12, no C++ stack): `pixi run docs` / `pixi run docs-build` run there ([#252]).
@@ -121,6 +123,7 @@
 - **Task composer: the rest of the C++ API** — `TaskComposerKeys` list ports, `remove`, `rename`, `__str__` ([#313]); `TaskComposerDataStorage(name)`, `getData()`, `remapData`, `copyAsInputData` / `copyAsOutputData` ([#314]); `TaskComposerFuture.clear` / `copy` ([#315]); uuid-addressed node, info and container members as canonical uuid strings, and native `getDotgraph` / `saveDotgraph(results_map)` ([#316]); `TaskComposerContext` constructors and `abort`, and a `name` for the `run(node, data_storage)` shortcut ([#317]); `TaskComposerNodeType`, `TaskComposerNodePorts` and the node's setters, type, ports, `validatePorts`, `getDataStorage` and synchronous `run` ([#318]); every `TaskComposerNodeInfo` field, read-write, `start_time` as `datetime` ([#319]); `TaskComposerNodeInfoContainer.find`, `prune`, `addInfo`, `insertInfoMap`, `mergeInfoMap`, `clear` ([#320]); `TaskComposerPluginFactory` search paths and libraries, plugin add/remove/default, creation from a `PluginInfo`, `getConfig` / `saveConfig`, executor plugin listing ([#321]); `TaskComposerServer` ([#323]); `TaskComposerTask`, `TaskComposerGraph` (with `addNode`) and `TaskComposerPipeline`, so factory pipelines expose their children ([#324]); `TaskComposerLog`, and `tesseract_serialization.task_composer_log_{to,from}_{xml,file,binary}` to save a run for replay ([#325]).
 - **`AnyPoly.getTypeName` is demangled** — `tesseract::command_language::CompositeInstruction` on every platform, not the compiler's mangled name ([#322]); the `AnyPoly_*` signatures name the Python types ([#312]).
 - **`from_yaml` examples for every planner** — `docs/user-guide/planning.md` gains "Profiles from YAML": one checked example each for the simple, OMPL, TrajOpt, TrajOpt-Ifopt and task-composer planning profiles, with the merge-versus-replace rule for nested configs ([#331]).
+- **`PlanningResult.trajectory` includes child composites** — `TaskComposer` builds it from `composite.flatten(moveFilter)`, so a raster program's segments are no longer skipped; flat programs give the same points, with each state waypoint's own time ([#270]).
 
 ### Fixed
 

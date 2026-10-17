@@ -64,9 +64,12 @@ across the boundary, so the bindings call it directly.
 
 The SWIG-era helpers `InstructionPoly_as_*` and `WaypointPoly_as_*` are removed (#328).
 
-## CompositeInstruction.flatten() - Not Needed
+## CompositeInstruction.flatten()
 
-The SWIG bindings had a `flatten()` method on `CompositeInstruction`. In nanobind, you can iterate directly over `CompositeInstruction` using `__getitem__` and `len()`.
+`CompositeInstruction.flatten(filter=None)` is bound (#270). Iterating a `CompositeInstruction`
+reads its top level only; `flatten` descends into child composites, which a raster program has.
+`flatten(moveFilter)` keeps the moves, and `toJointTrajectory(program)` turns them into joint
+states (#274). Each element is a reference into the program.
 
 ## Cross-Module Type Resolution
 

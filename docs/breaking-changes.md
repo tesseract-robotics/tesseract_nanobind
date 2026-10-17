@@ -29,6 +29,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
 | Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
 | Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `tesseract_motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
+| Unreleased | `viewer.util.tesseract_trajectory_to_list`: joint-waypoint times start at 1; time accumulates across child composites | [`toJointTrajectory` timing](#the-viewer-times-a-trajectory-with-tojointtrajectory) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -375,6 +376,17 @@ import.
 `from … import *` now exports every public name of the extension. The OMPL list had named only
 the legacy aliases, so a star import gave `OMPLRealVectorPlanProfile` but not
 `OMPLRealVectorMoveProfile`.
+
+### The viewer times a trajectory with `toJointTrajectory`
+
+`tesseract_trajectory_to_list`, which the viewer uses to animate a program, now calls
+`toJointTrajectory` (#274) instead of walking the top level of the program. A program with
+child composites, such as a raster, no longer raises. Two timings change:
+
+| before | after |
+| --- | --- |
+| joint waypoint `i` at time `i` (0, 1, 2, …) | one second each, from 1 (1, 2, 3, …) |
+| each state waypoint at its own time, restarting in each segment | time accumulates across child composites |
 
 ## 0.35.0.9
 
