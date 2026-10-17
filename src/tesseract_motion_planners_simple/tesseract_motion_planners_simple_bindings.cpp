@@ -59,9 +59,9 @@ namespace {
 // Python error, or one of the named errors below) there before upstream's catch sees it, and solve
 // rethrows it once upstream returns and the GIL is held again. A solve not started from Python (a
 // task-composer worker) leaves the slot unarmed and keeps upstream's failed response; nothing is
-// stored on such a thread. The last error stored wins, and solve raises it only for a failed
-// response: a solve nested in an override through the MotionPlanner base is unarmed, stores into
-// the enclosing slot, and its failure may be one the override handled.
+// stored on such a thread. Each generate call disarms the slot while its override runs, so only
+// the planner's own generate calls store; the last error stored wins, and solve raises it only
+// for a failed response.
 struct PendingGenerateError {
     bool armed{ false };
     std::exception_ptr error;
@@ -89,6 +89,18 @@ public:
 private:
     bool saved_armed_;
     std::exception_ptr saved_error_;
+};
+
+// Clears the slot's armed flag for one generate call and restores it after.
+class DisarmedSlot {
+public:
+    DisarmedSlot() : saved_(std::exchange(pending_generate_error.armed, false)) {}
+    ~DisarmedSlot() { pending_generate_error.armed = saved_; }
+    DisarmedSlot(const DisarmedSlot&) = delete;
+    DisarmedSlot& operator=(const DisarmedSlot&) = delete;
+
+private:
+    bool saved_;
 };
 
 // generate returned an empty list: upstream reads its back() (simple_motion_planner.cpp:261, :270).
@@ -129,7 +141,11 @@ public:
                                                    const std::shared_ptr<const te::Environment>& env,
                                                    const tc::ManipulatorInfo& global_manip_info) const override {
         // Everything, the ticket included, inside the try: each failure is stored in the slot
-        // before upstream's catch turns it into message text.
+        // before upstream's catch turns it into message text. The slot is disarmed while the
+        // override runs, so a solve nested in it through the MotionPlanner base (whose failure the
+        // override may handle) stores nothing here; only this call's own error is kept.
+        const bool armed = pending_generate_error.armed;
+        DisarmedSlot disarmed;
         try {
             nb::detail::ticket t(nb_trampoline, "generate", false);
             if (!t.key.is_valid())
@@ -153,7 +169,7 @@ public:
                                                "index " + std::to_string(i));
             return instructions;
         } catch (const std::exception&) {
-            if (pending_generate_error.armed)
+            if (armed)
                 pending_generate_error.error = std::current_exception();
             throw;
         }
