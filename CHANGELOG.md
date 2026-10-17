@@ -104,6 +104,13 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
   | `from …tesseract_motion_planners_trajopt import TrajOptCollisionConfig` | `from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig` |
   | `from …tesseract_motion_planners_trajopt import CollisionEvaluatorType` | `from tesseract_robotics.tesseract_collision import CollisionEvaluatorType` |
 
+- **`create_time_optimal_parameterization` and `create_iterative_spline_parameterization` take no arguments** — `path_tolerance`, `min_angle_change` and `add_points` were accepted and silently ignored since 0.33 moved them into the composite profiles. Passing one now raises `TypeError`; set the field on the profile instead.
+
+  | before | after |
+  | --- | --- |
+  | `create_time_optimal_parameterization(path_tolerance=0.05, min_angle_change=0.01)` | `create_time_optimal_parameterization()`, and `TimeOptimalTrajectoryGenerationCompositeProfile().path_tolerance = 0.05` (`.min_angle_change`) |
+  | `create_iterative_spline_parameterization(add_points=False)` | `create_iterative_spline_parameterization()`, and `IterativeSplineParameterizationCompositeProfile().add_points = False` |
+
 ### Changes
 
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.

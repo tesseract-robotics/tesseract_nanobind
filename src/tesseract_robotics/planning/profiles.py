@@ -1024,23 +1024,16 @@ def create_descartes_pipeline_profiles(
 # =============================================================================
 
 
-def create_time_optimal_parameterization(
-    path_tolerance: float = 0.1,
-    min_angle_change: float = 0.001,
-) -> Any:
+def create_time_optimal_parameterization() -> Any:
     """Create Time-Optimal Trajectory Generation (TOTG) parameterization.
 
     TOTG finds the time-optimal trajectory that respects velocity, acceleration,
     and jerk limits. It uses a numerical integration approach to find the fastest
     trajectory along a given geometric path.
 
-    Args:
-        path_tolerance: Path deviation tolerance in radians (default: 0.1)
-            Controls how closely the time-parameterized trajectory follows
-            the original path. Smaller values = closer following but slower.
-        min_angle_change: Minimum angle change in radians (default: 0.001)
-            Used to detect linear segments vs curves. Smaller values = more
-            sensitive curve detection.
+    The path tolerance, minimum angle change and limits are fields of
+    `TimeOptimalTrajectoryGenerationCompositeProfile` (`path_tolerance`,
+    `min_angle_change`, ...), which `compute` looks up in the profile dictionary.
 
     Returns:
         TimeOptimalTrajectoryGeneration instance
@@ -1074,26 +1067,19 @@ def create_time_optimal_parameterization(
         TimeOptimalTrajectoryGeneration,
     )
 
-    # 0.33 API: path_tolerance and min_angle_change are now in profile
-    # Constructor only takes name
-    _ = path_tolerance, min_angle_change  # Acknowledge but ignore for now
     return TimeOptimalTrajectoryGeneration()
 
 
-def create_iterative_spline_parameterization(
-    add_points: bool = True,
-) -> Any:
+def create_iterative_spline_parameterization() -> Any:
     """Create Iterative Spline Parameterization (ISP).
 
     ISP iteratively fits a spline to the trajectory while respecting velocity,
     acceleration, and jerk limits. Generally faster than TOTG but may produce
     slower trajectories.
 
-    Args:
-        add_points: Whether to add intermediate points (default: True)
-            If True, adds waypoints between existing ones to better satisfy
-            constraints. If False, only uses existing waypoints (faster but
-            may violate limits).
+    Whether to add intermediate points, and the limits, are fields of
+    `IterativeSplineParameterizationCompositeProfile` (`add_points`, ...), which
+    `compute` looks up in the profile dictionary.
 
     Returns:
         IterativeSplineParameterization instance
@@ -1128,6 +1114,4 @@ def create_iterative_spline_parameterization(
         IterativeSplineParameterization,
     )
 
-    # 0.33 API: add_points is now in profile, constructor only takes name
-    _ = add_points  # Acknowledge but ignore for now
     return IterativeSplineParameterization()
