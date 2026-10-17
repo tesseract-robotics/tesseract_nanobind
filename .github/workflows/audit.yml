@@ -28,6 +28,10 @@ jobs:
       uses: prefix-dev/setup-pixi@v0.8.0
       with:
         pixi-version: v0.70.1
+        # Explicit, as in the wheel workflows: without it setup-pixi v0.8.0 auto-detects
+        # the manifest by parsing pyproject.toml with a TOML parser that predates dotted
+        # keys and fails on `wheel.py-api = ...` (tool.scikit-build).
+        manifest-path: pyproject.toml
         environments: audit
         cache: true
         # Same rule as the wheel workflows: a lock that drifts from pyproject.toml fails
