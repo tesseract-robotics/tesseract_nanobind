@@ -158,6 +158,30 @@ ACCEPTED_SYMBOLS = {
         ("tesseract_scene_graph", tag): "boost-graph-property-tag"
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
+    # #256 group 1.
+    **{
+        ("tesseract_command_language", name): "type-erasure-interface"
+        for name in (
+            "WaypointInterface",
+            "CartesianWaypointInterface",
+            "JointWaypointInterface",
+            "StateWaypointInterface",
+            "InstructionInterface",
+            "MoveInstructionInterface",
+            "WaypointPoly.getWaypoint",
+            "CartesianWaypointPoly.getCartesianWaypoint",
+            "JointWaypointPoly.getJointWaypoint",
+            "StateWaypointPoly.getStateWaypoint",
+            "InstructionPoly.getInstruction",
+            "MoveInstructionPoly.getMoveInstruction",
+        )
+    },
+    **{
+        ("tesseract_time_parameterization", cls): "algorithm-internal-namespace"
+        for cls in ("Path", "PathSegment", "PathData", "Trajectory")
+    },
+    ("tesseract_command_language", "MoveInstruction.setWaypoint"): "reference-setter",
+    ("tesseract_command_language", "MoveInstructionPoly.setWaypoint"): "reference-setter",
 }
 # A C++ member template bound once per instance, under a name Python can spell
 # (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
