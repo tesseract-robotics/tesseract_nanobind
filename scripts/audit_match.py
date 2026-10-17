@@ -439,9 +439,15 @@ def poly_ancestors(ancestors: Ancestors) -> Ancestors:
 
 
 def _is_yaml_text_factory(ps: PySymbol | None) -> bool:
-    """`ps` is a static `from_yaml` taking one `str`, YAML text: the Python form of its class's
-    `YAML::Node` constructor (C6 6a)."""
-    return ps is not None and any(p.static and p.params == ("str",) for p in ps.overloads)
+    """`ps` is a static `Owner.from_yaml` taking one `str`, YAML text, and returning `Owner`:
+    the Python form of its class's `YAML::Node` constructor (C6 6a)."""
+    if ps is None:
+        return False
+    owner = ps.name.rpartition(".")[0].rpartition(".")[2]
+    return any(
+        p.static and p.params == ("str",) and p.returns.strip("'\"").rpartition(".")[2] == owner
+        for p in ps.overloads
+    )
 
 
 def _stands_for_yaml_ctor(leaf: str, ps: PySymbol, ctor: CppSymbol | None) -> bool:
@@ -905,6 +911,13 @@ def audit_tu(
         def bound(m: str) -> Mapping[str, str]:
             return own if m == module else bound_index(m)
 
+    modules = (module, *binding_modules())
+
+    @functools.cache
+    def bound_anywhere(qualified: str) -> bool:
+        """Some binding module (or this TU) binds the class: it has a Python form (R13)."""
+        return any(qualified in bound(m).values() for m in modules)
+
     tu = parse_tu(cpp_path, extra_include_dirs)
     direct = audited_headers(tu, module, prefixes, include_dirs)
     other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
@@ -928,7 +941,7 @@ def audit_tu(
     included = frozenset(Path(i.include.name).resolve() for i in tu.get_includes())
     report = match(
         module,
-        cpp_api(tu, frozenset(audited) & included, prefixes),
+        cpp_api(tu, frozenset(audited) & included, prefixes, bound_anywhere),
         decl_names(tu),
         py_api(load_stub(stub_path), rel(stub_path)),
         rel(stub_path),
