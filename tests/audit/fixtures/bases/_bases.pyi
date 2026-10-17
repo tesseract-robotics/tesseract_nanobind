@@ -1,24 +1,24 @@
 # Audit contract fixture (#256 T5): stub base classes vs the bound C++ bases (runners.h).
 import bases_remote._bases_remote
 
-class Runner:
+class Jogger:
     def go(self) -> None: ...
 
-class SlowRunner:
+class SlowJogger:
     def __init__(self) -> None: ...
     def go(self) -> None: ...
 
-class DeepRunner(Runner):
+class DeepJogger(Jogger):
     def __init__(self) -> None: ...
 
-class Loner(Runner):
+class Loner(Jogger):
     def __init__(self) -> None: ...
 
 class Hidden:
     def __init__(self) -> None: ...
     def go(self) -> None: ...
 
-class Tagged(Runner):
+class Tagged(Jogger):
     def __init__(self) -> None: ...
 
 class PlannerD:
@@ -26,7 +26,7 @@ class PlannerD:
     @property
     def value(self) -> float: ...
 
-class RemoteRunner(bases_remote._bases_remote.Runner):
+class RemoteJogger(bases_remote._bases_remote.Jogger):
     def __init__(self) -> None: ...
 
 class SubPlanner(PlannerD):

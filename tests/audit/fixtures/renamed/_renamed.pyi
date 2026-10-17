@@ -1,3 +1,3 @@
-# Audit contract fixture (#256 T3): binds C++ LongWidgetName as Widget.
-class Widget:
+# Audit contract fixture (#256 T3): binds C++ LongWidgetName as Gizmo.
+class Gizmo:
     def size(self) -> int: ...

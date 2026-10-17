@@ -21,15 +21,15 @@ protected:
   bool equals(const Shape& other) const;  // not public: never inherited (A5)
 };
 
-struct Square final : Shape  // stub binds none of Shape's API: 4 inherited gaps (A1)
+struct Tile final : Shape  // stub binds none of Shape's API: 4 inherited gaps (A1)
 {
-  Square();
+  Tile();
 };
 
-struct Circle final : Shape  // own operator== hides Shape::operator== only (A2)
+struct Disc final : Shape  // own operator== hides Shape::operator== only (A2)
 {
-  Circle();
-  bool operator==(const Circle& rhs) const;
+  Disc();
+  bool operator==(const Disc& rhs) const;
 };
 
 struct Hexagon final : Shape  // stub binds all of it: covered, no rows (A3)
@@ -37,9 +37,9 @@ struct Hexagon final : Shape  // stub binds all of it: covered, no rows (A3)
   Hexagon();
 };
 
-struct Hidden : private Shape  // private base: nothing inherited (A4)
+struct Concealed : private Shape  // private base: nothing inherited (A4)
 {
-  Hidden();
+  Concealed();
 };
 
 struct Exposer : Shape  // a using-declaration hides nothing: unbound area stays a gap (A10)
@@ -47,31 +47,31 @@ struct Exposer : Shape  // a using-declaration hides nothing: unbound area stays
   using Shape::area;
 };
 
-struct Runner  // bound base
+struct Sprinter  // bound base
 {
-  virtual ~Runner() = default;
+  virtual ~Sprinter() = default;
   virtual void go() = 0;
   int laps() const;
 };
 
-struct SlowRunner final : Runner  // laps() is not a row: the bound Runner audits it (A6)
+struct SlowSprinter final : Sprinter  // laps() is not a row: the bound Sprinter audits it (A6)
 {
-  SlowRunner();
+  SlowSprinter();
   void go() override;
 };
 
-struct Middle : Runner  // unbound intermediate
+struct Middle : Sprinter  // unbound intermediate
 {
   int depth() const;
 };
 
-struct DeepRunner final : Middle  // depth() inherited from Middle, laps() through it (A7)
+struct DeepSprinter final : Middle  // depth() inherited from Middle, laps() through it (A7)
 {
-  DeepRunner();
+  DeepSprinter();
   void go() override;
 };
 
-struct Relay final : Runner  // re-binds Runner's API on the derived class (A8)
+struct Relay final : Sprinter  // re-binds Sprinter's API on the derived class (A8)
 {
   Relay();
   void go() override;

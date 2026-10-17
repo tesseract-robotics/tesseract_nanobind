@@ -3,9 +3,9 @@
 
 namespace tesseract::identity
 {
-struct LongWidgetName  // bound as Widget: a rename
+struct LongWidgetName  // bound as Gizmo: a rename
 {
-  struct Part  // bound on the Widget class object: a nested class, skipped
+  struct Part  // bound on the Gizmo class object: a nested class, skipped
   {
   };
   int size() const;

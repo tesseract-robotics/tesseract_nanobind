@@ -3,53 +3,53 @@
 
 namespace tesseract::bases
 {
-struct Runner  // bound base
+struct Jogger  // bound base
 {
-  virtual ~Runner() = default;
+  virtual ~Jogger() = default;
   virtual void go() = 0;
 };
 
-struct SlowRunner final : Runner  // stub omits the Runner base: gap SlowRunner(Runner) (T5-1)
+struct SlowJogger final : Jogger  // stub omits the Jogger base: gap SlowJogger(Jogger) (T5-1)
 {
-  SlowRunner();
+  SlowJogger();
   void go() override;
 };
 
-struct Middle : Runner  // unbound intermediate
+struct Middle : Jogger  // unbound intermediate
 {
 };
 
-struct DeepRunner final : Middle  // stub base Runner is the nearest bound ancestor: no row (T5-2)
+struct DeepJogger final : Middle  // stub base Jogger is the nearest bound ancestor: no row (T5-2)
 {
-  DeepRunner();
+  DeepJogger();
   void go() override;
 };
 
-struct Loner  // stub claims a base C++ does not have: deviation Loner(Runner) (T5-3)
+struct Loner  // stub claims a base C++ does not have: deviation Loner(Jogger) (T5-3)
 {
   Loner();
 };
 
-struct Hidden : private Runner  // private base: Python sees no base, no row
+struct Hidden : private Jogger  // private base: Python sees no base, no row
 {
   Hidden();
   void go() override;
 };
 
-struct Tagged : Runner  // stub names its base: no row
+struct Tagged : Jogger  // stub names its base: no row
 {
   Tagged();
   void go() override;
 };
 
-struct RemoteRunner : Runner  // stub base is bases_remote's Runner: same class only if the index agrees
+struct RemoteJogger : Jogger  // stub base is bases_remote's Jogger: same class only if the index agrees
 {
-  RemoteRunner();
+  RemoteJogger();
   void go() override;
 };
 
 template <typename T>
-struct Planner : Runner  // Planner<double> bound as PlannerD without its base: gap PlannerD(Runner)
+struct Planner : Jogger  // Planner<double> bound as PlannerD without its base: gap PlannerD(Jogger)
 {
   void go() override;
   T value;
