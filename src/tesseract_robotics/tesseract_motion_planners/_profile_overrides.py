@@ -6,6 +6,10 @@ shim that forwards a virtual call to a Python override. The concrete profiles ar
 subclass of `SimplePlannerLVSMoveProfile` that defines `generate` is constructed as the plain C++
 profile, and the planner calls the C++ `generate`. The override is silently ignored, so the
 subclass is refused when the class statement runs.
+
+The guard sees only hooks in a class body. It misses a hook assigned to the class after its
+definition or set on an instance, and a subclass of an intermediate class whose own
+`__init_subclass__` does not call `super().__init_subclass__()`.
 """
 
 from __future__ import annotations

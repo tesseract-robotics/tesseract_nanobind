@@ -10,6 +10,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 |---|---|---|
 | Unreleased | 7 TrajOpt-Ifopt and Descartes profiles and waypoint configs compare by value and are unhashable | [A stable key, or `id()`](#trajopt-ifopt-and-descartes-profiles-compare-by-value-and-are-unhashable) |
 | Unreleased | The seven simple-planner move profiles compare by value and are unhashable | [A stable key, or `id()`](#simple-planner-move-profiles-compare-by-value-and-are-unhashable) |
+| Unreleased | Overriding a hook (`generate`, `create`, `create*`) on a Python subclass of a concrete profile raises `ProfileOverrideNotDispatchedError` at class definition; the override was silently never called | [Subclass the abstract base and hold the concrete profile](#overriding-a-hook-on-a-concrete-profile-raises) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -57,6 +58,23 @@ profiles with the same fields are `==`, and `hash()`, `set` members and `dict` k
 | --- | --- |
 | `{profile: name}` | `{id(profile): name}`, or key by the profile name |
 | `profile in seen_set` (identity) | `any(p is profile for p in seen)` |
+
+### Overriding a hook on a concrete profile raises
+
+Only the abstract profile bases forward the planner's calls to Python. A Python subclass of a
+concrete profile (the seven simple-planner move profiles, `TrajOptIfoptDefaultMoveProfile`,
+`TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile`,
+`DescartesDefaultMoveProfileD`, `DescartesLadderGraphSolverProfileD`) that defined `generate`,
+`create` or a `create*` hook planned with the C++ hook and never ran the override. Such a class
+statement now raises `ProfileOverrideNotDispatchedError`, a `TypeError` (#340):
+
+| before | after |
+| --- | --- |
+| `class P(SimplePlannerLVSMoveProfile): def generate(...)` | `class P(SimplePlannerMoveProfile)`, holding a `SimplePlannerLVSMoveProfile` and calling its `generate` |
+| `class P(TrajOptIfoptDefaultCompositeProfile): def create(...)` | `class P(TrajOptIfoptCompositeProfile)`, holding a `TrajOptIfoptDefaultCompositeProfile` and calling its `create` |
+| `class P(TrajOptIfoptOSQPSolverProfile): def create(...)` | configure the solver through the profile's fields and `callbacks` |
+
+A subclass that defines no hook (to add fields or helpers) is unaffected.
 
 ## 0.35.0.9
 
