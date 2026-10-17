@@ -23,6 +23,7 @@ BINDING_GLOB = "*/*_bindings.cpp"
 # matching prefix (`owning_prefix`), so a nested prefix is never its parent's.
 AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
     "tesseract_collision": ("tesseract/collision/",),
+    "tesseract_command_language": ("tesseract/command_language/",),
     "tesseract_common": ("tesseract/common/",),
     "tesseract_environment": ("tesseract/environment/",),
     "tesseract_geometry": ("tesseract/geometry/",),
@@ -33,6 +34,7 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
     "tesseract_serialization": ("tesseract/serialization/",),
     "tesseract_srdf": ("tesseract/srdf/",),
     "tesseract_state_solver": ("tesseract/state_solver/",),
+    "tesseract_time_parameterization": ("tesseract/time_parameterization/",),
     "tesseract_urdf": ("tesseract/urdf/",),
 }
 # Binding modules the audit does not cover yet: module → (reason, owned prefixes). The prefixes
@@ -40,14 +42,6 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
 # binding module is in exactly one of the two tables (`check_coverage`).
 UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
     "ompl_base": ("To be removed (#258); binds OMPL, not tesseract.", ()),
-    "tesseract_command_language": (
-        "Not yet audited: #256 group 1.",
-        ("tesseract/command_language/",),
-    ),
-    "tesseract_time_parameterization": (
-        "Not yet audited: #256 group 1.",
-        ("tesseract/time_parameterization/",),
-    ),
     # trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h).
     "trajopt_ifopt": ("Not yet audited: #256 group 2.", ("trajopt_ifopt/", "trajopt_common/")),
     "trajopt_sqp": ("Not yet audited: #256 group 2.", ("trajopt_sqp/",)),
