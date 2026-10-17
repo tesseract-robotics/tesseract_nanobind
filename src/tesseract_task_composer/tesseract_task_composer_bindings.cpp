@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <fstream>
+#include <unordered_set>
+#include <thread>
 #include <sstream>
 #include <stdexcept>  // std::runtime_error, std::invalid_argument (the named errors)
 
@@ -228,15 +230,20 @@ void load_yaml_text(const char* caller, const std::string& config, Load&& load) 
 // exit (wait_for_runs_at_exit).
 // Freeing a run may destroy the executor it holds (one the server replaced): its Python
 // references are dropped with the GIL held, the C++ executor without it (free_finished_runs).
+// A run is registered with the GIL held, before run() releases it, so no other thread can see
+// the node in use without its entry; its future is null until run() returns and counts as running.
 struct InFlightRun {
     std::unique_ptr<tp::TaskComposerFuture> future;
+    // The node being run. A server task has no Python owner to hold (upstream exposes it only as
+    // a const&), so the server refuses to replace a task while an entry points at it
+    // (require_tasks_replaceable).
+    const tp::TaskComposerNode* node_ptr = nullptr;
     nb::object node;
     nb::object owner;
     // A server run's executor: the server owns it, and addExecutor may replace it mid-run.
     std::shared_ptr<tp::TaskComposerExecutor> executor;
-    // A by-name server run's task. The server owns it and upstream exposes no owning accessor,
-    // so it cannot be held: loadConfig / addTask refuse to replace it mid-run instead.
-    std::string task_name;
+
+    bool finished() const { return future != nullptr && future->ready(); }
 };
 
 // Accessed with the GIL held only. Never freed: it outlives module teardown.
@@ -251,7 +258,7 @@ void free_finished_runs() {
     std::vector<std::shared_ptr<InFlightRun>> finished;
     auto running = runs.begin();
     for (auto& run : runs) {
-        if (run->future->ready())
+        if (run->finished())
             finished.push_back(std::move(run));
         else
             *running++ = std::move(run);
@@ -271,16 +278,27 @@ void free_finished_runs() {
 // Registered with atexit: wait for every run still in flight with the GIL released (workers may
 // call Python, e.g. a log handler), before the interpreter tears down what they use.
 // Worker callbacks or other threads may start runs while it waits: repeat until none is left.
+// A run still starting (null future) goes back on the list until its thread registers the future.
 void wait_for_runs_at_exit() {
     while (!in_flight_runs().empty()) {
         std::vector<std::shared_ptr<InFlightRun>> runs;
         runs.swap(in_flight_runs());
+        std::vector<std::shared_ptr<InFlightRun>> starting;
+        for (auto& run : runs)
+            if (run->future == nullptr)
+                starting.push_back(run);
         nb::gil_scoped_release release;
         for (auto& run : runs) {
+            if (run->future == nullptr)
+                continue;
             run->future->wait();
             run->executor.reset();
         }
+        if (runs.size() == starting.size())
+            std::this_thread::yield();
         nb::gil_scoped_acquire acquire;
+        for (auto& run : starting)
+            in_flight_runs().push_back(std::move(run));
         runs.clear();
     }
 }
@@ -294,47 +312,92 @@ nb::object python_object(const T& value) {
     return nb::borrow(found);
 }
 
-// Start a run with the GIL released, then hold what it uses until it ends.
+// Register a run, then start it with the GIL released, and hold what it uses until it ends. The
+// entry exists before the GIL is released, so a reload on another thread sees the node in use.
+// Callers free finished runs (which releases the GIL) before resolving `node`, never between.
 template <typename Run>
-std::unique_ptr<tp::TaskComposerFuture> run_held(nb::object node, nb::object owner, Run&& run,
-                                                 std::shared_ptr<tp::TaskComposerExecutor> executor = nullptr,
-                                                 std::string task_name = {}) {
-    free_finished_runs();
+std::unique_ptr<tp::TaskComposerFuture> run_held(const tp::TaskComposerNode& node_ref, nb::object node,
+                                                 nb::object owner, Run&& run,
+                                                 std::shared_ptr<tp::TaskComposerExecutor> executor = nullptr) {
+    auto entry = std::make_shared<InFlightRun>();
+    entry->node_ptr = &node_ref;
+    entry->node = std::move(node);
+    entry->owner = std::move(owner);
+    entry->executor = std::move(executor);
+    in_flight_runs().push_back(entry);
     std::unique_ptr<tp::TaskComposerFuture> future;
-    {
+    try {
         nb::gil_scoped_release release;
         future = run();
+    } catch (...) {
+        auto& runs = in_flight_runs();
+        runs.erase(std::remove(runs.begin(), runs.end(), entry), runs.end());
+        throw;
     }
-    in_flight_runs().push_back(std::make_shared<InFlightRun>(InFlightRun{ future->copy(), std::move(node), std::move(owner), std::move(executor), std::move(task_name) }));
+    entry->future = future->copy();
     return future;
 }
 
-// loadConfig or addTask would replace (and free) a task that a by-name run of the server uses.
+// loadConfig or addTask would replace (and free) a server task that a run or Python can reach,
+// or the server is loading and its tasks are being replaced.
 struct TaskComposerServerBusyError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-// Raise TaskComposerServerBusyError if an unfinished by-name run of `server` uses a task that
-// would be replaced: any task (`only` empty, loadConfig), or the task named `only` (addTask).
-void require_tasks_not_running(const char* caller, const tp::TaskComposerServer& server, const std::string& only = {}) {
-    free_finished_runs();
-    const nb::object self = python_object(server);
-    std::vector<std::string> running;
-    for (const auto& run : in_flight_runs()) {
-        if (run->task_name.empty() || !run->owner.is(self) || run->future->ready())
-            continue;
-        if ((only.empty() || run->task_name == only) &&
-            std::find(running.begin(), running.end(), run->task_name) == running.end())
-            running.push_back(run->task_name);
+// Servers inside loadConfig / addTask. A Python ResourceLocator or log handler may run (and switch
+// threads) mid-load: getTask and run raise meanwhile. GIL-protected; never freed.
+std::unordered_set<const tp::TaskComposerServer*>& loading_servers() {
+    static auto* servers = new std::unordered_set<const tp::TaskComposerServer*>();
+    return *servers;
+}
+
+void require_not_loading(const char* caller, const tp::TaskComposerServer& server) {
+    if (loading_servers().count(&server) != 0)
+        throw TaskComposerServerBusyError(std::string(caller) +
+                                          ": the server is inside loadConfig or addTask, replacing its tasks");
+}
+
+// Marks a server as loading for one scope, also when the load throws.
+struct ServerLoading {
+    const tp::TaskComposerServer& server;
+    ServerLoading(const char* caller, const tp::TaskComposerServer& s) : server(s) {
+        require_not_loading(caller, server);
+        loading_servers().insert(&server);
     }
-    if (running.empty())
+    ServerLoading(const ServerLoading&) = delete;
+    ServerLoading& operator=(const ServerLoading&) = delete;
+    ~ServerLoading() { loading_servers().erase(&server); }
+};
+
+// The one invariant for server tasks: a task is not replaced while a run or Python can reach it.
+// Raise TaskComposerServerBusyError if any of `names` (tasks of `server`) is the node of an
+// unfinished run, on any executor or path, or has a live Python wrapper (a getTask() result).
+// Call with the GIL held, after free_finished_runs, and keep it held until the replacement.
+void require_tasks_replaceable(const char* caller, const tp::TaskComposerServer& server,
+                               const std::vector<std::string>& names) {
+    std::string running;
+    std::string referenced;
+    for (const auto& name : names) {
+        const tp::TaskComposerNode* task = &const_cast<tp::TaskComposerServer&>(server).getTask(name);
+        for (const auto& run : in_flight_runs()) {
+            if (run->node_ptr == task && !run->finished()) {
+                running += (running.empty() ? "'" : ", '") + name + "'";
+                break;
+            }
+        }
+        if (nb::find(task).is_valid())
+            referenced += (referenced.empty() ? "'" : ", '") + name + "'";
+    }
+    if (running.empty() && referenced.empty())
         return;
-    std::string names;
-    for (const auto& name : running)
-        names += (names.empty() ? "'" : ", '") + name + "'";
-    throw TaskComposerServerBusyError(std::string(caller) + ": a run of task " + names +
-                                      " started by name is still running, and replacing the task would free "
-                                      "it under the run; wait() for the run's future first");
+    std::string reason;
+    if (!running.empty())
+        reason += "task " + running + " is running (wait() for its runs' futures first)";
+    if (!referenced.empty())
+        reason += std::string(reason.empty() ? "" : "; ") + "task " + referenced +
+                  " is referenced from Python (del the getTask() result first)";
+    throw TaskComposerServerBusyError(std::string(caller) + ": " + reason +
+                                      "; replacing it would free it under its user");
 }
 
 // prune found stored infos that changed (or were removed) while its callbacks ran.
@@ -465,8 +528,9 @@ NB_MODULE(_tesseract_task_composer, m) {
     bind_value_equality(node_info);
 
     nb::exception<TaskComposerServerBusyError>(m, "TaskComposerServerBusyError", PyExc_RuntimeError).attr("__doc__") =
-        "TaskComposerServer.loadConfig / addTask would replace a task that a run started by name is "
-        "still using; wait() for the run's future first.";
+        "TaskComposerServer.loadConfig / addTask would replace a task that a run or Python can reach "
+        "(wait() for the runs, del the getTask() results first), or the server is inside loadConfig / "
+        "addTask and getTask / run cannot reach its tasks.";
 
     nb::exception<TaskComposerPruneConflictError>(m, "TaskComposerPruneConflictError", PyExc_RuntimeError)
         .attr("__doc__") =
@@ -694,13 +758,15 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getName", &tp::TaskComposerExecutor::getName)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
-            return run_held(python_object(node), python_object(self), [&] { return self.run(node, context); });
+            free_finished_runs();
+            return run_held(node, python_object(node), python_object(self), [&] { return self.run(node, context); });
         }, "node"_a, "context"_a)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
-            return run_held(python_object(node), python_object(self), [&] { return self.run(node, context); });
+            free_finished_runs();
+            return run_held(node, python_object(node), python_object(self), [&] { return self.run(node, context); });
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
@@ -754,14 +820,16 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getName", &tp::TaskflowTaskComposerExecutor::getName)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
-            return run_held(python_object(node), python_object(self),
+            free_finished_runs();
+            return run_held(node, python_object(node), python_object(self),
                             [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
         }, "node"_a, "context"_a)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
-            return run_held(python_object(node), python_object(self),
+            free_finished_runs();
+            return run_held(node, python_object(node), python_object(self),
                             [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
@@ -919,11 +987,17 @@ NB_MODULE(_tesseract_task_composer, m) {
     nb::class_<Server>(m, "TaskComposerServer")
         .def(nb::init<>())
         .def("loadConfig", [](Server& self, const tesseract_nb::StrictPath& config_path, const tc::ResourceLocator& locator) {
-            require_tasks_not_running("TaskComposerServer.loadConfig", self);
+            require_not_loading("TaskComposerServer.loadConfig", self);
+            free_finished_runs();
+            require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
+            ServerLoading loading("TaskComposerServer.loadConfig", self);
             with_pinned_plugins([&] { self.loadConfig(config_path.value, locator); });
         }, "config_path"_a, "locator"_a)
         .def("loadConfig", [](Server& self, const std::string& config, const tc::ResourceLocator& locator) {
-            require_tasks_not_running("TaskComposerServer.loadConfig", self);
+            require_not_loading("TaskComposerServer.loadConfig", self);
+            free_finished_runs();
+            require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
+            ServerLoading loading("TaskComposerServer.loadConfig", self);
             load_yaml_text("TaskComposerServer.loadConfig", config,
                            [&] { with_pinned_plugins([&] { self.loadConfig(config, locator); }); });
         }, "config"_a, "locator"_a)
@@ -937,33 +1011,48 @@ NB_MODULE(_tesseract_task_composer, m) {
         // Upstream's hook for Python wrappers; addTask(unique_ptr) has no Python form. Adding a task
         // under a name a by-name run is using would free that run's task.
         .def("addTask", [](Server& self, std::shared_ptr<tp::TaskComposerNode> task) {
-            require_tasks_not_running("TaskComposerServer.addTask", self, task->getName());
+            require_not_loading("TaskComposerServer.addTask", self);
+            free_finished_runs();
+            if (self.hasTask(task->getName()))
+                require_tasks_replaceable("TaskComposerServer.addTask", self, { task->getName() });
+            ServerLoading loading("TaskComposerServer.addTask", self);
             self.addTaskPython(std::move(task));
         }, "task"_a,
            "Add `task` under its name, replacing a task of that name. Raises "
-           "TaskComposerServerBusyError if a run started by that name is still running.")
-        .def("getTask", &Server::getTask, "name"_a, nb::rv_policy::reference_internal)
+           "TaskComposerServerBusyError if that task is running or referenced from Python (a "
+           "getTask() result).")
+        .def("getTask", [](Server& self, const std::string& name) -> const tp::TaskComposerNode& {
+            require_not_loading("TaskComposerServer.getTask", self);
+            return self.getTask(name);
+        }, "name"_a, nb::rv_policy::reference_internal,
+           "The server's task `name`. While this reference lives, loadConfig and addTask of that "
+           "name raise TaskComposerServerBusyError: `del` it first.")
         .def("hasTask", &Server::hasTask, "name"_a)
         .def("getAvailableTasks", &Server::getAvailableTasks)
         .def("run", [](Server& self, const std::string& task_name, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
             // Upstream's run(task_name, ...), on an executor resolved once: the executor held is the
             // one running, even if addExecutor replaces it meanwhile. getExecutor and getTask throw
-            // upstream's errors, the executor's first. The server owns the task.
+            // upstream's errors, the executor's first. The server owns the task; the run is
+            // registered (run_held) before the GIL is released, so loadConfig sees it.
+            free_finished_runs();
+            require_not_loading("TaskComposerServer.run", self);
             auto executor = self.getExecutor(executor_name);
             const tp::TaskComposerNode& task = self.getTask(task_name);
             data_storage->setName(task_name);
             auto context = std::make_shared<tp::TaskComposerContext>(task_name, std::move(data_storage), dotgraph);
-            return run_held(nb::none(), python_object(self), [&] { return executor->run(task, context); }, executor,
-                            task_name);
+            return run_held(task, nb::none(), python_object(self), [&] { return executor->run(task, context); },
+                            executor);
         }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("run", [](Server& self, const tp::TaskComposerNode& node, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
                        bool dotgraph, const std::string& executor_name) {
             // Upstream's run(node, ...), on an executor resolved once (see above).
+            free_finished_runs();
+            require_not_loading("TaskComposerServer.run", self);
             auto executor = self.getExecutor(executor_name);
             data_storage->setName(node.getName());
             auto context = std::make_shared<tp::TaskComposerContext>(node.getName(), std::move(data_storage), dotgraph);
-            return run_held(python_object(node), python_object(self), [&] { return executor->run(node, context); },
+            return run_held(node, python_object(node), python_object(self), [&] { return executor->run(node, context); },
                             executor);
         }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("getWorkerCount", &Server::getWorkerCount, "name"_a)
