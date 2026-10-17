@@ -163,7 +163,12 @@ ACCEPTED_SYMBOLS = {
 # (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
 # name) -> the Python dotted names of its instances. The C++ row is accepted only when every
 # listed instance is bound; each instance is accepted on the Python side (template-instance-name).
-TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {}
+TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("tesseract_command_language", "InstructionPoly.as"): tuple(
+        f"InstructionPoly.as{t}Instruction"
+        for t in ("Move", "Composite", "Wait", "Timer", "SetAnalog", "SetDigital", "SetTool")
+    ),
+}
 # The rule `TEMPLATE_INSTANCES` entries are accepted under.
 TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
