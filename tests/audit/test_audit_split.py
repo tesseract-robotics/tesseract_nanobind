@@ -26,12 +26,13 @@ def defined_names(module: str) -> set[str]:
 
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
-# audit_types, audit_ownership, audit_parse, audit_stub, audit_rules, audit_match, audit_report,
-# audit_bindings.
+# audit_types, audit_ownership, audit_parse, audit_bound, audit_stub, audit_rules, audit_match,
+# audit_report, audit_bindings.
 EXPECTED_SCRIPTS = (
     "audit_types",
     "audit_ownership",
     "audit_parse",
+    "audit_bound",
     "audit_stub",
     "audit_rules",
     "audit_match",
@@ -67,8 +68,7 @@ PARSE = {
     "_is_byte_pointer", "_byte_buffer_pairs", "_has_default", "_is_yaml_node",
     "_same_python_form", "_stream_insertion_owner", "_befriends_cereal", "cpp_api", "decl_names",
     # 0b Task 6 (class identity)
-    "BODY_PARSE_OPTIONS", "NB_CLASS_TEMPLATES", "NB_CLASS_CTORS", "NB_MODULE_SCOPE",
-    "NB_MODULE_INIT_PREFIX", "SkippedBodiesError", "_in_main_file", "_scope_type", "bound_classes",
+    "BODY_PARSE_OPTIONS",
     # 0b Task 7 (inherited members)
     "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
     "_base_definition", "_overload", "own_header_lines",
@@ -85,6 +85,19 @@ PARSE = {
 def test_parse_defines_exactly():
     assert defined_names("audit_parse") == PARSE
     assert not defined_names("audit_match") & PARSE
+
+
+# 0b Task 6 (class identity); its own file since the wave-2 merge (#256).
+BOUND = {
+    "NB_CLASS_TEMPLATES", "NB_CLASS_CTORS", "NB_MODULE_SCOPE", "NB_MODULE_INIT_PREFIX",
+    "SkippedBodiesError", "_in_main_file", "_scope_type", "bound_classes",
+}  # fmt: skip
+
+
+def test_bound_defines_exactly():
+    assert defined_names("audit_bound") == BOUND
+    assert not defined_names("audit_parse") & BOUND
+    assert not defined_names("audit_match") & BOUND
 
 
 STUB = {
