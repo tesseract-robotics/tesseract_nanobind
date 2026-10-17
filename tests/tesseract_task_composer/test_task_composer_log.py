@@ -127,7 +127,13 @@ class TestSerialization:
 
     def test_file_round_trip(self, run_log, tmp_path):
         path = tmp_path / "run.tclx"
+        assert task_composer_log_to_file(run_log, path) is True
+        _assert_same_log(task_composer_log_from_file(path), run_log)
+
+    def test_file_takes_str_path(self, run_log, tmp_path):
+        path = tmp_path / "run.bin"
         assert task_composer_log_to_file(run_log, str(path)) is True
+        assert path.read_text().lstrip().startswith("<?xml")  # XML whatever the suffix
         _assert_same_log(task_composer_log_from_file(str(path)), run_log)
 
     def test_unregistered_profile_type_raises(self, factory, make_storage):
