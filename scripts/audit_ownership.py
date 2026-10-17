@@ -131,6 +131,54 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
         "ofkt/ofkt_node*.h": "Optimized forward kinematics tree nodes, internal to "
         "`OFKTStateSolver`.",
     },
+    # Group 2 (trajopt). Never `*.hpp`: below another prefix it would match `impl/*.hpp`.
+    "trajopt_sqp/": {
+        "callbacks/*": "Visualization callbacks: each takes a "
+        "`tesseract::visualization::Visualization`, which no module binds; Python writes an "
+        "`SQPCallback` subclass instead.",
+        "expressions.h": "`AffExprs`/`QuadExprs` convexification helpers behind "
+        "`TrajOptQPProblem`'s PIMPL; no installed header's signature names them (only `fwd.h` "
+        "forward-declares them).",
+        "ifopt_qp_problem.h": "`IfoptQPProblem` is being removed upstream "
+        "(tesseract-robotics/trajopt#595); the binding dropped it in 0.35.0.9 for "
+        "`TrajOptQPProblem`.",
+    },
+    "trajopt_ifopt/": {
+        "constraints/collision/weighted_average_methods.h": "Gradient averaging internal to the "
+        "continuous collision constraints (`getWeightedAvgGradientT0/T1`).",
+        "core/problem.h": "The `trajopt_ifopt::Problem` NLP serves only `IfoptQPProblem`, which "
+        "is not Python API; `TrajOptQPProblem` takes `ConstraintSet`s directly.",
+        "core/cost_term.h": "`CostTerm`, the cost base of the `trajopt_ifopt::Problem` path, "
+        "which only `IfoptQPProblem` uses.",
+        "costs/*": "`SquaredCost`/`AbsoluteCost` wrap constraints as `CostTerm`s for the "
+        "`trajopt_ifopt::Problem` path; `TrajOptQPProblem.addCostSet` takes a `ConstraintSet` "
+        "and a `CostPenaltyType`.",
+        "core/composite.h": "`CompositeDifferentiable`, the component container of the "
+        "`trajopt_ifopt::Problem` path.",
+        "variable_sets/nodes_observer.h": "Abstract `NodesObserver` with no implementation in "
+        "trajopt 0.35.0.",
+    },
+    "trajopt_common/": {
+        "basic_array.hpp": "trajopt-internal array helper from the sco era; numpy covers it.",
+        "eigen_conversions.hpp": "trajopt-internal Eigen/`std::vector` conversions; nanobind's "
+        "Eigen casters cover them.",
+        "eigen_slicing.hpp": "trajopt-internal index-slicing helpers; numpy indexing covers them.",
+        "interpolation.hpp": "trajopt-internal interpolation helpers; the bound "
+        "`trajopt_ifopt.interpolate` is the Python form.",
+        "utils.hpp": "trajopt-internal `std::vector` and string helpers; the Python standard "
+        "library covers them.",
+        "vector_ops.hpp": "trajopt-internal `std::vector` arithmetic; numpy covers it.",
+        "stl_to_string.hpp": "trajopt-internal `std::vector` to-string helpers; Python's "
+        "`str`/`repr` cover them.",
+        "clock.hpp": "Process-global `StartClock`/`GetClock` timer for trajopt's own timing logs.",
+        "config.hpp": "boost::program_options parameter registry for trajopt's command-line tools.",
+        "logging.hpp": "printf logging macros; verbosity is the `TRAJOPT_LOG_THRESH` environment "
+        "variable, read when the library loads.",
+        "collision_utils.h": "Gradient and hashing helpers behind the collision constraints "
+        "(`getHash`, `getGradient(GradientResults&, …)`, `debugPrintInfo`).",
+        "cache.h": "LRU pool template holding `CollisionCacheData` inside the collision "
+        "constraints.",
+    },
 }
 # Vendored third-party libraries installed under a module prefix, as fnmatch patterns like
 # UNAUDITED_HEADERS. Never audited, not even when the binding #includes one directly: such an
