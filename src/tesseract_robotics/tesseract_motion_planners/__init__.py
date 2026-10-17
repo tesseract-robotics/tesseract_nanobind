@@ -1,3 +1,6 @@
+from tesseract_robotics.tesseract_motion_planners._profile_overrides import (
+    ProfileOverrideNotDispatchedError,
+)
 from tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners import *
 
 __all__ = [
@@ -12,4 +15,5 @@ __all__ = [
     "getRobotConfig",
     "getJointTurns",
     "isWithinJointLimits",
+    "ProfileOverrideNotDispatchedError",
 ]
