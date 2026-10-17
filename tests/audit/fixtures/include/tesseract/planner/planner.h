@@ -86,6 +86,22 @@ public:
   IntYamlProfile(const YAML::Node& config);
 };
 
+// C6a negative: from_yaml is an instance method, so it is no YAML-text sibling.
+class MethodYamlProfile
+{
+public:
+  MethodYamlProfile();
+  MethodYamlProfile(const YAML::Node& config);
+};
+
+// C6a negative: from_yaml returns another class, so it does not construct this one.
+class ForeignYamlProfile
+{
+public:
+  ForeignYamlProfile();
+  ForeignYamlProfile(const YAML::Node& config);
+};
+
 // Task 4 (R13): third-party and not-API types in parameters, returns and fields.
 class Configurator
 {
