@@ -699,6 +699,25 @@ def _base_definition(base: ci.Cursor) -> ci.Cursor | None:
     return definition if definition is not None else base.referenced
 
 
+# One structural `absent_ok` rule: (cursor, its parameters, R13's type test) -> applies.
+AbsentOkTest = Callable[[ci.Cursor, list[ci.Cursor], Callable[[ci.Type], bool]], bool]
+# The structural `absent_ok` rules, first match wins (interfaces "Conflict points"). `yaml-node`
+# comes first: it overrides every other rule. A nullary overload no rule matches keeps its
+# class's `nullary_absent_ok` (`serialization-default-ctor`).
+ABSENT_OK_RULES: tuple[tuple[AbsentOkTest, str], ...] = (
+    (lambda c, params, unbound: any(_is_yaml_node(p) for p in params), "yaml-node"),
+    (lambda c, params, unbound: _is_forwarding_ctor_template(c), "template-instance-name"),
+    (
+        lambda c, params, unbound: unbound(c.result_type) or any(unbound(p.type) for p in params),
+        UNBOUND_DEPENDENCY,
+    ),
+    (
+        lambda c, params, unbound: c.result_type.get_canonical().spelling == TYPE_INDEX,
+        "type-index",
+    ),
+)
+
+
 def _overload(
     c: ci.Cursor, unbound: Callable[[ci.Type], bool], nullary_absent_ok: str | None = None
 ) -> CppOverload:
@@ -712,16 +731,8 @@ def _overload(
     n = len(params) - len(pairs)
     arity = Arity(n - n_default, n)
     void = c.result_type.kind == ci.TypeKind.VOID
-    absent_ok = nullary_absent_ok if arity.hi == 0 else None
-    # Structural rules first, `yaml-node` last: it wins.
-    if c.result_type.get_canonical().spelling == TYPE_INDEX:
-        absent_ok = "type-index"
-    if unbound(c.result_type) or any(unbound(p.type) for p in params):
-        absent_ok = UNBOUND_DEPENDENCY
-    if _is_forwarding_ctor_template(c):
-        absent_ok = "template-instance-name"
-    if any(_is_yaml_node(p) for p in params):
-        absent_ok = "yaml-node"
+    structural = next((rule for test, rule in ABSENT_OK_RULES if test(c, params, unbound)), None)
+    absent_ok = structural or (nullary_absent_ok if arity.hi == 0 else None)
     raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
     pointers = {pos + k for k, pos in enumerate(pairs)}
     python_params = [(i, p) for i, p in enumerate(params) if i in pointers or i not in paired]
