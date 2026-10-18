@@ -400,6 +400,9 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     # qp_problem.h:49, trajopt_qp_problem.h:30 `setVariables(const double* x)` (#282).
     ("trajopt_sqp", "QPProblem.setVariables", "1"): "sized-double-array",
     ("trajopt_sqp", "TrajOptQPProblem.setVariables", "1"): "sized-double-array",
+    # ifopt_utils.h:108 `(const double* x, Problem&, double)`; the `(Variables&,
+    # ConstraintSet&, double)` overload is bound (#295).
+    ("trajopt_ifopt", "calcNumericalConstraintGradient", "2-3"): "ifopt-problem-only",
     # tesseract_task_composer (#256 group 4). any_poly.h:115 `AnyPoly(const AnyInterface&)`: the
     # arity-1 forwarding ctor templates (:121, :138) are template-instance-name before this table.
     ("tesseract_task_composer", "AnyPoly.__init__", "1"): "type-erasure-interface",

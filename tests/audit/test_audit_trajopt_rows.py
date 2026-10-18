@@ -346,3 +346,12 @@ def test_real_sized_double_array(g2_reports, symbol):
     report = g2_reports["trajopt_sqp"]
     assert (symbol, "sized-double-array") in accepted_pairs(report)
     assert symbol not in {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
+
+
+def test_real_problem_overload_of_the_constraint_gradient(g2_reports):
+    """ifopt_utils.h:108 `(const double*, Problem&, double)` is the `IfoptQPProblem` path; the
+    `(Variables&, ConstraintSet&, double)` overload is bound (#295)."""
+    report = g2_reports["trajopt_ifopt"]
+    pair = ("calcNumericalConstraintGradient", "ifopt-problem-only")
+    assert pair in accepted_pairs(report)
+    assert "calcNumericalConstraintGradient" not in {g.symbol for g in report.gaps}
