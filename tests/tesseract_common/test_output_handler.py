@@ -38,10 +38,10 @@ class Collect(tesseract_common.OutputHandler):
 """
 
 
-def _run_both(script: str) -> "tuple[str, str]":
-    """Run `script` after the preamble in a fresh interpreter; return its stdout and stderr."""
+def _run_both(script: str, preamble: str = _PREAMBLE) -> "tuple[str, str]":
+    """Run `script` after `preamble` in a fresh interpreter; return its stdout and stderr."""
     proc = subprocess.run(
-        [sys.executable, "-c", _PREAMBLE + script],
+        [sys.executable, "-c", preamble + script],
         capture_output=True,
         text=True,
         timeout=TIMEOUT_S,
@@ -51,8 +51,8 @@ def _run_both(script: str) -> "tuple[str, str]":
     return proc.stdout, proc.stderr
 
 
-def _run(script: str) -> str:
-    return _run_both(script)[0]
+def _run(script: str, preamble: str = _PREAMBLE) -> str:
+    return _run_both(script, preamble)[0]
 
 
 def test_handler_that_releases_the_gil_with_two_logging_threads():
@@ -513,7 +513,10 @@ def test_null_filename_reaches_the_handler_as_none():
 import ctypes
 
 # console_bridge::log(const char* file, int line, LogLevel level, const char* fmt, ...)
-cb_log = ctypes.CDLL(None)["_ZN14console_bridge3logEPKciNS_8LogLevelES1_z"]
+# Looked up through the extension, whose dependencies include console_bridge: CDLL(None) only
+# searches the global namespace, which excludes console_bridge on Linux (RTLD_LOCAL).
+from tesseract_robotics.tesseract_common import _tesseract_common
+cb_log = ctypes.CDLL(_tesseract_common.__file__)["_ZN14console_bridge3logEPKciNS_8LogLevelES1_z"]
 cb_log.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
 cb_log.restype = None
 
@@ -534,3 +537,60 @@ tesseract_common.restorePreviousOutputHandler()
 print("FILES", handler.files)
 """)
     assert "FILES [None, 'test.py']" in out, out
+
+
+def test_child_forked_in_a_handler_exits_after_logging():
+    """A child forked from a handler that logs, then returns from the handler, hung: the copied
+    delivery thread (the child's only thread) ended, the child's own delivery thread waited
+    forever."""
+    out = _run("""
+class Forks(tesseract_common.OutputHandler):
+    child = None
+
+    def log(self, text, level, filename, line):
+        if text == "FORK" and Forks.child is None:
+            pid = os.fork()
+            if pid == 0:
+                Forks.child = 0
+                log("CHILD")
+                # logs after the handler returned, then ends: the child must still end
+                threading.Thread(target=lambda: (time.sleep(0.3), log("LATER"))).start()
+                return  # no os._exit
+            Forks.child = pid
+
+handler = Forks()
+tesseract_common.useOutputHandler(handler)
+log("FORK")
+tesseract_common.flushOutputHandlers()
+deadline = time.monotonic() + 20
+while time.monotonic() < deadline:
+    pid, status = os.waitpid(Forks.child, os.WNOHANG)
+    if pid:
+        print("CHILD EXITED", status)
+        break
+    time.sleep(0.05)
+else:
+    os.kill(Forks.child, 9)
+    os.waitpid(Forks.child, 0)
+    print("CHILD HUNG")
+tesseract_common.restorePreviousOutputHandler()
+""")
+    assert "CHILD EXITED 0" in out, out
+
+
+def test_import_without_fork_support():
+    """Windows has no os.register_at_fork; registering the fork reset unconditionally made the
+    import fail there."""
+    out = _run(
+        """
+handler = Collect()
+tesseract_common.useOutputHandler(handler)
+log("no fork")
+tesseract_common.flushOutputHandlers()
+tesseract_common.restorePreviousOutputHandler()
+print("DELIVERED", handler.texts)
+""",
+        # as on Windows: no fork, so no fork hooks
+        preamble="import os\ndel os.fork, os.register_at_fork\n" + _PREAMBLE,
+    )
+    assert "DELIVERED ['no fork']" in out, out

@@ -1373,8 +1373,11 @@ NB_MODULE(_tesseract_common, m) {
           "Wait until the Python OutputHandlers have received every message logged so far. Returns "
           "at once when called from a handler. A handler waiting for the calling thread blocks it.");
     nb::module_::import_("atexit").attr("register")(nb::cpp_function(&tesseract_nb_common::stop_log_delivery));
-    nb::module_::import_("os").attr("register_at_fork")(
-        "after_in_child"_a = nb::cpp_function(&tesseract_nb_common::reset_log_delivery_after_fork));
+    // os.register_at_fork exists exactly where os.fork does: not on Windows, which has no fork.
+    nb::module_ os_module = nb::module_::import_("os");
+    if (nb::hasattr(os_module, "register_at_fork"))
+        os_module.attr("register_at_fork")(
+            "after_in_child"_a = nb::cpp_function(&tesseract_nb_common::reset_log_delivery_after_fork));
 
     // ========== STL Container Bindings ==========
     // VectorVector3d - explicit binding for aligned Eigen vectors (NB_MAKE_OPAQUE at top)
