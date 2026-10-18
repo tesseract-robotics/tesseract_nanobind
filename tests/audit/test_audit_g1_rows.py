@@ -442,3 +442,12 @@ def test_real_poly_as_instances_accepted(g1_reports, template, instances):
     for name in (template, *instances):
         assert (name, "template-instance-name") in accepted_pairs(report), name
     assert not {template, *instances} & open_names(report)
+
+
+def test_real_composite_erase_is_the_delitem_protocol(g1_reports):
+    """`erase(p)`/`erase(first, last)` are bound as `__delitem__` of an int and a slice (#269)."""
+    report = g1_reports[CL]
+    assert ("CompositeInstruction.__delitem__", "container-protocol") in accepted_pairs(report)
+    assert not {"CompositeInstruction.erase", "CompositeInstruction.__delitem__"} & open_names(
+        report
+    )

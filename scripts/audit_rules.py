@@ -15,6 +15,7 @@ PROTOCOL_MEMBERS = {
     "cbegin": "__iter__",
     "cend": "__iter__",
     "clone": "__deepcopy__",  # clone-as-copy (R9)
+    "erase": "__delitem__",  # container-protocol: `del c[i]`, `del c[i:j]`
 }
 # Python protocol dunders accepted by rule: dunder -> (ACCEPTED key, C++ members, keyed as in
 # `cpp_api`, the owner must declare). An owner with no C++ class (a bound std container
@@ -22,6 +23,7 @@ PROTOCOL_MEMBERS = {
 PROTOCOL_RULES = {
     "__len__": ("container-protocol", ("size",)),
     "__setitem__": ("container-protocol", ("__getitem__",)),
+    "__delitem__": ("container-protocol", ("erase",)),
     "__iter__": ("iterator-pair", ("begin", "end")),
     "__repr__": ("presentation-dunder", ()),
     "__str__": ("presentation-dunder", ()),
@@ -39,8 +41,9 @@ ACCEPTED = {
     "the binding passes the buffer and its size (`createMeshFromBytes`, `BytesResource`).",
     "scalar-last-quaternion": "Quaterniond takes (x, y, z, w), the project-wide scalar-last "
     "order; Eigen's constructor is (w, x, y, z).",
-    "container-protocol": "`size()` is bound as `__len__` and `operator[]` as "
-    "`__getitem__`/`__setitem__`, the Python container protocol.",
+    "container-protocol": "`size()` is bound as `__len__`, `operator[]` as "
+    "`__getitem__`/`__setitem__` and `erase` (one element, or a range) as `__delitem__` (of an "
+    "index, or a slice), the Python container protocol.",
     "iterator-pair": "A `begin()`/`end()` pair (and `cbegin`/`cend`) is bound as `__iter__`.",
     "stream-insertion": "A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__` "
     "(`T` a class or an enum).",
