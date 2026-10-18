@@ -451,3 +451,11 @@ def test_real_composite_erase_is_the_delitem_protocol(g1_reports):
     assert not {"CompositeInstruction.erase", "CompositeInstruction.__delitem__"} & open_names(
         report
     )
+
+
+def test_real_composite_range_insert_has_no_python_form(g1_reports):
+    """composite_instruction.h:386 `template <class InputIt> insert(pos, first, last)` (#269)."""
+    report = g1_reports[CL]
+    pair = ("CompositeInstruction.insert", "vector-forwarding-no-python-form")
+    assert pair in accepted_pairs(report)
+    assert "CompositeInstruction.insert" not in open_names(report)

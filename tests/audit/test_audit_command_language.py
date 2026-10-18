@@ -532,9 +532,9 @@ G1_RULE_TEXTS = {
     "assigns through it.",
     "vector-forwarding-no-python-form": "A class that forwards the `std::vector` interface "
     "leaves `data()` (raw pointer), `emplace`/`emplace_back` (perfect-forwarding templates), "
-    "`swap(std::vector&)` and the reverse iterators unbound: Python builds the element and passes "
-    "it to `push_back`/`insert`, and `reversed()` walks any sequence with `__len__` and "
-    "`__getitem__`.",
+    "the iterator-range `insert(pos, first, last)` template, `swap(std::vector&)` and the reverse "
+    "iterators unbound: Python builds the element and passes it to `push_back`/`insert`, and "
+    "`reversed()` walks any sequence with `__len__` and `__getitem__`.",
     "clone-as-copy": "`__copy__`/`__deepcopy__` bind the C++ copy constructor and return the "
     "concrete type; `clone()`, which returns the `unique_ptr<…Interface>` of the type erasure, "
     "is then covered by `__deepcopy__`.",
