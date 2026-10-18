@@ -17,20 +17,11 @@
     }
   },
   "tesseract_command_language": {
-    "CartesianWaypointPoly.as": {
-      "issue": "#268"
-    },
     "CartesianWaypointPoly_wrap_CartesianWaypoint": {
       "issue": "#328"
     },
     "CompositeInstruction.appendMoveInstruction": {
       "issue": "#328"
-    },
-    "CompositeInstruction.erase": {
-      "issue": "#269"
-    },
-    "CompositeInstruction.insert": {
-      "issue": "#269"
     },
     "InstructionPoly_as_CompositeInstruction": {
       "issue": "#328"
@@ -53,9 +44,6 @@
     "InstructionPoly_as_WaitInstruction": {
       "issue": "#328"
     },
-    "JointWaypointPoly.as": {
-      "issue": "#268"
-    },
     "JointWaypointPoly_wrap_JointWaypoint": {
       "issue": "#328"
     },
@@ -67,9 +55,6 @@
     },
     "MoveInstruction.assignStateWaypoint": {
       "issue": "#276"
-    },
-    "MoveInstructionPoly.as": {
-      "issue": "#268"
     },
     "MoveInstructionPoly.assignCartesianWaypoint": {
       "issue": "#276"
@@ -98,14 +83,8 @@
     "ProfileDictionary_addProfile": {
       "issue": "#276"
     },
-    "StateWaypointPoly.as": {
-      "issue": "#268"
-    },
     "StateWaypointPoly_wrap_StateWaypoint": {
       "issue": "#328"
-    },
-    "WaypointPoly.as": {
-      "issue": "#268"
     },
     "WaypointPoly_as_CartesianWaypointPoly": {
       "issue": "#328"
@@ -115,6 +94,9 @@
     },
     "WaypointPoly_as_StateWaypointPoly": {
       "issue": "#328"
+    },
+    "validateSeedStructure": {
+      "issue": "#274"
     }
   },
   "tesseract_common": {
@@ -342,14 +324,14 @@
     }
   },
   "tesseract_motion_planners": {
-    "MotionPlanner.checkRequest": {
-      "issue": "#332"
-    },
     "PlannerResponse.failed_instructions": {
       "issue": "#304"
     },
     "PlannerResponse.succeeded_instructions": {
       "issue": "#304"
+    },
+    "isValidState": {
+      "issue": "#333"
     }
   },
   "tesseract_motion_planners_descartes": {
@@ -361,9 +343,6 @@
     },
     "DescartesPlanProfileD": {
       "issue": "#335"
-    },
-    "WaypointSampler.print": {
-      "issue": "#310"
     },
     "cast_DescartesMoveProfileD": {
       "issue": "#334"
@@ -393,12 +372,6 @@
     },
     "OMPLRealVectorPlanProfile": {
       "issue": "#335"
-    },
-    "OMPLSolverConfig.addPlanner": {
-      "issue": "#302"
-    },
-    "OMPLSolverConfig.clearPlanners": {
-      "issue": "#302"
     },
     "ProfileDictionary_addOMPLMoveProfile": {
       "issue": "#334"
@@ -448,9 +421,6 @@
     },
     "TrajOptPlanProfile": {
       "issue": "#335"
-    },
-    "operator==": {
-      "issue": "#306"
     }
   },
   "tesseract_motion_planners_trajopt_ifopt": {
@@ -870,16 +840,10 @@
       "issue": "#290"
     },
     "Var.__init__": {
-      "issue": "#297"
-    },
-    "calcNumericalConstraintGradient": {
-      "issue": "#295"
+      "wont_fix": "`Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297)."
     }
   },
   "trajopt_sqp": {
-    "QPProblem.setVariables": {
-      "issue": "#282"
-    },
     "QPSolverStatus.QP_ERROR": {
       "issue": "#330"
     },
@@ -915,9 +879,6 @@
     },
     "SQPStatus.kTimeLimit": {
       "issue": "#330"
-    },
-    "TrajOptQPProblem.setVariables": {
-      "issue": "#282"
     }
   }
 }
