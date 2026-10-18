@@ -290,7 +290,6 @@ def test_real_unbound_dependency_rows(g3_reports, module, symbol):
         (IFOPT, "TrajOptIfoptMoveProfile.create"),  # I-sqp-6 (g3/06)
         (IFOPT, "TrajOptIfoptSolverProfile.callbacks"),  # I-sqp-5: trajopt_sqp is audited
         (IFOPT, "TrajOptIfoptSolverProfile.createOptimizationCallbacks"),  # I-sqp-5
-        (OMPL, "OMPLSolverConfig.planners"),  # I-mp-plan-3 (g3/04)
         # `ompl::base::State` is bound by `ompl_base` until #258 removes it: a Python form.
         (OMPL, "OMPLMoveProfile.createStateExtractor"),
         (OMPL, "OMPLRealVectorMoveProfile.createStateExtractor"),
