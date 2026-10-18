@@ -58,6 +58,8 @@ def test_console_bridge():
         tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG,
         "This is a test message 2",
     )
+    # A Python handler gets its messages on a delivery thread: wait for them.
+    tesseract_common.flushOutputHandlers()
     tesseract_common.restorePreviousOutputHandler()
 
     assert output_handler.last_text == "This is a test message 2"
