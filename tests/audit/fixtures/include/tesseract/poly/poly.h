@@ -47,6 +47,8 @@ private:
 
 bool isSquare(const ThingPoly& thing);  // free-function-as-method: bound as ThingPoly.isSquare
 bool isRound(const ThingPoly& thing);   // bound nowhere: gap
+bool operator==(const Square& a, const Square& b);  // free-function-as-method: Square.__eq__
+bool operator!=(const Circle& a, const Circle& b);  // Circle binds no __ne__: gap
 
 class Box
 {

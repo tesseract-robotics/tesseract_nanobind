@@ -287,7 +287,6 @@ def test_real_unbound_dependency_rows(g3_reports, module, symbol):
     [
         # Bindable or owned types: these stay binding-fix rows.
         (TRAJOPT, "TrajOptOSQPSolverProfile.settings"),  # osqp/ is not a root (I-mp-plan-7)
-        (TRAJOPT, "operator=="),  # OSQPSettings, same
         (IFOPT, "TrajOptIfoptMoveProfile.create"),  # I-sqp-6 (g3/06)
         (IFOPT, "TrajOptIfoptSolverProfile.callbacks"),  # I-sqp-5: trajopt_sqp is audited
         (IFOPT, "TrajOptIfoptSolverProfile.createOptimizationCallbacks"),  # I-sqp-5
@@ -651,3 +650,11 @@ def test_real_check_request_reason(g3_reports):
     for symbol in ("MotionPlanner.checkRequest", "MotionPlanner.checkRequestReason"):
         assert (symbol, "reason-out-param") in accepted_pairs(report), symbol
         assert symbol not in open_names(report)
+
+
+def test_real_free_equality_bound_as_the_dunder(g3_reports):
+    """trajopt_osqp_solver_profile.h:37 `operator==(const OSQPSettings&, const OSQPSettings&)`
+    is `OSQPSettings.__eq__` (#306)."""
+    report = g3_reports[TRAJOPT]
+    assert ("operator==", "free-function-as-method") in accepted_pairs(report)
+    assert "operator==" not in open_names(report)

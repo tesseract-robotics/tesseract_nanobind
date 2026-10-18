@@ -26,6 +26,7 @@ from audit_ownership import (
 )
 from audit_parse import (
     INCLUDE_DIRS,
+    OPERATOR_DUNDERS,
     STRINGSTREAM,
     Arity,
     CppOverload,
@@ -492,14 +493,16 @@ def _whole_symbol_rule(sym: CppSymbol) -> str | None:
 
 
 def _bound_as_method(name: str, sym: CppSymbol, py: PyApi, stub_roots: Sequence[Path]) -> bool:
-    """A free function whose every overload takes one class `T` and is bound as `T.name` (T7)."""
+    """A free function whose every overload takes one class `T` and is bound as `T.name`, or a
+    free binary operator on two `T` bound as `T`'s dunder (`operator==` -> `T.__eq__`) (T7)."""
     if "." in name or sym.kind is not Kind.FUNCTION or not sym.overloads:
         return False
+    leaf, n = (OPERATOR_DUNDERS[name], 2) if name in OPERATOR_DUNDERS else (name, 1)
     for ov in sym.overloads:
-        if ov.arity != Arity(1, 1) or len(ov.params) != 1:
+        if ov.arity != Arity(n, n) or len(ov.params) != n:
             return False
-        classes = [k[1] for k in ov.params[0] or () if k is not None and k[0] == "class"]
-        if not any(_py_member(f"{c}.{name}", py, stub_roots) for c in classes):
+        each = [{k[1] for k in p or () if k is not None and k[0] == "class"} for p in ov.params]
+        if not any(_py_member(f"{c}.{leaf}", py, stub_roots) for c in set.intersection(*each)):
             return False
     return True
 

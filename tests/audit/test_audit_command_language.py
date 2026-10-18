@@ -377,6 +377,14 @@ def test_free_predicate_bound_as_a_method_is_accepted(poly_report):
     assert "isRound" in {g.symbol for g in poly_report.gaps}
 
 
+def test_free_binary_operator_bound_as_the_dunder_is_accepted(poly_report):
+    """`operator==(const Square&, const Square&)` is `Square.__eq__`; `operator!=` on two
+    `Circle`s stays a gap, `Circle` binds no `__ne__`."""
+    assert ("operator==", "free-function-as-method") in accepted_pairs(poly_report)
+    assert "operator==" not in open_names(poly_report)
+    assert "operator!=" in {g.symbol for g in poly_report.gaps}
+
+
 def test_type_index_getter_accepted(poly_report):
     assert ("ThingPoly.getType", "type-index") in accepted_pairs(poly_report)
 
@@ -468,6 +476,7 @@ def test_poly_alternatives_change_no_other_fixture_row(poly_report):
         ("Circle.clone", "—"),
         ("ThingPoly.is", "—"),
         ("isRound", "—"),
+        ("operator!=", "—"),
         ("Lonely.__init__", "1"),
     }
     assert len([g for g in poly_report.gaps if g.symbol == "Lonely.__init__"]) == 2
@@ -481,6 +490,7 @@ def test_poly_alternatives_change_no_other_fixture_row(poly_report):
         ("ThingPoly.as", "template-instance-name"),
         ("ThingPoly.asSquare", "template-instance-name"),
         ("isSquare", "free-function-as-method"),
+        ("operator==", "free-function-as-method"),
         ("Box.put", "poly-alternative-overloads"),
         ("Box.setThing", "reference-setter"),
         *{
@@ -516,7 +526,8 @@ G1_RULE_TEXTS = {
     "free-function-as-method": "A free predicate whose only parameter is `const T&` is bound as "
     "a method of `T` (`isWaitInstruction(const InstructionPoly&)` → "
     "`InstructionPoly.isWaitInstruction()`), beside `T`'s member predicates of the same shape "
-    "(`isMoveInstruction`).",
+    "(`isMoveInstruction`); a free binary operator on two `const T&` is bound as `T`'s dunder "
+    "(`operator==(const OSQPSettings&, const OSQPSettings&)` → `OSQPSettings.__eq__`).",
     "type-index": "`getType()` returns a `std::type_index`, which has no Python form; the bound "
     "`is…()` predicates and `as…()` casts answer the same question by name.",
     "type-erasure-interface": "The abstract `…Interface` of a type-erased `…Poly` is its C++ "
