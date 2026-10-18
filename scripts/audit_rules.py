@@ -160,6 +160,10 @@ ACCEPTED = {
     "ifopt-problem-only": "An overload taking `trajopt_ifopt::Problem` serves the "
     "`IfoptQPProblem` path, which is not Python API (`trajopt_sqp/ifopt_qp_problem.h` is "
     "unaudited); `TrajOptQPProblem` is the bound problem.",
+    "sized-double-array": "`QPProblem::setVariables(const double* x)` reads `getNumNLPVars()` "
+    "doubles through the pointer, with no length parameter; Python passes one float array, which "
+    "the binding checks against `getNumNLPVars()` (`VariablesSizeError`) before passing its "
+    "data.",
     "nodes-variables-factory": "`createNodesVariables` builds a `NodesVariables` of one vector "
     "`Var` per waypoint in one call, the layout every `TrajOptQPProblem` example uses; the C++ "
     "constructor takes `std::vector<std::unique_ptr<Node>>`, which this factory fills.",
@@ -393,6 +397,9 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     ): "vector-forwarding-no-python-form",
     # Group 2 (trajopt).
     ("trajopt_ifopt", "ContinuousCollisionConstraint.__init__", "3-7"): "split-var-pair",
+    # qp_problem.h:49, trajopt_qp_problem.h:30 `setVariables(const double* x)` (#282).
+    ("trajopt_sqp", "QPProblem.setVariables", "1"): "sized-double-array",
+    ("trajopt_sqp", "TrajOptQPProblem.setVariables", "1"): "sized-double-array",
     # tesseract_task_composer (#256 group 4). any_poly.h:115 `AnyPoly(const AnyInterface&)`: the
     # arity-1 forwarding ctor templates (:121, :138) are template-instance-name before this table.
     ("tesseract_task_composer", "AnyPoly.__init__", "1"): "type-erasure-interface",
@@ -407,6 +414,13 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
 ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
     # Group 2 (trajopt).
     ("trajopt_sqp", "OSQPEigenSolver.setWarmStart", ("bool",)): UNBOUND_DEPENDENCY,
+    (
+        "trajopt_sqp",
+        "QPProblem.setVariables",
+        (
+            "Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]",
+        ),
+    ): "sized-double-array",
     (
         "trajopt_ifopt",
         "ContinuousCollisionConstraint.__init__",
