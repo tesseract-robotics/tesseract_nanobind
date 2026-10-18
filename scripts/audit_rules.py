@@ -407,6 +407,8 @@ POLY_ALTERNATIVES: dict[str, tuple[str, ...]] = {
     "WaypointPoly": ("CartesianWaypointPoly", "JointWaypointPoly", "StateWaypointPoly"),
     "InstructionPoly": (
         "MoveInstructionPoly",
+        # instruction_poly.h:139 `InstructionPoly(const MoveInstructionInterface&)`.
+        "MoveInstruction",
         "CompositeInstruction",
         "WaitInstruction",
         "TimerInstruction",
