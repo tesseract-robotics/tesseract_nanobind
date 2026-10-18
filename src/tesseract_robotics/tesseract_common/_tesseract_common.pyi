@@ -1039,6 +1039,11 @@ def useOutputHandler(handler: OutputHandler) -> None: ...
 
 def restorePreviousOutputHandler() -> None: ...
 
+def flushOutputHandlers() -> None:
+    """
+    Wait until the Python OutputHandlers have received every message logged so far. Returns at once when called from a handler. A handler waiting for the calling thread blocks it.
+    """
+
 class VectorVector3d:
     def __init__(self) -> None: ...
 
