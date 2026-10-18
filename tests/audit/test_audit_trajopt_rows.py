@@ -54,11 +54,12 @@ def test_trajopt_sqp_includes_of_trajopt_ifopt_headers_are_not_delegated(g2_repo
 # Task 2 (T11): compound-assignment operators are keyed by their dunders.
 
 
-def test_unbound_inplace_operator_is_a_gap_under_its_dunder(g2_reports):
-    # trajopt_ifopt Bounds: unbound until #286 lands.
-    gaps = {g.symbol for g in g2_reports["trajopt_ifopt"].gaps}
-    assert {"Bounds.__iadd__", "Bounds.__isub__"} <= gaps
-    assert not {"Bounds.operator+=", "Bounds.operator-="} & gaps
+def test_inplace_operator_is_keyed_by_its_dunder(g2_reports):
+    # trajopt_ifopt Bounds: #345 binds `__iadd__`/`__isub__` (#286), which cover the C++
+    # `operator+=`/`operator-=` rows; neither spelling is open.
+    report = g2_reports["trajopt_ifopt"]
+    assert not {"Bounds.__iadd__", "Bounds.__isub__"} & open_rows(report)
+    assert not {"Bounds.operator+=", "Bounds.operator-="} & open_rows(report)
 
 
 # Task 3 (T10 + R15): `k-prefix-enumerator`.
@@ -106,6 +107,9 @@ K_PREFIX_ACCEPTED = {
         ),
         *(f"RangeBoundHandling.{e}" for e in ("kKeepAsIs", "kSplitToTwoInequalities")),
         *(f"RangeBoundHandling.{e}" for e in ("KEEP_AS_IS", "SPLIT_TO_TWO_INEQUALITIES")),
+        # `Differentiable::Mode` (core/component.h:200), bound by #345.
+        *(f"Differentiable.Mode.{e}" for e in ("kStackRows", "kSumToScalar")),
+        *(f"Differentiable.Mode.{e}" for e in ("STACK_ROWS", "SUM_TO_SCALAR")),
     },
 }
 
@@ -152,18 +156,16 @@ def test_real_osqp_rows_accepted(g2_reports, symbol):
 
 
 @pytest.mark.parametrize(
-    "symbol", ["OSQPEigenSolver.setDefaultOSQPSettings", "OSQPEigenSolver.solver_"]
+    "symbol",
+    [
+        "OSQPEigenSolver.setDefaultOSQPSettings",
+        "OSQPEigenSolver.solver_",
+        # #345 binds the C++ setWarmStart(const QPProblem&) (#283).
+        "OSQPEigenSolver.setWarmStart",
+    ],
 )
 def test_real_osqp_whole_symbols_leave_no_gap(g2_reports, symbol):
-    # setWarmStart is not here: its C++ QPProblem overload stays a gap (#283).
     assert symbol not in {g.symbol for g in g2_reports["trajopt_sqp"].gaps}
-
-
-def test_real_osqp_warm_start_from_problem_stays_a_gap(g2_reports):
-    """The C++ setWarmStart(const QPProblem&) is unbound: binding-fix #283."""
-    assert ("OSQPEigenSolver.setWarmStart", "1") in {
-        (g.symbol, g.arity) for g in g2_reports["trajopt_sqp"].gaps
-    }
 
 
 # Task 5: symbol- and overload-level rules R22-R27.
@@ -172,8 +174,6 @@ def test_real_osqp_warm_start_from_problem_stays_a_gap(g2_reports):
 @pytest.mark.parametrize(
     ("symbol", "rule"),
     [
-        ("Var.getParent", "parent-back-pointer"),
-        ("Node.getParent", "parent-back-pointer"),
         ("Component.print", "stdout-printer"),
         ("NodesVariables.addObserver", "unimplemented-observer"),
         ("calcNumericalCostGradient", "ifopt-problem-only"),
@@ -184,6 +184,15 @@ def test_real_trajopt_ifopt_symbol_rules(g2_reports, symbol, rule):
     report = g2_reports["trajopt_ifopt"]
     assert (symbol, rule) in accepted_pairs(report)
     assert symbol not in open_rows(report)
+
+
+@pytest.mark.parametrize("symbol", ["Var.getParent", "Node.getParent"])
+def test_real_get_parent_is_covered(g2_reports, symbol):
+    """#345 binds both back-pointers (resolved through a registry of live sets, raising
+    NodeParentUnavailableError otherwise), so no rule accepts them."""
+    report = g2_reports["trajopt_ifopt"]
+    assert symbol not in open_rows(report)
+    assert symbol not in {a.symbol for a in report.accepted}
 
 
 def test_real_split_var_pair_accepts_both_overloads(g2_reports):
@@ -211,7 +220,6 @@ def test_every_g2_table_entry_fires(g2_reports):
     [
         "k-prefix-enumerator",
         "unbound-dependency-type",
-        "parent-back-pointer",
         "stdout-printer",
         "unimplemented-observer",
         "split-var-pair",
@@ -274,15 +282,16 @@ def test_g2_not_api_transitive_class_has_no_row(g2_reports, symbol):
 @pytest.mark.parametrize(
     "symbol",
     [
-        # trajopt_ifopt ledger rows 85, 91, 92, 15: binding-fix, next to not-API headers.
+        # trajopt_ifopt ledger rows 85, 91, 92, 15: binding-fix, next to not-API headers;
+        # #345 includes the three headers and binds CollisionCacheData.
         "trajopt_ifopt/constraints/collision/continuous_collision_numerical_constraint.h",
         "trajopt_ifopt/utils/numeric_differentiation.h",
         "trajopt_ifopt/utils/trajopt_utils.h",
         "CollisionCacheData",
     ],
 )
-def test_g2_binding_fix_neighbour_stays_a_gap(g2_reports, symbol):
-    assert symbol in {g.symbol for g in g2_reports["trajopt_ifopt"].gaps}
+def test_g2_binding_fix_neighbour_is_covered(g2_reports, symbol):
+    assert symbol not in open_rows(g2_reports["trajopt_ifopt"])
 
 
 G2_PATTERNS = {

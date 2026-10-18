@@ -111,9 +111,11 @@ def test_g1_module_is_audited(module):
 def test_profile_headers_are_audited_with_command_language(g1_reports):
     """`tesseract/common/profile*.h` are under tesseract_common's prefix, but its binding does
     not include them; `header_auditor` gives them to the first includer by name, the command
-    language."""
+    language. #344 bound `ProfileDictionary.getAllProfileEntries`; `Profile.createKey` stays a
+    gap (#273)."""
     gaps = {g.symbol for g in g1_reports[CL].gaps}
-    assert {"Profile.createKey", "ProfileDictionary.getAllProfileEntries"} <= gaps
+    assert "Profile.createKey" in gaps
+    assert "ProfileDictionary.getAllProfileEntries" not in open_names(g1_reports[CL])
 
 
 def test_cereal_serialization_header_is_delegated_to_serialization(g1_reports):
@@ -122,38 +124,16 @@ def test_cereal_serialization_header_is_delegated_to_serialization(g1_reports):
     }
 
 
-def test_value_equality_rows_are_exactly_the_polys_and_the_concrete_types(g1_reports):
-    """Every `__eq__`/`__ne__` gap of the command language, binding-fix `00-value-equality.md`:
-    the six Polys' own operators (cl-poly rows 2, 3, 15, 17, 27, 28, 39, 41, 64, 65, 73, 78),
-    and the ten concrete types' operators inherited from their unbound `…Interface` (0b A,
-    cl-core rows 144-163)."""
-    eq_line = {
-        # The Polys declare their own `operator==`.
-        "CartesianWaypointPoly": ("cartesian_waypoint_poly.h", 304),
-        "InstructionPoly": ("instruction_poly.h", 240),
-        "JointWaypointPoly": ("joint_waypoint_poly.h", 309),
-        "MoveInstructionPoly": ("move_instruction_poly.h", 467),
-        "StateWaypointPoly": ("state_waypoint_poly.h", 330),
-        "WaypointPoly": ("waypoint_poly.h", 197),
-        # The concrete types inherit their interface's.
-        "CartesianWaypoint": ("cartesian_waypoint_poly.h", 136),
-        "JointWaypoint": ("joint_waypoint_poly.h", 148),
-        "StateWaypoint": ("state_waypoint_poly.h", 158),
-        "MoveInstruction": ("move_instruction_poly.h", 215),
-        **{c: ("instruction_poly.h", 114) for c in CONCRETE[4:]},
-    }
+def test_value_equality_rows_are_covered(g1_reports):
+    """#344 binds `__eq__`/`__ne__` on the six Polys and the ten concrete types (binding-fix
+    `00-value-equality.md`; cl-poly rows 2, 3, 15, 17, 27, 28, 39, 41, 64, 65, 73, 78 and
+    cl-core rows 144-163 were its gaps), so no value-equality row is open."""
     expected = {
-        (f"{c}.{dunder}", f"{CL_PREFIX}poly/{header}:{line + offset}")
-        for c, (header, line) in eq_line.items()
-        for dunder, offset in (("__eq__", 0), ("__ne__", 1))
-    }
-    rows = {
-        (g.symbol, g.location)
-        for g in g1_reports[CL].gaps
-        if g.symbol.endswith((".__eq__", ".__ne__"))
+        f"{c}.{dunder}" for c in (*POLY_INTERFACES, *CONCRETE) for dunder in ("__eq__", "__ne__")
     }
     assert len(expected) == 32
-    assert rows == expected
+    assert not expected & open_names(g1_reports[CL])
+    assert not [g for g in g1_reports[CL].gaps if g.symbol.endswith((".__eq__", ".__ne__"))]
 
 
 # Task 3: T2 member-template instances.
@@ -181,8 +161,10 @@ def test_real_profile_template_overload_accepted(g1_reports):
     report = g1_reports[CL]
     assert ("ProfileDictionary.getProfile", "profile-key-template") in accepted_pairs(report)
     assert "ProfileDictionary.getProfile" not in {g.symbol for g in report.gaps}
-    # The vector-names overload of addProfile is binding-fix g1/11, not this rule.
-    assert ("ProfileDictionary.addProfile", "3") in {(g.symbol, g.arity) for g in report.gaps}
+    # The vector-names overload of addProfile (binding-fix g1/11) is bound by #344, not
+    # accepted by this rule.
+    assert "ProfileDictionary.addProfile" not in {g.symbol for g in report.gaps}
+    assert ("ProfileDictionary.addProfile", "profile-key-template") not in accepted_pairs(report)
 
 
 # Task 5: T7 + R17, R3, R1, R5, R10.
@@ -268,9 +250,15 @@ def test_real_composite_instruction_vector_members_accepted(g1_reports, leaf):
         )
     ],
 )
-def test_real_clone_rows_stay_gaps_until_the_copy_protocol_is_bound(g1_reports, symbol):
-    """Binding-fix g1/02 binds `__copy__`/`__deepcopy__`; then these rows leave the report."""
-    assert symbol in {g.symbol for g in g1_reports[CL].gaps}
+def test_real_clone_rows_are_covered_by_the_copy_protocol(g1_reports, symbol):
+    """#344 (binding-fix g1/02) binds `__copy__`/`__deepcopy__`: R9 maps `clone` to
+    `__deepcopy__`, so the row is covered and the two dunders are accepted as clone-as-copy."""
+    cls = symbol.removesuffix(".clone")
+    report = g1_reports[CL]
+    assert symbol not in open_names(report)
+    assert {(f"{cls}.__copy__", "clone-as-copy"), (f"{cls}.__deepcopy__", "clone-as-copy")} <= (
+        accepted_pairs(report)
+    )
 
 
 # Task 7: T9 + R8 poly-alternative-overloads.
@@ -295,34 +283,36 @@ def test_poly_alternatives_convert_through_a_poly_constructor(cl_tu, poly):
 
 def test_real_poly_alternative_overloads_accepted(g1_reports):
     """`MoveInstruction.__init__`: the 6 Python overloads per waypoint alternative (cl-core rows
-    121-126) and the C++ ctor `move_instruction.h:71` (cl-core row 37), which those overloads
-    cover at arity 2-3."""
+    121-126). The C++ ctor `move_instruction.h:71` (cl-core row 37) is covered directly since
+    #344 binds its `manipulator_info`, so the rule no longer accepts it.
+    `CompositeInstruction.push_back`: the 8 Python overloads per instruction alternative
+    (#344 adds `MoveInstructionPoly`)."""
     report = g1_reports[CL]
     rows = [(a.symbol, a.rule) for a in report.accepted if a.rule == "poly-alternative-overloads"]
-    assert rows.count(("CompositeInstruction.push_back", "poly-alternative-overloads")) == 7
-    assert rows.count(("MoveInstruction.__init__", "poly-alternative-overloads")) == 7
+    assert rows.count(("CompositeInstruction.push_back", "poly-alternative-overloads")) == 8
+    assert rows.count(("MoveInstruction.__init__", "poly-alternative-overloads")) == 6
     assert "CompositeInstruction.push_back" not in {d.name for d in report.deviations}
 
 
-def test_real_move_instruction_ctors_stay_binding_fix(g1_reports):
-    """g1/03 (#264): the `path_profile` overload is unbound, one constructor gap (cl-core row
-    38). The `(waypoint, type, profile, manipulator_info)` ctor (row 37) is covered at arity
-    2-3 through the waypoint alternatives and accepted (R8); its unbound trailing
-    `manipulator_info` returns as a gap once #251 lands. The Python overloads per waypoint
-    alternative are accepted, not deviations (cl-core rows 121-126)."""
+def test_real_move_instruction_ctors_are_covered(g1_reports):
+    """g1/03 (#264): #344 binds the `path_profile` overload (cl-core row 38, was the
+    `move_instruction.h:84` gap) and the trailing `manipulator_info` of both ctors, so no
+    constructor gap remains. The Python overloads per waypoint alternative are accepted, not
+    deviations (cl-core rows 121-126)."""
     report = g1_reports[CL]
     ctor_gaps = [
         g
         for g in report.gaps
         if g.symbol == "MoveInstruction.__init__" and g.kind is audit.Kind.CONSTRUCTOR
     ]
-    assert [g.location for g in ctor_gaps] == ["tesseract/command_language/move_instruction.h:84"]
+    assert ctor_gaps == []
     assert "MoveInstruction.__init__" not in {d.name for d in report.deviations}
 
 
-# Every row the group 1 rules accept, exactly: the 47 NEW command-language rows of the
-# cl-core and cl-poly ledgers plus cl-core row 37 (covered through the waypoint alternatives
-# until #251), and the 5 NEW time-parameterization rows.
+# Every row the group 1 rules accept, exactly: the NEW command-language rows of the cl-core
+# and cl-poly ledgers as #344 left them (cl-core row 37 is covered directly; `insert`,
+# `setUserData` and the `MoveInstructionPoly` push_back are new; the 32 `__copy__`/
+# `__deepcopy__` rows are R9's), and the 5 NEW time-parameterization rows.
 
 G1_ACCEPTED = {
     CL: Counter(
@@ -339,13 +329,19 @@ G1_ACCEPTED = {
             },
             ("MoveInstruction.setWaypoint", "reference-setter"): 1,
             ("MoveInstructionPoly.setWaypoint", "reference-setter"): 1,
+            ("CompositeInstruction.setUserData", "reference-setter"): 1,
             **{
                 (f"CompositeInstruction.{leaf}", "vector-forwarding-no-python-form"): 1
-                for leaf in VECTOR_FORWARDING_LEAVES
+                for leaf in (*VECTOR_FORWARDING_LEAVES, "insert")
             },
             ("ProfileDictionary.getProfile", "profile-key-template"): 1,
-            ("CompositeInstruction.push_back", "poly-alternative-overloads"): 7,
-            ("MoveInstruction.__init__", "poly-alternative-overloads"): 7,
+            ("CompositeInstruction.push_back", "poly-alternative-overloads"): 8,
+            ("MoveInstruction.__init__", "poly-alternative-overloads"): 6,
+            **{
+                (f"{c}.{dunder}", "clone-as-copy"): 1
+                for c in (*POLY_INTERFACES, *CONCRETE)
+                for dunder in ("__copy__", "__deepcopy__")
+            },
         }
     ),
     TP: Counter(
@@ -363,7 +359,7 @@ G1_ACCEPTED = {
 @pytest.mark.parametrize("module", G1)
 def test_g1_rules_accept_exactly_the_ledger_rows(g1_reports, module):
     rows = Counter((a.symbol, a.rule) for a in g1_reports[module].accepted if a.rule in G1_RULES)
-    assert G1_ACCEPTED[CL].total() == 48
+    assert G1_ACCEPTED[CL].total() == 82
     assert G1_ACCEPTED[TP].total() == 5
     assert rows == G1_ACCEPTED[module]
 
@@ -381,16 +377,16 @@ def test_tp_profile_is_covered_and_its_abbreviation_stays_open(g1_reports, cpp, 
 
 
 @pytest.mark.parametrize("cpp", TP_PROFILES)
-def test_tp_profile_members_are_audited(g1_reports, cpp):
-    """The members the abbreviation hid are rows: `__eq__`/`__ne__` until 00-value-equality."""
-    gaps = {g.symbol for g in g1_reports[TP].gaps}
-    assert {f"{cpp}.__eq__", f"{cpp}.__ne__"} <= gaps
+def test_tp_profile_members_are_covered(g1_reports, cpp):
+    """The members the abbreviation hid are audited; #344 binds their `__eq__`/`__ne__`
+    (00-value-equality), so neither is open."""
+    assert not {f"{cpp}.__eq__", f"{cpp}.__ne__"} & open_names(g1_reports[TP])
 
 
-def test_isp_minimum_time_delta_is_a_gap(g1_reports):
-    """Binding-fix g1/21, hidden behind the abbreviation before 0b T3."""
-    gaps = {g.symbol for g in g1_reports[TP].gaps}
-    assert "IterativeSplineParameterizationCompositeProfile.minimum_time_delta" in gaps
+def test_isp_minimum_time_delta_is_covered(g1_reports):
+    """Binding-fix g1/21, hidden behind the abbreviation before 0b T3; #344 binds it."""
+    symbol = "IterativeSplineParameterizationCompositeProfile.minimum_time_delta"
+    assert symbol not in open_names(g1_reports[TP])
 
 
 # Task 9: every group 1 table entry fires; every group 1 rule is in the report.
