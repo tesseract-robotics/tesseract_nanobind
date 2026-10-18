@@ -658,3 +658,10 @@ def test_real_free_equality_bound_as_the_dunder(g3_reports):
     report = g3_reports[TRAJOPT]
     assert ("operator==", "free-function-as-method") in accepted_pairs(report)
     assert "operator==" not in open_names(report)
+
+
+def test_real_sampler_print_is_the_stream_insertion_hook(descartes_report):
+    """waypoint_sampler.h:63 `print(std::ostream&)` is what the friend `operator<<` writes,
+    bound as `DescartesWaypointSamplerD.__str__` (#310)."""
+    assert ("WaypointSampler.print", "stream-insertion") in accepted_pairs(descartes_report)
+    assert "WaypointSampler.print" not in open_names(descartes_report)
