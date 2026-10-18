@@ -51,8 +51,8 @@ constexpr std::size_t LOG_DELIVERY_BATCH = 256;
 
 // Interpreter exit: time [ms] the delivery thread gets to deliver what is queued; every message not
 // yet handed to a handler then goes to stderr, and a delivery thread still inside a handler is left
-// behind. Two seconds keeps exit
-// prompt while a full queue of fast handlers (microseconds each) is delivered in full.
+// behind. Two seconds keeps exit prompt while a full queue of fast handlers (microseconds each) is
+// delivered in full.
 constexpr std::chrono::milliseconds LOG_EXIT_BUDGET{ 2000 };
 
 class PyOutputHandler;
@@ -94,6 +94,10 @@ struct LogDelivery {
     bool stopping = false;
     std::chrono::steady_clock::time_point stop_deadline;
     bool stopped = false;  // later messages go to stderr: Python is going away
+    // A child forked in a handler whose forking thread returned from it: no atexit stops the
+    // delivery thread there, which would keep the child alive. It exits whenever the queue is
+    // empty instead; the next message starts another.
+    bool exit_when_idle = false;
     // Mirrors console_bridge's current and previous handler, so each Python handler console_bridge
     // can call stays alive until useOutputHandler / restorePreviousOutputHandler drops it.
     std::shared_ptr<HandlerRef> current;
@@ -192,14 +196,22 @@ public:
 // Each message is claimed (in_flight_next) under `mutex` before it is handed over, so exit prints
 // exactly the messages no handler got. A handler that forks leaves a copy of this thread as the
 // child's only thread: that copy stops at once, before touching `d`, whose mutex another parent
-// thread may have held; the child starts its own delivery thread on fresh state.
+// thread may have held; the child starts its own delivery thread on fresh state. The copy then
+// ends, and with it the child once its other threads end: the child's delivery thread exits when
+// idle from then on (exit_when_idle) instead of waiting forever.
 inline void deliver_log_messages(LogDelivery* delivery) {
     LogDelivery& d = *delivery;
     std::unique_lock<std::mutex> lock(d.mutex);
     for (;;) {
-        d.pending.wait(lock, [&] { return !d.queue.empty() || !d.dropped_by.empty() || d.stopping; });
+        d.pending.wait(lock, [&] {
+            return !d.queue.empty() || !d.dropped_by.empty() || d.stopping || d.exit_when_idle;
+        });
         if (d.stopping && (d.queue.empty() || std::chrono::steady_clock::now() >= d.stop_deadline)) {
             // stop_log_delivery takes what is left.
+            return;
+        }
+        if (d.exit_when_idle && d.queue.empty() && d.dropped_by.empty()) {
+            d.started = false;  // the next message starts another delivery thread
             return;
         }
         const std::size_t count = std::min(d.queue.size(), LOG_DELIVERY_BATCH);
@@ -216,8 +228,14 @@ inline void deliver_log_messages(LogDelivery* delivery) {
             nb::gil_scoped_acquire gil;
             for (;;) {
                 // The GIL orders this read after reset_log_delivery_after_fork in a forked child.
-                if (&d != log_delivery_state())
-                    return;  // the parent's state: its messages stay with the parent
+                if (&d != log_delivery_state()) {
+                    // The parent's state: its messages stay with the parent.
+                    LogDelivery& child = *log_delivery_state();
+                    std::lock_guard<std::mutex> idle(child.mutex);
+                    child.exit_when_idle = true;
+                    child.pending.notify_one();
+                    return;
+                }
                 const LogMessage* message = nullptr;
                 {
                     std::lock_guard<std::mutex> claim(d.mutex);
@@ -258,7 +276,8 @@ inline void flush_python_output_handlers() {
         return;
     nb::gil_scoped_release release;
     std::unique_lock<std::mutex> lock(d.mutex);
-    const std::uint64_t target = d.enqueued;
+    // Each handler in dropped_by gets one drop notice, queued after every message counted so far.
+    const std::uint64_t target = d.enqueued + d.dropped_by.size();
     d.delivered.wait(lock, [&] { return d.delivered_count >= target || d.stopped; });
 }
 
