@@ -20,6 +20,7 @@
 #include <console_bridge/console.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -30,8 +31,10 @@
 #include <iterator>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace tesseract_nb_common {
 
@@ -46,8 +49,9 @@ constexpr std::size_t LOG_QUEUE_CAPACITY = 10000;
 // LOG_QUEUE_CAPACITY handler calls and checks the exit deadline as rarely.
 constexpr std::size_t LOG_DELIVERY_BATCH = 256;
 
-// Interpreter exit: time [ms] the delivery thread gets to deliver what is queued; the rest goes to
-// stderr and a delivery thread still inside a handler is left behind. Two seconds keeps exit
+// Interpreter exit: time [ms] the delivery thread gets to deliver what is queued; every message not
+// yet handed to a handler then goes to stderr, and a delivery thread still inside a handler is left
+// behind. Two seconds keeps exit
 // prompt while a full queue of fast handlers (microseconds each) is delivered in full.
 constexpr std::chrono::milliseconds LOG_EXIT_BUDGET{ 2000 };
 
@@ -59,12 +63,13 @@ class PyOutputHandler;
 struct HandlerRef {
     PyOutputHandler* handler;
     nb::object object;
+    std::uint64_t dropped = 0;  // messages to this handler dropped since its last drop notice; `mutex`
 };
 
 struct LogMessage {
     std::string text;
     console_bridge::LogLevel level;
-    std::string filename;
+    std::optional<std::string> filename;  // none: C++ logged a null filename, Python gets None
     int line;
     std::shared_ptr<HandlerRef> handler;  // the handler installed when it was logged
 };
@@ -74,12 +79,18 @@ struct LogDelivery {
     std::condition_variable pending;    // the delivery thread: a message, or stop
     std::condition_variable delivered;  // flush and stop: a batch was delivered, or stopped
     std::deque<LogMessage> queue;
-    std::uint64_t enqueued = 0;
+    // The batch the delivery thread took off the queue; it hands in_flight[in_flight_next] to its
+    // handler next. Only the delivery thread changes either, holding `mutex`; exit prints the rest.
+    std::deque<LogMessage> in_flight;
+    std::size_t in_flight_next = 0;
+    std::uint64_t enqueued = 0;  // messages and drop notices queued, ever
     std::uint64_t delivered_count = 0;
-    std::uint64_t dropped_unreported = 0;  // dropped since the last drop notice
-    bool delivering = false;               // a batch is off the queue, being delivered
+    // Handlers with drops not yet reported (HandlerRef::dropped), each once. A logger only adds a
+    // copy; a notice takes the reference over, so no logger drops one.
+    std::vector<std::shared_ptr<HandlerRef>> dropped_by;
+    bool delivering = false;  // a batch is off the queue, being delivered
     bool started = false;
-    std::thread::id thread_id;
+    std::atomic<std::thread::id> thread_id{};  // read unlocked by flush
     bool stopping = false;
     std::chrono::steady_clock::time_point stop_deadline;
     bool stopped = false;  // later messages go to stderr: Python is going away
@@ -98,13 +109,25 @@ inline LogDelivery*& log_delivery_state() {
 
 inline void print_to_stderr(const std::string& text) { std::fprintf(stderr, "%s\n", text.c_str()); }
 
-inline LogMessage drop_notice(LogDelivery& d, std::shared_ptr<HandlerRef> handler) {
-    LogMessage notice{ "tesseract_common: dropped " + std::to_string(d.dropped_unreported) +
+// The drop notice for `handler`, which takes the reference over; resets its count. With `mutex`.
+inline LogMessage drop_notice(std::shared_ptr<HandlerRef> handler) {
+    LogMessage notice{ "tesseract_common: dropped " + std::to_string(handler->dropped) +
                            " log messages: the Python OutputHandler fell behind (queue of " +
                            std::to_string(LOG_QUEUE_CAPACITY) + ")",
-                       console_bridge::CONSOLE_BRIDGE_LOG_WARN, __FILE__, __LINE__, std::move(handler) };
-    d.dropped_unreported = 0;
+                       console_bridge::CONSOLE_BRIDGE_LOG_WARN, std::string(__FILE__), __LINE__, std::move(handler) };
+    notice.handler->dropped = 0;
     return notice;
+}
+
+// Queue a drop notice for every handler with unreported drops, ahead of what is queued next, and
+// count them as queued (a flush started now waits for them). With `mutex`.
+template <class Sink>
+inline void queue_drop_notices_locked(LogDelivery& d, Sink& sink) {
+    for (auto& handler : d.dropped_by) {
+        sink.push_back(drop_notice(std::move(handler)));
+        ++d.enqueued;
+    }
+    d.dropped_by.clear();  // moved from: no reference is dropped here
 }
 
 inline void deliver_log_messages(LogDelivery* delivery);
@@ -112,7 +135,7 @@ inline void deliver_log_messages(LogDelivery* delivery);
 // Start the delivery thread, with `d.mutex` held. Lazily, on the first message: also after a fork.
 inline void start_log_delivery_locked(LogDelivery& d) {
     std::thread thread(deliver_log_messages, &d);
-    d.thread_id = thread.get_id();
+    d.thread_id.store(thread.get_id());
     thread.detach();  // never joined: exit waits a bounded time (stop_log_delivery)
     d.started = true;
 }
@@ -138,25 +161,25 @@ public:
             print_to_stderr(text);
             return;
         }
-        const std::size_t needed = d.dropped_unreported != 0 ? 2 : 1;
-        if (d.queue.size() + needed > LOG_QUEUE_CAPACITY) {
-            ++d.dropped_unreported;
+        if (d.queue.size() + d.dropped_by.size() + 1 > LOG_QUEUE_CAPACITY) {
+            if (std::find(d.dropped_by.begin(), d.dropped_by.end(), *ref) == d.dropped_by.end())
+                d.dropped_by.push_back(*ref);
+            ++(*ref)->dropped;
             return;
         }
         if (!d.started)
             start_log_delivery_locked(d);
-        if (d.dropped_unreported != 0) {
-            d.queue.push_back(drop_notice(d, *ref));
-            ++d.enqueued;
-        }
-        d.queue.push_back({ text, level, filename == nullptr ? std::string() : std::string(filename), line, *ref });
+        queue_drop_notices_locked(d, d.queue);
+        d.queue.push_back({ text, level,
+                            filename == nullptr ? std::nullopt : std::optional<std::string>(filename), line,
+                            *ref });
         ++d.enqueued;
         d.pending.notify_one();
     }
 
     // The Python override, with the GIL held (delivery thread).
     void deliver(const LogMessage& m) {
-        NB_OVERRIDE_PURE_NAME("log", log, m.text, m.level, m.filename.c_str(), m.line);
+        NB_OVERRIDE_PURE_NAME("log", log, m.text, m.level, m.filename ? m.filename->c_str() : nullptr, m.line);
     }
 };
 
@@ -164,49 +187,64 @@ public:
 // one GIL acquisition. A handler that raises is reported through sys.unraisablehook and the next
 // message is delivered: there is no caller to raise into. (Called synchronously, the exception
 // propagated into whichever C++ code logged.) Drops not yet reported when the queue runs empty
-// are reported to the current handler.
+// are reported to the handlers whose messages were dropped, installed or not.
+//
+// Each message is claimed (in_flight_next) under `mutex` before it is handed over, so exit prints
+// exactly the messages no handler got. A handler that forks leaves a copy of this thread as the
+// child's only thread: that copy stops at once, before touching `d`, whose mutex another parent
+// thread may have held; the child starts its own delivery thread on fresh state.
 inline void deliver_log_messages(LogDelivery* delivery) {
     LogDelivery& d = *delivery;
     std::unique_lock<std::mutex> lock(d.mutex);
     for (;;) {
-        d.pending.wait(lock, [&] { return !d.queue.empty() || d.dropped_unreported != 0 || d.stopping; });
+        d.pending.wait(lock, [&] { return !d.queue.empty() || !d.dropped_by.empty() || d.stopping; });
         if (d.stopping && (d.queue.empty() || std::chrono::steady_clock::now() >= d.stop_deadline)) {
             // stop_log_delivery takes what is left.
             return;
         }
         const std::size_t count = std::min(d.queue.size(), LOG_DELIVERY_BATCH);
-        std::deque<LogMessage> batch(std::make_move_iterator(d.queue.begin()),
-                                     std::make_move_iterator(d.queue.begin() + static_cast<std::ptrdiff_t>(count)));
+        d.in_flight.assign(std::make_move_iterator(d.queue.begin()),
+                           std::make_move_iterator(d.queue.begin() + static_cast<std::ptrdiff_t>(count)));
         d.queue.erase(d.queue.begin(), d.queue.begin() + static_cast<std::ptrdiff_t>(count));
+        d.in_flight_next = 0;
         d.delivering = true;
-        std::size_t notices = 0;
-        if (d.queue.empty() && d.dropped_unreported != 0 && d.current) {
-            batch.push_back(drop_notice(d, d.current));
-            notices = 1;
-        } else if (d.queue.empty()) {
-            d.dropped_unreported = 0;  // no Python handler to report to
-        }
+        if (d.queue.empty())
+            queue_drop_notices_locked(d, d.in_flight);
+        const std::size_t taken = d.in_flight.size();
         lock.unlock();
         {
             nb::gil_scoped_acquire gil;
-            for (const auto& message : batch) {
+            for (;;) {
+                // The GIL orders this read after reset_log_delivery_after_fork in a forked child.
+                if (&d != log_delivery_state())
+                    return;  // the parent's state: its messages stay with the parent
+                const LogMessage* message = nullptr;
+                {
+                    std::lock_guard<std::mutex> claim(d.mutex);
+                    if (d.stopped || d.in_flight_next == d.in_flight.size())
+                        break;  // stopped: exit printed the rest
+                    message = &d.in_flight[d.in_flight_next++];
+                }
                 try {
-                    message.handler->handler->deliver(message);
+                    message->handler->handler->deliver(*message);
                 } catch (nb::python_error& e) {
-                    e.discard_as_unraisable(message.handler->object);
+                    e.discard_as_unraisable(message->handler->object);
                 } catch (const std::exception& e) {  // e.g. a subclass without a log override
                     PyErr_SetString(PyExc_RuntimeError, e.what());
-                    PyErr_WriteUnraisable(message.handler->object.ptr());
+                    PyErr_WriteUnraisable(message->handler->object.ptr());
                 }
             }
-            batch.clear();  // handler references go with the GIL held
+            std::deque<LogMessage> done;  // handler references go with the GIL held
+            {
+                std::lock_guard<std::mutex> finish(d.mutex);
+                done.swap(d.in_flight);
+                d.in_flight_next = 0;
+                d.delivering = false;
+                d.delivered_count += taken;
+                d.delivered.notify_all();
+            }
         }
         lock.lock();
-        d.delivering = false;
-        d.delivered_count += count;
-        d.enqueued += notices;
-        d.delivered_count += notices;
-        d.delivered.notify_all();
     }
 }
 
@@ -216,7 +254,7 @@ inline void deliver_log_messages(LogDelivery* delivery) {
 // may be waiting on.
 inline void flush_python_output_handlers() {
     LogDelivery& d = *log_delivery_state();
-    if (std::this_thread::get_id() == d.thread_id)
+    if (std::this_thread::get_id() == d.thread_id.load())
         return;
     nb::gil_scoped_release release;
     std::unique_lock<std::mutex> lock(d.mutex);
@@ -257,12 +295,15 @@ inline void restore_previous_python_output_handler() {
 }
 
 // atexit, with the GIL held: let the delivery thread deliver what is queued for at most
-// LOG_EXIT_BUDGET, then stop. What is left goes to stderr, and so does every later message. A
-// delivery thread still inside a handler is left behind (it is detached); the messages it holds
-// and the handler references stay allocated, as Python is going away.
+// LOG_EXIT_BUDGET, then stop. Every message no handler got goes to stderr: the rest of the batch
+// the delivery thread holds, the queue, a line per handler with unreported drops, and every later
+// message. A delivery thread still inside a handler is left behind (it is detached); the message
+// that handler has is not repeated, and the references the thread holds stay allocated, as Python
+// is going away.
 inline void stop_log_delivery() {
     LogDelivery& d = *log_delivery_state();
-    std::deque<LogMessage> left;
+    std::deque<LogMessage> left;  // references: dropped with the GIL held, at return
+    std::vector<std::string> texts;
     {
         nb::gil_scoped_release release;
         std::unique_lock<std::mutex> lock(d.mutex);
@@ -273,13 +314,19 @@ inline void stop_log_delivery() {
         d.pending.notify_one();
         if (d.started)
             d.delivered.wait_until(lock, d.stop_deadline, [&] { return d.queue.empty() && !d.delivering; });
-        d.stopped = true;
+        d.stopped = true;  // the delivery thread hands over nothing more
+        if (d.delivering) {
+            for (std::size_t i = d.in_flight_next; i < d.in_flight.size(); ++i)
+                texts.push_back(d.in_flight[i].text);
+        }
+        queue_drop_notices_locked(d, d.queue);  // after the messages logged before the drops
         left.swap(d.queue);
         d.delivered.notify_all();
     }
+    for (const auto& text : texts)
+        print_to_stderr(text);
     for (const auto& message : left)
         print_to_stderr(message.text);
-    // Holding the GIL: dropping the references is safe.
 }
 
 // os.register_at_fork(after_in_child=...): the child has no delivery thread, and the parent's
@@ -292,6 +339,9 @@ inline void reset_log_delivery_after_fork() {
     auto* fresh = new LogDelivery();
     fresh->current = old->current;
     fresh->previous = old->previous;
+    for (auto* ref : { fresh->current.get(), fresh->previous.get() })
+        if (ref != nullptr)
+            ref->dropped = 0;  // the parent's drops, reported in the parent
     log_delivery_state() = fresh;  // `old` is leaked: its mutex may be held forever
 }
 
