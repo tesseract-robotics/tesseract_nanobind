@@ -10,32 +10,31 @@ post-processors, and validators into pipelines.
 ```python
 from tesseract_robotics.tesseract_task_composer import (
     TaskComposerPluginFactory, TaskflowTaskComposerExecutor,
-    TaskComposerDataStorage, TaskComposerContext,
-    createTaskComposerPluginFactory, createTaskComposerDataStorage,
+    TaskComposerDataStorage, TaskComposerContext, TaskComposerServer,
 )
 ```
 
 ## Quick Start
 
 ```python
+import tesseract_robotics
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import (
-    createTaskComposerPluginFactory, createTaskComposerDataStorage,
-    TaskflowTaskComposerExecutor,
-)
-from tesseract_robotics.tesseract_command_language import (
-    AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_as_CompositeInstruction,
+    AnyPoly_as_CompositeInstruction, AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_EnvironmentConst, AnyPoly_wrap_ProfileDictionary,
+    TaskComposerDataStorage, TaskComposerPluginFactory,
 )
 
 # Create factory and executor
-factory = createTaskComposerPluginFactory()
-executor = TaskflowTaskComposerExecutor(factory, 4)  # 4 threads
+config = tesseract_robotics.get_task_composer_config_path()  # a pathlib.Path
+factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 
 # Get pipeline task
 task = factory.createTaskComposerNode("TrajOptPipeline")
 
 # Setup data storage
-data = createTaskComposerDataStorage()
+data = TaskComposerDataStorage()
 data.setData("planning_input", AnyPoly_wrap_CompositeInstruction(program))
 data.setData("environment", AnyPoly_wrap_EnvironmentConst(env))
 data.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
@@ -54,32 +53,45 @@ result = AnyPoly_as_CompositeInstruction(context.data_storage.getData(output_key
 
 ### TaskComposerPluginFactory
 
-Loads pipeline definitions from YAML config.
+Loads pipeline definitions from YAML config. As on the kinematics and contact-manager plugin
+factories, an `os.PathLike` (`pathlib.Path`) is a config file and a `str` is YAML text:
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
-    TaskComposerPluginFactory, createTaskComposerPluginFactory
-)
+from pathlib import Path
 
-# Use bundled config (auto-configured)
-factory = createTaskComposerPluginFactory()
+from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
 
-# Or specify config file
-factory = TaskComposerPluginFactory(config_path)
+factory = TaskComposerPluginFactory(Path(config_path), locator)       # a file
+factory = TaskComposerPluginFactory(Path(config_path).read_text(), locator)  # YAML text
+
+# Or build it up
+factory = TaskComposerPluginFactory()
+factory.loadConfig(Path(config_path), locator)
 
 # Get available pipelines
 # Common pipelines: TrajOptPipeline, OMPLPipeline, FreespacePipeline
 task = factory.createTaskComposerNode("TrajOptPipeline")
 
-# Inspect the loaded config (after `!include` expansion)
-factory.getTaskComposerNodePlugins()           # {node name: PluginInfo}, a copy
-factory.getAvailableTaskComposerNodePlugins()  # node factory class names; loads the plugin libraries
+# Inspect and edit the loaded config (after `!include` expansion)
+factory.getTaskComposerNodePlugins()               # {node name: PluginInfo}, a copy
+factory.getTaskComposerExecutorPlugins()           # {executor name: PluginInfo}, a copy
+factory.getAvailableTaskComposerNodePlugins()      # node factory class names; loads the plugin libraries
+factory.getAvailableTaskComposerExecutorPlugins()  # executor factory class names; the same
+factory.addTaskComposerNodePlugin("MyTrajOpt", plugin_info)
+factory.createTaskComposerNode("Unconfigured", plugin_info)  # from an explicit PluginInfo
+factory.getConfig()                                # the config as a YAML document string
+factory.saveConfig(Path("task_composer_plugins.yaml"))
 ```
+
+A path passed as `str` is parsed as YAML text and raises `TaskComposerConfigError` (a
+`ValueError`) naming the text; so does YAML text without a top-level `task_composer_plugins`
+mapping (empty, `~`, a list, an unrelated mapping), which upstream loads as an empty config.
 
 `createTaskComposerNode` and `createTaskComposerExecutor` raise `TaskComposerPluginError` (a
 `RuntimeError`) when the name is not configured, listing the configured names, or when its plugin
 fails to load or build; they never return `None`. Upstream only logs a console_bridge warning
 and returns null, so the warning on stderr carries the build failure's cause.
+`remove*Plugin` and `setDefault*Plugin` raise `KeyError` for an unknown name.
 
 ### TaskflowTaskComposerExecutor
 
@@ -88,7 +100,7 @@ Executes tasks with parallel support.
 ```python
 from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
 
-executor = TaskflowTaskComposerExecutor(factory, num_threads=4)
+executor = TaskflowTaskComposerExecutor("MyExecutor", 4)  # name, threads
 
 future = executor.run(task, data_storage)
 future.wait()
@@ -103,12 +115,9 @@ if future.context.isSuccessful():
 Key-value storage for pipeline data.
 
 ```python
-from tesseract_robotics.tesseract_task_composer import createTaskComposerDataStorage
-from tesseract_robotics.tesseract_command_language import (
-    AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_ProfileDictionary,
-)
+from tesseract_robotics.tesseract_task_composer import TaskComposerDataStorage
 
-data = createTaskComposerDataStorage()
+data = TaskComposerDataStorage()  # or TaskComposerDataStorage("name")
 
 # Set inputs
 data.setData("planning_input", AnyPoly_wrap_CompositeInstruction(program))
@@ -117,14 +126,23 @@ data.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
 
 # Get outputs
 result = data.getData("program")
+everything = data.getData()        # {key: AnyPoly}
+data.remapData({"program": "seed"})  # rename keys; copy=True keeps both
 ```
 
 ### TaskComposerContext
 
-Execution context with results and status.
+Execution context with results and status. `executor.run(task, data)` builds one from the data
+storage (named `"run"`, or `name=`); build one yourself to choose its name, share a node-info
+container, or abort it:
 
 ```python
-context = future.context
+from tesseract_robotics.tesseract_task_composer import TaskComposerContext
+
+context = TaskComposerContext("my_run", data)
+future = executor.run(task, context)
+future.wait()
+assert future.context is context
 
 # Check status
 if context.isSuccessful():
@@ -136,6 +154,9 @@ else:
 info = context.task_infos
 ```
 
+`task.run(context, executor)` runs a node synchronously in the calling thread; graphs and
+pipelines still need an executor for their children.
+
 ### TaskComposerFuture
 
 Async execution handle.
@@ -146,12 +167,135 @@ future = executor.run(task, data)
 # Wait for completion
 future.wait()
 
-# Or wait with timeout (milliseconds)
-completed = future.waitFor(5000)  # 5 seconds
+# Or wait with timeout (seconds)
+status = future.waitFor(5.0)  # FutureStatus.ready / .timeout
 
 # Get context
 context = future.context
 ```
+
+The run uses the node, the data and the executor after `run` returns. The bindings hold them
+until the run ends, independent of the future: dropping the future, the node or the executor
+mid-run is safe and never blocks. A finished run's node and executor are released when a future
+is seen done (`wait()`, `waitFor()` returning `FutureStatus.ready`, `ready()` returning `True`)
+or at the next `run`. A server run also holds the executor it runs on, so
+`TaskComposerServer.addExecutor` may replace it mid-run. At interpreter exit, runs still in
+flight, including runs started while waiting, are waited for (an `atexit` hook).
+
+### Node infos
+
+Every node that ran records a `TaskComposerNodeInfo` in `context.task_infos`, keyed by node
+uuid (a canonical uuid `str`):
+
+```python
+infos = future.context.task_infos
+root = infos.getInfo(infos.getRootNode())   # the node passed to run()
+print(root.name, root.status_message, root.start_time, root.elapsed_time)
+
+for uuid, info in infos.getInfoMap().items():
+    print(uuid, info.name, info.return_value)
+
+trajopt = infos.find(lambda i: i.name == "TrajOptMotionPlannerTask")
+aborting = infos.getInfo(infos.getAbortingNode())  # None if nothing aborted
+
+# prune edits every stored info: the callback gets a copy, which is stored when prune returns
+infos.prune(lambda i: setattr(i, "data_storage", TaskComposerDataStorage()))
+```
+
+`find` and `prune` call back on a snapshot taken before the first call, outside the
+container's lock, so a callback may call into the container. `prune` stores the copies its
+callback changed, each only if the stored info is still the one the callback was given; when one
+was changed or removed meanwhile, the other edits are stored and `TaskComposerPruneConflictError`
+(a `RuntimeError`) names the conflicting uuids. An info kept from a `prune` callback is an
+independent copy: edits made to it after `prune` returns are not stored.
+
+### Graphs and pipelines
+
+Pipelines from the factory are `TaskComposerPipeline` objects (a `TaskComposerGraph`):
+their children, terminals and override keys are readable, and a graph can be built in Python
+from factory nodes:
+
+```python
+from tesseract_robotics.tesseract_task_composer import TaskComposerGraph
+
+pipeline = factory.createTaskComposerNode("TrajOptPipeline")
+pipeline.getNodes()     # {uuid: TaskComposerNode}
+pipeline.getTerminals()
+
+graph = TaskComposerGraph("two_pass")
+first = graph.addNode(factory.createTaskComposerNode("TrajOptPipeline"))
+second = graph.addNode(factory.createTaskComposerNode("TrajOptPipeline"))
+graph.addEdges(first, [second])
+graph.setTerminals([second])
+assert graph.isValid()[0]
+future = executor.run(graph, data)
+```
+
+### TaskComposerServer
+
+Upstream's top-level entry point: one config, executors and tasks by name.
+
+```python
+from tesseract_robotics.tesseract_task_composer import TaskComposerServer
+
+server = TaskComposerServer()
+server.loadConfig(config, GeneralResourceLocator())  # Path; a str is YAML text
+future = server.run("TrajOptPipeline", data, False, "TaskflowExecutor")
+future.wait()
+```
+
+The server's tasks cannot be held: upstream exposes them only as `const&`. So a server task is
+never replaced while a run or Python can reach it. `loadConfig` (which re-creates every task) and
+`addTask` with an existing task's name raise `TaskComposerServerBusyError` (a `RuntimeError`)
+naming the task and the reason:
+
+- the task is running: a run by name, `server.run(task, ...)` or `executor.run(task, ...)` with a
+  `getTask()` result is unfinished. `wait()` for its future first;
+- the task is referenced from Python: a `getTask()` result is alive. `del` it first. A result
+  caught in a reference cycle stays alive, and blocks replacement, until `gc.collect()`. A task you
+  added with `addTask` is owned by its Python object and never blocks.
+
+```python
+task = server.getTask("TrajOptPipeline")
+future = executor.run(task, data)
+future.wait()
+del task
+server.loadConfig(config, GeneralResourceLocator())  # now allowed
+```
+
+While a server is inside `loadConfig`, `addTask` or `addExecutor`, other threads wait for it.
+Only calls from inside it raise the same error. That means calls from a Python
+`ResourceLocator` or log handler that runs during the reload. It also means calls from any
+Python log handler while another thread reloads: the handler holds console_bridge's output lock,
+which the reload needs. A call made from inside another server's reload raises too while this
+server reloads: two reloads whose locators reach each other's server would wait for each other.
+Adding a task under a new name, and running a node you built yourself, are unaffected.
+
+### TaskComposerLog
+
+Upstream's record of a run for replay: the input data, the finished context and the dot graph.
+`tesseract_serialization` saves and loads it:
+
+```python
+from tesseract_robotics.tesseract_serialization import (
+    task_composer_log_from_file, task_composer_log_to_file,
+)
+from tesseract_robotics.tesseract_task_composer import TaskComposerLog
+
+log = TaskComposerLog("failing plan")
+log.initial_data = data            # a copy, taken before the run
+future = executor.run(task, data)
+future.wait()
+log.context = future.context
+log.dotgraph = task.getDotgraph(future.context.task_infos.getInfoMap())
+task_composer_log_to_file(log, "failing_plan.tclx")
+replay = task_composer_log_from_file("failing_plan.tclx")
+```
+
+The archive holds only types registered with `tesseract_serialization`'s cereal registry: a data
+storage holding planner profiles (`TrajOptDefaultMoveProfile`, …) raises `RuntimeError`
+("unregistered polymorphic type"). A loaded log is not `==` to the original: `AnyPoly` compares
+`shared_ptr` payloads (environment, profiles, nested data storages) by pointer.
 
 ### DOT Graph Export
 
@@ -162,14 +306,15 @@ task = factory.createTaskComposerNode("FreespacePipeline")
 
 # Structure only
 dot = task.getDotgraph()             # DOT source as a string
-task.saveDotgraph("pipeline.dot")    # write to file, returns bool
+task.saveDotgraph("pipeline.dot")    # write to file (str or Path); OSError if it cannot
 
-# Annotated with execution results — pass the run's TaskComposerNodeInfoContainer:
+# Annotated with execution results — pass the run's info map:
 # successful nodes render green with execution time, failed/aborted nodes red
 future = executor.run(task, data)
 future.wait()
-dot = task.getDotgraph(future.context.task_infos)
-task.saveDotgraph("debug.dot", future.context.task_infos)
+results = future.context.task_infos.getInfoMap()
+dot = task.getDotgraph(results)
+task.saveDotgraph("debug.dot", results)
 ```
 
 Render with graphviz: `dot -Tsvg pipeline.dot -o pipeline.svg`.
@@ -255,22 +400,23 @@ program = AnyPoly_as_CompositeInstruction(any_poly)
 ## Complete Example
 
 ```python
+import tesseract_robotics
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import (
-    createTaskComposerPluginFactory, createTaskComposerDataStorage,
-    TaskflowTaskComposerExecutor, AnyPoly_wrap_EnvironmentConst,
-)
-from tesseract_robotics.tesseract_command_language import (
-    AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_ProfileDictionary,
-    AnyPoly_as_CompositeInstruction,
+    AnyPoly_as_CompositeInstruction, AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_EnvironmentConst, AnyPoly_wrap_ProfileDictionary,
+    TaskComposerDataStorage, TaskComposerPluginFactory,
 )
 
 # Setup
-factory = createTaskComposerPluginFactory()
-executor = TaskflowTaskComposerExecutor(factory, 4)
+factory = TaskComposerPluginFactory(
+    tesseract_robotics.get_task_composer_config_path(), GeneralResourceLocator()
+)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 task = factory.createTaskComposerNode("FreespacePipeline")
 
 # Prepare data
-data = createTaskComposerDataStorage()
+data = TaskComposerDataStorage()
 data.setData("planning_input", AnyPoly_wrap_CompositeInstruction(program))
 data.setData("environment", AnyPoly_wrap_EnvironmentConst(env))
 data.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
@@ -289,9 +435,9 @@ if context.isSuccessful():
     print(f"Planned trajectory with {len(result)} instructions")
 else:
     print("Planning failed")
-    for name, info in context.task_infos.items():
-        if info.return_value != 0:
-            print(f"  {name}: {info.message}")
+    for info in context.task_infos.getInfoMap().values():
+        if info.status_message:
+            print(f"  {info.name}: {info.status_message}")
 ```
 
 ## High-Level Alternative

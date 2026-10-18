@@ -95,12 +95,23 @@ public:
     }
 };
 
+// Python log handlers running on this thread. console_bridge calls a handler with its output
+// mutex held, so a thread inside one must not block on anything that logs (the task composer's
+// server gate). Other modules read it through the _log_callback_depth capsule.
+thread_local int python_log_callback_depth = 0;
+
+int current_python_log_callback_depth() { return python_log_callback_depth; }
+
 // Trampoline class for OutputHandler
 class PyOutputHandler : public console_bridge::OutputHandler {
 public:
     NB_TRAMPOLINE(console_bridge::OutputHandler, 1);
 
     void log(const std::string& text, console_bridge::LogLevel level, const char* filename, int line) override {
+        struct Depth {
+            Depth() { ++python_log_callback_depth; }
+            ~Depth() { --python_log_callback_depth; }
+        } depth;
         NB_OVERRIDE_PURE(log, text, level, filename, line);
     }
 };
@@ -1373,6 +1384,9 @@ NB_MODULE(_tesseract_common, m) {
     }, "filename"_a, "line"_a, "level"_a, "msg"_a);
     m.def("useOutputHandler", &console_bridge::useOutputHandler, "handler"_a);
     m.def("restorePreviousOutputHandler", &console_bridge::restorePreviousOutputHandler);
+    // int (*)(): Python log handlers running on the calling thread (PyOutputHandler).
+    m.attr("_log_callback_depth") = nb::capsule(reinterpret_cast<void*>(&current_python_log_callback_depth),
+                                                "tesseract_robotics.log_callback_depth");
 
     // ========== STL Container Bindings ==========
     // VectorVector3d - explicit binding for aligned Eigen vectors (NB_MAKE_OPAQUE at top)
