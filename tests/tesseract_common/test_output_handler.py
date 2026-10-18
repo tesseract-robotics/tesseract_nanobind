@@ -9,6 +9,8 @@ through a bounded queue. Each case runs in a subprocess: the failures are hangs 
 import subprocess
 import sys
 
+import pytest
+
 # A case logs a few thousand messages; a deadlock never ends. Generous for a loaded machine.
 TIMEOUT_S = 60
 
@@ -243,6 +245,7 @@ print("ACCOUNTED", delivered + dropped == sent[0], "DROPPED", dropped > 0, "FLUS
     assert "ACCOUNTED True DROPPED True FLUSH FAST True" in out, out
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no os.fork")
 def test_forked_child_delivers():
     """The child of a fork has no delivery thread: it starts one on its first message."""
     out = _run("""
@@ -402,6 +405,7 @@ print("SECOND", [t for t in second.texts if "dropped" in t])
     assert "SECOND ['tesseract_common: dropped 30 log messages" in out, out
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no os.fork")
 def test_fork_from_inside_a_handler():
     """The child's only thread is a copy of the delivery thread. It went on delivering the
     parent's queue from the parent's state (each message twice, once per process) and the child's
@@ -506,6 +510,11 @@ print("EXITING", flush=True)
     assert "tesseract_common: dropped 7 log messages" in err, err
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="console_bridge::log is looked up by its Itanium-mangled name through the extension; "
+    "a Windows .pyd does not resolve its dependencies' symbols",
+)
 def test_null_filename_reaches_the_handler_as_none():
     """C++ code may log without a file; the handler got "" instead of None. Python cannot pass a
     null filename, so this calls console_bridge::log through ctypes."""
@@ -539,6 +548,7 @@ print("FILES", handler.files)
     assert "FILES [None, 'test.py']" in out, out
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no os.fork")
 def test_child_forked_in_a_handler_exits_after_logging():
     """A child forked from a handler that logs, then returns from the handler, hung: the copied
     delivery thread (the child's only thread) ended, the child's own delivery thread waited
