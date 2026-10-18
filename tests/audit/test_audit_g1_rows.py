@@ -419,3 +419,26 @@ def test_g1_rule_is_justified_in_the_report(rule):
     """Reads the committed report: passes once it is regenerated with the group 1 rules."""
     assert audit.ACCEPTED[rule]
     assert f"`{rule}`" in audit.REPORT_PATH.read_text(encoding="utf-8")
+
+
+# The rows of the merged binding fixes (#344): what the audit could not see.
+
+# `as<T>()` of the waypoint and move-instruction Polys, bound per instance (#268).
+POLY_AS = {
+    "WaypointPoly.as": tuple(
+        f"WaypointPoly.as{t}Waypoint" for t in ("Cartesian", "Joint", "State")
+    ),
+    "CartesianWaypointPoly.as": ("CartesianWaypointPoly.asCartesianWaypoint",),
+    "JointWaypointPoly.as": ("JointWaypointPoly.asJointWaypoint",),
+    "StateWaypointPoly.as": ("StateWaypointPoly.asStateWaypoint",),
+    "MoveInstructionPoly.as": ("MoveInstructionPoly.asMoveInstruction",),
+}
+
+
+@pytest.mark.parametrize(("template", "instances"), POLY_AS.items())
+def test_real_poly_as_instances_accepted(g1_reports, template, instances):
+    report = g1_reports[CL]
+    assert audit.TEMPLATE_INSTANCES[(CL, template)] == instances
+    for name in (template, *instances):
+        assert (name, "template-instance-name") in accepted_pairs(report), name
+    assert not {template, *instances} & open_names(report)

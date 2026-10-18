@@ -343,6 +343,15 @@ TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {
         f"InstructionPoly.as{t}Instruction"
         for t in ("Move", "Composite", "Wait", "Timer", "SetAnalog", "SetDigital", "SetTool")
     ),
+    # The waypoint and move-instruction Polys' `as<T>()` (#268): to the typed Polys on
+    # `WaypointPoly`, to the concrete type on each typed Poly.
+    ("tesseract_command_language", "WaypointPoly.as"): tuple(
+        f"WaypointPoly.as{t}Waypoint" for t in ("Cartesian", "Joint", "State")
+    ),
+    **{
+        ("tesseract_command_language", f"{t}Poly.as"): (f"{t}Poly.as{t}",)
+        for t in ("CartesianWaypoint", "JointWaypoint", "StateWaypoint", "MoveInstruction")
+    },
     # tesseract_task_composer (#256 group 4): `template <T> T& AnyPoly::as()`.
     ("tesseract_task_composer", "AnyPoly.as"): (
         "AnyPoly_as_CompositeInstruction",
