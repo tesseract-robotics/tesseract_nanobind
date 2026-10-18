@@ -1,4 +1,5 @@
 #include "tesseract_nb.h"
+#include "python_output_handler.h"
 #include <iterator>
 
 // tesseract_common headers (need eigen_types.h before opaque declarations)
@@ -95,15 +96,7 @@ public:
     }
 };
 
-// Trampoline class for OutputHandler
-class PyOutputHandler : public console_bridge::OutputHandler {
-public:
-    NB_TRAMPOLINE(console_bridge::OutputHandler, 1);
-
-    void log(const std::string& text, console_bridge::LogLevel level, const char* filename, int line) override {
-        NB_OVERRIDE_PURE(log, text, level, filename, line);
-    }
-};
+using tesseract_nb_common::PyOutputHandler;
 
 NB_MODULE(_tesseract_common, m) {
     m.doc() = "tesseract_common Python bindings (nanobind)";
@@ -1371,8 +1364,20 @@ NB_MODULE(_tesseract_common, m) {
     m.def("log", [](const std::string& filename, int line, console_bridge::LogLevel level, const std::string& msg) {
         console_bridge::log(filename.c_str(), line, level, "%s", msg.c_str());
     }, "filename"_a, "line"_a, "level"_a, "msg"_a);
-    m.def("useOutputHandler", &console_bridge::useOutputHandler, "handler"_a);
-    m.def("restorePreviousOutputHandler", &console_bridge::restorePreviousOutputHandler);
+    // A Python handler gets its messages on a delivery thread, in order, through a bounded queue
+    // (python_output_handler.h). Installing a handler keeps it alive until console_bridge can no
+    // longer call it; a swap does not wait for the queue, since each message carries its handler.
+    m.def("useOutputHandler", &tesseract_nb_common::use_python_output_handler, "handler"_a);
+    m.def("restorePreviousOutputHandler", &tesseract_nb_common::restore_previous_python_output_handler);
+    m.def("flushOutputHandlers", &tesseract_nb_common::flush_python_output_handlers,
+          "Wait until the Python OutputHandlers have received every message logged so far. Returns "
+          "at once when called from a handler. A handler waiting for the calling thread blocks it.");
+    nb::module_::import_("atexit").attr("register")(nb::cpp_function(&tesseract_nb_common::stop_log_delivery));
+    // os.register_at_fork exists exactly where os.fork does: not on Windows, which has no fork.
+    nb::module_ os_module = nb::module_::import_("os");
+    if (nb::hasattr(os_module, "register_at_fork"))
+        os_module.attr("register_at_fork")(
+            "after_in_child"_a = nb::cpp_function(&tesseract_nb_common::reset_log_delivery_after_fork));
 
     // ========== STL Container Bindings ==========
     // VectorVector3d - explicit binding for aligned Eigen vectors (NB_MAKE_OPAQUE at top)

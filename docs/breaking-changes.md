@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | A Python `OutputHandler` gets its messages asynchronously, on a delivery thread | [`flushOutputHandlers()`](#python-outputhandlers-are-called-asynchronously) |
 | Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
@@ -38,6 +39,21 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### Python `OutputHandler`s are called asynchronously
+
+A Python `OutputHandler` was called inside console_bridge's output lock, on the thread that
+logged, and deadlocked against any other thread logging while it held the GIL. It now gets its
+messages on a delivery thread, a moment after they are logged. Code that logs, then reads what
+the handler recorded, waits first:
+
+```python
+tesseract_common.log(filename, line, level, "message")
+tesseract_common.flushOutputHandlers()
+assert handler.last_text == "message"
+```
+
+A handler's exception goes to `sys.unraisablehook` instead of the code that logged.
 
 ### `setPairCollisionCoeff` and `getPairCollisionCoeff` removed
 
