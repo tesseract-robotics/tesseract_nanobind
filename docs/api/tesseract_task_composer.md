@@ -263,9 +263,12 @@ del task
 server.loadConfig(config, GeneralResourceLocator())  # now allowed
 ```
 
-While the server is inside `loadConfig` or `addTask`, where a Python `ResourceLocator` or log
-handler can run, `getTask` and `run` on that server raise the same error. Adding a task under a
-new name, and running a node you built yourself, are unaffected.
+While a server is inside `loadConfig`, `addTask` or `addExecutor`, other threads wait for it.
+Only calls from inside it raise the same error. That means calls from a Python
+`ResourceLocator` or log handler that runs during the reload. It also means calls from any
+Python log handler while another thread reloads: the handler holds console_bridge's output lock,
+which the reload needs. Adding a task under a new name, and running a node you built yourself,
+are unaffected.
 
 ### TaskComposerLog
 
