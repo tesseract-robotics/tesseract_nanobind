@@ -569,6 +569,57 @@ print("LOADED", server.hasTask("TrajOptPipeline"))
         assert out.count("BUSY") == 4, out
         assert "LOADED True" in out, out
 
+    def test_reloads_whose_locators_reach_each_others_server_raise(self, tmp_path):
+        """Two servers reloading on two threads, each ResourceLocator calling the other server:
+        each waited for the other's reload. A call made inside a reload of another server
+        raises instead of waiting."""
+        import yaml
+
+        import tesseract_robotics
+
+        config = yaml.safe_load(tesseract_robotics.get_task_composer_config_path().read_text())
+        included = tmp_path / "plugins.yaml"
+        included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
+        out = _run(f"""
+import threading
+from tesseract_robotics.tesseract_common import ResourceLocator
+from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
+a, b = TaskComposerServer(), TaskComposerServer()
+a.loadConfig(config_path, GeneralResourceLocator())
+b.loadConfig(config_path, GeneralResourceLocator())
+both_loading = threading.Barrier(2, timeout=30)
+
+class CallOther(ResourceLocator):
+    def __init__(self, other):
+        super().__init__()
+        self.inner = GeneralResourceLocator()
+        self.other = other
+        self.called = False
+
+    def locateResource(self, url):
+        if not self.called:
+            self.called = True
+            both_loading.wait()
+            try:
+                self.other.hasTask("TrajOptPipeline")
+            except TaskComposerServerBusyError:
+                pass  # the other server is reloading too
+            print("CALLED", flush=True)
+        return self.inner.locateResource(url)
+
+def load(server, other):
+    server.loadConfig("task_composer_plugins: !include file://{included}", CallOther(other))
+
+threads = [threading.Thread(target=load, args=(a, b)), threading.Thread(target=load, args=(b, a))]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+print("LOADED", a.hasTask("TrajOptPipeline"), b.hasTask("TrajOptPipeline"))
+""")
+        assert out.count("CALLED") == 2, out
+        assert "LOADED True True" in out, out
+
     def test_add_task_with_another_name_mid_run_succeeds(self):
         out = _run("""
 server = TaskComposerServer()
