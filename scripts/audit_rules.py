@@ -46,7 +46,8 @@ ACCEPTED = {
     "index, or a slice), the Python container protocol.",
     "iterator-pair": "A `begin()`/`end()` pair (and `cbegin`/`cend`) is bound as `__iter__`.",
     "stream-insertion": "A free `operator<<(std::ostream&, const T&)` is bound as `T.__str__` "
-    "(`T` a class or an enum).",
+    "(`T` a class or an enum); the virtual `print(std::ostream&)` such an operator writes through "
+    "(descartes_light's `WaypointSampler`) is covered by the same `__str__`.",
     "presentation-dunder": "`__repr__` and `__str__` are Python presentation and need no C++ "
     "counterpart.",
     "serialization-default-ctor": "The default constructor of a class that befriends cereal "
@@ -347,6 +348,8 @@ ACCEPTED_SYMBOLS = {
             "DescartesStateEvaluatorD",
         )
     },
+    # waypoint_sampler.h:63, the hook of the friend `operator<<` (#310).
+    ("tesseract_motion_planners_descartes", "WaypointSampler.print"): "stream-insertion",
 }
 # Classes that wrap one bound Eigen vector field; their operators forward to it (R32):
 # (module, C++ class).
