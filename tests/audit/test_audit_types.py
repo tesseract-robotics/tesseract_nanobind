@@ -186,3 +186,11 @@ def test_report_renders_type_fallbacks(typed_report):
 def test_json_has_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
     assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE, NO_LEDGER)
+
+
+def test_path_annotation_covers_a_string_parameter():
+    """nanobind's `std::filesystem::path` caster takes every `str`: a `str | os.PathLike`
+    parameter covers a C++ `std::string`. Not the reverse: a `str` rejects an `os.PathLike`."""
+    assert types.verdict(frozenset({("str",)}), ("path",)) is True
+    assert types.verdict(frozenset({("path",)}), ("str",)) is False
+    assert types.verdict(frozenset({("seq", ("str",))}), ("seq", ("path",))) is True
