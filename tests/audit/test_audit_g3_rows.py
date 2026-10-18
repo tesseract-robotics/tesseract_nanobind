@@ -633,3 +633,15 @@ def test_every_g3_table_entry_fires(g3_reports, descartes_report):
         ]
     ]
     assert stale == []
+
+
+# The rows of the merged binding fixes (#346): what the audit could not see.
+
+
+def test_real_check_request_reason(g3_reports):
+    """C2 (a): `checkRequest(request, std::string& reason)` (planner.h:84) is bound as
+    `checkRequestReason(request) -> str`; `checkRequest(request) -> bool` stays the C++ one."""
+    report = g3_reports[MP]
+    for symbol in ("MotionPlanner.checkRequest", "MotionPlanner.checkRequestReason"):
+        assert (symbol, "reason-out-param") in accepted_pairs(report), symbol
+        assert symbol not in open_names(report)
