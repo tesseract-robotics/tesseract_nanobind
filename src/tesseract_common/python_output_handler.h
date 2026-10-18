@@ -256,6 +256,18 @@ public:
 
 };
 
+// Python log handlers running on this thread (the delivery thread, inside call_python_handler).
+// The task composer's server gate reads it through the _log_callback_depth capsule: a server call
+// from inside a handler raises instead of waiting, since a reload that waits for the delivery
+// thread (flushOutputHandlers from a Python ResourceLocator) would wait for it forever. A plain
+// int: nothing with a destructor stays alive across the call (see "Interpreter exit" above).
+inline int& python_log_callback_depth() {
+    static thread_local int depth = 0;
+    return depth;
+}
+
+inline int current_python_log_callback_depth() { return python_log_callback_depth(); }
+
 // handler.log(text, level, filename, line) through the C API, with the GIL held (delivery thread).
 // A plain function owning only raw references: CPython may end the thread inside the call (see
 // "Interpreter exit" above), and the references are then left behind. A handler that raises, or a
@@ -329,7 +341,9 @@ inline bool deliver_batch(LogDelivery& d, std::size_t taken) {
                 break;  // stopped: exit printed the rest
             message = &d.in_flight[d.in_flight_next++];
         }
+        ++python_log_callback_depth();
         call_python_handler(*message);
+        --python_log_callback_depth();
     }
     {
         std::deque<LogMessage> done;  // its HandlerRefs retire their references

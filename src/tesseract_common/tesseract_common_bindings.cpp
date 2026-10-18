@@ -1379,6 +1379,10 @@ NB_MODULE(_tesseract_common, m) {
     if (nb::hasattr(os_module, "register_at_fork"))
         os_module.attr("register_at_fork")(
             "after_in_child"_a = nb::cpp_function(&tesseract_nb_common::reset_log_delivery_after_fork));
+    // int (*)(): Python log handlers running on the calling thread (python_output_handler.h).
+    m.attr("_log_callback_depth") = nb::capsule(
+        reinterpret_cast<void*>(&tesseract_nb_common::current_python_log_callback_depth),
+        "tesseract_robotics.log_callback_depth");
 
     // ========== STL Container Bindings ==========
     // VectorVector3d - explicit binding for aligned Eigen vectors (NB_MAKE_OPAQUE at top)
