@@ -153,10 +153,11 @@ ACCEPTED = {
     "unimplemented-observer": "`NodesObserver` has no implementation in trajopt 0.35.0 (the "
     "library exports only its base constructor), so `NodesVariables.addObserver` has nothing to "
     "register.",
-    "split-var-pair": "`ContinuousCollisionConstraint` takes "
+    "split-var-pair": "`ContinuousCollisionConstraint`, `ContinuousCollisionConstraintD` and "
+    "`ContinuousCollisionNumericalConstraint` take "
     "`std::array<std::shared_ptr<const Var>, 2> position_vars`; Python passes the pair as two "
     "named parameters, `position_var0` and `position_var1`, and the required "
-    "`vars0_fixed`/`vars1_fixed` default to `False`.",
+    "`vars0_fixed`/`vars1_fixed` default to `False` (Python's `fixed0`/`fixed1`).",
     "ifopt-problem-only": "An overload taking `trajopt_ifopt::Problem` serves the "
     "`IfoptQPProblem` path, which is not Python API (`trajopt_sqp/ifopt_qp_problem.h` is "
     "unaudited); `TrajOptQPProblem` is the bound problem.",
@@ -397,6 +398,8 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     ): "vector-forwarding-no-python-form",
     # Group 2 (trajopt).
     ("trajopt_ifopt", "ContinuousCollisionConstraint.__init__", "3-7"): "split-var-pair",
+    ("trajopt_ifopt", "ContinuousCollisionConstraintD.__init__", "3-5"): "split-var-pair",
+    ("trajopt_ifopt", "ContinuousCollisionNumericalConstraint.__init__", "3-7"): "split-var-pair",
     # qp_problem.h:49, trajopt_qp_problem.h:30 `setVariables(const double* x)` (#282).
     ("trajopt_sqp", "QPProblem.setVariables", "1"): "sized-double-array",
     ("trajopt_sqp", "TrajOptQPProblem.setVariables", "1"): "sized-double-array",
@@ -427,6 +430,16 @@ ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
     (
         "trajopt_ifopt",
         "ContinuousCollisionConstraint.__init__",
+        ("ContinuousCollisionEvaluator", "Var", "Var", "bool", "bool", "int", "bool", "str"),
+    ): "split-var-pair",
+    (
+        "trajopt_ifopt",
+        "ContinuousCollisionConstraintD.__init__",
+        ("ContinuousCollisionEvaluator", "Var", "Var", "bool", "bool", "str"),
+    ): "split-var-pair",
+    (
+        "trajopt_ifopt",
+        "ContinuousCollisionNumericalConstraint.__init__",
         ("ContinuousCollisionEvaluator", "Var", "Var", "bool", "bool", "int", "bool", "str"),
     ): "split-var-pair",
     # tesseract_task_composer (#256 group 4; C23 keeps the rule).

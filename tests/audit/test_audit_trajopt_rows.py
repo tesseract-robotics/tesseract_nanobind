@@ -355,3 +355,13 @@ def test_real_problem_overload_of_the_constraint_gradient(g2_reports):
     pair = ("calcNumericalConstraintGradient", "ifopt-problem-only")
     assert pair in accepted_pairs(report)
     assert "calcNumericalConstraintGradient" not in {g.symbol for g in report.gaps}
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["ContinuousCollisionConstraintD.__init__", "ContinuousCollisionNumericalConstraint.__init__"],
+)
+def test_real_split_var_pair_of_the_continuous_constraints(g2_reports, name):
+    report = g2_reports["trajopt_ifopt"]
+    assert [a.rule for a in report.accepted if a.symbol == name] == ["split-var-pair"] * 2
+    assert name not in {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
