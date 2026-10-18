@@ -490,12 +490,17 @@ the GIL, such as an executor worker against a failing `createTaskComposerNode`.
   the handler that was installed when it was logged.
 - The handler stays alive while console_bridge can call it: until it is replaced, or restored
   away from.
-- The queue holds up to 10 000 messages. Beyond that, messages are dropped, and the handler later
-  gets a warning naming how many were dropped. A logger never waits for the queue.
+- The queue holds up to 10 000 messages. Beyond that, messages are dropped, and the handler whose
+  messages were dropped later gets a warning naming how many, even if it was uninstalled
+  meanwhile. A logger never waits for the queue.
 - A handler that raises is reported through `sys.unraisablehook`, and delivery goes on.
-- In a forked child, delivery starts again on the first message.
-- At interpreter exit, queued messages are delivered for up to 2 s. What is left, and anything
-  logged later, goes to stderr; a handler that never returns does not hold up exit.
+- In a forked child, delivery starts again on the first message, also when a handler forked. The
+  parent's queued messages stay with the parent.
+- At interpreter exit, queued messages are delivered for up to 2 s. Then every message no handler
+  has received goes to stderr, with a line for each handler's unreported drops, and so does
+  anything logged later. A handler that never returns does not hold up exit; the message it is
+  handling is not repeated.
+- A message C++ logged without a file reaches the handler with `filename` set to `None`.
 
 ```python
 from tesseract_robotics.tesseract_common import (
