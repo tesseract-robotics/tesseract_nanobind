@@ -103,7 +103,8 @@ ACCEPTED = {
     "free-function-as-method": "A free predicate whose only parameter is `const T&` is bound as "
     "a method of `T` (`isWaitInstruction(const InstructionPoly&)` → "
     "`InstructionPoly.isWaitInstruction()`), beside `T`'s member predicates of the same shape "
-    "(`isMoveInstruction`).",
+    "(`isMoveInstruction`); a free binary operator on two `const T&` is bound as `T`'s dunder "
+    "(`operator==(const OSQPSettings&, const OSQPSettings&)` → `OSQPSettings.__eq__`).",
     "type-index": "`getType()` returns a `std::type_index`, which has no Python form; the bound "
     "`is…()` predicates and `as…()` casts answer the same question by name.",
     "type-erasure-interface": "The abstract `…Interface` of a type-erased `…Poly` is its C++ "
