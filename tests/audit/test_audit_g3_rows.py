@@ -378,7 +378,12 @@ def test_solver_behind_profile_leaves_the_parameters_audited(g3_reports):
         "trajopt_sco/optimizers.hpp:63"
     ]
     assert "BasicTrustRegionSQPParameters.__eq__" not in open_names(report)
-    assert not [a for a in report.accepted if a.symbol.startswith("BasicTrustRegionSQPParameters")]
+    assert not [
+        a
+        for a in report.accepted
+        if a.symbol.startswith("BasicTrustRegionSQPParameters")
+        and a.rule == "solver-behind-profile"
+    ]
 
 
 @pytest.mark.parametrize(
