@@ -283,32 +283,39 @@ void free_finished_runs() {
     finished.clear();
 }
 
-// Registered with atexit: wait for every run still in flight with the GIL released (workers may
-// call Python, e.g. a log handler), before the interpreter tears down what they use.
-// Worker callbacks or other threads may start runs while it waits: repeat until none is left.
-// A run still starting (null future) goes back on the list until its thread registers the future.
+// Registered with atexit: wait for every run still in flight with the GIL released (a worker's
+// log handler or a run started meanwhile may need the GIL), before the interpreter tears down
+// what they use. Other threads may start runs while it waits: repeat until none is left.
+// A run still starting (null future) goes back on the list until its thread registers the
+// future. The starter assigns `future` with the GIL held, so the entries are sorted with the GIL
+// held, and only entries whose future was already set are touched without it.
 void wait_for_runs_at_exit() {
     while (!in_flight_runs().empty()) {
         std::vector<std::shared_ptr<InFlightRun>> runs;
         runs.swap(in_flight_runs());
+        std::vector<std::shared_ptr<InFlightRun>> started;
         std::vector<std::shared_ptr<InFlightRun>> starting;
-        for (auto& run : runs)
-            if (run->future == nullptr && !run->start_failed)
-                starting.push_back(run);
-        nb::gil_scoped_release release;
         for (auto& run : runs) {
-            if (run->future == nullptr)
-                continue;
-            run->future->wait();
-            run->executor.reset();
+            if (run->future != nullptr)
+                started.push_back(std::move(run));
+            else if (!run->start_failed)
+                starting.push_back(std::move(run));
         }
-        if (runs.size() == starting.size())
-            std::this_thread::yield();
-        nb::gil_scoped_acquire acquire;
+        runs.clear();
+        {
+            nb::gil_scoped_release release;
+            for (auto& run : started) {
+                run->future->wait();
+                run->executor.reset();
+            }
+            if (started.empty())
+                std::this_thread::yield();
+        }
+        // Python references go with the GIL held.
+        started.clear();
         for (auto& run : starting)
             if (!run->start_failed)
                 in_flight_runs().push_back(std::move(run));
-        runs.clear();
     }
 }
 
