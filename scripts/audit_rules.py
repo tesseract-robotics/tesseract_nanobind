@@ -301,6 +301,11 @@ ACCEPTED_SYMBOLS = {
     # R14 (C13 = keep): OMPL's process-global RNG.
     ("tesseract_motion_planners_ompl", "RNG_setSeed"): "third-party-global",
     ("tesseract_motion_planners_ompl", "RNG_getSeed"): "third-party-global",
+    # ompl_solver_config.h:75 `planners` is a bound std::vector field (#302).
+    **{
+        ("tesseract_motion_planners_ompl", f"OMPLSolverConfig.{m}"): "copied-vector-field-mutator"
+        for m in ("addPlanner", "clearPlanners")
+    },
     # R21: the classic-TrajOpt optimizer in optimizers.hpp, next to the bound parameters.
     **{
         ("tesseract_motion_planners_trajopt", name): "solver-behind-profile"

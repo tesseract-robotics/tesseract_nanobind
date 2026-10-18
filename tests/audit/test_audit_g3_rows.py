@@ -359,10 +359,16 @@ def test_solver_behind_profile_leaves_the_parameters_audited(g3_reports):
     assert "BasicTrustRegionSQPParameters.__eq__" in gap_symbols(g3_reports[TRAJOPT])
 
 
-def test_copied_vector_field_mutator_waits_for_its_premise(g3_reports):
-    """ompl rows 38-39: no rule before `g3/04` binds `planners` (spec §3)."""
-    names = {d.name for d in g3_reports[OMPL].deviations}
-    assert {"OMPLSolverConfig.addPlanner", "OMPLSolverConfig.clearPlanners"} <= names
+@pytest.mark.parametrize(
+    "symbol", ["OMPLSolverConfig.addPlanner", "OMPLSolverConfig.clearPlanners"]
+)
+def test_copied_vector_field_mutator_once_its_premise_holds(g3_reports, symbol):
+    """ompl rows 38-39: `g3/04` (#302) binds the `planners` vector field, which converts to a
+    fresh list on each access; `addPlanner`/`clearPlanners` mutate the C++ vector (spec §3)."""
+    report = g3_reports[OMPL]
+    assert "OMPLSolverConfig.planners" not in open_names(report)
+    assert (symbol, "copied-vector-field-mutator") in accepted_pairs(report)
+    assert symbol not in open_names(report)
 
 
 # Task 7 (C8 = 7a, bind): the profile hooks stay binding-fix gaps (g3/06).
