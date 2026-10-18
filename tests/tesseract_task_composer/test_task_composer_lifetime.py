@@ -496,7 +496,8 @@ print("REPLACED", server.hasTask("Child"))
 
     def test_reload_racing_by_name_runs(self):
         """A run registered only after releasing the GIL: a reload on another thread could free
-        the task between the lookup and the registration."""
+        the task between the lookup and the registration. Runs and reads on this thread wait for
+        the other thread's reload instead of raising."""
         out = _run("""
 import threading
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
@@ -518,19 +519,16 @@ reloader = threading.Thread(target=reload_forever)
 reloader.start()
 results = []
 for _ in range(15):
-    while True:
-        try:
-            future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
-            break
-        except TaskComposerServerBusyError:
-            pass  # the reloader is mid-load
+    # Another thread's reload makes these wait, never raise.
+    future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
+    assert server.hasTask("TrajOptPipeline")
     future.wait()
     results.append(future.context.isSuccessful())
 stop.append(True)
 reloader.join()
-print("SUCCESS", all(results), len(results))
+print("SUCCESS", all(results), len(results), stats["reloads"] > 0)
 """)
-        assert "SUCCESS True 15" in out, out
+        assert "SUCCESS True 15 True" in out, out
 
     def test_server_is_busy_while_loading(self, tmp_path):
         """A Python ResourceLocator runs mid-load (and may switch threads there): getTask and
@@ -556,6 +554,7 @@ class Reentrant(ResourceLocator):
 
     def locateResource(self, url):
         for call in (lambda: server.getTask("TrajOptPipeline"),
+                     lambda: server.hasTask("TrajOptPipeline"),
                      lambda: server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor"),
                      lambda: server.run(node, make_storage(node), False, "TaskflowExecutor")):
             try:
@@ -567,7 +566,7 @@ class Reentrant(ResourceLocator):
 server.loadConfig("task_composer_plugins: !include file://{included}", Reentrant())
 print("LOADED", server.hasTask("TrajOptPipeline"))
 """)
-        assert out.count("BUSY") == 3, out
+        assert out.count("BUSY") == 4, out
         assert "LOADED True" in out, out
 
     def test_add_task_with_another_name_mid_run_succeeds(self):
