@@ -38,7 +38,8 @@ class Collect(tesseract_common.OutputHandler):
 """
 
 
-def _run(script: str) -> str:
+def _run_both(script: str) -> "tuple[str, str]":
+    """Run `script` after the preamble in a fresh interpreter; return its stdout and stderr."""
     proc = subprocess.run(
         [sys.executable, "-c", _PREAMBLE + script],
         capture_output=True,
@@ -47,7 +48,11 @@ def _run(script: str) -> str:
         check=False,
     )
     assert proc.returncode == 0, f"rc={proc.returncode}: {proc.stderr[-1500:]}"
-    return proc.stdout
+    return proc.stdout, proc.stderr
+
+
+def _run(script: str) -> str:
+    return _run_both(script)[0]
 
 
 def test_handler_that_releases_the_gil_with_two_logging_threads():
@@ -294,3 +299,238 @@ log("never delivered")
 print("EXITING", flush=True)
 """)
     assert "EXITING" in out, out
+
+
+def test_flush_waits_for_a_message_logged_while_drops_are_reported():
+    """The delivery thread's drop notice was counted as queued only once its batch was delivered:
+    a flush that started during that batch returned one message early."""
+    out = _run("""
+release_block = threading.Event()
+at_last = threading.Event()
+release_last = threading.Event()
+
+class Gated(Collect):
+    def log(self, text, level, filename, line):
+        if text == "BLOCK":
+            release_block.wait(30)
+        if text == "m9999":
+            at_last.set()
+            release_last.wait(30)
+        if text == "AFTER":
+            time.sleep(0.5)  # the flush must wait for this
+        super().log(text, level, filename, line)
+
+handler = Gated()
+tesseract_common.useOutputHandler(handler)
+log("BLOCK")
+time.sleep(0.3)  # the delivery thread waits inside BLOCK
+for i in range(10500):  # the queue holds 10000: 500 are dropped
+    log(f"m{i}")
+release_block.set()
+assert at_last.wait(30)  # inside the last batch, which carries the drop notice
+log("AFTER")
+seen = {}
+
+def flusher():
+    tesseract_common.flushOutputHandlers()
+    seen["after"] = "AFTER" in handler.texts
+
+t = threading.Thread(target=flusher)
+t.start()
+time.sleep(0.3)  # the flush reads its target while the notice's batch is being delivered
+release_last.set()
+t.join(30)
+tesseract_common.restorePreviousOutputHandler()
+print("FLUSHED AFTER", seen.get("after"))
+""")
+    assert "FLUSHED AFTER True" in out, out
+
+
+def test_drops_are_reported_to_their_handler_after_it_is_uninstalled():
+    """Drops counted while the handler fell behind were forgotten, without a notice or a stderr
+    line, when no Python handler was installed by the time the queue ran empty."""
+    out = _run("""
+release = threading.Event()
+
+class Blocks(Collect):
+    def log(self, text, level, filename, line):
+        if text == "BLOCK":
+            release.wait(30)
+        super().log(text, level, filename, line)
+
+handler = Blocks()
+tesseract_common.useOutputHandler(handler)
+log("BLOCK")
+time.sleep(0.3)
+for i in range(10500):
+    log(f"m{i}")
+tesseract_common.restorePreviousOutputHandler()  # console_bridge's own handler again
+release.set()
+tesseract_common.flushOutputHandlers()
+notices = [t for t in handler.texts if "dropped" in t]
+print("NOTICES", notices)
+""")
+    assert "NOTICES ['tesseract_common: dropped 500 log messages" in out, out
+
+
+def test_drops_from_two_handlers_are_reported_to_each():
+    out = _run("""
+release = threading.Event()
+
+class Blocks(Collect):
+    def log(self, text, level, filename, line):
+        if text == "BLOCK":
+            release.wait(30)
+        super().log(text, level, filename, line)
+
+first, second = Blocks(), Collect()
+tesseract_common.useOutputHandler(first)
+log("BLOCK")
+time.sleep(0.3)
+for i in range(10200):  # 10000 queued (BLOCK is taken): 200 dropped
+    log(f"a{i}")
+tesseract_common.useOutputHandler(second)
+for i in range(30):  # all dropped
+    log(f"b{i}")
+release.set()
+tesseract_common.flushOutputHandlers()
+tesseract_common.restorePreviousOutputHandler()
+print("FIRST", [t for t in first.texts if "dropped" in t])
+print("SECOND", [t for t in second.texts if "dropped" in t])
+""")
+    assert "FIRST ['tesseract_common: dropped 200 log messages" in out, out
+    assert "SECOND ['tesseract_common: dropped 30 log messages" in out, out
+
+
+def test_fork_from_inside_a_handler():
+    """The child's only thread is a copy of the delivery thread. It went on delivering the
+    parent's queue from the parent's state (each message twice, once per process) and the child's
+    first message started a second delivery thread."""
+    out = _run("""
+r, w = os.pipe()
+
+class Forks(Collect):
+    child = None
+    in_child = False
+
+    def log(self, text, level, filename, line):
+        super().log(text, level, filename, line)
+        if text == "FORK":
+            pid = os.fork()
+            if pid == 0:
+                self.in_child = True
+                self.texts = []
+                self.threads = set()
+                threading.Thread(target=child_main).start()
+            else:
+                self.child = pid
+
+def child_main():
+    time.sleep(0.5)  # the parent's queued messages would arrive meanwhile
+    log("CHILD")
+    tesseract_common.flushOutputHandlers()
+    os.write(w, ("CHILD %r THREADS %d\\n" % (handler.texts, len(handler.threads))).encode())
+    os._exit(0)
+
+handler = Forks()
+tesseract_common.useOutputHandler(handler)
+log("FORK")
+for i in range(5):
+    log(f"parent{i}")
+tesseract_common.flushOutputHandlers()
+_, status = os.waitpid(handler.child, 0)
+os.close(w)
+print(os.read(r, 100000).decode())
+print("PARENT", handler.texts, "STATUS", status)
+tesseract_common.restorePreviousOutputHandler()
+""")
+    assert "CHILD ['CHILD'] THREADS 1" in out, out
+    assert (
+        "PARENT ['FORK', 'parent0', 'parent1', 'parent2', 'parent3', 'parent4'] STATUS 0" in out
+    ), out
+
+
+def test_exit_prints_what_the_delivery_thread_has_not_delivered():
+    """Exit printed only the queue: the rest of the batch the delivery thread had taken (up to
+    LOG_DELIVERY_BATCH messages) was neither delivered nor printed, and neither were unreported
+    drops."""
+    out, err = _run_both("""
+release = threading.Event()
+
+class Spins(tesseract_common.OutputHandler):
+    def log(self, text, level, filename, line):
+        if text == "BLOCK":
+            release.wait(30)
+        if text == "SPIN":
+            while True:
+                pass
+
+handler = Spins()
+tesseract_common.useOutputHandler(handler)
+log("BLOCK")
+time.sleep(0.3)
+log("SPIN")
+for i in range(3):
+    log(f"in-batch-{i}")  # queued behind SPIN, taken with it
+release.set()
+time.sleep(0.3)  # the delivery thread spins inside SPIN
+for i in range(3):
+    log(f"queued-{i}")
+print("EXITING", flush=True)
+""")
+    assert "EXITING" in out, out
+    lines = err.splitlines()
+    for text in ["in-batch-0", "in-batch-1", "in-batch-2", "queued-0", "queued-1", "queued-2"]:
+        assert text in lines, err
+    assert "SPIN" not in lines, err  # the handler has it
+
+
+def test_exit_prints_unreported_drops():
+    out, err = _run_both("""
+entered = threading.Event()
+
+class Stuck(tesseract_common.OutputHandler):
+    def log(self, text, level, filename, line):
+        entered.set()
+        threading.Event().wait()
+
+handler = Stuck()
+tesseract_common.useOutputHandler(handler)
+log("stuck")
+assert entered.wait(30)
+for i in range(10007):
+    log(f"m{i}")
+print("EXITING", flush=True)
+""")
+    assert "EXITING" in out, out
+    assert "tesseract_common: dropped 7 log messages" in err, err
+
+
+def test_null_filename_reaches_the_handler_as_none():
+    """C++ code may log without a file; the handler got "" instead of None. Python cannot pass a
+    null filename, so this calls console_bridge::log through ctypes."""
+    out = _run("""
+import ctypes
+
+# console_bridge::log(const char* file, int line, LogLevel level, const char* fmt, ...)
+cb_log = ctypes.CDLL(None)["_ZN14console_bridge3logEPKciNS_8LogLevelES1_z"]
+cb_log.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]
+cb_log.restype = None
+
+class Files(tesseract_common.OutputHandler):
+    def __init__(self):
+        super().__init__()
+        self.files = []
+
+    def log(self, text, level, filename, line):
+        self.files.append(filename)
+
+handler = Files()
+tesseract_common.useOutputHandler(handler)
+cb_log(None, 1, LEVEL.value, b"x")
+log("y")
+tesseract_common.flushOutputHandlers()
+tesseract_common.restorePreviousOutputHandler()
+print("FILES", handler.files)
+""")
+    assert "FILES [None, 'test.py']" in out, out
