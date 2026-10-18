@@ -119,9 +119,9 @@ ACCEPTED = {
     "assigns through it.",
     "vector-forwarding-no-python-form": "A class that forwards the `std::vector` interface "
     "leaves `data()` (raw pointer), `emplace`/`emplace_back` (perfect-forwarding templates), "
-    "`swap(std::vector&)` and the reverse iterators unbound: Python builds the element and passes "
-    "it to `push_back`/`insert`, and `reversed()` walks any sequence with `__len__` and "
-    "`__getitem__`.",
+    "the iterator-range `insert(pos, first, last)` template, `swap(std::vector&)` and the reverse "
+    "iterators unbound: Python builds the element and passes it to `push_back`/`insert`, and "
+    "`reversed()` walks any sequence with `__len__` and `__getitem__`.",
     "clone-as-copy": "`__copy__`/`__deepcopy__` bind the C++ copy constructor and return the "
     "concrete type; `clone()`, which returns the `unique_ptr<…Interface>` of the type erasure, "
     "is then covered by `__deepcopy__`.",
@@ -368,6 +368,12 @@ TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # symbol Python binds, where the other overloads stay checked (T4).
 ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     ("tesseract_command_language", "ProfileDictionary.getProfile", "2-3"): "profile-key-template",
+    # composite_instruction.h:386 `template <class InputIt> insert(pos, first, last)` (#269).
+    (
+        "tesseract_command_language",
+        "CompositeInstruction.insert",
+        "3",
+    ): "vector-forwarding-no-python-form",
     # Group 2 (trajopt).
     ("trajopt_ifopt", "ContinuousCollisionConstraint.__init__", "3-7"): "split-var-pair",
     # tesseract_task_composer (#256 group 4). any_poly.h:115 `AnyPoly(const AnyInterface&)`: the
