@@ -197,6 +197,10 @@ ACCEPTED = {
     "eigen-value-wrapper": "`descartes_light::State` wraps one Eigen vector, `values`; its "
     "indexing, call, arithmetic, comma-initializer and conversion operators forward to it, and "
     "Python does the same on the bound `values` array.",
+    "reason-out-param": "`MotionPlanner::checkRequest(request, std::string& reason)` is bound as "
+    "`checkRequestReason(request) -> str` (empty for a valid request) beside the bound "
+    "`checkRequest(request) -> bool`: an `out-param` tuple would make `if checkRequest(req):` "
+    "pass an invalid request, since a non-empty tuple is truthy (decision C2).",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
@@ -292,6 +296,8 @@ ACCEPTED_SYMBOLS = {
     # Group 3 (motion planners). R2: type-erased planner payloads.
     ("tesseract_motion_planners", "PlannerRequest.data"): "type-erased-data",
     ("tesseract_motion_planners", "PlannerResponse.data"): "type-erased-data",
+    # C2 (a): the reason overload of checkRequest under its own name (#332).
+    ("tesseract_motion_planners", "MotionPlanner.checkRequestReason"): "reason-out-param",
     # R14 (C13 = keep): OMPL's process-global RNG.
     ("tesseract_motion_planners_ompl", "RNG_setSeed"): "third-party-global",
     ("tesseract_motion_planners_ompl", "RNG_getSeed"): "third-party-global",
@@ -384,6 +390,8 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     # taskflow_task_composer_executor.h:71 `(std::string name, const YAML::Node& config)`: no
     # YAML-text sibling, so `yaml-node` falls through to here (T1).
     ("tesseract_task_composer", "TaskflowTaskComposerExecutor.__init__", "2"): "plugin-config-ctor",
+    # planner.h:84 `checkRequest(request, std::string& reason)`: `checkRequestReason` (C2).
+    ("tesseract_motion_planners", "MotionPlanner.checkRequest", "2"): "reason-out-param",
 }
 # A Python-only overload accepted: (module, dotted name, `PyOverload.params`) -> ACCEPTED rule.
 # Two overloads of one arity differ by their annotations (G2: `setWarmStart(bool)`).
