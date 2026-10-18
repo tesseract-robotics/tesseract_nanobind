@@ -251,7 +251,9 @@ naming the task and the reason:
 
 - the task is running: a run by name, `server.run(task, ...)` or `executor.run(task, ...)` with a
   `getTask()` result is unfinished. `wait()` for its future first;
-- the task is referenced from Python: a `getTask()` result is alive. `del` it first.
+- the task is referenced from Python: a `getTask()` result is alive. `del` it first. A result
+  caught in a reference cycle stays alive, and blocks replacement, until `gc.collect()`. A task you
+  added with `addTask` is owned by its Python object and never blocks.
 
 ```python
 task = server.getTask("TrajOptPipeline")

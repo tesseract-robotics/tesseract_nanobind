@@ -448,6 +448,52 @@ print("RELOADED")
         assert "NAME TrajOptPipeline" in out, out
         assert "RELOADED" in out, out
 
+    def test_task_added_from_python_stays_replaceable(self):
+        """The server's shared_ptr keeps the wrapper of a task added from Python alive, so the
+        wrapper always exists; it owns the task and never dangles, so it must not block."""
+        out = _run("""
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+
+def my_task():
+    task = factory.createTaskComposerNode("OMPLPipeline")
+    task.setName("MyTask")
+    return task
+
+task = my_task()
+server.addTask(task)
+del task
+gc.collect()
+server.addTask(my_task())
+server.loadConfig(config_path, GeneralResourceLocator())
+kept = my_task()
+server.addTask(kept)
+server.addTask(my_task())  # replacing it while Python holds it: Python still owns it
+print("REPLACED", kept.getName())
+""")
+        assert "REPLACED MyTask" in out, out
+
+    def test_shared_child_added_from_python_stays_replaceable(self):
+        """A getNodes() child is a shared_ptr the graph shares: its wrapper holds a shared_ptr
+        instead of owning the node outright, and it still owns it, so it must not block."""
+        out = _run("""
+server = TaskComposerServer()
+server.loadConfig(config_path, GeneralResourceLocator())
+
+def child():
+    graph = factory.createTaskComposerNode("TrajOptPipeline")
+    node = next(iter(graph.getNodes().values()))
+    node.setName("Child")
+    return node
+
+server.addTask(child())
+gc.collect()
+server.addTask(child())
+server.loadConfig(config_path, GeneralResourceLocator())
+print("REPLACED", server.hasTask("Child"))
+""")
+        assert "REPLACED True" in out, out
+
     def test_reload_racing_by_name_runs(self):
         """A run registered only after releasing the GIL: a reload on another thread could free
         the task between the lookup and the registration."""
