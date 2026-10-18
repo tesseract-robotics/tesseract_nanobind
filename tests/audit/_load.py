@@ -14,6 +14,7 @@ SCRIPTS = (
     "audit_parse",
     "audit_bound",
     "audit_stub",
+    "audit_lookup",
     "audit_rules",
     "audit_match",
     "audit_report",
