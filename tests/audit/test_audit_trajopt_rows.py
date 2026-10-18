@@ -334,3 +334,15 @@ def test_no_g2_pattern_under_any_prefix():
 def test_g2_patterns_are_scoped_to_their_prefix(spelling):
     # The spellings need not exist: the test pins the pattern table, not the include tree.
     assert not own.is_unaudited(spelling, ("tesseract/common/",))
+
+
+# The rows of the merged binding fixes (#345): what the audit could not see.
+
+
+@pytest.mark.parametrize("symbol", ["QPProblem.setVariables", "TrajOptQPProblem.setVariables"])
+def test_real_sized_double_array(g2_reports, symbol):
+    """`setVariables(const double* x)` (qp_problem.h:49, trajopt_qp_problem.h:30) reads
+    `getNumNLPVars()` doubles; Python passes a size-checked array (#282)."""
+    report = g2_reports["trajopt_sqp"]
+    assert (symbol, "sized-double-array") in accepted_pairs(report)
+    assert symbol not in {g.symbol for g in report.gaps} | {d.name for d in report.deviations}
