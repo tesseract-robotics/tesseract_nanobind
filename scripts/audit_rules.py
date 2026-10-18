@@ -143,10 +143,6 @@ ACCEPTED = {
     "Python form; the owning object exposes what Python needs instead: bound fields, or `set…` "
     "forwarders such as `OSQPEigenSolver`'s into its OSQP settings (`setPolish`, "
     "`setWarmStart(bool)`, `setMaxIteration`, …).",
-    "parent-back-pointer": "`Var.getParent()` and `Node.getParent()` return a raw `const T*` to "
-    "the owning container; Python reaches a `Var` or `Node` from its owner "
-    "(`NodesVariables.getNodes`, `Node.getVar`), and a bound back-pointer would dangle once the "
-    "owner is collected.",
     "stdout-printer": "`Component.print(index, tolerance)` writes a table to `std::cout`, which "
     "bypasses `sys.stdout`; Python reads the same values through the bound `getValues` and "
     "`getBounds`.",
@@ -265,8 +261,6 @@ ACCEPTED_SYMBOLS = {
     # composite_instruction.h:299 `UserData& getUserData()`; the binding converts a dict (#271).
     ("tesseract_command_language", "CompositeInstruction.setUserData"): "reference-setter",
     # Group 2 (trajopt).
-    ("trajopt_ifopt", "Var.getParent"): "parent-back-pointer",
-    ("trajopt_ifopt", "Node.getParent"): "parent-back-pointer",
     ("trajopt_ifopt", "Component.print"): "stdout-printer",
     ("trajopt_ifopt", "NodesVariables.addObserver"): "unimplemented-observer",
     ("trajopt_ifopt", "calcNumericalCostGradient"): "ifopt-problem-only",

@@ -90,9 +90,11 @@ def test_parent_module_does_not_report_planner_headers(g3_reports):
     "header",
     ["tesseract/motion_planners/planner_utils.h", "tesseract/motion_planners/robot_config.h"],
 )
-def test_robot_config_headers_stay_gaps(g3_reports, header):
-    """mp-base rows 9-10, C7 = bind (g3/13): header gaps, never not-API."""
-    assert header in gap_symbols(g3_reports[MP])
+def test_robot_config_headers_are_bound(g3_reports, header):
+    """mp-base rows 9-10, C7 = bind (g3/13): #346 includes both headers in the binding, so
+    neither is a header gap (and neither was ever not-API)."""
+    assert header not in gap_symbols(g3_reports[MP])
+    assert {"getRobotConfig", "isWithinJointLimits"}.isdisjoint(open_names(g3_reports[MP]))
 
 
 @pytest.mark.parametrize(
@@ -104,9 +106,10 @@ def test_robot_config_headers_stay_gaps(g3_reports, header):
         (IFOPT, "TrajOptIfoptMotionPlanner"),
     ],
 )
-def test_planner_base_gaps_from_t5(g3_reports, module, cls):
-    """PR 0b's T5 rows: four planners bound without their `MotionPlanner` base (g3/01)."""
-    assert (f"{cls}(MotionPlanner)", audit.Kind.BASE) in {
+def test_planner_base_rows_from_t5_are_covered(g3_reports, module, cls):
+    """PR 0b's T5 rows: four planners were bound without their `MotionPlanner` base (g3/01);
+    #346 declares the base, so the row is covered."""
+    assert (f"{cls}(MotionPlanner)", audit.Kind.BASE) not in {
         (g.symbol, g.kind) for g in g3_reports[module].gaps
     }
 
@@ -155,11 +158,12 @@ PROFILE_YAML_CTORS = [
 
 
 @pytest.mark.parametrize(("module", "symbol"), PROFILE_YAML_CTORS)
-def test_real_profile_yaml_ctor_is_a_gap(g3_reports, module, symbol):
-    """No profile binds a YAML-text sibling yet: binding-fix g3/08 (C6 = 6a)."""
+def test_real_profile_yaml_ctor_is_accepted_through_from_yaml(g3_reports, module, symbol):
+    """Binding-fix g3/08 (C6 = 6a): #346 and #331 bind a static `from_yaml(text)` on each
+    profile, so its `YAML::Node` ctor is accepted (yaml-node), not a gap."""
     report = g3_reports[module]
-    assert (symbol, "2") in {(g.symbol, g.arity) for g in report.gaps}
-    assert (symbol, "yaml-node") not in accepted_pairs(report)
+    assert (symbol, "2") not in {(g.symbol, g.arity) for g in report.gaps}
+    assert (symbol, "yaml-node") in accepted_pairs(report)
 
 
 # Task 3: not-API headers, scoped by owning prefix (TF-1).
@@ -285,11 +289,6 @@ def test_real_unbound_dependency_rows(g3_reports, module, symbol):
 @pytest.mark.parametrize(
     ("module", "symbol"),
     [
-        # Bindable or owned types: these stay binding-fix rows.
-        (TRAJOPT, "TrajOptOSQPSolverProfile.settings"),  # osqp/ is not a root (I-mp-plan-7)
-        (IFOPT, "TrajOptIfoptMoveProfile.create"),  # I-sqp-6 (g3/06)
-        (IFOPT, "TrajOptIfoptSolverProfile.callbacks"),  # I-sqp-5: trajopt_sqp is audited
-        (IFOPT, "TrajOptIfoptSolverProfile.createOptimizationCallbacks"),  # I-sqp-5
         # `ompl::base::State` is bound by `ompl_base` until #258 removes it: a Python form.
         (OMPL, "OMPLMoveProfile.createStateExtractor"),
         (OMPL, "OMPLRealVectorMoveProfile.createStateExtractor"),
@@ -297,6 +296,23 @@ def test_real_unbound_dependency_rows(g3_reports, module, symbol):
 )
 def test_real_bindable_rows_stay_gaps(g3_reports, module, symbol):
     assert symbol in gap_symbols(g3_reports[module])
+
+
+@pytest.mark.parametrize(
+    ("module", "symbol"),
+    [
+        # Bindable or owned types the binding-fix PRs bound (#345, #346).
+        (TRAJOPT, "TrajOptOSQPSolverProfile.settings"),  # osqp/ is not a root (I-mp-plan-7)
+        (IFOPT, "TrajOptIfoptMoveProfile.create"),  # I-sqp-6 (g3/06)
+        (IFOPT, "TrajOptIfoptSolverProfile.callbacks"),  # I-sqp-5: trajopt_sqp is audited
+        (IFOPT, "TrajOptIfoptSolverProfile.createOptimizationCallbacks"),  # I-sqp-5
+    ],
+)
+def test_real_bindable_rows_are_covered(g3_reports, module, symbol):
+    """Covered, never accepted: no rule may close a bindable row."""
+    report = g3_reports[module]
+    assert symbol not in open_names(report)
+    assert symbol not in {a.symbol for a in report.accepted}
 
 
 # Task 5: symbol-level rules R2, R14, R21 and the explicit R13 entries.
@@ -353,8 +369,16 @@ def test_type_erased_data_premise():
 
 
 def test_solver_behind_profile_leaves_the_parameters_audited(g3_reports):
-    """`trajopt_sco/optimizers.hpp` is a direct include: audited, not hidden by `trajopt_sco/*`."""
-    assert "BasicTrustRegionSQPParameters.__eq__" in gap_symbols(g3_reports[TRAJOPT])
+    """`trajopt_sco/optimizers.hpp` is a direct include: audited, not hidden by `trajopt_sco/*`.
+    The rule accepts the solver classes there; the parameters stay audited rows, and #346
+    binds their `__eq__`, so it is covered rather than accepted."""
+    report = g3_reports[TRAJOPT]
+    assert ("Optimizer", "solver-behind-profile") in accepted_pairs(report)
+    assert [a.location for a in report.accepted if a.symbol == "Optimizer"] == [
+        "trajopt_sco/optimizers.hpp:63"
+    ]
+    assert "BasicTrustRegionSQPParameters.__eq__" not in open_names(report)
+    assert not [a for a in report.accepted if a.symbol.startswith("BasicTrustRegionSQPParameters")]
 
 
 @pytest.mark.parametrize(
@@ -369,7 +393,7 @@ def test_copied_vector_field_mutator_once_its_premise_holds(g3_reports, symbol):
     assert symbol not in open_names(report)
 
 
-# Task 7 (C8 = 7a, bind): the profile hooks stay binding-fix gaps (g3/06).
+# Task 7 (C8 = 7a, bind): the profile hooks were binding-fix gaps (g3/06); #346 binds them.
 
 PROFILE_HOOKS = [
     (OMPL, "OMPLMoveProfile.createSolverConfig"),
@@ -405,10 +429,10 @@ PROFILE_HOOKS = [
 
 
 @pytest.mark.parametrize(("module", "symbol"), PROFILE_HOOKS)
-def test_real_profile_hooks_stay_gaps(g3_reports, module, symbol):
-    """C8 = bind: no rule may accept a hook; each stays a gap until g3/06 binds it."""
+def test_real_profile_hooks_are_covered(g3_reports, module, symbol):
+    """C8 = bind: no rule may accept a hook; #346 (g3/06) binds each, so it is covered."""
     report = g3_reports[module]
-    assert symbol in gap_symbols(report)
+    assert symbol not in open_names(report)
     assert symbol not in {a.symbol for a in report.accepted}
 
 
@@ -491,8 +515,9 @@ def test_descartes_state_is_not_ompl_state(descartes_report):
     assert not {"State.__init__", "State.values"} & gap_symbols(descartes_report)
 
 
-def test_descartes_planner_base_gap(descartes_report):
-    assert ("DescartesMotionPlannerD(MotionPlanner)", audit.Kind.BASE) in {
+def test_descartes_planner_base_is_covered(descartes_report):
+    """#346 declares the `MotionPlanner` base of `DescartesMotionPlannerD`."""
+    assert ("DescartesMotionPlannerD(MotionPlanner)", audit.Kind.BASE) not in {
         (g.symbol, g.kind) for g in descartes_report.gaps
     }
 
@@ -606,15 +631,18 @@ def test_descartes_solver_profile_create_is_unbound_dependency(descartes_report,
 
 @pytest.mark.parametrize(
     "symbol",
-    [
-        *[
-            f"sample{s}" for s in ("Fixed", "ToolAxis", "ToolXAxis", "ToolYAxis", "ToolZAxis")
-        ],  # g3/20
-        "DescartesMoveProfile.createKinematicGroup",  # C3 = 8a: g3/07
-    ],
+    ["DescartesMoveProfile.createKinematicGroup"],  # C3 = 8a: g3/07
 )
 def test_descartes_binding_fix_rows_stay_gaps(descartes_report, symbol):
     assert symbol in gap_symbols(descartes_report)
+
+
+@pytest.mark.parametrize(
+    "symbol", [f"sample{s}" for s in ("Fixed", "ToolAxis", "ToolXAxis", "ToolYAxis", "ToolZAxis")]
+)
+def test_descartes_samplers_are_covered(descartes_report, symbol):
+    """g3/20: #346 binds the five pose samplers."""
+    assert symbol not in open_names(descartes_report)
 
 
 # Every G3 table entry fires: a stale entry fails here, never silently.
