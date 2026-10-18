@@ -242,8 +242,11 @@ struct InFlightRun {
     nb::object owner;
     // A server run's executor: the server owns it, and addExecutor may replace it mid-run.
     std::shared_ptr<tp::TaskComposerExecutor> executor;
+    // run() threw. Its thread erases the entry, but the exit drain may have moved it off the list
+    // first: the drain and free_finished_runs drop flagged entries instead of waiting for them.
+    bool start_failed = false;
 
-    bool finished() const { return future != nullptr && future->ready(); }
+    bool finished() const { return start_failed || (future != nullptr && future->ready()); }
 };
 
 // Accessed with the GIL held only. Never freed: it outlives module teardown.
@@ -285,7 +288,7 @@ void wait_for_runs_at_exit() {
         runs.swap(in_flight_runs());
         std::vector<std::shared_ptr<InFlightRun>> starting;
         for (auto& run : runs)
-            if (run->future == nullptr)
+            if (run->future == nullptr && !run->start_failed)
                 starting.push_back(run);
         nb::gil_scoped_release release;
         for (auto& run : runs) {
@@ -298,7 +301,8 @@ void wait_for_runs_at_exit() {
             std::this_thread::yield();
         nb::gil_scoped_acquire acquire;
         for (auto& run : starting)
-            in_flight_runs().push_back(std::move(run));
+            if (!run->start_failed)
+                in_flight_runs().push_back(std::move(run));
         runs.clear();
     }
 }
@@ -330,6 +334,7 @@ std::unique_ptr<tp::TaskComposerFuture> run_held(const tp::TaskComposerNode& nod
         nb::gil_scoped_release release;
         future = run();
     } catch (...) {
+        entry->start_failed = true;
         auto& runs = in_flight_runs();
         runs.erase(std::remove(runs.begin(), runs.end(), entry), runs.end());
         throw;
@@ -369,10 +374,41 @@ struct ServerLoading {
     ~ServerLoading() { loading_servers().erase(&server); }
 };
 
+// Tasks a server got from Python (addTask), per server. Python owns such a task: the server's
+// shared_ptr only holds its Python object, which owns it (or holds its own shared_ptr, e.g. a
+// getNodes() child), so replacing it never frees it under a wrapper. A weak_ptr to the server's
+// shared_ptr names the task exactly: it expires when the server drops it, so a later task at the
+// same address never matches. Entries of a destroyed server name objects that server no longer
+// holds; a later server at its address only matches them by adding the same object from Python.
+// GIL-protected; never freed.
+struct PythonAddedTask {
+    const tp::TaskComposerServer* server;
+    std::weak_ptr<tp::TaskComposerNode> task;
+};
+std::vector<PythonAddedTask>& python_added_tasks() {
+    static auto* tasks = new std::vector<PythonAddedTask>();
+    return *tasks;
+}
+
+void record_python_added_task(const tp::TaskComposerServer& server, const std::shared_ptr<tp::TaskComposerNode>& task) {
+    auto& tasks = python_added_tasks();
+    tasks.erase(std::remove_if(tasks.begin(), tasks.end(), [](const PythonAddedTask& t) { return t.task.expired(); }),
+                tasks.end());
+    tasks.push_back({ &server, task });
+}
+
+bool is_python_added_task(const tp::TaskComposerServer& server, const tp::TaskComposerNode* task) {
+    for (const auto& added : python_added_tasks())
+        if (added.server == &server && added.task.lock().get() == task)
+            return true;
+    return false;
+}
+
 // The one invariant for server tasks: a task is not replaced while a run or Python can reach it.
 // Raise TaskComposerServerBusyError if any of `names` (tasks of `server`) is the node of an
-// unfinished run, on any executor or path, or has a live Python wrapper (a getTask() result).
-// Call with the GIL held, after free_finished_runs, and keep it held until the replacement.
+// unfinished run, on any executor or path, or a task the server owns has a live Python wrapper
+// (a getTask() result, which does not own it). Call with the GIL held, after free_finished_runs,
+// and keep it held until the replacement.
 void require_tasks_replaceable(const char* caller, const tp::TaskComposerServer& server,
                                const std::vector<std::string>& names) {
     std::string running;
@@ -385,7 +421,10 @@ void require_tasks_replaceable(const char* caller, const tp::TaskComposerServer&
                 break;
             }
         }
-        if (nb::find(task).is_valid())
+        // A wrapper of a task added from Python is the object that owns it (the server's
+        // shared_ptr keeps it alive, so it is always found): replacing the task only drops that
+        // reference. Any wrapper of a task the server owns is a getTask() view and would dangle.
+        if (!is_python_added_task(server, task) && nb::find(task).is_valid())
             referenced += (referenced.empty() ? "'" : ", '") + name + "'";
     }
     if (running.empty() && referenced.empty())
@@ -1016,6 +1055,7 @@ NB_MODULE(_tesseract_task_composer, m) {
             if (self.hasTask(task->getName()))
                 require_tasks_replaceable("TaskComposerServer.addTask", self, { task->getName() });
             ServerLoading loading("TaskComposerServer.addTask", self);
+            record_python_added_task(self, task);
             self.addTaskPython(std::move(task));
         }, "task"_a,
            "Add `task` under its name, replacing a task of that name. Raises "
