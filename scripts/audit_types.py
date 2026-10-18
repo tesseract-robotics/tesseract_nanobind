@@ -69,6 +69,10 @@ STD_SEQUENCES = frozenset({"vector", "list", "deque"})
 STD_MAPS = frozenset({"map", "unordered_map"})
 STD_POINTERS = frozenset({"shared_ptr", "unique_ptr"})
 TYPE_PARAMETER_PREFIX = "type-parameter-"  # libclang's spelling of a template parameter
+# A binding may widen a `std::string` file path to `std::filesystem::path` (`str |
+# os.PathLike`): the path annotation covers the string parameter, never the reverse.
+STR_KEY = ("str",)
+PATH_KEY = ("path",)
 
 
 def record_path(decl: ci.Cursor) -> str:
@@ -353,6 +357,8 @@ def public_bases(tu: ci.TranslationUnit) -> dict[str, tuple[str, ...]]:
 def _compare(cpp: TypeKey, py: TypeKey, ancestors: Ancestors) -> bool | None:
     if cpp is None or py is None:
         return None
+    if cpp == STR_KEY and py == PATH_KEY:
+        return True  # nanobind's std::filesystem::path caster takes every `str`
     if cpp[0] != py[0] or len(cpp) != len(py):
         return False
     if cpp[0] == "class":

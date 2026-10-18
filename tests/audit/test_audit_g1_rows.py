@@ -482,3 +482,9 @@ def test_real_set_user_data_is_a_reference_setter(g1_reports, cl_tu):
     report = g1_reports[CL]
     assert ("CompositeInstruction.setUserData", "reference-setter") in accepted_pairs(report)
     assert "CompositeInstruction.setUserData" not in open_names(report)
+
+
+def test_real_path_parameter_covers_a_string_path(g1_reports):
+    """`toDelimitedFile(composite, const std::string& file_path, …)` bound with a
+    `std::filesystem::path` (`str | os.PathLike`): it takes every `str` the C++ takes."""
+    assert "toDelimitedFile" not in open_names(g1_reports[CL])
