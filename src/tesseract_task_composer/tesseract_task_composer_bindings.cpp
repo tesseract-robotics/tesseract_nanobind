@@ -372,7 +372,9 @@ int (*python_log_callback_depth)() = nullptr;
 // other server call (enter_server) on another thread waits for it with the GIL released, and
 // raises only where waiting cannot end:
 // - on the mutating thread itself (a Python ResourceLocator or log handler inside the load);
-// - inside a Python log handler: the waiter holds console_bridge's mutex, which the load needs.
+// - inside a Python log handler: the waiter holds console_bridge's mutex, which the load needs;
+// - on a thread mutating another server: two loads whose ResourceLocators reach each other's
+//   server would wait for each other.
 // Lock order: the GIL, then `mutex`. `mutex` is taken with the GIL held only by the mutating
 // thread (ServerMutation), and released before anything that can log or call Python; a waiter
 // releases the GIL before taking it. Nothing acquires the GIL while holding `mutex`.
@@ -383,6 +385,9 @@ struct ServerGate {
     bool busy = false;
     std::thread::id thread;
 };
+
+// Mutations (ServerMutation) running on this thread, on any server.
+thread_local int server_mutations_on_this_thread = 0;
 
 // One gate per server address. GIL-protected; never freed, so a waiter's reference stays valid
 // with the GIL released. A later server at the same address reuses an idle gate.
@@ -407,6 +412,11 @@ void enter_server(const char* caller, const tp::TaskComposerServer& server) {
             throw TaskComposerServerBusyError(std::string(caller) +
                                               ": called from a log handler while another thread reloads the server; "
                                               "waiting would deadlock on the logger the reload uses");
+        if (server_mutations_on_this_thread != 0)
+            throw TaskComposerServerBusyError(std::string(caller) +
+                                              ": called from inside another server's loadConfig, addTask or "
+                                              "addExecutor while this server is reloading: they could wait for "
+                                              "each other");
         nb::gil_scoped_release release;
         std::unique_lock<std::mutex> lock(gate.mutex);
         gate.idle.wait(lock, [&] { return !gate.busy; });
@@ -422,10 +432,12 @@ struct ServerMutation {
         std::lock_guard<std::mutex> lock(gate.mutex);
         gate.busy = true;
         gate.thread = std::this_thread::get_id();
+        ++server_mutations_on_this_thread;
     }
     ServerMutation(const ServerMutation&) = delete;
     ServerMutation& operator=(const ServerMutation&) = delete;
     ~ServerMutation() {
+        --server_mutations_on_this_thread;
         {
             std::lock_guard<std::mutex> lock(gate.mutex);
             gate.busy = false;
