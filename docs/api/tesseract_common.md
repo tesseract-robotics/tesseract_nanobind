@@ -475,6 +475,48 @@ setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_ERROR)
 setLogLevel(LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
 ```
 
+### Python output handlers
+
+A subclass of `OutputHandler` installed with `useOutputHandler` gets its messages asynchronously,
+on a delivery thread, in the order they were logged, from every thread, including the one
+holding the GIL. It is never called inside console_bridge's output lock. Called there, a Python
+handler that gave the GIL away mid-call deadlocked against any thread that logged while holding
+the GIL, such as an executor worker against a failing `createTaskComposerNode`.
+
+- `flushOutputHandlers()` waits until the handlers have received everything logged so far.
+  Called from inside a handler, it returns at once. Don't call it from code that a handler waits
+  for: the handler blocks it.
+- `useOutputHandler` and `restorePreviousOutputHandler` don't wait. Each queued message goes to
+  the handler that was installed when it was logged.
+- The handler stays alive while console_bridge can call it: until it is replaced, or restored
+  away from.
+- The queue holds up to 10 000 messages. Beyond that, messages are dropped, and the handler later
+  gets a warning naming how many were dropped. A logger never waits for the queue.
+- A handler that raises is reported through `sys.unraisablehook`, and delivery goes on.
+- In a forked child, delivery starts again on the first message.
+- At interpreter exit, queued messages are delivered for up to 2 s. What is left, and anything
+  logged later, goes to stderr; a handler that never returns does not hold up exit.
+
+```python
+from tesseract_robotics.tesseract_common import (
+    OutputHandler, flushOutputHandlers, restorePreviousOutputHandler, useOutputHandler,
+)
+
+class Collect(OutputHandler):
+    def __init__(self):
+        super().__init__()
+        self.texts = []
+
+    def log(self, text, level, filename, line):
+        self.texts.append(text)  # on the delivery thread
+
+handler = Collect()
+useOutputHandler(handler)
+...
+flushOutputHandlers()  # handler.texts now holds everything logged so far
+restorePreviousOutputHandler()
+```
+
 ## Container Types
 
 | Type | Description |

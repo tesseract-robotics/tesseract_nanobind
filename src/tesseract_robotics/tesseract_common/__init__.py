@@ -59,6 +59,7 @@ __all__ = [
     "getLogLevel",
     "useOutputHandler",
     "restorePreviousOutputHandler",
+    "flushOutputHandlers",
     # Eigen helper types
     "Isometry3d",
     "Translation3d",
