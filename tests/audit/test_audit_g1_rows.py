@@ -459,3 +459,11 @@ def test_real_composite_range_insert_has_no_python_form(g1_reports):
     pair = ("CompositeInstruction.insert", "vector-forwarding-no-python-form")
     assert pair in accepted_pairs(report)
     assert "CompositeInstruction.insert" not in open_names(report)
+
+
+def test_real_push_back_of_a_move_instruction_is_a_poly_alternative(g1_reports):
+    """`push_back(MoveInstruction)`: `InstructionPoly(const MoveInstructionInterface&)` converts
+    it (instruction_poly.h:139)."""
+    report = g1_reports[CL]
+    assert "MoveInstruction" in audit.POLY_ALTERNATIVES["InstructionPoly"]
+    assert "CompositeInstruction.push_back" not in open_names(report)
