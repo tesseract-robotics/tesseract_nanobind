@@ -251,6 +251,8 @@ ACCEPTED_SYMBOLS = {
     },
     ("tesseract_command_language", "MoveInstruction.setWaypoint"): "reference-setter",
     ("tesseract_command_language", "MoveInstructionPoly.setWaypoint"): "reference-setter",
+    # composite_instruction.h:299 `UserData& getUserData()`; the binding converts a dict (#271).
+    ("tesseract_command_language", "CompositeInstruction.setUserData"): "reference-setter",
     # Group 2 (trajopt).
     ("trajopt_ifopt", "Var.getParent"): "parent-back-pointer",
     ("trajopt_ifopt", "Node.getParent"): "parent-back-pointer",

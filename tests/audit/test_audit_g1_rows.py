@@ -467,3 +467,18 @@ def test_real_push_back_of_a_move_instruction_is_a_poly_alternative(g1_reports):
     report = g1_reports[CL]
     assert "MoveInstruction" in audit.POLY_ALTERNATIVES["InstructionPoly"]
     assert "CompositeInstruction.push_back" not in open_names(report)
+
+
+def test_real_set_user_data_is_a_reference_setter(g1_reports, cl_tu):
+    """R10's premise: `getUserData()` returns a non-const reference, C++ has no setter."""
+    members = list(_record(cl_tu, "CompositeInstruction").get_children())
+    assert any(
+        m.spelling == "getUserData"
+        and m.result_type.kind == audit.ci.TypeKind.LVALUEREFERENCE
+        and not m.result_type.get_pointee().is_const_qualified()
+        for m in members
+    )
+    assert not any(m.spelling == "setUserData" for m in members)
+    report = g1_reports[CL]
+    assert ("CompositeInstruction.setUserData", "reference-setter") in accepted_pairs(report)
+    assert "CompositeInstruction.setUserData" not in open_names(report)
