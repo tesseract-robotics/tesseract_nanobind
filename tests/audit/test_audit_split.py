@@ -26,14 +26,15 @@ def defined_names(module: str) -> set[str]:
 
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
-# audit_types, audit_ownership, audit_parse, audit_bound, audit_stub, audit_rules, audit_match,
-# audit_report, audit_bindings.
+# audit_types, audit_ownership, audit_parse, audit_bound, audit_stub, audit_lookup, audit_rules,
+# audit_match, audit_report, audit_bindings.
 EXPECTED_SCRIPTS = (
     "audit_types",
     "audit_ownership",
     "audit_parse",
     "audit_bound",
     "audit_stub",
+    "audit_lookup",
     "audit_rules",
     "audit_match",
     "audit_report",
@@ -159,16 +160,12 @@ def test_rules_defines_exactly():
 
 MATCH = {
     "PrefixMismatchError", "resolve_module", "Gap", "ModuleReport", "Cover", "_fits", "_upcasts_to",
-    "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "_stub_py_api",
-    "_base_stub", "_py_member", "_binding_stub", "_stubs_under", "_ancestor_missing", "match",
+    "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
     # 0b Task 6 (class identity)
-    "BoundLookup", "NO_ALIAS", "no_bound", "_bound_classes_of", "bound_index", "_same_class",
-    "_renamed",
+    "_bound_classes_of", "bound_index",
     # 0b Task 8 (stub bases)
-    "_stub_base", "_base_rows",
-    # 0b Task 7 (inherited members)
-    "_inherited_from_bound",
+    "_base_rows",
     # #256 group 1
     "poly_ancestors", "_absent_ok_accepts", "_whole_symbol_rule", "_bound_as_method",
     "_unbound_rule", "_uncovered_rule",
@@ -176,13 +173,31 @@ MATCH = {
     "YAML_TEXT_KEYS", "_yaml_sibling",
     # G3 C6 6a: a static `from_yaml(text)` is the YAML-text sibling.
     "_is_yaml_text_factory", "_stands_for_yaml_ctor",
-    # G3 Task 10: renamed classes in parameter types.
-    "_unaliased_key", "_unaliased_api",
 }  # fmt: skip
 
 
 def test_match_defines_exactly():
     assert defined_names("audit_match") == MATCH
+
+
+# Wave 3 split (#256): a C++ symbol's Python form across stubs, out of `match` at the 1k gate.
+LOOKUP = {
+    "_stub_py_api", "_base_stub", "_py_member", "_binding_stub", "_stubs_under",
+    "_ancestor_missing",
+    # 0b Task 6 (class identity)
+    "BoundLookup", "NO_ALIAS", "no_bound", "_same_class", "_renamed",
+    # 0b Task 8 (stub bases)
+    "_stub_base",
+    # 0b Task 7 (inherited members)
+    "_inherited_from_bound",
+    # G3 Task 10: renamed classes in parameter types.
+    "_unaliased_key", "_unaliased_api",
+}  # fmt: skip
+
+
+def test_lookup_defines_exactly():
+    assert defined_names("audit_lookup") == LOOKUP
+    assert not defined_names("audit_match") & LOOKUP
 
 
 @pytest.mark.parametrize("module", SCRIPTS)
