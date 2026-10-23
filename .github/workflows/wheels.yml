@@ -1,0 +1,343 @@
+name: Python Wheels
+
+# Builds the nanobind bindings the same way the tesseract_python SWIG wheels are built: the tesseract
+# C++ stack is built from source with colcon against distro (Linux) or vcpkg (Windows/macOS)
+# dependencies, then the wheel is repaired with auditwheel/delvewheel/delocate. The plugin factories
+# are linked into the extension modules and registered through their anchors, so the repair tools
+# bundle them like any other dependency.
+
+on:
+  push:
+    branches:
+      - 'dev**'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  VCPKG_PKGS: >-
+    boost-dll boost-program-options
+    boost-serialization boost-filesystem
+    boost-stacktrace boost-algorithm
+    boost-format cereal
+    tinyxml2 console-bridge assimp
+    urdfdom octomap orocos-kdl pcl
+    gtest benchmark flann jsoncpp
+    yaml-cpp eigen3
+    openblas
+    fcl ompl taskflow
+    bullet3[multithreading,double-precision,rtti]
+    ccd[double-precision] gperftools
+  # setuptools-scm needs tags, which a fork branch does not carry
+  SETUPTOOLS_SCM_PRETEND_VERSION: 0.35.0.9
+  NB_BUILD_REQS: scikit-build-core>=0.10 nanobind==2.12.0 setuptools-scm>=8 wheel
+
+jobs:
+  build-ubuntu:
+    runs-on: ${{ matrix.config.runs_on }}
+    container: ubuntu:24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - runs_on: ubuntu-24.04
+          plat: manylinux_2_39_x86_64
+        - runs_on: ubuntu-24.04-arm
+          plat: manylinux_2_39_aarch64
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+    - name: install sudo, tzdata, keyboard-configuration
+      shell: bash
+      run: |
+        echo -en "XKBMODEL=\"pc105\"\nXKBLAYOUT=\"us\"\nXKBVARIANT=\"\"\nXKBOPTIONS=\"\"\nBACKSPACE=\"guess\"\n" > /etc/default/keyboard
+        apt update
+        apt install sudo tzdata python3 keyboard-configuration git -y -qq
+        ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime
+        dpkg-reconfigure --frontend noninteractive tzdata
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - name: apt
+      run: >
+        sudo apt-get install python3-pip python3-venv python3-dev libboost-all-dev libtaskflow-cpp-dev
+        libeigen3-dev libtinyxml2-dev libconsole-bridge-dev libassimp-dev
+        liburdfdom-dev liboctomap-dev liborocos-kdl-dev libpcl-dev libompl-dev
+        libflann-dev libjsoncpp-dev libyaml-cpp-dev git cmake ninja-build
+        build-essential autoconf automake libtool bison libpcre2-dev
+        lcov libbullet-dev libbullet-extras-dev curl libfcl-dev -y -qq
+    - name: pip
+      shell: bash
+      run: |
+        python3 -m venv $GITHUB_WORKSPACE/venv
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        python -m pip install --upgrade pip
+        python -m pip install colcon-common-extensions vcs2l auditwheel patchelf $NB_BUILD_REQS
+    - name: vcs import
+      shell: bash
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        mkdir -p ws/src
+        vcs import --input tesseract_nanobind/dependencies_with_ext.rosinstall ws/src
+    - name: colcon build
+      shell: bash
+      working-directory: ws
+      run: >
+        source $GITHUB_WORKSPACE/venv/bin/activate &&
+        colcon build --merge-install
+        --cmake-force-configure
+        --packages-ignore bullet
+        --event-handlers console_cohesion+
+        --cmake-args -DCMAKE_BUILD_TYPE=Release
+        -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF
+        -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON
+    - name: build wheel
+      shell: bash
+      working-directory: tesseract_nanobind
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        export TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install
+        export CMAKE_PREFIX_PATH=$TESSERACT_CPP_PREFIX
+        export LD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib
+        python -m pip wheel . -w dist --no-build-isolation --no-deps \
+          -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
+        auditwheel show dist/*.whl
+        auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
+    - name: test
+      shell: bash
+      run: |
+        python3 -m venv test-venv
+        source test-venv/bin/activate
+        python -m pip install --upgrade pip
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl pytest pytest-xdist pyyaml
+        cd tesseract_nanobind
+        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
+    - name: archive wheels
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-ubuntu-${{ matrix.config.runs_on }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
+    - name: archive logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'build-logs-ubuntu-${{ matrix.config.runs_on }}'
+        path: "**/*.log"
+        retention-days: 2
+
+  build-win:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - arch: x64
+            vcpkg_triplet: x64-windows-release
+            python_version: "3.12"
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - uses: actions/setup-python@v6
+      id: setup-python
+      with:
+        python-version: '${{ matrix.config.python_version }}'
+        architecture: ${{ matrix.config.arch }}
+    - name: pip3
+      run: |
+        python -m pip install colcon-common-extensions vcs2l delvewheel ${{ env.NB_BUILD_REQS }}
+    - name: choco
+      run: |
+        choco install ninja -r
+    - name: vcs import
+      run: |
+        mkdir ws\src
+        vcs import --input tesseract_nanobind\dependencies.rosinstall ws\src
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v8
+      with:
+        pkgs: >-
+          ${{ env.VCPKG_PKGS }}
+        triplet: ${{ matrix.config.vcpkg_triplet }}
+        extra-args: >-
+          --clean-after-build
+          --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
+        token: ${{ github.token }}
+        cache-key: win-${{ matrix.config.arch }}-nanobind
+    - name: colcon build
+      working-directory: ws
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+        set CMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}
+        set PATH=%PATH%;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin
+        set CC=cl
+        set CCX=cl
+        colcon build --merge-install ^
+        --cmake-force-configure ^
+        --event-handlers console_cohesion+ ^
+        --packages-ignore tesseract_examples gtest ^
+        --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release ^
+        -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON ^
+        -DVCPKG_APPLOCAL_DEPS=OFF ^
+        -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON ^
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        if %ERRORLEVEL% GEQ 1 exit 1
+    - name: build wheel
+      working-directory: tesseract_nanobind
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+        set TESSERACT_CPP_PREFIX=%GITHUB_WORKSPACE%\ws\install
+        set CMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%\ws\install;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}
+        python -m pip wheel . -w dist --no-build-isolation --no-deps -Ccmake.args=-GNinja -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
+        if %ERRORLEVEL% GEQ 1 exit 1
+        for %%I in ("dist\*.whl") do set WHEEL_FILE=%%~I
+        python -m delvewheel repair --add-path "%GITHUB_WORKSPACE%\ws\install\bin;%GITHUB_WORKSPACE%\ws\install\lib;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin" --no-dll "msvcp140.dll;vcomp140.dll" -w wheelhouse "%WHEEL_FILE%"
+        if %ERRORLEVEL% GEQ 1 exit 1
+    - name: test
+      shell: cmd
+      run: |
+        python -m venv test-venv
+        if %errorlevel% neq 0 exit /b %errorlevel%
+        call test-venv\Scripts\activate
+        if %errorlevel% neq 0 exit /b %errorlevel%
+        python -m pip install --upgrade pip
+        for %%I in ("%GITHUB_WORKSPACE%\tesseract_nanobind\wheelhouse\*.whl") do set WHEEL_FILE=%%~I
+        python -m pip install "%WHEEL_FILE%" pytest pytest-xdist pyyaml
+        if %errorlevel% neq 0 exit /b %errorlevel%
+        cd %GITHUB_WORKSPACE%\tesseract_nanobind
+        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
+        if %errorlevel% neq 0 exit /b %errorlevel%
+    - name: archive wheels
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-win-${{ matrix.config.arch }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
+    - name: archive logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'build-logs-win-${{ matrix.config.arch }}'
+        path: "**/*.log"
+        retention-days: 2
+
+  build-macos:
+    runs-on: ${{ matrix.config.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - arch: x64
+          runner: macos-15-intel
+          brew_prefix: /usr/local
+        - arch: arm64
+          runner: macos-15
+          brew_prefix: /opt/homebrew
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - uses: actions/setup-python@v6
+      id: setup-python
+      with:
+        python-version: '3.12'
+    - name: brew
+      run: |
+        brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja
+    - name: pip3
+      run: |
+        python3 -m pip install colcon-common-extensions vcs2l delocate ${{ env.NB_BUILD_REQS }}
+    - name: vcs import
+      run: |
+        mkdir -p ws/src
+        vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v8
+      with:
+        pkgs: >-
+          ${{ env.VCPKG_PKGS }}
+        triplet: ${{ matrix.config.arch }}-osx-dynamic-release
+        extra-args: >-
+          --clean-after-build
+          --overlay-triplets=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_triplets
+          --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
+        token: ${{ github.token }}
+        cache-key: osx-${{ matrix.config.arch }}-vcpkg
+    - name: colcon build
+      working-directory: ws
+      run: |
+        export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib:$GITHUB_WORKSPACE/ws/install/lib
+        export CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
+
+        colcon build --merge-install \
+            --packages-ignore tesseract_examples ifopt vhacd \
+            --event-handlers console_cohesion+ \
+            --cmake-force-configure \
+            --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
+            -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
+            -DVCPKG_APPLOCAL_DEPS=OFF -DTESSERACT_ENABLE_TESTING=OFF \
+            -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -DOpenMP_CXX_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
+            -DOpenMP_C_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
+            -DOpenMP_CXX_LIB_NAMES=libomp -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp" \
+            -DOpenMP_C_LIB_NAMES=libomp -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp" \
+            -DOpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib \
+            -Dtcmalloc_minimal_LIBRARY=${{ github.workspace }}/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib/libtcmalloc_minimal.dylib \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    - name: build wheel
+      working-directory: tesseract_nanobind
+      run: |
+        VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
+        export TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install
+        export CMAKE_PREFIX_PATH="$TESSERACT_CPP_PREFIX;$VCPKG_PREFIX"
+        python3 -m pip wheel . -w dist --no-build-isolation --no-deps \
+          -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=12.0
+        DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
+    - name: test
+      shell: bash
+      run: |
+        ${{ steps.setup-python.outputs.python-path }} -m venv test-venv
+        source test-venv/bin/activate
+        python -m pip install --upgrade pip
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl pytest pytest-xdist pyyaml
+        cd tesseract_nanobind
+        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
+    - name: archive wheels
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-macos-${{ matrix.config.arch }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
+    - name: archive logs
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'build-logs-macos-${{ matrix.config.arch }}'
+        path: "**/*.log"
+        retention-days: 2
+
+  collect-wheels:
+    needs:
+      - build-win
+      - build-ubuntu
+      - build-macos
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Download CI artifacts
+      uses: actions/download-artifact@v8
+      with:
+        pattern: python-wheels-*
+        path: artifacts
+        merge-multiple: true
+    - name: archive wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-all'
+        path: artifacts/*.whl

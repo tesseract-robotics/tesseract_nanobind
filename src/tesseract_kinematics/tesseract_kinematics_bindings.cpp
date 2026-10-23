@@ -30,6 +30,15 @@
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/resource_locator.h>
 #include <tesseract/common/plugin_info.h>
+
+// Plugin anchors: the factory libraries are linked into this module, so the wheel repair tools
+// bundle them; the anchors register the bundled copies with the plugin loader at import
+#include <tesseract/kinematics/rep_factory.h>
+#include <tesseract/kinematics/rop_factory.h>
+#include <tesseract/kinematics/kdl/kdl_factories.h>
+#include <tesseract/kinematics/opw/opw_factory.h>
+#include <tesseract/kinematics/ur/ur_factory.h>
+#include <boost_plugin_loader/utils.h>
 #include <filesystem>
 #include <algorithm>
 #include <fstream>
@@ -119,6 +128,12 @@ std::string repr_ellipsoid(const tk::ManipulabilityEllipsoid& e) {
 }  // namespace
 
 NB_MODULE(_tesseract_kinematics, m) {
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::kinematics::REPInvKinFactoriesAnchor(), "TESSERACT_KINEMATICS_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::kinematics::ROPInvKinFactoriesAnchor(), "TESSERACT_KINEMATICS_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::kinematics::KDLFactoriesAnchor(), "TESSERACT_KINEMATICS_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::kinematics::OPWFactoriesAnchor(), "TESSERACT_KINEMATICS_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::kinematics::URFactoriesAnchor(), "TESSERACT_KINEMATICS_PLUGINS");
+
     m.doc() = "tesseract_kinematics Python bindings";
 
     // ResourceLocator, Isometry3d, LinkId / JointId / LinkIdPair live in tesseract_common

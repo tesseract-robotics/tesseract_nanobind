@@ -67,6 +67,13 @@
 // tesseract's logger (spdlog since tesseract #1367), so output sits alongside tesseract's own
 #include <tesseract/common/logging.h>
 
+// Plugin anchors: the factory libraries are linked into this module, so the wheel repair tools
+// bundle them; the anchors register the bundled copies with the plugin loader at import
+#include <tesseract/task_composer/task_composer_task_plugin_factory.h>
+#include <tesseract/task_composer/planning/planning_task_composer_plugin_factories.h>
+#include <tesseract/task_composer/taskflow/taskflow_task_composer_plugin_factories.h>
+#include <boost_plugin_loader/utils.h>
+
 // Plugin libraries stay loaded for the process lifetime (macOS, Windows): see plugin_pinning.h.
 #include "tesseract_task_composer/plugin_pinning.h"
 
@@ -539,6 +546,10 @@ std::vector<tp::TaskComposerNodeInfo> snapshot(const tp::TaskComposerNodeInfoCon
 }  // anonymous namespace
 
 NB_MODULE(_tesseract_task_composer, m) {
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::task_composer::TaskComposerPlanningFactoriesAnchor(), "TESSERACT_TASK_COMPOSER_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::task_composer::TaskComposerTaskflowFactoriesAnchor(), "TESSERACT_TASK_COMPOSER_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tesseract::task_composer::TaskComposerTaskFactoryAnchor(), "TESSERACT_TASK_COMPOSER_PLUGINS");
+
     m.doc() = "tesseract_task_composer Python bindings";
 
     // Import the modules that bind the types this one takes and returns, so nanobind names
