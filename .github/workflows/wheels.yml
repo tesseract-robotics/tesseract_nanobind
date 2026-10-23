@@ -33,8 +33,9 @@ env:
 
 jobs:
   build-ubuntu:
+    # Runs on the host runner: johnwason/vcpkg-action uses the host workspace path, which does not
+    # exist inside a container job. Ubuntu 24.04 gives the manylinux_2_39 glibc baseline.
     runs-on: ${{ matrix.config.runs_on }}
-    container: ubuntu:24.04
     strategy:
       fail-fast: false
       matrix:
@@ -50,20 +51,13 @@ jobs:
       # vcpkg does not ship prebuilt tools for arm64 Linux; use the system cmake/ninja everywhere
       VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
-    - name: install sudo, tzdata, keyboard-configuration
-      shell: bash
-      run: |
-        echo -en "XKBMODEL=\"pc105\"\nXKBLAYOUT=\"us\"\nXKBVARIANT=\"\"\nXKBOPTIONS=\"\"\nBACKSPACE=\"guess\"\n" > /etc/default/keyboard
-        apt update
-        apt install sudo tzdata python3 keyboard-configuration git -y -qq
-        ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime
-        dpkg-reconfigure --frontend noninteractive tzdata
     - uses: actions/checkout@v6
       with:
         path: tesseract_nanobind
     - name: apt
       # Only the toolchain and the tools vcpkg ports need; all libraries come from vcpkg
       run: >
+        sudo apt-get update -qq &&
         sudo apt-get install python3-pip python3-venv python3-dev git cmake ninja-build
         build-essential pkg-config curl zip unzip tar autoconf autoconf-archive automake
         libtool bison flex perl linux-libc-dev -y -qq
