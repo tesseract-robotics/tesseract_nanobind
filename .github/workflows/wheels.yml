@@ -1,10 +1,10 @@
 name: Python Wheels
 
 # Builds the nanobind bindings the same way the tesseract_python SWIG wheels are built: the tesseract
-# C++ stack is built from source with colcon against distro (Linux) or vcpkg (Windows/macOS)
-# dependencies, then the wheel is repaired with auditwheel/delvewheel/delocate. The plugin factories
-# are linked into the extension modules and registered through their anchors, so the repair tools
-# bundle them like any other dependency.
+# C++ stack is built from source with colcon against vcpkg dependencies on every platform, then the
+# wheel is repaired with auditwheel/delvewheel/delocate. The plugin factories are linked into the
+# extension modules and registered through their anchors, so the repair tools bundle them like any
+# other dependency.
 
 on:
   push:
@@ -40,11 +40,15 @@ jobs:
       matrix:
         config:
         - runs_on: ubuntu-24.04
+          vcpkg_triplet: x64-linux-dynamic-release
           plat: manylinux_2_39_x86_64
         - runs_on: ubuntu-24.04-arm
+          vcpkg_triplet: arm64-linux-dynamic-release
           plat: manylinux_2_39_aarch64
     env:
       DEBIAN_FRONTEND: noninteractive
+      # vcpkg does not ship prebuilt tools for arm64 Linux; use the system cmake/ninja everywhere
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
     - name: install sudo, tzdata, keyboard-configuration
       shell: bash
@@ -58,13 +62,11 @@ jobs:
       with:
         path: tesseract_nanobind
     - name: apt
+      # Only the toolchain and the tools vcpkg ports need; all libraries come from vcpkg
       run: >
-        sudo apt-get install python3-pip python3-venv python3-dev libboost-all-dev libtaskflow-cpp-dev
-        libeigen3-dev libtinyxml2-dev libconsole-bridge-dev libassimp-dev
-        liburdfdom-dev liboctomap-dev liborocos-kdl-dev libpcl-dev libompl-dev
-        libflann-dev libjsoncpp-dev libyaml-cpp-dev git cmake ninja-build
-        build-essential autoconf automake libtool bison libpcre2-dev
-        lcov libbullet-dev libbullet-extras-dev curl libfcl-dev -y -qq
+        sudo apt-get install python3-pip python3-venv python3-dev git cmake ninja-build
+        build-essential pkg-config curl zip unzip tar autoconf autoconf-archive automake
+        libtool bison flex perl linux-libc-dev -y -qq
     - name: pip
       shell: bash
       run: |
@@ -77,27 +79,45 @@ jobs:
       run: |
         source $GITHUB_WORKSPACE/venv/bin/activate
         mkdir -p ws/src
-        vcs import --input tesseract_nanobind/dependencies_with_ext.rosinstall ws/src
+        vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
+    - name: vcpkg build
+      uses: johnwason/vcpkg-action@v8
+      with:
+        pkgs: >-
+          ${{ env.VCPKG_PKGS }}
+        triplet: ${{ matrix.config.vcpkg_triplet }}
+        extra-args: >-
+          --clean-after-build
+          --overlay-triplets=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_triplets
+          --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
+        token: ${{ github.token }}
+        cache-key: linux-${{ matrix.config.vcpkg_triplet }}
     - name: colcon build
       shell: bash
       working-directory: ws
-      run: >
-        source $GITHUB_WORKSPACE/venv/bin/activate &&
-        colcon build --merge-install
-        --cmake-force-configure
-        --packages-ignore bullet
-        --event-handlers console_cohesion+
-        --cmake-args -DCMAKE_BUILD_TYPE=Release
-        -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF
-        -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.vcpkg_triplet }}
+        export CMAKE_PREFIX_PATH=$VCPKG_PREFIX
+        export LD_LIBRARY_PATH=$VCPKG_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
+        colcon build --merge-install \
+          --cmake-force-configure \
+          --packages-ignore tesseract_examples gtest \
+          --event-handlers console_cohesion+ \
+          --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
+          -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_ENABLE_TESTING=OFF \
+          -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - name: build wheel
       shell: bash
       working-directory: tesseract_nanobind
       run: |
         source $GITHUB_WORKSPACE/venv/bin/activate
+        VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.vcpkg_triplet }}
         export TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install
-        export CMAKE_PREFIX_PATH=$TESSERACT_CPP_PREFIX
-        export LD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib
+        export CMAKE_PREFIX_PATH=$TESSERACT_CPP_PREFIX:$VCPKG_PREFIX
+        export LD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib
         python -m pip wheel . -w dist --no-build-isolation --no-deps \
           -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
         auditwheel show dist/*.whl
@@ -295,7 +315,7 @@ jobs:
       run: |
         VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
         export TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install
-        export CMAKE_PREFIX_PATH="$TESSERACT_CPP_PREFIX;$VCPKG_PREFIX"
+        export CMAKE_PREFIX_PATH="$TESSERACT_CPP_PREFIX:$VCPKG_PREFIX"
         python3 -m pip wheel . -w dist --no-build-isolation --no-deps \
           -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5 \
           -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=12.0
