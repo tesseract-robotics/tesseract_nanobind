@@ -310,9 +310,17 @@ jobs:
         VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
         export TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install
         export CMAKE_PREFIX_PATH="$TESSERACT_CPP_PREFIX:$VCPKG_PREFIX"
+        # descartes_light's exported config needs OpenMP; point it at Homebrew's libomp as colcon does
         python3 -m pip wheel . -w dist --no-build-isolation --no-deps \
           -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5 \
-          -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+          -Ccmake.define.OpenMP_CXX_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
+          -Ccmake.define.OpenMP_C_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
+          -Ccmake.define.OpenMP_CXX_LIB_NAMES=libomp \
+          -Ccmake.define.OpenMP_C_LIB_NAMES=libomp \
+          "-Ccmake.define.OpenMP_CXX_FLAGS=-Xpreprocessor -fopenmp" \
+          "-Ccmake.define.OpenMP_C_FLAGS=-Xpreprocessor -fopenmp" \
+          -Ccmake.define.OpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib
         DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
     - name: test
       shell: bash
