@@ -296,6 +296,15 @@ mkdocstrings = { version = ">=1.0", extras = ["python"] }
 docs = { cmd = "zensical serve --dev-addr=localhost:8000 --open", env = { PYTHONPATH = "src" }, description = "Live docs server with incremental rebuilds" }
 docs-build = { cmd = "zensical build --strict", env = { PYTHONPATH = "src" }, description = "Build static docs to site/ with the same strict check as CI" }
 
+# GIL hotspots (docs/developer/threading.md): py-spy samples the GIL-holding thread of a pytest
+# run to find bindings worth adding to scripts/nogil_entry_points.yaml. Part of the default env:
+# it profiles the extensions installed there.
+[tool.pixi.feature.profile.dependencies]
+py-spy = ">=0.4.2"
+
+[tool.pixi.feature.profile.tasks]
+gil-hotspots = { cmd = "python scripts/gil_hotspots.py all", description = "Record benchmarks and tests with py-spy --gil (asks for sudo); rank the bindings that hold the GIL (#124)" }
+
 # Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding
 # TUs, ast reads the committed stubs. Dev-only: never in the default env or the wheel.
 [tool.pixi.feature.audit.dependencies]
@@ -315,7 +324,7 @@ audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GI
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
 
 [tool.pixi.environments]
-default = { solve-group = "default" }
+default = { features = ["profile"], solve-group = "default" }
 py39 = { features = ["py39"], no-default-feature = true, solve-group = "py39" }
 py310 = { features = ["py310"], solve-group = "py310" }
 py311 = { features = ["py311"], solve-group = "py311" }

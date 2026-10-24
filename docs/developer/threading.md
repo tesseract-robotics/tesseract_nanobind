@@ -54,6 +54,28 @@ releases it. An entry covers every overload of its name that releases the GIL.
 --8<-- "scripts/nogil_entry_points.yaml"
 ```
 
+## Finding candidates
+
+The list was compiled by reading code. To measure instead, `pixi run gil-hotspots`
+(`scripts/gil_hotspots.py`) records the benchmarks, then the test suite, with
+`py-spy record --gil` and prints the bindings ranked by the time they hold the GIL. `--gil`
+keeps only samples of the thread holding it, so a binding that already releases it drops out.
+Benchmarks come first: test timings are dominated by setup.
+
+py-spy samples time but cannot count calls or name a nanobind function, so the same run loads
+`scripts/gil_call_counts.py`, a pytest plugin that counts every binding call by the Python line
+it is made from (`sys.monitoring` CALL events). A sample whose innermost Python frame is such a
+line is time inside that binding: the binding runs below the line, and a Python callback it
+calls has its own frame. Native frames (`--native`, Linux x86_64 and Windows only) are not
+needed, so it runs on macOS too. py-spy attaches to the pytest process and asks for `sudo`
+(macOS, and Linux unless `kernel.yama.ptrace_scope=0`).
+
+Two limits show in the table: two bindings called on one line share a row with no per-call
+mean, and Python work on a binding's line (building its arguments) counts toward it. Read the
+calling line before acting on a row, then judge each candidate above roughly 50 µs per call
+against the rule above. `python scripts/gil_hotspots.py report build/gil-hotspots/*.txt`
+re-ranks a recording, for instance after the list changed.
+
 ## Tests
 
 - `tests/audit/test_audit_gil.py`: the audit's contract, on a fixture TU with one binding per
