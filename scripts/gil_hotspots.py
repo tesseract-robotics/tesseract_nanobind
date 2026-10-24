@@ -40,6 +40,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
 from gil_call_counts import OUTPUT_ENV
 from gil_entry_points import ENTRY_POINTS, MODULE_SCOPE, Release, load_entry_points
 
@@ -200,8 +201,10 @@ def render(report: Report, title: str, top: int) -> str:
     return "\n".join(out)
 
 
-def record(name: str, pytest_args: Sequence[str], rate_hz: int) -> Path:
-    """Run pytest with the call counter, py-spy attached; fail if either fails."""
+def record(name: str, pytest_args: Sequence[str], rate_hz: int) -> tuple[Path, bool]:
+    """Run pytest with the call counter, py-spy attached. Returns the recording and whether
+    every test passed: failing tests still leave a valid profile. Raises when py-spy fails or
+    pytest does not complete (interrupted, internal or usage error)."""
     py_spy = shutil.which("py-spy")
     if py_spy is None:
         raise FileNotFoundError("py-spy is not on PATH: run in the default pixi env")
@@ -230,10 +233,10 @@ def record(name: str, pytest_args: Sequence[str], rate_hz: int) -> Path:
         ],
         check=False,
     )  # fmt: skip
-    if tests.wait() != 0:
+    if tests.wait() not in (pytest.ExitCode.OK, pytest.ExitCode.TESTS_FAILED):
         raise subprocess.CalledProcessError(tests.returncode, tests.args)
     spy.check_returncode()
-    return raw
+    return raw, tests.returncode == pytest.ExitCode.OK
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -251,17 +254,28 @@ def main(argv: list[str] | None = None) -> int:
 
     if opts.command == "record":
         args = opts.pytest_args[1:] if opts.pytest_args[:1] == ["--"] else opts.pytest_args
-        record(opts.name, args, opts.rate)
-        return 0
+        _, passed = record(opts.name, args, opts.rate)
+        return 0 if passed else 1
     listed = load_entry_points(ENTRY_POINTS)
+    failed: list[str] = []
     if opts.command == "all":
-        raws = [record(name, args, opts.rate) for name, args in RUNS.items()]
+        raws = []
+        for name, args in RUNS.items():
+            raw, passed = record(name, args, opts.rate)
+            raws.append(raw)
+            if not passed:
+                failed.append(name)
     else:
         raws = opts.raws
     for raw in raws:
         print(render(build_report([raw], opts.rate, listed), raw.stem, opts.top))
         print()
-    return 0
+    if failed:
+        print(
+            f"tests failed in: {', '.join(failed)} (profiles above are still complete)",
+            file=sys.stderr,
+        )
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
