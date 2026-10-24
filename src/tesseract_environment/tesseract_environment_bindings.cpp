@@ -886,9 +886,9 @@ NB_MODULE(_tesseract_environment, m) {
             // can still be re-entered from inside this region - an event callback fires on every
             // applied command - which is why PyEventCallbackFn re-acquires the GIL.
             // ponytail: deadlocks if a Python event callback is registered AND another Python
-            // thread calls a non-releasing Environment method - callbacks fire under the env's
-            // unique lock, so this thread would hold that lock while re-acquiring the GIL. Lift by
-            // skipping the release when Python callbacks are registered, if that ever bites.
+            // thread calls a writer that keeps the GIL (setState, ...): callbacks fire under the
+            // env's shared lock, so this thread holds it while re-acquiring the GIL, and the writer
+            // holds the GIL while waiting for the unique lock (docs/developer/threading.md).
             nb::gil_scoped_release nogil;
             return self.applyCommand(cmd_ptr);
         }, "command"_a)
