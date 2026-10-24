@@ -48,8 +48,8 @@ OUT_DIR = REPO_ROOT / "build" / "gil-hotspots"
 RAW_SUFFIX = ".txt"
 CALLS_GLOB = "{stem}.calls.*.json"
 
-# Samples per second: 250 Hz = one sample per 4 ms, 2.5x py-spy's default resolution.
-DEFAULT_RATE_HZ = 250
+# Samples per second: py-spy's default, one sample per 10 ms.
+DEFAULT_RATE_HZ = 100
 MS_PER_S = 1000.0
 US_PER_MS = 1000.0
 # Rows printed per report.
