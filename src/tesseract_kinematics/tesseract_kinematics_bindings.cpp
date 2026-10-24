@@ -192,6 +192,8 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("clone", [](const tk::ForwardKinematics& self) { return self.clone(); });
 
     // ========== InverseKinematics (abstract) ==========
+    // calcInvKin releases the GIL here and on KinematicGroup: numerical solvers such as TRAC-IK
+    // run until their timeout (scripts/nogil_entry_points.yaml).
     nb::class_<tk::InverseKinematics>(m, "InverseKinematics")
         .def("calcInvKin", [](const tk::InverseKinematics& self,
                               const std::map<std::string, Eigen::Isometry3d>& tip_link_poses,
@@ -202,7 +204,7 @@ NB_MODULE(_tesseract_kinematics, m) {
                 poses[p.first] = p.second;
             }
             return self.calcInvKin(poses, seed);
-        }, "tip_link_poses"_a, "seed"_a)
+        }, "tip_link_poses"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("getJointNames", &tk::InverseKinematics::getJointNames)
         .def("numJoints", &tk::InverseKinematics::numJoints)
         .def("getBaseLinkName", &tk::InverseKinematics::getBaseLinkName)
@@ -302,14 +304,14 @@ NB_MODULE(_tesseract_kinematics, m) {
                               const tk::KinGroupIKInputs& tip_link_poses,
                               const Eigen::Ref<const Eigen::VectorXd>& seed) {
             return self.calcInvKin(tip_link_poses, seed);
-        }, "tip_link_poses"_a, "seed"_a)
+        }, "tip_link_poses"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("calcInvKin", [](const tk::KinematicGroup& self,
                               const tk::KinGroupIKInput& tip_link_pose,
                               const Eigen::Ref<const Eigen::VectorXd>& seed) {
             return self.calcInvKin(tip_link_pose, seed);
-        }, "tip_link_pose"_a, "seed"_a)
-        .def("calcInvKin", inv_kin_from_list, "tip_link_poses"_a, "seed"_a)
-        .def("calcInvKinMultiple", inv_kin_from_list, "tip_link_poses"_a, "seed"_a,
+        }, "tip_link_pose"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>())
+        .def("calcInvKin", inv_kin_from_list, "tip_link_poses"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>())
+        .def("calcInvKinMultiple", inv_kin_from_list, "tip_link_poses"_a, "seed"_a, nb::call_guard<nb::gil_scoped_release>(),
              "Alias of `calcInvKin(tip_link_poses, seed)` with a list, the native form.")
         .def("getAllValidWorkingFrames", &tk::KinematicGroup::getAllValidWorkingFrames)
         .def("getAllPossibleTipLinkNames", &tk::KinematicGroup::getAllPossibleTipLinkNames)

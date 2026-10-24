@@ -186,6 +186,7 @@ nav:
     - developer/index.md
     - Binding API Audit: developer/binding-api-audit.md
     - Binding Audit Coverage: developer/binding-audit-coverage.md
+    - Threading and the GIL: developer/threading.md
     - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md

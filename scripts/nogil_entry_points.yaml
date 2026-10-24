@@ -1,0 +1,106 @@
+# Every binding that releases the GIL, and why (#124). scripts/audit_gil.py fails CI when
+# this list and the bindings disagree, in either direction; docs/developer/threading.md
+# embeds this file.
+#
+# module (binding TU) -> Python class (`module` for module-level functions) -> method: reason
+# An entry covers every overload of that name that releases the GIL.
+#
+# The rule (docs/developer/threading.md): release the GIL only around a call that
+#   1. is expensive or blocking (roughly > 50 us, or it can wait), or blocks on a C++ lock that a
+#      thread waiting for the GIL can hold;
+#   2. runs pure C++: no Python object is created, copied or dropped in the released region
+#      (trampolines and the std::function caster re-acquire the GIL themselves);
+#   3. does not mutate state Python code typically shares across threads.
+# Value types, getters, setters and constructors never qualify.
+
+tesseract_task_composer:
+  TaskComposerFuture:
+    wait: >-
+      Blocks until the executor finishes. Mandatory, not a speed-up: a Python profile or cost
+      running on a worker thread needs the GIL, so holding it here deadlocks.
+    waitFor: Blocks for up to `duration`; see wait.
+  TaskComposerExecutor:
+    run: >-
+      Schedules the graph on the worker threads, which re-enter Python for Python profiles;
+      the context and node are converted before the release.
+  TaskflowTaskComposerExecutor:
+    run: Re-exposed TaskComposerExecutor.run; same reason.
+
+tesseract_motion_planners:
+  MotionPlanner:
+    solve: Seconds of CPU for OMPL, TrajOpt, TrajOpt-Ifopt and Descartes.
+  module:
+    contactCheckProgram: Collision-checks every state of a program; pure C++ loop.
+
+tesseract_motion_planners_simple:
+  SimpleMotionPlanner:
+    solve: >-
+      Interpolates and runs IK for every segment; a Python move profile re-acquires the GIL
+      through its trampoline.
+  SimplePlannerMoveProfile:
+    generate: Interpolation plus IK for one segment, called by the planner in a loop.
+
+trajopt_sqp:
+  TrustRegionSQPSolver:
+    solve: Runs the full SQP optimization.
+
+tesseract_kinematics:
+  InverseKinematics:
+    calcInvKin: Numerical solvers (TRAC-IK, KDL) iterate until their timeout.
+  KinematicGroup:
+    calcInvKin: See InverseKinematics.calcInvKin; plus redundant-solution expansion.
+    calcInvKinMultiple: Alias of the list overload of calcInvKin.
+  module:
+    checkKinematics: FK then IK for every working frame and tip link.
+
+tesseract_time_parameterization:
+  TimeParameterization:
+    compute: >-
+      TOTG, ISP, constant-TCP and Ruckig scale with trajectory length. Only reads env, so no
+      Environment event callback fires inside it.
+
+tesseract_urdf:
+  module:
+    parseURDFString: >-
+      XML parsing plus mesh loading. A Python ResourceLocator re-acquires the GIL through its
+      trampoline.
+    parseURDFFile: See parseURDFString.
+
+tesseract_collision:
+  DiscreteContactManager:
+    contactTest: Broad and narrow phase over every enabled object; called in loops.
+    setCollisionObjectsTransform: >-
+      The transform-map overload updates every listed object's broad-phase AABB (gh-241).
+  ContinuousContactManager:
+    contactTest: See DiscreteContactManager.contactTest; swept volumes are costlier still.
+    setCollisionObjectsTransform: See DiscreteContactManager.setCollisionObjectsTransform.
+  ConvexDecomposition:
+    compute: VHACD convex decomposition takes seconds per mesh.
+
+tesseract_environment:
+  Environment:
+    applyCommand: >-
+      The AddLink, AddSceneGraph and AddTrajectoryLink overloads build collision geometry,
+      seconds for mesh- or SDF-heavy links. Event callbacks re-acquire the GIL (see the
+      deadlock caveat in docs/developer/threading.md).
+    applyCommands: See applyCommand.
+    clone: >-
+      Deep copy under the environment's shared lock, so a background thread can clone without
+      blocking the UI thread (gh-134).
+    getState: >-
+      The overloads that solve a new state; they take the environment's shared lock, which a
+      writer releasing the GIL may hold.
+    getStateByMap: Python-only alias of getState.
+    getStateByNamesAndValues: Python-only alias of getState.
+    getDiscreteContactManager: >-
+      Builds every collision shape on first use when no manager is cached; read-locked, and no
+      event callback fires.
+    getContinuousContactManager: See getDiscreteContactManager.
+    bind_value_equality: >-
+      __eq__ / __ne__ hold a shared lock on the left operand's mutex, as clone() does.
+  module:
+    checkTrajectory: Collision-checks every state of a trajectory; can run for seconds.
+    checkTrajectorySegment: One continuous check; called in loops.
+    checkTrajectoryState: One discrete check; called in loops.
+    _find_tcp_offset_on_native_thread: >-
+      Private test oracle (gh-183): joins a native thread that must take the GIL itself.

@@ -176,8 +176,10 @@ NB_MODULE(_tesseract_time_parameterization, m) {
     // Note: 0.33 API change - now uses profiles and Environment
     nb::class_<tp::TimeParameterization>(m, "TimeParameterization")
         .def("getName", &tp::TimeParameterization::getName)
+        // GIL released: scales with trajectory length, and only reads env, so it never fires an
+        // Environment event callback (scripts/nogil_entry_points.yaml).
         .def("compute", &tp::TimeParameterization::compute,
-             "composite_instruction"_a, "env"_a, "profiles"_a);
+             "composite_instruction"_a, "env"_a, "profiles"_a, nb::call_guard<nb::gil_scoped_release>());
 
     // ========== TimeOptimalTrajectoryGeneration ==========
     nb::class_<tp::TimeOptimalTrajectoryGeneration, tp::TimeParameterization>(m, "TimeOptimalTrajectoryGeneration")

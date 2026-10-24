@@ -195,7 +195,7 @@ nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this 
 pytest = ">=7.0"
 pytest-xdist = ">=3.0"
 pytest-benchmark = "*"
-pyyaml = ">=6.0"  # tests only: task composer config fixtures
+pyyaml = ">=6.0"  # tests (task composer config fixtures) and scripts/audit_gil.py
 ruff = ">=0.8.0"
 pre-commit = ">=3.0"
 
@@ -309,6 +309,7 @@ clang-22 = "==22.1.8"
 
 [tool.pixi.feature.audit.tasks]
 audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff each binding's C++ API against its committed stub; writes docs/developer/binding-api-audit.md" }
+audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GIL release in the bindings against scripts/nogil_entry_points.yaml (#124)" }
 # -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }

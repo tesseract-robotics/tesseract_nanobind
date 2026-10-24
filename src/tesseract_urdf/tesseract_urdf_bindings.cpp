@@ -27,14 +27,16 @@ NB_MODULE(_tesseract_urdf, m) {
     // writeMeshToFile takes a PolygonMesh: import its defining module so the stub names it (#168).
     nb::module_::import_("tesseract_robotics.tesseract_geometry._tesseract_geometry");
 
+    // parseURDF* release the GIL: XML parsing plus mesh loading. A Python ResourceLocator
+    // subclass still works: its trampoline re-acquires the GIL (scripts/nogil_entry_points.yaml).
     // parseURDFString - returns unique_ptr, nanobind handles conversion
     m.def("parseURDFString", &tu::parseURDFString,
-          "urdf_xml_string"_a, "locator"_a,
+          "urdf_xml_string"_a, "locator"_a, nb::call_guard<nb::gil_scoped_release>(),
           "Parse a URDF string into a SceneGraph");
 
     // parseURDFFile
     m.def("parseURDFFile", &tu::parseURDFFile,
-          "path"_a, "locator"_a,
+          "path"_a, "locator"_a, nb::call_guard<nb::gil_scoped_release>(),
           "Parse a URDF file into a SceneGraph");
 
     // writeURDFFile

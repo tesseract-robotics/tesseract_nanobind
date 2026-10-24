@@ -42,6 +42,11 @@ jobs:
     - name: Contract tests
       run: pixi run -e audit audit-test
 
+    # Every GIL release is listed, with its reason, in scripts/nogil_entry_points.yaml, and
+    # every listed entry point still releases it (#124; docs/developer/threading.md).
+    - name: GIL releases match the list
+      run: pixi run -e audit audit-gil
+
     # The committed report must be what the audit generates from this tree. The provenance
     # line carries the stubs' last-commit SHA, which on a PR merge ref is the synthetic merge
     # commit, so that one line is ignored (git diff -I, git >= 2.30); every row is compared.
