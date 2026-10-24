@@ -263,6 +263,12 @@ All scene modifications use the command pattern. The full list is bound in `tess
     the environment's read lock: concurrent reads proceed, and writers such as
     `setState` or `applyCommand` wait for it to finish.
 
+    With a Python event callback registered, don't change one environment
+    from two Python threads at once: `applyCommand` fires the callback while
+    holding the environment's lock, so a concurrent `setState` can deadlock.
+    [Threading and the GIL](../developer/threading.md#known-limitation-environment-event-callbacks)
+    has the details and the list of calls that release the GIL.
+
 !!! tip "Cloning for Planning"
     Motion planners internally clone the environment. You don't need to
     clone manually unless you're running parallel planners.

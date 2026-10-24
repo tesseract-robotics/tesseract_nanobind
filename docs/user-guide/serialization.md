@@ -71,6 +71,12 @@ env = environment_from_file("scene.xml")
 !!! note "Environment returns shared_ptr"
     Due to C++ implementation details, `environment_from_*` functions return a shared pointer. In Python this behaves identically to a regular object.
 
+!!! note "Runs without the GIL"
+    The `environment_to_*` and `environment_from_*` functions release the GIL:
+    serializing or rebuilding a mesh-heavy scene can take seconds, and other
+    Python threads keep running meanwhile. See
+    [Threading and the GIL](../developer/threading.md).
+
 ## SceneState
 
 Checkpoint joint positions and link transforms:

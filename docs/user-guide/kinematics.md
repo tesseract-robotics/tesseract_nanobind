@@ -300,6 +300,12 @@ full_chain = robot.env.getKinematicGroup("manipulator_with_positioner")
     OPW is dramatically faster than KDL for supported 6-DOF arms. Configure
     it in your SRDF for production workloads.
 
+!!! note "IK runs without the GIL"
+    `calcInvKin` (on `KinematicGroup` and `InverseKinematics`) releases the GIL,
+    so IK on worker threads runs in parallel. `calcFwdKin` and
+    `getKinematicGroup` hold it. See
+    [Threading and the GIL](../developer/threading.md).
+
 ## Next Steps
 
 - [Collision Detection](collision.md) — Check for collisions against the world

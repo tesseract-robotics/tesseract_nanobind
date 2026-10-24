@@ -22,6 +22,9 @@ pixi task list
 | `docs` | Live docs | mkdocs serve with auto-reload |
 | `docs-build` | Build docs | Static site to `site/` |
 | `check-changelog` | Check changelog | `CHANGELOG.md` release structure (the Docs workflow runs it too) |
+| `audit-gil` (`-e audit`) | GIL audit | Every GIL release in the bindings against `scripts/nogil_entry_points.yaml`; see [Threading and the GIL](threading.md) |
+| `audit-test` (`-e audit`) | Audit contract tests | `tests/audit`, which needs libclang |
+| `gil-hotspots` | GIL hotspots | Records benchmarks and tests with `py-spy --gil`, ranks the bindings that hold the GIL ([Finding candidates](threading.md#finding-candidates)) |
 
 ### Daily Workflow
 
@@ -191,6 +194,11 @@ tesseract_nanobind/
 ├── scripts/
 │   ├── build_tesseract_cpp.sh # C++ build (colcon + vcstool)
 │   ├── generate_stubs.py      # Regenerate / check .pyi stubs
+│   ├── audit_gil.py           # GIL releases vs nogil_entry_points.yaml (libclang)
+│   ├── gil_hotspots.py        # Rank GIL-held time per binding (py-spy --gil)
+│   ├── gil_call_counts.py     # pytest plugin: binding calls per call site
+│   ├── gil_entry_points.py    # nogil_entry_points.yaml loader
+│   ├── nogil_entry_points.yaml # Every binding that releases the GIL, and why
 │   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
 │   └── build_macos_wheel.sh   # Portable macOS wheel (delocate)
 └── ws/                        # C++ workspace
