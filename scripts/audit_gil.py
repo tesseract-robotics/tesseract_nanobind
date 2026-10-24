@@ -26,17 +26,16 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
 import clang.cindex as ci
-import yaml
+from gil_entry_points import (
+    ENTRY_POINTS,
+    MODULE_SCOPE,
+    Release,
+    load_entry_points,
+)
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-ENTRY_POINTS = REPO_ROOT / "scripts" / "nogil_entry_points.yaml"
-
-# The scope of a module-level `m.def`.
-MODULE_SCOPE = "module"
 RELEASE_TYPE = "nanobind::gil_scoped_release"
 GUARD_TYPE = f"nanobind::call_guard<{RELEASE_TYPE}>"
 CLASS_PREFIX = "nanobind::class_<"
@@ -72,22 +71,6 @@ FOLLOWED_KINDS = frozenset(
 
 class ParseError(RuntimeError):
     """libclang reported an error: a partial AST would silently miss releases."""
-
-
-class EntryPointsError(ValueError):
-    """nogil_entry_points.yaml is malformed."""
-
-
-@dataclass(frozen=True, order=True)
-class Release:
-    """One bound name that releases the GIL: Python module, class (or `module`) and name."""
-
-    module: str
-    scope: str
-    name: str
-
-    def __str__(self) -> str:
-        return f"{self.module}: {self.scope}.{self.name}"
 
 
 def parse(cpp: Path, args: Sequence[str], unsaved: str | None = None) -> ci.TranslationUnit:
@@ -279,25 +262,6 @@ class Scanner:
                 )
                 found.setdefault(release, f"{Path(loc.file.name).name}:{loc.line}")
         return found
-
-
-def load_entry_points(path: Path) -> dict[Release, str]:
-    """`{module: {scope: {name: reason}}}` -> `{Release: reason}`."""
-    data = yaml.safe_load(path.read_text()) or {}
-    out: dict[Release, str] = {}
-    if not isinstance(data, Mapping):
-        raise EntryPointsError(f"{path}: expected a mapping of modules")
-    for module, scopes in data.items():
-        if not isinstance(scopes, Mapping):
-            raise EntryPointsError(f"{path}: {module}: expected a mapping of classes")
-        for scope, names in scopes.items():
-            if not isinstance(names, Mapping):
-                raise EntryPointsError(f"{path}: {module}.{scope}: expected a mapping of names")
-            for name, reason in names.items():
-                if not isinstance(reason, str) or not reason.strip():
-                    raise EntryPointsError(f"{path}: {module}: {scope}.{name}: needs a reason")
-                out[Release(str(module), str(scope), str(name))] = reason
-    return out
 
 
 def compare(

@@ -17,17 +17,19 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "gil_bindings.cpp"
 
-_spec = importlib.util.spec_from_file_location("audit_gil", REPO_ROOT / "scripts" / "audit_gil.py")
-gil = importlib.util.module_from_spec(_spec)
-sys.modules["audit_gil"] = gil  # dataclasses resolve annotations via sys.modules
-_spec.loader.exec_module(gil)
 
-_own_spec = importlib.util.spec_from_file_location(
-    "audit_ownership", REPO_ROOT / "scripts" / "audit_ownership.py"
-)
-_own = importlib.util.module_from_spec(_own_spec)
-sys.modules["audit_ownership"] = _own
-_own_spec.loader.exec_module(_own)
+def _load_script(name):
+    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclasses resolve annotations via sys.modules
+    spec.loader.exec_module(module)
+    return module
+
+
+entry_points = _load_script("gil_entry_points")  # audit_gil imports it
+gil = _load_script("audit_gil")
+
+_own = _load_script("audit_ownership")
 
 
 def _resource_dir() -> str:
@@ -110,7 +112,7 @@ def test_compare_ignores_unscanned_modules():
 def test_entry_needs_a_reason(tmp_path):
     path = tmp_path / "nogil.yaml"
     path.write_text("mod:\n  C:\n    m: ''\n")
-    with pytest.raises(gil.EntryPointsError, match="needs a reason"):
+    with pytest.raises(entry_points.EntryPointsError, match="needs a reason"):
         gil.load_entry_points(path)
 
 
