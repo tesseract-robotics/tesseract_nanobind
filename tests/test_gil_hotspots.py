@@ -194,3 +194,27 @@ def test_call_counter_counts_binding_calls_by_call_site(tmp_path):
     (out,) = tmp_path.glob("counts.*.json")
     rows = json.loads(out.read_text())
     assert [str(script), 4, "tesseract_common", "Isometry3d.Identity", 3] in rows
+
+
+def test_a_subprocess_command_with_newlines_stays_one_record(tmp_path):
+    # `py-spy record --subprocesses` roots each stack in `process PID:"COMMAND"`; a `python -c`
+    # command keeps its newlines, so one record spans several lines.
+    process = 'process 7:"python -c import sys\nfrom pathlib import Path\nrun()"'
+    raw = _raw(
+        tmp_path,
+        [
+            (f"{process};{_stack(f't ({TEST}:3)')}", 5),
+            (f'process 8:"python -m pytest";{_stack(f"t ({TEST}:4)")}', 2),
+        ],
+        counts=[
+            (TEST, 3, "tesseract_environment", "Environment.a", 1),
+            (TEST, 4, "tesseract_environment", "Environment.b", 1),
+        ],
+    )
+
+    rows = hot.build_report([raw], rate_hz=100, listed={}).rows
+
+    assert {r.binding: r.samples for r in rows} == {
+        "tesseract_environment: Environment.a": 5,
+        "tesseract_environment: Environment.b": 2,
+    }

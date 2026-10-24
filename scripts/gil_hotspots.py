@@ -59,6 +59,9 @@ DEFAULT_TOP = 40
 # A frame's location: `file:line`, or a bare file.
 LOCATION = re.compile(r"^(?P<file>.*?)(?::(?P<line>\d+))?$")
 PYTHON_SUFFIX = ".py"
+# The root frame `py-spy record --subprocesses` gives every stack.
+PROCESS_PREFIX = "process "
+PROCESS_RECORD = re.compile(r"\n(?=process \d+:\")")
 SEPARATOR = " | "
 
 # The runs `pixi run gil-hotspots` records, benchmarks first: real workloads, where test
@@ -116,11 +119,19 @@ class Report:
 
 
 def read_raw(path: Path) -> Iterator[tuple[list[Frame], int]]:
-    """py-spy's collapsed stacks: frames root first, `;`-joined, then the sample count."""
-    for line in path.read_text().splitlines():
-        if not line.strip():
+    """py-spy's collapsed stacks: frames root first, `;`-joined, then the sample count.
+
+    With `--subprocesses` each stack starts with a `process PID:"COMMAND"` frame, and the
+    command keeps its newlines and semicolons (`python -c ...`): a record then runs up to the
+    next process frame, and the command may split into junk frames on the root side. Only the
+    innermost frames are read, so the junk is harmless.
+    """
+    text = path.read_text()
+    records = PROCESS_RECORD.split(text) if text.startswith(PROCESS_PREFIX) else text.splitlines()
+    for record in records:
+        if not record.strip():
             continue
-        stack, count = line.rsplit(" ", 1)
+        stack, count = record.rstrip("\n").rsplit(" ", 1)
         yield [Frame.parse(f) for f in stack.split(";")], int(count)
 
 
