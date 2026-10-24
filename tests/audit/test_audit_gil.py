@@ -45,9 +45,8 @@ def _resource_dir() -> str:
     return subprocess.check_output([clang, "-print-resource-dir"], text=True).strip()
 
 
-@pytest.fixture(scope="module")
-def fixture_releases():
-    args = [
+def _args():
+    return [
         "-x",
         "c++",
         "-std=c++17",
@@ -57,7 +56,11 @@ def fixture_releases():
         f"-I{nanobind.include_dir()}",
         f"-I{sysconfig.get_paths()['include']}",
     ]
-    return gil.Scanner(gil.parse(FIXTURE, args), "fixture").scan()
+
+
+@pytest.fixture(scope="module")
+def fixture_releases():
+    return gil.Scanner(gil.parse(FIXTURE, _args()), "fixture").scan()
 
 
 def R(scope, name):
@@ -72,6 +75,8 @@ def test_fixture_finds_every_release_form(fixture_releases):
         R("Planner", "bind_equality"),  # a binding helper given the call_guard
         R("Manager", "contactTest"),  # in a function template the lambda calls
         R("module", "segment"),  # in a free function bound by pointer
+        R("module", "loadInt"),  # call_guard in a helper template, named at its call site
+        R("module", "loadLong"),
     }
 
 
@@ -86,6 +91,10 @@ def test_fixture_finds_every_release_form(fixture_releases):
 )
 def test_fixture_non_releases_are_not_reported(fixture_releases, name):
     assert R("Planner", name) not in fixture_releases
+
+
+def test_fixture_plain_helper_is_not_reported(fixture_releases):
+    assert R("module", "loadPlain") not in fixture_releases
 
 
 def test_fixture_location_is_the_def_line(fixture_releases):
@@ -120,3 +129,20 @@ def test_committed_list_loads_and_names_real_modules():
     listed = gil.load_entry_points(gil.ENTRY_POINTS)
     assert listed
     assert {r.module for r in listed} <= set(_own.binding_modules())
+
+
+def test_a_release_whose_class_cannot_be_resolved_fails_loudly(tmp_path):
+    # A literal name on a template-dependent receiver: the Python class is unknowable here.
+    source = """
+#include <nanobind/nanobind.h>
+namespace nb = nanobind;
+template <typename Class>
+void def_solve(Class& cls) {
+    cls.def("solve", [](int n) { return n; }, nb::call_guard<nb::gil_scoped_release>());
+}
+NB_MODULE(_unresolved, m) {}
+"""
+    cpp = tmp_path / "unresolved.cpp"
+    cpp.write_text(source)
+    with pytest.raises(gil.UnresolvedScopeError, match="solve"):
+        gil.Scanner(gil.parse(cpp, _args()), "fixture").scan()

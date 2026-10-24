@@ -73,6 +73,11 @@ class ParseError(RuntimeError):
     """libclang reported an error: a partial AST would silently miss releases."""
 
 
+class UnresolvedScopeError(RuntimeError):
+    """A `.def` releases the GIL on a receiver whose Python class the scanner cannot name:
+    listing it under a guessed class would hide it from the comparison."""
+
+
 def parse(cpp: Path, args: Sequence[str], unsaved: str | None = None) -> ci.TranslationUnit:
     """Parse a binding TU with function bodies; raise on any error diagnostic."""
     files = [(str(cpp), unsaved)] if unsaved is not None else None
@@ -198,8 +203,73 @@ class Scanner:
         # An implicit instantiation of a main-file template: libclang gives no body.
         return tuple(self._definitions.get(target.spelling, ()))
 
-    def _guarded(self, call: ci.Cursor) -> bool:
-        return any(GUARD_TYPE in _canonical(a.type).spelling for a in call.get_arguments())
+    @staticmethod
+    def _guarded(args: Iterable[ci.Cursor]) -> bool:
+        return any(GUARD_TYPE in _canonical(a.type).spelling for a in args)
+
+    @staticmethod
+    def _def_call(call: ci.Cursor) -> tuple[ci.Cursor, ci.Cursor, list[ci.Cursor]] | None:
+        """`(callee, receiver, arguments)` of a `.def`-family call, also inside a template, where
+        the call is dependent: libclang leaves its spelling empty and its arguments unlisted."""
+        children = list(call.get_children())
+        if not children:
+            return None
+        callee = _strip(children[0])
+        if callee.kind != ci.CursorKind.MEMBER_REF_EXPR:
+            return None
+        parts = list(callee.get_children())
+        # Non-dependent: the call's spelling. Dependent on an overload set: its
+        # OVERLOADED_DECL_REF. Dependent receiver (`cls.def` on a template parameter): only the
+        # callee's last token names the member.
+        method = (
+            call.spelling
+            or next((p.spelling for p in parts if p.kind == ci.CursorKind.OVERLOADED_DECL_REF), "")
+            or next((t.spelling for t in reversed(list(callee.get_tokens()))), "")
+        )
+        receivers = [p for p in parts if p.kind != ci.CursorKind.OVERLOADED_DECL_REF]
+        if method not in DEF_METHODS or not receivers:
+            return None
+        return callee, receivers[0], list(call.get_arguments()) or children[1:]
+
+    @staticmethod
+    def _parameter_index(expr: ci.Cursor) -> int | None:
+        """The position of the enclosing function's parameter `expr` names, if it names one."""
+        expr = _strip(expr)
+        param = expr.referenced if expr.kind == ci.CursorKind.DECL_REF_EXPR else None
+        if param is None or param.kind != ci.CursorKind.PARM_DECL:
+            return None
+        params = [
+            c for c in param.semantic_parent.get_children() if c.kind == ci.CursorKind.PARM_DECL
+        ]
+        return next((i for i, c in enumerate(params) if c == param), None)
+
+    def _def_releases(self, args: list[ci.Cursor]) -> bool:
+        named = args and (
+            _string_literal(_strip(args[0])) is not None
+            or self._parameter_index(args[0]) is not None
+        )
+        return self._guarded(args) or any(self.releases(a) for a in (args[1:] if named else args))
+
+    def _named_by_caller(self) -> dict[str, list[tuple[int, int]]]:
+        """Main-file helpers that bind a releasing `.def` under the name their caller passes
+        (geometry's def_create_mesh_from_path): helper name -> (receiver, name) parameter
+        positions. By name: a call site resolves to the implicit instantiation, not the
+        template."""
+        helpers: dict[str, list[tuple[int, int]]] = {}
+        for call in self.tu.cursor.walk_preorder():
+            if call.kind != ci.CursorKind.CALL_EXPR or not _in_main_file(call, self.tu):
+                continue
+            parts = self._def_call(call)
+            if parts is None or not parts[2]:
+                continue
+            _, receiver, args = parts
+            name_at = self._parameter_index(args[0])
+            receiver_at = self._parameter_index(receiver)
+            if name_at is None or receiver_at is None or not self._def_releases(args):
+                continue
+            helper = _strip(args[0]).referenced.semantic_parent
+            helpers.setdefault(helper.spelling, []).append((receiver_at, name_at))
+        return helpers
 
     # --- bound names ---------------------------------------------------------
 
@@ -230,36 +300,45 @@ class Scanner:
 
     def scan(self) -> dict[Release, str]:
         """Every release in the TU, with the `file:line` of the first binding that has it."""
+        helpers = self._named_by_caller()
         found: dict[Release, str] = {}
         for call in self.tu.cursor.walk_preorder():
             if call.kind != ci.CursorKind.CALL_EXPR or not _in_main_file(call, self.tu):
                 continue
-            children = list(call.get_children())
-            if not children:
-                continue
-            callee = _strip(children[0])
-            args = list(call.get_arguments())
-            release: Release | None = None
-            if callee.kind == ci.CursorKind.MEMBER_REF_EXPR and call.spelling in DEF_METHODS:
-                receivers = list(callee.get_children())
-                scope = self._scope(receivers[0]) if receivers else None
-                if scope is None:
-                    continue
-                bound = args[1:] if args and _string_literal(_strip(args[0])) is not None else args
-                if self._guarded(call) or any(self.releases(a) for a in bound):
-                    release = Release(self.module, scope, self._bound_name(call, args))
-            elif self._guarded(call) and args:
-                # A binding helper given the guard: bind_value_equality(cls, guard).
-                scope = self._scope(_strip(args[0]))
-                if scope is not None:
-                    release = Release(self.module, scope, call.spelling)
-            if release is not None:
+            releases: list[Release] = []
+            loc = call.location
+            parts = self._def_call(call)
+            if parts is not None:
+                callee, receiver, args = parts
+                scope = self._scope(receiver)
+                # A name the caller passes is resolved at the call site (helpers, below).
+                named_by_caller = bool(args) and self._parameter_index(args[0]) is not None
+                if not named_by_caller and self._def_releases(args):
+                    name = self._bound_name(call, args)
+                    if scope is None:
+                        where = f"{Path(callee.location.file.name).name}:{callee.location.line}"
+                        raise UnresolvedScopeError(
+                            f"{where}: {name} releases the GIL, but the Python class of its "
+                            "receiver is unknown here (a template parameter?)"
+                        )
+                    releases.append(Release(self.module, scope, name))
                 # The `.def` token, not the start of the chain the call is part of.
-                loc = (
-                    callee.location
-                    if callee.kind == ci.CursorKind.MEMBER_REF_EXPR
-                    else call.location
-                )
+                loc = callee.location
+            else:
+                args = list(call.get_arguments())
+                target = call.referenced
+                if target is not None and _in_main_file(target, self.tu):
+                    for receiver_at, name_at in helpers.get(target.spelling, ()):
+                        scope = self._scope(_strip(args[receiver_at]))
+                        name = _string_literal(_strip(args[name_at]))
+                        if scope is not None and name is not None:
+                            releases.append(Release(self.module, scope, name))
+                if self._guarded(args) and args:
+                    # A binding helper given the guard: bind_value_equality(cls, guard).
+                    scope = self._scope(_strip(args[0]))
+                    if scope is not None:
+                        releases.append(Release(self.module, scope, call.spelling))
+            for release in releases:
                 found.setdefault(release, f"{Path(loc.file.name).name}:{loc.line}")
         return found
 
