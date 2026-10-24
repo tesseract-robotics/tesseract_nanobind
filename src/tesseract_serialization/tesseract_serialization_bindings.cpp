@@ -110,11 +110,13 @@ NB_MODULE(_tesseract_serialization, m)
         return std::shared_ptr<Environment>(const_cast<Environment*>(&env), [](Environment*) {});
     };
 
+    // GIL released (scripts/nogil_entry_points.yaml): serializing reads the environment under its
+    // shared lock; deserializing replays the commands into a new one, which has no event callbacks.
     m.def("environment_to_xml",
         [as_shared](const Environment& env) {
             return Serialization::toArchiveStringXML(as_shared(env));
         },
-        nb::arg("environment"),
+        nb::arg("environment"), nb::call_guard<nb::gil_scoped_release>(),
         "Serialize Environment to XML string. Includes command history - "
         "on deserialize, commands are replayed to rebuild scene graph.");
 
@@ -122,35 +124,35 @@ NB_MODULE(_tesseract_serialization, m)
         [](const std::string& xml) {
             return Serialization::fromArchiveStringXML<std::shared_ptr<Environment>>(xml);
         },
-        nb::arg("xml"),
+        nb::arg("xml"), nb::call_guard<nb::gil_scoped_release>(),
         "Deserialize Environment from XML string. Returns shared_ptr.");
 
     m.def("environment_to_file",
         [as_shared](const Environment& env, const std::string& path) {
             return Serialization::toArchiveFileXML(as_shared(env), path);
         },
-        nb::arg("environment"), nb::arg("path"),
+        nb::arg("environment"), nb::arg("path"), nb::call_guard<nb::gil_scoped_release>(),
         "Save Environment to XML file.");
 
     m.def("environment_from_file",
         [](const std::string& path) {
             return Serialization::fromArchiveFileXML<std::shared_ptr<Environment>>(path);
         },
-        nb::arg("path"),
+        nb::arg("path"), nb::call_guard<nb::gil_scoped_release>(),
         "Load Environment from XML file. Returns shared_ptr.");
 
     m.def("environment_to_binary",
         [as_shared](const Environment& env) {
             return Serialization::toArchiveBinaryData(as_shared(env));
         },
-        nb::arg("environment"),
+        nb::arg("environment"), nb::call_guard<nb::gil_scoped_release>(),
         "Serialize Environment to binary data.");
 
     m.def("environment_from_binary",
         [](const std::vector<uint8_t>& data) {
             return Serialization::fromArchiveBinaryData<std::shared_ptr<Environment>>(data);
         },
-        nb::arg("data"),
+        nb::arg("data"), nb::call_guard<nb::gil_scoped_release>(),
         "Deserialize Environment from binary data. Returns shared_ptr.");
 
     // ============================================================

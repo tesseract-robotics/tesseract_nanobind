@@ -312,6 +312,7 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
             "Plan `request`. An exception a Python profile's generate raises propagates from here.");
 
     // ========== generateInterpolatedProgram ==========
+    // GIL released: interpolates and solves a state per step; reads env (scripts/nogil_entry_points.yaml).
     m.def("generateInterpolatedProgram",
           [](const tcl::CompositeInstruction& instructions,
              const std::shared_ptr<const te::Environment>& env,
@@ -326,7 +327,7 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
           "state_longest_valid_segment_length"_a = 5 * M_PI / 180,
           "translation_longest_valid_segment_length"_a = 0.15,
           "rotation_longest_valid_segment_length"_a = 5 * M_PI / 180,
-          "min_steps"_a = 1,
+          "min_steps"_a = 1, nb::call_guard<nb::gil_scoped_release>(),
           "Generate an interpolated program from a composite instruction");
 
     // ========== Interpolation (interpolation.h) ==========

@@ -152,3 +152,52 @@ def test_time_parameterization_compute_releases_gil(abb_env):  # noqa: F811
 
     program = _abb_program(num=200)
     assert totg.compute(program, abb_env, profiles)
+
+
+# --- Releases found by `pixi run gil-hotspots` -------------------------------------------------
+
+
+def test_generate_interpolated_program_releases_gil(abb_env):  # noqa: F811
+    from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+
+    program = _abb_program(num=20)
+    # 0.001 rad segments: hundreds of interpolated states, each with its own state solve.
+    interpolate = lambda: generateInterpolatedProgram(program, abb_env, 0.001, 1.0, 0.001, 1)  # noqa: E731
+
+    assert_releases_gil(interpolate)
+    assert len(interpolate().flatten()) > len(program.flatten())
+
+
+def test_environment_serialization_releases_gil(abb_env, tmp_path):  # noqa: F811
+    from tesseract_robotics import tesseract_serialization as ts
+
+    xml = ts.environment_to_xml(abb_env)
+    data = ts.environment_to_binary(abb_env)
+    path = str(tmp_path / "env.xml")
+    ts.environment_to_file(abb_env, path)
+
+    for call in (
+        lambda: ts.environment_to_xml(abb_env),
+        lambda: ts.environment_from_xml(xml),
+        lambda: ts.environment_to_binary(abb_env),
+        lambda: ts.environment_from_binary(data),
+        lambda: ts.environment_to_file(abb_env, path),
+        lambda: ts.environment_from_file(path),
+    ):
+        assert_releases_gil(call)
+    assert set(ts.environment_from_xml(xml).getJointNames()) == set(abb_env.getJointNames())
+
+
+@pytest.mark.parametrize("kind", ["Mesh", "ConvexMesh", "SDFMesh"])
+def test_create_mesh_releases_gil(kind):
+    from tesseract_robotics import tesseract_geometry as tg
+
+    path = str(Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes" / "sphere_p25m.dae")
+    from_path = getattr(tg, f"create{kind}FromPath")
+    from_resource = getattr(tg, f"create{kind}FromResource")
+    locator = _PythonLocator()
+    resource = locator.locateResource("package://tesseract/support/meshes/sphere_p25m.dae")
+
+    assert_releases_gil(lambda: from_path(path))
+    assert_releases_gil(lambda: from_resource(resource))
+    assert len(from_resource(resource)) == len(from_path(path)) > 0

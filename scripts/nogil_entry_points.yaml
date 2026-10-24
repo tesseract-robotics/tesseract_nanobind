@@ -39,6 +39,10 @@ tesseract_motion_planners_simple:
       through its trampoline.
   SimplePlannerMoveProfile:
     generate: Interpolation plus IK for one segment, called by the planner in a loop.
+  module:
+    generateInterpolatedProgram: >-
+      Interpolates every segment and solves a state per step: ~0.1 s per call in the tests
+      (gil-hotspots). Only reads env.
 
 trajopt_sqp:
   TrustRegionSQPSolver:
@@ -65,6 +69,31 @@ tesseract_urdf:
       XML parsing plus mesh loading. A Python ResourceLocator re-acquires the GIL through its
       trampoline.
     parseURDFFile: See parseURDFString.
+
+tesseract_geometry:
+  module:
+    createMeshFromPath: >-
+      File IO plus assimp parsing, like parseURDFFile; milliseconds per mesh (gil-hotspots).
+    createConvexMeshFromPath: See createMeshFromPath; plus a convex hull.
+    createSDFMeshFromPath: See createMeshFromPath.
+    createMeshFromResource: >-
+      See createMeshFromPath. A Python Resource re-acquires the GIL through its trampoline, and
+      nanobind's shared_ptr deleter for it takes the GIL itself.
+    createConvexMeshFromResource: See createMeshFromResource; plus a convex hull.
+    createSDFMeshFromResource: See createMeshFromResource.
+
+tesseract_serialization:
+  module:
+    environment_to_xml: >-
+      Serializes the whole command history: seconds for a mesh-heavy scene (gil-hotspots).
+      Reads the environment under its shared lock, as clone() does; fires no event callback.
+    environment_to_binary: See environment_to_xml.
+    environment_to_file: See environment_to_xml; plus file IO.
+    environment_from_xml: >-
+      Replays the command history into a new Environment, building its collision geometry:
+      seconds (gil-hotspots). The new Environment has no event callbacks yet.
+    environment_from_binary: See environment_from_xml.
+    environment_from_file: See environment_from_xml; plus file IO.
 
 tesseract_collision:
   DiscreteContactManager:

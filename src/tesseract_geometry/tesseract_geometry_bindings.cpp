@@ -118,6 +118,8 @@ Class bind_mesh_ctors(Class cls, const char* name, TailArgs... tail_args) {
 
 // One instance of createMeshFromPath<T> (mesh_parser.h:338) / createMeshFromResource<T>
 // (mesh_parser.h:420). Same defaults as createMeshFromBytes below: triangulate=true, the rest false.
+// The mesh loaders release the GIL: file IO plus assimp (and a convex hull or SDF). A Python
+// Resource re-acquires it through its trampoline (scripts/nogil_entry_points.yaml).
 template <typename T>
 void def_create_mesh_from_path(nb::module_& m, const char* name, const char* doc) {
     m.def(name, [](const std::string& path, const Eigen::Vector3d& scale, bool triangulate, bool flatten,
@@ -125,7 +127,7 @@ void def_create_mesh_from_path(nb::module_& m, const char* name, const char* doc
         return tg::createMeshFromPath<T>(path, scale, triangulate, flatten, normals, vertex_colors,
                                          material_and_texture);
     }, "path"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, doc);
+       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, nb::call_guard<nb::gil_scoped_release>(), doc);
 }
 
 template <typename T>
@@ -135,7 +137,7 @@ void def_create_mesh_from_resource(nb::module_& m, const char* name, const char*
         return tg::createMeshFromResource<T>(resource, scale, triangulate, flatten, normals, vertex_colors,
                                              material_and_texture);
     }, "resource"_a, "scale"_a = Eigen::Vector3d::Ones(), "triangulate"_a = true, "flatten"_a = false,
-       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, doc);
+       "normals"_a = false, "vertex_colors"_a = false, "material_and_texture"_a = false, nb::call_guard<nb::gil_scoped_release>(), doc);
 }
 
 // One instance of createMeshFromBytes<T> (mesh_parser.h:537). The flags keep upstream's defaults
