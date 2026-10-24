@@ -1472,6 +1472,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pthread-stubs-0.4-hb9d3cd8_1002.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pugixml-1.15-h3f63f65_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pulseaudio-client-17.0-h9a6aba3_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/py-spy-0.4.2-hbe0e3b8_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/python-3.14.5-habeac84_100_cp314.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyyaml-6.0.3-py314h67df5f8_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/qdldl-python-0.1.7.post5-np2py314h60906d0_3.conda
@@ -1808,6 +1809,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pthread-stubs-0.4-h86ecc28_1002.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pugixml-1.15-h6ef32b0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pulseaudio-client-17.0-hcf98165_3.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/py-spy-0.4.2-h40b01a3_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/python-3.14.5-hfd9ac0a_100_cp314.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyyaml-6.0.3-py314h807365f_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/qdldl-python-0.1.7.post5-np2py314h325ae0e_3.conda
@@ -2177,6 +2179,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/proj-9.8.1-ha88f16d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pthread-stubs-0.4-hd74edd7_1002.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pugixml-1.15-hd3d436d_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/py-spy-0.4.2-hc2d82ec_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.14.5-h4c637c5_100_cp314.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyyaml-6.0.3-py314h6e9b3f0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/qdldl-python-0.1.7.post5-np2py314hfae1593_3.conda
@@ -2428,6 +2431,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/proj-9.8.1-hd30e2cd_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pthread-stubs-0.4-h0e40799_1002.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pugixml-1.15-h372dad0_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/py-spy-0.4.2-h18a1a76_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/python-3.14.5-h4b44e0e_100_cp314.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyyaml-6.0.3-py314h2359020_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/qdldl-python-0.1.7.post5-np2py314he79ee03_3.conda
@@ -13277,6 +13281,22 @@ packages:
     - pulseaudio-client >=17.0,<17.1.0a0
   size: 754544
   timestamp: 1790788151618
+- conda: https://conda.anaconda.org/conda-forge/linux-64/py-spy-0.4.2-hbe0e3b8_1.conda
+  sha256: cb23242015d1b3fb9d009e98edf673900811b73a1e16a5e3d74104c96eb172dc
+  md5: a9b890615f46d689cbadb145415d333a
+  depends:
+  - libgcc >=15
+  - __glibc >=2.17,<3.0.a0
+  - libunwind >=1.8.3,<1.9.0a0
+  - liblzma >=5.8.3,<6.0a0
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  purls: []
+  run_exports: {}
+  size: 1909369
+  timestamp: 1787924738130
 - conda: https://conda.anaconda.org/conda-forge/linux-64/python-3.10.20-h3c07f61_0_cpython.conda
   sha256: 8ff2ce308faf2588b69c65b120293f59a8f2577b772b34df4e817d220b09e081
   md5: 5d4e2b00d99feacd026859b7fa239dc0
@@ -21951,6 +21971,21 @@ packages:
   purls: []
   size: 760306
   timestamp: 1763148231117
+- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/py-spy-0.4.2-h40b01a3_1.conda
+  sha256: 67811776d8baf316e63f366439db4117557385d2e5a65c0d5001c12dfebdd67a
+  md5: a3593d145ac4639f16145d8e08a40560
+  depends:
+  - libgcc >=15
+  - liblzma >=5.8.3,<6.0a0
+  - libunwind >=1.8.3,<1.9.0a0
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  purls: []
+  run_exports: {}
+  size: 1431819
+  timestamp: 1787924733536
 - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/python-3.10.20-h28be5d3_0_cpython.conda
   sha256: 2f16794d69e058404cca633021b284e70253dfb76e4b314d9dbd448aa0354e84
   md5: 5d61c9a2acf7c675f7ae5f6cf51ffb0b
@@ -31243,6 +31278,19 @@ packages:
     - pugixml >=1.15,<1.16.0a0
   size: 91283
   timestamp: 1736601509593
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/py-spy-0.4.2-hc2d82ec_1.conda
+  sha256: fad6d3e45bd00438e40e32f75fe722bf95bb809fc80d04144f8a302a465bfd6b
+  md5: fef444d478f754f055488b0d6749d17d
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: MIT
+  license_family: MIT
+  purls: []
+  run_exports: {}
+  size: 1310461
+  timestamp: 1787924738185
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.10.20-h1b19095_0_cpython.conda
   sha256: f0f6fcbb6cfdee5a6b9c03b5b94d2bbe737f3b17a618006c7685cc48992ae667
   md5: 55ec25b0d09379eb11c32dbe09ee28c4
@@ -37806,6 +37854,19 @@ packages:
     - pugixml >=1.15,<1.16.0a0
   size: 113967
   timestamp: 1736601565527
+- conda: https://conda.anaconda.org/conda-forge/win-64/py-spy-0.4.2-h18a1a76_1.conda
+  sha256: c4215034365119aa5e0ecab613479532d5c1f6964c69bdc82bde6ce0300932c3
+  md5: d583f0e7b428ed3991a84d0289b502f5
+  depends:
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  license: MIT
+  license_family: MIT
+  purls: []
+  run_exports: {}
+  size: 1587075
+  timestamp: 1787924746243
 - conda: https://conda.anaconda.org/conda-forge/win-64/python-3.10.20-hc20f281_0_cpython.conda
   sha256: e71595dd281a9902d7b84f545f16d7d4c0fb62cc6816431301f8f4870c94dc8c
   md5: 6c18c24d33a7ac8a4f81c68b8eb8581b
