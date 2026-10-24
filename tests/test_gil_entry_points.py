@@ -116,7 +116,7 @@ def test_kinematic_group_calc_inv_kin_still_solves(iiwa_group):
     assert len(solutions) > 0
     for solution in solutions:
         np.testing.assert_allclose(
-            iiwa_group.calcFwdKin(solution)["tool0"].matrix(), pose.matrix(), atol=1e-4
+            iiwa_group.calcFwdKin(solution)["tool0"].matrix, pose.matrix, atol=1e-4
         )
 
 
