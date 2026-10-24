@@ -93,7 +93,7 @@ minversion = "6.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 # tests/audit needs libclang, which only the `audit` env has: run it with `pixi run -e audit audit-test`.
-addopts = ["-ra", "--strict-markers", "--tb=short", "--ignore=tests/audit"]
+addopts = ["-ra", "--strict-markers", "--tb=short", "--ignore=tests/audit", "--ignore=tests/devtools"]
 markers = [
     "viewer: Viewer examples (deselect with '-m \"not viewer\"')",
     "planning: Motion planning examples",
@@ -303,6 +303,9 @@ docs-build = { cmd = "zensical build --strict", env = { PYTHONPATH = "src" }, de
 py-spy = ">=0.4.2"
 
 [tool.pixi.feature.profile.tasks]
+# tests/devtools: the hotspot tooling needs Python >= 3.12 (sys.monitoring), which the wheel
+# test matrix (3.9+) does not guarantee; -o addopts drops the default --ignore=tests/devtools.
+devtools-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' tests/devtools -n auto", description = "Contract tests of the GIL hotspot tooling (Python >= 3.12)" }
 gil-hotspots = { cmd = "python scripts/gil_hotspots.py all", description = "Record benchmarks and tests with py-spy --gil (asks for sudo); rank the bindings that hold the GIL (#124)" }
 
 # Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding

@@ -24,6 +24,7 @@ pixi task list
 | `check-changelog` | Check changelog | `CHANGELOG.md` release structure (the Docs workflow runs it too) |
 | `audit-gil` (`-e audit`) | GIL audit | Every GIL release in the bindings against `scripts/nogil_entry_points.yaml`; see [Threading and the GIL](threading.md) |
 | `audit-test` (`-e audit`) | Audit contract tests | `tests/audit`, which needs libclang |
+| `devtools-test` | Dev tooling tests | `tests/devtools` (Python >= 3.12), outside the wheel test suite |
 | `gil-hotspots` | GIL hotspots | Records benchmarks and tests with `py-spy --gil`, ranks the bindings that hold the GIL ([Finding candidates](threading.md#finding-candidates)) |
 
 ### Daily Workflow

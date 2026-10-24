@@ -1,5 +1,8 @@
 """Contract tests of scripts/gil_hotspots.py and scripts/gil_call_counts.py (#124).
 
+Dev tooling on Python >= 3.12 (sys.monitoring), outside the wheel test suite:
+`pixi run devtools-test`.
+
 The raw lines follow py-spy's collapsed-stack format (root first, `;`-joined frames
 `name (file:line)`, then the sample count), as `py-spy record --full-filenames --format raw`
 writes it.
@@ -14,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SCRIPTS = REPO_ROOT / "scripts"
 
 

@@ -173,8 +173,8 @@ re-ranks a recording, for instance after the list changed.
   is inside the call if the call dropped the GIL. The worker repeats the call until the main
   thread has run, so a fast call is still caught. A call that holds the GIL fails
   deterministically.
-- `tests/test_gil_hotspots.py`: the hotspot report's attribution rules on py-spy's raw format,
-  and the call counter on a real binding.
+- `tests/devtools/test_gil_hotspots.py` (`pixi run devtools-test`, Python >= 3.12): the hotspot
+  report's attribution rules on py-spy's raw format, and the call counter on a real binding.
 - `tests/tesseract_motion_planners/test_trajopt_ifopt_planner.py` (`_TASK_COMPOSER_RELEASE`): a
   Python composite profile and a Python cost run on the task composer's worker threads while the
   main thread waits on the future. Without the release in `TaskComposerFuture.wait` this deadlocks.
