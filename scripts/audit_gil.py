@@ -328,6 +328,9 @@ def main(argv: list[str] | None = None) -> int:
     modules = opts.modules or binding_modules()
     args = [
         *audit_bindings.PARSE_ARGS,
+        # osqp-eigen's CMake target exports this beside OSQP_EIGEN_OSQP_IS_V1. Only inline
+        # function bodies in OsqpEigen/Compat.hpp use it, which the API audit skips.
+        "-DOSQP_EIGEN_OSQP_IS_V1_FINAL",
         *(f"-I{d}" for d in audit_bindings.INCLUDE_DIRS),
     ]
     found: dict[Release, str] = {}
