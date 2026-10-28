@@ -113,6 +113,9 @@ struct LogDelivery {
     std::atomic<std::thread::id> thread_id{};  // read unlocked by flush
     bool stopping = false;
     std::chrono::steady_clock::time_point stop_deadline;
+    // Interpreter exit: LOG_EXIT_BUDGET from the first exit hook that waits for the handlers
+    // (exit_deadline_locked). One budget for all of them, so a stuck handler delays exit once.
+    std::optional<std::chrono::steady_clock::time_point> exit_deadline;
     bool stopped = false;  // later messages go to stderr: Python is going away
     // A child forked in a handler whose forking thread returned from it: no atexit stops the
     // delivery thread there, which would keep the child alive. It exits whenever the queue is
@@ -416,6 +419,29 @@ inline void flush_python_output_handlers() {
     d.delivered.wait(lock, [&] { return d.delivered_count >= target || d.stopped; });
 }
 
+// The exit deadline, set by the first caller. With `mutex`.
+inline std::chrono::steady_clock::time_point exit_deadline_locked(LogDelivery& d) {
+    if (!d.exit_deadline)
+        d.exit_deadline = std::chrono::steady_clock::now() + LOG_EXIT_BUDGET;
+    return *d.exit_deadline;
+}
+
+// For an exit hook that runs before stop_log_delivery (the task composer's run drain), with the
+// GIL held: flushOutputHandlers within the exit budget. True when every message queued so far was
+// delivered; false when the budget ran out (a slow or stuck handler) or delivery has stopped, and
+// stop_log_delivery then prints the rest.
+inline bool flush_python_output_handlers_at_exit() {
+    LogDelivery& d = *log_delivery_state();
+    if (std::this_thread::get_id() == d.thread_id.load())
+        return true;
+    nb::gil_scoped_release release;
+    std::unique_lock<std::mutex> lock(d.mutex);
+    const std::uint64_t target = d.enqueued + d.dropped_by.size();
+    const auto deadline = exit_deadline_locked(d);
+    return d.delivered.wait_until(lock, deadline, [&] { return d.delivered_count >= target || d.stopped; }) &&
+           !d.stopped;
+}
+
 inline std::shared_ptr<HandlerRef> handler_ref(console_bridge::OutputHandler* handler) {
     auto* py = dynamic_cast<PyOutputHandler*>(handler);
     if (py == nullptr)
@@ -452,8 +478,8 @@ inline void restore_previous_python_output_handler() {
     console_bridge::restorePreviousOutputHandler();
 }
 
-// atexit, with the GIL held: let the delivery thread deliver what is queued for at most
-// LOG_EXIT_BUDGET, then stop. Every message no handler got goes to stderr: the rest of the batch
+// atexit, with the GIL held: let the delivery thread deliver what is queued until the exit
+// deadline (LOG_EXIT_BUDGET from the first exit hook that waited for it), then stop. Every message no handler got goes to stderr: the rest of the batch
 // the delivery thread holds, the queue, a line per handler with unreported drops, and every later
 // message. A delivery thread still inside a handler is left behind (it is detached); the message
 // that handler has is not repeated, and the references the thread holds stay allocated, as Python
@@ -468,7 +494,7 @@ inline void stop_log_delivery() {
         if (d.stopped)
             return;
         d.stopping = true;
-        d.stop_deadline = std::chrono::steady_clock::now() + LOG_EXIT_BUDGET;
+        d.stop_deadline = exit_deadline_locked(d);
         d.pending.notify_one();
         if (d.started)
             d.delivered.wait_until(lock, d.stop_deadline, [&] { return d.queue.empty() && !d.delivering; });

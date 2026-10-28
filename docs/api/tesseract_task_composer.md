@@ -183,6 +183,9 @@ or at the next `run`. A server run also holds the executor it runs on, so
 flight, including runs started while waiting, are waited for (an `atexit` hook). A Python
 `OutputHandler` receives messages after they were logged, so the hook also waits until the
 handlers have received everything logged, and waits again for any run a handler started then.
+It waits for the handlers only within the log delivery's exit budget (2 s, shared with
+`tesseract_common`'s own exit hook): a stuck handler does not hold up exit, and what it did not
+receive goes to stderr.
 
 ### Node infos
 

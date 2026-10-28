@@ -249,8 +249,9 @@ void free_finished_runs() {
 // counted off: one step of Taskflow's teardown, microseconds unless the worker is preempted.
 constexpr auto EXIT_DRAIN_IDLE_POLL = std::chrono::milliseconds(1);
 
-// tesseract_common.flushOutputHandlers, with the GIL held. Set once at module init.
-void (*flush_output_handlers)() = nullptr;
+// tesseract_common's flushOutputHandlers within the log delivery's exit budget, with the GIL held:
+// false when the budget ran out. Set once at module init.
+bool (*flush_output_handlers_at_exit)() = nullptr;
 
 // Wait for every run still in flight with the GIL released (a worker's log handler or a run
 // started meanwhile may need the GIL), before the interpreter tears down what they use. Other threads may start runs while it waits: repeat until none is left. A run is
@@ -294,11 +295,17 @@ void wait_for_in_flight_runs() {
 // Registered with atexit. Python log handlers get their messages on tesseract_common's delivery
 // thread, after they were logged: a message delivered once the last run ended may start another.
 // So the drain then waits for the handlers to receive everything logged so far, and starts over
-// if they started a run.
+// if they started a run. It waits for the handlers only within the log delivery's exit budget
+// (shared with its own exit hook, which runs next): a stuck handler does not hold up exit. Once
+// the budget is spent, the runs already started are waited for one last time, and the rest of the
+// messages go to stderr.
 void wait_for_runs_at_exit() {
     do {
         wait_for_in_flight_runs();
-        flush_output_handlers();
+        if (!flush_output_handlers_at_exit()) {
+            wait_for_in_flight_runs();
+            return;
+        }
     } while (!in_flight_runs().empty());
 }
 
@@ -529,10 +536,10 @@ NB_MODULE(_tesseract_task_composer, m) {
         if (std::strcmp(depth.name(), "tesseract_robotics.log_callback_depth") != 0)
             throw std::logic_error("tesseract_common._log_callback_depth: unexpected capsule");
         python_log_callback_depth = reinterpret_cast<int (*)()>(depth.data());
-        auto flush = nb::cast<nb::capsule>(common.attr("_flush_output_handlers"));
-        if (std::strcmp(flush.name(), "tesseract_robotics.flush_output_handlers") != 0)
-            throw std::logic_error("tesseract_common._flush_output_handlers: unexpected capsule");
-        flush_output_handlers = reinterpret_cast<void (*)()>(flush.data());
+        auto flush = nb::cast<nb::capsule>(common.attr("_flush_output_handlers_at_exit"));
+        if (std::strcmp(flush.name(), "tesseract_robotics.flush_output_handlers_at_exit") != 0)
+            throw std::logic_error("tesseract_common._flush_output_handlers_at_exit: unexpected capsule");
+        flush_output_handlers_at_exit = reinterpret_cast<bool (*)()>(flush.data());
     }
     // Runs still in flight at exit finish before the interpreter tears down (run_held). Registered
     // after tesseract_common registers its own exit hook, so it runs first (atexit is last in,

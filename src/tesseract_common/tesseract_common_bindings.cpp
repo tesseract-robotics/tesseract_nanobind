@@ -1383,10 +1383,11 @@ NB_MODULE(_tesseract_common, m) {
     m.attr("_log_callback_depth") = nb::capsule(
         reinterpret_cast<void*>(&tesseract_nb_common::current_python_log_callback_depth),
         "tesseract_robotics.log_callback_depth");
-    // void (*)(), called with the GIL held: flushOutputHandlers, for the task composer's exit drain.
-    m.attr("_flush_output_handlers") = nb::capsule(
-        reinterpret_cast<void*>(&tesseract_nb_common::flush_python_output_handlers),
-        "tesseract_robotics.flush_output_handlers");
+    // bool (*)(), called with the GIL held: flushOutputHandlers within the exit budget, for the task
+    // composer's exit drain (python_output_handler.h).
+    m.attr("_flush_output_handlers_at_exit") = nb::capsule(
+        reinterpret_cast<void*>(&tesseract_nb_common::flush_python_output_handlers_at_exit),
+        "tesseract_robotics.flush_output_handlers_at_exit");
 
     // ========== STL Container Bindings ==========
     // VectorVector3d - explicit binding for aligned Eigen vectors (NB_MAKE_OPAQUE at top)
