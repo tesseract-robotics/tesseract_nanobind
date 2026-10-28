@@ -540,6 +540,8 @@ print("SUCCESS", all(results), len(results), stats["reloads"] > 0)
         config = yaml.safe_load(tesseract_robotics.get_task_composer_config_path().read_text())
         included = tmp_path / "plugins.yaml"
         included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
+        # repr: a Windows path pasted into the child's source reads as escape sequences.
+        including = f"task_composer_plugins: !include file://{included}"
         out = _run(f"""
 from tesseract_robotics.tesseract_common import ResourceLocator
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
@@ -563,7 +565,7 @@ class Reentrant(ResourceLocator):
                 print("BUSY", flush=True)
         return self.inner.locateResource(url)
 
-server.loadConfig("task_composer_plugins: !include file://{included}", Reentrant())
+server.loadConfig({including!r}, Reentrant())
 print("LOADED", server.hasTask("TrajOptPipeline"))
 """)
         assert out.count("BUSY") == 4, out
@@ -580,6 +582,8 @@ print("LOADED", server.hasTask("TrajOptPipeline"))
         config = yaml.safe_load(tesseract_robotics.get_task_composer_config_path().read_text())
         included = tmp_path / "plugins.yaml"
         included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
+        # repr: a Windows path pasted into the child's source reads as escape sequences.
+        including = f"task_composer_plugins: !include file://{included}"
         out = _run(f"""
 import threading
 from tesseract_robotics.tesseract_common import ResourceLocator
@@ -608,7 +612,7 @@ class CallOther(ResourceLocator):
         return self.inner.locateResource(url)
 
 def load(server, other):
-    server.loadConfig("task_composer_plugins: !include file://{included}", CallOther(other))
+    server.loadConfig({including!r}, CallOther(other))
 
 threads = [threading.Thread(target=load, args=(a, b)), threading.Thread(target=load, args=(b, a))]
 for t in threads:
