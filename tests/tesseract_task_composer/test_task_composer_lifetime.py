@@ -69,7 +69,24 @@ def _run(script: str, *, planning: bool = True) -> str:
         timeout=TIMEOUT_S,
         check=False,
     )
-    assert proc.returncode == 0, f"rc={proc.returncode}: {proc.stderr[-1500:]}"
+    # nanobind's leak report after an uncaught exception, and the plugin pinning notices on
+    # Windows, would push the traceback out of view: drop them, and show the traceback whole.
+    stderr = "\n".join(
+        line
+        for line in proc.stderr.splitlines()
+        if not line.startswith(
+            (
+                "nanobind: ",
+                " - leaked ",
+                " - ... skipped remainder",
+                "See https://nanobind",
+                "[tesseract_nanobind] pinned ",
+            )
+        )
+    )
+    traceback_at = stderr.find("Traceback (most recent call last)")
+    shown = stderr[traceback_at:][:4000] if traceback_at >= 0 else stderr[-3000:]
+    assert proc.returncode == 0, f"rc={proc.returncode}: {shown}"
     return proc.stdout
 
 
