@@ -1,6 +1,7 @@
 """TaskComposerLog: a run recorded for replay (#325) and its equality (#261)."""
 
 import gc
+import sys
 
 import pytest
 
@@ -147,6 +148,10 @@ class TestSerialization:
         with pytest.raises(FileNotFoundError):
             task_composer_log_to_file(run_log, tmp_path / "missing" / "run.xml")
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows has no read-only directories; chmod does not stop writes into one",
+    )
     def test_to_file_in_read_only_directory_raises(self, run_log, tmp_path):
         read_only = tmp_path / "ro"
         read_only.mkdir()
