@@ -640,7 +640,9 @@ print("SUCCESS", all(results), len(results), stats["reloads"] > 0)
         included = tmp_path / "plugins.yaml"
         included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
         # repr: a Windows path pasted into the child's source reads as escape sequences.
-        including = f"task_composer_plugins: !include file://{included}"
+        # A plain absolute path: upstream's GeneralResourceLocator reads only `file:///`, which
+        # leaves `/C:/...` on Windows, not an absolute path there.
+        including = f"task_composer_plugins: !include {included}"
         out = _run(f"""
 from tesseract_robotics.tesseract_common import ResourceLocator
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
@@ -682,7 +684,9 @@ print("LOADED", server.hasTask("TrajOptPipeline"))
         included = tmp_path / "plugins.yaml"
         included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
         # repr: a Windows path pasted into the child's source reads as escape sequences.
-        including = f"task_composer_plugins: !include file://{included}"
+        # A plain absolute path: upstream's GeneralResourceLocator reads only `file:///`, which
+        # leaves `/C:/...` on Windows, not an absolute path there.
+        including = f"task_composer_plugins: !include {included}"
         out = _run(f"""
 import threading
 from tesseract_robotics.tesseract_common import ResourceLocator
