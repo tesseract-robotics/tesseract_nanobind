@@ -485,7 +485,10 @@ the GIL, such as an executor worker against a failing `createTaskComposerNode`.
 
 - `flushOutputHandlers()` waits until the handlers have received everything logged so far.
   Called from inside a handler, it returns at once. Don't call it from code that a handler waits
-  for: the handler blocks it.
+  for: the handler blocks it. Where the bindings know a handler may be waiting for the calling
+  thread, it raises `OutputHandlerFlushForbiddenError` (a `RuntimeError`) instead of waiting:
+  inside a `TaskComposerServer` reload (`loadConfig`, `addTask`, `addExecutor`, for example from
+  a `ResourceLocator`), since a handler that calls that server waits for the reload.
 - `useOutputHandler` and `restorePreviousOutputHandler` don't wait. Each queued message goes to
   the handler that was installed when it was logged.
 - The handler stays alive while console_bridge can call it: until it is replaced, or restored

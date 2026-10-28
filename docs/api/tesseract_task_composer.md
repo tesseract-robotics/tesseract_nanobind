@@ -268,13 +268,18 @@ del task
 server.loadConfig(config, GeneralResourceLocator())  # now allowed
 ```
 
-While a server is inside `loadConfig`, `addTask` or `addExecutor`, other threads wait for it.
-Only calls from inside it raise the same error. That means calls from a Python
-`ResourceLocator` or log handler that runs during the reload. It also means calls from any
-Python log handler while another thread reloads: a reload that waits for the handlers
-(`flushOutputHandlers()` from a `ResourceLocator`) would wait for that handler forever. A call made from inside another server's reload raises too while this
-server reloads: two reloads whose locators reach each other's server would wait for each other.
-Adding a task under a new name, and running a node you built yourself, are unaffected.
+While a server is inside `loadConfig`, `addTask` or `addExecutor`, other threads wait for it,
+including a Python log handler on the `OutputHandler` delivery thread. Only calls from inside it
+raise the same error: calls from a Python `ResourceLocator` that runs during the reload. A call
+made from inside another server's reload raises too while this server reloads: two reloads whose
+locators reach each other's server would wait for each other. Adding a task under a new name,
+and running a node you built yourself, are unaffected.
+
+A reload never waits for the log handlers, so a handler waiting for it always gets its turn.
+`flushOutputHandlers()` called inside a reload (from a `ResourceLocator`) raises
+`OutputHandlerFlushForbiddenError` (a `RuntimeError`, from `tesseract_common`) instead of
+waiting: the handler it would wait for may be waiting for that reload. Flush before or after
+`loadConfig`, not inside it.
 
 ### TaskComposerLog
 
