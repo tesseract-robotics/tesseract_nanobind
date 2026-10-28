@@ -385,6 +385,8 @@ add_tesseract_nanobind_extension(
   tesseract::collision
   tesseract::common
 )
+# Pins the plugin libraries the task composer loads (macOS, Windows).
+target_sources(_tesseract_task_composer PRIVATE src/tesseract_task_composer/plugin_pinning.cpp)
 
 add_tesseract_nanobind_extension(
   tesseract_task_composer_planning
