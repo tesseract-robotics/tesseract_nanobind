@@ -356,6 +356,54 @@ future = executor.run(node, make_storage(node))
         assert "NESTED STARTED" in out, out
         assert "NESTED TASKS 0" in out, out
 
+    def test_run_started_by_a_message_delivered_after_its_run_ended_finishes(self):
+        """Handlers get messages on a delivery thread, later than they were logged: a message
+        delivered after the last run ended starts runs once the drain had nothing left to wait
+        for, and interpreter teardown cut them off. The drain waits for the handlers too."""
+        out = _run(
+            """
+import atexit
+report = {}
+atexit.register(lambda: print("NESTED TASKS", report["executor"].getTaskCount(), flush=True))
+"""
+            + _PREAMBLE
+            + _WORKER_HANDLER
+            + """
+exiting = []
+atexit.register(lambda: exiting.append(True))
+from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+nested = TaskflowTaskComposerExecutor("nested", 1)
+report["executor"] = nested
+nested_node = factory.createTaskComposerNode("TrajOptPipeline")
+nested_storage = make_storage(nested_node)
+
+class StartAfterTheRun(tesseract_common.OutputHandler):
+    def __init__(self):
+        super().__init__()
+        self.started = False
+
+    def log(self, text, level, filename, line):
+        if exiting and not self.started:
+            self.started = True
+            # Deliver this message only once the run that logged it has ended.
+            while executor.getTaskCount():
+                time.sleep(0.01)
+            for _ in range(4):
+                nested.run(nested_node, nested_storage)
+            print("NESTED STARTED", flush=True)
+
+handler = StartAfterTheRun()
+tesseract_common.useOutputHandler(handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = executor.run(node, make_storage(node))
+""",
+            planning=False,
+        )
+        assert "NESTED STARTED" in out, out
+        assert "NESTED TASKS 0" in out, out
+
 
 class TestServerTaskReplacement:
     """A server task cannot be replaced (loadConfig, addTask with its name) while Python or a run
