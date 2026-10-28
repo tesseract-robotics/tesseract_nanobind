@@ -19,6 +19,37 @@ tesseract_task_composer:
       Blocks until the executor finishes. Mandatory, not a speed-up: a Python profile or cost
       running on a worker thread needs the GIL, so holding it here deadlocks.
     waitFor: Blocks for up to `duration`; see wait.
+    ready: >-
+      Frees the finished runs once this one is done (as wait and waitFor do): dropping the last
+      reference to an executor a server replaced joins its workers, which may wait for the GIL in
+      a Python log handler. The runs' Python references are dropped before the release.
+  TaskComposerNode:
+    run: >-
+      Runs the node in the calling thread; a graph or pipeline waits for its children on the
+      executor's workers, which re-enter Python for Python profiles and log handlers.
+  TaskComposerServer:
+    loadConfig: >-
+      Waits for another thread's loadConfig / addTask / addExecutor on this server (the server
+      gate, enter_server), which calls Python (a ResourceLocator, a log handler) and needs the
+      GIL; frees finished runs first (see TaskComposerFuture.ready). The load itself holds the GIL.
+    addTask: Waits for another thread's mutation of this server; see loadConfig.
+    addExecutor: >-
+      Replacing an executor destroys the old one, which joins workers that may wait for the GIL
+      in a Python callback; also waits for another thread's mutation (see loadConfig). Other
+      server calls wait on the gate while it runs, so no Python thread sees it half done.
+    run: >-
+      Waits for another thread's mutation of this server, then schedules the task on the worker
+      threads (see TaskComposerExecutor.run); frees finished runs first.
+    getTask: >-
+      Waits for another thread's mutation of this server (see loadConfig); releases nothing when
+      none runs.
+    hasTask: See getTask.
+    getAvailableTasks: See getTask.
+    getExecutor: See getTask.
+    hasExecutor: See getTask.
+    getAvailableExecutors: See getTask.
+    getWorkerCount: See getTask.
+    getTaskCount: See getTask.
   TaskComposerExecutor:
     run: >-
       Schedules the graph on the worker threads, which re-enter Python for Python profiles;
