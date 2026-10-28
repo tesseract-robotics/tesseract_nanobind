@@ -15,6 +15,7 @@
 #include <yaml-cpp/yaml.h>  // YAML::Emitter for getConfig; YAML::Exception from the text overloads
 
 #include <algorithm>
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <fstream>
@@ -244,6 +245,9 @@ struct InFlightRun {
     nb::object owner;
     // A server run's executor: the server owns it, and addExecutor may replace it mid-run.
     std::shared_ptr<tp::TaskComposerExecutor> executor;
+    // The executor running it, held by `owner` or `executor`. The exit drain waits for it to go
+    // idle: Taskflow sets the future before it counts the run off (Executor::_tear_down_topology).
+    const tp::TaskComposerExecutor* runner = nullptr;
     // run() threw. Its thread erases the entry, but the exit drain may have moved it off the list
     // first: the drain and free_finished_runs drop flagged entries instead of waiting for them.
     // No test: the bound executors cannot be made to throw from run() through the Python API
@@ -283,9 +287,15 @@ void free_finished_runs() {
     finished.clear();
 }
 
+// How often the exit drain polls an executor whose last run set its future but is still being
+// counted off: one step of Taskflow's teardown, microseconds unless the worker is preempted.
+constexpr auto EXIT_DRAIN_IDLE_POLL = std::chrono::milliseconds(1);
+
 // Registered with atexit: wait for every run still in flight with the GIL released (a worker's
 // log handler or a run started meanwhile may need the GIL), before the interpreter tears down
-// what they use. Other threads may start runs while it waits: repeat until none is left.
+// what they use. Other threads may start runs while it waits: repeat until none is left. A run is
+// done when its executor is idle, not when its future is ready: Taskflow sets the future first,
+// and the worker is still in the executor's code after it.
 // A run still starting (null future) goes back on the list until its thread registers the
 // future. The starter assigns `future` with the GIL held, so the entries are sorted with the GIL
 // held, and only entries whose future was already set are touched without it.
@@ -306,6 +316,8 @@ void wait_for_runs_at_exit() {
             nb::gil_scoped_release release;
             for (auto& run : started) {
                 run->future->wait();
+                while (run->runner->getTaskCount() != 0)
+                    std::this_thread::sleep_for(EXIT_DRAIN_IDLE_POLL);
                 run->executor.reset();
             }
             if (started.empty())
@@ -333,12 +345,14 @@ nb::object python_object(const T& value) {
 // Callers free finished runs (which releases the GIL) before resolving `node`, never between.
 template <typename Run>
 std::unique_ptr<tp::TaskComposerFuture> run_held(const tp::TaskComposerNode& node_ref, nb::object node,
-                                                 nb::object owner, Run&& run,
+                                                 nb::object owner, const tp::TaskComposerExecutor& runner,
+                                                 Run&& run,
                                                  std::shared_ptr<tp::TaskComposerExecutor> executor = nullptr) {
     auto entry = std::make_shared<InFlightRun>();
     entry->node_ptr = &node_ref;
     entry->node = std::move(node);
     entry->owner = std::move(owner);
+    entry->runner = &runner;
     entry->executor = std::move(executor);
     in_flight_runs().push_back(entry);
     std::unique_ptr<tp::TaskComposerFuture> future;
@@ -878,14 +892,16 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
             free_finished_runs();
-            return run_held(node, python_object(node), python_object(self), [&] { return self.run(node, context); });
+            return run_held(node, python_object(node), python_object(self), self,
+                            [&] { return self.run(node, context); });
         }, "node"_a, "context"_a)
         .def("run", [](tp::TaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerDataStorage> data_storage, bool dotgraph,
                        const std::string& name) {
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
             free_finished_runs();
-            return run_held(node, python_object(node), python_object(self), [&] { return self.run(node, context); });
+            return run_held(node, python_object(node), python_object(self), self,
+                            [&] { return self.run(node, context); });
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskComposerExecutor::getWorkerCount)
         .def("getTaskCount", &tp::TaskComposerExecutor::getTaskCount);
@@ -940,7 +956,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
                        std::shared_ptr<tp::TaskComposerContext> context) {
             free_finished_runs();
-            return run_held(node, python_object(node), python_object(self),
+            return run_held(node, python_object(node), python_object(self), self,
                             [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
         }, "node"_a, "context"_a)
         .def("run", [](tp::TaskflowTaskComposerExecutor& self, const tp::TaskComposerNode& node,
@@ -948,7 +964,7 @@ NB_MODULE(_tesseract_task_composer, m) {
                        const std::string& name) {
             auto context = std::make_shared<tp::TaskComposerContext>(name, data_storage, dotgraph);
             free_finished_runs();
-            return run_held(node, python_object(node), python_object(self),
+            return run_held(node, python_object(node), python_object(self), self,
                             [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
@@ -1182,7 +1198,7 @@ NB_MODULE(_tesseract_task_composer, m) {
             const tp::TaskComposerNode& task = self.getTask(task_name);
             data_storage->setName(task_name);
             auto context = std::make_shared<tp::TaskComposerContext>(task_name, std::move(data_storage), dotgraph);
-            return run_held(task, nb::none(), python_object(self), [&] { return executor->run(task, context); },
+            return run_held(task, nb::none(), python_object(self), *executor, [&] { return executor->run(task, context); },
                             executor);
         }, "task_name"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("run", [](Server& self, const tp::TaskComposerNode& node, std::shared_ptr<tp::TaskComposerDataStorage> data_storage,
@@ -1193,7 +1209,8 @@ NB_MODULE(_tesseract_task_composer, m) {
             auto executor = self.getExecutor(executor_name);
             data_storage->setName(node.getName());
             auto context = std::make_shared<tp::TaskComposerContext>(node.getName(), std::move(data_storage), dotgraph);
-            return run_held(node, python_object(node), python_object(self), [&] { return executor->run(node, context); },
+            return run_held(node, python_object(node), python_object(self), *executor,
+                            [&] { return executor->run(node, context); },
                             executor);
         }, "node"_a, "data_storage"_a, "dotgraph"_a, "executor_name"_a)
         .def("getWorkerCount", [](const Server& self, const std::string& name) {
