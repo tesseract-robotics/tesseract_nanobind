@@ -497,7 +497,9 @@ the GIL, such as an executor worker against a failing `createTaskComposerNode`.
 - In a forked child, delivery starts again on the first message, also when a handler forked. The
   parent's queued messages stay with the parent. A child forked inside a handler ends once the
   handler has returned and the child's other threads have ended; the delivery thread does not keep
-  it alive. Windows has no `fork`.
+  it alive. The thread that forked is the child's main thread: its Python thread state stays when
+  it ends (on CPython 3.12 the child aborted once its threads had all ended and another started),
+  so in the child `threading.main_thread().is_alive()` stays true. Windows has no `fork`.
 - At interpreter exit, queued messages are delivered for up to 2 s. Then every message no handler
   has received goes to stderr, with a line for each handler's unreported drops, and so does
   anything logged later. A handler that never returns does not hold up exit, nor crash it; the

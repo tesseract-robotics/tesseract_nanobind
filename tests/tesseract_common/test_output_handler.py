@@ -575,40 +575,48 @@ print("FILES", handler.files)
 def test_child_forked_in_a_handler_exits_after_logging():
     """A child forked from a handler that logs, then returns from the handler, hung: the copied
     delivery thread (the child's only thread) ended, the child's own delivery thread waited
-    forever."""
-    out = _run("""
-class Forks(tesseract_common.OutputHandler):
-    child = None
+    forever. Then it aborted on CPython 3.12, intermittently ("init_threadstate: thread state
+    already initialized"): the copy deleted its thread state, the child's main one, and the next
+    thread state created once the child's threads had all ended reused it un-reset. One child
+    in three or so, so several children."""
+    out, err = _run_both("""
+CHILDREN = 8
+children = []
 
+class Forks(tesseract_common.OutputHandler):
     def log(self, text, level, filename, line):
-        if text == "FORK" and Forks.child is None:
-            pid = os.fork()
-            if pid == 0:
-                Forks.child = 0
-                log("CHILD")
-                # logs after the handler returned, then ends: the child must still end
-                threading.Thread(target=lambda: (time.sleep(0.3), log("LATER"))).start()
-                return  # no os._exit
-            Forks.child = pid
+        if text != "FORK":
+            return
+        pid = os.fork()
+        if pid == 0:
+            children.clear()
+            log("CHILD")
+            # logs after the handler returned, then ends: the child must still end
+            threading.Thread(target=lambda: (time.sleep(0.3), log("LATER"))).start()
+            return  # no os._exit
+        children.append(pid)
 
 handler = Forks()
 tesseract_common.useOutputHandler(handler)
-log("FORK")
-tesseract_common.flushOutputHandlers()
-deadline = time.monotonic() + 20
-while time.monotonic() < deadline:
-    pid, status = os.waitpid(Forks.child, os.WNOHANG)
-    if pid:
-        print("CHILD EXITED", status)
-        break
-    time.sleep(0.05)
-else:
-    os.kill(Forks.child, 9)
-    os.waitpid(Forks.child, 0)
-    print("CHILD HUNG")
+for _ in range(CHILDREN):
+    log("FORK")
+    tesseract_common.flushOutputHandlers()
+for child in children:
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        pid, status = os.waitpid(child, os.WNOHANG)
+        if pid:
+            print("CHILD EXITED", status)
+            break
+        time.sleep(0.05)
+    else:
+        os.kill(child, 9)
+        os.waitpid(child, 0)
+        print("CHILD HUNG")
 tesseract_common.restorePreviousOutputHandler()
 """)
-    assert "CHILD EXITED 0" in out, out
+    # the children share the parent's stderr: a child's fatal error is there
+    assert out.splitlines() == ["CHILD EXITED 0"] * 8, out + err
 
 
 def test_import_without_fork_support():
