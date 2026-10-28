@@ -333,8 +333,8 @@ struct TaskComposerServerBusyError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-// Python log handlers running on this thread (tesseract_common's PyOutputHandler): console_bridge
-// holds its output mutex while it calls one. Set once at module init.
+// Python log handlers running on this thread (tesseract_common's delivery thread, inside a
+// handler). Set once at module init.
 int (*python_log_callback_depth)() = nullptr;
 
 // Upstream's server has no lock. loadConfig and addTask (mutations) hold the GIL, but give it up
@@ -344,7 +344,8 @@ int (*python_log_callback_depth)() = nullptr;
 // other server call (enter_server) on another thread waits for it with the GIL released, and
 // raises only where waiting cannot end:
 // - on the mutating thread itself (a Python ResourceLocator or log handler inside the load);
-// - inside a Python log handler: the waiter holds console_bridge's mutex, which the load needs;
+// - inside a Python log handler: a load that waits for the delivery thread (flushOutputHandlers
+//   from a Python ResourceLocator) would wait for the handler forever;
 // - on a thread mutating another server: two loads whose ResourceLocators reach each other's
 //   server would wait for each other.
 // Lock order: the GIL, then `mutex`. `mutex` is taken with the GIL held only by the mutating

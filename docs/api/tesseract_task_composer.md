@@ -266,8 +266,8 @@ server.loadConfig(config, GeneralResourceLocator())  # now allowed
 While a server is inside `loadConfig`, `addTask` or `addExecutor`, other threads wait for it.
 Only calls from inside it raise the same error. That means calls from a Python
 `ResourceLocator` or log handler that runs during the reload. It also means calls from any
-Python log handler while another thread reloads: the handler holds console_bridge's output lock,
-which the reload needs. A call made from inside another server's reload raises too while this
+Python log handler while another thread reloads: a reload that waits for the handlers
+(`flushOutputHandlers()` from a `ResourceLocator`) would wait for that handler forever. A call made from inside another server's reload raises too while this
 server reloads: two reloads whose locators reach each other's server would wait for each other.
 Adding a task under a new name, and running a node you built yourself, are unaffected.
 
