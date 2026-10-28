@@ -13,6 +13,19 @@
 // for the queue: a full queue drops. (A logger blocked for space would hold console_bridge's
 // mutex, which a handler that logs needs on the delivery thread.) The delivery thread takes the
 // GIL holding no lock.
+//
+// Interpreter exit. Every call that may take the GIL (PyGILState_Ensure, and any Python code: the
+// eval loop gives the GIL away and takes it back) can end the delivery thread once Python is
+// finalizing. CPython 3.9-3.13 call PyThread_exit_thread there: pthread_exit, which on glibc
+// unwinds the thread's C++ frames and runs their destructors (forced unwinding); 3.14 hangs the
+// thread instead; macOS and Windows end it without running destructors. A destructor that touches
+// Python during that unwind runs on a thread whose thread state CPython already took away: the
+// GIL guard's PyGILState_Release aborted with "thread state must be current when releasing". So
+// the delivery thread calls Python only through the C API, from plain functions: while it is
+// inside a call that may take the GIL, no frame of it owns a Python reference, a GIL guard or a
+// nanobind override ticket, and no frame is noexcept (unwinding through one terminates). A
+// destructor never drops a Python reference (HandlerRef retires it); the references a thread
+// ended this way still held stay allocated, as Python is going away.
 #pragma once
 
 #include "tesseract_nb.h"
@@ -27,7 +40,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <deque>
-#include <exception>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -57,13 +69,21 @@ constexpr std::chrono::milliseconds LOG_EXIT_BUDGET{ 2000 };
 
 class PyOutputHandler;
 
+inline void retire_python_reference(PyObject* object);
+
 // A strong reference to an installed Python handler. Created and dropped with the GIL held (by
 // the swap functions and the delivery thread); a logger only copies one into the queue, never
-// dropping the last copy.
+// dropping the last copy. Its destructor does not touch Python: it retires the reference, and
+// release_retired_references drops it (see "Interpreter exit" above).
 struct HandlerRef {
     PyOutputHandler* handler;
-    nb::object object;
+    PyObject* object;           // strong
     std::uint64_t dropped = 0;  // messages to this handler dropped since its last drop notice; `mutex`
+
+    HandlerRef(PyOutputHandler* handler_, PyObject* object_) : handler(handler_), object(object_) {}
+    HandlerRef(const HandlerRef&) = delete;
+    HandlerRef& operator=(const HandlerRef&) = delete;
+    ~HandlerRef() { retire_python_reference(object); }
 };
 
 struct LogMessage {
@@ -102,6 +122,10 @@ struct LogDelivery {
     // can call stays alive until useOutputHandler / restorePreviousOutputHandler drops it.
     std::shared_ptr<HandlerRef> current;
     std::shared_ptr<HandlerRef> previous;
+    // References HandlerRef destructors let go of, for release_retired_references to drop with the
+    // GIL held. A leaf lock: nothing else is taken while holding it.
+    std::mutex retired_mutex;
+    std::vector<PyObject*> retired;
 };
 
 // The live delivery state. Never freed: the delivery thread and late loggers may outlive module
@@ -112,6 +136,55 @@ inline LogDelivery*& log_delivery_state() {
 }
 
 inline void print_to_stderr(const std::string& text) { std::fprintf(stderr, "%s\n", text.c_str()); }
+
+inline void retire_python_reference(PyObject* object) {
+    LogDelivery& d = *log_delivery_state();
+    std::lock_guard<std::mutex> lock(d.retired_mutex);
+    d.retired.push_back(object);
+}
+
+// Drop the retired references, with the GIL held, from a plain function: a handler's __del__ may
+// run here, so this thread may end inside a Py_DECREF at interpreter exit. The references not
+// yet dropped then stay allocated.
+inline void release_retired_references() {
+    LogDelivery& d = *log_delivery_state();
+    for (;;) {
+        std::vector<PyObject*> objects;
+        {
+            std::lock_guard<std::mutex> lock(d.retired_mutex);
+            if (d.retired.empty())
+                return;
+            objects.swap(d.retired);
+        }
+        for (PyObject* object : objects)
+            Py_DECREF(object);  // a __del__ may retire more: loop
+    }
+}
+
+// What the delivery thread needs to call a Python handler through the C API, set once at module
+// import. base_log and levels are borrowed: the OutputHandler and LogLevel types hold them until
+// interpreter finalization, and from then on no thread other than the finalizing one runs Python.
+// (Strong references would keep both types alive past nanobind's leak check.)
+struct PythonHandlerApi {
+    PyObject* log_name = nullptr;  // "log", strong
+    PyObject* base_log = nullptr;  // OutputHandler.log, the binding: a subclass that does not override it
+    PyObject* levels[console_bridge::CONSOLE_BRIDGE_LOG_NONE + 1] = {};  // the LogLevel members
+};
+
+inline PythonHandlerApi& python_handler_api() {
+    static PythonHandlerApi api;
+    return api;
+}
+
+// At module import, with the GIL held, after OutputHandler and LogLevel are bound.
+inline void init_python_handler_api(nb::handle output_handler_type) {
+    PythonHandlerApi& api = python_handler_api();
+    api.log_name = nb::str("log").release().ptr();
+    api.base_log = nb::getattr(output_handler_type, "log").ptr();
+    for (int level = console_bridge::CONSOLE_BRIDGE_LOG_DEBUG; level <= console_bridge::CONSOLE_BRIDGE_LOG_NONE;
+         ++level)
+        api.levels[level] = nb::cast(static_cast<console_bridge::LogLevel>(level)).ptr();
+}
 
 // The drop notice for `handler`, which takes the reference over; resets its count. With `mutex`.
 inline LogMessage drop_notice(std::shared_ptr<HandlerRef> handler) {
@@ -181,17 +254,101 @@ public:
         d.pending.notify_one();
     }
 
-    // The Python override, with the GIL held (delivery thread).
-    void deliver(const LogMessage& m) {
-        NB_OVERRIDE_PURE_NAME("log", log, m.text, m.level, m.filename ? m.filename->c_str() : nullptr, m.line);
-    }
 };
 
+// handler.log(text, level, filename, line) through the C API, with the GIL held (delivery thread).
+// A plain function owning only raw references: CPython may end the thread inside the call (see
+// "Interpreter exit" above), and the references are then left behind. A handler that raises, or a
+// subclass that does not override log, is reported through sys.unraisablehook: there is no caller
+// to raise into. (Called synchronously, the exception propagated into whichever C++ code logged.)
+inline void call_python_handler(const LogMessage& m) {
+    const PythonHandlerApi& api = python_handler_api();
+    PyObject* self = m.handler->object;
+    PyObject* type_log = PyObject_GetAttr(reinterpret_cast<PyObject*>(Py_TYPE(self)), api.log_name);
+    if (type_log == nullptr) {
+        PyErr_WriteUnraisable(self);
+        return;
+    }
+    const bool overridden = type_log != api.base_log;
+    Py_DECREF(type_log);
+    if (!overridden) {
+        PyErr_Format(PyExc_RuntimeError, "%R does not override OutputHandler.log",
+                     reinterpret_cast<PyObject*>(Py_TYPE(self)));
+        PyErr_WriteUnraisable(self);
+        return;
+    }
+    const int level = static_cast<int>(m.level);
+    if (level < console_bridge::CONSOLE_BRIDGE_LOG_DEBUG || level > console_bridge::CONSOLE_BRIDGE_LOG_NONE) {
+        PyErr_Format(PyExc_ValueError, "console_bridge logged an unknown LogLevel %d", level);
+        PyErr_WriteUnraisable(self);
+        return;
+    }
+    PyObject* text = PyUnicode_FromStringAndSize(m.text.data(), static_cast<Py_ssize_t>(m.text.size()));
+    PyObject* filename = nullptr;
+    if (m.filename)
+        filename = PyUnicode_FromStringAndSize(m.filename->data(), static_cast<Py_ssize_t>(m.filename->size()));
+    else {
+        filename = Py_None;
+        Py_INCREF(filename);
+    }
+    PyObject* line = PyLong_FromLong(m.line);
+    PyObject* result = nullptr;
+    if (text != nullptr && filename != nullptr && line != nullptr)
+        result = PyObject_CallMethodObjArgs(self, api.log_name, text, api.levels[level], filename, line, nullptr);
+    Py_XDECREF(text);
+    Py_XDECREF(filename);
+    Py_XDECREF(line);
+    if (result == nullptr)
+        PyErr_WriteUnraisable(self);
+    else
+        Py_DECREF(result);
+}
+
+// One batch, from a plain function holding no lock, nor any object owning Python state (see
+// "Interpreter exit" above). False: a forked child's copy of the delivery thread, which ends.
+inline bool deliver_batch(LogDelivery& d, std::size_t taken) {
+    // May end this thread at interpreter exit (3.9-3.13) or hang it (3.14).
+    const PyGILState_STATE gil = PyGILState_Ensure();
+    for (;;) {
+        // The GIL orders this read after reset_log_delivery_after_fork in a forked child.
+        if (&d != log_delivery_state()) {
+            // The parent's state: its messages stay with the parent.
+            {
+                LogDelivery& child = *log_delivery_state();
+                std::lock_guard<std::mutex> idle(child.mutex);
+                child.exit_when_idle = true;
+                child.pending.notify_one();
+            }
+            PyGILState_Release(gil);
+            return false;
+        }
+        const LogMessage* message = nullptr;
+        {
+            std::lock_guard<std::mutex> claim(d.mutex);
+            if (d.stopped || d.in_flight_next == d.in_flight.size())
+                break;  // stopped: exit printed the rest
+            message = &d.in_flight[d.in_flight_next++];
+        }
+        call_python_handler(*message);
+    }
+    {
+        std::deque<LogMessage> done;  // its HandlerRefs retire their references
+        std::lock_guard<std::mutex> finish(d.mutex);
+        done.swap(d.in_flight);
+        d.in_flight_next = 0;
+        d.delivering = false;
+        d.delivered_count += taken;
+        d.delivered.notify_all();
+    }
+    release_retired_references();
+    PyGILState_Release(gil);
+    return true;
+}
+
 // The delivery thread. It takes up to LOG_DELIVERY_BATCH queued messages and delivers them under
-// one GIL acquisition. A handler that raises is reported through sys.unraisablehook and the next
-// message is delivered: there is no caller to raise into. (Called synchronously, the exception
-// propagated into whichever C++ code logged.) Drops not yet reported when the queue runs empty
-// are reported to the handlers whose messages were dropped, installed or not.
+// one GIL acquisition (deliver_batch). A handler that raises is reported and the next message is
+// delivered. Drops not yet reported when the queue runs empty are reported to the handlers whose
+// messages were dropped, installed or not.
 //
 // Each message is claimed (in_flight_next) under `mutex` before it is handed over, so exit prints
 // exactly the messages no handler got. A handler that forks leaves a copy of this thread as the
@@ -224,44 +381,8 @@ inline void deliver_log_messages(LogDelivery* delivery) {
             queue_drop_notices_locked(d, d.in_flight);
         const std::size_t taken = d.in_flight.size();
         lock.unlock();
-        {
-            nb::gil_scoped_acquire gil;
-            for (;;) {
-                // The GIL orders this read after reset_log_delivery_after_fork in a forked child.
-                if (&d != log_delivery_state()) {
-                    // The parent's state: its messages stay with the parent.
-                    LogDelivery& child = *log_delivery_state();
-                    std::lock_guard<std::mutex> idle(child.mutex);
-                    child.exit_when_idle = true;
-                    child.pending.notify_one();
-                    return;
-                }
-                const LogMessage* message = nullptr;
-                {
-                    std::lock_guard<std::mutex> claim(d.mutex);
-                    if (d.stopped || d.in_flight_next == d.in_flight.size())
-                        break;  // stopped: exit printed the rest
-                    message = &d.in_flight[d.in_flight_next++];
-                }
-                try {
-                    message->handler->handler->deliver(*message);
-                } catch (nb::python_error& e) {
-                    e.discard_as_unraisable(message->handler->object);
-                } catch (const std::exception& e) {  // e.g. a subclass without a log override
-                    PyErr_SetString(PyExc_RuntimeError, e.what());
-                    PyErr_WriteUnraisable(message->handler->object.ptr());
-                }
-            }
-            std::deque<LogMessage> done;  // handler references go with the GIL held
-            {
-                std::lock_guard<std::mutex> finish(d.mutex);
-                done.swap(d.in_flight);
-                d.in_flight_next = 0;
-                d.delivering = false;
-                d.delivered_count += taken;
-                d.delivered.notify_all();
-            }
-        }
+        if (!deliver_batch(d, taken))
+            return;
         lock.lock();
     }
 }
@@ -285,7 +406,9 @@ inline std::shared_ptr<HandlerRef> handler_ref(console_bridge::OutputHandler* ha
     auto* py = dynamic_cast<PyOutputHandler*>(handler);
     if (py == nullptr)
         return nullptr;
-    return std::make_shared<HandlerRef>(HandlerRef{ py, nb::borrow(py->nb_trampoline.base()) });
+    PyObject* object = py->nb_trampoline.base().ptr();
+    Py_INCREF(object);
+    return std::make_shared<HandlerRef>(py, object);
 }
 
 // useOutputHandler. It does not wait for the queue: each queued message carries the handler it
@@ -302,6 +425,8 @@ inline void use_python_output_handler(console_bridge::OutputHandler* handler) {
         d.current = std::move(ref);
     }
     console_bridge::useOutputHandler(handler);
+    dropped.reset();
+    release_retired_references();
 }
 
 inline void restore_previous_python_output_handler() {
@@ -346,6 +471,8 @@ inline void stop_log_delivery() {
         print_to_stderr(text);
     for (const auto& message : left)
         print_to_stderr(message.text);
+    left.clear();
+    release_retired_references();
 }
 
 // os.register_at_fork(after_in_child=...): the child has no delivery thread, and the parent's

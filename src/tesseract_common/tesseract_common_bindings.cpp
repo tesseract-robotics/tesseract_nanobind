@@ -1354,9 +1354,10 @@ NB_MODULE(_tesseract_common, m) {
         .value("CONSOLE_BRIDGE_LOG_ERROR", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_ERROR)
         .value("CONSOLE_BRIDGE_LOG_NONE", console_bridge::LogLevel::CONSOLE_BRIDGE_LOG_NONE);
 
-    nb::class_<console_bridge::OutputHandler, PyOutputHandler>(m, "OutputHandler")
+    auto output_handler = nb::class_<console_bridge::OutputHandler, PyOutputHandler>(m, "OutputHandler")
         .def(nb::init<>())
         .def("log", &console_bridge::OutputHandler::log);
+    tesseract_nb_common::init_python_handler_api(output_handler);
 
     m.def("setLogLevel", &console_bridge::setLogLevel, "level"_a);
     m.def("getLogLevel", &console_bridge::getLogLevel);
