@@ -120,6 +120,25 @@ print("SEEN", seen)
     assert "SEEN ['kept']" in out, out
 
 
+def test_handler_without_a_log_override_goes_to_unraisablehook():
+    """The base OutputHandler.log is the C++ binding, which would queue the message again."""
+    out = _run("""
+caught = []
+sys.unraisablehook = lambda u: caught.append((type(u.exc_value).__name__, u.object is handler))
+
+class NoLog(tesseract_common.OutputHandler):
+    pass
+
+handler = NoLog()
+tesseract_common.useOutputHandler(handler)
+log("lost")
+tesseract_common.flushOutputHandlers()
+tesseract_common.restorePreviousOutputHandler()
+print("CAUGHT", caught)
+""")
+    assert "CAUGHT [('RuntimeError', True)]" in out, out
+
+
 def test_handler_exception_goes_to_unraisablehook():
     out = _run("""
 caught = []

@@ -500,8 +500,8 @@ the GIL, such as an executor worker against a failing `createTaskComposerNode`.
   it alive. Windows has no `fork`.
 - At interpreter exit, queued messages are delivered for up to 2 s. Then every message no handler
   has received goes to stderr, with a line for each handler's unreported drops, and so does
-  anything logged later. A handler that never returns does not hold up exit; the message it is
-  handling is not repeated.
+  anything logged later. A handler that never returns does not hold up exit, nor crash it; the
+  message it is handling is not repeated.
 - A message C++ logged without a file reaches the handler with `filename` set to `None`.
 
 ```python

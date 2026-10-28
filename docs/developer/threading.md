@@ -194,6 +194,33 @@ writer thread is safe. Until every `Environment` binding that takes its mutex re
 `Environment.init` doesn't release it either, so the window doesn't widen. This also keeps
 `Environment.getKinematicGroup`, the second-largest GIL holder measured above, GIL-held.
 
+## C++ threads that call Python at interpreter exit
+
+A thread CPython didn't start, such as the `OutputHandler` delivery thread
+(`src/tesseract_common/python_output_handler.h`), can be inside Python when the interpreter
+finalizes. Every call that takes the GIL then ends it: `PyGILState_Ensure`, `PyEval_RestoreThread`,
+and any Python code, since the eval loop gives the GIL away and takes it back. What "ends" means
+depends on the version and platform:
+
+| | 3.9–3.13 | 3.14+ |
+|---|---|---|
+| Linux (glibc) | `pthread_exit`: forced unwinding runs the thread's C++ destructors and `catch (...)` blocks | the thread hangs |
+| macOS | `pthread_exit`, no C++ destructors run | the thread hangs |
+| Windows | `_endthreadex`, no C++ destructors run | the thread hangs |
+
+So on Linux before 3.14, a RAII guard on such a thread runs during that unwind, after CPython
+took its thread state away. `nb::gil_scoped_acquire` (and the `PyGILState_Release` in a nanobind
+override ticket) then aborts with `PyGILState_Release: thread state ... must be current when
+releasing`; a `noexcept` frame on the way terminates the process. CI hit this on Linux 3.12 only:
+macOS, Windows and 3.14 never run the destructors; the 3.13 jobs did not hit it in that run.
+
+The rule for such a thread: while it is inside a call that may take the GIL, none of its frames
+owns a Python reference, a GIL guard or an override ticket, and none is `noexcept`. Call Python
+through the C API from plain functions (`PyGILState_Ensure` / `PyGILState_Release` by hand,
+`PyObject_CallMethodObjArgs`, raw references), and never drop a Python reference in a destructor:
+the delivery thread's `HandlerRef` retires its reference to a list that a plain function drops
+with the GIL held. A thread ended mid-call leaves what it held allocated; Python is going away.
+
 ## Upstream: plugin factory caches
 
 `TaskComposerPluginFactory`, `KinematicsPluginFactory` and `ContactManagersPluginFactory` each
