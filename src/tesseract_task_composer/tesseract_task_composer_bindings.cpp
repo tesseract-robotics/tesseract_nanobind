@@ -249,15 +249,17 @@ void free_finished_runs() {
 // counted off: one step of Taskflow's teardown, microseconds unless the worker is preempted.
 constexpr auto EXIT_DRAIN_IDLE_POLL = std::chrono::milliseconds(1);
 
-// Registered with atexit: wait for every run still in flight with the GIL released (a worker's
-// log handler or a run started meanwhile may need the GIL), before the interpreter tears down
-// what they use. Other threads may start runs while it waits: repeat until none is left. A run is
+// tesseract_common.flushOutputHandlers, with the GIL held. Set once at module init.
+void (*flush_output_handlers)() = nullptr;
+
+// Wait for every run still in flight with the GIL released (a worker's log handler or a run
+// started meanwhile may need the GIL), before the interpreter tears down what they use. Other threads may start runs while it waits: repeat until none is left. A run is
 // done when its executor is idle, not when its future is ready: Taskflow sets the future first,
 // and the worker is still in the executor's code after it.
 // A run still starting (null future) goes back on the list until its thread registers the
 // future. The starter assigns `future` with the GIL held, so the entries are sorted with the GIL
 // held, and only entries whose future was already set are touched without it.
-void wait_for_runs_at_exit() {
+void wait_for_in_flight_runs() {
     while (!in_flight_runs().empty()) {
         std::vector<std::shared_ptr<InFlightRun>> runs;
         runs.swap(in_flight_runs());
@@ -287,6 +289,17 @@ void wait_for_runs_at_exit() {
             if (!run->start_failed)
                 in_flight_runs().push_back(std::move(run));
     }
+}
+
+// Registered with atexit. Python log handlers get their messages on tesseract_common's delivery
+// thread, after they were logged: a message delivered once the last run ended may start another.
+// So the drain then waits for the handlers to receive everything logged so far, and starts over
+// if they started a run.
+void wait_for_runs_at_exit() {
+    do {
+        wait_for_in_flight_runs();
+        flush_output_handlers();
+    } while (!in_flight_runs().empty());
 }
 
 // The Python object of a C++ argument that Python passed in.
@@ -507,9 +520,6 @@ std::vector<tp::TaskComposerNodeInfo> snapshot(const tp::TaskComposerNodeInfoCon
 NB_MODULE(_tesseract_task_composer, m) {
     m.doc() = "tesseract_task_composer Python bindings";
 
-    // Runs still in flight at exit finish before the interpreter tears down (run_held).
-    nb::module_::import_("atexit").attr("register")(nb::cpp_function(&wait_for_runs_at_exit));
-
     // Import the modules that bind the types this one takes and returns, so nanobind names
     // them in signatures (#312): ResourceLocator and AnyPoly's ProfileDictionary come from
     // common and command language, Environment and ContactResultMap from their own modules.
@@ -519,7 +529,15 @@ NB_MODULE(_tesseract_task_composer, m) {
         if (std::strcmp(depth.name(), "tesseract_robotics.log_callback_depth") != 0)
             throw std::logic_error("tesseract_common._log_callback_depth: unexpected capsule");
         python_log_callback_depth = reinterpret_cast<int (*)()>(depth.data());
+        auto flush = nb::cast<nb::capsule>(common.attr("_flush_output_handlers"));
+        if (std::strcmp(flush.name(), "tesseract_robotics.flush_output_handlers") != 0)
+            throw std::logic_error("tesseract_common._flush_output_handlers: unexpected capsule");
+        flush_output_handlers = reinterpret_cast<void (*)()>(flush.data());
     }
+    // Runs still in flight at exit finish before the interpreter tears down (run_held). Registered
+    // after tesseract_common registers its own exit hook, so it runs first (atexit is last in,
+    // first out): while it waits, the Python log handlers still get their messages.
+    nb::module_::import_("atexit").attr("register")(nb::cpp_function(&wait_for_runs_at_exit));
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
     nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");

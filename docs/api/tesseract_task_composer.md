@@ -180,7 +180,9 @@ mid-run is safe and never blocks. A finished run's node and executor are release
 is seen done (`wait()`, `waitFor()` returning `FutureStatus.ready`, `ready()` returning `True`)
 or at the next `run`. A server run also holds the executor it runs on, so
 `TaskComposerServer.addExecutor` may replace it mid-run. At interpreter exit, runs still in
-flight, including runs started while waiting, are waited for (an `atexit` hook).
+flight, including runs started while waiting, are waited for (an `atexit` hook). A Python
+`OutputHandler` receives messages after they were logged, so the hook also waits until the
+handlers have received everything logged, and waits again for any run a handler started then.
 
 ### Node infos
 
