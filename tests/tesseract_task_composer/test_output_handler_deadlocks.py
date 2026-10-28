@@ -31,7 +31,7 @@ from tesseract_robotics.tesseract_task_composer import (
 J_START = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 J_END = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 config_path = tesseract_robotics.get_task_composer_config_path()
-factory = TaskComposerPluginFactory(str(config_path), GeneralResourceLocator())
+factory = TaskComposerPluginFactory(config_path, GeneralResourceLocator())
 robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
 joint_names = robot.get_joint_names("manipulator")
 robot.set_joints(J_START, joint_names=joint_names)
