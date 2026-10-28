@@ -17,10 +17,12 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <cctype>
 #include <cstring>
 #include <fstream>
 #include <unordered_set>
 #include <thread>
+#include <typeindex>
 #include <sstream>
 #include <stdexcept>  // std::runtime_error, std::invalid_argument (the named errors)
 
@@ -84,6 +86,25 @@ decltype(auto) with_pinned_plugins(Load&& load) {
         ~Pin() { tesseract_nb::pin_libraries_loaded_since(before); }
     } pin;
     return load();
+}
+
+// The C++ name of `type`, the same on every compiler: GCC and Clang mangle typeid names
+// (demangled here), MSVC writes them unmangled but with an elaborated-type keyword before each
+// class name ("class tesseract::command_language::CompositeInstruction"), dropped here (#322).
+std::string type_name(const std::type_index& type) {
+    std::string name = boost::core::demangle(type.name());
+    for (const char* keyword : { "class ", "struct ", "union ", "enum " }) {
+        const std::size_t length = std::strlen(keyword);
+        for (std::size_t at = name.find(keyword); at != std::string::npos; at = name.find(keyword, at)) {
+            const bool starts_word = at == 0 || !(std::isalnum(static_cast<unsigned char>(name[at - 1])) ||
+                                                  name[at - 1] == '_');
+            if (starts_word)
+                name.erase(at, length);
+            else
+                at += length;
+        }
+    }
+    return name;
 }
 
 // createTaskComposer{Node,Executor} never throw: an unknown name, a plugin symbol that fails to
@@ -1189,7 +1210,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getTypeName", [](const tc::AnyPoly& self) {
             if (self.isNull())
                 return std::string("null");
-            return boost::core::demangle(self.getType().name());
+            return type_name(self.getType());
         }, "Demangled C++ type name of the stored value, or `null`.");
     // operator== compares the held values (AnyWrapper<T>::equals); two null AnyPolys are equal.
     bind_value_equality(any_poly);
