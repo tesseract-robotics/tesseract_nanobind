@@ -60,6 +60,7 @@ __all__ = [
     "useOutputHandler",
     "restorePreviousOutputHandler",
     "flushOutputHandlers",
+    "OutputHandlerFlushForbiddenError",
     # Eigen helper types
     "Isometry3d",
     "Translation3d",

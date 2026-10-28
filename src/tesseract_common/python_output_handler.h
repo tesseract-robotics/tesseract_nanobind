@@ -29,6 +29,7 @@
 #pragma once
 
 #include "tesseract_nb.h"
+#include "tesseract_common/log_flush_barrier.h"
 
 #include <console_bridge/console.h>
 
@@ -44,6 +45,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -259,17 +261,41 @@ public:
 
 };
 
-// Python log handlers running on this thread (the delivery thread, inside call_python_handler).
-// The task composer's server gate reads it through the _log_callback_depth capsule: a server call
-// from inside a handler raises instead of waiting, since a reload that waits for the delivery
-// thread (flushOutputHandlers from a Python ResourceLocator) would wait for it forever. A plain
-// int: nothing with a destructor stays alive across the call (see "Interpreter exit" above).
-inline int& python_log_callback_depth() {
-    static thread_local int depth = 0;
-    return depth;
+// The flush barrier (log_flush_barrier.h): marks on this thread, and what holds the outermost.
+// Plain data, no destructor: a handler may enter one on the delivery thread (a server reload
+// called from the handler), and CPython may end that thread inside it (see "Interpreter exit").
+struct LogFlushBarrier {
+    int depth = 0;
+    const char* holder = nullptr;
+};
+
+inline LogFlushBarrier& log_flush_barrier() {
+    static thread_local LogFlushBarrier barrier;
+    return barrier;
 }
 
-inline int current_python_log_callback_depth() { return python_log_callback_depth(); }
+inline void enter_log_flush_barrier(const char* holder) {
+    LogFlushBarrier& barrier = log_flush_barrier();
+    if (barrier.depth++ == 0)
+        barrier.holder = holder;
+}
+
+inline void leave_log_flush_barrier() {
+    LogFlushBarrier& barrier = log_flush_barrier();
+    if (--barrier.depth == 0)
+        barrier.holder = nullptr;
+}
+
+// The table behind the _log_flush_barrier capsule.
+inline const LogFlushBarrierApi& log_flush_barrier_api() {
+    static const LogFlushBarrierApi api{ &enter_log_flush_barrier, &leave_log_flush_barrier };
+    return api;
+}
+
+// flushOutputHandlers on a thread inside a flush barrier: a handler may be waiting for it.
+struct OutputHandlerFlushForbiddenError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 
 // handler.log(text, level, filename, line) through the C API, with the GIL held (delivery thread).
 // A plain function owning only raw references: CPython may end the thread inside the call (see
@@ -351,9 +377,7 @@ inline bool deliver_batch(LogDelivery& d, std::size_t taken) {
                 break;  // stopped: exit printed the rest
             message = &d.in_flight[d.in_flight_next++];
         }
-        ++python_log_callback_depth();
         call_python_handler(*message);
-        --python_log_callback_depth();
     }
     {
         std::deque<LogMessage> done;  // its HandlerRefs retire their references
@@ -413,10 +437,16 @@ inline void deliver_log_messages(LogDelivery* delivery) {
 }
 
 // flushOutputHandlers: wait, with the GIL released, until every message queued so far has been
-// delivered. From the delivery thread (a handler) it returns at once: it would wait for itself.
-// A handler that waits for the calling thread blocks this call; do not flush from code a handler
-// may be waiting on.
+// delivered. Inside a flush barrier it raises instead: a handler may be waiting for this thread,
+// so this wait could never end. From the delivery thread (a handler) it returns at once: it would
+// wait for itself. A handler that waits for the calling thread outside a barrier blocks this
+// call; do not flush from code a handler may be waiting on.
 inline void flush_python_output_handlers() {
+    const LogFlushBarrier& barrier = log_flush_barrier();
+    if (barrier.depth != 0)
+        throw OutputHandlerFlushForbiddenError(
+            std::string("flushOutputHandlers: called inside ") + barrier.holder +
+            ", which a Python OutputHandler may be waiting for; flush before or after it");
     LogDelivery& d = *log_delivery_state();
     if (std::this_thread::get_id() == d.thread_id.load())
         return;

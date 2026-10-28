@@ -1370,19 +1370,28 @@ NB_MODULE(_tesseract_common, m) {
     // longer call it; a swap does not wait for the queue, since each message carries its handler.
     m.def("useOutputHandler", &tesseract_nb_common::use_python_output_handler, "handler"_a);
     m.def("restorePreviousOutputHandler", &tesseract_nb_common::restore_previous_python_output_handler);
+    nb::exception<tesseract_nb_common::OutputHandlerFlushForbiddenError>(m, "OutputHandlerFlushForbiddenError",
+                                                                         PyExc_RuntimeError)
+        .attr("__doc__") =
+        "flushOutputHandlers was called where a Python OutputHandler may be waiting for the calling "
+        "thread (inside a TaskComposerServer loadConfig / addTask / addExecutor), so waiting for the "
+        "handlers could never end.";
     m.def("flushOutputHandlers", &tesseract_nb_common::flush_python_output_handlers,
           "Wait until the Python OutputHandlers have received every message logged so far. Returns "
-          "at once when called from a handler. A handler waiting for the calling thread blocks it.");
+          "at once when called from a handler. A handler waiting for the calling thread blocks it; "
+          "where the bindings know one may (inside a TaskComposerServer reload), it raises "
+          "OutputHandlerFlushForbiddenError instead.");
     nb::module_::import_("atexit").attr("register")(nb::cpp_function(&tesseract_nb_common::stop_log_delivery));
     // os.register_at_fork exists exactly where os.fork does: not on Windows, which has no fork.
     nb::module_ os_module = nb::module_::import_("os");
     if (nb::hasattr(os_module, "register_at_fork"))
         os_module.attr("register_at_fork")(
             "after_in_child"_a = nb::cpp_function(&tesseract_nb_common::reset_log_delivery_after_fork));
-    // int (*)(): Python log handlers running on the calling thread (python_output_handler.h).
-    m.attr("_log_callback_depth") = nb::capsule(
-        reinterpret_cast<void*>(&tesseract_nb_common::current_python_log_callback_depth),
-        "tesseract_robotics.log_callback_depth");
+    // The flush barrier's enter / leave (log_flush_barrier.h), for modules that make a Python
+    // handler wait for a thread.
+    m.attr("_log_flush_barrier") =
+        nb::capsule(static_cast<const void*>(&tesseract_nb_common::log_flush_barrier_api()),
+                    tesseract_nb_common::LOG_FLUSH_BARRIER_CAPSULE);
     // bool (*)(), called with the GIL held: flushOutputHandlers within the exit budget, for the task
     // composer's exit drain (python_output_handler.h).
     m.attr("_flush_output_handlers_at_exit") = nb::capsule(

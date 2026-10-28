@@ -4,6 +4,7 @@
  */
 
 #include "tesseract_nb.h"
+#include "tesseract_common/log_flush_barrier.h"
 #include <future>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/vector.h>
@@ -353,21 +354,21 @@ struct TaskComposerServerBusyError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-// Python log handlers running on this thread (tesseract_common's delivery thread, inside a
-// handler). Set once at module init.
-int (*python_log_callback_depth)() = nullptr;
+// tesseract_common's flush barrier (log_flush_barrier.h). Set once at module init.
+const tesseract_nb_common::LogFlushBarrierApi* log_flush_barrier = nullptr;
 
 // Upstream's server has no lock. loadConfig and addTask (mutations) hold the GIL, but give it up
-// inside Python callbacks they make (a ResourceLocator, a log handler, a Python-owned task's
-// deleter), where other threads run; addExecutor (a mutation too) runs without the GIL, because
-// destroying an executor joins workers that may wait for the GIL. While a mutation runs, every
-// other server call (enter_server) on another thread waits for it with the GIL released, and
-// raises only where waiting cannot end:
-// - on the mutating thread itself (a Python ResourceLocator or log handler inside the load);
-// - inside a Python log handler: a load that waits for the delivery thread (flushOutputHandlers
-//   from a Python ResourceLocator) would wait for the handler forever;
+// inside Python callbacks they make (a ResourceLocator, a Python-owned task's deleter), where
+// other threads run; addExecutor (a mutation too) runs without the GIL, because destroying an
+// executor joins workers that may wait for the GIL. While a mutation runs, every other server
+// call (enter_server) on another thread waits for it with the GIL released, a Python log handler
+// on tesseract_common's delivery thread included, and raises only where waiting cannot end:
+// - on the mutating thread itself (a Python ResourceLocator inside the load);
 // - on a thread mutating another server: two loads whose ResourceLocators reach each other's
 //   server would wait for each other.
+// A mutation never waits for the delivery thread, so a handler waiting here always gets in: the
+// mutating thread is inside tesseract_common's flush barrier, where flushOutputHandlers (from a
+// Python ResourceLocator) raises instead of waiting for a handler that waits for this mutation.
 // Lock order: the GIL, then `mutex`. `mutex` is taken with the GIL held only by the mutating
 // thread (ServerMutation), and released before anything that can log or call Python; a waiter
 // releases the GIL before taking it. Nothing acquires the GIL while holding `mutex`.
@@ -400,11 +401,7 @@ void enter_server(const char* caller, const tp::TaskComposerServer& server) {
         if (gate.thread == std::this_thread::get_id())
             throw TaskComposerServerBusyError(std::string(caller) +
                                               ": called from inside this server's loadConfig, addTask or addExecutor "
-                                              "(a ResourceLocator or log handler)");
-        if (python_log_callback_depth() != 0)
-            throw TaskComposerServerBusyError(std::string(caller) +
-                                              ": called from a log handler while another thread reloads the server; "
-                                              "waiting would deadlock on the logger the reload uses");
+                                              "(a ResourceLocator)");
         if (server_mutations_on_this_thread != 0)
             throw TaskComposerServerBusyError(std::string(caller) +
                                               ": called from inside another server's loadConfig, addTask or "
@@ -416,12 +413,14 @@ void enter_server(const char* caller, const tp::TaskComposerServer& server) {
     }
 }
 
-// Marks a server busy for one mutation, also when it throws. Enter the server (enter_server)
-// first, with the GIL held since. A mutation that releases the GIL declares the release after
-// this, so the gate is cleared with the GIL held.
+// Marks a server busy for one mutation, also when it throws, and keeps the mutating thread in
+// tesseract_common's flush barrier meanwhile (`caller`, a string literal, names it there). Enter
+// the server (enter_server) first, with the GIL held since. A mutation that releases the GIL
+// declares the release after this, so the gate is cleared with the GIL held.
 struct ServerMutation {
     ServerGate& gate;
-    explicit ServerMutation(const tp::TaskComposerServer& server) : gate(server_gate(server)) {
+    ServerMutation(const char* caller, const tp::TaskComposerServer& server) : gate(server_gate(server)) {
+        log_flush_barrier->enter(caller);
         std::lock_guard<std::mutex> lock(gate.mutex);
         gate.busy = true;
         gate.thread = std::this_thread::get_id();
@@ -431,6 +430,7 @@ struct ServerMutation {
     ServerMutation& operator=(const ServerMutation&) = delete;
     ~ServerMutation() {
         --server_mutations_on_this_thread;
+        log_flush_barrier->leave();
         {
             std::lock_guard<std::mutex> lock(gate.mutex);
             gate.busy = false;
@@ -532,10 +532,10 @@ NB_MODULE(_tesseract_task_composer, m) {
     // common and command language, Environment and ContactResultMap from their own modules.
     {
         nb::module_ common = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
-        auto depth = nb::cast<nb::capsule>(common.attr("_log_callback_depth"));
-        if (std::strcmp(depth.name(), "tesseract_robotics.log_callback_depth") != 0)
-            throw std::logic_error("tesseract_common._log_callback_depth: unexpected capsule");
-        python_log_callback_depth = reinterpret_cast<int (*)()>(depth.data());
+        auto barrier = nb::cast<nb::capsule>(common.attr("_log_flush_barrier"));
+        if (std::strcmp(barrier.name(), tesseract_nb_common::LOG_FLUSH_BARRIER_CAPSULE) != 0)
+            throw std::logic_error("tesseract_common._log_flush_barrier: unexpected capsule");
+        log_flush_barrier = static_cast<const tesseract_nb_common::LogFlushBarrierApi*>(barrier.data());
         auto flush = nb::cast<nb::capsule>(common.attr("_flush_output_handlers_at_exit"));
         if (std::strcmp(flush.name(), "tesseract_robotics.flush_output_handlers_at_exit") != 0)
             throw std::logic_error("tesseract_common._flush_output_handlers_at_exit: unexpected capsule");
@@ -1109,14 +1109,14 @@ NB_MODULE(_tesseract_task_composer, m) {
             free_finished_runs();
             enter_server("TaskComposerServer.loadConfig", self);
             require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
-            ServerMutation mutation(self);
+            ServerMutation mutation("TaskComposerServer.loadConfig", self);
             with_pinned_plugins([&] { self.loadConfig(config_path.value, locator); });
         }, "config_path"_a, "locator"_a)
         .def("loadConfig", [](Server& self, const std::string& config, const tc::ResourceLocator& locator) {
             free_finished_runs();
             enter_server("TaskComposerServer.loadConfig", self);
             require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
-            ServerMutation mutation(self);
+            ServerMutation mutation("TaskComposerServer.loadConfig", self);
             load_yaml_text("TaskComposerServer.loadConfig", config,
                            [&] { with_pinned_plugins([&] { self.loadConfig(config, locator); }); });
         }, "config"_a, "locator"_a)
@@ -1126,7 +1126,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         // never destroyed mid-run.
         .def("addExecutor", [](Server& self, const std::shared_ptr<tp::TaskComposerExecutor>& executor) {
             enter_server("TaskComposerServer.addExecutor", self);
-            ServerMutation mutation(self);
+            ServerMutation mutation("TaskComposerServer.addExecutor", self);
             nb::gil_scoped_release release;  // see ServerGate
             self.addExecutor(executor);
         }, "executor"_a)
@@ -1149,7 +1149,7 @@ NB_MODULE(_tesseract_task_composer, m) {
             enter_server("TaskComposerServer.addTask", self);
             if (self.hasTask(task->getName()))
                 require_tasks_replaceable("TaskComposerServer.addTask", self, { task->getName() });
-            ServerMutation mutation(self);
+            ServerMutation mutation("TaskComposerServer.addTask", self);
             record_python_added_task(self, task);
             self.addTaskPython(std::move(task));
         }, "task"_a,

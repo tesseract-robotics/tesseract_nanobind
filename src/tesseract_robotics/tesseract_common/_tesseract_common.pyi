@@ -1039,9 +1039,14 @@ def useOutputHandler(handler: OutputHandler) -> None: ...
 
 def restorePreviousOutputHandler() -> None: ...
 
+class OutputHandlerFlushForbiddenError(RuntimeError):
+    """
+    flushOutputHandlers was called where a Python OutputHandler may be waiting for the calling thread (inside a TaskComposerServer loadConfig / addTask / addExecutor), so waiting for the handlers could never end.
+    """
+
 def flushOutputHandlers() -> None:
     """
-    Wait until the Python OutputHandlers have received every message logged so far. Returns at once when called from a handler. A handler waiting for the calling thread blocks it.
+    Wait until the Python OutputHandlers have received every message logged so far. Returns at once when called from a handler. A handler waiting for the calling thread blocks it; where the bindings know one may (inside a TaskComposerServer reload), it raises OutputHandlerFlushForbiddenError instead.
     """
 
 class VectorVector3d:
