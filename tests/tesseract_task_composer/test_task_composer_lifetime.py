@@ -421,6 +421,40 @@ future = executor.run(node, make_storage(node))
         assert "NESTED STARTED" in out, out
         assert "NESTED TASKS 0" in out, out
 
+    def test_exit_while_a_handler_never_returns_and_a_run_is_in_flight(self):
+        """The drain waits for the handlers only within the exit budget of the log delivery: a
+        stuck handler does not keep the interpreter from exiting, and the run still finishes."""
+        out = _run(
+            """
+import atexit
+report = {}
+atexit.register(lambda: print("TASKS", report["executor"].getTaskCount(), flush=True))
+"""
+            + _PREAMBLE
+            + _WORKER_HANDLER
+            + """
+entered = threading.Event()
+
+class Stuck(tesseract_common.OutputHandler):
+    def log(self, text, level, filename, line):
+        entered.set()
+        threading.Event().wait()
+
+handler = Stuck()
+tesseract_common.useOutputHandler(handler)
+tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+report["executor"] = executor
+node = factory.createTaskComposerNode("TrajOptPipeline")
+future = executor.run(node, make_storage(node))
+assert entered.wait(30)
+print("EXITING", flush=True)
+""",
+            planning=False,
+        )
+        assert "EXITING" in out, out
+        assert "TASKS 0" in out, out
+
 
 class TestServerTaskReplacement:
     """A server task cannot be replaced (loadConfig, addTask with its name) while Python or a run
