@@ -233,7 +233,11 @@ import re
 
 class Slow(Collect):
     def log(self, text, level, filename, line):
-        time.sleep(0.0001)
+        # 20 us, spun: time.sleep(0.0001) lasts a clock tick (15.6 ms on Windows before 3.11),
+        # which made draining a full queue take minutes
+        end = time.perf_counter() + 0.00002
+        while time.perf_counter() < end:
+            pass
         super().log(text, level, filename, line)
 
 handler = Slow()
@@ -619,7 +623,8 @@ tesseract_common.flushOutputHandlers()
 tesseract_common.restorePreviousOutputHandler()
 print("DELIVERED", handler.texts)
 """,
-        # as on Windows: no fork, so no fork hooks
-        preamble="import os\ndel os.fork, os.register_at_fork\n" + _PREAMBLE,
+        # as on Windows: no fork, so no fork hooks (on Windows there is nothing to delete)
+        preamble='import os\nfor name in ("fork", "register_at_fork"):\n    os.__dict__.pop(name, None)\n'
+        + _PREAMBLE,
     )
     assert "DELIVERED ['no fork']" in out, out
