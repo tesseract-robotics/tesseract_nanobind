@@ -334,7 +334,14 @@ inline bool deliver_batch(LogDelivery& d, std::size_t taken) {
                 child.exit_when_idle = true;
                 child.pending.notify_one();
             }
-            PyGILState_Release(gil);
+            // This copy is the child's main thread (CPython made the forking thread main), and its
+            // thread state the interpreter's main thread state, which must outlive the others: on
+            // CPython 3.12, the next thread state made once an interpreter has none left reuses
+            // the main one without resetting it, and aborts ("init_threadstate: thread state
+            // already initialized"). So it keeps its thread state, as a main thread does until
+            // finalization, and only gives up the GIL. The child never finalizes: it ends when its
+            // last thread does.
+            PyEval_SaveThread();
             return false;
         }
         const LogMessage* message = nullptr;
@@ -371,8 +378,9 @@ inline bool deliver_batch(LogDelivery& d, std::size_t taken) {
 // exactly the messages no handler got. A handler that forks leaves a copy of this thread as the
 // child's only thread: that copy stops at once, before touching `d`, whose mutex another parent
 // thread may have held; the child starts its own delivery thread on fresh state. The copy then
-// ends, and with it the child once its other threads end: the child's delivery thread exits when
-// idle from then on (exit_when_idle) instead of waiting forever.
+// ends, keeping its thread state (the child's main one; see deliver_batch), and with it the child
+// once its other threads end: the child's delivery thread exits when idle from then on
+// (exit_when_idle) instead of waiting forever.
 inline void deliver_log_messages(LogDelivery* delivery) {
     LogDelivery& d = *delivery;
     std::unique_lock<std::mutex> lock(d.mutex);
