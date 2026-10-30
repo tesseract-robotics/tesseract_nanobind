@@ -50,8 +50,9 @@ ACCEPTED = {
     "(descartes_light's `WaypointSampler`) is covered by the same `__str__`.",
     "presentation-dunder": "`__repr__` and `__str__` are Python presentation and need no C++ "
     "counterpart.",
-    "serialization-default-ctor": "The default constructor of a class that befriends cereal "
-    "`serialize` and declares another public constructor exists for deserialization only.",
+    "serialization-default-ctor": "The default constructor of a class that cereal serializes "
+    "(it befriends cereal `serialize`, or its library's `cereal_serialization.h` declares a free "
+    "one) and that declares another public constructor exists for deserialization only.",
     "value-equality-unhashable": "`__hash__ = None` next to a bound `__eq__` makes a mutable "
     "value type unhashable, as Python does for any class that defines `__eq__`; it needs no "
     "C++ counterpart.",
@@ -107,7 +108,8 @@ ACCEPTED = {
     "(`isMoveInstruction`); a free binary operator on two `const T&` is bound as `T`'s dunder "
     "(`operator==(const OSQPSettings&, const OSQPSettings&)` → `OSQPSettings.__eq__`).",
     "type-index": "`getType()` returns a `std::type_index`, which has no Python form; the bound "
-    "`is…()` predicates and `as…()` casts answer the same question by name.",
+    "`is…()` predicates and `as…()` casts answer the same question by name, and "
+    "`AnyPoly.getTypeName()` returns the demangled type name.",
     "type-erasure-interface": "The abstract `…Interface` of a type-erased `…Poly` is its C++ "
     "extension point (pure virtuals, a protected `equals`, cereal registration); Python holds "
     "the concrete classes and their Polys, and reaches the stored object through the bound casts "
@@ -179,7 +181,8 @@ ACCEPTED = {
     "clock-deadline": "`TaskComposerFuture.waitUntil` takes a `std::chrono::high_resolution_clock` "
     "time point, which is `steady_clock` under libc++ and MSVC and has no epoch Python can name; "
     "`waitFor(duration)` is its Python form.",
-    "context-from-data-storage": "`TaskComposerExecutor.run(node, data_storage, dotgraph=False)` "
+    "context-from-data-storage": "`TaskComposerExecutor.run(node, data_storage, dotgraph=False, "
+    "name='run')` "
     "builds the `TaskComposerContext` that the C++ `run(node, context)` takes, the shape of "
     "upstream's `TaskComposerServer::run(node, data_storage, dotgraph, executor_name)`.",
     "dot-dump-hook": "`TaskComposerNode::dump(std::ostream&, …)` and its overrides are the virtual "
@@ -279,6 +282,8 @@ ACCEPTED_SYMBOLS = {
     ("tesseract_task_composer", "AnyInterface"): "type-erasure-interface",
     ("tesseract_task_composer", "AnyWrapper"): "type-erasure-interface",
     ("tesseract_task_composer", "AnyPoly.get"): "type-erasure-interface",
+    # any_poly.h:156 `getType()`; the binding demangles its name (#322).
+    ("tesseract_task_composer", "AnyPoly.getTypeName"): "type-index",
     ("tesseract_task_composer", "FutureStatus"): "std-library-enum",
     ("tesseract_task_composer", "TaskComposerFuture.waitUntil"): "clock-deadline",
     ("tesseract_task_composer", "TaskComposerNode.dump"): "dot-dump-hook",
@@ -406,6 +411,13 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     # taskflow_task_composer_executor.h:71 `(std::string name, const YAML::Node& config)`: no
     # YAML-text sibling, so `yaml-node` falls through to here (T1).
     ("tesseract_task_composer", "TaskflowTaskComposerExecutor.__init__", "2"): "plugin-config-ctor",
+    # task_composer_node_info.h:52 "Required for serialization": the free `serialize` is in
+    # cereal_serialization.h, which the binding does not include, so no friend marks it (#319).
+    (
+        "tesseract_task_composer",
+        "TaskComposerNodeInfo.__init__",
+        "0",
+    ): "serialization-default-ctor",
     # planner.h:84 `checkRequest(request, std::string& reason)`: `checkRequestReason` (C2).
     ("tesseract_motion_planners", "MotionPlanner.checkRequest", "2"): "reason-out-param",
 }
@@ -440,7 +452,7 @@ ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
     (
         "tesseract_task_composer",
         "TaskComposerExecutor.run",
-        ("TaskComposerNode", "TaskComposerDataStorage", "bool"),
+        ("TaskComposerNode", "TaskComposerDataStorage", "bool", "str"),
     ): "context-from-data-storage",
 }
 # A type-erased Poly -> the bound classes it wraps, which C++ converts into it through the

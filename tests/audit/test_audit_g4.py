@@ -29,7 +29,8 @@ TC_NOT_API = (
 TC_PREFIX = "tesseract/task_composer/"
 TCP_PREFIX = "tesseract/task_composer/planning/"
 ANY_POLY_H = "tesseract/common/any_poly.h"
-# Location of each tcp profile's `(YAML::Node, ProfilePluginFactory)` ctor (C6 = 6a: gap rows).
+# Location of each tcp profile's `(YAML::Node, ProfilePluginFactory)` ctor: accepted by
+# `yaml-node` since each profile binds `from_yaml` (#331).
 TCP_PROFILE_YAML_CTORS = {
     "ContactCheckProfile": "contact_check_profile.h:51",
     "FixStateBoundsProfile": "fix_state_bounds_profile.h:58",
@@ -39,13 +40,9 @@ TCP_PROFILE_YAML_CTORS = {
     "ProfileSwitchProfile": "profile_switch_profile.h:47",
     "UpsampleTrajectoryProfile": "upsample_trajectory_profile.h:49",
 }
-# Header rows left after the not-API patterns: binding-fix I-tc-17, I-tc-19 (ledger tc 110-114).
-TC_HEADER_GAPS = {
-    f"{TC_PREFIX}task_composer_graph.h",
-    f"{TC_PREFIX}task_composer_log.h",
-    f"{TC_PREFIX}task_composer_pipeline.h",
-    f"{TC_PREFIX}task_composer_task.h",
-}
+# Header rows left after the not-API patterns: none, since graph, log, pipeline and task are
+# bound (#324, #325).
+TC_HEADER_GAPS: set[str] = set()
 
 
 @pytest.fixture(scope="module")
@@ -86,6 +83,9 @@ def test_g4_modules_are_audited():
         ("AnyWrapper", "type-erasure-interface"),
         ("AnyPoly.get", "type-erasure-interface"),
         ("AnyPoly.getType", "type-index"),  # structural (G1 R3)
+        ("AnyPoly.getTypeName", "type-index"),  # the demangled name (#322)
+        # task_composer_node_info.h:52; the free `serialize` is in cereal_serialization.h (#319)
+        ("TaskComposerNodeInfo.__init__", "serialization-default-ctor"),
         ("FutureStatus", "std-library-enum"),
         ("TaskComposerFuture.waitUntil", "clock-deadline"),
         ("TaskComposerNode.dump", "dot-dump-hook"),
@@ -117,19 +117,19 @@ def test_any_poly_ctor_rules_by_location(g4_reports):
     ]
 
 
-def test_any_poly_rows_left_are_value_equality_only(g4_reports):
-    """Left of AnyPoly: `__eq__`/`__ne__` (g1/00-value-equality.md), `getTypeName` (I-tc-15)."""
+def test_any_poly_has_no_rows_left(g4_reports):
+    """`__eq__`/`__ne__` are bound (#348); `getTypeName` is demangled and accepted (#322)."""
     report = g4_reports[TC]
     prefixes = ("AnyPoly", "AnyInterface", "AnyWrapper")
-    assert {g.symbol for g in report.gaps if g.symbol.startswith(prefixes)} == {
-        "AnyPoly.__eq__",
-        "AnyPoly.__ne__",
-    }
-    # getTypeName returns a mangled name: binding-fix I-tc-15, not type-index (premise fails).
-    assert {d.name for d in report.deviations if d.name.startswith(prefixes)} == {
-        "AnyPoly.getTypeName"
-    }
+    assert not {g.symbol for g in report.gaps if g.symbol.startswith(prefixes)}
+    assert not {d.name for d in report.deviations if d.name.startswith(prefixes)}
     assert "AnyPoly.operator=" not in {g.symbol for g in report.gaps}  # T12 (G3)
+
+
+def test_node_info_default_ctor_is_not_a_gap(g4_reports):
+    """Only the deserialization ctor is accepted; `TaskComposerNodeInfo(node)` is bound (#319)."""
+    gaps = {(g.symbol, g.arity) for g in g4_reports[TC].gaps}
+    assert not {a for s, a in gaps if s == "TaskComposerNodeInfo.__init__"}
 
 
 def test_executor_run_context_overload_still_matched(g4_reports):
@@ -146,13 +146,13 @@ def test_plugin_factory_yaml_ctor_keeps_yaml_node(g4_reports):
 
 
 @pytest.mark.parametrize(("profile", "where"), TCP_PROFILE_YAML_CTORS.items())
-def test_tcp_profile_yaml_ctor_is_a_gap(g4_reports, profile, where):
-    """C6 = 6a: no `from_yaml` sibling yet; the YAML ctor is binding-fix #331 (g3/08)."""
+def test_tcp_profile_yaml_ctor_is_accepted(g4_reports, profile, where):
+    """The YAML ctor's Python form is the bound `from_yaml` (#331): `yaml-node`, not a gap."""
     report = g4_reports[TCP]
     symbol = f"{profile}.__init__"
     location = f"{TCP_PREFIX}profiles/{where}"
-    assert (symbol, location) in {(g.symbol, g.location) for g in report.gaps}
-    assert (symbol, "yaml-node") not in {(a.symbol, a.rule) for a in report.accepted}
+    assert (symbol, location) not in {(g.symbol, g.location) for g in report.gaps}
+    assert (symbol, "yaml-node") in {(a.symbol, a.rule) for a in report.accepted}
 
 
 # Task 3: prefix-scoped not-API headers.

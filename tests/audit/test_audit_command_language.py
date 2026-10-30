@@ -529,7 +529,8 @@ G1_RULE_TEXTS = {
     "(`isMoveInstruction`); a free binary operator on two `const T&` is bound as `T`'s dunder "
     "(`operator==(const OSQPSettings&, const OSQPSettings&)` → `OSQPSettings.__eq__`).",
     "type-index": "`getType()` returns a `std::type_index`, which has no Python form; the bound "
-    "`is…()` predicates and `as…()` casts answer the same question by name.",
+    "`is…()` predicates and `as…()` casts answer the same question by name, and "
+    "`AnyPoly.getTypeName()` returns the demangled type name.",
     "type-erasure-interface": "The abstract `…Interface` of a type-erased `…Poly` is its C++ "
     "extension point (pure virtuals, a protected `equals`, cereal registration); Python holds "
     "the concrete classes and their Polys, and reaches the stored object through the bound casts "
