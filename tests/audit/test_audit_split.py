@@ -72,7 +72,7 @@ PARSE = {
     "BODY_PARSE_OPTIONS",
     # 0b Task 7 (inherited members)
     "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
-    "_base_definition", "_overload", "_specialises_unaudited_template", "own_header_lines",
+    "_base_definition", "_overload", "_specialises_not_api_template", "own_header_lines",
     "TYPE_INDEX", "_is_reference_wrapper_vector",  # #256 group 1
     # G2 (R13)
     "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",

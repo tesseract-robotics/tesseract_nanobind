@@ -774,11 +774,8 @@ def cpp_api(
     symbols: dict[str, CppSymbol] = {}
     seen: set[str] = set()
     owned = _owned_headers(tu)
-    unbound = partial(
-        _names_unbound_dependency,
-        not_api=_not_api_headers(tu, headers, owner_prefixes() if prefixes is None else prefixes),
-        is_bound=is_bound,
-    )
+    not_api = _not_api_headers(tu, headers, owner_prefixes() if prefixes is None else prefixes)
+    unbound = partial(_names_unbound_dependency, not_api=not_api, is_bound=is_bound)
     # Inherited overloads dedupe per (derived class, USR), never through `seen`: the base's
     # own record must keep its members, and each derived class its inherited copy.
     inherited: set[tuple[str, str]] = set()
@@ -915,7 +912,7 @@ def cpp_api(
                 continue
             if c.availability == ci.AvailabilityKind.DEPRECATED:
                 continue
-            if c.kind in RECORD_KINDS and _specialises_unaudited_template(c, headers):
+            if c.kind in RECORD_KINDS and _specialises_not_api_template(c, not_api):
                 continue
             if c.kind in RECORD_KINDS and c.is_definition() and first_time(c):
                 add_record("", c)
@@ -932,15 +929,17 @@ def cpp_api(
     return symbols
 
 
-def _specialises_unaudited_template(c: ci.Cursor, headers: frozenset[Path]) -> bool:
-    """An explicit specialisation of a template no audited header declares belongs to that
-    template: `TESSERACT_CLASS_EXTENSION` in task_composer_log.h specialises `extension<T>` of
-    tesseract/common/serialization_extensions.h (not API) for `TaskComposerLog`."""
+def _specialises_not_api_template(c: ci.Cursor, not_api: frozenset[Path]) -> bool:
+    """An explicit specialisation of a template declared in an owned not-API header belongs to
+    that template: `TESSERACT_CLASS_EXTENSION` in task_composer_log.h specialises `extension<T>`
+    of tesseract/common/serialization_extensions.h (not API) for `TaskComposerLog`. A
+    specialisation of a third-party template (`BOOST_INSTALL_PROPERTY`'s `property_kind`) is
+    the audited header's own declaration and stays a row."""
     primary = c.specialized_template
     return (
         primary is not None
         and primary.location.file is not None
-        and Path(primary.location.file.name).resolve() not in headers
+        and Path(primary.location.file.name).resolve() in not_api
     )
 
 
