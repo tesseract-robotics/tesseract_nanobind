@@ -362,20 +362,14 @@ def compare(
 
 
 def main(argv: list[str] | None = None) -> int:
-    import audit_bindings  # needs the audit env (CONDA_PREFIX); not at import, for the tests
+    import audit_parse  # needs the audit env (CONDA_PREFIX); not at import, for the tests
     from audit_ownership import binding_modules, binding_source
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("modules", nargs="*", help="Default: every binding module.")
     opts = parser.parse_args(argv)
     modules = opts.modules or binding_modules()
-    args = [
-        *audit_bindings.PARSE_ARGS,
-        # osqp-eigen's CMake target exports this beside OSQP_EIGEN_OSQP_IS_V1. Only inline
-        # function bodies in OsqpEigen/Compat.hpp use it, which the API audit skips.
-        "-DOSQP_EIGEN_OSQP_IS_V1_FINAL",
-        *(f"-I{d}" for d in audit_bindings.INCLUDE_DIRS),
-    ]
+    args = [*audit_parse.PARSE_ARGS, *(f"-I{d}" for d in audit_parse.INCLUDE_DIRS)]
     found: dict[Release, str] = {}
     for module in modules:
         found.update(Scanner(parse(binding_source(module), args), module).scan())
