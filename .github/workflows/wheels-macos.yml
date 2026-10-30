@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       # Tag builds must yield EXACTLY the tag version. A dirty CI tree otherwise makes
       # setuptools_scm guess-next-dev (e.g. 0.35.0.4.dev0) which — local segment stripped —
@@ -157,7 +157,7 @@ jobs:
 
   test-wheel:
     needs: build
-    runs-on: macos-14
+    runs-on: macos-15
     continue-on-error: ${{ matrix.continue_on_error }}
     strategy:
       fail-fast: false
