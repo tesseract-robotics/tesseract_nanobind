@@ -14,12 +14,17 @@ from pathlib import Path
 import nanobind
 import pytest
 
+from tests.audit._load import ScriptLoadError
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "gil_bindings.cpp"
 
 
 def _load_script(name):
-    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
+    path = REPO_ROOT / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ScriptLoadError(f"no loader for {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module  # dataclasses resolve annotations via sys.modules
     spec.loader.exec_module(module)
