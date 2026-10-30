@@ -103,6 +103,29 @@ aa = AngleAxisd(np.pi/2, np.array([0, 0, 1]))
 rotation_matrix = aa.toRotationMatrix()
 ```
 
+### nearest_rotation
+
+The rotation closest to a 3x3 matrix in the Frobenius norm: `U·diag(1, 1, det(U·Vᵀ))·Vᵀ` from
+the SVD `M = U·Σ·Vᵀ` (Eigen's `JacobiSVD`). Use it to project a rotation that carries arithmetic
+noise (a pose stored from float32 math) back onto SO(3).
+
+```python
+from tesseract_robotics.tesseract_common import Quaterniond, nearest_rotation
+
+R = nearest_rotation(noisy_rotation)  # (3, 3) float64, det +1
+q = Quaterniond(R)                    # passes the orthonormality check
+```
+
+- The result is always a proper rotation (det +1). For a reflection (det(M) < 0) it is the
+  nearest rotation, not the orthogonal factor: the smallest singular direction flips.
+- Not bitwise idempotent: an exact rotation comes back within a few ulp (measured ≤ 5.5 ε over
+  10 000 random rotations, osx-arm64), because `U·Vᵀ` re-rounds.
+- A NaN or infinite entry raises `NonFiniteMatrixError` (a `ValueError`); a shape other than
+  3x3 raises `TypeError`.
+- The minimiser is unique only for rank ≥ 2 (and σ₂ > σ₃ when det(M) < 0). Otherwise one
+  minimiser comes back without warning: the zero matrix, `diag(1, 0, 0)` and `diag(1, 1, -1)`
+  all return the identity.
+
 ## Frame and error math
 
 Re-base twists and jacobians, and compute pose errors, with tesseract's own math. A twist

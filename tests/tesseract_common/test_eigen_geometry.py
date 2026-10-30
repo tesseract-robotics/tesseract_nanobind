@@ -14,9 +14,11 @@ from tesseract_robotics.tesseract_common import (
     AngleAxisd,
     Hyperplane3d,
     Isometry3d,
+    NonFiniteMatrixError,
     ParametrizedLine3d,
     Quaterniond,
     Translation3d,
+    nearest_rotation,
 )
 
 # Tolerance constants — all expressed relative to Eigen's default
@@ -936,3 +938,123 @@ def test_apply_points_returns_a_new_array_and_leaves_its_input():
 def test_apply_refuses_what_is_not_n_by_3(method, bad):
     with pytest.raises(TypeError):
         getattr(_random_rigid(23), method)(bad)
+
+
+# ---------------------------------------------------------------------------
+# nearest_rotation: the rotation closest to a 3x3 matrix in the Frobenius norm,
+# U·diag(1, 1, det(U·Vᵀ))·Vᵀ from the SVD M = U·Σ·Vᵀ. The oracle is the same
+# formula on numpy's (LAPACK) SVD. Both SVDs are backward stable, so the two
+# polar factors agree to a few ulp scaled by 1 / (σ₂ + σ₃); the inputs below
+# keep σ ≥ 0.5, which bounds that factor by 1.
+# ---------------------------------------------------------------------------
+
+# [dimensionless] oracle agreement: Eigen's default precision (1e-12) is ~4500 ulp
+# of 1.0, far above the few-ulp backward error of two SVDs at σ ≥ 0.5.
+POLAR_ORACLE_ATOL = DEFAULT_PREC
+# [dimensionless] an exact rotation in, the same rotation out: not bitwise (0 of 10 000
+# random rotations, osx-arm64: U·Vᵀ re-rounds), measured within 5.5 ε; 16 ε leaves headroom.
+POLAR_IDEMPOTENCE_ATOL = 16 * np.finfo(np.float64).eps
+
+
+def _numpy_nearest_rotation(m):
+    u, _, vt = np.linalg.svd(m)
+    d = np.sign(np.linalg.det(u @ vt))
+    return u @ np.diag([1.0, 1.0, d]) @ vt
+
+
+def _random_rotation(rng):
+    q, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+    return q * np.sign(np.linalg.det(q))
+
+
+def _assert_proper_rotation(r):
+    nptest.assert_allclose(r.T @ r, np.eye(3), rtol=0, atol=POLAR_ORACLE_ATOL)
+    assert abs(np.linalg.det(r) - 1.0) <= POLAR_ORACLE_ATOL
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_nearest_rotation_matches_the_numpy_svd_oracle(seed):
+    rng = np.random.default_rng(seed)
+    # Distinct singular values in [0.5, 2]: the minimiser is unique.
+    m = (
+        _random_rotation(rng)
+        @ np.diag(np.sort(rng.uniform(0.5, 2.0, size=3))[::-1])
+        @ _random_rotation(rng)
+    )
+    r = nearest_rotation(m)
+    assert r.shape == (3, 3) and r.dtype == np.float64
+    _assert_proper_rotation(r)
+    nptest.assert_allclose(r, _numpy_nearest_rotation(m), rtol=0, atol=POLAR_ORACLE_ATOL)
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_nearest_rotation_recovers_a_rotation_under_float32_noise(seed):
+    # The decoded-pose case: a rotation carrying float32 arithmetic noise.
+    rng = np.random.default_rng(100 + seed)
+    rotation = _random_rotation(rng)
+    noisy = rotation + rng.uniform(-1.0, 1.0, size=(3, 3)) * np.finfo(np.float32).eps
+    r = nearest_rotation(noisy)
+    _assert_proper_rotation(r)
+    nptest.assert_allclose(r, _numpy_nearest_rotation(noisy), rtol=0, atol=POLAR_ORACLE_ATOL)
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_nearest_rotation_of_a_reflection_is_the_nearest_proper_rotation(seed):
+    # det(M) < 0: the result is in SO(3), not the orthogonal factor (det -1). The
+    # smallest singular direction is the one flipped, so the minimiser stays unique.
+    rng = np.random.default_rng(200 + seed)
+    m = _random_rotation(rng) @ np.diag([2.0, 1.0, -0.5]) @ _random_rotation(rng)
+    assert np.linalg.det(m) < 0
+    r = nearest_rotation(m)
+    _assert_proper_rotation(r)
+    nptest.assert_allclose(r, _numpy_nearest_rotation(m), rtol=0, atol=POLAR_ORACLE_ATOL)
+
+
+def test_nearest_rotation_of_a_pure_reflection_is_one_of_its_minimisers():
+    # diag(1, 1, -1): every rotation by π about an axis in the xy-plane, and the
+    # identity, sit at the minimum distance 2; which one returns is the SVD's choice.
+    m = np.diag([1.0, 1.0, -1.0])
+    r = nearest_rotation(m)
+    _assert_proper_rotation(r)
+    assert abs(np.linalg.norm(m - r) - 2.0) <= POLAR_ORACLE_ATOL
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_nearest_rotation_is_idempotent_to_a_few_ulp_not_bitwise(seed):
+    rng = np.random.default_rng(300 + seed)
+    rotation = Quaterniond(rng.normal(size=4)).normalized().toRotationMatrix()
+    once = nearest_rotation(rotation)
+    nptest.assert_allclose(once, rotation, rtol=0, atol=POLAR_IDEMPOTENCE_ATOL)
+    nptest.assert_allclose(nearest_rotation(once), once, rtol=0, atol=POLAR_IDEMPOTENCE_ATOL)
+
+
+def test_nearest_rotation_of_the_identity_is_the_identity_bitwise():
+    nptest.assert_array_equal(nearest_rotation(np.eye(3)), np.eye(3))
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize("index", [(0, 0), (1, 2), (2, 2)])
+def test_nearest_rotation_refuses_a_non_finite_entry(bad, index):
+    m = np.eye(3)
+    m[index] = bad
+    with pytest.raises(NonFiniteMatrixError, match="non-finite"):
+        nearest_rotation(m)
+    assert issubclass(NonFiniteMatrixError, ValueError)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [np.zeros(3), np.zeros((4, 4)), np.zeros((3, 4)), np.zeros((2, 3, 3))],
+    ids=["(3,)", "(4, 4)", "(3, 4)", "3-d"],
+)
+def test_nearest_rotation_refuses_what_is_not_3_by_3(bad):
+    with pytest.raises(TypeError):
+        nearest_rotation(bad)
+
+
+def test_nearest_rotation_returns_a_new_array_and_leaves_its_input():
+    m = np.random.default_rng(400).normal(size=(3, 3))
+    before = m.copy()
+    r = nearest_rotation(m)
+    nptest.assert_array_equal(m, before)
+    assert not np.shares_memory(r, m)

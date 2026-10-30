@@ -240,6 +240,14 @@ class AngleAxisd:
 
     def __repr__(self) -> str: ...
 
+class NonFiniteMatrixError(ValueError):
+    """nearest_rotation got a matrix with a NaN or infinite entry."""
+
+def nearest_rotation(matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')]:
+    """
+    The rotation closest to a 3x3 matrix in the Frobenius norm, U·diag(1, 1, det(U·Vᵀ))·Vᵀ from its SVD; det is +1 also for a reflection. A new array; the input is unchanged.
+    """
+
 class Hyperplane3d:
     @overload
     def __init__(self, normal: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], offset: float) -> None: ...

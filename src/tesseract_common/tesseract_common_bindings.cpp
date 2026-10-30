@@ -77,6 +77,24 @@ static void check_tolerance_size(Eigen::Index n, const Eigen::Ref<const Eigen::V
                                          std::to_string(upper.size()));
 }
 
+// nearest_rotation got a NaN or an infinity: the SVD of such a matrix is undefined.
+struct NonFiniteMatrixError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// The rotation closest to `m` in the Frobenius norm (orthogonal Procrustes; the polar factor
+// when det(m) > 0): U·diag(1, 1, det(U·Vᵀ))·Vᵀ from m = U·Σ·Vᵀ. Σ is sorted descending, so a
+// reflection flips the smallest singular direction. JacobiSVD, not BDCSVD: BDCSVD hands
+// matrices under 16 columns to JacobiSVD anyway, and two-sided Jacobi on a fixed-size 3x3
+// runs without heap allocation and with high relative accuracy.
+static Eigen::Matrix3d nearest_rotation(const Eigen::Matrix3d& m) {
+    if (!m.allFinite())
+        throw NonFiniteMatrixError("nearest_rotation: matrix has a non-finite entry");
+    const Eigen::JacobiSVD<Eigen::Matrix3d, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(m);
+    const double d = svd.matrixU().determinant() * svd.matrixV().determinant() < 0.0 ? -1.0 : 1.0;
+    return svd.matrixU() * Eigen::Vector3d(1.0, 1.0, d).asDiagonal() * svd.matrixV().transpose();
+}
+
 // Python index (negative counts from the end) -> container index; std::out_of_range -> IndexError.
 static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
     const auto n = static_cast<Py_ssize_t>(size);
@@ -608,6 +626,13 @@ NB_MODULE(_tesseract_common, m) {
                << ", axis=[" << ax.x() << ", " << ax.y() << ", " << ax.z() << "])";
             return ss.str();
         });
+
+    // ========== nearest_rotation ==========
+    nb::exception<NonFiniteMatrixError>(m, "NonFiniteMatrixError", PyExc_ValueError)
+        .attr("__doc__") = "nearest_rotation got a matrix with a NaN or infinite entry.";
+    m.def("nearest_rotation", &nearest_rotation, "matrix"_a,
+          "The rotation closest to a 3x3 matrix in the Frobenius norm, U·diag(1, 1, det(U·Vᵀ))·Vᵀ "
+          "from its SVD; det is +1 also for a reflection. A new array; the input is unchanged.");
 
     // ========== Hyperplane3d ==========
     // Plane in 3D as {x : normal · x + offset = 0}. Bound before
