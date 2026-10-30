@@ -255,6 +255,36 @@ def init_findings(path: Path) -> list[Deviation]:
     return sorted(rows)
 
 
+# The helper a package `__init__.py` calls to install `__init_subclass__` on a bound concrete
+# profile (tesseract_motion_planners/_profile_overrides.py).
+OVERRIDE_GUARD = "refuse_hook_overrides"
+
+
+def override_guarded(path: Path) -> frozenset[str]:
+    """Classes a package `__init__.py` passes to `refuse_hook_overrides`: by name, or as the
+    variable of a `for` loop over a literal tuple or list of names."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    loops: dict[str, list[str]] = {}
+    for n in ast.walk(tree):
+        if (
+            isinstance(n, ast.For)
+            and isinstance(n.target, ast.Name)
+            and isinstance(n.iter, (ast.Tuple, ast.List))
+        ):
+            loops[n.target.id] = [e.id for e in n.iter.elts if isinstance(e, ast.Name)]
+    guarded: set[str] = set()
+    for n in ast.walk(tree):
+        if (
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == OVERRIDE_GUARD
+            and n.args
+            and isinstance(n.args[0], ast.Name)
+        ):
+            guarded.update(loops.get(n.args[0].id, [n.args[0].id]))
+    return frozenset(guarded)
+
+
 def init_accepted(path: Path) -> list[Accepted]:
     """The module-level hooks (`INIT_HOOKS`) a package `__init__.py` defines."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

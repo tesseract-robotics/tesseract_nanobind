@@ -172,9 +172,11 @@ ACCEPTED = {
     "objects through the owning plugin factory (`TaskComposerPluginFactory`, "
     "`KinematicsPluginFactory`, `ContactManagersPluginFactory`) and cannot implement a plugin.",
     "plugin-config-ctor": "A `(…, const YAML::Node& config)` constructor that only the plugin "
-    "factory calls (`TaskComposerExecutorFactoryImpl<T>::create(name, config)` passes the "
-    "plugin's config block) has no Python caller; Python constructs the class from its other "
-    "constructors or gets it from `TaskComposerPluginFactory.createTaskComposerExecutor`.",
+    "factory calls (`TaskComposerExecutorFactoryImpl<T>::create(name, config)` and "
+    "`TaskComposerTaskFactory<T>::create(name, config, plugin_factory)` pass the plugin's config "
+    "block) has no Python caller; Python constructs the class from its other constructors or "
+    "gets it from `TaskComposerPluginFactory.createTaskComposerExecutor` or "
+    "`createTaskComposerNode`.",
     "std-library-enum": "The enum is declared by the C++ standard library, not an audited header; "
     "it is bound because a bound member returns it (`std::future_status` → `FutureStatus`, "
     "returned by `TaskComposerFuture.waitFor`).",
@@ -187,6 +189,21 @@ ACCEPTED = {
     "upstream's `TaskComposerServer::run(node, data_storage, dotgraph, executor_name)`.",
     "dot-dump-hook": "`TaskComposerNode::dump(std::ostream&, …)` and its overrides are the virtual "
     "hook behind `getDotgraph`/`saveDotgraph`, which return or write the same DOT text.",
+    "python-hook-method": "Upstream's `…Python` method, documented \"only available for python "
+    'bindings" (`TaskComposerGraph::addNodePython`, `TaskComposerServer::addTaskPython`), is '
+    "bound under the plain name (`addNode`, `addTask`); the `std::unique_ptr` overload it stands "
+    "beside has no Python form.",
+    "to-string-as-str": "A `toString() const` returning `std::string` is bound as `__str__` "
+    "(`TaskComposerNodePorts`).",
+    "hook-override-guard": "`__init_subclass__` on a concrete profile is installed by the "
+    "package `__init__.py` (`refuse_hook_overrides`): the profile has no trampoline, so a Python "
+    "subclass that overrides a hook the planner would never call is refused at class "
+    "definition. A Python class-creation hook, with no C++ counterpart.",
+    "declared-never-defined": "Declared in the header, but the 0.35.0 library defines no such "
+    "symbol (`nm` finds none in its library): a binding cannot link it. "
+    "`JointGroupInstructionInfo::getWorkingFrame` (`libtesseract_motion_planners_simple`; its "
+    "value is the bound `working_frame_transform`) and `validateSeedStructure` "
+    "(`libtesseract_command_language`).",
     # Group 3 (motion planners).
     "type-erased-data": "`PlannerRequest.data` and `PlannerResponse.data` are "
     "`std::shared_ptr<void>`: a planner's internal problem, type-erased; Python has no type to "
@@ -224,7 +241,7 @@ ACCEPTED_SYMBOLS = {
     },
     **{
         ("tesseract_serialization", f"{t}_{d}_{f}"): "template-instance-name"
-        for t in ("composite_instruction", "environment", "scene_state")
+        for t in ("composite_instruction", "environment", "scene_state", "task_composer_log")
         for d in ("to", "from")
         for f in ("xml", "file", "binary")
     },
@@ -287,6 +304,17 @@ ACCEPTED_SYMBOLS = {
     ("tesseract_task_composer", "FutureStatus"): "std-library-enum",
     ("tesseract_task_composer", "TaskComposerFuture.waitUntil"): "clock-deadline",
     ("tesseract_task_composer", "TaskComposerNode.dump"): "dot-dump-hook",
+    ("tesseract_task_composer", "TaskComposerGraph.dump"): "dot-dump-hook",
+    ("tesseract_task_composer", "TaskComposerGraph.addNodePython"): "python-hook-method",
+    ("tesseract_task_composer", "TaskComposerServer.addTaskPython"): "python-hook-method",
+    ("tesseract_task_composer", "TaskComposerNodePorts.toString"): "to-string-as-str",
+    # interpolation.h:70 and utils.h:242: declared, never defined upstream (the bindings'
+    # comments say so).
+    ("tesseract_command_language", "validateSeedStructure"): "declared-never-defined",
+    (
+        "tesseract_motion_planners_simple",
+        "JointGroupInstructionInfo.getWorkingFrame",
+    ): "declared-never-defined",
     ("tesseract_task_composer", "TaskComposerNodeFactory"): "plugin-author-factory-interface",
     ("tesseract_task_composer", "TaskComposerExecutorFactory"): "plugin-author-factory-interface",
     # C20: the core plugin factory interfaces, under the same rule.
@@ -411,6 +439,10 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     # taskflow_task_composer_executor.h:71 `(std::string name, const YAML::Node& config)`: no
     # YAML-text sibling, so `yaml-node` falls through to here (T1).
     ("tesseract_task_composer", "TaskflowTaskComposerExecutor.__init__", "2"): "plugin-config-ctor",
+    # task_composer_graph.h:53, task_composer_pipeline.h:56 `(name, config, plugin_factory)`:
+    # what `TaskComposerTaskFactory<T>::create` calls (task_composer_task_plugin_factory.cpp:48).
+    ("tesseract_task_composer", "TaskComposerGraph.__init__", "3"): "plugin-config-ctor",
+    ("tesseract_task_composer", "TaskComposerPipeline.__init__", "3"): "plugin-config-ctor",
     # task_composer_node_info.h:52 "Required for serialization": the free `serialize` is in
     # cereal_serialization.h, which the binding does not include, so no friend marks it (#319).
     (

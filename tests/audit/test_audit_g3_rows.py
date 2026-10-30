@@ -464,9 +464,10 @@ def test_trajopt_term_infos_are_unbound_dependency(g3_reports, symbol):
         "interpolateJointJointWaypoint",
     ],
 )
-def test_simple_author_helpers_stay_gaps(g3_reports, symbol):
-    """C3 = trampolines: the helpers a Python `generate` override calls get bound (g3/07)."""
-    assert symbol in gap_symbols(g3_reports[SIMPLE])
+def test_simple_author_helpers_are_bound(g3_reports, symbol):
+    """C3 = trampolines: the helpers a Python `generate` override calls are bound (g3/07,
+    #348), so none is open."""
+    assert symbol not in open_names(g3_reports[SIMPLE])
 
 
 # Task 10.1: Descartes; `bound_classes` maps the `…D` instances to their templates.
@@ -638,8 +639,9 @@ def test_descartes_solver_profile_create_is_unbound_dependency(descartes_report,
     "symbol",
     ["DescartesMoveProfile.createKinematicGroup"],  # C3 = 8a: g3/07
 )
-def test_descartes_binding_fix_rows_stay_gaps(descartes_report, symbol):
-    assert symbol in gap_symbols(descartes_report)
+def test_descartes_binding_fix_rows_are_bound(descartes_report, symbol):
+    """Bound with its environment kept alive (#340, merged in #347)."""
+    assert symbol not in open_names(descartes_report)
 
 
 @pytest.mark.parametrize(
@@ -648,6 +650,65 @@ def test_descartes_binding_fix_rows_stay_gaps(descartes_report, symbol):
 def test_descartes_samplers_are_covered(descartes_report, symbol):
     """g3/20: #346 binds the five pose samplers."""
     assert symbol not in open_names(descartes_report)
+
+
+# The rows #347/#348's bindings added: Python-side API with no C++ symbol of its name.
+
+# Concrete profiles whose `__init_subclass__` the package `__init__.py` installs
+# (`refuse_hook_overrides`, _profile_overrides.py).
+GUARDED_PROFILES = [
+    *[
+        (SIMPLE, f"SimplePlanner{p}MoveProfile")
+        for p in (
+            "FixedSize", "FixedSizeAssign", "FixedSizeAssignNoIK",
+            "LVS", "LVSNoIK", "LVSAssign", "LVSAssignNoIK",
+        )
+    ],
+    *[
+        (IFOPT, f"TrajOptIfopt{p}")
+        for p in ("DefaultMoveProfile", "DefaultCompositeProfile", "OSQPSolverProfile")
+    ],
+    (DESCARTES, "DescartesDefaultMoveProfileD"),
+    (DESCARTES, "DescartesLadderGraphSolverProfileD"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("module", "cls"), GUARDED_PROFILES)
+def test_override_guard_hook_is_accepted(g3_reports, descartes_report, module, cls):
+    report = {**g3_reports, DESCARTES: descartes_report}[module]
+    symbol = f"{cls}.__init_subclass__"
+    assert (symbol, "hook-override-guard") in accepted_pairs(report)
+    assert symbol not in open_names(report)
+
+
+# Exceptions the bindings register under a module prefix (`nb::exception<EmptyGenerateError>(m,
+# "SimplePlannerEmptyGenerateError", …)`): bound by construction, so no row.
+RENAMED_EXCEPTIONS = [
+    *[
+        (SIMPLE, f"SimplePlanner{e}Error")
+        for e in ("EmptyGenerate", "NullInstruction", "GenerateMismatch", "ProfileReturnType",
+                  "PureVirtualCall")
+    ],
+    *[
+        (IFOPT, f"TrajOptIfopt{e}Error")
+        for e in ("PureVirtualCall", "NodeLayoutChanged", "ProfileReturnType",
+                  "WaypointInfoWithoutNode", "WaypointInfoInUse")
+    ],
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("module", "name"), RENAMED_EXCEPTIONS)
+def test_renamed_binding_exception_has_no_row(g3_reports, module, name):
+    assert name not in open_names(g3_reports[module])
+
+
+def test_undefined_upstream_method_is_accepted(g3_reports):
+    """interpolation.h:70 declares `JointGroupInstructionInfo::getWorkingFrame`; the 0.35.0
+    library defines no such symbol, so a binding cannot link it."""
+    report = g3_reports[SIMPLE]
+    symbol = "JointGroupInstructionInfo.getWorkingFrame"
+    assert (symbol, "declared-never-defined") in accepted_pairs(report)
+    assert symbol not in open_names(report)
 
 
 # Every G3 table entry fires: a stale entry fails here, never silently.

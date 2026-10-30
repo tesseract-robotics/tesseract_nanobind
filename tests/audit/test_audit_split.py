@@ -72,7 +72,7 @@ PARSE = {
     "BODY_PARSE_OPTIONS",
     # 0b Task 7 (inherited members)
     "OWNED_ROOTS", "_owned_headers", "_is_ctor", "_member", "_declared_leaves",
-    "_base_definition", "_overload", "own_header_lines",
+    "_base_definition", "_overload", "_specialises_unaudited_template", "own_header_lines",
     "TYPE_INDEX", "_is_reference_wrapper_vector",  # #256 group 1
     # G2 (R13)
     "UNBOUND_DEPENDENCY_ROOTS", "UNBOUND_DEPENDENCY", "_names_unbound_dependency",
@@ -92,8 +92,9 @@ def test_parse_defines_exactly():
 
 # 0b Task 6 (class identity); its own file since the wave-2 merge (#256).
 BOUND = {
-    "NB_CLASS_TEMPLATES", "NB_CLASS_CTORS", "NB_MODULE_SCOPE", "NB_MODULE_INIT_PREFIX",
-    "SkippedBodiesError", "_in_main_file", "_scope_type", "bound_classes",
+    "NB_CLASS_TEMPLATES", "NB_EXCEPTION_TEMPLATE", "NB_CLASS_CTORS", "NB_MODULE_SCOPE",
+    "NB_MODULE_INIT_PREFIX", "SkippedBodiesError", "_in_main_file", "_scope_type",
+    "bound_classes", "bound_exceptions", "_constructions",
 }  # fmt: skip
 
 
@@ -108,7 +109,7 @@ STUB = {
     "TRY_IMPORT", "PyOverload", "PySymbol", "QuotedType", "Deviation", "Accepted", "PyApi",
     "rel", "_decorators", "_is_setter", "_py_arity", "_py_param_nodes", "_function_kind",
     "_annotations", "_quoted_names", "_enum_member", "py_api", "_catches_import_error",
-    "INIT_HOOKS", "init_findings", "init_accepted",
+    "INIT_HOOKS", "init_findings", "init_accepted", "OVERRIDE_GUARD", "override_guarded",
 }  # fmt: skip
 
 
@@ -163,7 +164,7 @@ MATCH = {
     "_derived_element_sibling", "_covered", "_cover", "_protocol_rule", "match",
     "unincluded_header_gaps", "_header_gaps", "audit_tu", "audit_module",
     # 0b Task 6 (class identity)
-    "_bound_classes_of", "bound_index",
+    "_bound_of", "_bound_classes_of", "bound_index",
     # 0b Task 8 (stub bases)
     "_base_rows",
     # #256 group 1

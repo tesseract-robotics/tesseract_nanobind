@@ -915,6 +915,8 @@ def cpp_api(
                 continue
             if c.availability == ci.AvailabilityKind.DEPRECATED:
                 continue
+            if c.kind in RECORD_KINDS and _specialises_unaudited_template(c, headers):
+                continue
             if c.kind in RECORD_KINDS and c.is_definition() and first_time(c):
                 add_record("", c)
             elif c.kind == ci.CursorKind.ENUM_DECL and c.is_definition() and first_time(c):
@@ -928,6 +930,18 @@ def cpp_api(
 
     visit(tu.cursor)
     return symbols
+
+
+def _specialises_unaudited_template(c: ci.Cursor, headers: frozenset[Path]) -> bool:
+    """An explicit specialisation of a template no audited header declares belongs to that
+    template: `TESSERACT_CLASS_EXTENSION` in task_composer_log.h specialises `extension<T>` of
+    tesseract/common/serialization_extensions.h (not API) for `TaskComposerLog`."""
+    primary = c.specialized_template
+    return (
+        primary is not None
+        and primary.location.file is not None
+        and Path(primary.location.file.name).resolve() not in headers
+    )
 
 
 def own_header_lines(cpp: Mapping[str, CppSymbol]) -> dict[str, list[int]]:

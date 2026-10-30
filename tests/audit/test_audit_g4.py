@@ -93,6 +93,13 @@ def test_g4_modules_are_audited():
         ("TaskComposerExecutorFactory", PLUGIN_AUTHOR),
         ("TaskComposerExecutor.run", "context-from-data-storage"),  # C23: keep the rule
         ("TaskflowTaskComposerExecutor.__init__", "plugin-config-ctor"),
+        # (name, config, plugin_factory): what TaskComposerTaskFactory<T>::create calls
+        ("TaskComposerGraph.__init__", "plugin-config-ctor"),
+        ("TaskComposerPipeline.__init__", "plugin-config-ctor"),
+        ("TaskComposerGraph.dump", "dot-dump-hook"),  # the override of Node.dump
+        ("TaskComposerGraph.addNodePython", "python-hook-method"),  # bound as addNode
+        ("TaskComposerServer.addTaskPython", "python-hook-method"),  # bound as addTask
+        ("TaskComposerNodePorts.toString", "to-string-as-str"),
     ],
 )
 def test_tc_rows_accepted(g4_reports, symbol, rule):
@@ -105,6 +112,14 @@ def test_core_factory_interfaces_accepted(core_reports, module, symbol):
     report = core_reports[module]
     assert (symbol, PLUGIN_AUTHOR) in {(a.symbol, a.rule) for a in report.accepted}
     assert symbol not in {g.symbol for g in report.gaps}
+
+
+def test_class_extension_trait_has_no_row(g4_reports):
+    """task_composer_log.h:46 `TESSERACT_CLASS_EXTENSION` specialises `extension<T>`, a
+    template of serialization_extensions.h (not API): the specialisation is not API either."""
+    report = g4_reports[TC]
+    assert "extension" not in {g.symbol for g in report.gaps}
+    assert "extension" not in {a.symbol for a in report.accepted}
 
 
 def test_any_poly_ctor_rules_by_location(g4_reports):

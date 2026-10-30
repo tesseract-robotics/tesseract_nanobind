@@ -440,6 +440,13 @@ def test_init_module_getattr_is_accepted():
     assert audit.ACCEPTED["module-getattr"]
 
 
+def test_override_guarded_reads_direct_and_loop_calls():
+    """The classes whose `__init_subclass__` the package installs (`refuse_hook_overrides`)."""
+    assert audit.override_guarded(FIXTURES / "guarded_init.py") == {"Lone", "LoopA", "LoopB"}
+    assert audit.override_guarded(FIXTURES / "package_init.py") == frozenset()
+    assert audit.ACCEPTED["hook-override-guard"]
+
+
 def test_fixture_report_accepts_module_getattr(fixture_report):
     assert ("__getattr__", "module-getattr") in {
         (a.symbol, a.rule) for a in fixture_report.accepted

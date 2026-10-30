@@ -37,6 +37,12 @@ def test_bound_classes_reads_each_top_level_construction():
     }
 
 
+def test_bound_exceptions_reads_each_registration():
+    """`nb::exception` under another name; its type sits in the TU's anonymous namespace."""
+    tu = audit.parse_tu(FIXTURES / "identity_bindings.cpp", (FIXTURE_INCLUDE,), bodies=True)
+    assert audit.bound_exceptions(tu) == {"GizmoWidgetError": "::WidgetError"}
+
+
 def test_bound_classes_rejects_a_tu_without_function_bodies():
     """The default parse skips bodies, NB_MODULE's included: no construction would be seen."""
     tu = audit.parse_tu(FIXTURES / "identity_bindings.cpp", (FIXTURE_INCLUDE,))

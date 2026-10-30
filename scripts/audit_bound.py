@@ -1,4 +1,5 @@
-"""What a binding TU binds: the `nb::class_`/`nb::enum_` constructions in its NB_MODULE body."""
+"""What a binding TU binds: the `nb::class_`/`nb::enum_`/`nb::exception` constructions in its
+NB_MODULE body."""
 
 from __future__ import annotations
 
@@ -9,7 +10,8 @@ import clang.cindex as ci
 
 # Canonical spellings of the nanobind constructions that bind a C++ type to a Python name.
 NB_CLASS_TEMPLATES = ("nanobind::class_<", "nanobind::enum_<")
-NB_CLASS_CTORS = frozenset({"class_", "enum_"})
+NB_EXCEPTION_TEMPLATE = "nanobind::exception<"
+NB_CLASS_CTORS = frozenset({"class_", "enum_", "exception"})
 NB_MODULE_SCOPE = "nanobind::module_"
 # NB_MODULE(name, m) defines `PyInit_<name>`; a TU parsed without bodies only declares it.
 NB_MODULE_INIT_PREFIX = "PyInit_"
@@ -44,6 +46,22 @@ def bound_classes(tu: ci.TranslationUnit) -> dict[str, str]:
     Raises:
         SkippedBodiesError: `tu` was parsed without function bodies (`parse_tu(bodies=True)`).
     """
+    return _constructions(tu, NB_CLASS_TEMPLATES)
+
+
+def bound_exceptions(tu: ci.TranslationUnit) -> dict[str, str]:
+    """Python exception name -> qualified C++ exception type, as the binding's `nb::exception`
+    registrations in the TU's main file say (`SimplePlannerEmptyGenerateError` ->
+    `::EmptyGenerateError`, declared in the binding's anonymous namespace).
+
+    Raises:
+        SkippedBodiesError: `tu` was parsed without function bodies (`parse_tu(bodies=True)`).
+    """
+    return _constructions(tu, (NB_EXCEPTION_TEMPLATE,))
+
+
+def _constructions(tu: ci.TranslationUnit, templates: tuple[str, ...]) -> dict[str, str]:
+    """Python name -> qualified C++ type of each top-level construction of `templates`."""
     main = Path(tu.spelling).resolve()
     out: dict[str, str] = {}
     # Walk only the main file's top-level declarations: the headers' bodies are most of a TU.
@@ -64,7 +82,7 @@ def bound_classes(tu: ci.TranslationUnit) -> dict[str, str]:
         if c.kind != ci.CursorKind.CALL_EXPR or c.spelling not in NB_CLASS_CTORS:
             continue
         t = c.type.get_canonical()
-        if not t.spelling.startswith(NB_CLASS_TEMPLATES):
+        if not t.spelling.startswith(templates):
             continue
         args = list(c.get_arguments())
         if len(args) < 2 or not _scope_type(args[0]).startswith(NB_MODULE_SCOPE):

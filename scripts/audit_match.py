@@ -9,7 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import audit_types
-from audit_bound import bound_classes
+from audit_bound import bound_classes, bound_exceptions
 from audit_lookup import (
     NO_ALIAS,
     BoundLookup,
@@ -85,6 +85,7 @@ from audit_stub import (
     init_accepted,
     init_findings,
     load_stub,
+    override_guarded,
     py_api,
     rel,
 )
@@ -279,9 +280,18 @@ def _protocol_rule(name: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str
 
 
 @functools.cache
+def _bound_of(
+    cpp: Path, extra_include_dirs: tuple[Path, ...]
+) -> tuple[Mapping[str, str], frozenset[str]]:
+    """`bound_classes` and the `bound_exceptions` names of one binding source, parsed with
+    bodies once per audit run."""
+    tu = parse_tu(cpp, extra_include_dirs, bodies=True)
+    return MappingProxyType(bound_classes(tu)), frozenset(bound_exceptions(tu))
+
+
 def _bound_classes_of(cpp: Path, extra_include_dirs: tuple[Path, ...]) -> Mapping[str, str]:
-    """`bound_classes` of one binding source, parsed with bodies once per audit run."""
-    return MappingProxyType(bound_classes(parse_tu(cpp, extra_include_dirs, bodies=True)))
+    """`bound_classes` of one binding source."""
+    return _bound_of(cpp, extra_include_dirs)[0]
 
 
 @functools.cache
@@ -436,6 +446,7 @@ def match(
     ancestors: Ancestors = NO_ANCESTORS,
     bound: BoundLookup = no_bound,
     bases: Bases = NO_BASES,
+    exceptions: frozenset[str] = frozenset(),
 ) -> ModuleReport:
     """Diff the audited C++ API against the stub; base classes resolve under `stub_roots`,
     C++ class ancestry (`audit_types.class_ancestors`) lets a subclass bind a base parameter.
@@ -445,6 +456,7 @@ def match(
     name, and a class another stub declares under its leaf is bound there only if that
     module's binding does not demonstrably bind a different class under it. `bases`
     (`audit_types.public_bases`) checks each bound class's stub bases (`_base_rows`).
+    `exceptions` (`bound_exceptions`) are the stub classes the binding registers as exceptions.
     """
     gaps: list[Gap] = []
     accepted: list[Accepted] = []
@@ -554,7 +566,8 @@ def match(
         elif leaf == "__init__":
             found = "ctor"
         else:
-            found = DUNDER_OPERATORS.get(leaf, leaf) in tu_names or None
+            # An exception the TU registers under another name (`nb::exception`, `exceptions`).
+            found = DUNDER_OPERATORS.get(leaf, leaf) in tu_names or name in exceptions or None
         if found is None:
             if rule:
                 accepted.append(Accepted(name, rule, where))
@@ -805,13 +818,29 @@ def audit_tu(
         audit_types.class_ancestors(tu),
         lookup,
         audit_types.public_bases(tu),
+        _bound_of(cpp_path, tuple(extra_include_dirs))[1],
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}
     report.gaps = sorted(
         [*report.gaps, *unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)]
     )
-    report.deviations = sorted([*report.deviations, *init_findings(init_path)])
-    report.accepted = sorted([*report.accepted, *init_accepted(init_path)])
+    # `__init_subclass__` on a class the package `__init__.py` guards is that guard's hook.
+    guarded = override_guarded(init_path)
+    hooks = [
+        d
+        for d in report.deviations
+        if d.name.endswith(".__init_subclass__") and d.name.rpartition(".")[0] in guarded
+    ]
+    report.deviations = sorted(
+        [*(d for d in report.deviations if d not in hooks), *init_findings(init_path)]
+    )
+    report.accepted = sorted(
+        [
+            *report.accepted,
+            *init_accepted(init_path),
+            *(Accepted(d.name, "hook-override-guard", d.location) for d in hooks),
+        ]
+    )
     report.delegated = dict(sorted(delegated.items()))
     return report
 

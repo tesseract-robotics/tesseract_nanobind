@@ -484,3 +484,11 @@ def test_real_path_parameter_covers_a_string_path(g1_reports):
     """`toDelimitedFile(composite, const std::string& file_path, …)` bound with a
     `std::filesystem::path` (`str | os.PathLike`): it takes every `str` the C++ takes."""
     assert "toDelimitedFile" not in open_names(g1_reports[CL])
+
+
+def test_undefined_upstream_function_is_accepted(g1_reports):
+    """utils.h:242 declares `validateSeedStructure`; the 0.35.0 library defines no such symbol,
+    so a binding cannot link it (the binding says so)."""
+    report = g1_reports[CL]
+    assert ("validateSeedStructure", "declared-never-defined") in accepted_pairs(report)
+    assert "validateSeedStructure" not in open_names(report)
