@@ -76,6 +76,11 @@ jobs:
       if: matrix.python != '3.9'
       working-directory: tesseract_nanobind
       run: pixi run typecheck
+    # The build dir's CMakeCache holds absolute Xcode compiler and SDK paths: a cache from
+    # another toolchain (macos-14's Xcode_15.4) fails to configure, so the key names it.
+    - name: toolchain key
+      id: toolchain
+      run: echo "key=$( { xcode-select -p; xcrun --show-sdk-path; } | shasum | cut -c1-12 )" >> "$GITHUB_OUTPUT"
     # Cache the scikit-build dir so a warm build skips the ~15-20 min nanobind
     # recompile (incremental cmake). Per-python; any source/config/dep change
     # invalidates it (pixi.lock is hashed: objects compiled against one conda lib
@@ -85,7 +90,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: tesseract_nanobind/build
-        key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
+        key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
     - name: build wheel
       working-directory: tesseract_nanobind
       env:
@@ -116,7 +121,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: tesseract_nanobind/build
-        key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
+        key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
     # actions/upload-artifact@v4 intermittently fails on macOS arm64 runners with
     # "Failed to CreateArtifact: Request timeout" (~1/3 of uploads) — a long-standing
     # open GitHub bug (actions/upload-artifact#569, #527) inherent to arm64 mac runners'
