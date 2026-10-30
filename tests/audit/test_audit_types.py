@@ -7,6 +7,7 @@ Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 import ast
 from pathlib import Path
 
+import clang.cindex as ci
 import pytest
 
 from tests.audit._load import audit, load
@@ -194,3 +195,26 @@ def test_path_annotation_covers_a_string_parameter():
     assert types.verdict(frozenset({("str",)}), ("path",)) is True
     assert types.verdict(frozenset({("path",)}), ("str",)) is False
     assert types.verdict(frozenset({("seq", ("str",))}), ("seq", ("path",))) is True
+
+
+# The two standard libraries' `std::vector<T>::const_iterator`, declared without their headers.
+STDLIB_ITERATORS = """
+namespace std { inline namespace __1 { template <class P> class __wrap_iter {}; } }
+namespace __gnu_cxx { template <class P, class C> class __normal_iterator {}; }
+struct Vec {};
+void libcxx(std::__wrap_iter<const int*> p);
+void libstdcxx(__gnu_cxx::__normal_iterator<const int*, Vec> p);
+"""
+
+
+def test_a_vector_iterator_has_one_key_under_either_standard_library():
+    """libstdc++ declares `__normal_iterator` in `__gnu_cxx`, not `std`: as a class key it is a
+    mismatch for the `int` index the stub takes, where libc++'s `std::__wrap_iter` has no key."""
+    tu = ci.Index.create().parse(
+        "iterators.cpp", args=["-std=c++17"], unsaved_files=[("iterators.cpp", STDLIB_ITERATORS)]
+    )
+    funcs = {
+        c.spelling: c for c in tu.cursor.get_children() if c.kind == ci.CursorKind.FUNCTION_DECL
+    }
+    keys = {name: types.cpp_key(next(f.get_arguments()).type) for name, f in funcs.items()}
+    assert keys == {"libcxx": None, "libstdcxx": None}

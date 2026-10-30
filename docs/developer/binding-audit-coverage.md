@@ -126,6 +126,8 @@ For each Python name, in order: a `TEMPLATE_INSTANCES` instance; a `kCamelCase` 
 
 Structural `absent_ok` rules are set while parsing, and the later rule wins: `type-index`, then `unbound-dependency-type`, then `template-instance-name` (forwarding constructor templates), then `yaml-node`. `serialization-default-ctor` applies only to a nullary constructor that none of the others claims.
 
+A parameter key comes from the canonical C++ type, so it has to be the same under libc++ (the committed report, macOS) and libstdc++ (CI, Linux). Records in `std` that the audit has no mapping for get no key, so they are neither a match nor a mismatch. libstdc++ declares `std::vector<T>::iterator` as `__gnu_cxx::__normal_iterator`, outside `std`, so `audit_types.STD_NAMESPACES` also holds `__gnu_cxx`. Without it, libc++'s `std::__wrap_iter` has no key but the libstdc++ iterator is a class key, and on Linux every `CompositeInstruction.insert(pos, …)` became a gap and a deviation.
+
 ## Rule catalogue
 
 Each rule is listed with what it accepts and why. "Structural" means a predicate decides it from the TU or the stub. "Table" means an explicit entry in `audit_rules.py`.

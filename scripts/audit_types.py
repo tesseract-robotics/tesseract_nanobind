@@ -69,6 +69,9 @@ STD_SEQUENCES = frozenset({"vector", "list", "deque"})
 STD_MAPS = frozenset({"map", "unordered_map"})
 STD_POINTERS = frozenset({"shared_ptr", "unique_ptr"})
 TYPE_PARAMETER_PREFIX = "type-parameter-"  # libclang's spelling of a template parameter
+# Namespaces of the standard library: libstdc++ declares `std::vector<T>::iterator` as
+# `__gnu_cxx::__normal_iterator`, where libc++ has `std::__1::__wrap_iter`.
+STD_NAMESPACES = frozenset({"std", "__gnu_cxx"})
 # A binding may widen a `std::string` file path to `std::filesystem::path` (`str |
 # os.PathLike`): the path annotation covers the string parameter, never the reverse.
 STR_KEY = ("str",)
@@ -175,7 +178,7 @@ def cpp_key(t: ci.Type) -> TypeKey:
     if decl.kind not in RECORD_KINDS and decl.kind != ci.CursorKind.CLASS_TEMPLATE:
         return None
     namespace = _top_namespace(decl)
-    if namespace == "std":
+    if namespace in STD_NAMESPACES:
         return _std_key(decl.spelling, t)
     if namespace == "Eigen":
         return _eigen_key(decl.spelling, t.get_canonical())
