@@ -129,6 +129,10 @@ CMAKE_POLICY_DEFAULT_CMP0135 = "NEW"
 # tesseract C++ conda packages. See .github/workflows/wheels-{linux,macos,windows}.yml
 # for the custom CI that installs them via pixi and bundles them into the wheels.
 
+[tool.ty.src]
+# Audit fixtures are deliberately broken stubs and sources (unbound names, bad overrides).
+exclude = ["tests/audit/fixtures/"]
+
 [tool.ruff]
 target-version = "py39"
 line-length = 100
@@ -311,6 +315,8 @@ gil-hotspots = { cmd = "python scripts/gil_hotspots.py all", description = "Reco
 # Binding API audit (docs/developer/binding-api-audit.md): libclang reads the binding
 # TUs, ast reads the committed stubs. Dev-only: never in the default env or the wheel.
 [tool.pixi.feature.audit.dependencies]
+# The audit scripts read pyproject.toml with tomllib (3.11+).
+python = ">=3.11"
 # libclang Python bindings; pulls libclang 22. Exact build: every python-clang build since
 # 2026-08 (h3fd057f_*, incl. all of 23.1.x) is noarch but depends on __glibc/libgcc, so it
 # cannot install on macOS or Windows. default_hccd1708_2 is the newest portable build.
@@ -318,6 +324,7 @@ python-clang = { version = "==22.1.8", build = "default_hccd1708_2" }
 # lib/clang/22/include: the builtin headers (stdarg.h, stddef.h) libclang expects in its
 # resource dir; python-clang/libclang do not ship them.
 clang-22 = "==22.1.8"
+ty = ">=0.0.89,<0.0.90"
 
 [tool.pixi.feature.audit.tasks]
 audit-bindings = { cmd = "python scripts/audit_bindings.py", description = "Diff each binding's C++ API against its committed stub; writes docs/developer/binding-api-audit.md" }
@@ -325,6 +332,8 @@ audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GI
 # -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
+# ty takes its target from requires-python (>=3.9), not the audit env's pin: name 3.11 here.
+audit-typecheck = { cmd = "ty check --python-version 3.11 scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
 
 [tool.pixi.environments]
 default = { features = ["profile"], solve-group = "default" }

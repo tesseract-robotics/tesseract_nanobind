@@ -1,0 +1,3 @@
+# Audit contract fixture (#256 T5): another module's stub binding a class under the leaf Jogger.
+class Jogger:
+    def go(self) -> None: ...

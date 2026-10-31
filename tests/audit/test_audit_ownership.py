@@ -3,27 +3,17 @@
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
+
+from tests.audit._load import audit, load
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURE_INCLUDE = Path(__file__).resolve().parent / "fixtures" / "include"
 
 
-def _load(name):
-    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module  # dataclasses resolve annotations via sys.modules
-    spec.loader.exec_module(module)
-    return module
-
-
-_load("audit_types")
-own = _load("audit_ownership")
-audit = _load("audit_bindings")
+own = load("audit_ownership")
 
 NESTED = {"fixture": ("tesseract/fixture/",), "fixture_sub": ("tesseract/fixture/sub/",)}
 
@@ -74,7 +64,15 @@ def test_duplicate_prefix_raises(monkeypatch):
 
 def test_core_prefixes_are_one_element_tuples():
     """The 10 core modules own the same headers as before #256: one prefix each."""
-    assert all(isinstance(p, tuple) and len(p) == 1 for p in own.AUDITED_HEADER_PREFIX.values())
+    assert len(own.CORE_MODULES) == 10
+    assert own.CORE_MODULES <= own.AUDITED_HEADER_PREFIX.keys()
+    core = [own.AUDITED_HEADER_PREFIX[m] for m in own.CORE_MODULES]
+    assert all(isinstance(p, tuple) and len(p) == 1 for p in core)
+
+
+def test_trajopt_ifopt_owns_trajopt_common():
+    """G2: trajopt_ifopt registers `TrajOptCollisionConfig` (trajopt_common/collision_types.h)."""
+    assert own.AUDITED_HEADER_PREFIX["trajopt_ifopt"] == ("trajopt_ifopt/", "trajopt_common/")
 
 
 def test_every_binding_module_is_classified():
@@ -104,11 +102,15 @@ def test_unaudited_module_raises_with_its_reason():
 
 
 def test_main_checks_coverage_before_parsing(monkeypatch):
-    real = audit.binding_modules
-    monkeypatch.setattr(audit, "binding_modules", lambda: [*real(), "tesseract_new"])
-    monkeypatch.setattr(audit, "parse_tu", lambda *a, **k: pytest.fail("parsed before coverage"))
+    # Patch the modules that read the names: `audit` is a combined copy (Review Focus 1).
+    cli = load("audit_bindings")
+    real = cli.binding_modules
+    monkeypatch.setattr(cli, "binding_modules", lambda: [*real(), "tesseract_new"])
+    monkeypatch.setattr(
+        load("audit_match"), "parse_tu", lambda *a, **k: pytest.fail("parsed before coverage")
+    )
     with pytest.raises(own.UnclassifiedModuleError):
-        audit.main([])
+        cli.main([])
 
 
 def test_owner_prefixes_come_from_the_tables_only():
@@ -161,10 +163,7 @@ def test_unaudited_rows_ordered_by_group_then_name():
     """The reasons carry the group (`#256 group N`); `ompl_base`'s removal reason sorts last."""
     rows = list(own.coverage().unaudited.items())
     assert rows == sorted(rows, key=lambda mr: (mr[1], mr[0]))
-    assert [m for m, _ in rows][:2] == [
-        "tesseract_command_language",
-        "tesseract_time_parameterization",
-    ]
+    assert [m for m, _ in rows][:-1] == []  # groups 1-4 are audited
     assert rows[-1][0] == "ompl_base"
 
 
@@ -192,7 +191,9 @@ def test_parseable_headers_must_still_parse_together_beside_an_unparseable_one()
 
 def test_audit_tu_refuses_a_prefix_that_disagrees_with_prefixes(monkeypatch):
     """`prefix` and `prefixes[module]` name the same thing; a mismatch is a caller bug."""
-    monkeypatch.setattr(audit, "parse_tu", lambda *a, **k: pytest.fail("parsed before the check"))
+    monkeypatch.setattr(
+        load("audit_match"), "parse_tu", lambda *a, **k: pytest.fail("parsed before the check")
+    )
     fixtures = FIXTURE_INCLUDE.parent
     with pytest.raises(audit.PrefixMismatchError, match="tesseract/other/"):
         audit.audit_tu(

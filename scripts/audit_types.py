@@ -18,6 +18,9 @@ TypeKey = tuple | None
 # Class name -> the names of all its (transitive) base classes, from the TU.
 Ancestors = Mapping[str, frozenset[str]]
 NO_ANCESTORS: Ancestors = MappingProxyType({})
+# Qualified class -> the qualified classes of its direct public bases, from the TU (T5).
+Bases = Mapping[str, tuple[str, ...]]
+NO_BASES: Bases = MappingProxyType({})
 
 RECORD_KINDS = frozenset(
     {ci.CursorKind.CLASS_DECL, ci.CursorKind.STRUCT_DECL, ci.CursorKind.CLASS_TEMPLATE}
@@ -66,6 +69,13 @@ STD_SEQUENCES = frozenset({"vector", "list", "deque"})
 STD_MAPS = frozenset({"map", "unordered_map"})
 STD_POINTERS = frozenset({"shared_ptr", "unique_ptr"})
 TYPE_PARAMETER_PREFIX = "type-parameter-"  # libclang's spelling of a template parameter
+# Namespaces of the standard library: libstdc++ declares `std::vector<T>::iterator` as
+# `__gnu_cxx::__normal_iterator`, where libc++ has `std::__1::__wrap_iter`.
+STD_NAMESPACES = frozenset({"std", "__gnu_cxx"})
+# A binding may widen a `std::string` file path to `std::filesystem::path` (`str |
+# os.PathLike`): the path annotation covers the string parameter, never the reverse.
+STR_KEY = ("str",)
+PATH_KEY = ("path",)
 
 
 def record_path(decl: ci.Cursor) -> str:
@@ -76,6 +86,18 @@ def record_path(decl: ci.Cursor) -> str:
         parts.append(parent.spelling)
         parent = parent.semantic_parent
     return ".".join(reversed(parts))
+
+
+def qualified_path(decl: ci.Cursor) -> str:
+    """`record_path` behind its enclosing namespaces (`trajopt_ifopt::Var`,
+    `tesseract::geometry::PointCloud.Point`): one name per C++ class, unlike the leaf."""
+    namespaces = []
+    parent = decl.semantic_parent
+    while parent is not None and parent.kind != ci.CursorKind.TRANSLATION_UNIT:
+        if parent.kind == ci.CursorKind.NAMESPACE:
+            namespaces.append(parent.spelling)
+        parent = parent.semantic_parent
+    return "::".join([*reversed(namespaces), record_path(decl)])
 
 
 def _top_namespace(decl: ci.Cursor) -> str | None:
@@ -156,7 +178,7 @@ def cpp_key(t: ci.Type) -> TypeKey:
     if decl.kind not in RECORD_KINDS and decl.kind != ci.CursorKind.CLASS_TEMPLATE:
         return None
     namespace = _top_namespace(decl)
-    if namespace == "std":
+    if namespace in STD_NAMESPACES:
         return _std_key(decl.spelling, t)
     if namespace == "Eigen":
         return _eigen_key(decl.spelling, t.get_canonical())
@@ -232,8 +254,8 @@ def py_key(node: ast.expr | None) -> TypeKey:
     if len(members) > 1:
         if any(_dotted(m) == "os.PathLike" for m in members):
             return ("path",)
-        keys = [py_key(m) for m in members]
-        if None in keys:
+        keys = [k for k in map(py_key, members) if k is not None]
+        if len(keys) < len(members):
             return None
         # tesseract_nb.h spells an Eigen argument's input as the array or a sequence of numbers
         # (nested for a matrix): one C++ type, keyed as the array.
@@ -311,9 +333,35 @@ def class_ancestors(tu: ci.TranslationUnit) -> dict[str, frozenset[str]]:
     return {name: closure(name) for name in direct}
 
 
+def public_bases(tu: ci.TranslationUnit) -> dict[str, tuple[str, ...]]:
+    """Every class defined in the TU (by `qualified_path`) -> its direct public bases, in
+    declaration order; `()` for a class without one. A template instance base names its
+    template (`Planner<double>` -> `…::Planner`), as `bound_classes` does."""
+    out: dict[str, tuple[str, ...]] = {}
+    for c in tu.cursor.walk_preorder():
+        if c.kind not in RECORD_KINDS or not c.is_definition():
+            continue
+        bases: list[str] = []
+        for b in c.get_children():
+            if (
+                b.kind != ci.CursorKind.CXX_BASE_SPECIFIER
+                or b.access_specifier != ci.AccessSpecifier.PUBLIC
+            ):
+                continue
+            decl = b.type.get_canonical().get_declaration()
+            if decl.kind not in RECORD_KINDS:
+                decl = b.referenced  # a dependent base: the template itself
+            if decl is not None and decl.kind in RECORD_KINDS:
+                bases.append(qualified_path(decl))
+        out.setdefault(qualified_path(c), tuple(bases))
+    return out
+
+
 def _compare(cpp: TypeKey, py: TypeKey, ancestors: Ancestors) -> bool | None:
     if cpp is None or py is None:
         return None
+    if cpp == STR_KEY and py == PATH_KEY:
+        return True  # nanobind's std::filesystem::path caster takes every `str`
     if cpp[0] != py[0] or len(cpp) != len(py):
         return False
     if cpp[0] == "class":

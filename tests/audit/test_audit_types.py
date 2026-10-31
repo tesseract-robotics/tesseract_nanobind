@@ -1,15 +1,16 @@
 """Contract tests of overload matching by parameter type (#247): scripts/audit_types.py and
-its use in scripts/audit_bindings.py.
+its use in scripts/audit_match.py.
 
 Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
 import ast
-import importlib.util
-import sys
 from pathlib import Path
 
+import clang.cindex as ci
 import pytest
+
+from tests.audit._load import audit, load
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -17,18 +18,9 @@ FIXTURE_INCLUDE = FIXTURES / "include"
 TYPED_PREFIX = ("tesseract/typed/",)
 
 
-def _load(name):
-    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module  # dataclasses resolve annotations via sys.modules
-    spec.loader.exec_module(module)
-    return module
-
-
-types = _load("audit_types")
-_load("audit_ownership")
-audit = _load("audit_bindings")
+types = load("audit_types")
 COVERAGE = audit.Coverage(audited=("typed",), unaudited={}, total=1)
+NO_LEDGER: dict = {}  # these report tests check rendering, not outcomes
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +55,9 @@ def test_every_mapping_rule_gives_the_stub_key(typed_cpp, typed_py):
     """Each C++ parameter of `kinds` maps to the key of the annotation nanobind writes for it."""
     [cpp] = typed_cpp["kinds"].overloads
     [py] = typed_py.symbols["kinds"].overloads
-    names = [a.arg for a in ast.parse((FIXTURES / "_typed.pyi").read_text()).body[-1].args.args]
+    kinds = ast.parse((FIXTURES / "_typed.pyi").read_text()).body[-1]
+    assert isinstance(kinds, ast.FunctionDef)
+    names = [a.arg for a in kinds.args.args]
     assert len(cpp.params) == len(py.keys) == len(names)
     mismatched = [
         (name, sorted(c, key=repr) if c else c, p)
@@ -181,7 +175,7 @@ def test_type_fallbacks_counted(typed_report):
 
 def test_report_renders_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    text = audit.render_markdown([typed_report], prov, COVERAGE)
+    text = audit.render_markdown([typed_report], prov, COVERAGE, NO_LEDGER)
     assert (
         "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |"
         in text
@@ -192,4 +186,35 @@ def test_report_renders_type_fallbacks(typed_report):
 
 def test_json_has_type_fallbacks(typed_report):
     prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
-    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE)
+    assert '"type_fallbacks": 2' in audit.to_json([typed_report], prov, COVERAGE, NO_LEDGER)
+
+
+def test_path_annotation_covers_a_string_parameter():
+    """nanobind's `std::filesystem::path` caster takes every `str`: a `str | os.PathLike`
+    parameter covers a C++ `std::string`. Not the reverse: a `str` rejects an `os.PathLike`."""
+    assert types.verdict(frozenset({("str",)}), ("path",)) is True
+    assert types.verdict(frozenset({("path",)}), ("str",)) is False
+    assert types.verdict(frozenset({("seq", ("str",))}), ("seq", ("path",))) is True
+
+
+# The two standard libraries' `std::vector<T>::const_iterator`, declared without their headers.
+STDLIB_ITERATORS = """
+namespace std { inline namespace __1 { template <class P> class __wrap_iter {}; } }
+namespace __gnu_cxx { template <class P, class C> class __normal_iterator {}; }
+struct Vec {};
+void libcxx(std::__wrap_iter<const int*> p);
+void libstdcxx(__gnu_cxx::__normal_iterator<const int*, Vec> p);
+"""
+
+
+def test_a_vector_iterator_has_one_key_under_either_standard_library():
+    """libstdc++ declares `__normal_iterator` in `__gnu_cxx`, not `std`: as a class key it is a
+    mismatch for the `int` index the stub takes, where libc++'s `std::__wrap_iter` has no key."""
+    tu = ci.Index.create().parse(
+        "iterators.cpp", args=["-std=c++17"], unsaved_files=[("iterators.cpp", STDLIB_ITERATORS)]
+    )
+    funcs = {
+        c.spelling: c for c in tu.cursor.get_children() if c.kind == ci.CursorKind.FUNCTION_DECL
+    }
+    keys = {name: types.cpp_key(next(f.get_arguments()).type) for name, f in funcs.items()}
+    assert keys == {"libcxx": None, "libstdcxx": None}
