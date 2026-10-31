@@ -59,6 +59,55 @@ def make_storage(node):
 """
 
 
+# A run held in flight until the script sets `release`: a busy check cannot race the run's end
+# (a fast runner finished TrajOptPipeline before the next line, so nothing was busy). The
+# TrajOptIfopt composite profile is the first Python a run calls: its `create` blocks the worker.
+_GATED = """
+import threading
+from tesseract_robotics.planning.profiles import (
+    TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
+    TRAJOPT_PROFILE_NAMES,
+    create_trajopt_ifopt_default_profiles,
+)
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    TrajOptIfoptCompositeProfile,
+    TrajOptIfoptDefaultCompositeProfile,
+)
+
+GATED = "TrajOptIfoptPipeline"
+entered = threading.Event()
+release = threading.Event()
+
+
+class Gate(TrajOptIfoptCompositeProfile):
+    def __init__(self):
+        super().__init__()
+        self.inner = TrajOptIfoptDefaultCompositeProfile()
+        self.inner.smooth_velocities = False
+        self.inner.smooth_accelerations = False
+        self.inner.smooth_jerks = False
+
+    def create(self, composite_manip_info, env, nodes, fixed_indices):
+        entered.set()
+        release.wait()
+        return self.inner.create(composite_manip_info, env, nodes, fixed_indices)
+
+
+gated_profiles = create_trajopt_ifopt_default_profiles()
+for name in TRAJOPT_PROFILE_NAMES:
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(
+        gated_profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, Gate()
+    )
+
+
+def gated_storage(node):
+    storage = make_storage(node)
+    storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(gated_profiles))
+    return storage
+"""
+
+
 def _run(script: str, *, planning: bool = True) -> str:
     """Run `script` in a fresh interpreter; return its stdout, failing on a crash or a hang."""
     source = (_PREAMBLE if planning else "") + script
@@ -462,64 +511,78 @@ class TestServerTaskReplacement:
     replacing it freed it under the run or behind a getTask() reference."""
 
     def test_load_config_mid_run_raises(self):
-        out = _run("""
+        out = _run(
+            _GATED
+            + """
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator())
-node = factory.createTaskComposerNode("TrajOptPipeline")
-futures = [server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor") for _ in range(4)]
+node = factory.createTaskComposerNode(GATED)
+future = server.run(GATED, gated_storage(node), False, "TaskflowExecutor")
+assert entered.wait(30)
 for load in (lambda: server.loadConfig(config_path, GeneralResourceLocator()),
              lambda: server.loadConfig(config_path.read_text(), GeneralResourceLocator())):
     try:
         load()
     except TaskComposerServerBusyError as e:
-        print("BUSY", "TrajOptPipeline" in str(e))
-for future in futures:
-    future.wait()
-print("SUCCESS", all(future.context.isSuccessful() for future in futures))
-""")
+        print("BUSY", GATED in str(e))
+release.set()
+future.wait()
+print("SUCCESS", future.context.isSuccessful())
+"""
+        )
         assert out.count("BUSY True") == 2, out
         assert "SUCCESS True" in out, out
 
     def test_add_task_with_the_running_name_raises(self):
-        out = _run("""
+        out = _run(
+            _GATED
+            + """
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator())
-node = factory.createTaskComposerNode("TrajOptPipeline")
-future = server.run("TrajOptPipeline", make_storage(node), False, "TaskflowExecutor")
+node = factory.createTaskComposerNode(GATED)
+future = server.run(GATED, gated_storage(node), False, "TaskflowExecutor")
+assert entered.wait(30)
 try:
-    server.addTask(factory.createTaskComposerNode("TrajOptPipeline"))
+    server.addTask(factory.createTaskComposerNode(GATED))
 except TaskComposerServerBusyError as e:
-    print("BUSY", "TrajOptPipeline" in str(e))
+    print("BUSY", GATED in str(e))
+release.set()
 future.wait()
 print("SUCCESS", future.context.isSuccessful())
-""")
+"""
+        )
         assert "BUSY True" in out, out
         assert "SUCCESS True" in out, out
 
     def test_server_task_run_on_an_executor_blocks_reload(self):
         """A task reached through getTask and run on any executor (or by server.run(node)) is
         the server's: reloading freed it under the run."""
-        out = _run("""
+        out = _run(
+            _GATED
+            + """
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator())
-task = server.getTask("TrajOptPipeline")
+task = server.getTask(GATED)
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
-futures = [executor.run(task, make_storage(task)) for _ in range(2)]
-futures.append(server.run(task, make_storage(task), False, "TaskflowExecutor"))
+futures = [executor.run(task, gated_storage(task)) for _ in range(2)]
+futures.append(server.run(task, gated_storage(task), False, "TaskflowExecutor"))
 del task
+assert entered.wait(30)
 try:
     server.loadConfig(config_path, GeneralResourceLocator())
 except TaskComposerServerBusyError as e:
     print("BUSY", "running" in str(e))
+release.set()
 for future in futures:
     future.wait()
 print("SUCCESS", all(future.context.isSuccessful() for future in futures))
 server.loadConfig(config_path, GeneralResourceLocator())
 print("RELOADED")
-""")
+"""
+        )
         assert "BUSY True" in out, out
         assert "SUCCESS True" in out, out
         assert "RELOADED" in out, out
