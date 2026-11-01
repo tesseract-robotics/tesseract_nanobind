@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping, Sequence
 import enum
 import io
 import os
-from typing import Annotated, overload
+from typing import Annotated, Self, overload
 
 import numpy
 from numpy.typing import NDArray
@@ -54,10 +54,10 @@ class Isometry3d:
     @property
     def linear(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')]: ...
 
-    def inverse(self) -> Isometry3d: ...
+    def inverse(self) -> Self: ...
 
     @overload
-    def __mul__(self, arg: Isometry3d, /) -> Isometry3d: ...
+    def __mul__(self, arg: Isometry3d, /) -> Self: ...
 
     @overload
     def __mul__(self, arg: Translation3d, /) -> Isometry3d: ...

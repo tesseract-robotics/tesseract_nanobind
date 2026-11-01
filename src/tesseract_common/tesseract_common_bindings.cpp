@@ -124,6 +124,17 @@ static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
     return static_cast<std::size_t>(j);
 }
 
+// An Isometry3d of the caller's own Python type. `Pose` subclasses Isometry3d in Python, and a
+// frame-tagged pose subclasses `Pose`; inverse and compose hand each its own type back, built here
+// with no Python-level re-wrap (a `type(self)(...)` override in Python measured ~3x the plain call).
+// No subclass `__init__` runs: the value is copied in place, as `Isometry3d(iso)` would.
+static nb::object isometry_like(nb::handle self, const Eigen::Isometry3d& value) {
+    nb::object result = nb::inst_alloc(self.type());
+    new (nb::inst_ptr<Eigen::Isometry3d>(result)) Eigen::Isometry3d(value);
+    nb::inst_mark_ready(result);
+    return result;
+}
+
 // Trampoline class for ResourceLocator
 class PyResourceLocator : public tesseract::common::ResourceLocator {
 public:
@@ -223,12 +234,12 @@ NB_MODULE(_tesseract_common, m) {
         .def_prop_ro("linear", [](const Eigen::Isometry3d& self) -> Eigen::Matrix3d {
             return self.linear();
         })
-        .def("inverse", [](const Eigen::Isometry3d& self) {
-            return self.inverse();
-        })
-        .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::Isometry3d& other) {
-            return self * other;
-        })
+        .def("inverse", [](nb::pointer_and_handle<Eigen::Isometry3d> self) {
+            return isometry_like(self.h, self.p->inverse());
+        }, nb::sig("def inverse(self) -> typing.Self"))
+        .def("__mul__", [](nb::pointer_and_handle<Eigen::Isometry3d> self, const Eigen::Isometry3d& other) {
+            return isometry_like(self.h, *self.p * other);
+        }, nb::sig("def __mul__(self, arg: Isometry3d, /) -> typing.Self"))
         .def("__mul__", [](const Eigen::Isometry3d& self, const Eigen::Translation3d& t) {
             return Eigen::Isometry3d(self * t);
         })
