@@ -32,6 +32,14 @@ flowchart LR
 
 Regenerate with `pixi run -e audit audit-bindings` and test with `pixi run -e audit audit-test`. CI runs both on every PR and fails if the regenerated report differs from the committed one (provenance line excepted).
 
+A stub row names its file, not its line, and a header row keeps its line. Line numbers in the header rows move only when the headers change, which is only on a tesseract bump through `pixi.lock`. The report therefore changes only when a row is added, removed or reclassified, and needs regenerating only after one of these changes:
+
+- a tesseract bump (`pixi.lock` headers);
+- a binding added, removed or given another signature;
+- a change to `scripts/audit_*.py` or `scripts/audit_ledger.json`.
+
+Other changes (rebases, tests, CI, a stub edit that only moves lines) leave it current; CI's "Report is current" step says when it is not. The JSON report (`--json`) keeps every line number.
+
 ## Audited modules
 
 | module | owned prefixes | group | gaps | deviations | accepted | ledger: issue | ledger: won't fix |

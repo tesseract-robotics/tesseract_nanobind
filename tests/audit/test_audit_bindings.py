@@ -848,6 +848,33 @@ def test_quoted_names_heading_is_scoped(fixture_report):
     assert "Quoted C++ names in the stubs of audited modules" in text
 
 
+def _stub_line_report(stub_line: int) -> object:
+    stub = f"src/tesseract_robotics/fixture/_fixture.pyi:{stub_line}"
+    return audit.ModuleReport(
+        module="fixture",
+        covered=0,
+        gaps=[audit.Gap("Missing", audit.Kind.CLASS, "tesseract/fixture/a.h:7")],
+        deviations=[audit.Deviation("pyOnly", audit.Kind.FUNCTION, stub)],
+        accepted=[
+            audit.Accepted("Kept.__repr__", "presentation-dunder", stub),
+            audit.Accepted("makePair", "out-param", "tesseract/fixture/a.h:9"),
+        ],
+        quoted=[audit.QuotedType("f", "ns::Unbound", stub)],
+    )
+
+
+def test_report_names_a_stub_row_by_its_file_alone():
+    """A stub edit that only moves lines leaves the report as it was: stub rows name the
+    file, not the line, so CI's "Report is current" fails only when a row changes. Header
+    rows keep their line, which moves only with an upstream bump."""
+    text = audit.render_markdown([_stub_line_report(10)], PROV, COVERAGE, NO_LEDGER)
+    assert text == audit.render_markdown([_stub_line_report(99)], PROV, COVERAGE, NO_LEDGER)
+    assert ".pyi:" not in text
+    assert "| `pyOnly` | function | src/tesseract_robotics/fixture/_fixture.pyi |" in text
+    assert "tesseract/fixture/a.h:7" in text
+    assert "| `makePair` | out-param | tesseract/fixture/a.h:9 |" in text
+
+
 def test_json_has_coverage(fixture_report):
     data = json.loads(audit.to_json([fixture_report], PROV, COVERAGE, NO_LEDGER))
     assert data["coverage"] == {"audited": ["fixture"], "unaudited": {"other": "Not yet audited."}}

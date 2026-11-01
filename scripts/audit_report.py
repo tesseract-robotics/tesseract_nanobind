@@ -160,6 +160,14 @@ def _table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
     ]
 
 
+def _where(location: str) -> str:
+    """A row's location as the report prints it: a stub row names its file alone, so a stub
+    edit that only moves lines leaves the report as it was; a header row keeps its line,
+    which moves only with an upstream bump. The JSON report keeps every line."""
+    path, _, _ = location.rpartition(":")
+    return path if path.endswith(".pyi") else location
+
+
 def _unaudited_patterns() -> list[tuple[str, str]]:
     """Each `UNAUDITED_HEADERS` pattern below its prefix (`*/` for `ANY_PREFIX`), with its
     reason, sorted by that path."""
@@ -204,13 +212,13 @@ def render_markdown(
         "`nb::module_::import_`):",
         "",
         *_table(
-            ("module", "Python name", "annotation", "stub:line", "issue"),
+            ("module", "Python name", "annotation", "stub", "issue"),
             [
                 (
                     r.module,
                     f"`{q.name}`",
                     f"`{q.annotation}`",
-                    q.location,
+                    _where(q.location),
                     _issue_cell(ledger.get(r.module, {}).get(q.annotation)),
                 )
                 for r in reports
@@ -240,7 +248,7 @@ def render_markdown(
                 (
                     f"`{g.symbol}`",
                     g.kind.value,
-                    g.location,
+                    _where(g.location),
                     g.arity,
                     _issue_cell(outcomes.get(g.symbol)),
                 )
@@ -249,12 +257,12 @@ def render_markdown(
         )
         out += ["### Deviations", ""]
         out += _table(
-            ("Python name", "kind", "stub:line", "arity", "issue"),
+            ("Python name", "kind", "stub", "arity", "issue"),
             [
                 (
                     f"`{d.name}`",
                     d.kind.value,
-                    d.location,
+                    _where(d.location),
                     d.arity,
                     _issue_cell(outcomes.get(d.name)),
                 )
@@ -264,7 +272,7 @@ def render_markdown(
         out += ["### Accepted", ""]
         out += _table(
             ("symbol", "rule", "location"),
-            [(f"`{a.symbol}`", a.rule, a.location) for a in r.accepted],
+            [(f"`{a.symbol}`", a.rule, _where(a.location)) for a in r.accepted],
         )
         out += ["### Headers audited with another module", ""]
         out += _table(
