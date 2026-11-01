@@ -91,12 +91,6 @@ jobs:
     - name: pip build tools
       run: python -m pip install --upgrade pip delvewheel
 
-    - name: install zip CLI
-      shell: pwsh
-      run: |
-        choco install zip -y --no-progress
-        zip --version
-
     - name: restore nanobind wheel build cache
       id: nanobind-build-cache
       uses: actions/cache/restore@v4
@@ -198,7 +192,13 @@ jobs:
         done
 
         rm "$WHEEL_FILE"
-        (cd "$WHEEL_DIR" && zip -rq "$GITHUB_WORKSPACE/tesseract_nanobind/$WHEEL_FILE" .)
+        # Python's zipfile repacks it: Git Bash has unzip but no zip, and installing one from the
+        # Chocolatey feed failed the job whenever the feed was down. delvewheel rewrites RECORD.
+        python -c 'import pathlib, sys, zipfile
+        root, out = pathlib.Path(sys.argv[1]), sys.argv[2]
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in sorted(p for p in root.rglob("*") if p.is_file()):
+                zf.write(f, f.relative_to(root).as_posix())' "$WHEEL_DIR" "$WHEEL_FILE"
         rm -rf "$WHEEL_DIR"
 
         echo "=== delvewheel repair ==="
