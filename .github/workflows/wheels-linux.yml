@@ -197,6 +197,16 @@ jobs:
           source test_env/bin/activate
           pip install pytest pytest-xdist scipy pyyaml
           cd tesseract_nanobind
+          # The x64 runner has died mid-suite three times ("received a shutdown signal",
+          # #354/#353/#358). Memory and the largest processes every 10 s, so the log of the
+          # next one shows whether the suite ran the runner out of memory.
+          (while :; do
+            echo "MEM $(date -u +%T) $(free -m | awk '/^Mem:/{print "used=" $3 "M avail=" $7 "M"}')"
+            ps -eo rss=,pid=,args= --sort=-rss | head -5 | awk '{printf "MEM   %6dM %s %s\n", $1/1024, $2, substr($0, index($0,$3), 120)}'
+            sleep 10
+          done) &
+          sampler=$!
+          trap 'kill $sampler' EXIT
           pytest tests -n auto \
             --ignore=tests/benchmarks \
             -v --tb=short
