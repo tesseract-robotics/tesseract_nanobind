@@ -348,6 +348,27 @@ def nearest_rotation(matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3)
     The rotation closest to a 3x3 matrix in the Frobenius norm, U·diag(1, 1, det(U·Vᵀ))·Vᵀ from its SVD; det is +1 also for a reflection. A new array; the input is unchanged.
     """
 
+def orthonormality_residual(matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> float:
+    """max|RᵀR − I| of a 3x3 matrix, dimensionless: 0 for an exact rotation."""
+
+def determinant(matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> float:
+    """
+    The determinant of a 3x3 matrix: +1 for a rotation, -1 for a reflection.
+    """
+
+def orthonormality_residual_each(transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """
+    max|RᵀR − I| of the rotation block of each transform of an (M, 4, 4) stack, (M,); row i is bitwise orthonormality_residual(stack[i, :3, :3]).
+    """
+
+def rotation_determinant_each(transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """
+    The determinant of the rotation block of each transform of an (M, 4, 4) stack, (M,); row i is bitwise determinant(stack[i, :3, :3]).
+    """
+
+def norm_each(vectors: Annotated[NDArray[numpy.float64], dict(shape=(None, 3), writable=False)] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    """The Euclidean norm of each row of an (N, 3) array, (N,)."""
+
 class Hyperplane3d:
     @overload
     def __init__(self, normal: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], offset: float) -> None: ...

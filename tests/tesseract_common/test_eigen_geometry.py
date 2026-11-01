@@ -19,7 +19,12 @@ from tesseract_robotics.tesseract_common import (
     Quaterniond,
     Translation3d,
     apply_directions_each,
+    determinant,
     nearest_rotation,
+    norm_each,
+    orthonormality_residual,
+    orthonormality_residual_each,
+    rotation_determinant_each,
 )
 
 # Tolerance constants — all expressed relative to Eigen's default
@@ -1117,3 +1122,104 @@ def test_batched_stacks_refuse_what_is_not_m_by_4_by_4(bad):
 def test_apply_directions_each_refuses_a_row_count_mismatch():
     with pytest.raises(ValueError, match="rows"):
         apply_directions_each(_random_stack(36, 3), np.zeros((2, 3)))
+
+
+# ---------------------------------------------------------------------------
+# Rigidity readouts: max|RᵀR − I|, det(R) and row norms in Eigen, so a consumer
+# validating rotations needs no numpy linear algebra beside the binding's types.
+# Row i of each _each result is bitwise the scalar call on stack[i, :3, :3].
+# ---------------------------------------------------------------------------
+
+# How far Eigen's and numpy's evaluation of the same 3-term sums may differ, in units of float64
+# eps: each entry of RᵀR, det(R) (cofactor vs LU) and |v| round a handful of times on values of
+# magnitude ≤ 1, so a few eps covers either order of summation.
+READOUT_ROUTE_EPS = 8.0
+
+
+def _sheared_stack(seed, m):
+    """Random rigid transforms with a shear of up to 1e-3 in the rotation block, one reflected."""
+    stack = _random_stack(seed, m)
+    stack[:, :3, :3] += np.random.default_rng(seed).uniform(-1e-3, 1e-3, size=(m, 3, 3))
+    if m:
+        stack[m // 2, :3, 0] *= -1.0
+    return stack
+
+
+@pytest.mark.parametrize("m", [0, 1, 500])
+def test_orthonormality_residual_each_is_the_scalar_call_bitwise(m):
+    stack = _sheared_stack(40, m)
+    residual = orthonormality_residual_each(stack)
+    assert residual.shape == (m,) and residual.dtype == np.float64
+    for i in range(m):
+        assert residual[i] == orthonormality_residual(stack[i, :3, :3])
+
+
+def test_orthonormality_residual_is_max_abs_rtr_minus_identity():
+    stack = _sheared_stack(41, 200)
+    for r in stack[:, :3, :3]:
+        want = np.abs(r.T @ r - np.eye(3)).max()
+        assert abs(orthonormality_residual(r) - want) <= READOUT_ROUTE_EPS * np.finfo(float).eps
+
+
+def test_orthonormality_residual_of_the_identity_is_zero():
+    assert orthonormality_residual(np.eye(3)) == 0.0
+
+
+@pytest.mark.parametrize("m", [0, 1, 500])
+def test_rotation_determinant_each_is_the_scalar_call_bitwise(m):
+    stack = _sheared_stack(42, m)
+    det = rotation_determinant_each(stack)
+    assert det.shape == (m,) and det.dtype == np.float64
+    for i in range(m):
+        assert det[i] == determinant(stack[i, :3, :3])
+    if m > 1:
+        assert det[m // 2] < 0.0 and np.delete(det, m // 2).min() > 0.0
+
+
+def test_determinant_matches_numpy():
+    for r in _sheared_stack(43, 200)[:, :3, :3]:
+        assert abs(determinant(r) - np.linalg.det(r)) <= READOUT_ROUTE_EPS * np.finfo(float).eps
+
+
+@pytest.mark.parametrize("m", [0, 1, 500])
+def test_norm_each_matches_numpy(m):
+    vectors = np.random.default_rng(m).normal(size=(m, 3))
+    norms = norm_each(vectors)
+    assert norms.shape == (m,) and norms.dtype == np.float64
+    nptest.assert_allclose(
+        norms, np.linalg.norm(vectors, axis=1), rtol=READOUT_ROUTE_EPS * np.finfo(float).eps, atol=0
+    )
+
+
+def test_rigidity_readouts_read_strided_input_by_value():
+    stack = _sheared_stack(44, 8)
+    wide = np.concatenate([stack, stack], axis=0)[::2]
+    vectors = np.random.default_rng(44).normal(size=(8, 6))[:, ::2]
+    nptest.assert_array_equal(
+        orthonormality_residual_each(wide), orthonormality_residual_each(np.array(wide))
+    )
+    nptest.assert_array_equal(
+        rotation_determinant_each(wide), rotation_determinant_each(np.array(wide))
+    )
+    nptest.assert_array_equal(norm_each(vectors), norm_each(np.array(vectors)))
+
+
+@pytest.mark.parametrize("bad", [np.zeros((4, 4)), np.zeros((2, 3, 4)), np.zeros((2, 4, 3))])
+def test_rigidity_readouts_refuse_what_is_not_m_by_4_by_4(bad):
+    with pytest.raises((TypeError, ValueError)):
+        orthonormality_residual_each(bad)
+    with pytest.raises((TypeError, ValueError)):
+        rotation_determinant_each(bad)
+
+
+@pytest.mark.parametrize("bad", [np.zeros((2, 2)), np.zeros((4, 4)), np.zeros(9)])
+def test_scalar_rigidity_readouts_refuse_what_is_not_3_by_3(bad):
+    with pytest.raises(TypeError):
+        orthonormality_residual(bad)
+    with pytest.raises(TypeError):
+        determinant(bad)
+
+
+def test_norm_each_refuses_what_is_not_n_by_3():
+    with pytest.raises(TypeError):
+        norm_each(np.zeros((2, 4)))
