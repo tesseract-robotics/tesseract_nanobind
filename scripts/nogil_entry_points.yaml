@@ -30,8 +30,9 @@ tesseract_task_composer:
   TaskComposerServer:
     loadConfig: >-
       Waits for another thread's loadConfig / addTask / addExecutor on this server (the server
-      gate, enter_server), which calls Python (a ResourceLocator, a log handler) and needs the
-      GIL; frees finished runs first (see TaskComposerFuture.ready). The load itself holds the GIL.
+      gate, enter_server), which calls Python (a ResourceLocator) and needs the GIL; a Python
+      log handler waits there too, on the delivery thread; frees finished runs first (see
+      TaskComposerFuture.ready). The load itself holds the GIL.
     addTask: Waits for another thread's mutation of this server; see loadConfig.
     addExecutor: >-
       Replacing an executor destroys the old one, which joins workers that may wait for the GIL
