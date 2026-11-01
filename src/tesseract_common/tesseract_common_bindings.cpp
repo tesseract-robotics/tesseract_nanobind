@@ -18,6 +18,26 @@ NB_MAKE_OPAQUE(VectorIsometry3d)
 // (N, 3) points or directions as numpy holds them: row-major, one point per row.
 using PointsRowMajor = Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>;
 
+// (M, 4, 4) homogeneous matrices as numpy holds a stack of them: C order, row-major 4 x 4 per
+// transform. An input that is strided, Fortran-ordered or not float64 is converted by nanobind
+// first; an output owns a new buffer.
+using TransformStackIn = nb::ndarray<nb::numpy, const double, nb::shape<-1, 4, 4>, nb::c_contig>;
+using TransformStackOut = nb::ndarray<nb::numpy, double, nb::shape<-1, 4, 4>, nb::c_contig>;
+using RowMajor4d = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
+
+// Transform i of a stack, built as `Isometry3d(matrix)` builds one: assigned through matrix().
+static Eigen::Isometry3d stack_isometry(const TransformStackIn& stack, std::size_t i) {
+    Eigen::Isometry3d iso;
+    iso.matrix() = Eigen::Map<const RowMajor4d>(stack.data() + 16 * i);
+    return iso;
+}
+
+static TransformStackOut new_transform_stack(std::size_t m) {
+    double* data = new double[16 * m];
+    nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+    return TransformStackOut(data, {m, 4, 4}, owner);
+}
+
 #include <tesseract/common/resource_locator.h>
 #include <tesseract/common/manipulator_info.h>
 #include <tesseract/common/joint_state.h>
@@ -257,6 +277,16 @@ NB_MODULE(_tesseract_common, m) {
             }
             return mapped;
         }, "vectors"_a)
+        // `self * Isometry3d(stack[i])` for every transform of an (M, 4, 4) stack, in one call:
+        // row i is bitwise the single product.
+        .def("compose_each", [](const Eigen::Isometry3d& self, const TransformStackIn& stack) {
+            const std::size_t m = stack.shape(0);
+            TransformStackOut out = new_transform_stack(m);
+            for (std::size_t i = 0; i < m; ++i) {
+                Eigen::Map<RowMajor4d>(out.data() + 16 * i) = (self * stack_isometry(stack, i)).matrix();
+            }
+            return out;
+        }, "transforms"_a)
         // In-place composition mutators. Return self so callers can chain
         // (`iso.translate(v).rotate(q)`), matching Eigen's fluent C++ API.
         //
@@ -626,6 +656,25 @@ NB_MODULE(_tesseract_common, m) {
                << ", axis=[" << ax.x() << ", " << ax.y() << ", " << ax.z() << "])";
             return ss.str();
         });
+
+    // ========== apply_directions_each ==========
+    // Row i of an (M, 3) array rotated by transform i of an (M, 4, 4) stack: bitwise
+    // `Isometry3d(stack[i]).apply_directions(vectors[i:i + 1])[0]`, without M Python calls.
+    m.def("apply_directions_each", [](const TransformStackIn& stack,
+                                      const Eigen::Ref<const PointsRowMajor>& vectors) -> PointsRowMajor {
+        const std::size_t count = stack.shape(0);
+        if (static_cast<Eigen::Index>(count) != vectors.rows())
+            throw std::invalid_argument("apply_directions_each: " + std::to_string(count) + " transforms but " +
+                                        std::to_string(vectors.rows()) + " vector rows");
+        PointsRowMajor rotated(vectors.rows(), 3);
+        for (std::size_t i = 0; i < count; ++i) {
+            Eigen::Isometry3d rotation = stack_isometry(stack, i);
+            rotation.translation().setZero();
+            rotated.row(static_cast<Eigen::Index>(i)) =
+                (rotation * Eigen::Vector3d(vectors.row(static_cast<Eigen::Index>(i)).transpose())).transpose();
+        }
+        return rotated;
+    }, "transforms"_a, "vectors"_a);
 
     // ========== nearest_rotation ==========
     nb::exception<NonFiniteMatrixError>(m, "NonFiniteMatrixError", PyExc_ValueError)

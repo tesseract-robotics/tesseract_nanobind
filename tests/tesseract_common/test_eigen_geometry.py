@@ -18,6 +18,7 @@ from tesseract_robotics.tesseract_common import (
     ParametrizedLine3d,
     Quaterniond,
     Translation3d,
+    apply_directions_each,
     nearest_rotation,
 )
 
@@ -1058,3 +1059,61 @@ def test_nearest_rotation_returns_a_new_array_and_leaves_its_input():
     r = nearest_rotation(m)
     nptest.assert_array_equal(m, before)
     assert not np.shares_memory(r, m)
+
+
+# ---------------------------------------------------------------------------
+# Batched transform stacks: (M, 4, 4) row-major homogeneous matrices. Row i of
+# each result is bitwise the per-transform binding call on Isometry3d(stack[i]).
+# ---------------------------------------------------------------------------
+
+
+def _random_stack(seed, m):
+    return np.array([_random_rigid(seed * 1000 + i).matrix for i in range(m)]).reshape(m, 4, 4)
+
+
+@pytest.mark.parametrize("m", [0, 1, 500])
+def test_compose_each_is_the_per_transform_product_bitwise(m):
+    left = _random_rigid(30)
+    stack = _random_stack(31, m)
+    composed = left.compose_each(stack)
+    assert composed.shape == (m, 4, 4)
+    assert composed.dtype == np.float64 and composed.flags.c_contiguous
+    for i in range(m):
+        nptest.assert_array_equal(composed[i], (left * Isometry3d(stack[i])).matrix)
+
+
+@pytest.mark.parametrize("m", [0, 1, 500])
+def test_apply_directions_each_rotates_row_i_by_transform_i_bitwise(m):
+    stack = _random_stack(32, m)
+    vectors = np.random.default_rng(m).normal(size=(m, 3))
+    rotated = apply_directions_each(stack, vectors)
+    assert rotated.shape == (m, 3)
+    for i in range(m):
+        nptest.assert_array_equal(
+            rotated[i], Isometry3d(stack[i]).apply_directions(vectors[i : i + 1])[0]
+        )
+
+
+def test_batched_stacks_read_strided_input_by_value():
+    stack = _random_stack(33, 8)
+    wide = np.concatenate([stack, stack], axis=0)[::2]
+    vectors = np.random.default_rng(33).normal(size=(8, 6))[:, ::2]
+    left = _random_rigid(34)
+    nptest.assert_array_equal(left.compose_each(wide), left.compose_each(np.array(wide)))
+    nptest.assert_array_equal(
+        apply_directions_each(wide, vectors),
+        apply_directions_each(np.array(wide), np.array(vectors)),
+    )
+
+
+@pytest.mark.parametrize("bad", [np.zeros((4, 4)), np.zeros((2, 3, 4)), np.zeros((2, 4, 3))])
+def test_batched_stacks_refuse_what_is_not_m_by_4_by_4(bad):
+    with pytest.raises((TypeError, ValueError)):
+        _random_rigid(35).compose_each(bad)
+    with pytest.raises((TypeError, ValueError)):
+        apply_directions_each(bad, np.zeros((len(bad), 3)))
+
+
+def test_apply_directions_each_refuses_a_row_count_mismatch():
+    with pytest.raises(ValueError, match="rows"):
+        apply_directions_each(_random_stack(36, 3), np.zeros((2, 3)))
