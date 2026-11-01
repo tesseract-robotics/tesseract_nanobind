@@ -132,7 +132,9 @@ def _including_config(tmp_path) -> str:
     config = yaml.safe_load(tesseract_robotics.get_task_composer_config_path().read_text())
     included = tmp_path / "plugins.yaml"
     included.write_text(yaml.safe_dump(config["task_composer_plugins"]))
-    return f"task_composer_plugins: !include file://{included}"
+    # A plain absolute path: upstream's GeneralResourceLocator reads only `file:///`, which
+    # leaves `/C:/...` on Windows, not an absolute path there.
+    return f"task_composer_plugins: !include {included}"
 
 
 # A handler that calls the server from the delivery thread, at the message "TOUCH" that a
