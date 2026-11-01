@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping, Sequence
 import enum
 import io
 import os
-from typing import Annotated, overload
+from typing import Annotated, Self, overload
 
 import numpy
 from numpy.typing import NDArray
@@ -54,10 +54,10 @@ class Isometry3d:
     @property
     def linear(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')]: ...
 
-    def inverse(self) -> Isometry3d: ...
+    def inverse(self) -> Self: ...
 
     @overload
-    def __mul__(self, arg: Isometry3d, /) -> Isometry3d: ...
+    def __mul__(self, arg: Isometry3d, /) -> Self: ...
 
     @overload
     def __mul__(self, arg: Translation3d, /) -> Isometry3d: ...
@@ -74,6 +74,8 @@ class Isometry3d:
     def apply_points(self, points: Annotated[NDArray[numpy.float64], dict(shape=(None, 3), writable=False)] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 3), order='C')]: ...
 
     def apply_directions(self, vectors: Annotated[NDArray[numpy.float64], dict(shape=(None, 3), writable=False)] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 3), order='C')]: ...
+
+    def compose_each(self, transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C')]: ...
 
     def translate(self, vec: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> Isometry3d: ...
 
@@ -239,6 +241,16 @@ class AngleAxisd:
     def isApprox(self, other: AngleAxisd, prec: float = 1e-12) -> bool: ...
 
     def __repr__(self) -> str: ...
+
+def apply_directions_each(transforms: Annotated[NDArray[numpy.float64], dict(shape=(None, 4, 4), order='C', writable=False)], vectors: Annotated[NDArray[numpy.float64], dict(shape=(None, 3), writable=False)] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 3), order='C')]: ...
+
+class NonFiniteMatrixError(ValueError):
+    """nearest_rotation got a matrix with a NaN or infinite entry."""
+
+def nearest_rotation(matrix: Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(3, 3), order='F')]:
+    """
+    The rotation closest to a 3x3 matrix in the Frobenius norm, U·diag(1, 1, det(U·Vᵀ))·Vᵀ from its SVD; det is +1 also for a reflection. A new array; the input is unchanged.
+    """
 
 class Hyperplane3d:
     @overload

@@ -67,6 +67,8 @@ __all__ = [
     "AngleAxisd",
     "Hyperplane3d",
     "ParametrizedLine3d",
+    "nearest_rotation",
+    "NonFiniteMatrixError",
     # Unit axes (Vector3d-compatible numpy arrays)
     "X_AXIS",
     "Y_AXIS",

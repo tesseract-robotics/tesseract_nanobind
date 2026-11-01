@@ -31,7 +31,7 @@ Example:
 from __future__ import annotations
 
 import math
-from typing import overload
+from typing import Self, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -129,13 +129,13 @@ class Pose(Isometry3d):
     # ----- Factories ----------------------------------------------------
 
     @classmethod
-    def from_xyz(cls, x: float, y: float, z: float) -> Pose:
+    def from_xyz(cls, x: float, y: float, z: float) -> Self:
         """Pure translation pose from scalar components."""
         return cls(Translation3d(x, y, z), Quaterniond.Identity())
 
     @overload
     @classmethod
-    def from_xyz_quat(cls, position: ArrayLike, quaternion: ArrayLike) -> Pose: ...
+    def from_xyz_quat(cls, position: ArrayLike, quaternion: ArrayLike) -> Self: ...
     @overload
     @classmethod
     def from_xyz_quat(
@@ -147,7 +147,7 @@ class Pose(Isometry3d):
         qy: float,
         qz: float,
         qw: float,
-    ) -> Pose: ...
+    ) -> Self: ...
     # pyright wants the impl signature to enumerate named params from every
     # overload (would be 7 params with 5 defaults, narrowed on len(args)
     # anyway). The dispatch in the body is correct; the wart is purely
@@ -163,7 +163,7 @@ class Pose(Isometry3d):
     #      Readability cost > diagnostic-noise cost. Kept the one-line
     #      ignore as the principled trade-off.
     @classmethod
-    def from_xyz_quat(cls, *args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
+    def from_xyz_quat(cls, *args) -> Self:  # pyright: ignore[reportInconsistentOverload]
         """Pose from position `[x, y, z]` and scalar-last quaternion `[qx, qy, qz, qw]`.
 
         Two calling conventions, dispatched on `len(args)`:
@@ -197,7 +197,7 @@ class Pose(Isometry3d):
 
     @overload
     @classmethod
-    def from_xyz_rpy(cls, position: ArrayLike, rpy: ArrayLike) -> Pose: ...
+    def from_xyz_rpy(cls, position: ArrayLike, rpy: ArrayLike) -> Self: ...
     @overload
     @classmethod
     def from_xyz_rpy(
@@ -208,10 +208,10 @@ class Pose(Isometry3d):
         roll: float,
         pitch: float,
         yaw: float,
-    ) -> Pose: ...
+    ) -> Self: ...
     # Same structural pyright limitation as from_xyz_quat — see comment there.
     @classmethod
-    def from_xyz_rpy(cls, *args) -> Pose:  # pyright: ignore[reportInconsistentOverload]
+    def from_xyz_rpy(cls, *args) -> Self:  # pyright: ignore[reportInconsistentOverload]
         """Pose from position `[x, y, z]` and XYZ Tait-Bryan angles `[roll, pitch, yaw]`.
 
         Two calling conventions:
@@ -241,7 +241,7 @@ class Pose(Isometry3d):
         )
 
     @classmethod
-    def from_matrix_position(cls, rotation: ArrayLike, position: ArrayLike) -> Pose:
+    def from_matrix_position(cls, rotation: ArrayLike, position: ArrayLike) -> Self:
         """Pose from a 3x3 rotation matrix and `[x, y, z]` position.
 
         The rotation must be orthonormal — `Quaterniond(Matrix3d)` validates
@@ -363,7 +363,12 @@ class Pose(Isometry3d):
 
     # ----- Conversions / ops --------------------------------------------
 
-    def __matmul__(self, other: object) -> Pose:
+    # A subclass (a frame-tagged pose) gets its own type back from every
+    # operation that builds a pose: the factories (`cls(...)`), and
+    # `inverse()` / `*` by an Isometry3d, which the binding builds as
+    # `type(self)` in C++ (`isometry_like`), so `@` below needs no re-wrap.
+
+    def __matmul__(self, other: object) -> Self:
         """Compose: `self @ other` applies `other` then `self`.
 
         Returns `NotImplemented` (not raises) for non-Isometry3d operands so
@@ -374,7 +379,7 @@ class Pose(Isometry3d):
         `isinstance` check as dead code.
         """
         if isinstance(other, Isometry3d):
-            return Pose(self * other)
+            return self * other
         return NotImplemented
 
     def __repr__(self) -> str:

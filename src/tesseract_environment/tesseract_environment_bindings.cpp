@@ -164,6 +164,9 @@ tcol::ContactResultMap check_trajectory_segment(tcol::ContinuousContactManager& 
 // traceback. The binding owns the Python boundary, so validate here and fail
 // loud (std::invalid_argument -> ValueError). Valid targets are the ACTIVE
 // joints: fixed/mimic joints aren't in the solver's map and crash identically.
+// (M, N) joint states as numpy holds them: one state per row.
+using RowMajorXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
 void validate_set_state_joint_names(const te::Environment& env,
                                     const std::vector<std::string>& names,
                                     const std::string& caller = "setState")
@@ -848,6 +851,45 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getStateByNamesAndValues", get_state_names_values,
              "joint_names"_a, "joint_values"_a, "floating_joints"_a = tc::TransformMap{},
              nb::call_guard<nb::gil_scoped_release>())
+        // M joint states in one call: (M, N) values of `joint_names` -> (M, L, 4, 4) world
+        // transforms of `link_names`, row-major. Row m is bitwise
+        // `getState(joint_names, joint_values[m]).link_transforms[link].matrix`; the
+        // environment's own state is not moved.
+        .def("link_transforms_batch", [](const te::Environment& self,
+                                         const std::vector<std::string>& joint_names,
+                                         const Eigen::Ref<const RowMajorXd>& joint_values,
+                                         const std::vector<std::string>& link_names) {
+            if (static_cast<Eigen::Index>(joint_names.size()) != joint_values.cols())
+                throw std::invalid_argument("link_transforms_batch: joint_names length (" +
+                                            std::to_string(joint_names.size()) + ") != joint_values columns (" +
+                                            std::to_string(joint_values.cols()) + ")");
+            validate_set_state_joint_names(self, joint_names, "link_transforms_batch");
+            std::string unknown;
+            for (const auto& name : link_names) {
+                if (!self.getLink(name)) {
+                    if (!unknown.empty()) unknown += ", ";
+                    unknown += name;
+                }
+            }
+            if (!unknown.empty())
+                throw std::invalid_argument("link_transforms_batch: unknown link names: " + unknown);
+            const std::size_t m = static_cast<std::size_t>(joint_values.rows());
+            const std::size_t l = link_names.size();
+            double* data = new double[16 * m * l];
+            nb::capsule owner(data, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+            {
+                nb::gil_scoped_release nogil;
+                for (std::size_t row = 0; row < m; ++row) {
+                    const Eigen::VectorXd values = joint_values.row(static_cast<Eigen::Index>(row)).transpose();
+                    const auto state = self.getState(joint_names, values);
+                    for (std::size_t link = 0; link < l; ++link) {
+                        Eigen::Map<Eigen::Matrix<double, 4, 4, Eigen::RowMajor>>(data + 16 * (row * l + link)) =
+                            state.link_transforms.at(link_names[link]).matrix();
+                    }
+                }
+            }
+            return nb::ndarray<nb::numpy, double, nb::shape<-1, -1, 4, 4>, nb::c_contig>(data, {m, l, 4, 4}, owner);
+        }, "joint_names"_a, "joint_values"_a, "link_names"_a)
         .def("setState", [](te::Environment& self,
                             const std::unordered_map<std::string, double>& joints,
                             const tc::TransformMap& floating_joints) {
