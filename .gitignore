@@ -48,6 +48,8 @@ AGENTS.md
 
 # upstream-main feedstock builds (pixi run build-feedstock)
 packaging/output/
+packaging/output-*/
+packaging/linux-aarch64-out/
 packaging/SDKs/
 packaging/logs/
 upstream/build/

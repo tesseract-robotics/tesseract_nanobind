@@ -7161,10 +7161,10 @@ environments:
     - https://pypi.org/simple
     packages:
       osx-arm64:
-      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/boost-plugin-loader-0.4.5-h61ae055_0.conda
-      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/tesseract-robotics-0.36.0.dev20260929-h6706788_1.conda
-      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/tesseract-robotics-planning-0.36.0.dev20260929-h6757943_1.conda
-      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/trajopt-0.36.0.dev20260930-h6757943_0.conda
+      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/boost-plugin-loader-0.5.0-h730ede2_0.conda
+      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/tesseract-robotics-0.36.0.dev20260929-h0ad4b0b_1.conda
+      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/tesseract-robotics-planning-0.36.0.dev20260929-hb3c21f6_1.conda
+      - conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/trajopt-0.36.0.dev20260930-hb3c21f6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/aiohappyeyeballs-2.7.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/aiosignal-1.4.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/attrs-26.1.0-pyhcf101f3_0.conda
@@ -7434,7 +7434,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/vtk-io-ffmpeg-9.6.1-py312hb537b8f_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/x264-1!164.3095-hb001647_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/x265-3.5-h55d2f36_4.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xorg-libx11-1.8.13-hf948f5a_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xorg-libx11-1.8.14-hbffa61f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xorg-libxau-1.0.12-hb001647_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xorg-libxdmcp-1.1.5-hb001647_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/xorg-libxext-1.3.7-hb001647_1.conda
@@ -44380,3 +44380,208 @@ packages:
   run_exports: {}
   size: 149244
   timestamp: 1763950605754
+- conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/boost-plugin-loader-0.5.0-h730ede2_0.conda
+  subdir: osx-arm64
+  sha256: bca2edaaa6403264b55468a49ab32fc9b0d8e9856dde388a4eb1481c79842711
+  md5: 1a6614246bea5d03bc984a5aec6e870b
+  depends:
+  - libcxx >=21
+  - __osx >=11.0
+  - libboost >=1.88.0,<1.89.0a0
+  channel: file:///Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output
+  license: Apache-2.0
+  run_exports:
+    weak:
+    - boost-plugin-loader >=0.5.0,<0.6.0a0
+  size: 94747
+  timestamp: 1793543682405
+- conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/tesseract-robotics-0.36.0.dev20260929-h0ad4b0b_1.conda
+  subdir: osx-arm64
+  sha256: 7be7a824781ed03cb290ff180eedc739e6ef16c92476450cbcdc7d8694944987
+  md5: fee70654dc54518584b8e2707ea65968
+  depends:
+  - cereal
+  - eigen
+  - tinyxml2
+  - spdlog
+  - assimp
+  - urdfdom
+  - fcl
+  - octomap
+  - orocos-kdl
+  - pcl
+  - xz
+  - yaml-cpp
+  - bullet-cpp
+  - blas
+  - xorg-libx11
+  - xorg-libxext
+  - libcxx >=21
+  - __osx >=11.0
+  - bullet-cpp >=3.25,<3.26.0a0
+  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
+  - octomap >=1.10.1,<1.11.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - assimp >=6.0.5,<7.0a0
+  - libboost >=1.88.0,<1.89.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - pcl >=1.15.1,<1.15.2.0a0
+  - urdfdom_headers >=2.1.2,<3.0a0
+  - urdfdom >=5.1.2,<5.2.0a0
+  - xorg-libxext >=1.3.7,<2.0a0
+  - flann >=1.9.2,<1.9.3.0a0
+  - xorg-libx11 >=1.8.14,<2.0a0
+  - tinyxml2 >=11.0.0,<11.1.0a0
+  - yaml-cpp >=0.8.0,<0.9.0a0
+  - orocos-kdl >=1.5.4,<1.6.0a0
+  - boost-plugin-loader >=0.5.0,<0.6.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
+  - opw-kinematics >=0.5.3,<0.6.0a0
+  - spdlog >=1.17.0,<1.18.0a0
+  - liblzma >=5.8.3,<6.0a0
+  channel: file:///Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output
+  license: Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause
+  run_exports:
+    weak:
+    - tesseract-robotics >=0.36.0.dev20260929,<0.37.0a0
+  size: 39805134
+  timestamp: 1793543869679
+- conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/tesseract-robotics-planning-0.36.0.dev20260929-hb3c21f6_1.conda
+  subdir: osx-arm64
+  sha256: 7f1390c24fb817c6f9de3cc29774c335037cfb42711de62f2dd49e9dbf5b58b1
+  md5: 37542508eb1c4a8ea0dbad694fb56942
+  depends:
+  - cereal
+  - eigen
+  - tinyxml2
+  - spdlog
+  - assimp
+  - urdfdom
+  - fcl
+  - octomap
+  - orocos-kdl
+  - pcl
+  - gtest
+  - gmock
+  - xz
+  - jsoncpp
+  - taskflow
+  - yaml-cpp
+  - bullet-cpp
+  - blas
+  - osqp
+  - osqp-eigen
+  - qpoases
+  - ompl
+  - xorg-libx11
+  - xorg-libxext
+  - gperftools
+  - __osx >=11.0
+  - libcxx >=21
+  - urdfdom_headers >=2.1.2,<3.0a0
+  - urdfdom >=5.1.2,<5.2.0a0
+  - descartes-light >=0.4.10,<0.5.0a0
+  - xorg-libx11 >=1.8.14,<2.0a0
+  - xorg-libxext >=1.3.7,<2.0a0
+  - orocos-kdl >=1.5.4,<1.6.0a0
+  - assimp >=6.0.5,<7.0a0
+  - spdlog >=1.17.0,<1.18.0a0
+  - tinyxml2 >=11.0.0,<11.1.0a0
+  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
+  - trajopt >=0.36.0.dev20260930,<0.37.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
+  - qpoases >=3.2.2,<3.2.3.0a0
+  - osqp-eigen >=0.11.2,<0.12.0a0
+  - yaml-cpp >=0.8.0,<0.9.0a0
+  - bullet-cpp >=3.25,<3.26.0a0
+  - pcl >=1.15.1,<1.15.2.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - libruckig >=0.17.3,<0.18.0a0
+  - ompl >=1.7.0,<1.8.0a0
+  - tesseract-robotics >=0.36.0.dev20260929,<0.37.0a0
+  - libboost >=1.88.0,<1.89.0a0
+  - octomap >=1.10.1,<1.11.0a0
+  - liblzma >=5.8.3,<6.0a0
+  - flann >=1.9.2,<1.9.3.0a0
+  channel: file:///Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output
+  license: Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause
+  run_exports:
+    weak:
+    - tesseract-robotics-planning >=0.36.0.dev20260929,<0.37.0a0
+  size: 1203551
+  timestamp: 1793544613087
+- conda: /Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output/osx-arm64/trajopt-0.36.0.dev20260930-hb3c21f6_0.conda
+  subdir: osx-arm64
+  sha256: c69a9779d8bfdcb3304a9c91cf100d89e47c5771b0b14add71190bda05651115
+  md5: cacb8edb592c4bad60f5c9c834331c00
+  depends:
+  - libboost-devel
+  - cereal
+  - eigen
+  - tinyxml2
+  - spdlog
+  - assimp
+  - urdfdom
+  - fcl
+  - octomap
+  - orocos-kdl
+  - pcl
+  - gtest
+  - gmock
+  - xz
+  - jsoncpp
+  - taskflow
+  - yaml-cpp
+  - bullet-cpp
+  - blas
+  - osqp
+  - osqp-eigen
+  - qpoases
+  - xorg-libx11
+  - xorg-libxext
+  - __osx >=11.0
+  - libcxx >=21
+  - flann >=1.9.2,<1.9.3.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - xorg-libxext >=1.3.7,<2.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
+  - bullet-cpp >=3.25,<3.26.0a0
+  - assimp >=6.0.5,<7.0a0
+  - osqp-eigen >=0.11.2,<0.12.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - octomap >=1.10.1,<1.11.0a0
+  - spdlog >=1.17.0,<1.18.0a0
+  - pcl >=1.15.1,<1.15.2.0a0
+  - liblzma >=5.8.3,<6.0a0
+  - yaml-cpp >=0.8.0,<0.9.0a0
+  - qpoases >=3.2.2,<3.2.3.0a0
+  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
+  - tesseract-robotics >=0.36.0.dev20260929,<0.37.0a0
+  - tinyxml2 >=11.0.0,<11.1.0a0
+  - xorg-libx11 >=1.8.14,<2.0a0
+  - orocos-kdl >=1.5.4,<1.6.0a0
+  - libboost >=1.88.0,<1.89.0a0
+  - urdfdom_headers >=2.1.2,<3.0a0
+  - urdfdom >=5.1.2,<5.2.0a0
+  channel: file:///Users/jelle/Code/CADCAM/tesseract_nanobind-upstream-main/packaging/output
+  license: BSD-2-Clause
+  run_exports:
+    weak:
+    - trajopt >=0.36.0.dev20260930,<0.37.0a0
+  size: 26536509
+  timestamp: 1793544326753
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/xorg-libx11-1.8.14-hbffa61f_0.conda
+  sha256: ae54cdc415a16054bbe41d256a7725b5bc493e26dfff5e27245f0b0ac878c9d5
+  md5: eb7fc152a9a671b2d1ccdf0d93b9d25a
+  depends:
+  - __osx >=11.0
+  - libxcb >=1.17.0,<2.0a0
+  license: MIT
+  license_family: MIT
+  purls: []
+  run_exports:
+    weak:
+    - xorg-libx11 >=1.8.14,<2.0a0
+  size: 759849
+  timestamp: 1792545397288

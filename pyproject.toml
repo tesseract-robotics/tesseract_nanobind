@@ -252,6 +252,8 @@ stubs-check = { cmd = "python scripts/generate_stubs.py --check", description = 
 # so each feedstock links the ones built before it. FEEDSTOCK_CONFIG is the
 # .ci_support config for the host platform (set per target below). Setting
 # OSX_SDK_DIR accepts Apple's macOS SDK licence (conda-smithy downloads the SDK there).
+# CI is defined but empty: conda-forge-ci-setup 4.30.1 reads $CI under `set -u`
+# (GitHub Actions sets it; build-locally.py does not).
 # conda-forge's build setup appends CONDA_BUILD_SYSROOT to .ci_support/<config>.yaml in
 # place (CI checkouts are throwaway); a second local run then fails on a duplicate key,
 # so every build restores .ci_support first.
@@ -259,14 +261,14 @@ stubs-check = { cmd = "python scripts/generate_stubs.py --check", description = 
 # packaged 0.4.10, so the chain takes it from the channel.
 # tesseract main needs boost_plugin_loader 0.4.5 (PluginLoader::acquireLibraryLifetimeTokens);
 # the channel has 0.4.3.
-build-feedstock-boost-plugin-loader = { cmd = "mkdir -p $PIXI_PROJECT_ROOT/packaging/SDKs && git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/boost-plugin-loader-feedstock", env = { EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, description = "Build the boost-plugin-loader feedstock (dev branch) into packaging/output" }
-build-feedstock-tesseract = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-feedstock", env = { EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
+build-feedstock-boost-plugin-loader = { cmd = "mkdir -p $PIXI_PROJECT_ROOT/packaging/SDKs && git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/boost-plugin-loader-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, description = "Build the boost-plugin-loader feedstock (dev branch) into packaging/output" }
+build-feedstock-tesseract = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
     "build-feedstock-boost-plugin-loader",
 ], description = "Build the tesseract feedstock (dev branch) against the local boost-plugin-loader" }
-build-feedstock-trajopt = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/trajopt-feedstock", env = { EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
+build-feedstock-trajopt = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/trajopt-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
     "build-feedstock-tesseract",
 ], description = "Build the trajopt feedstock (dev branch) against the local tesseract" }
-build-feedstock-planning = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-planning-feedstock", env = { EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
+build-feedstock-planning = { cmd = "git checkout -- .ci_support && python build-locally.py $FEEDSTOCK_CONFIG", cwd = "packaging/tesseract-robotics-planning-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs" }, depends-on = [
     "build-feedstock-trajopt",
 ], description = "Build the tesseract_planning feedstock (dev branch) against the local tesseract + trajopt" }
 # rattler-build indexes packaging/output after every build with a rattler-index
