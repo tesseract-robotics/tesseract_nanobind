@@ -75,6 +75,11 @@ __all__ = [
     "ParametrizedLine3d",
     "nearest_rotation",
     "NonFiniteMatrixError",
+    "orthonormality_residual",
+    "orthonormality_residual_each",
+    "determinant",
+    "rotation_determinant_each",
+    "norm_each",
     # Unit axes (Vector3d-compatible numpy arrays)
     "X_AXIS",
     "Y_AXIS",

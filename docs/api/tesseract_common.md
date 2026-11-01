@@ -126,6 +126,23 @@ q = Quaterniond(R)                    # passes the orthonormality check
   minimiser comes back without warning: the zero matrix, `diag(1, 0, 0)` and `diag(1, 1, -1)`
   all return the identity.
 
+### Rigidity readouts
+
+The checks that accept a matrix as a rotation, in Eigen: `orthonormality_residual(R)` is
+`max|RᵀR − I|` of a 3x3 (0 for an exact rotation) and `determinant(R)` its determinant. The stack
+forms read the rotation block of each transform of an `(M, 4, 4)` stack, and `norm_each` the norm
+of each row of an `(N, 3)` array.
+
+```python
+from tesseract_robotics.tesseract_common import (
+    orthonormality_residual_each,
+    rotation_determinant_each,
+)
+
+residual = orthonormality_residual_each(stack)  # (M,): row i bitwise orthonormality_residual(stack[i, :3, :3])
+proper = rotation_determinant_each(stack) > 0.0  # (M,): row i bitwise determinant(stack[i, :3, :3])
+```
+
 ## Frame and error math
 
 Re-base twists and jacobians, and compute pose errors, with tesseract's own math. A twist

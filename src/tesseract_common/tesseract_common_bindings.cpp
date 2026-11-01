@@ -130,6 +130,18 @@ static std::size_t insert_index(Py_ssize_t i, std::size_t size) {
     return static_cast<std::size_t>(std::clamp<Py_ssize_t>(j, 0, n));
 }
 
+// max|RᵀR − I| of a 3x3, dimensionless: how far it is from orthonormal. A consumer bounds it to
+// accept a matrix as a rotation; computed here so that check is Eigen's, as the rotation is.
+static double orthonormality_residual(const Eigen::Matrix3d& r) {
+    return (r.transpose() * r - Eigen::Matrix3d::Identity()).cwiseAbs().maxCoeff();
+}
+
+// The 3x3 rotation block of transform i of a stack, as a fixed-size matrix: the scalar readouts
+// on it give row i of the _each readouts bit for bit.
+static Eigen::Matrix3d stack_rotation(const TransformStackIn& stack, std::size_t i) {
+    return Eigen::Map<const RowMajor4d>(stack.data() + 16 * i).topLeftCorner<3, 3>();
+}
+
 // Python index (negative counts from the end) -> container index; std::out_of_range -> IndexError.
 static std::size_t normalize_index(Py_ssize_t i, std::size_t size) {
     const auto n = static_cast<Py_ssize_t>(size);
@@ -877,6 +889,33 @@ NB_MODULE(_tesseract_common, m) {
     m.def("nearest_rotation", &nearest_rotation, "matrix"_a,
           "The rotation closest to a 3x3 matrix in the Frobenius norm, U·diag(1, 1, det(U·Vᵀ))·Vᵀ "
           "from its SVD; det is +1 also for a reflection. A new array; the input is unchanged.");
+
+    // ========== rigidity readouts ==========
+    m.def("orthonormality_residual", &orthonormality_residual, "matrix"_a,
+          "max|RᵀR − I| of a 3x3 matrix, dimensionless: 0 for an exact rotation.");
+    m.def("determinant", [](const Eigen::Matrix3d& r) { return r.determinant(); }, "matrix"_a,
+          "The determinant of a 3x3 matrix: +1 for a rotation, -1 for a reflection.");
+    m.def("orthonormality_residual_each", [](const TransformStackIn& stack) {
+        const std::size_t count = stack.shape(0);
+        Eigen::VectorXd residual(static_cast<Eigen::Index>(count));
+        for (std::size_t i = 0; i < count; ++i)
+            residual(static_cast<Eigen::Index>(i)) = orthonormality_residual(stack_rotation(stack, i));
+        return residual;
+    }, "transforms"_a,
+          "max|RᵀR − I| of the rotation block of each transform of an (M, 4, 4) stack, (M,); row i is "
+          "bitwise orthonormality_residual(stack[i, :3, :3]).");
+    m.def("rotation_determinant_each", [](const TransformStackIn& stack) {
+        const std::size_t count = stack.shape(0);
+        Eigen::VectorXd det(static_cast<Eigen::Index>(count));
+        for (std::size_t i = 0; i < count; ++i)
+            det(static_cast<Eigen::Index>(i)) = stack_rotation(stack, i).determinant();
+        return det;
+    }, "transforms"_a,
+          "The determinant of the rotation block of each transform of an (M, 4, 4) stack, (M,); row i "
+          "is bitwise determinant(stack[i, :3, :3]).");
+    m.def("norm_each", [](const Eigen::Ref<const PointsRowMajor>& vectors) -> Eigen::VectorXd {
+        return vectors.rowwise().norm();
+    }, "vectors"_a, "The Euclidean norm of each row of an (N, 3) array, (N,).");
 
     // ========== Hyperplane3d ==========
     // Plane in 3D as {x : normal · x + offset = 0}. Bound before
