@@ -123,6 +123,33 @@ def test_mesh_normals_follow_non_uniform_scale():
     np.testing.assert_allclose(stretched.vertex_normals, expected, atol=NORMAL_ATOL)
 
 
+def _glb_attributes(mesh):
+    glb = mesh.export(file_type="glb")
+    header_len = struct.unpack_from("<I", glb, 12)[0]
+    return json.loads(glb[20 : 20 + header_len])["meshes"][0]["primitives"][0]["attributes"]
+
+
+# Two triangles; the second is degenerate (zero area), so its lone vertex has no normal.
+TWO_TRIANGLES = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [2.0, 0.0, 0.0]]
+TWO_TRIANGLE_FACES = np.array([3, 0, 1, 2, 3, 1, 3, 1], dtype=np.int32)
+
+
+def test_all_zero_normals_mean_no_normals():
+    """A file without normals (car_seat end_effector_simple.stl) comes back all zero."""
+    mesh = tg.Mesh(TWO_TRIANGLES, TWO_TRIANGLE_FACES, normals=[[0.0, 0.0, 0.0]] * 4)
+    (result,) = visual_to_trimesh(_visual(mesh), "l")
+    assert "NORMAL" not in _glb_attributes(result)
+
+
+def test_zero_normal_on_degenerate_face_stays_finite():
+    """NaN normals cost the browser its WebGL context; a zero normal must not become one."""
+    normals = [[0.0, 0.0, 1.0]] * 3 + [[0.0, 0.0, 0.0]]
+    mesh = tg.Mesh(TWO_TRIANGLES, TWO_TRIANGLE_FACES, normals=normals)
+    (result,) = visual_to_trimesh(_visual(mesh), "l")
+    assert np.isfinite(result.vertex_normals).all()
+    np.testing.assert_allclose(result.vertex_normals[:3], [[0.0, 0.0, 1.0]] * 3)
+
+
 def test_mesh_normals_reach_the_glb():
     _, mesh = _stl_mesh((1.0, 1.0, 1.0))
     glb = mesh.export(file_type="glb")

@@ -64,7 +64,13 @@ def _scaled_normals(mesh: tg.PolygonMesh) -> NDArray[np.float64] | None:
         return None
     scale = np.asarray(mesh.getScale(), dtype=np.float64)
     scaled = np.asarray(normals, dtype=np.float64).reshape(-1, 3) / scale**2
-    return scaled / np.linalg.norm(scaled, axis=1, keepdims=True)
+    length = np.linalg.norm(scaled, axis=1, keepdims=True)
+    # All zero: the file had no normals (e.g. car_seat end_effector_simple.stl).
+    if not length.any():
+        return None
+    # Some zero: vertices of zero-area faces, which draw no pixels. Keep them zero; NaN
+    # vertex data costs the browser its WebGL context.
+    return np.divide(scaled, length, out=np.zeros_like(scaled), where=length > 0.0)
 
 
 def _polygon_mesh(mesh: tg.PolygonMesh, visual_material: Material | None) -> trimesh.Trimesh:
