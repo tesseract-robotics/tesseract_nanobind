@@ -10,9 +10,10 @@ factories into the wheel. Each platform's workflow then publishes its wheels to
 PyPI when a version tag is pushed.
 
 Released wheels are built against tesseract 0.35.0. The 0.36 stack that
-`upstream-main` (#161) binds is not published yet: it is built from source on a
-developer machine (see [Building against upstream main](upstream-main.md)), so
-CI cannot build that branch until the packages exist on the channel.
+`upstream-main` (#161) binds is published as `0.36.0.dev` packages on the
+channel's `dev` label (`tesseract-robotics/label/dev`), built by the feedstocks'
+`dev` branches on CI for all five platforms; the `default` env pins them (see
+[Building against upstream main](upstream-main.md#status)).
 
 ```mermaid
 flowchart LR
@@ -65,10 +66,10 @@ Each upstream library has a conda-forge-style feedstock in the
 
 | Feedstock | Package | On the channel | Notes |
 |---|---|---|---|
-| `boost-plugin-loader-feedstock` | `boost-plugin-loader` | 0.4.3 | tesseract `master` needs 0.4.5 |
-| `tesseract-robotics-feedstock` | `tesseract-robotics` | 0.35.0 | |
-| `trajopt-feedstock` | `trajopt` | 0.35.0 | |
-| `tesseract-robotics-planning-feedstock` | `tesseract-robotics-planning` | 0.35.0 | |
+| `boost-plugin-loader-feedstock` | `boost-plugin-loader` | 0.4.3 | `dev` label: 0.5.0 (tesseract `master` needs ≥ 0.4.5) |
+| `tesseract-robotics-feedstock` | `tesseract-robotics` | 0.35.0 | `dev` label: 0.36.0.dev20260929 |
+| `trajopt-feedstock` | `trajopt` | 0.35.0 | `dev` label: 0.36.0.dev20260930 |
+| `tesseract-robotics-planning-feedstock` | `tesseract-robotics-planning` | 0.35.0 | `dev` label: 0.36.0.dev20260929 |
 | `descartes-light-feedstock` | `descartes-light` | 0.4.10 | |
 | `opw-kinematics-feedstock`, `ruckig-feedstock`, `ros-industrial-cmake-boilerplate-feedstock` | supporting packages | | |
 | `tesseract-robotics-python-feedstock` | `tesseract-robotics-python` (SWIG) | 0.35.0 | not used by this repository |
@@ -100,23 +101,23 @@ below; the released wheels never touch them.
 
 ```mermaid
 flowchart TB
-    subgraph released["Released stack (0.35.0)"]
-        CH[(tesseract-robotics channel)]
+    subgraph published["0.36 dev stack (published)"]
+        CH[(tesseract-robotics channel<br/>label: dev)]
     end
-    subgraph src["0.36 stack (unpublished)"]
+    subgraph src["0.36 stack (local)"]
         SM[upstream/ submodules<br/>tesseract, trajopt,<br/>tesseract_planning, bpl]
         OUT[(packaging/output<br/>local .conda files)]
     end
-    D[default, py310, py311, py312] -->|tesseract-robotics ==0.35.0<br/>tesseract-robotics-planning ==0.35.0| CH
+    D[default, py310, py311, py312] -->|tesseract-robotics ==0.36.0.dev20260929<br/>tesseract-robotics-planning ==0.36.0.dev20260929<br/>trajopt ==0.36.0.dev20260930| CH
     P39[py39] -->|TESSERACT_CPP_PREFIX| D
     U[upstream] -->|scripts/build_upstream.sh<br/>installs into the env prefix| SM
     FS[build-feedstock tasks] -->|build-locally.py| OUT
-    PK[packaged] -->|local channel<br/>./packaging/output| OUT
+    PK[packaged] -->|label/dev, or<br/>./packaging/output| CH
 ```
 
 | Environment | Python | C++ stack comes from | Used for |
 |---|---|---|---|
-| `default` | 3.14 (unpinned, `>=3.10`) | `tesseract-robotics` channel: `tesseract-robotics ==0.35.0`, `tesseract-robotics-planning ==0.35.0`; trajopt, descartes-light, opw-kinematics and every third-party library arrive transitively | local development |
+| `default` | 3.14 (unpinned, `>=3.10`) | `tesseract-robotics/label/dev`: `tesseract-robotics` / `tesseract-robotics-planning ==0.36.0.dev20260929`, `trajopt ==0.36.0.dev20260930`; descartes-light, opw-kinematics and every third-party library arrive transitively | local development |
 | `py310`, `py311`, `py312` | pinned | same as `default` | CI wheel builds |
 | `py39` | 3.9 | none of its own: the pcl → vtk closure has no cp39 builds, so the build reads the `py312` env through `TESSERACT_CPP_PREFIX` | CI wheels for Python 3.9 (macOS, Windows) |
 | `upstream` | 3.12 | the `upstream/` submodules, compiled by `pixi run -e upstream build-upstream-cpp` and installed into the env prefix; third-party libraries from conda-forge | 0.36 inner loop |
@@ -127,10 +128,10 @@ conda's clang 19 / gcc 14, scikit-build-core, nanobind, pytest), so they
 differ only in where the C++ stack comes from. Each builds the bindings into
 its own `SKBUILD_BUILD_DIR` (`build/upstream-*`, `build/packaged-*`).
 
-The pins are in `pyproject.toml` under `[tool.pixi.dependencies]`. Only the two
-top-level tesseract packages are pinned: pinning trajopt or eigen as well
-deadlocks the solve, because `tesseract-robotics 0.35.0` was rebuilt against
-eigen 5.0.1 and its `run_exports` drive the rest.
+The pins are in `pyproject.toml` under `[tool.pixi.dependencies]`: the three
+0.36 dev stack packages and `taskflow 3.11.*` (header-only, matched to the planning
+build). Pinning eigen or the other third-party libraries as well deadlocks the
+solve; the stack packages' `run_exports` drive the rest.
 
 `TESSERACT_CPP_PREFIX` takes precedence over `CONDA_PREFIX` in `CMakeLists.txt`
 (the RPATH, `CMAKE_PREFIX_PATH`, link directories and the data that gets
@@ -246,16 +247,17 @@ to move the bindings to another environment.
 ## The 0.36 track
 
 `upstream-main` binds tesseract, trajopt and tesseract_planning `master` ahead
-of 0.36. Nothing on the channel can build it yet:
+of 0.36. The feedstocks' `dev` branches build that stack on CI and upload it to the
+channel's `dev` label, which the `default` env reads:
 
-| Package | Channel | `upstream-main` needs |
+| Package | Label `main` | Label `dev` (built from) |
 |---|---|---|
-| boost-plugin-loader | 0.4.3 | 0.4.5 |
-| tesseract-robotics | 0.35.0 | `master` @ `f4cc080` |
-| trajopt | 0.35.0 | `master` @ `de9e941` |
-| tesseract-robotics-planning | 0.35.0 | `master` @ `4efed5f` |
+| boost-plugin-loader | 0.4.3 | 0.5.0 |
+| tesseract-robotics | 0.35.0 | 0.36.0.dev20260929 (`master` @ `f4cc080`) |
+| trajopt | 0.35.0 | 0.36.0.dev20260930 (`master` @ `de9e941`) |
+| tesseract-robotics-planning | 0.35.0 | 0.36.0.dev20260929 (`master` @ `4efed5f`) |
 
-Two local loops exist, described in [Building against upstream main](upstream-main.md):
+Two local loops also exist, described in [Building against upstream main](upstream-main.md):
 
 - **Inner loop**: the `upstream` env compiles the `upstream/` submodules from
   source. This is what the branch's tests run against.
@@ -266,13 +268,12 @@ Two local loops exist, described in [Building against upstream main](upstream-ma
 !!! warning "Status of the 0.36 packages"
     - **Confirmed:** the dev recipes pin the same SHAs as the `upstream/`
       submodules, and replace `console_bridge` with `spdlog`.
-    - **Confirmed:** the dev recipe edits are uncommitted changes in the
-      `packaging/*-feedstock` submodules. A fresh clone builds the 0.35.0
-      recipes.
-    - **Confirmed:** packages exist for osx-arm64 only, in `packaging/output`.
-      The `packaged` env consumes them; the bindings build and the full suite
-      passes (997 passed, 3 skipped), matching the source-built `upstream` env.
-      See [Packaged stack](upstream-main.md#packaged-stack-162-step-0).
+    - **Confirmed:** the dev recipes live on the feedstock forks' `dev`
+      branches; feedstock CI builds them on linux-64, linux-aarch64, osx-64,
+      osx-arm64 and win-64 and uploads to `tesseract-robotics/label/dev`.
+    - **Confirmed:** the bindings build against the dev-label packages and the
+      full suite passes on osx-arm64 in the `default` env (3087 passed). See
+      [Status](upstream-main.md#status).
     - **Confirmed and fixed:** the tesseract feedstock has to strip
       `-fvisibility-inlines-hidden` on macOS, as upstream's own conda recipe
       does. Without it every cereal registry singleton in the packaged dylibs
@@ -281,10 +282,8 @@ Two local loops exist, described in [Building against upstream main](upstream-ma
     - **Refuted:** tesseract_planning needs no strip. On macOS it registers
       its cereal types in headers, so its dylibs carry no registry singletons.
 
-Landing the 0.36 stack on the channel for every platform needs a `dev` track in
-the packaging feedstocks, uploaded to a separate label. A
-`tesseract-robotics-nanobind` feedstock built like the python feedstock would
-let this repository's CI test against the published dev packages.
+The `dev` track uploads to its own label, so the `main` label keeps serving the
+0.35.0 packages the released wheels are built from.
 
 ## Known gaps
 
