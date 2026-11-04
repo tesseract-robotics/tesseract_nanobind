@@ -36,7 +36,6 @@ import gc
 
 gc.disable()  # Disable GC to avoid nanobind reference leak warnings on exit
 
-import sys  # noqa: E402
 
 import numpy as np  # noqa: E402
 
@@ -74,10 +73,6 @@ from tesseract_robotics.tesseract_scene_graph import Joint, JointType  # noqa: E
 # TrajOpt planner namespace for profile registration
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
-# Optional viewer (disabled during pytest)
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 # C++ constants from pick_and_place_example.cpp
 OFFSET = 0.005  # 5mm clearance above box surface
@@ -388,22 +383,15 @@ def run():
 
 
 def main():
-    """Entry point - run workflow and optionally visualize.
-
-    When run standalone (not under pytest), launches web viewer at localhost:8000
-    to visualize the planned trajectory.
-    """
+    """Entry point - run the workflow, then animate the place trajectory in the viewer."""
     results = run()
 
-    # Launch viewer if available (skipped during pytest)
-    if TesseractViewer is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        # Load environment with attached box
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
-        # Display place trajectory (includes retreat, transit, and place motions)
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
         viewer.update_trajectory(results["place_result"].raw_results)
-        viewer.start_serve_background()
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     print("\nDone!")

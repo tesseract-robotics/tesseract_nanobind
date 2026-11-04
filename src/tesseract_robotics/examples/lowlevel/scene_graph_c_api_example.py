@@ -19,7 +19,6 @@ Use Cases:
 """
 
 import math
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -37,13 +36,8 @@ from tesseract_robotics.tesseract_environment import (
 )
 from tesseract_robotics.tesseract_scene_graph import Joint, JointType
 
-# Viewer (skip in pytest)
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
-
-def main():
+def run():
     """
     Demonstrates three scene graph operations:
     1. MoveJointCommand - change joint's parent link
@@ -61,9 +55,7 @@ def main():
 
     # Initialize environment (loads URDF/SRDF, builds scene graph)
     env = Environment()
-    if not env.init(urdf_path, srdf_path, locator):
-        print("Failed to initialize environment")
-        return False
+    assert env.init(urdf_path, srdf_path, locator)
 
     print(f"Environment initialized: {env.getName()}")
     print(f"Root link: {env.getRootLinkName()}")
@@ -173,15 +165,19 @@ def main():
             if joint.parent_link_name == link_name:
                 stack.append((joint.child_link_name, depth + 1))
 
-    # Optional: visualize with viewer
-    if TesseractViewer is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(env, [0, 0, 0])
-        viewer.start_serve_background()
-        input("Press Enter to exit...")
+    return {"env": env, "success": True}
 
-    return True
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
+    return results["success"]
 
 
 if __name__ == "__main__":

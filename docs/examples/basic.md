@@ -151,7 +151,7 @@ tesseract_pointcloud_octree_collision_example --cloud path/to/scan.ply --resolut
 ```
 
 !!! tip "Toggle in the viewer"
-    The viewer starts on the colliding trajectory; press **`t` + Enter** in the terminal to swap between the colliding (red) and collision-aware (green) trajectories. Press **Enter** alone to exit.
+    The viewer starts on the colliding trajectory; the **Trajectory** dropdown in the viewer's control panel swaps between the colliding (red) and collision-aware (green) trajectories. Press **Enter** in the terminal to exit.
 
 Typical output:
 

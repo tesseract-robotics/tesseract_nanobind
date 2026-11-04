@@ -96,7 +96,6 @@ For interactive use, call composer.warmup() or use warmup=True:
 from __future__ import annotations
 
 import csv
-import sys
 
 import numpy as np
 
@@ -129,10 +128,6 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 
 def make_puzzle_tool_poses(robot):
@@ -384,13 +379,13 @@ def main():
     """Execute example and optionally visualize."""
     results = run()
 
-    if TesseractViewer is not None and results.get("result"):
-        print("\nViewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
         if results["result"].raw_results is not None:
             viewer.update_trajectory(results["result"].raw_results)
-        viewer.start_serve_background()
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     return results["success"]

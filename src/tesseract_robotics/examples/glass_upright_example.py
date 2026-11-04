@@ -58,8 +58,6 @@ Related Examples:
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 
 from tesseract_robotics.planning import (
@@ -75,10 +73,6 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
     create_trajopt_upright_profiles,
 )
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
@@ -178,12 +172,13 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
 
 def main():
     results = run()
-    if TesseractViewer is not None and results["result"].raw_results is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
-        viewer.update_trajectory(results["result"].raw_results)
-        viewer.start_serve_background()
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
+        if results["result"].raw_results is not None:
+            viewer.update_trajectory(results["result"].raw_results)
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
     return True
 

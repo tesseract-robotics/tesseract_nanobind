@@ -82,7 +82,6 @@ Related Examples
 
 from __future__ import annotations
 
-import sys
 import time
 
 import numpy as np
@@ -94,10 +93,6 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 
 def update_human_position(robot, human_x, human_y):
@@ -271,13 +266,13 @@ def run(
 def main():
     results = run()
 
-    if TesseractViewer is not None and results.get("trajectories"):
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
-        # Show last trajectory
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
         if results["trajectories"][-1].raw_results is not None:
             viewer.update_trajectory(results["trajectories"][-1].raw_results)
-        viewer.start_serve_background()
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     return results["success"]

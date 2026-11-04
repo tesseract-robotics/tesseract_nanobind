@@ -39,7 +39,6 @@ Architecture
 """
 
 # --8<-- [start:setup]
-import sys
 import time
 
 import numpy as np
@@ -51,9 +50,6 @@ from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, ContactTestType
 from tesseract_robotics.tesseract_common import Isometry3d
 
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 # --8<-- [end:setup]
 
 
@@ -341,40 +337,40 @@ def main():
         )
         print(f"Final TCP:   {final_pos} (error: {np.linalg.norm(final_pos - target_pos):.3f}m)")
 
-    if TesseractViewer is not None and results.get("trajectories"):
-        print("\n=== Starting Viewer ===")
-        print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
-        print("Human: red cylinder at FINAL position (static in viewer)")
-        print("URL: http://localhost:8000")
+    if not results.get("trajectories"):
+        return results["success"]
 
-        env = results["robot"].env
-        scene = env.getSceneGraph()
+    from tesseract_robotics.viewer import (  # viser: Python >= 3.11 (#369)
+        TesseractViewer,
+        Trajectory,
+    )
 
-        human_link = scene.getLink("human_estop_zone")
-        for v in human_link.visual:
-            if v.material:
-                v.material.color = np.array([0.8, 0.0, 0.0, 0.7])
+    print("\n=== Viewer ===")
+    print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
+    print("Human: red cylinder at FINAL position (static in viewer)")
 
-        robot_zone = scene.getLink("robot_estop_zone")
-        robot_zone.visual.clear()
+    env = results["robot"].env
+    scene = env.getSceneGraph()
 
-        viewer = TesseractViewer()
-        viewer.update_environment(env, [0, 0, 0])
+    human_link = scene.getLink("human_estop_zone")
+    for v in human_link.visual:
+        if v.material:
+            v.material.color = np.array([0.8, 0.0, 0.0, 0.7])
 
-        n_joints = len(results["joint_names"])
-        steps = 12
-        traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
-        dt = 0.1
-        trajectory_list = []
-        for i, wp in enumerate(traj_final):
-            row = wp.tolist() + [i * dt]
-            trajectory_list.append(row)
-        viewer.update_trajectory_list(results["joint_names"], trajectory_list)
+    robot_zone = scene.getLink("robot_estop_zone")
+    robot_zone.visual.clear()
 
-        viewer.start_serve_background()
+    n_joints = len(results["joint_names"])
+    steps = 12
+    traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
+    dt = 0.1
+    rows = [wp.tolist() + [i * dt] for i, wp in enumerate(traj_final)]
 
-        print("\nPress Enter to exit...")
-        input()
+    with TesseractViewer() as viewer:
+        viewer.update_environment(env)
+        viewer.update_trajectory(Trajectory.from_rows(results["joint_names"], rows))
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
 
     return results["success"]
 

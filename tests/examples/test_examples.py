@@ -20,18 +20,23 @@ import tesseract_robotics.examples
 
 @pytest.mark.viewer
 def test_shapes_viewer():
-    tesseract_robotics.examples.shapes_viewer()
+    results = importlib.import_module("tesseract_robotics.examples.shapes_viewer").run()
+    assert results["env"].isInitialized()
 
 
 @pytest.mark.viewer
 def test_material_mesh_viewer():
-    tesseract_robotics.examples.tesseract_material_mesh_viewer()
+    module = importlib.import_module("tesseract_robotics.examples.tesseract_material_mesh_viewer")
+    results = module.run()
+    assert results["env"].isInitialized()
 
 
 @pytest.mark.viewer
 @pytest.mark.planning
 def test_abb_irb2400_viewer():
-    tesseract_robotics.examples.abb_irb2400_viewer()
+    results = importlib.import_module("tesseract_robotics.examples.abb_irb2400_viewer").run()
+    assert results["env"].isInitialized()
+    assert results["trajectory"].size() > 0
 
 
 # === High-Level API Examples ===

@@ -1,13 +1,10 @@
 """Mesh viewer example demonstrating GLB and DAE mesh loading with materials."""
 
-import sys
-
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.viewer import TesseractViewer
 
 shapes_urdf = """
-<robot name="mesh_viewer">
+<robot name="mesh_viewer" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">
 
   <link name="world"/>
   <link name="mesh_gltf2_link">
@@ -46,22 +43,24 @@ shapes_urdf = """
 """
 
 
-def main():
-    HEADLESS = "pytest" in sys.modules
-
+def run():
     t_env = Environment()
 
     # GeneralResourceLocator uses TESSERACT_RESOURCE_PATH env var
     locator = GeneralResourceLocator()
-    t_env.init(shapes_urdf, locator)
+    assert t_env.init(shapes_urdf, locator)
+    return {"env": t_env, "locator": locator}
 
-    if not HEADLESS:
-        viewer = TesseractViewer()
-        viewer.update_environment(t_env, [0, 0, 0])
-        viewer.start_serve_background()
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
-    else:
-        print("tesseract_material_mesh_viewer.py: PASSED")
 
 
 if __name__ == "__main__":

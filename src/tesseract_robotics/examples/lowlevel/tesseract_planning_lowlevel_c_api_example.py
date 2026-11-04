@@ -15,7 +15,6 @@ Use this low-level approach when you need:
 - To bypass the TaskComposer config system
 """
 
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -57,16 +56,11 @@ from tesseract_robotics.tesseract_time_parameterization import (
     TOTGCompositeProfile,
 )
 
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
-
-
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
 
-def main():
+def run():
     # Initialize the resource locator and environment
     locator = GeneralResourceLocator()
     abb_irb2400_urdf_package_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
@@ -211,15 +205,26 @@ def main():
         wp = WaypointPoly_as_StateWaypointPoly(wp1)
         print(f"Joint Positions: {wp.getPosition().flatten()} time: {wp.getTime()}")
 
-    # Visualize if viewer available
-    if TesseractViewer is not None:
-        viewer = TesseractViewer()
-        viewer.update_environment(t_env, [0, 0, 0])
-        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
-        viewer.start_serve_background()
-        viewer.update_trajectory(trajopt_results)
-        viewer.plot_trajectory(trajopt_results, manip_info, axes_length=0.05)
+    return {
+        "env": t_env,
+        "success": True,
+        "trajectory": trajopt_results_instruction,
+        "manip_info": manip_info,
+    }
+
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        viewer.update_trajectory(results["trajectory"])
+        viewer.plot_trajectory(results["trajectory"], results["manip_info"], axes_length=0.05)
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
+    return results["success"]
 
 
 if __name__ == "__main__":

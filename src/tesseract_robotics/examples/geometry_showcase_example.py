@@ -53,7 +53,6 @@ Related Examples
 - tesseract_collision_example.py: Collision checking with geometries
 """
 
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -86,9 +85,6 @@ from tesseract_robotics.tesseract_scene_graph import (
 )
 
 # Viewer (skip import during testing)
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 
 def create_geometry_link(
@@ -492,11 +488,11 @@ not typically visualized as a shape.
 def main():
     results = run()
 
-    if TesseractViewer is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
-        viewer.start_serve_background()
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
 

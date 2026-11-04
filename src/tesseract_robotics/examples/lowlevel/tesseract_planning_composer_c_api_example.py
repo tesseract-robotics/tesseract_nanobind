@@ -95,10 +95,6 @@ Related Examples
 - basic_cartesian_c_api_example.py: TrajOpt Cartesian planning
 """
 
-import sys
-
-import numpy as np
-
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -107,12 +103,8 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
-
-def main():
+def run():
     # Load ABB IRB2400 robot from tesseract_support package
     # WHY: ABB IRB2400 is a standard 6-DOF industrial robot with well-tested
     # kinematic model. SRDF defines "manipulator" group with tool0 TCP frame.
@@ -179,18 +171,21 @@ def main():
     # WHY raw_results: PlanningResult stores both extracted TrajectoryPoints
     # (for easy iteration) and the raw CompositeInstruction (for visualization
     # and low-level access). The viewer requires the raw CompositeInstruction format.
-    if TesseractViewer is not None and result.raw_results is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        # WHY robot.env: Access underlying Environment for viewer
-        viewer.update_environment(robot.env, [0, 0, 0])
-        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
-        viewer.start_serve_background()
-        # WHY raw_results: Viewer animates the CompositeInstruction directly
-        viewer.update_trajectory(result.raw_results)
-        input("Press Enter to exit...")
+    return {"env": robot.env, "success": True, "trajectory": result.raw_results}
 
-    return True
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        if results["trajectory"] is not None:
+            viewer.update_trajectory(results["trajectory"])
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
+    return results["success"]
 
 
 if __name__ == "__main__":

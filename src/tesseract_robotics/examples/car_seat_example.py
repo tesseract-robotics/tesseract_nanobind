@@ -60,8 +60,6 @@ RELATED EXAMPLES
 - lowlevel/car_seat_c_api_example.py: low-level API version with detailed comments
 """
 
-import sys
-
 import numpy as np
 
 from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
@@ -103,10 +101,6 @@ from tesseract_robotics.tesseract_scene_graph import (
     Visual,
 )
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 # Predefined joint positions from C++ getPredefinedPosition()
 # All values in radians except carriage_rail (meters)
@@ -485,13 +479,12 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 def main():
     results = run()
 
-    # Visualize
-    if TesseractViewer is not None:
-        print("\nViewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
         viewer.update_trajectory(results["place_result"].raw_results)
-        viewer.start_serve_background()
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     print("\nDone!")

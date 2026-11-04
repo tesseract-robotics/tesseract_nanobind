@@ -27,7 +27,6 @@ Related Examples:
 - tesseract_planning_lowlevel_c_api_example.py - OMPL+TrajOpt via planner API
 """
 
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -73,10 +72,6 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
     TrajOptOSQPSolverProfile,
 )
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -170,7 +165,7 @@ def _iter_move_instructions(composite):
             yield InstructionPoly_as_MoveInstructionPoly(instruction)
 
 
-def main():
+def run():
     # ABB IRB2400 with the OPW closed-form IK solver — Descartes samples IK at
     # every waypoint, so an analytic solver is what makes the ladder graph fast.
     locator = GeneralResourceLocator()
@@ -278,14 +273,24 @@ def main():
             state = WaypointPoly_as_StateWaypointPoly(waypoint)
             print(f"  {np.array2string(state.getPosition().flatten(), precision=3)}")
 
-    if TesseractViewer is not None:
-        viewer = TesseractViewer()
-        viewer.update_environment(env, [0, 0, 0])
-        viewer.start_serve_background()
-        viewer.update_trajectory(trajopt_response.results.getInstructions())
-        input("Press Enter to exit...")
+    return {
+        "env": env,
+        "success": trajopt_response.successful,
+        "trajectory": trajopt_response.results,
+    }
 
-    return trajopt_response.successful
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        viewer.update_trajectory(results["trajectory"])
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
+    return results["success"]
 
 
 if __name__ == "__main__":

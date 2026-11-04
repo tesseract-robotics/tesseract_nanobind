@@ -69,8 +69,6 @@ Related Examples:
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 
 from tesseract_robotics.planning import (
@@ -95,9 +93,6 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 OFFSET = 0.005
 BOX_SIZE = 0.1
@@ -309,12 +304,12 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
 def main():
     results = run()
 
-    if TesseractViewer is not None:
-        print("\nViewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
         viewer.update_trajectory(results["place_result"].raw_results)
-        viewer.start_serve_background()
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     print("\nDone!")

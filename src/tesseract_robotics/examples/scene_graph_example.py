@@ -54,8 +54,6 @@ weight = origin translation norm, graph.cpp:599) and the one returned is a tie-b
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 
 from tesseract_robotics.planning import Robot, TaskComposer
@@ -74,10 +72,6 @@ from tesseract_robotics.tesseract_scene_graph import (
 
 # createTestSceneGraph: each joint origin sits 1.25 m along one axis of its parent, m
 JOINT_OFFSET = 1.25
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 
 def make_joint(name, parent, child, joint_type, axis, limits=None):
@@ -306,11 +300,11 @@ def main():
     """Execute example and optionally visualize."""
     results = run()
 
-    if TesseractViewer is not None:
-        print("\nViewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
-        viewer.start_serve_background()
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     return results["success"]
