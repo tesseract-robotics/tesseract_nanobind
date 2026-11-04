@@ -96,6 +96,7 @@ For interactive use, call composer.warmup() or use warmup=True:
 from __future__ import annotations
 
 import csv
+import sys
 
 import numpy as np
 
@@ -375,7 +376,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     }
 
 
-def main():
+def main() -> int:
     """Execute example and optionally visualize."""
     results = run()
 
@@ -388,8 +389,8 @@ def main():
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

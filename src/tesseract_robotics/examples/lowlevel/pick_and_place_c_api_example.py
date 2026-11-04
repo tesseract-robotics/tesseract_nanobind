@@ -33,6 +33,7 @@ This example uses the low-level C API bindings directly to demonstrate:
 """
 
 import gc
+import sys
 
 gc.disable()  # Disable GC to avoid nanobind reference leak warnings on exit
 
@@ -382,7 +383,7 @@ def run():
     }
 
 
-def main():
+def main() -> int:
     """Entry point - run the workflow, then animate the place trajectory in the viewer."""
     results = run()
 
@@ -395,9 +396,8 @@ def main():
         input("Press Enter to exit...")
 
     print("\nDone!")
-    return True
+    return 0 if results["pick_result"].successful and results["place_result"].successful else 1
 
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    sys.exit(main())

@@ -54,6 +54,8 @@ weight = origin translation norm, graph.cpp:599) and the one returned is a tie-b
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import Robot, TaskComposer
@@ -296,7 +298,7 @@ def run(pipeline=None, num_planners=None, *, composer: TaskComposer | None = Non
     }
 
 
-def main():
+def main() -> int:
     """Execute example and optionally visualize."""
     results = run()
 
@@ -307,8 +309,8 @@ def main():
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -2,6 +2,7 @@
 
 import os
 import re
+import sys
 import traceback
 from typing import override
 
@@ -112,7 +113,7 @@ def run():
     return {"env": t_env, "locator": locator}
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -123,7 +124,8 @@ def main():
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
     # --8<-- [end:serve]
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

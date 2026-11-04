@@ -53,6 +53,7 @@ Related Examples
 - tesseract_collision_example.py: Collision checking with geometries
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -485,7 +486,7 @@ not typically visualized as a shape.
     return {"robot": robot}
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -494,7 +495,8 @@ def main():
         viewer.update_environment(results["robot"].env)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

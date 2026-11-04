@@ -28,6 +28,7 @@ Reference:
 """
 
 import math
+import sys
 
 from tesseract_robotics.ompl_base import (
     DubinsStateSpace,
@@ -211,5 +212,9 @@ def run(pipeline=None, num_planners=None):
     return True
 
 
+def main() -> int:
+    return 0 if run() else 1
+
+
 if __name__ == "__main__":
-    run()
+    sys.exit(main())

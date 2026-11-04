@@ -39,6 +39,7 @@ Architecture
 """
 
 # --8<-- [start:setup]
+import sys
 import time
 
 import numpy as np
@@ -308,7 +309,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     }
 
 
-def main():
+def main() -> int:
     results = run(verbose=False)
 
     if results.get("trajectories"):
@@ -338,7 +339,7 @@ def main():
         print(f"Final TCP:   {final_pos} (error: {np.linalg.norm(final_pos - target_pos):.3f}m)")
 
     if not results.get("trajectories"):
-        return results["success"]
+        return 0 if results["success"] else 1
 
     from tesseract_robotics.viewer import (  # viser: Python >= 3.11 (#369)
         TesseractViewer,
@@ -372,8 +373,8 @@ def main():
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

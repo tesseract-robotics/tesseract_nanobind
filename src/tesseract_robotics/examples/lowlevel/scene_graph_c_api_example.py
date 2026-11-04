@@ -19,6 +19,7 @@ Use Cases:
 """
 
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -168,7 +169,7 @@ def run():
     return {"env": env, "success": True}
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -177,9 +178,8 @@ def main():
         viewer.update_environment(results["env"])
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    sys.exit(main())

@@ -28,6 +28,8 @@ Mesh decomposition rationale:
 Based on: tesseract_examples/src/car_seat_example.cpp
 """
 
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
@@ -473,7 +475,7 @@ def run():
     }
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -485,9 +487,8 @@ def main():
         input("Press Enter to exit...")
 
     print("\nDone!")
-    return True
+    return 0 if results["pick_result"].successful and results["place_result"].successful else 1
 
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    sys.exit(main())
