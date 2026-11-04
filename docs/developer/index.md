@@ -184,7 +184,6 @@ tesseract_nanobind/
 ├── tests/                     # pytest tests
 ├── examples/                  # Usage examples
 ├── scripts/
-│   ├── build_tesseract_cpp.sh # C++ build (colcon + vcstool)
 │   ├── generate_stubs.py      # Regenerate / check .pyi stubs
 │   ├── audit_gil.py           # GIL releases vs nogil_entry_points.yaml (libclang)
 │   ├── gil_hotspots.py        # Rank GIL-held time per binding (py-spy --gil)

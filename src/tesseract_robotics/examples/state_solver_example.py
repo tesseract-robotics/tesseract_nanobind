@@ -121,8 +121,8 @@ def sub_scene_graph() -> SceneGraph:
     base.addCollision(collision)
     joint = Joint("subgraph_joint1")
     joint.parent_to_joint_origin_transform = translation(SUBGRAPH_JOINT_X)
-    joint.parent_link_name = "subgraph_base_link"
-    joint.child_link_name = "subgraph_link_1"
+    joint.parent_link_id = "subgraph_base_link"
+    joint.child_link_id = "subgraph_link_1"
     joint.type = JointType.FIXED
     subgraph.addLink(base)
     subgraph.addLink(Link("subgraph_link_1"))
@@ -132,7 +132,7 @@ def sub_scene_graph() -> SceneGraph:
 
 def check_step(solver: StateSolver, scene_graph: SceneGraph, origin: Isometry3d) -> dict[str, Any]:
     """Compare the solver with a KDL solver rebuilt from `scene_graph`, with `origin` moved in."""
-    names = solver.getActiveJointNames()
+    names = solver.getActiveJointIds()
     # No floating_joint_values: the solver uses the floating value it holds
     state = solver.getState(names, JOINT_VALUES)
     base_link = state.link_transforms["base_link"]
@@ -157,8 +157,8 @@ def run() -> dict[str, Any]:
     origin = translation(ORIGIN_X)
     joint = Joint(FLOATING_JOINT)
     joint.parent_to_joint_origin_transform = origin
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = "link_1"
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = "link_1"
     joint.type = JointType.FLOATING
 
     edits = [
@@ -167,7 +167,7 @@ def run() -> dict[str, Any]:
         solver.replaceJoint(joint),
     ]
     # --8<-- [end:floating_joint]
-    floating_joint_names = solver.getFloatingJointNames()
+    floating_joint_names = solver.getFloatingJointIds()
     steps = [check_step(solver, scene_graph, origin)]
 
     # --8<-- [start:move_floating]
@@ -187,7 +187,7 @@ def run() -> dict[str, Any]:
     steps.append(check_step(solver, scene_graph, origin))
     # --8<-- [end:move_floating]
 
-    names = solver.getActiveJointNames()
+    names = solver.getActiveJointIds()
     floating = {FLOATING_JOINT: origin}
     joints = dict(zip(names, JOINT_VALUES))
     oracle = kdl_oracle(scene_graph, names, JOINT_VALUES)
@@ -228,17 +228,16 @@ def run() -> dict[str, Any]:
         solver.getLinkTransforms(names, JOINT_VALUES, floating), oracle
     )
 
-    # getLinkTransforms() lists the current state in getLinkNames() order
+    # getLinkTransforms() lists the current state in getLinkIds() order
     solver.setState(JOINT_VALUES, floating)
     overloads["getLinkTransforms()"] = agree(
-        dict(zip(solver.getLinkNames(), solver.getLinkTransforms())), oracle
+        dict(zip(solver.getLinkIds(), solver.getLinkTransforms())), oracle
     )
     # --8<-- [end:overloads]
 
     # --8<-- [start:jacobian]
     jacobians = [
         solver.getJacobian(JOINT_VALUES, TIP_LINK, floating),
-        solver.getJacobian(joints, TIP_LINK, floating),
         solver.getJacobian(names, JOINT_VALUES, TIP_LINK, floating),
     ]
     kdl_jacobian = KDLStateSolver(scene_graph).getJacobian(names, JOINT_VALUES, TIP_LINK)
@@ -256,13 +255,13 @@ def run() -> dict[str, Any]:
     root = scene_graph.getRoot()
 
     attach = Joint("attach_subgraph_joint")
-    attach.parent_link_name = root
-    attach.child_link_name = subgraph.getRoot()
+    attach.parent_link_id = root
+    attach.child_link_id = subgraph.getRoot()
     attach.type = JointType.FIXED
 
     prefix_attach = Joint(PREFIX + "attach_subgraph_joint")
-    prefix_attach.parent_link_name = root
-    prefix_attach.child_link_name = PREFIX + subgraph.getRoot()
+    prefix_attach.parent_link_id = root
+    prefix_attach.child_link_id = PREFIX + str(subgraph.getRoot())
     prefix_attach.type = JointType.FLOATING
 
     inserted = {}
@@ -280,8 +279,10 @@ def run() -> dict[str, Any]:
     ).link_transforms[prefixed_root]
     insert = {
         "inserted": inserted,
-        "prefixed_links": sorted(name for name in solver.getLinkNames() if name.startswith(PREFIX)),
-        "floating_joint_names": sorted(solver.getFloatingJointNames()),
+        "prefixed_links": sorted(
+            str(link_id) for link_id in solver.getLinkIds() if str(link_id).startswith(PREFIX)
+        ),
+        "floating_joint_names": sorted(str(joint_id) for joint_id in solver.getFloatingJointIds()),
         "agrees_with_kdl": agree(transforms, kdl_oracle(scene_graph, names, JOINT_VALUES)),
         # the attach joints have the identity origin: inserted root = parent ∘ origin = parent
         "root_is_parent_times_origin": is_approx(

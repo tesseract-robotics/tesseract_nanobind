@@ -249,7 +249,7 @@ def run() -> dict[str, Any]:
                     - numericalJacobian(identity, group, Q, link, np.zeros(3))
                 ).max()
             )
-            for base in group.getStaticLinkNames():
+            for base in group.getStaticLinkIds():
                 change_base = poses[base].inverse()
                 errors.append(
                     np.abs(
@@ -263,7 +263,7 @@ def run() -> dict[str, Any]:
                         - numericalJacobian(change_base, group, Q, link, np.zeros(3))
                     ).max()
                 )
-            for base in group.getActiveLinkNames():
+            for base in group.getActiveLinkIds():
                 relative_errors.append(
                     np.abs(
                         group.calcJacobian(Q, base, link, link_point)

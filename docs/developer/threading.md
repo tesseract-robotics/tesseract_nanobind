@@ -119,7 +119,7 @@ one sample is 10 ms.
 | `tesseract_serialization: environment_to_file` | 2.2 s | 1 | tests | released: reads under the shared lock, as `clone()` does |
 | `tesseract_serialization: environment_{to,from}_{xml,binary}` | 12.2 s together | - | tests | released: same reasons (to and from share a test line, so no per-call mean) |
 | `tesseract_motion_planners_simple: generateInterpolatedProgram` | 106 ms | 37 | tests | released: interpolation and a state solve per step; only reads `env` |
-| `tesseract_geometry: createMeshFromResource` | 2.5 ms | 69 | tests | released, with the `Path` loaders and the `ConvexMesh` / `SDFMesh` variants: file IO plus assimp, like `parseURDFFile` |
+| `tesseract_geometry: createMeshFromResource` | 2.5 ms | 69 | tests | released, with the `Path` loaders and the `ConvexMesh` variants: file IO plus assimp, like `parseURDFFile` |
 | `tesseract_environment: Environment.init` | 0.85 s / 0.93 s | 303 / 438 | bench / tests | GIL-held: `Environment` method, see the deadlock below |
 | `tesseract_environment: Environment.getKinematicGroup` | 0.83 s / 0.54 s | 35 / 146 | bench / tests | GIL-held: `Environment` method |
 | `tesseract_task_composer: TaskComposerPluginFactory.createTaskComposerNode` | 26 ms / 1.6 s | 570 / 338 | bench / tests | GIL-held: unsynchronised factory cache |

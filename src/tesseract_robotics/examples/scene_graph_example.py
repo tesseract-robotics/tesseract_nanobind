@@ -59,7 +59,7 @@ import sys
 import numpy as np
 
 from tesseract_robotics.planning import Robot, TaskComposer
-from tesseract_robotics.tesseract_common import AllowedCollisionMatrix, Isometry3d
+from tesseract_robotics.tesseract_common import AllowedCollisionMatrix, Isometry3d, LinkIdPair
 from tesseract_robotics.tesseract_scene_graph import (
     Joint,
     JointCalibration,
@@ -84,8 +84,8 @@ def make_joint(name, parent, child, joint_type, axis, limits=None):
     origin = Isometry3d.Identity()
     origin.translate(offset)
     joint.parent_to_joint_origin_transform = origin
-    joint.parent_link_name = parent
-    joint.child_link_name = child
+    joint.parent_link_id = parent
+    joint.child_link_id = child
     joint.type = joint_type
     if limits is not None:
         joint.limits = limits
@@ -122,10 +122,10 @@ def build_scene_graph():
 
     print("\n=== Building a Scene Graph ===")
     # --8<-- [start:queries]
-    adjacent = graph.getAdjacentLinkNames("link_3")
-    inv_adjacent = graph.getInvAdjacentLinkNames("link_3")
-    children = sorted(graph.getLinkChildrenNames("link_2"))
-    joint_children = graph.getJointChildrenNames("joint_4")
+    adjacent = graph.getAdjacentLinkIds("link_3")
+    inv_adjacent = graph.getInvAdjacentLinkIds("link_3")
+    children = sorted(graph.getLinkChildrenIds("link_2"))
+    joint_children = graph.getJointChildrenIds("joint_4")
     # each link of the subtrees below link_2 and link_3, mapped to the nearest of the two above it
     adjacency_map = graph.getAdjacencyMap(["link_2", "link_3"])
     acyclic, tree = graph.isAcyclic(), graph.isTree()
@@ -151,11 +151,11 @@ def build_scene_graph():
 
     # --8<-- [start:acm]
     initial_entries = len(graph.getAllowedCollisionMatrix().getAllAllowedCollisions())
-    allowed_before = graph.isCollisionAllowed("link_1", "link_2")
+    allowed_before = graph.isCollisionAllowed(LinkIdPair("link_1", "link_2"))
     acm = AllowedCollisionMatrix()
     acm.addAllowedCollision("link_3", "link_4", "Adjacent")
     graph.setAllowedCollisionMatrix(acm)
-    allowed_after = graph.isCollisionAllowed("link_1", "link_2")
+    allowed_after = graph.isCollisionAllowed(LinkIdPair("link_1", "link_2"))
     entries_after = len(graph.getAllowedCollisionMatrix().getAllAllowedCollisions())
     # the graph keeps `acm` itself: an edit after the call is an edit to the graph's matrix
     acm.addAllowedCollision("link_1", "link_5", "Never")
@@ -164,9 +164,9 @@ def build_scene_graph():
         "initial_entries": initial_entries,
         "link_1_link_2_before": allowed_before,
         "link_1_link_2_after": allowed_after,
-        "link_3_link_4_after": graph.isCollisionAllowed("link_3", "link_4"),
+        "link_3_link_4_after": graph.isCollisionAllowed(LinkIdPair("link_3", "link_4")),
         "entries_after": entries_after,
-        "later_edit_seen": graph.isCollisionAllowed("link_1", "link_5"),
+        "later_edit_seen": graph.isCollisionAllowed(LinkIdPair("link_1", "link_5")),
     }
     print(f"Allowed collisions: {acm_result}")
 

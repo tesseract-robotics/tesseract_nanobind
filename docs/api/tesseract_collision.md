@@ -113,7 +113,7 @@ from tesseract_robotics.tesseract_collision import ContactResultValidator
 
 class IgnoreGripper(ContactResultValidator):
     def __call__(self, result):
-        return "gripper" not in result.link_names
+        return "gripper" not in result.link_ids
 
 
 request.is_valid = IgnoreGripper()   # the request keeps the validator alive
@@ -168,7 +168,7 @@ for contact in result_vector:
 
 The pair fields hold exactly two items, one per link. Assigning a list of any
 other length raises `TypeError`. Every read returns a new list, so
-`contact.link_names[0] = "x"` changes only that copy; assign the whole list instead.
+`contact.link_ids[0] = "x"` changes only that copy; assign the whole list instead.
 
 ### ContactResultMap
 

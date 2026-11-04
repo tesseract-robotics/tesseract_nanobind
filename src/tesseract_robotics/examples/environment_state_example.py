@@ -33,7 +33,7 @@ Key Concepts
 **Floating joints**:
     A FLOATING joint has no joint value; its pose is set as an `Isometry3d`
     through `floating_joints`. It is not an active joint, so it adds no
-    Jacobian column and `getActiveJointNames()` leaves it out.
+    Jacobian column and `getActiveJointIds()` leaves it out.
 
 **Timestamps**:
     `setState` stamps both `getTimestamp()` and `getCurrentStateTimestamp()`
@@ -142,12 +142,12 @@ def run() -> dict[str, Any]:
     # --8<-- [start:floating_joint]
     joint = Joint(FLOATING_JOINT)
     joint.parent_to_joint_origin_transform = translation(ORIGIN_X)
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = "link_1"
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = "link_1"
     joint.type = JointType.FLOATING
     env.applyCommand(ReplaceJointCommand(joint))
 
-    names = env.getActiveJointNames()  # joint_a1 is no longer among them
+    names = env.getActiveJointIds()  # joint_a1 is no longer among them
     floating = env.getCurrentFloatingJointValues()
     floating_by_name = env.getCurrentFloatingJointValues([FLOATING_JOINT])
     # --8<-- [end:floating_joint]
@@ -218,7 +218,7 @@ def run() -> dict[str, Any]:
 
     # --8<-- [start:link_transforms]
     link_transforms = {
-        "getLinkTransforms()": dict(zip(env.getLinkNames(), env.getLinkTransforms())),
+        "getLinkTransforms()": dict(zip(env.getLinkIds(), env.getLinkTransforms())),
         "getLinkTransforms(names, values)": env.getLinkTransforms(names, zeros),
         "getLinkTransforms(names, values, floating)": env.getLinkTransforms(names, zeros, other),
     }
@@ -238,8 +238,8 @@ def run() -> dict[str, Any]:
 
     # --8<-- [start:queries]
     current_joint_values = env.getCurrentJointValues(["joint_a3", "joint_a2"])
-    active_links = env.getActiveLinkNames(["joint_a5"])  # the links joint_a5 moves
-    static_links = env.getStaticLinkNames(["joint_a5"])
+    active_links = env.getActiveLinkIds(["joint_a5"])  # the links joint_a5 moves
+    static_links = env.getStaticLinkIds(["joint_a5"])
     group = env.getJointGroup("active_joints", names)
     limits = env.getJointLimits("joint_a2")
 
@@ -325,7 +325,7 @@ def run() -> dict[str, Any]:
         "current_joint_values": current_joint_values.tolist(),
         "link_names_by_joint": {"active": sorted(active_links), "static": sorted(static_links)},
         "joint_group": {
-            "joint_names": group.getJointNames(),
+            "joint_names": [str(joint_id) for joint_id in group.getJointIds()],
             "tool0_matches_environment": is_approx(
                 group.calcFwdKin(JOINT_VALUES)["tool0"], current["tool0"]
             ),

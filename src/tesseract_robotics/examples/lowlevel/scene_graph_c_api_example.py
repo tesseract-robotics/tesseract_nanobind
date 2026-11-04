@@ -85,7 +85,7 @@ def run():
         print(f"  Current child: {joint.child_link_id}")
 
     # MoveJointCommand(joint_name, new_parent_link)
-    # This preserves the joint but changes parent_link_name
+    # This preserves the joint but changes parent_link_id
     move_joint_cmd = MoveJointCommand("joint_a4", "base_link")
     if env.applyCommand(move_joint_cmd):
         print("  Command applied successfully!")

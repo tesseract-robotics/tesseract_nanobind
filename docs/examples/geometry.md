@@ -21,9 +21,8 @@ For the primitive shapes (`Box`, `Sphere`, `Cylinder`, ...) see
 
 ### Loading from bytes
 
-`createMeshFromBytes`, `createSDFMeshFromBytes` and `createConvexMeshFromBytes`
-parse a mesh held in memory; the URL names the resource and its extension tells
-Assimp the format. `triangulate` defaults to `True` in the binding, which is
+`createMeshFromBytes` and `createConvexMeshFromBytes` parse a mesh held in
+memory; the URL names the resource and its extension tells Assimp the format. `triangulate` defaults to `True` in the binding, which is
 what the URDF parser passes for every mesh (`urdf/src/mesh.cpp:84–88`).
 Upstream's C++ default is `false` (`mesh_parser.h:541`).
 
@@ -34,7 +33,6 @@ Upstream's C++ default is `false` (`mesh_parser.h:541`).
 | call | (faces, vertices) |
 |---|---|
 | `createMeshFromBytes(url, data)` | (12, 8): six quads, triangulated |
-| `createSDFMeshFromBytes(url, data, scale, True, ...)` | (12, 8) |
 | `createConvexMeshFromBytes(url, data, scale, False, ...)` | (6, 8): the quads kept |
 
 ### Normals, vertex colors, materials and textures
@@ -59,7 +57,7 @@ return `None`. The file has no vertex colors.
 
 ### Full constructors
 
-`Mesh`, `SDFMesh`, `PolygonMesh` and `ConvexMesh` take every part a loader
+`Mesh`, `PolygonMesh` and `ConvexMesh` take every part a loader
 fills: resource, scale, normals, vertex colors, material and textures. Each has
 two overloads, with and without `face_count` as the third argument; a
 `face_count` that disagrees with `faces` raises `MeshFaceCountError`.

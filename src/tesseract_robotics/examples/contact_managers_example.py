@@ -28,7 +28,7 @@ Overview
 4. Add, set-default and remove a plugin (upstream `PluginFactorAPIUnit`),
    `saveConfig` round trip, `clearSearchPaths` / `clearSearchLibraries`.
 5. `AllowedCollisionMatrix` from a dict, `getAllowedCollisions`,
-   `makeOrderedLinkPair`, `removeAllowedCollision(link)`.
+   `LinkIdPair`, `removeAllowedCollision(link)`.
 6. A `ContactResultValidator` subclass drops one pair; `ContactResultMap`
    iteration, `at`, `filter`, `addContactResult` / `setContactResult`.
 7. A continuous manager through the three cast overloads of
@@ -54,8 +54,9 @@ Key Concepts
     They agree on the colliding pair set. Penetration depth is backend-defined:
     FCL reports the analytic 1.3 m, Bullet 1.266 m on this hull (upstream's own
     unit test avoids `box_2m.ply` for Bullet, `collision_box_box_unit.hpp:58`).
-    Bullet's simple manager also reports `link_names` in the other order, so pairs
-    are compared as `ContactResultMap` keys, which are ordered.
+    Bullet's simple manager also reports `link_ids` in the other order, so pairs
+    are compared as `ContactResultMap` keys: `LinkIdPair` is unordered, and
+    `orderedNameView()` gives its names sorted.
 """
 
 import math
@@ -82,9 +83,9 @@ from tesseract_robotics.tesseract_common import (
     CollisionMarginPairOverrideType,
     GeneralResourceLocator,
     Isometry3d,
+    LinkIdPair,
     PluginInfo,
     getAllowedCollisions,
-    makeOrderedLinkPair,
 )
 from tesseract_robotics.tesseract_environment import (
     Environment,
@@ -115,7 +116,7 @@ BOX_BOX_TOL = 0.001
 MARGIN_ARITHMETIC_TOL = 2 * math.ulp(LARGER_MARGIN)
 
 # collision_box_box_unit.hpp:208: a margin on a pair that is not in the scene
-UNRELATED_PAIR = makeOrderedLinkPair("not_box_link", "also_not_box_link")
+UNRELATED_PAIR = LinkIdPair("not_box_link", "also_not_box_link")
 UNRELATED_MARGIN = 1.7
 
 # collision_box_box_cast_unit.hpp: static box, moving box (shape offset), sweep
@@ -153,8 +154,8 @@ def translation(x: float, y: float = 0.0, z: float = 0.0) -> Isometry3d:
 
 
 def contact_pairs(results: ContactResultMap) -> list[tuple[str, str]]:
-    """Ordered link pairs that hold at least one contact."""
-    return sorted(key for key, vector in results if len(vector))
+    """Sorted link-name pairs that hold at least one contact."""
+    return sorted(key.orderedNameView() for key, vector in results if len(vector))
 
 
 def contact_test(manager, test_type: ContactTestType = ContactTestType.CLOSEST, request=None):
@@ -256,8 +257,12 @@ def margins(manager) -> dict[str, Any]:
         "scaled": pair_scaled.getMaxCollisionMargin(),
         "max_box_link": pair_modified.getMaxCollisionMargin("box_link"),
         "max_unrelated_link": pair_incremented.getMaxCollisionMargin("not_box_link"),
-        "modify_applied_pairs": sorted(pair_modified.getCollisionMargins()),
-        "replace_applied_pairs": sorted(pair_replaced.getCollisionMargins()),
+        "modify_applied_pairs": sorted(
+            p.orderedNameView() for p in pair_modified.getCollisionMargins()
+        ),
+        "replace_applied_pairs": sorted(
+            p.orderedNameView() for p in pair_replaced.getCollisionMargins()
+        ),
     }
     return result
 
@@ -309,8 +314,7 @@ def allowed_collisions() -> dict[str, Any]:
     """TestGetAllowedCollisions, with the ACM built from a dict."""
     # --8<-- [start:acm]
     entries = {
-        makeOrderedLinkPair(*link_pair): reason
-        for link_pair, reason in zip(ACM_ENTRIES, ACM_REASONS)
+        LinkIdPair(*link_pair): reason for link_pair, reason in zip(ACM_ENTRIES, ACM_REASONS)
     }
     acm = AllowedCollisionMatrix(entries)
 
@@ -327,10 +331,10 @@ def allowed_collisions() -> dict[str, Any]:
     # --8<-- [end:acm]
     return {
         "from_dict_equal": from_dict_equal,
-        "allowed_deduplicated": allowed_deduplicated,
+        "allowed_deduplicated": [str(link_id) for link_id in allowed_deduplicated],
         "allowed_with_duplicates": allowed_with_duplicates,
-        "ordered_pair": makeOrderedLinkPair("link4", "link3"),
-        "after_remove_link1": sorted(acm.getAllAllowedCollisions()),
+        "ordered_pair": LinkIdPair("link4", "link3").orderedNameView(),
+        "after_remove_link1": sorted(p.orderedNameView() for p in acm.getAllAllowedCollisions()),
         "str_after_remove": str(acm),
     }
 
@@ -339,15 +343,15 @@ def allowed_collisions() -> dict[str, Any]:
 class DropPairValidator(ContactResultValidator):
     """Rejects every contact between two given links; records what it was asked."""
 
-    def __init__(self, link_pair: tuple[str, str]):
+    def __init__(self, link_pair: LinkIdPair):
         super().__init__()
         self.link_pair = link_pair
         self.seen: list[tuple[str, str]] = []
 
     @override
     def __call__(self, result: ContactResult) -> bool:
-        link_pair = makeOrderedLinkPair(*result.link_names)
-        self.seen.append(link_pair)
+        link_pair = LinkIdPair(*result.link_ids)
+        self.seen.append(link_pair.orderedNameView())
         return link_pair != self.link_pair
 
 
@@ -365,12 +369,12 @@ def validator_and_result_map(manager, hull) -> dict[str, Any]:
     manager.enableCollisionObject("thin_box_link")
     manager.setActiveCollisionObjects(["box_link", "thin_box_link", "second_box_link"])
 
-    dropped = makeOrderedLinkPair("thin_box_link", "box_link")
+    dropped = LinkIdPair("thin_box_link", "box_link")
     validator = DropPairValidator(dropped)
     probe = ContactResult()
-    probe.link_names = list(dropped)
+    probe.link_ids = list(dropped.orderedNameView())
     dropped_pair = validator(probe)
-    probe.link_names = list(BOX_PAIR)
+    probe.link_ids = list(BOX_PAIR)
     kept_pair = validator(probe)
     validator.seen.clear()
 
@@ -381,7 +385,7 @@ def validator_and_result_map(manager, hull) -> dict[str, Any]:
     # --8<-- [end:validator]
 
     # --8<-- [start:result_map]
-    iterated_keys = [key for key, _ in without]
+    iterated_keys = [key.orderedNameView() for key, _ in without]
     container = without.getContainer()
     at_matches_container = all(
         len(without.at(key)) == len(vector) for key, vector in container.items()
@@ -497,9 +501,11 @@ def environment(locator: GeneralResourceLocator) -> dict[str, Any]:
 
     # --8<-- [start:environment]
     validator = EnvironmentContactAllowedValidator(scene_graph)
-    links = [link.getName() for link in scene_graph.getLinks()]
+    links = [link.getId() for link in scene_graph.getLinks()]
     validator_matches_scene_graph = all(
-        validator(a, b) == scene_graph.isCollisionAllowed(a, b) for a in links for b in links
+        validator(LinkIdPair(a, b)) == scene_graph.isCollisionAllowed(LinkIdPair(a, b))
+        for a in links
+        for b in links
     )
 
     by_name = (
@@ -519,8 +525,8 @@ def environment(locator: GeneralResourceLocator) -> dict[str, Any]:
         "validator_matches_scene_graph": validator_matches_scene_graph,
         # lbr_iiwa_14_r820.srdf:53 disables base_link / link_1 ("Adjacent");
         # base_link / link_5 has no disable_collisions entry
-        "adjacent_allowed": validator("base_link", "link_1"),
-        "distant_allowed": validator("base_link", "link_5"),
+        "adjacent_allowed": validator(LinkIdPair("base_link", "link_1")),
+        "distant_allowed": validator(LinkIdPair("base_link", "link_5")),
         "by_name": by_name,
         "commands": (discrete_command.getName(), continuous_command.getName()),
         "applied": applied,
