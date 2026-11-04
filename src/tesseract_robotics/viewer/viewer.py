@@ -37,6 +37,9 @@ SERVE_POLL_S = 1.0
 PLAYBACK_DT_S = 1.0 / 30.0
 # Time slider resolution [s]: 10 ms, finer than a 30 Hz frame.
 TIME_SLIDER_STEP_S = 0.01
+# Playback speed: 1x real time, adjustable in 10 % steps.
+DEFAULT_SPEED = 1.0
+SPEED_STEP = 0.1
 # Slider upper bound before any trajectory [s]; viser needs max > min.
 EMPTY_TIME_MAX_S = 1.0
 # How long close() waits for the player [s]: many ticks, so only a wedged pose update trips it.
@@ -45,6 +48,8 @@ PLAYER_JOIN_TIMEOUT_S = 5.0
 PLOT_AXES_LENGTH_M = 0.1
 # Default TCP path colour for plot_trajectory, 8-bit RGB: white, the old viewer's default.
 PLOT_COLOR_RGB = (255, 255, 255)
+# TCP triad axis radius per unit axis length [-]: slim enough that triads don't merge.
+PLOT_AXES_RADIUS_RATIO = 0.05
 # TCP path line thickness [m]: 2 mm, visible at robot scale.
 PLOT_PATH_THICKNESS_M = 0.002
 
@@ -99,7 +104,7 @@ class TesseractViewer:
             self._gui_time = gui.add_slider(
                 "Time [s]", 0.0, EMPTY_TIME_MAX_S, TIME_SLIDER_STEP_S, 0.0, disabled=True
             )
-            self._gui_speed = gui.add_number("Speed", 1.0, min=0.0, step=0.1)
+            self._gui_speed = gui.add_number("Speed", DEFAULT_SPEED, min=0.0, step=SPEED_STEP)
             self._gui_loop = gui.add_checkbox("Loop", True)
         self._gui_time.on_update(self._on_time_dragged)
 
@@ -262,7 +267,7 @@ class TesseractViewer:
                 wxyzs,
                 positions,
                 axes_length=axes_length,
-                axes_radius=axes_length / 20.0,
+                axes_radius=axes_length * PLOT_AXES_RADIUS_RATIO,
             )
         )
 

@@ -6,6 +6,7 @@ Lives here for the Python >= 3.11 gate in conftest.py. Slow: most mains plan.
 from __future__ import annotations
 
 import ast
+import importlib
 import sys
 from pathlib import Path
 
@@ -16,6 +17,9 @@ import tesseract_robotics.examples
 from tesseract_robotics.viewer import TesseractViewer
 
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
+# The pointcloud example's default cloud is found relative to a source checkout; the wheel
+# tests import an installed package.
+SAMPLE_CLOUD = Path(__file__).resolve().parents[2] / "docs" / "assets" / "sample.ply"
 
 # Needs ws/src/tesseract_ros_workcell (`git submodule update --init`), absent from CI's
 # wheel tests; hand-checked instead. Not a pytest skip: awaiting a go for one.
@@ -77,9 +81,10 @@ def test_main_runs_and_exits_zero(module_name, monkeypatch, tmp_path):
     monkeypatch.setattr("tesseract_robotics.viewer.TesseractViewer", AnyPortViewer)
     monkeypatch.setattr("builtins.input", fake_input)
     monkeypatch.setattr(sys, "argv", [module_name])
+    monkeypatch.setenv("TESSERACT_NANOBIND_SAMPLE_CLOUD", str(SAMPLE_CLOUD))
     monkeypatch.chdir(tmp_path)
 
-    module = __import__(f"tesseract_robotics.examples.{module_name}", fromlist=["main"])
-    exit_code = module.main()
+    # import_module: the package re-exports each example's run() under the module's name.
+    exit_code = importlib.import_module(f"tesseract_robotics.examples.{module_name}").main()
 
     assert exit_code is None or (type(exit_code) is int and exit_code == 0)
