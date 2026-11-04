@@ -159,10 +159,12 @@ quote-style = "double"
 
 [tool.pixi.workspace]
 name = "tesseract_robotics_dev"
-# tesseract-robotics ships the prebuilt tesseract C++ libs + CMake configs (v0.35.0,
-# all four platforms); conda-forge stays highest-priority so common deps (boost, eigen,
-# ompl, …) resolve from there exactly as the tesseract feedstocks were built against.
-channels = ["conda-forge", "tesseract-robotics"]
+# tesseract-robotics ships the prebuilt tesseract C++ libs + CMake configs. The 0.36 dev
+# packages (all four platforms) live on its `dev` label, built by the feedstocks' `dev`
+# branches on CI; the label wins for those four packages only (it carries nothing else).
+# conda-forge stays ahead of tesseract-robotics `main` so common deps (boost, eigen, ompl,
+# …) resolve from there exactly as the tesseract feedstocks were built against.
+channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
 platforms = ["osx-arm64", "linux-64", "win-64", "linux-aarch64"]
 
 [tool.pixi.dependencies]
@@ -176,17 +178,16 @@ pkg-config = "*"
 git = "*"  # needed by setuptools-scm for version derivation; CI pixi envs don't see system git
 
 # Prebuilt tesseract C++ libs (CMake configs + headers + .so/.dylib) from the
-# tesseract-robotics conda channel. These replace the from-source colcon build:
-# every C++ dependency (boost, eigen, ompl, bullet, fcl, taskflow, …) now arrives
-# transitively as a run/host dep of these packages, matched to how the feedstocks
-# were built. Pinned to 0.35.0 to track the version this binding set targets.
-tesseract-robotics = "==0.35.0"
-tesseract-robotics-planning = "==0.35.0"
-# trajopt, descartes-light, and every C++ dependency (boost, eigen, ompl, bullet, …)
-# arrive transitively, matched to how the feedstocks were built. Don't pin them here:
-# tesseract-robotics 0.35.0 was rebuilt against conda-forge's eigen 5.0.1
-# (eigen-abi >=5.0.1.100), so an explicit `eigen <3.5` or `trajopt = "*"` deadlocks
-# the solve. Let the tesseract packages drive the resolution.
+# tesseract-robotics channel's `dev` label: the 0.36 dev stack this binding set targets
+# (tesseract_nanobind#161). Every C++ dependency (boost, eigen, ompl, bullet, fcl, …)
+# arrives transitively as a run/host dep of these packages, matched to how the
+# feedstocks were built; don't pin those here (an explicit eigen pin deadlocks the solve).
+tesseract-robotics = "==0.36.0.dev20260929"
+tesseract-robotics-planning = "==0.36.0.dev20260929"
+trajopt = "==0.36.0.dev20260930"
+# header-only, no run_exports, run dep unpinned in the planning recipe: match the
+# taskflow tesseract-robotics-planning was built with (its rendered_recipe.yaml)
+taskflow = "3.11.*"
 
 # Python build deps
 pip = "*"
