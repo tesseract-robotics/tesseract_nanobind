@@ -310,7 +310,7 @@ class ConvexMesh(PolygonMesh):
         """Set how the mesh was made"""
 
 class SignedDistanceField(Geometry):
-    def __init__(self, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')], distances: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ...) -> None:
+    def __init__(self, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')] | Sequence[int], distances: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ...) -> None:
         """
         Create a field from signed distances sampled on a regular grid.
 
@@ -341,7 +341,7 @@ class SignedDistanceField(Geometry):
     def getScale(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
         """Get the local scaling applied to the field"""
 
-    def getDistance(self, point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> float:
+    def getDistance(self, point: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> float:
         """
         Get the signed distance at a point in the field's local frame.
         A function-backed field evaluates its sampler directly; a grid-backed field
@@ -495,7 +495,17 @@ def createMeshFromResource(resource: tesseract_robotics.tesseract_common._tesser
 def createConvexMeshFromResource(resource: tesseract_robotics.tesseract_common._tesseract_common.Resource, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
     """Load ConvexMesh from resource (e.g., package:// URL)"""
 
-def createDiscreteSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., batched: bool = False) -> SignedDistanceField:
+def createMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
+    """
+    Load Mesh geometries from an in-memory mesh file; url's extension (.stl, .dae, ...) selects the format
+    """
+
+def createConvexMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
+    """
+    Load ConvexMesh geometries from an in-memory mesh file; url's extension selects the format
+    """
+
+def createDiscreteSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')] | Sequence[int], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., batched: bool = False) -> SignedDistanceField:
     """
     Sample a signed distance function onto a dense grid up front and return the resulting field.
 
@@ -508,7 +518,7 @@ def createDiscreteSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArr
     reference back into your Python objects.
     """
 
-def createSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ..., batched: bool = False) -> SignedDistanceField:
+def createSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], domain_max: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], dimensions: Annotated[NDArray[numpy.int32], dict(shape=(3), order='C')] | Sequence[int], scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., batched: bool = False) -> SignedDistanceField:
     """
     Create a lazily-evaluated field that keeps the distance function as its source of truth.
 
@@ -517,11 +527,22 @@ def createSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy
     the resolution used when that happens.
 
     Use createDiscreteSignedDistanceField unless you specifically need exact sampling. The field
-    keeps sdf alive and re-enters it from C++, which costs you three things: sdf must be
-    thread-safe; every evaluation takes the GIL, so a lazy field in a contact manager serializes
-    collision checking against the interpreter; and because the field references sdf (and so its
-    __globals__), storing the field in a module-level global forms a reference cycle the garbage
-    collector cannot see through - drop the field explicitly or keep it out of module scope.
+    keeps sdf alive and re-enters it from C++, which costs you three things.
+
+    1. sdf must be thread-safe.
+    2. Every evaluation takes the GIL, and the collision backends call getDistance() once per
+       sample point. contactTest releases the GIL precisely so trajectory sweeps can run in
+       parallel; a lazy field re-acquires it per query, serializing that work back against the
+       interpreter. Call discretize() before handing the field to a contact manager - after that
+       the sampler is never invoked again and the field behaves like pure data.
+    3. The field references sdf (and so its __globals__), so storing it in a module-level global
+       forms a reference cycle the garbage collector cannot see through - drop the field
+       explicitly or keep it out of module scope.
+
+    Discretizing from a thread that does not hold the GIL is also a deadlock risk: discretize()
+    holds a process-wide static mutex while calling the sampler, so it must not run inside a
+    GIL-released region. The bindings never do that (the VDB writers discretize up front), but do
+    not arrange it yourself by, say, discretizing from inside a C++ callback.
     """
 
 def writeSignedDistanceFieldVDB(sdf: SignedDistanceField) -> bytes:
@@ -529,7 +550,7 @@ def writeSignedDistanceFieldVDB(sdf: SignedDistanceField) -> bytes:
     Serialize a field as a standard OpenVDB FloatGrid (raises if the voxel spacing is non-uniform)
     """
 
-def readSignedDistanceFieldVDB(data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ...) -> SignedDistanceField:
+def readSignedDistanceFieldVDB(data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ...) -> SignedDistanceField:
     """
     Reconstruct a field from OpenVDB FloatGrid bytes (exactly one axis-aligned, uniformly scaled grid)
     """
@@ -537,19 +558,9 @@ def readSignedDistanceFieldVDB(data: bytes, scale: Annotated[NDArray[numpy.float
 def writeSignedDistanceFieldNVDB(sdf: SignedDistanceField) -> bytes:
     """Serialize a field as a standard NanoVDB FloatGrid file"""
 
-def readSignedDistanceFieldNVDB(data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] = ...) -> SignedDistanceField:
+def readSignedDistanceFieldNVDB(data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ...) -> SignedDistanceField:
     """
     Reconstruct a field from NanoVDB FloatGrid bytes (exactly one axis-aligned, uniformly scaled grid)
-    """
-
-def createMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[Mesh]:
-    """
-    Load Mesh geometries from an in-memory mesh file; url's extension (.stl, .dae, ...) selects the format
-    """
-
-def createConvexMeshFromBytes(url: str, data: bytes, scale: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float] = ..., triangulate: bool = True, flatten: bool = False, normals: bool = False, vertex_colors: bool = False, material_and_texture: bool = False) -> list[ConvexMesh]:
-    """
-    Load ConvexMesh geometries from an in-memory mesh file; url's extension selects the format
     """
 
 def isIdentical(geom1: Geometry, geom2: Geometry) -> bool:
