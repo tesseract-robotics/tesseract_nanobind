@@ -833,7 +833,7 @@ def cpp_api(
                 befriends_cereal |= any(f.spelling in CEREAL_HOOKS for f in m.get_children())
             if m.kind == ci.CursorKind.CXX_BASE_SPECIFIER and m.referenced is not None:
                 # A subclass serialized through its base (`cereal::base_class`) has no friend
-                # of its own: `Mesh` and `SDFMesh` through `PolygonMesh`.
+                # of its own: `Mesh` through `PolygonMesh`.
                 befriends_cereal |= _befriends_cereal(m.referenced)
             if m.access_specifier != ci.AccessSpecifier.PUBLIC:
                 continue

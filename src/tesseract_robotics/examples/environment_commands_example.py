@@ -265,7 +265,9 @@ def run_in(fixture_root: Path) -> dict[str, Any]:
         "history": history_types(calibrated_history),
         # the calibration is a hash map, so its joint order is unspecified: compare sorted
         "calibrated_joints": sorted(
-            c.getJointName() for c in calibrated_history if isinstance(c, ChangeJointOriginCommand)
+            str(c.getJointId())
+            for c in calibrated_history
+            if isinstance(c, ChangeJointOriginCommand)
         ),
         "origins_applied": origins_applied(calibrated, joints),
         "empty_before_insert": empty_before_insert,

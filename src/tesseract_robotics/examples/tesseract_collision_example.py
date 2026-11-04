@@ -111,7 +111,7 @@ def main():
     manager = robot.env.getDiscreteContactManager()
 
     # Specify which links to include in collision checking
-    # getActiveLinkNames() returns all links with collision geometry
+    # getActiveLinkIds() returns all links with collision geometry
     manager.setActiveCollisionObjects(robot.env.getActiveLinkIds())
 
     # Collision margin: report contacts when objects are within 10cm

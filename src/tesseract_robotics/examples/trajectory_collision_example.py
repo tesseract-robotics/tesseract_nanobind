@@ -139,8 +139,8 @@ def load(locator: GeneralResourceLocator, urdf_url: str, srdf_url: str) -> Envir
 
 
 def contact_pairs(results: ContactResultMap) -> list[tuple[str, str]]:
-    """Ordered link pairs that hold at least one contact."""
-    return sorted(key for key, vector in results if len(vector))
+    """Sorted link-name pairs that hold at least one contact."""
+    return sorted(key.orderedNameView() for key, vector in results if len(vector))
 
 
 def boxbot_checks(locator: GeneralResourceLocator) -> dict[str, Any]:
@@ -209,8 +209,8 @@ def add_attached_sphere(env: Environment) -> None:
     link.addCollision(collision)
 
     joint = Joint("joint_sphere_attached")
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = link.getName()
+    joint.parent_link_id = "base_link"
+    joint.child_link_id = link.getName()
     joint.type = JointType.FIXED
     if not env.applyCommand(AddLinkCommand(link, joint)):
         raise RuntimeError("could not attach the sphere")
@@ -317,7 +317,7 @@ def trajectory_link(locator: GeneralResourceLocator, trajectory: JointTrajectory
     env = load(locator, IIWA_URDF_URL, IIWA_SRDF_URL)
     scene_graph = env.getSceneGraph()
     active_links = sorted(
-        {name for joint in TRAJECTORY_JOINTS for name in scene_graph.getJointChildrenNames(joint)}
+        {name for joint in TRAJECTORY_JOINTS for name in scene_graph.getJointChildrenIds(joint)}
     )
     with_collision = [name for name in active_links if scene_graph.getLink(name).collision]
     num_shapes = sum(len(scene_graph.getLink(name).collision) for name in with_collision)
@@ -341,8 +341,8 @@ def trajectory_link(locator: GeneralResourceLocator, trajectory: JointTrajectory
         collisions[method.name] = len(env.getLink(TRAJECTORY_LINK).collision)
         # --8<-- [end:trajectory_link]
         getters[method.name] = {
-            "link_name": command.getLinkName(),
-            "parent_link_name": command.getParentLinkName(),
+            "link_name": str(command.getLinkId()),
+            "parent_link_name": str(command.getParentLinkId()),
             "trajectory_equal": command.getTrajectory() == trajectory,
             "replace_allowed": command.replaceAllowed(),
             "method": command.getMethod().name,

@@ -107,12 +107,10 @@ tesseract_geometry:
     createMeshFromPath: >-
       File IO plus assimp parsing, like parseURDFFile; milliseconds per mesh (gil-hotspots).
     createConvexMeshFromPath: See createMeshFromPath; plus a convex hull.
-    createSDFMeshFromPath: See createMeshFromPath.
     createMeshFromResource: >-
       See createMeshFromPath. A Python Resource re-acquires the GIL through its trampoline, and
       nanobind's shared_ptr deleter for it takes the GIL itself.
     createConvexMeshFromResource: See createMeshFromResource; plus a convex hull.
-    createSDFMeshFromResource: See createMeshFromResource.
 
 tesseract_serialization:
   module:

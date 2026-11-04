@@ -221,8 +221,9 @@ call that changed nothing would disagree with the oracle:
 --8<-- "src/tesseract_robotics/examples/state_solver_example.py:overloads"
 ```
 
-The three `getJacobian` overloads give the same matrix, which agrees with
-KDL's; the floating joint adds no column.
+The two `getJacobian` overloads give the same matrix, which agrees with
+KDL's; the floating joint adds no column. 0.36 has no name-to-value map
+overload: pass the values, or the joint ids and values.
 
 ```python title="state_solver_example.py"
 --8<-- "src/tesseract_robotics/examples/state_solver_example.py:jacobian"
