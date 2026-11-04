@@ -273,7 +273,7 @@ class TestTrajOptSQPTypes:
         solver.params.trust_shrink_ratio = 0.5
 
         # Convergence parameters
-        solver.params.max_iterations = 100
+        solver.params.max_iter = 100
         solver.params.cnt_tolerance = 1e-4
         solver.params.min_approx_improve = 1e-6
         solver.params.improve_ratio_threshold = 0.25
@@ -284,7 +284,7 @@ class TestTrajOptSQPTypes:
         solver.params.merit_coeff_increase_ratio = 10.0
 
         assert solver.params.initial_trust_box_size == 0.5
-        assert solver.params.max_iterations == 100
+        assert solver.params.max_iter == 100
 
     def test_solver_status_after_solve(self, kuka_setup):
         """Test getStatus method returns valid status after solve."""
@@ -849,7 +849,7 @@ class TestConstraintSetInterface:
         problem.setup()
 
         solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
-        solver.params.max_iterations = 10
+        solver.params.max_iter = 10
         solver.verbose = False
         solver.solve(problem)
 
@@ -1012,15 +1012,34 @@ class TestTrajOptQPProblem:
         assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
         assert nodes.getValues()[2] == pytest.approx(2.0, abs=OSQP_ABSOLUTE_TOLERANCE)
 
-    def test_squared_cost_needs_equality_bounds(self):
+    def test_squared_cost_takes_one_sided_rows(self):
+        """trajopt charges a one-sided row of a squared cost through a slack (trajopt c1bd090)."""
         nodes = ti.createNodesVariables(
             "trajectory", ["j0"], [np.zeros(1)] * 3, ti.toBounds(np.array([[-10.0, 10.0]]))
         )
         var = nodes.getNodes()[1].getVar("joints")
         upper_limited = ti.JointPosConstraint([ti.Bounds(-np.inf, 1.0)], var, np.ones(1), "upper")
         problem = tsqp.TrajOptQPProblem(nodes)
-        with pytest.raises(RuntimeError, match="equality bounds"):
-            problem.addCostSet(upper_limited, tsqp.CostPenaltyType.SQUARED)
+        problem.addCostSet(upper_limited, tsqp.CostPenaltyType.SQUARED)
+        problem.setup()
+        assert problem.getNLPCostNames() == ["upper"]
+
+    @pytest.mark.parametrize("penalty", [None, "SQUARED", "ABSOLUTE", "HINGE"])
+    def test_range_rows_are_refused_when_added(self, penalty):
+        """Every row of a cost or constraint set must be an equality or one-sided (trajopt bb3d6e6)."""
+        nodes = ti.createNodesVariables(
+            "trajectory", ["j0"], [np.zeros(1)] * 3, ti.toBounds(np.array([[-10.0, 10.0]]))
+        )
+        var = nodes.getNodes()[1].getVar("joints")
+        ranged = ti.JointPosConstraint(
+            [ti.Bounds(-1.0, 1.0)], var, np.ones(1), "ranged", ti.RangeBoundHandling.KEEP_AS_IS
+        )
+        problem = tsqp.TrajOptQPProblem(nodes)
+        with pytest.raises(RuntimeError, match="rows must have equality or one-sided bounds"):
+            if penalty is None:
+                problem.addConstraintSet(ranged)
+            else:
+                problem.addCostSet(ranged, getattr(tsqp.CostPenaltyType, penalty))
 
     def test_interpreter_teardown_without_ordered_del(self):
         """Module globals die in the interpreter's order, not C++'s ownership order."""
@@ -1133,7 +1152,8 @@ class TestTrajOptQPProblemPenaltyCosts:
     tesseract_nanobind#151; `main` (trajopt 0.35.0) still pins the defective behaviour.
     """
 
-    def test_absolute_cost_needs_equality_bounds(self):
+    def test_absolute_cost_takes_one_sided_rows(self):
+        """A linear-penalty cost may mix equality and one-sided rows (trajopt 95a3325)."""
         nodes, vars_list = _make_nodes_variables(
             ["j0"], np.array([[-PENALTY_JOINT_LIMIT, PENALTY_JOINT_LIMIT]]), [np.zeros(1)] * 3
         )
@@ -1141,10 +1161,12 @@ class TestTrajOptQPProblemPenaltyCosts:
             [ti.Bounds(-np.inf, HINGE_UPPER)], vars_list[1], np.ones(1), "upper"
         )
         problem = tsqp.TrajOptQPProblem(nodes)
-        with pytest.raises(RuntimeError, match="absolute cost must have equality bounds"):
-            problem.addCostSet(upper_limited, tsqp.CostPenaltyType.ABSOLUTE)
+        problem.addCostSet(upper_limited, tsqp.CostPenaltyType.ABSOLUTE)
+        problem.setup()
+        assert problem.getNLPCostNames() == ["upper"]
 
-    def test_hinge_cost_needs_inequality_bounds(self):
+    def test_hinge_cost_takes_equality_rows(self):
+        """A linear-penalty cost may mix equality and one-sided rows (trajopt 95a3325)."""
         nodes, vars_list = _make_nodes_variables(
             ["j0"], np.array([[-PENALTY_JOINT_LIMIT, PENALTY_JOINT_LIMIT]]), [np.zeros(1)] * 3
         )
@@ -1152,8 +1174,9 @@ class TestTrajOptQPProblemPenaltyCosts:
             np.array([ABSOLUTE_TARGET]), vars_list[1], np.ones(1), "pinned"
         )
         problem = tsqp.TrajOptQPProblem(nodes)
-        with pytest.raises(RuntimeError, match="hinge cost must have inequality bounds"):
-            problem.addCostSet(pinned, tsqp.CostPenaltyType.HINGE)
+        problem.addCostSet(pinned, tsqp.CostPenaltyType.HINGE)
+        problem.setup()
+        assert problem.getNLPCostNames() == ["pinned"]
 
     def test_absolute_exact_cost_is_the_summed_absolute_error(self):
         """At c = 1 the exact cost is the sum over rows of |e|, one row below its target and

@@ -96,11 +96,11 @@ class SQPParameters:
     def min_approx_improve_frac(self, arg: float, /) -> None: ...
 
     @property
-    def max_iterations(self) -> int:
+    def max_iter(self) -> int:
         """Max number of QP calls allowed (default: 50)"""
 
-    @max_iterations.setter
-    def max_iterations(self, arg: int, /) -> None: ...
+    @max_iter.setter
+    def max_iter(self, arg: int, /) -> None: ...
 
     @property
     def trust_shrink_ratio(self) -> float:

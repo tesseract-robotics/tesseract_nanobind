@@ -227,7 +227,7 @@ class TestConstraintSetInTrajOptQPProblem:
         assert problem.getNLPConstraintNames() == ["test_constraint"]
 
     def test_add_squared_cost(self):
-        """A squared cost needs equality bounds; ScalarCost has them."""
+        """A Python cost set goes in as a squared cost."""
         from tesseract_robotics.trajopt_sqp import CostPenaltyType, TrajOptQPProblem
 
         problem = TrajOptQPProblem(_make_nodes_variables(3, 2))
