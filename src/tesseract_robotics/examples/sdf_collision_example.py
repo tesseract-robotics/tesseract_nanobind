@@ -175,7 +175,7 @@ PROBE_CELL_SRDF = """\
   <group name="manipulator">
     <chain base_link="base_link" tip_link="probe"/>
   </group>
-  <contact_managers_plugin_config filename="file://{yaml_path}"/>
+  <contact_managers_plugin_config filename="{yaml_path}"/>
 </robot>
 """
 
@@ -224,7 +224,8 @@ def write_scene(directory: Path, contact_manager_plugins: str) -> tuple[str, str
     srdf_path = directory / "sdf_cell.srdf"
     srdf_path.write_text(PROBE_CELL_SRDF.format(yaml_path=yaml_path), encoding="utf-8")
 
-    return f"file://{urdf_path}", f"file://{srdf_path}"
+    # Plain absolute paths: GeneralResourceLocator reads a `file:///` URL as `/C:/...` on Windows
+    return str(urdf_path), str(srdf_path)
 
 
 def build_robot(directory: Path, contact_manager_plugins: str) -> Robot:
