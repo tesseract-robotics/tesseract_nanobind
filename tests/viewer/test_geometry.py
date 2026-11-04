@@ -113,14 +113,50 @@ def test_mesh_keeps_tesseract_normals():
     )
 
 
+# Two triangles; the second is degenerate (zero area), so its lone vertex has no normal.
+TWO_TRIANGLES = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [2.0, 0.0, 0.0]]
+TWO_TRIANGLE_FACES = np.array([3, 0, 1, 2, 3, 1, 3, 1], dtype=np.int32)
+
+
+SCALED_DAE_URDF = """
+<robot name="scaled_dae" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
+  <link name="world"/>
+  <link name="dae_link">
+    <visual><geometry>
+      <mesh filename="package://tesseract/support/meshes/tesseract_material_mesh.dae" scale="{scale}"/>
+    </geometry></visual>
+  </link>
+  <joint name="j_dae" type="fixed"><parent link="world"/><child link="dae_link"/></joint>
+</robot>
+"""
+
+
+def _raw_dae_normals(scale):
+    env = Environment()
+    assert env.init(SCALED_DAE_URDF.format(scale=scale), GeneralResourceLocator())
+    (visual,) = env.getLink("dae_link").visual
+    return np.vstack(
+        [np.asarray(m.getNormals()).reshape(-1, 3) for m in visual.geometry.getMeshes()]
+    )
+
+
+def test_parser_stores_normals_scaled_like_vertices():
+    """The invariant _scaled_normals undoes: tesseract stores S n, not n."""
+    scale = np.array([1.0, 2.0, 3.0])
+    np.testing.assert_allclose(_raw_dae_normals("1 2 3"), _raw_dae_normals("1 1 1") * scale)
+
+
 def test_mesh_normals_follow_non_uniform_scale():
     """Normals transform by the inverse scale: n' = normalize(S^-1 n)."""
-    _, unit = _stl_mesh((1.0, 1.0, 1.0))
-    scale = np.array([1.0, 1.0, 2.0])
-    _, stretched = _stl_mesh(tuple(scale))
-    expected = unit.vertex_normals / scale
+    scale = np.array([1.0, 2.0, 3.0])
+    # Authored smooth normals: one per vertex, not per face, so they are kept.
+    n = np.array([[1.0, 1.0, 1.0], [1.0, -1.0, 2.0], [-1.0, 2.0, 1.0], [2.0, 1.0, -1.0]])
+    n /= np.linalg.norm(n, axis=1, keepdims=True)
+    mesh = tg.Mesh(TWO_TRIANGLES, TWO_TRIANGLE_FACES, scale=scale, normals=list(n * scale))
+    (result,) = visual_to_trimesh(_visual(mesh), "l")
+    expected = n / scale
     expected /= np.linalg.norm(expected, axis=1, keepdims=True)
-    np.testing.assert_allclose(stretched.vertex_normals, expected, atol=NORMAL_ATOL)
+    np.testing.assert_allclose(result.vertex_normals, expected, atol=NORMAL_ATOL)
 
 
 def _glb_attributes(mesh):
@@ -129,16 +165,13 @@ def _glb_attributes(mesh):
     return json.loads(glb[20 : 20 + header_len])["meshes"][0]["primitives"][0]["attributes"]
 
 
-# Two triangles; the second is degenerate (zero area), so its lone vertex has no normal.
-TWO_TRIANGLES = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [2.0, 0.0, 0.0]]
-TWO_TRIANGLE_FACES = np.array([3, 0, 1, 2, 3, 1, 3, 1], dtype=np.int32)
-
-
 def test_all_zero_normals_mean_no_normals():
-    """A file without normals (car_seat end_effector_simple.stl) comes back all zero."""
+    """A file without normals (car_seat end_effector_simple.stl) comes back all zero; it is
+    auto-smoothed like a faceted file."""
     mesh = tg.Mesh(TWO_TRIANGLES, TWO_TRIANGLE_FACES, normals=[[0.0, 0.0, 0.0]] * 4)
     (result,) = visual_to_trimesh(_visual(mesh), "l")
-    assert "NORMAL" not in _glb_attributes(result)
+    assert "NORMAL" in _glb_attributes(result)
+    assert np.isfinite(result.vertex_normals).all()
 
 
 def test_zero_normal_on_degenerate_face_stays_finite():
@@ -202,3 +235,45 @@ def test_octree_voxel_count():
 def test_unsupported_raises():
     with pytest.raises(UnsupportedGeometryError, match="Plane.*'floor'"):
         visual_to_trimesh(_visual(tg.Plane(0.0, 0.0, 1.0, 0.0)), "floor")
+
+
+def _folded_strip(fold_deg):
+    """Two triangles hinged on the x axis, unshared vertices, facet normals (an STL)."""
+    t = np.radians(fold_deg)
+    a = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.5, 1.0, 0.0]])
+    b = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.5, -np.cos(t), np.sin(t)]])
+    vertices = np.vstack([a, b])
+    normals = []
+    for tri in (a, b):
+        n = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+        normals += [n / np.linalg.norm(n)] * 3
+    faces = np.array([3, 0, 1, 2, 3, 3, 4, 5], dtype=np.int32)
+    return tg.Mesh(list(vertices), faces, normals=normals), np.array(normals[::3])
+
+
+def _normals_at_hinge(result):
+    on_hinge = np.isclose(result.vertices[:, 1], 0.0) & np.isclose(result.vertices[:, 2], 0.0)
+    return result.vertex_normals[on_hinge]
+
+
+def test_faceted_mesh_is_smooth_shaded_below_the_crease_angle():
+    mesh, (n_a, n_b) = _folded_strip(fold_deg=10.0)
+    (result,) = visual_to_trimesh(_visual(mesh), "l")
+    hinge = _normals_at_hinge(result)
+    expected = (n_a + n_b) / np.linalg.norm(n_a + n_b)
+    np.testing.assert_allclose(hinge, np.tile(expected, (len(hinge), 1)), atol=NORMAL_ATOL)
+
+
+def test_faceted_mesh_keeps_creases():
+    mesh, (n_a, n_b) = _folded_strip(fold_deg=90.0)
+    (result,) = visual_to_trimesh(_visual(mesh), "l")
+    hinge = _normals_at_hinge(result)
+    for n in hinge:
+        assert np.isclose(abs(n @ n_a), 1.0) or np.isclose(abs(n @ n_b), 1.0)
+
+
+def test_materials_are_double_sided():
+    """Sheet-metal meshes (car_seat car.stl) mix windings; one-sided materials punch holes."""
+    mesh, _ = _folded_strip(fold_deg=10.0)
+    (result,) = visual_to_trimesh(_visual(mesh), "l")
+    assert result.visual.material.doubleSided
