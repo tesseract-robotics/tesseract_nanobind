@@ -25,6 +25,7 @@ from tesseract_robotics.viewer.errors import (
     NoEnvironmentError,
     NoTrajectoryError,
     UnknownJointError,
+    ViewerCloseTimeoutError,
     ViewerPortInUseError,
 )
 from tesseract_robotics.viewer.poses import link_poses
@@ -374,3 +375,52 @@ def test_port_zero_picks_a_free_port():
         port = viewer.server.get_port()
         assert port != 0
         assert viewer.url == f"http://127.0.0.1:{port}"
+
+
+def test_loop_off_stops_at_the_end(viewer, env):
+    viewer.update_environment(env)
+    traj = Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, PLAYBACK_DT_S])
+    viewer._gui_loop.value = False
+    viewer.update_trajectory(traj)
+    _wait_for(lambda: viewer._gui_play.value is False)
+    assert viewer._gui_time.value == traj.duration_s
+    xyz, _ = link_poses(env, JOINT_NAMES, Q)["tool0"]
+    np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
+
+
+def test_loop_on_wraps_to_the_start(viewer, env):
+    viewer.update_environment(env)
+    traj = Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, 3 * PLAYBACK_DT_S])
+    viewer.update_trajectory(traj)
+    _wait_for(lambda: viewer._t_s > 0.0)
+    _wait_for(lambda: viewer._t_s == 0.0)
+    assert viewer._gui_play.value is True
+
+
+def test_speed_zero_holds_time(viewer, env):
+    viewer.update_environment(env)
+    viewer._gui_speed.value = 0.0
+    viewer.update_trajectory(_two_waypoints())
+    time.sleep(3 * PLAYBACK_DT_S)
+    assert viewer._t_s == 0.0
+
+
+def test_speed_scales_playback(viewer, env):
+    viewer.update_environment(env)
+    viewer._gui_speed.value = 2.0
+    with viewer._pose_lock:
+        viewer.update_trajectory(_two_waypoints())
+        viewer._tick()
+        assert viewer._t_s == 2.0 * PLAYBACK_DT_S
+
+
+def test_close_raises_when_the_player_is_wedged(monkeypatch):
+    monkeypatch.setattr("tesseract_robotics.viewer.viewer.PLAYER_JOIN_TIMEOUT_S", 2 * PLAYBACK_DT_S)
+    viewer = TesseractViewer(port=0)
+    # The player blocks on a pose lock this thread holds, as a wedged pose update would.
+    with viewer._pose_lock:
+        time.sleep(2 * PLAYBACK_DT_S)
+        with pytest.raises(ViewerCloseTimeoutError):
+            viewer.close()
+    viewer._player.join(PLAYER_ADVANCE_TIMEOUT_S)
+    assert not viewer._player.is_alive()
