@@ -42,7 +42,7 @@ def _plain(value):
 # test_contact_result_continuous.py.
 PAIR_FIELDS = [
     ("type_id", lambda: [3, 4]),
-    ("link_names", lambda: ["link_a", "link_b"]),
+    ("link_ids", lambda: ["link_a", "link_b"]),
     ("shape_id", lambda: [1, 2]),
     ("subshape_id", lambda: [5, 6]),
     ("nearest_points", lambda: [np.array([1.0, 2.0, 3.0]), np.array([4.0, 5.0, 6.0])]),
@@ -114,7 +114,7 @@ def test_continuous_contact_cc_transform_is_cast_end_pose():
 
         none = ContinuousCollisionType.CCType_None
         for cr in flat:
-            moving = list(cr.link_names).index("moving_box")
+            moving = list(cr.link_ids).index("moving_box")
             assert cr.cc_type[moving] != none
             np.testing.assert_array_equal(np.asarray(cr.cc_transform[moving].matrix), end)
     finally:

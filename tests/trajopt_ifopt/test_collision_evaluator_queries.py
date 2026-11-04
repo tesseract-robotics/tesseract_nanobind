@@ -10,10 +10,11 @@ from __future__ import annotations
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics.tesseract_common import LinkIdPair
 
 from .scenes import OVERLAP_X, TwoBoxes, two_boxes_at
 
-PAIR = ("base_link", "slider_link")
+PAIR = LinkIdPair("base_link", "slider_link")
 # max contacts per link pair the evaluator keeps
 MAX_ALLOWED = 3
 # m: second slider position of the continuous pair, still overlapping the fixed box
@@ -22,7 +23,7 @@ SECOND_X = 0.15
 
 def _pair_results(data: ti.CollisionCacheData):
     container = data.contact_results_map.getContainer()
-    return container.get(PAIR) or container[PAIR[::-1]]
+    return container[PAIR]
 
 
 def test_calc_collisions_reports_the_pair(two_boxes: TwoBoxes):
@@ -31,7 +32,7 @@ def test_calc_collisions_reports_the_pair(two_boxes: TwoBoxes):
     assert len(_pair_results(data)) >= 1
     assert len(data.gradient_results_sets) >= 1
     (results_set,) = data.gradient_results_sets
-    assert set(results_set.key) == set(PAIR)
+    assert results_set.key == PAIR
     assert results_set.getMaxError() > 0.0
 
 
@@ -49,7 +50,7 @@ def test_get_gradient_is_non_zero(two_boxes: TwoBoxes):
 
 def test_get_joint_group_names_the_joints(two_boxes: TwoBoxes):
     evaluator = two_boxes.discrete_evaluator()
-    assert list(evaluator.getJointGroup().getJointNames()) == ["slider_joint"]
+    assert [str(j) for j in evaluator.getJointGroup().getJointIds()] == ["slider_joint"]
 
 
 def test_continuous_queries():
@@ -61,7 +62,7 @@ def test_continuous_queries():
     contact = _pair_results(data)[0]
     gradient = evaluator.calcGradientData(dof0, dof1, contact)
     assert isinstance(gradient, ti.GradientResults)
-    assert list(evaluator.getJointGroup().getJointNames()) == ["slider_joint"]
+    assert [str(j) for j in evaluator.getJointGroup().getJointIds()] == ["slider_joint"]
 
 
 def test_result_types_are_value_types():

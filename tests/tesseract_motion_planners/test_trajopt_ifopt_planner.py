@@ -580,6 +580,11 @@ class TestTrajOptIfoptSolverCallbacks:
         assert all(is_problem and is_results for _, is_problem, is_results in seen)
 
 
+def _names(joint_ids):
+    """trajopt_ifopt's Node::addVar takes `std::vector<std::string>` child names, not JointIds."""
+    return [str(joint_id) for joint_id in joint_ids]
+
+
 class TestTrajOptIfoptConstraintFactories:
     """The planner's term factories from trajopt_ifopt_utils.h (gh-309)."""
 
@@ -588,7 +593,7 @@ class TestTrajOptIfoptConstraintFactories:
         manip = t_env.getKinematicGroup("manipulator")
         states = [START_POS, 0.5 * (START_POS + END_POS), END_POS]
         nodes = ti.createNodesVariables(
-            "trajectory", joint_names, states, ti.toBounds(manip.getLimits().joint_limits)
+            "trajectory", _names(joint_names), states, ti.toBounds(manip.getLimits().joint_limits)
         )
         variables = [node.getVar("joints") for node in nodes.getNodes()]
         target = np.zeros(len(joint_names))
@@ -621,14 +626,14 @@ class TestTrajOptIfoptConstraintFactories:
         obstacle.addCollision(collision)
         joint = Joint("obstacle_joint")
         joint.type = JointType.FIXED
-        joint.parent_link_name = "base_link"
-        joint.child_link_name = "obstacle"
+        joint.parent_link_id = "base_link"
+        joint.child_link_id = "obstacle"
         joint.parent_to_joint_origin_transform = manip.calcFwdKin(END_POS)["tool0"]
         assert t_env.applyCommand(AddLinkCommand(obstacle, joint))
 
         nodes = ti.createNodesVariables(
             "trajectory",
-            joint_names,
+            _names(joint_names),
             [START_POS, END_POS],
             ti.toBounds(manip.getLimits().joint_limits),
         )
@@ -651,7 +656,7 @@ class TestTrajOptIfoptConstraintFactories:
         manip = t_env.getKinematicGroup("manipulator")
         nodes = ti.createNodesVariables(
             "trajectory",
-            joint_names,
+            _names(joint_names),
             [START_POS, END_POS, START_POS],
             ti.toBounds(manip.getLimits().joint_limits),
         )
@@ -1118,7 +1123,7 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
         locator,
     )
     manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
-    joints = list(env.getJointGroup("manipulator").getJointNames())
+    joints = list(env.getJointGroup("manipulator").getJointIds())
 
     def move(position):
         return MoveInstructionPoly_wrap_MoveInstruction(
@@ -1202,7 +1207,7 @@ _SUPER_CREATE = textwrap.dedent(
         locator,
     )
     manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
-    joints = list(env.getJointGroup("manipulator").getJointNames())
+    joints = list(env.getJointGroup("manipulator").getJointIds())
     move = MoveInstructionPoly_wrap_MoveInstruction(
         MoveInstruction(
             JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.zeros(len(joints)))),
@@ -1279,7 +1284,7 @@ _KEEP_FROM_CREATE = textwrap.dedent(
         locator,
     )
     manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
-    joints = list(env.getJointGroup("manipulator").getJointNames())
+    joints = list(env.getJointGroup("manipulator").getJointIds())
 
     def move(position):
         return MoveInstructionPoly_wrap_MoveInstruction(

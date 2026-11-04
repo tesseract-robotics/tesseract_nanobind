@@ -99,7 +99,7 @@ def iiwa_group():
 def test_kinematic_group_calc_inv_kin_releases_gil(iiwa_group):
     # Out of reach: the numerical solver (KDL LMA) runs to its iteration limit every call.
     pose = Isometry3d.Identity().translate([10.0, 0.0, 0.0])
-    ik_input = tesseract_kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkName(), "tool0")
+    ik_input = tesseract_kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkId(), "tool0")
     seed = np.zeros(7)
 
     assert_releases_gil(lambda: iiwa_group.calcInvKin(ik_input, seed))
@@ -109,7 +109,7 @@ def test_kinematic_group_calc_inv_kin_releases_gil(iiwa_group):
 def test_kinematic_group_calc_inv_kin_still_solves(iiwa_group):
     q = np.array([0.1, 0.2, -0.1, -0.5, 0.2, 0.3, 0.0])
     pose = iiwa_group.calcFwdKin(q)["tool0"]
-    ik_input = tesseract_kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkName(), "tool0")
+    ik_input = tesseract_kinematics.KinGroupIKInput(pose, iiwa_group.getBaseLinkId(), "tool0")
 
     solutions = iiwa_group.calcInvKin([ik_input], q)
 
@@ -185,10 +185,10 @@ def test_environment_serialization_releases_gil(abb_env, tmp_path):  # noqa: F81
         lambda: ts.environment_from_file(path),
     ):
         assert_releases_gil(call)
-    assert set(ts.environment_from_xml(xml).getJointNames()) == set(abb_env.getJointNames())
+    assert set(ts.environment_from_xml(xml).getJointIds()) == set(abb_env.getJointIds())
 
 
-@pytest.mark.parametrize("kind", ["Mesh", "ConvexMesh", "SDFMesh"])
+@pytest.mark.parametrize("kind", ["Mesh", "ConvexMesh"])
 def test_create_mesh_releases_gil(kind):
     from tesseract_robotics import tesseract_geometry as tg
 

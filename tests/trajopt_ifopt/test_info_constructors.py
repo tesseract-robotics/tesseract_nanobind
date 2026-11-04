@@ -36,7 +36,7 @@ def test_cart_line_info_all_fields(iiwa: Iiwa):
         _translated(z=TCP_LENGTH),
         np.array([0, 1, 2]),
     )
-    assert list(info.manip.getJointNames()) == iiwa.joint_names
+    assert [str(j) for j in info.manip.getJointIds()] == iiwa.joint_names
     assert (info.source_frame, info.target_frame) == ("tool0", "base_link")
     np.testing.assert_allclose(info.target_frame_offset1.matrix, np.eye(4))
     np.testing.assert_allclose(info.target_frame_offset2.matrix, _translated(x=LINE_LENGTH).matrix)
@@ -67,7 +67,7 @@ def test_cart_line_info_defaults(iiwa: Iiwa):
 
 def test_inverse_kinematics_info_all_fields(iiwa: Iiwa):
     info = ti.InverseKinematicsInfo(iiwa.manip, "base_link", "tool0", _translated(z=TCP_LENGTH))
-    assert list(info.manip.getJointNames()) == iiwa.joint_names
+    assert [str(j) for j in info.manip.getJointIds()] == iiwa.joint_names
     assert (info.working_frame, info.tcp_frame) == ("base_link", "tool0")
     np.testing.assert_allclose(info.tcp_offset.matrix, _translated(z=TCP_LENGTH).matrix)
 

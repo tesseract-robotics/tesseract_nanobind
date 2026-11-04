@@ -1,8 +1,10 @@
-"""`SceneGraph.getJointChildrenNames` binds both C++ overloads: one joint name and a list.
+"""`SceneGraph.getJointChildrenIds` binds both C++ overloads: one joint name and a list.
 
 The graph is upstream's `createTestSceneGraph` (tesseract_scene_graph_unit.cpp:44-92); the
 expectations are its unit test (:137-151) and the list overload's union of each joint's
-children in a `std::set` (graph.cpp:909-919), so the result is sorted and has no duplicates.
+children. 0.36 collects it in a `std::unordered_set` (graph.cpp:922-932): no duplicates, no
+order, so the list results are compared sorted (expected lists are sorted and duplicate-free,
+so equality still rules out duplicates).
 """
 
 from __future__ import annotations
@@ -22,8 +24,8 @@ def _joint(name, parent, child, joint_type, axis, limits=None):
     offset[axis] = JOINT_OFFSET
     joint = sg.Joint(name)
     joint.parent_to_joint_origin_transform = Isometry3d(offset, Quaterniond.Identity())
-    joint.parent_link_name = parent
-    joint.child_link_name = child
+    joint.parent_link_id = parent
+    joint.child_link_id = child
     joint.type = joint_type
     if limits is not None:
         joint.limits = limits
@@ -68,20 +70,23 @@ def graph() -> sg.SceneGraph:
     ],
 )
 def test_joint_children_names_of_a_list(graph, names, children):
-    assert graph.getJointChildrenNames(names) == children
+    assert sorted(map(str, graph.getJointChildrenIds(names))) == children
 
 
 def test_joint_children_names_of_a_tuple(graph):
-    assert graph.getJointChildrenNames(("joint_3", "joint_4")) == ["link_4", "link_5"]
+    assert sorted(map(str, graph.getJointChildrenIds(("joint_3", "joint_4")))) == [
+        "link_4",
+        "link_5",
+    ]
 
 
 def test_a_str_still_selects_the_one_name_overload(graph):
     """A `str` is a sequence of `str`; it must not be read as a list of one-letter names."""
-    assert graph.getJointChildrenNames("joint_4") == ["link_5"]
+    assert graph.getJointChildrenIds("joint_4") == ["link_5"]
 
 
 @pytest.mark.parametrize("names", ["nope", ["joint_4", "nope"]])
 def test_unknown_joint_name_raises(graph, names):
     """Upstream's getEdge throws std::runtime_error (graph.cpp:1092-1099) for either overload."""
     with pytest.raises(RuntimeError, match="'nope' does not exist"):
-        graph.getJointChildrenNames(names)
+        graph.getJointChildrenIds(names)

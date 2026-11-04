@@ -418,7 +418,7 @@ def test_contact_manager_config_pair_margin_reaches_manager():
         margins = manager.getCollisionMarginData()
         assert margins.getDefaultCollisionMargin() == pytest.approx(0.025)
         pair_data = margins.getCollisionMarginPairData()
-        assert pair_data.getCollisionMargin("link_a", "link_b") == pytest.approx(0.05)
+        assert pair_data.getCollisionMargin(("link_a", "link_b")) == pytest.approx(0.05)
     finally:
         del manager
         del factory

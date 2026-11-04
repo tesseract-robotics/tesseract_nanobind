@@ -34,7 +34,8 @@ def _validator_class():
             self.seen = []
 
         def __call__(self, result):
-            self.seen.append(tuple(result.link_names))
+            # 0.36 link_ids order is by id hash, not by name: record the pair in name order
+            self.seen.append(tuple(sorted(lid.name() for lid in result.link_ids)))
             return self.accept(result)
 
     return Recording
@@ -75,11 +76,12 @@ def test_reject_by_link_names_keeps_allowed_pairs(discrete_checker):
     discrete_checker.setActiveCollisionObjects(["box_a", "box_b", "box_c"])
     assert _contacts(discrete_checker, ContactRequest(ContactTestType.ALL)).count() == 3
 
-    validator = _validator_class()(lambda r: "box_c" not in r.link_names)
+    validator = _validator_class()(lambda r: "box_c" not in r.link_ids)
     request = ContactRequest(ContactTestType.ALL)
     request.is_valid = validator
     result = _contacts(discrete_checker, request)
-    assert [key for key, v in result.getContainer().items() if len(v)] == [("box_a", "box_b")]
+    kept = [key.orderedNameView() for key, v in result.getContainer().items() if len(v)]
+    assert kept == [("box_a", "box_b")]
     assert sorted(validator.seen) == [("box_a", "box_b"), ("box_a", "box_c"), ("box_b", "box_c")]
 
 

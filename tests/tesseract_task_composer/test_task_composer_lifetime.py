@@ -49,10 +49,10 @@ assignCurrentStateAsSeed(composite, robot.env)
 profiles = create_trajopt_default_profiles()
 
 def make_storage(node):
-    keys = node.getInputKeys()
-    port = "planning_input" if keys.has("planning_input") else "program"
+    ports = node.getInputPortMappings()
+    port = "planning_input" if ports.contains("planning_input") else "program"
     storage = TaskComposerDataStorage()
-    storage.setData(keys.get(port), AnyPoly_wrap_CompositeInstruction(composite))
+    storage.setData(ports.single(port), AnyPoly_wrap_CompositeInstruction(composite))
     storage.setData("environment", AnyPoly_wrap_EnvironmentConst(robot.env))
     storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
     return storage
@@ -257,20 +257,22 @@ print("RELEASED")
         assert "RELEASED" in out, out
 
 
-# A Python console_bridge handler: executor workers call it while a run is in flight.
+# A Python log record handler: executor workers call it while a run is in flight (they log at
+# debug during a TrajOpt run), on the worker's own thread.
 _WORKER_HANDLER = """
 import threading
 import time
 from tesseract_robotics import tesseract_common
+from tesseract_robotics.tesseract_common import LogLevel
 MAIN = threading.get_ident()
+tesseract_common.getLogger().set_level(LogLevel.debug)
 
-class WorkerHook(tesseract_common.OutputHandler):
+class WorkerHook:
     def __init__(self, hook):
-        super().__init__()
         self.hook = hook
         self.fired = False
 
-    def log(self, text, level, filename, line):
+    def __call__(self, record):
         if threading.get_ident() != MAIN and not self.fired:
             self.fired = True
             self.hook()
@@ -290,8 +292,7 @@ def drop():
     print("DROPPED ON WORKER", flush=True)
 
 sys_handler = WorkerHook(drop)
-tesseract_common.useOutputHandler(sys_handler)
-tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+tesseract_common.addLogRecordHandler(sys_handler)
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 node = factory.createTaskComposerNode("TrajOptPipeline")
 future = executor.run(node, make_storage(node))
@@ -313,8 +314,7 @@ def collect():
     print("COLLECTED ON WORKER", flush=True)
 
 sys_handler = WorkerHook(collect)
-tesseract_common.useOutputHandler(sys_handler)
-tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+tesseract_common.addLogRecordHandler(sys_handler)
 gc.disable()
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 node = factory.createTaskComposerNode("TrajOptPipeline")
@@ -336,8 +336,7 @@ print("TASKS", executor.getTaskCount())
             + """
 import sys
 sys.handler = WorkerHook(lambda: None)
-tesseract_common.useOutputHandler(sys.handler)
-tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+tesseract_common.addLogRecordHandler(sys.handler)
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 futures = []
 for _ in range(4):
@@ -355,13 +354,12 @@ class TestServerAndExitDrain:
     def test_executor_replaced_mid_run(self):
         """addExecutor replaced the running executor with the GIL held: its destructor joined
         workers blocked on the GIL in a Python log handler (a deadlock), and a run that survived
-        the join lost its executor."""
+        the join lost its executor. The handlers run on the workers themselves now."""
         out = _run(
             _WORKER_HANDLER
             + """
 handler = WorkerHook(lambda: None)
-tesseract_common.useOutputHandler(handler)
-tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+handler_id = tesseract_common.addLogRecordHandler(handler)
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator())
 name = "TaskflowExecutor"
@@ -372,7 +370,7 @@ server.addExecutor(factory.createTaskComposerExecutor(name))
 for future in futures:
     future.wait()
 print("SUCCESS", all(future.context.isSuccessful() for future in futures))
-tesseract_common.restorePreviousOutputHandler()
+tesseract_common.removeLogRecordHandler(handler_id)
 """
         )
         assert "SUCCESS True" in out, out
@@ -398,12 +396,11 @@ report["executor"] = nested
 nested_node = factory.createTaskComposerNode("TrajOptPipeline")
 nested_storage = make_storage(nested_node)
 
-class StartAtExit(tesseract_common.OutputHandler):
+class StartAtExit:
     def __init__(self):
-        super().__init__()
         self.started = False
 
-    def log(self, text, level, filename, line):
+    def __call__(self, record):
         if exiting and not self.started and threading.get_ident() != MAIN:
             self.started = True
             for _ in range(4):
@@ -411,8 +408,7 @@ class StartAtExit(tesseract_common.OutputHandler):
             print("NESTED STARTED", flush=True)
 
 handler = StartAtExit()
-tesseract_common.useOutputHandler(handler)
-tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
+handler_id = tesseract_common.addLogRecordHandler(handler)
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 node = factory.createTaskComposerNode("TrajOptPipeline")
 future = executor.run(node, make_storage(node))

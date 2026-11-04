@@ -55,7 +55,7 @@ def _call(env, evaluator, overload, traj):
     manager = _manager(env, evaluator)
     config = _config(evaluator)
     if overload == "state_solver":
-        names = env.getGroupJointNames(GROUP)
+        names = env.getGroupJointIds(GROUP)
         return checkTrajectory(manager, env.getStateSolver(), names, traj, config)
     return checkTrajectory(manager, env.getJointGroup(GROUP), traj, config)
 
@@ -74,7 +74,7 @@ def test_colliding_trajectory_reports_contacts(evaluator, overload):
     assert isinstance(results, ContactTrajectoryResults)
     assert results
     assert results.numContacts() > 0
-    assert list(results.joint_names) == list(env.getGroupJointNames(GROUP))
+    assert list(results.joint_ids) == list(env.getGroupJointIds(GROUP))
     assert any(c.count() > 0 for c in contacts)
 
 
@@ -126,7 +126,7 @@ def test_results_structure_and_summaries():
 
 
 def _link_transforms(env, joint_values):
-    names = env.getGroupJointNames(GROUP)
+    names = env.getGroupJointIds(GROUP)
     return env.getState(names, joint_values).link_transforms
 
 
@@ -198,7 +198,11 @@ def test_check_trajectory_state_missing_active_link_raises_key_error(evaluator):
     partial = _link_transforms(env, COLLIDING_STATE)
     del partial["link_7"]
     del partial["tool0"]
-    with pytest.raises(KeyError, match=r"checkTrajectoryState: state .*link_7, tool0"):
+    # 0.36: getActiveCollisionObjects() is an unordered_set, so the listing order is unspecified.
+    with pytest.raises(
+        KeyError,
+        match=r"checkTrajectoryState: state .*: (link_7, tool0|tool0, link_7)'?$",
+    ):
         checkTrajectoryState(manager, partial, ContactRequest())
     untouched = ContactResultMap()
     manager.contactTest(untouched, ContactRequest())

@@ -29,17 +29,17 @@ TRANSFORM_ATOL = 1e-12
 def test_ofkt_state_solver_from_a_root_link_name():
     """#247: OFKTStateSolver(root_name) starts with the root link only; links are added later."""
     solver = OFKTStateSolver("world")
-    assert solver.getBaseLinkName() == "world"
-    assert solver.getLinkNames() == ["world"]
+    assert solver.getBaseLinkId() == "world"
+    assert solver.getLinkIds() == ["world"]
 
     link = sg.Link("arm")
     joint = sg.Joint("world_arm")
     joint.type = sg.JointType.FIXED
-    joint.parent_link_name = "world"
-    joint.child_link_name = "arm"
+    joint.parent_link_id = "world"
+    joint.child_link_id = "arm"
     joint.parent_to_joint_origin_transform = _translation(0.0, 0.0, 1.0)
     assert solver.addLink(link, joint)
-    assert sorted(solver.getLinkNames()) == ["arm", "world"]
+    assert sorted(solver.getLinkIds()) == ["arm", "world"]
     np.testing.assert_allclose(
         solver.getState().link_transforms["arm"].translation, [0.0, 0.0, 1.0]
     )
@@ -51,8 +51,8 @@ def _translation(x: float, y: float, z: float) -> Isometry3d:
 
 def _joint(name, parent, child, joint_type, axis, origin):
     joint = sg.Joint(name)
-    joint.parent_link_name = parent
-    joint.child_link_name = child
+    joint.parent_link_id = parent
+    joint.child_link_id = child
     joint.type = joint_type
     joint.axis = np.array(axis, dtype=float)
     joint.parent_to_joint_origin_transform = origin
@@ -168,6 +168,12 @@ def test_get_state_overloads_agree(solver):
 
 # --- unknown names ----------------------------------------------------------------------------
 
+
+def _ids_values(joint_map):
+    """Split a {joint: value} map into the (joint_ids, joint_values) getJacobian takes in 0.36."""
+    return list(joint_map), np.array(list(joint_map.values()))
+
+
 UNKNOWN_NAME_CALLS = {
     "setState-map": lambda s: s.setState({"nope": 1.0}),
     "setState-names": lambda s: s.setState(["nope"], np.array([1.0])),
@@ -175,7 +181,8 @@ UNKNOWN_NAME_CALLS = {
     "setStateByNamesAndValues": lambda s: s.setStateByNamesAndValues(["nope"], np.array([1.0])),
     "getState-map": lambda s: s.getState({"nope": 1.0}),
     "getState-names": lambda s: s.getState(["nope"], np.array([1.0])),
-    "getJacobian-map": lambda s: s.getJacobian({"nope": 1.0}, TIP_LINK),
+    # 0.36 has no {name: value} getJacobian (state_solver.h:171-189): the map goes in as ids + values
+    "getJacobian-map": lambda s: s.getJacobian(*_ids_values({"nope": 1.0}), TIP_LINK),
     "getJacobian-names": lambda s: s.getJacobian(["nope"], np.array([1.0]), TIP_LINK),
     "getLinkTransforms": lambda s: s.getLinkTransforms(["nope"], np.array([1.0])),
     "setState-floating": lambda s: s.setState({"nope": _translation(1, 0, 0)}),
@@ -229,13 +236,13 @@ def test_get_jacobian_overloads_agree(solver):
         solver.getJacobian(names, JOINT_VALUES[::-1].copy(), TIP_LINK), expected
     )
     np.testing.assert_allclose(
-        solver.getJacobian(dict(zip(ACTIVE_JOINTS, JOINT_VALUES)), TIP_LINK), expected
+        solver.getJacobian(*_ids_values(dict(zip(ACTIVE_JOINTS, JOINT_VALUES))), TIP_LINK), expected
     )
 
 
 UNKNOWN_LINK_CALLS = {
     "vector": lambda s: s.getJacobian(JOINT_VALUES, "no_link"),
-    "map": lambda s: s.getJacobian(dict(zip(ACTIVE_JOINTS, JOINT_VALUES)), "no_link"),
+    "map": lambda s: s.getJacobian(*_ids_values(dict(zip(ACTIVE_JOINTS, JOINT_VALUES))), "no_link"),
     "names": lambda s: s.getJacobian(ACTIVE_JOINTS, JOINT_VALUES, "no_link"),
 }
 
@@ -247,12 +254,12 @@ def test_get_jacobian_unknown_link_raises_key_error(solver, call):
 
 
 def test_get_link_transforms_current_state(solver):
-    """getLinkTransforms() lists the current transforms in getLinkNames() order."""
+    """getLinkTransforms() lists the current transforms in getLinkIds() order."""
     solver.setState(JOINT_VALUES)
     current = solver.getState().link_transforms
     transforms = solver.getLinkTransforms()
-    assert len(transforms) == len(solver.getLinkNames())
-    for name, transform in zip(solver.getLinkNames(), transforms):
+    assert len(transforms) == len(solver.getLinkIds())
+    for name, transform in zip(solver.getLinkIds(), transforms):
         np.testing.assert_allclose(transform.matrix, current[name].matrix, atol=TRANSFORM_ATOL)
 
 
@@ -409,5 +416,5 @@ def test_insert_scene_graph():
 
     assert solver.insertSceneGraph(_tool_graph(), mount, "p_")
 
-    assert {"p_tool_base", "p_tool_tip"} <= set(solver.getLinkNames())
+    assert {"p_tool_base", "p_tool_tip"} <= set(solver.getLinkIds())
     assert not solver.insertSceneGraph(_tool_graph(), mount, "p_")

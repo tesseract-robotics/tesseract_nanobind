@@ -13,6 +13,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactResultVector,
     ContinuousCollisionType,
 )
+from tesseract_robotics.tesseract_common import LinkIdPair
 
 KEY_AB = ("a", "b")
 KEY_AC = ("a", "c")
@@ -21,7 +22,7 @@ KEY_BC = ("b", "c")
 
 def _result(link1, link2, distance=-0.1):
     r = ContactResult()
-    r.link_names = [link1, link2]
+    r.link_ids = [link1, link2]
     r.distance = distance
     return r
 
@@ -40,7 +41,7 @@ def test_add_then_at_returns_copy():
 
     v = m.at(KEY_AB)
     assert len(v) == 1
-    assert list(v[0].link_names) == ["a", "b"]
+    assert list(v[0].link_ids) == ["a", "b"]
 
     v.append(_result("a", "b"))
     assert m.count() == 1
@@ -93,14 +94,20 @@ def test_vector_overloads_reject_empty_results(method):
 
 @pytest.mark.parametrize("method", ["addContactResult", "setContactResult"])
 @pytest.mark.parametrize("vector", [False, True], ids=["single", "vector"])
-def test_unordered_key_raises(method, vector):
+def test_reversed_key_addresses_same_entry(method, vector):
+    # 0.36: the key is a canonical LinkIdPair (common/types.h OrderedIdPair), so ("b", "a")
+    # and ("a", "b") name one entry; 0.35's UnorderedLinkPairError is unreachable.
     m = ContactResultMap()
     value = _vector(_result("b", "a")) if vector else _result("b", "a")
-    with pytest.raises(tc.UnorderedLinkPairError):
-        getattr(m, method)(("b", "a"), value)
-    assert issubclass(tc.UnorderedLinkPairError, ValueError)
-    assert m.count() == 0
-    assert len(list(m)) == 0
+    getattr(m, method)(("b", "a"), value)
+    assert (m.count(), m.size()) == (1, 1)
+    assert len(m.at(KEY_AB)) == 1
+    assert list(m.getContainer()) == [LinkIdPair(*KEY_AB)]
+
+    getattr(m, method)(KEY_AB, value)
+    assert m.size() == 1
+    assert m.count() == (2 if method == "addContactResult" else 1)
+    assert len(m.at(("b", "a"))) == m.count()
 
 
 def test_at_missing_key_raises_key_error():
@@ -116,8 +123,8 @@ def test_get_container_is_dict_keyed_by_link_pair():
     m.addContactResult(KEY_BC, _result("b", "c"))
     container = m.getContainer()
     assert isinstance(container, dict)
-    assert set(container) == {KEY_AB, KEY_BC}
-    assert len(container[KEY_AB]) == 1
+    assert set(container) == {LinkIdPair(*KEY_AB), LinkIdPair(*KEY_BC)}
+    assert len(container[LinkIdPair(*KEY_AB)]) == 1
 
 
 def test_iteration_yields_key_vector_pairs_and_follows_clear_semantics():
@@ -126,7 +133,8 @@ def test_iteration_yields_key_vector_pairs_and_follows_clear_semantics():
     m.addContactResult(KEY_BC, _result("b", "c"))
 
     items = list(m)
-    assert [key for key, _ in items] == [KEY_AB, KEY_BC]
+    # unordered_map container (collision/types.h ContainerType): compare in name order
+    assert sorted(key.orderedNameView() for key, _ in items) == [KEY_AB, KEY_BC]
     assert all(isinstance(v, ContactResultVector) and len(v) == 1 for _, v in items)
 
     # clear() empties the vectors but keeps the keys (types.h:142-144)
@@ -146,8 +154,8 @@ def test_iteration_survives_shrink_to_fit_mid_loop():
     seen = []
     for key, vector in m:
         m.shrinkToFit()
-        seen.append((key, len(vector)))
-    assert seen == [(KEY_AB, 0), (KEY_BC, 0)]
+        seen.append((key.orderedNameView(), len(vector)))
+    assert sorted(seen) == [(KEY_AB, 0), (KEY_BC, 0)]
 
 
 def test_filter_clears_pairs_involving_link():
@@ -160,8 +168,8 @@ def test_filter_clears_pairs_involving_link():
     calls = []
 
     def drop_a(key, results):
-        calls.append(key)
-        if "a" in key:
+        calls.append(key.orderedNameView())
+        if "a" in key.orderedNameView():
             results.clear()
 
     m.filter(drop_a)

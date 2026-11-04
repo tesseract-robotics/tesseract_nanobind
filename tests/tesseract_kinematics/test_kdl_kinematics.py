@@ -190,7 +190,7 @@ def test_calc_jacobian_in_group_base_is_the_plain_jacobian():
     """joint_group.cpp:184-185 @ 0.35.0: base_link_name == group base is calcJacobian(q, link)."""
     jg, _ = _joint_group(_IIWA_JOINTS)
     nptest.assert_array_equal(
-        jg.calcJacobian(_IIWA_Q, jg.getBaseLinkName(), "tool0"), jg.calcJacobian(_IIWA_Q, "tool0")
+        jg.calcJacobian(_IIWA_Q, jg.getBaseLinkId(), "tool0"), jg.calcJacobian(_IIWA_Q, "tool0")
     )
 
 
@@ -198,7 +198,7 @@ def test_calc_jacobian_static_base_matches_jacobian_change_base():
     """Oracle: joint_group.cpp:211 @ 0.35.0, re-based on the static link's scene-state pose."""
     jg, scene_state = _joint_group(_PARTIAL_JOINTS)
     base = "link_2"
-    assert base in jg.getStaticLinkNames()
+    assert base in jg.getStaticLinkIds()
     q = _IIWA_Q[2:]
     expected = jg.calcJacobian(q, "tool0")
     tesseract_common.jacobianChangeBase(expected, scene_state.link_transforms[base].inverse())
@@ -221,7 +221,7 @@ def test_calc_jacobian_static_base_with_link_point():
 def test_calc_jacobian_active_link_relative_to_itself_is_zero():
     """joint_group.cpp:194-208 @ 0.35.0: an active base subtracts its own Jacobian."""
     jg, _ = _joint_group(_IIWA_JOINTS)
-    assert jg.isActiveLinkName("link_4")
+    assert jg.isActiveLinkId("link_4")
     nptest.assert_allclose(
         jg.calcJacobian(_IIWA_Q, "link_4", "link_4"), np.zeros((6, 7)), rtol=0, atol=JACOBIAN_ATOL
     )
@@ -267,7 +267,7 @@ def _iiwa_env():
 
 def _ik_input(kin_group):
     pose = kin_group.calcFwdKin(_IIWA_Q)["tool0"]
-    return tesseract_kinematics.KinGroupIKInput(pose, kin_group.getBaseLinkName(), "tool0")
+    return tesseract_kinematics.KinGroupIKInput(pose, kin_group.getBaseLinkId(), "tool0")
 
 
 def _assert_same_solutions(actual, expected):
@@ -311,8 +311,8 @@ def test_kinematic_group_constructor_solves_like_the_environment_group():
 
 
 def test_kinematic_group_constructor_wrong_joint_names_raises():
-    """kinematic_group.cpp:115-116 @ 0.35.0: joint_names of the wrong size."""
-    with pytest.raises(RuntimeError, match="joint_names is not the correct size"):
+    """kinematic_group.cpp:118-119 @ 0.36: joint_ids of the wrong size."""
+    with pytest.raises(RuntimeError, match="joint_ids is not the correct size"):
         _kinematic_group_from_factory(_IIWA_JOINTS[:6])
 
 
@@ -343,7 +343,7 @@ del inv_kin, factory
 gc.collect()
 q = np.array([-0.785398, 0.785398, -0.785398, 0.785398, -0.785398, 0.785398, -0.785398])
 pose = kg.calcFwdKin(q)["tool0"]
-solutions = kg.calcInvKin(KinGroupIKInput(pose, kg.getBaseLinkName(), "tool0"), np.zeros(7))
+solutions = kg.calcInvKin(KinGroupIKInput(pose, kg.getBaseLinkId(), "tool0"), np.zeros(7))
 print("OK:", len(solutions) > 0)
 """
 

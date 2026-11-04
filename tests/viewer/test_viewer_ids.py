@@ -57,7 +57,7 @@ def test_trajectory_json_carries_joint_names_as_str(robot, trajectory):
 def test_plot_trajectory_marker_parents_on_root_link_str(robot, trajectory):
     viewer = TesseractViewerAIO()
     viewer.t_env = robot.env
-    manip = robot.get_manipulator_info("manipulator")
+    manip = robot.get_manipulator_info("manipulator", "tool0", "base_link")
 
     async def plot():
         await viewer.plot_trajectory(trajectory, manip, update_now=False)

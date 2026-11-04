@@ -1,4 +1,4 @@
-"""TaskComposerKeys, TaskComposerDataStorage and AnyPoly: the data a task-composer run reads."""
+"""TaskComposerPortMap, TaskComposerDataStorage and AnyPoly: the data a task-composer run reads."""
 
 import subprocess
 import sys
@@ -12,7 +12,7 @@ from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
     TaskComposerDataStorage,
-    TaskComposerKeys,
+    TaskComposerPortMap,
 )
 
 # The wrappers whose signatures name types bound outside tesseract_common (#312).
@@ -29,46 +29,46 @@ def _ci(profile: str) -> AnyPoly:
     return AnyPoly_wrap_CompositeInstruction(CompositeInstruction(profile))
 
 
-class TestTaskComposerKeys:
-    """The list overload of `add`, `remove`, `rename`, `__str__`, and `get` of a list (#313)."""
+class TestTaskComposerPortMap:
+    """The list overload of `set`, `erase`, `renameStorageKeys`, `__str__`, and `at` of a list (#313)."""
 
     def test_add_list_then_get_returns_list(self):
-        keys = TaskComposerKeys()
-        keys.add("p", ["a", "b"])
-        assert keys.get("p") == ["a", "b"]
+        keys = TaskComposerPortMap()
+        keys.set("p", ["a", "b"])
+        assert keys.at("p") == ["a", "b"]
 
     def test_add_str_then_get_returns_str(self):
-        keys = TaskComposerKeys()
-        keys.add("q", "k")
-        assert keys.get("q") == "k"
+        keys = TaskComposerPortMap()
+        keys.set("q", "k")
+        assert keys.at("q") == "k"
 
     def test_remove(self):
-        keys = TaskComposerKeys()
-        keys.add("p", ["a", "b"])
-        keys.remove("p")
-        assert keys.has("p") is False
+        keys = TaskComposerPortMap()
+        keys.set("p", ["a", "b"])
+        keys.erase("p")
+        assert keys.contains("p") is False
 
     def test_rename(self):
-        """`rename` maps old *key* -> new key in every port; the ports stay (upstream
-        task_composer_keys.cpp)."""
-        keys = TaskComposerKeys()
-        keys.add("q", "k")
-        keys.add("p", ["k", "other"])
-        keys.rename({"k": "r"})
-        assert keys.get("q") == "r"
-        assert keys.get("p") == ["r", "other"]
+        """`renameStorageKeys` maps old *key* -> new key in every port; the ports stay (upstream
+        task_composer_port_map.cpp)."""
+        keys = TaskComposerPortMap()
+        keys.set("q", "k")
+        keys.set("p", ["k", "other"])
+        keys.renameStorageKeys({"k": "r"})
+        assert keys.at("q") == "r"
+        assert keys.at("p") == ["r", "other"]
 
     def test_str_lists_every_port(self):
-        keys = TaskComposerKeys()
-        keys.add("single_port", "k")
-        keys.add("list_port", ["a", "b"])
+        keys = TaskComposerPortMap()
+        keys.set("single_port", "k")
+        keys.set("list_port", ["a", "b"])
         text = str(keys)
         assert "single_port" in text
         assert "list_port" in text
 
     def test_add_keys_is_gone(self):
         """`addKeys` was the list overload of `add` under another name (#313)."""
-        assert not hasattr(TaskComposerKeys, "addKeys")
+        assert not hasattr(TaskComposerPortMap, "addKeys")
 
 
 class TestTaskComposerDataStorage:
@@ -110,11 +110,11 @@ class TestTaskComposerDataStorage:
         parent = TaskComposerDataStorage()
         parent.setData("plain", _ci("PLAIN"))
         parent.setData("parent_key", _ci("OVERRIDDEN"))
-        keys = TaskComposerKeys()
-        keys.add("p1", "plain")
-        keys.add("p2", "local_key")
-        override = TaskComposerKeys()
-        override.add("p2", "parent_key")
+        keys = TaskComposerPortMap()
+        keys.set("p1", "plain")
+        keys.set("p2", "local_key")
+        override = TaskComposerPortMap()
+        override.set("p2", "parent_key")
 
         local = TaskComposerDataStorage()
         local.copyAsInputData(parent, keys, override)
@@ -129,11 +129,11 @@ class TestTaskComposerDataStorage:
         child = TaskComposerDataStorage()
         child.setData("plain", _ci("PLAIN"))
         child.setData("local_key", _ci("OUT"))
-        keys = TaskComposerKeys()
-        keys.add("p1", "plain")
-        keys.add("p2", "local_key")
-        override = TaskComposerKeys()
-        override.add("p2", "parent_key")
+        keys = TaskComposerPortMap()
+        keys.set("p1", "plain")
+        keys.set("p2", "local_key")
+        override = TaskComposerPortMap()
+        override.set("p2", "parent_key")
 
         parent = TaskComposerDataStorage()
         parent.copyAsOutputData(child, keys, override)
@@ -189,11 +189,11 @@ class TestValueEquality:
     """`operator==` bound as `__eq__`/`__ne__`; the types are mutable, so unhashable (#261)."""
 
     def test_keys(self):
-        a, b = TaskComposerKeys(), TaskComposerKeys()
-        a.add("p", "k")
-        b.add("p", "k")
+        a, b = TaskComposerPortMap(), TaskComposerPortMap()
+        a.set("p", "k")
+        b.set("p", "k")
         assert a == b
-        b.add("p", "other")
+        b.set("p", "other")
         assert a != b
         with pytest.raises(TypeError):
             hash(a)
