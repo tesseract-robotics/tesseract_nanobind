@@ -151,9 +151,9 @@ def _two_waypoints():
     return Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, 2.0])
 
 
-def _paused(viewer):
+def _load_paused(viewer, trajectory):
+    viewer.update_trajectory(trajectory)
     viewer._gui_play.value = False
-    return viewer
 
 
 def test_playback_gui_exists_before_any_client(viewer):
@@ -167,7 +167,7 @@ def test_playback_gui_exists_before_any_client(viewer):
 def test_show_time_poses_interpolated(viewer, env):
     viewer.update_environment(env)
     traj = _two_waypoints()
-    _paused(viewer).update_trajectory(traj)
+    _load_paused(viewer, traj)
     viewer.show_time(1.0)
     xyz, _ = link_poses(env, JOINT_NAMES, traj.sample(1.0))["tool0"]
     np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
@@ -181,9 +181,8 @@ def test_update_trajectory_from_composite(viewer, env):
         wp.setTime(t)
         waypoints.append(StateWaypointPoly_wrap_StateWaypoint(wp))
     composite = _composite(waypoints)
-    _paused(viewer).update_trajectory(composite)
+    _load_paused(viewer, composite)
     assert viewer._gui_time.max == Trajectory.from_composite(composite).duration_s
-    assert viewer._gui_time.value == 0.0
 
 
 def test_joint_waypoint_composite_plays(viewer, env):
@@ -193,7 +192,7 @@ def test_joint_waypoint_composite_plays(viewer, env):
         JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(JOINT_NAMES, q))
         for q in (np.zeros(6), Q, np.zeros(6))
     ]
-    _paused(viewer).update_trajectory(_composite(waypoints))
+    _load_paused(viewer, _composite(waypoints))
     assert viewer._gui_time.max == 2.0
     viewer.show_time(1.0)
     xyz, _ = link_poses(env, JOINT_NAMES, Q)["tool0"]
@@ -204,7 +203,7 @@ def test_subset_joint_trajectory_poses_by_its_own_names(viewer, env):
     """Review Focus 3: a trajectory over a reordered subset of joints."""
     viewer.update_environment(env)
     traj = Trajectory.build(["joint_3", "joint_1"], [[0.0, 0.0], [0.4, -0.7]], [0.0, 1.0])
-    _paused(viewer).update_trajectory(traj)
+    _load_paused(viewer, traj)
     viewer.show_time(1.0)
     xyz, _ = link_poses(env, ["joint_1", "joint_3"], [-0.7, 0.4])["tool0"]
     np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
@@ -246,3 +245,10 @@ def test_close_joins_player():
     assert player.is_alive()
     viewer.close()
     assert not player.is_alive()
+
+
+def test_update_trajectory_restarts_playback(viewer, env):
+    viewer.update_environment(env)
+    viewer.update_joint_positions(JOINT_NAMES, Q)
+    viewer.update_trajectory(_two_waypoints())
+    assert viewer._gui_play.value is True
