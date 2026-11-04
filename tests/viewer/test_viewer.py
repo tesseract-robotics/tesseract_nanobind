@@ -1,20 +1,36 @@
 """TesseractViewer: viser server lifecycle and scene state."""
 
 import socket
+import time
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.tesseract_command_language import (
+    CompositeInstruction,
+    JointWaypoint,
+    JointWaypointPoly_wrap_JointWaypoint,
+    MoveInstruction,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType,
+    StateWaypoint,
+    StateWaypointPoly_wrap_StateWaypoint,
+)
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer, Trajectory
 from tesseract_robotics.viewer.poses import link_poses
+from tesseract_robotics.viewer.viewer import PLAYBACK_DT_S
 
 # Seconds to wait for the server socket to accept a TCP connection after start.
 CONNECT_TIMEOUT_S = 5.0
 # Frame position vs. an independent evaluation of the same state [m]; float64 round-off.
 POSE_ATOL_M = 1e-12
+# viser stores batched axes as float32: ~1e-7 relative on ~1 m positions.
+PLOT_ATOL_M = 1e-6
+# Wall time for the 30 Hz player to tick at least once [s]; generous for loaded CI.
+PLAYER_ADVANCE_TIMEOUT_S = 5.0
 
 JOINT_NAMES = [f"joint_{i + 1}" for i in range(6)]
 Q = np.array([0.3, -0.2, 0.1, 0.4, -0.5, 0.6])
@@ -121,3 +137,112 @@ def test_serve_forever_closes_on_keyboard_interrupt(monkeypatch):
     monkeypatch.setattr("tesseract_robotics.viewer.viewer.time.sleep", interrupt)
     viewer.serve_forever()
     _assert_port_free(port)
+
+
+def _composite(waypoints):
+    composite = CompositeInstruction()
+    for wp in waypoints:
+        move = MoveInstruction(wp, MoveInstructionType.FREESPACE)
+        composite.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move))
+    return composite
+
+
+def _two_waypoints():
+    return Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, 2.0])
+
+
+def _paused(viewer):
+    viewer._gui_play.value = False
+    return viewer
+
+
+def test_playback_gui_exists_before_any_client(viewer):
+    """Review Focus 5: controls exist from construction, before a browser connects."""
+    assert viewer._gui_play.value is True
+    assert viewer._gui_loop.value is True
+    assert viewer._gui_speed.value == 1.0
+    assert viewer._gui_time.value == 0.0
+
+
+def test_show_time_poses_interpolated(viewer, env):
+    viewer.update_environment(env)
+    traj = _two_waypoints()
+    _paused(viewer).update_trajectory(traj)
+    viewer.show_time(1.0)
+    xyz, _ = link_poses(env, JOINT_NAMES, traj.sample(1.0))["tool0"]
+    np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
+
+
+def test_update_trajectory_from_composite(viewer, env):
+    viewer.update_environment(env)
+    waypoints = []
+    for q, t in ((np.zeros(6), 0.0), (Q, 1.5)):
+        wp = StateWaypoint(JOINT_NAMES, q)
+        wp.setTime(t)
+        waypoints.append(StateWaypointPoly_wrap_StateWaypoint(wp))
+    composite = _composite(waypoints)
+    _paused(viewer).update_trajectory(composite)
+    assert viewer._gui_time.max == Trajectory.from_composite(composite).duration_s
+    assert viewer._gui_time.value == 0.0
+
+
+def test_joint_waypoint_composite_plays(viewer, env):
+    """Review Focus 4: joint waypoints carry no time; index is time."""
+    viewer.update_environment(env)
+    waypoints = [
+        JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(JOINT_NAMES, q))
+        for q in (np.zeros(6), Q, np.zeros(6))
+    ]
+    _paused(viewer).update_trajectory(_composite(waypoints))
+    assert viewer._gui_time.max == 2.0
+    viewer.show_time(1.0)
+    xyz, _ = link_poses(env, JOINT_NAMES, Q)["tool0"]
+    np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
+
+
+def test_subset_joint_trajectory_poses_by_its_own_names(viewer, env):
+    """Review Focus 3: a trajectory over a reordered subset of joints."""
+    viewer.update_environment(env)
+    traj = Trajectory.build(["joint_3", "joint_1"], [[0.0, 0.0], [0.4, -0.7]], [0.0, 1.0])
+    _paused(viewer).update_trajectory(traj)
+    viewer.show_time(1.0)
+    xyz, _ = link_poses(env, ["joint_1", "joint_3"], [-0.7, 0.4])["tool0"]
+    np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
+
+
+def test_player_advances_time(viewer, env):
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    deadline = time.monotonic() + PLAYER_ADVANCE_TIMEOUT_S
+    while viewer._gui_time.value == 0.0 and time.monotonic() < deadline:
+        time.sleep(PLAYBACK_DT_S)
+    assert viewer._gui_time.value > 0.0
+
+
+def test_update_joint_positions_stops_playback(viewer, env):
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    viewer.update_joint_positions(JOINT_NAMES, Q)
+    assert viewer._gui_play.value is False
+    xyz, _ = link_poses(env, JOINT_NAMES, Q)["tool0"]
+    np.testing.assert_allclose(viewer._link_frames["tool0"].position, xyz, atol=POSE_ATOL_M)
+
+
+def test_plot_trajectory_adds_path_and_axes(viewer, env):
+    viewer.update_environment(env)
+    manip = ManipulatorInfo("manipulator", "base_link", "tool0")
+    traj = Trajectory.build(JOINT_NAMES, [np.zeros(6), Q / 2, Q], [0.0, 1.0, 2.0])
+    viewer.plot_trajectory(traj, manip, axes_length=0.05)
+    path, axes = viewer._plot_handles
+    assert len(axes.batched_positions) == 3
+    tcp = env.getKinematicGroup("manipulator").calcFwdKin(Q)["tool0"]
+    np.testing.assert_allclose(axes.batched_positions[-1], tcp.translation, atol=PLOT_ATOL_M)
+    assert len(path.points) == 3
+
+
+def test_close_joins_player():
+    viewer = TesseractViewer(port=_free_port())
+    player = viewer._player
+    assert player.is_alive()
+    viewer.close()
+    assert not player.is_alive()
