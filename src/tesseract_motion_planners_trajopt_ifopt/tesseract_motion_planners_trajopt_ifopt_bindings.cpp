@@ -321,11 +321,11 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     // ========== TrajOptIfoptSolverProfile (base) ==========
     // No trampoline: create returns a unique_ptr to the concrete TrustRegionSQPSolver, which a
     // Python-allocated solver cannot become. Configure the solver through the fields (#340).
-    // opt_params is the SQP loop itself (max_iterations, max_qp_solver_failures,
+    // opt_params is the SQP loop itself (max_iter, max_qp_solver_failures,
     // trust-region ratios, merit-coeff inflation) -- create() assigns it straight
     // onto the TrustRegionSQPSolver, so it is the only route to those knobs. The
     // sco back-end exposes them via TrajOptOSQPSolverProfile; unbound here, an
-    // IFOPT migration silently loses them and runs on C++ defaults (max_iterations
+    // IFOPT migration silently loses them and runs on C++ defaults (max_iter
     // 50, max_qp_solver_failures 3).
     nb::class_<tp::TrajOptIfoptSolverProfile, tc::Profile>(m, "TrajOptIfoptSolverProfile")
         .def_rw("opt_params", &tp::TrajOptIfoptSolverProfile::opt_params)

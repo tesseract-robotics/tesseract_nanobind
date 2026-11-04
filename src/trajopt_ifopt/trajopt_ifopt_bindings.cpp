@@ -1380,7 +1380,7 @@ NB_MODULE(_trajopt_ifopt, m) {
              "needs linked variables and all 6 indices (#237)")
         .def("calcValues", &ti::CartLineConstraint::calcValues, "joint_vals"_a,
              "Calculate error values for given joint values")
-        .def("getLinePoint", &ti::CartLineConstraint::getLinePoint,
+        .def_static("getLinePoint", &ti::CartLineConstraint::getLinePoint,
              "source_tf"_a, "target_tf1"_a, "target_tf2"_a,
              "Find nearest point on line (uses SLERP for orientation)")
         .def_rw("use_numeric_differentiation", &ti::CartLineConstraint::use_numeric_differentiation,

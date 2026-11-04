@@ -270,8 +270,8 @@ NB_MODULE(_trajopt_sqp, m) {
                 "NLP converges if approx_merit_improve smaller than this (default: 1e-4)")
         .def_rw("min_approx_improve_frac", &tsqp::SQPParameters::min_approx_improve_frac,
                 "NLP converges if approx_merit_improve/best_exact_merit < this")
-        .def_rw("max_iterations", &tsqp::SQPParameters::max_iterations,
-                "Max number of QP calls allowed (default: 50)")
+        .def_rw("max_iter", &tsqp::SQPParameters::max_iter,
+                "Max convexifications per penalty iteration; rejected trust-region steps do not count (default: 50)")
         .def_rw("trust_shrink_ratio", &tsqp::SQPParameters::trust_shrink_ratio,
                 "Trust region scale factor when shrinking (default: 0.1)")
         .def_rw("trust_expand_ratio", &tsqp::SQPParameters::trust_expand_ratio,

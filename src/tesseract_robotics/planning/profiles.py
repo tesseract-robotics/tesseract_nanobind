@@ -191,7 +191,7 @@ def create_trajopt_ifopt_default_profiles(
 
         Solver Profile (OSQP configuration):
         - Uses default OSQP settings for QP solving
-        - opt_params (the SQP loop) left at the C++ defaults: max_iterations=50,
+        - opt_params (the SQP loop) left at the C++ defaults: max_iter=50,
           max_qp_solver_failures=3
 
     Args:
@@ -234,7 +234,7 @@ def create_trajopt_ifopt_default_profiles(
         composite.collision_constraint_config.max_num_cnt = 3
 
         solver = TrajOptIfoptOSQPSolverProfile()
-        solver.opt_params.max_iterations = 100
+        solver.opt_params.max_iter = 100
 
         The profiles this helper builds can also be retrieved and edited in
         place — getProfile returns the concrete profile type, not the Profile
