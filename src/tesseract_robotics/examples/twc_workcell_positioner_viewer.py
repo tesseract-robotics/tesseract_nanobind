@@ -123,7 +123,7 @@ WORKCELLS = {
         "srdf": "config/workcell_positioner.srdf",
         "joints": {
             "positioner_joint_1": (-math.pi, math.pi),
-            "positioner_joint_2": (-math.pi / 2, math.pi / 2),
+            "positioner_base_joint": (-math.pi / 2, math.pi / 2),
             "robot_joint_1": (-math.pi / 2, math.pi / 2),
             "robot_joint_2": (-math.pi / 4, math.pi / 4),
             "robot_joint_3": (-math.pi / 4, math.pi / 4),

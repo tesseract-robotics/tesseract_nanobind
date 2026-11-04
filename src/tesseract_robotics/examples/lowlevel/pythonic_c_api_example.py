@@ -190,7 +190,8 @@ def main() -> int:
         robot,
         name="table",
         geometry=box(0.8, 0.8, 0.05),
-        transform=Pose.from_xyz(0.5, 0, 0.3),
+        # Clear of the robot: at x = 0.5 the table's edge cuts link_1 and no plan exists.
+        transform=Pose.from_xyz(0.75, 0, 0.3),
         color=(0.6, 0.4, 0.2, 1.0),
     )
     print("   Added table obstacle")
