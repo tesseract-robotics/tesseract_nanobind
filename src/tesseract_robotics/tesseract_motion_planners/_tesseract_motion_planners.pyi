@@ -96,7 +96,7 @@ class MotionPlanner:
         """
 
     @staticmethod
-    def assignSolution(mi: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, joint_names: Sequence[str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], format_result_as_input: bool) -> None:
+    def assignSolution(mi: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, joint_names: Sequence[tesseract_robotics.tesseract_common._tesseract_common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], format_result_as_input: bool) -> None:
         """
         Write a joint solution into `mi` in place: a state waypoint, or with `format_result_as_input` the seed of a Cartesian / the position of a joint waypoint.
         """

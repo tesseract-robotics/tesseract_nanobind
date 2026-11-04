@@ -4,7 +4,9 @@ The module list is discovered from the installed package, so a new extension
 module cannot be left without a stub. Each stub is rendered by
 `nanobind.stubgen` in a fresh interpreter: which cross-module types resolve
 depends on what is imported, and a shared process would make one module's
-stub depend on the modules rendered before it.
+stub depend on the modules rendered before it. Its id parameters are then
+widened to the implicit `str` / `tuple` conversions (`widen_implicit_id_stubs.py`),
+which stubgen does not record.
 
 Usage:
     pixi run stubs         # rewrite the committed stubs
@@ -23,6 +25,8 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from widen_implicit_id_stubs import widen
 
 import tesseract_robotics
 
@@ -66,7 +70,7 @@ def stub_path(module: str) -> Path:
 
 
 def render(module: str) -> str:
-    """Render the stub of `module` in a fresh interpreter.
+    """Render the stub of `module` in a fresh interpreter, id parameters widened.
 
     Raises:
         StubRenderError: stubgen exited non-zero.
@@ -82,7 +86,7 @@ def render(module: str) -> str:
     )
     if proc.returncode != 0:
         raise StubRenderError(f"stubgen failed for {module}:\n{proc.stderr}")
-    return proc.stdout
+    return widen(proc.stdout)
 
 
 def render_all(modules: list[str]) -> dict[str, str]:
