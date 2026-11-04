@@ -27,6 +27,9 @@
 #include <tesseract/motion_planners/trajopt/profile/trajopt_default_move_profile.h>
 #include <tesseract/motion_planners/trajopt/profile/trajopt_default_composite_profile.h>
 #include <tesseract/motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h>
+#ifdef TRAJOPT_SCO_HAS_PIQP
+#include <tesseract/motion_planners/trajopt/profile/trajopt_piqp_solver_profile.h>
+#endif
 #include <tesseract/motion_planners/trajopt/trajopt_waypoint_config.h>
 
 // trajopt_sco for optimizer parameters
@@ -260,6 +263,20 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
         "`settings:` and `opt_params:` are merged into the profile's values: keys left out "
         "keep them (`settings: {max_iter: 321}` keeps eps_abs 1e-4). This is per struct; "
         "other profiles' from_yaml may replace a nested sub-config instead.");
+
+#ifdef TRAJOPT_SCO_HAS_PIQP
+    // ========== TrajOptPIQPSolverProfile (optional: trajopt_sco exports TRAJOPT_SCO_HAS_PIQP) ==========
+    // PIQPSettings is owned by the trajopt_sqp module.
+    // shortcut: assumes trajopt_sqp was built with PIQP whenever trajopt_sco was (trajopt builds both
+    // against the same PIQP); otherwise `settings` has no Python type.
+    nb::module_::import_("tesseract_robotics.trajopt_sqp._trajopt_sqp");
+    nb::class_<tp::TrajOptPIQPSolverProfile, tp::TrajOptSolverProfile>(m, "TrajOptPIQPSolverProfile")
+        .def(nb::init<>())
+        .def_rw("settings", &tp::TrajOptPIQPSolverProfile::settings, "PIQP settings for each QP");
+    m.attr("HAS_PIQP") = true;
+#else
+    m.attr("HAS_PIQP") = false;
+#endif
 
     // Helper to add TrajOpt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptMoveProfile", [](tc::ProfileDictionary& dict,
