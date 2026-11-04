@@ -75,9 +75,33 @@ def test_a_multi_line_def_widens_across_its_lines():
     )
 
 
-def test_mapping_keys_stay_exact_so_an_id_keyed_dict_passes_back_in():
-    # Mapping keys are invariant: widening them would reject SceneState.link_transforms.
+def test_mapping_params_accept_an_id_keyed_dict_and_a_str_keyed_one():
+    # Mapping keys are invariant: `Mapping[LinkId | str, X]` would reject the dict[LinkId, X]
+    # the bindings hand out (SceneState.link_transforms), so the parameter becomes a union.
     line = f"    def setTransforms(self, t: Mapping[{Q}LinkId, Isometry3d], tip: {Q}LinkId) -> None: ...\n"
     assert widen(line) == (
-        f"    def setTransforms(self, t: Mapping[{Q}LinkId, Isometry3d], tip: {Q}LinkId | str) -> None: ...\n"
+        f"    def setTransforms(self, t: Mapping[{Q}LinkId, Isometry3d] | Mapping[str, Isometry3d], "
+        f"tip: {Q}LinkId | str) -> None: ...\n"
     )
+
+
+def test_nested_and_pair_keyed_mappings_widen():
+    line = (
+        f"    def f(self, s: Mapping[str, Mapping[{Q}JointId, float]], "
+        f"c: Mapping[{Q}LinkIdPair, float]) -> None: ...\n"
+    )
+    assert widen(line) == (
+        f"    def f(self, s: Mapping[str, Mapping[{Q}JointId, float] | Mapping[str, float]], "
+        f"c: Mapping[{Q}LinkIdPair, float] | Mapping[tuple[str, str], float]) -> None: ...\n"
+    )
+
+
+def test_widened_mapping_is_a_fixed_point():
+    line = f"    def f(self, m: Mapping[{Q}JointId, Mapping[{Q}LinkId, float]]) -> None: ...\n"
+    once = widen(line)
+    assert widen(once) == once
+
+
+def test_returned_mapping_stays_exact():
+    line = f"    def get(self) -> dict[{Q}JointId, float]: ...\n"
+    assert widen(line) == line
