@@ -298,7 +298,7 @@ NB_MODULE(_tesseract_state_solver, m) {
              "name"_a, "limit"_a)
         .def("changeJointJerkLimits", &tsg::MutableStateSolver::changeJointJerkLimits,
              "name"_a, "limit"_a)
-        // False (and a console_bridge error) when the joint's parent link is not in the solver, its
+        // False (and a tesseract error) when the joint's parent link is not in the solver, its
         // child is not in scene_graph, or the joint name exists (ofkt_state_solver.cpp:861-886).
         .def("insertSceneGraph", &tsg::MutableStateSolver::insertSceneGraph,
              "scene_graph"_a, "joint"_a, "prefix"_a = "");

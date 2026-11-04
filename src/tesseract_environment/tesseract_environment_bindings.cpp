@@ -88,13 +88,13 @@ using CheckTrajectoryResult = std::pair<tcol::ContactTrajectoryResults, std::vec
 template <typename Manager>
 CheckTrajectoryResult check_trajectory(Manager& manager,
                                        const tsg::StateSolver& state_solver,
-                                       const std::vector<std::string>& joint_names,
+                                       const std::vector<tc::JointId>& joint_ids,
                                        const tc::TrajArray& traj,
                                        const tcol::CollisionCheckConfig& config)
 {
     CheckTrajectoryResult out;
     nb::gil_scoped_release release;
-    out.first = te::checkTrajectory(out.second, manager, state_solver, joint_names, traj, config);
+    out.first = te::checkTrajectory(out.second, manager, state_solver, joint_ids, traj, config);
     return out;
 }
 
@@ -115,15 +115,15 @@ CheckTrajectoryResult check_trajectory(Manager& manager,
 // were already moved. Check up front, with the GIL held, and name every missing link.
 template <typename Manager>
 void require_active_link_transforms(const Manager& manager,
-                                    const tc::TransformMap& state,
+                                    const tc::LinkIdTransformMap& state,
                                     const char* caller,
                                     const char* arg)
 {
     std::string missing;
-    for (const auto& name : manager.getActiveCollisionObjects()) {
-        if (state.find(name) == state.end()) {
+    for (const auto& id : manager.getActiveCollisionObjects()) {
+        if (state.find(id) == state.end()) {
             if (!missing.empty()) missing += ", ";
-            missing += name;
+            missing += id.name();
         }
     }
     if (!missing.empty())
@@ -136,7 +136,7 @@ void require_active_link_transforms(const Manager& manager,
 // GIL released in-body, as in check_trajectory, so the map is cast back with the GIL held.
 template <typename Manager>
 tcol::ContactResultMap check_trajectory_state(Manager& manager,
-                                              const tc::TransformMap& state,
+                                              const tc::LinkIdTransformMap& state,
                                               const tcol::ContactRequest& contact_request)
 {
     require_active_link_transforms(manager, state, "checkTrajectoryState", "state");
@@ -147,8 +147,8 @@ tcol::ContactResultMap check_trajectory_state(Manager& manager,
 }
 
 tcol::ContactResultMap check_trajectory_segment(tcol::ContinuousContactManager& manager,
-                                                const tc::TransformMap& state0,
-                                                const tc::TransformMap& state1,
+                                                const tc::LinkIdTransformMap& state0,
+                                                const tc::LinkIdTransformMap& state1,
                                                 const tcol::ContactRequest& contact_request)
 {
     require_active_link_transforms(manager, state0, "checkTrajectorySegment", "state0");
@@ -167,7 +167,7 @@ tcol::ContactResultMap check_trajectory_segment(tcol::ContinuousContactManager& 
 // (M, N) joint states as numpy holds them: one state per row.
 using RowMajorXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-void validate_set_state_joint_names(const te::Environment& env,
+void validate_set_state_joint_ids(const te::Environment& env,
                                     const std::vector<tc::JointId>& ids,
                                     const std::string& caller = "setState")
 {
@@ -191,30 +191,30 @@ void validate_set_state(const te::Environment& env,
     if (static_cast<Eigen::Index>(names.size()) != values.size())
         throw std::invalid_argument(caller + ": joint_names length (" + std::to_string(names.size()) +
                                     ") != joint_values length (" + std::to_string(values.size()) + ")");
-    validate_set_state_joint_names(env, names, caller);
+    validate_set_state_joint_ids(env, names, caller);
 }
 
 // gh-188: Environment has no floating-joint name accessor; the keys of
-// getCurrentFloatingJointValues() are every floating joint. Returns the names that are not
-// floating joints, comma-separated, or "" when all are.
-std::string unknown_floating_joint_names(const te::Environment& env, const std::vector<std::string>& names)
+// getCurrentFloatingJointValues() are every floating joint. Returns the names of the ids that are
+// not floating joints, comma-separated, or "" when all are.
+std::string unknown_floating_joint_ids(const te::Environment& env, const std::vector<tc::JointId>& ids)
 {
-    const tc::TransformMap floating = env.getCurrentFloatingJointValues();
+    const tc::JointIdTransformMap floating = env.getCurrentFloatingJointValues();
     std::string unknown;
-    for (const auto& name : names) {
-        if (floating.find(name) == floating.end()) {
+    for (const auto& id : ids) {
+        if (floating.find(id) == floating.end()) {
             if (!unknown.empty()) unknown += ", ";
-            unknown += name;
+            unknown += id.name();
         }
     }
     return unknown;
 }
 
-// Map keys as a name list, for the validators that take names.
+// Map keys as an id list, for the validators that take ids.
 template <typename Map>
-std::vector<std::string> keys_of(const Map& map)
+std::vector<typename Map::key_type> keys_of(const Map& map)
 {
-    std::vector<std::string> keys;
+    std::vector<typename Map::key_type> keys;
     keys.reserve(map.size());
     for (const auto& kv : map) keys.push_back(kv.first);
     return keys;
@@ -224,26 +224,26 @@ std::vector<std::string> keys_of(const Map& map)
 // floating_joints.at() in the state solver (std::out_of_range -> IndexError). In setState that
 // throw lands after the joint values were stored, leaving the solver half-updated. Validate first.
 void validate_floating_joints(const te::Environment& env,
-                              const tc::TransformMap& floating_joints,
+                              const tc::JointIdTransformMap& floating_joints,
                               const std::string& caller)
 {
     if (floating_joints.empty()) return;  // the common call: skip copying the floating-joint map
-    const std::string unknown = unknown_floating_joint_names(env, keys_of(floating_joints));
+    const std::string unknown = unknown_floating_joint_ids(env, keys_of(floating_joints));
     if (!unknown.empty())
         throw std::invalid_argument(caller + ": unknown floating joint names: " + unknown);
 }
 
 // gh-187: getActiveLinkNames/getStaticLinkNames/getJointGroup(name, joint_names) accept any joint
 // type, so they check scene-graph membership, not the active set (GH #43 validators).
-void validate_joint_names_exist(const te::Environment& env,
-                                const std::vector<std::string>& names,
+void validate_joint_ids_exist(const te::Environment& env,
+                                const std::vector<tc::JointId>& ids,
                                 const std::string& caller)
 {
     std::string unknown;
-    for (const auto& name : names) {
-        if (!env.getJoint(name)) {
+    for (const auto& id : ids) {
+        if (!env.getJoint(id)) {
             if (!unknown.empty()) unknown += ", ";
-            unknown += name;
+            unknown += id.name();
         }
     }
     if (!unknown.empty())
@@ -268,10 +268,10 @@ void require_continuous_contact_manager(const te::Environment& env, const std::s
 }
 
 // gh-188: the link-keyed getters do not document a miss; raise KeyError before C++ sees one.
-void require_link(const te::Environment& env, const std::string& name)
+void require_link(const te::Environment& env, const tc::LinkId& id)
 {
-    if (!env.getLink(name))
-        throw nb::key_error(("Link not found: " + name).c_str());
+    if (!env.getLink(id))
+        throw nb::key_error(("Link not found: " + id.name()).c_str());
 }
 
 // gh-186: nanobind's None check covers a direct shared_ptr argument but not the elements of a
@@ -457,13 +457,13 @@ NB_MODULE(_tesseract_environment, m) {
        "Downcast an Event to SceneStateChangedEvent. Raises EventTypeError if evt.type is not SCENE_STATE_CHANGED.");
 
     // ========== checkTrajectory (utils.h) ==========
-    // {discrete, continuous} manager x {StateSolver + joint_names, JointGroup}
+    // {discrete, continuous} manager x {StateSolver + joint_ids, JointGroup}
     m.def("checkTrajectory",
         [](tcol::DiscreteContactManager& manager, const tsg::StateSolver& state_solver,
-           const std::vector<std::string>& joint_names, const tc::TrajArray& traj,
+           const std::vector<tc::JointId>& joint_ids, const tc::TrajArray& traj,
            const tcol::CollisionCheckConfig& config) {
-            return check_trajectory(manager, state_solver, joint_names, traj, config);
-        }, "manager"_a, "state_solver"_a, "joint_names"_a, "traj"_a, "config"_a);
+            return check_trajectory(manager, state_solver, joint_ids, traj, config);
+        }, "manager"_a, "state_solver"_a, "joint_ids"_a, "traj"_a, "config"_a);
     m.def("checkTrajectory",
         [](tcol::DiscreteContactManager& manager, const tk::JointGroup& manip,
            const tc::TrajArray& traj, const tcol::CollisionCheckConfig& config) {
@@ -471,10 +471,10 @@ NB_MODULE(_tesseract_environment, m) {
         }, "manager"_a, "manip"_a, "traj"_a, "config"_a);
     m.def("checkTrajectory",
         [](tcol::ContinuousContactManager& manager, const tsg::StateSolver& state_solver,
-           const std::vector<std::string>& joint_names, const tc::TrajArray& traj,
+           const std::vector<tc::JointId>& joint_ids, const tc::TrajArray& traj,
            const tcol::CollisionCheckConfig& config) {
-            return check_trajectory(manager, state_solver, joint_names, traj, config);
-        }, "manager"_a, "state_solver"_a, "joint_names"_a, "traj"_a, "config"_a);
+            return check_trajectory(manager, state_solver, joint_ids, traj, config);
+        }, "manager"_a, "state_solver"_a, "joint_ids"_a, "traj"_a, "config"_a);
     m.def("checkTrajectory",
         [](tcol::ContinuousContactManager& manager, const tk::JointGroup& manip,
            const tc::TrajArray& traj, const tcol::CollisionCheckConfig& config) {
@@ -487,12 +487,12 @@ NB_MODULE(_tesseract_environment, m) {
     m.def("checkTrajectorySegment", &check_trajectory_segment,
           "manager"_a, "state0"_a, "state1"_a, "contact_request"_a);
     m.def("checkTrajectoryState",
-        [](tcol::DiscreteContactManager& manager, const tc::TransformMap& state,
+        [](tcol::DiscreteContactManager& manager, const tc::LinkIdTransformMap& state,
            const tcol::ContactRequest& contact_request) {
             return check_trajectory_state(manager, state, contact_request);
         }, "manager"_a, "state"_a, "contact_request"_a);
     m.def("checkTrajectoryState",
-        [](tcol::ContinuousContactManager& manager, const tc::TransformMap& state,
+        [](tcol::ContinuousContactManager& manager, const tc::LinkIdTransformMap& state,
            const tcol::ContactRequest& contact_request) {
             return check_trajectory_state(manager, state, contact_request);
         }, "manager"_a, "state"_a, "contact_request"_a);
@@ -582,11 +582,11 @@ NB_MODULE(_tesseract_environment, m) {
         .value("GLOBAL_PER_LINK_CONVEX_HULL", TrajectoryLinkMethod::GLOBAL_PER_LINK_CONVEX_HULL)
         .value("GLOBAL_CONVEX_HULL", TrajectoryLinkMethod::GLOBAL_CONVEX_HULL);
     add_trajectory_link_command
-        .def(nb::init<std::string, std::string, tc::JointTrajectory, bool, TrajectoryLinkMethod>(),
-             "link_name"_a, "parent_link_name"_a, "trajectory"_a, "replace_allowed"_a = false,
+        .def(nb::init<tc::LinkId, tc::LinkId, tc::JointTrajectory, bool, TrajectoryLinkMethod>(),
+             "link_id"_a, "parent_link_id"_a, "trajectory"_a, "replace_allowed"_a = false,
              "method"_a = TrajectoryLinkMethod::PER_STATE_OBJECTS)
-        .def("getLinkName", &te::AddTrajectoryLinkCommand::getLinkName)
-        .def("getParentLinkName", &te::AddTrajectoryLinkCommand::getParentLinkName)
+        .def("getLinkId", &te::AddTrajectoryLinkCommand::getLinkId)
+        .def("getParentLinkId", &te::AddTrajectoryLinkCommand::getParentLinkId)
         .def("getTrajectory", &te::AddTrajectoryLinkCommand::getTrajectory, nb::rv_policy::copy)
         .def("replaceAllowed", &te::AddTrajectoryLinkCommand::replaceAllowed)
         .def("getMethod", &te::AddTrajectoryLinkCommand::getMethod);
@@ -730,43 +730,43 @@ NB_MODULE(_tesseract_environment, m) {
     // unknown or fixed joint names into the returned state without complaint and, on a
     // names/values length mismatch, reads joint_values out of bounds.
     const auto get_state_map = [](const te::Environment& self,
-                                  const std::unordered_map<std::string, double>& joints,
-                                  const tc::TransformMap& floating_joints) {
-        validate_set_state_joint_names(self, keys_of(joints), "getState");
+                                  const tsg::SceneState::JointValues& joints,
+                                  const tc::JointIdTransformMap& floating_joints) {
+        validate_set_state_joint_ids(self, keys_of(joints), "getState");
         validate_floating_joints(self, floating_joints, "getState");
         return self.getState(joints, floating_joints);
     };
     const auto get_state_names_values = [](const te::Environment& self,
-                                           const std::vector<std::string>& joint_names,
+                                           const std::vector<tc::JointId>& joint_ids,
                                            const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                           const tc::TransformMap& floating_joints) {
-        validate_set_state(self, joint_names, joint_values, "getState");
+                                           const tc::JointIdTransformMap& floating_joints) {
+        validate_set_state(self, joint_ids, joint_values, "getState");
         validate_floating_joints(self, floating_joints, "getState");
-        return self.getState(joint_names, joint_values, floating_joints);
+        return self.getState(joint_ids, joint_values, floating_joints);
     };
     const auto set_state_names_values = [](te::Environment& self,
-                                           const std::vector<std::string>& joint_names,
+                                           const std::vector<tc::JointId>& joint_ids,
                                            const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                           const tc::TransformMap& floating_joints) {
-        validate_set_state(self, joint_names, joint_values);  // GH #43
+                                           const tc::JointIdTransformMap& floating_joints) {
+        validate_set_state(self, joint_ids, joint_values);  // GH #43
         validate_floating_joints(self, floating_joints, "setState");
-        self.setState(joint_names, joint_values, floating_joints);
+        self.setState(joint_ids, joint_values, floating_joints);
     };
     // current_state.joints is keyed by exactly the active joints; a miss is std::out_of_range
-    // (IndexError) upstream. Raise KeyError like getCurrentFloatingJointValues(joint_names).
-    const auto get_current_joint_values_by_names = [](const te::Environment& self,
-                                                      const std::vector<std::string>& joint_names) {
+    // (IndexError) upstream. Raise KeyError like getCurrentFloatingJointValues(joint_ids).
+    const auto get_current_joint_values_by_ids = [](const te::Environment& self,
+                                                    const std::vector<tc::JointId>& joint_ids) {
         std::string unknown;
-        const std::vector<std::string> active = self.getActiveJointNames();
-        for (const auto& name : joint_names) {
-            if (std::find(active.begin(), active.end(), name) == active.end()) {
+        const std::vector<tc::JointId> active = self.getActiveJointIds();
+        for (const auto& id : joint_ids) {
+            if (std::find(active.begin(), active.end(), id) == active.end()) {
                 if (!unknown.empty()) unknown += ", ";
-                unknown += name;
+                unknown += id.name();
             }
         }
         if (!unknown.empty())
             throw nb::key_error(("Active joint not found: " + unknown).c_str());
-        return self.getCurrentJointValues(joint_names);
+        return self.getCurrentJointValues(joint_ids);
     };
 
     // ========== EnvironmentContactAllowedValidator ==========
@@ -1089,8 +1089,8 @@ NB_MODULE(_tesseract_environment, m) {
         .def("getCurrentJointValues", [](const te::Environment& self) {
             return self.getCurrentJointValues();
         })
-        .def("getCurrentJointValues", get_current_joint_values_by_names, "joint_ids"_a)
-        .def("getCurrentJointValuesByNames", get_current_joint_values_by_names, "joint_ids"_a)
+        .def("getCurrentJointValues", get_current_joint_values_by_ids, "joint_ids"_a)
+        .def("getCurrentJointValuesByNames", get_current_joint_values_by_ids, "joint_ids"_a)
         // Transforms
         .def("getLinkTransform", &te::Environment::getLinkTransform, "link_id"_a)
         .def("getRelativeLinkTransform", &te::Environment::getRelativeLinkTransform,
@@ -1174,10 +1174,10 @@ NB_MODULE(_tesseract_environment, m) {
             return ptr;
         }, "group_name"_a, nb::keep_alive<0, 1>())
         .def("getJointGroup", [](const te::Environment& self, const std::string& name,
-                                 const std::vector<std::string>& joint_names) {
-            validate_joint_names_exist(self, joint_names, "getJointGroup");
-            return self.getJointGroup(name, joint_names);
-        }, "name"_a, "joint_names"_a, nb::keep_alive<0, 1>())
+                                 const std::vector<tc::JointId>& joint_ids) {
+            validate_joint_ids_exist(self, joint_ids, "getJointGroup");
+            return self.getJointGroup(name, joint_ids);
+        }, "name"_a, "joint_ids"_a, nb::keep_alive<0, 1>())
         .def("getKinematicGroup", [](const te::Environment& self, const std::string& group_name,
                                       const std::string& ik_solver_name) {
             auto ptr = self.getKinematicGroup(group_name, ik_solver_name);

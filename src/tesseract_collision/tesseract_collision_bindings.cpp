@@ -61,11 +61,8 @@ namespace {
 
 using CRM = tc::ContactResultMap;
 
-// ContactResultMap mutator preconditions that upstream only assert()s (types.cpp), so a
-// release build would store an unreachable key or call back() on an empty vector.
-struct UnorderedLinkPairError : std::invalid_argument {
-    using std::invalid_argument::invalid_argument;
-};
+// ContactResultMap mutator precondition that upstream only assert()s (types.cpp), so a release
+// build would call back() on an empty vector. The key needs no check: LinkIdPair is canonical.
 struct EmptyContactResultsError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
 };
@@ -153,12 +150,6 @@ tg::ConvexMesh::Ptr repair_convex_mesh(const tg::ConvexMesh& mesh) {
         mesh.getFaceCount(), mesh.getResource(), mesh.getScale());
     repaired->setCreationMethod(mesh.getCreationMethod());
     return repaired;
-}
-
-void check_ordered_key(const CRM::KeyType& key) {
-    if (tcommon::makeOrderedLinkPair(key.first, key.second) != key)
-        throw UnorderedLinkPairError("ContactResultMap key ('" + key.first + "', '" + key.second +
-                                     "') is not ordered: use ('" + key.second + "', '" + key.first + "')");
 }
 
 void check_nonempty(const CRM::MappedType& results) {
@@ -279,8 +270,6 @@ NB_MODULE(_tesseract_collision, m) {
         .def("clear", [](tc::ContactResultVector& v) { v.clear(); });
 
     // ========== ContactResultMap ==========
-    nb::exception<UnorderedLinkPairError>(m, "UnorderedLinkPairError", PyExc_ValueError)
-        .attr("__doc__") = "A ContactResultMap key is not ordered: the first link name must not sort after the second.";
     nb::exception<EmptyContactResultsError>(m, "EmptyContactResultsError", PyExc_ValueError)
         .attr("__doc__") = "A ContactResultMap vector overload got an empty ContactResultVector.";
 
@@ -307,11 +296,11 @@ NB_MODULE(_tesseract_collision, m) {
             const auto& container = self.getContainer();
             auto it = container.find(key);
             if (it == container.end())
-                throw nb::key_error(("ContactResultMap has no key ('" + key.first + "', '" + key.second + "')").c_str());
+                throw nb::key_error(("ContactResultMap has no key ('" + key.first().name() + "', '" + key.second().name() + "')").c_str());
             return it->second;
         }, "key"_a, "Copy of the results stored under `key`; raises KeyError when it is absent.")
         .def("getContainer", [](const CRM& self) { return self.getContainer(); },
-             "Copy of the underlying map, keyed by (link_name1, link_name2).")
+             "Copy of the underlying map, keyed by LinkIdPair.")
         .def("__iter__", [](const CRM& self) {
             // Snapshot: iterating a copy keeps a shrinkToFit()/release() inside the loop safe.
             nb::list items;
@@ -323,20 +312,16 @@ NB_MODULE(_tesseract_collision, m) {
         // Mutators. The returned ContactResult is a copy: the C++ reference points into a vector
         // that the next insert may reallocate.
         .def("addContactResult", [](CRM& self, const CRM::KeyType& key, tc::ContactResult result) {
-            check_ordered_key(key);
             return tc::ContactResult(self.addContactResult(key, std::move(result)));
         }, "key"_a, "result"_a)
         .def("addContactResult", [](CRM& self, const CRM::KeyType& key, const CRM::MappedType& results) {
-            check_ordered_key(key);
             check_nonempty(results);
             return tc::ContactResult(self.addContactResult(key, results));
         }, "key"_a, "results"_a)
         .def("setContactResult", [](CRM& self, const CRM::KeyType& key, tc::ContactResult result) {
-            check_ordered_key(key);
             return tc::ContactResult(self.setContactResult(key, std::move(result)));
         }, "key"_a, "result"_a)
         .def("setContactResult", [](CRM& self, const CRM::KeyType& key, const CRM::MappedType& results) {
-            check_ordered_key(key);
             check_nonempty(results);
             return tc::ContactResult(self.setContactResult(key, results));
         }, "key"_a, "results"_a)
@@ -346,12 +331,12 @@ NB_MODULE(_tesseract_collision, m) {
              "`results` is valid only during the call.")
         .def("addInterpolatedCollisionResults",
              [](CRM& self, CRM& sub_segment_results, long sub_segment_index, long sub_segment_last_index,
-                const std::vector<std::string>& active_link_names, double segment_dt, bool discrete,
+                const std::unordered_set<tcommon::LinkId>& active_link_ids, double segment_dt, bool discrete,
                 const std::optional<PyFilterFn>& filter) {
                  self.addInterpolatedCollisionResults(sub_segment_results, sub_segment_index, sub_segment_last_index,
-                                                      active_link_names, segment_dt, discrete, to_filter_fn(filter));
+                                                      active_link_ids, segment_dt, discrete, to_filter_fn(filter));
              },
-             "sub_segment_results"_a, "sub_segment_index"_a, "sub_segment_last_index"_a, "active_link_names"_a,
+             "sub_segment_results"_a, "sub_segment_index"_a, "sub_segment_last_index"_a, "active_link_ids"_a,
              "segment_dt"_a, "discrete"_a, "filter"_a = nb::none());
     bind_value_equality(contact_result_map);
 
@@ -396,8 +381,8 @@ NB_MODULE(_tesseract_collision, m) {
 
     nb::class_<tc::ContactTrajectoryResults>(m, "ContactTrajectoryResults")
         .def(nb::init<>())
-        .def(nb::init<std::vector<std::string>>(), "j_names"_a)
-        .def(nb::init<std::vector<std::string>, int>(), "j_names"_a, "num_steps"_a)
+        .def(nb::init<std::vector<tcommon::JointId>>(), "j_ids"_a)
+        .def(nb::init<std::vector<tcommon::JointId>, int>(), "j_ids"_a, "num_steps"_a)
         .def("__bool__", [](const tc::ContactTrajectoryResults& self) { return static_cast<bool>(self); })
         .def("addContact", &tc::ContactTrajectoryResults::addContact,
              "step_number"_a, "substep_number"_a, "num_substeps"_a, "start_state"_a, "end_state"_a,
@@ -415,7 +400,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def("condensedSummary",
              [](const tc::ContactTrajectoryResults& self) { return self.condensedSummary().str(); })
         .def_rw("steps", &tc::ContactTrajectoryResults::steps)
-        .def_rw("joint_names", &tc::ContactTrajectoryResults::joint_names)
+        .def_rw("joint_ids", &tc::ContactTrajectoryResults::joint_ids)
         .def_rw("total_steps", &tc::ContactTrajectoryResults::total_steps);
 
     // ========== ContactResultValidator ==========
@@ -540,20 +525,17 @@ NB_MODULE(_tesseract_collision, m) {
 
     // ========== ContinuousContactManager (abstract, expose key methods) ==========
     // The three cast (start+end pose) overloads, each registered under two names below.
-    auto cast_name = [](tc::ContinuousContactManager& self, const std::string& name,
+    auto cast_name = [](tc::ContinuousContactManager& self, const tcommon::LinkId& id,
                         const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2) {
-        self.setCollisionObjectsTransform(name, pose1, pose2);
+        self.setCollisionObjectsTransform(id, pose1, pose2);
     };
-    auto cast_names = [](tc::ContinuousContactManager& self, const std::vector<std::string>& names,
+    auto cast_names = [](tc::ContinuousContactManager& self, const std::vector<tcommon::LinkId>& ids,
                          const tcommon::VectorIsometry3d& pose1, const tcommon::VectorIsometry3d& pose2) {
-        self.setCollisionObjectsTransform(names, pose1, pose2);
+        self.setCollisionObjectsTransform(ids, pose1, pose2);
     };
-    auto cast_maps = [](tc::ContinuousContactManager& self, const std::map<std::string, Eigen::Isometry3d>& pose1,
-                        const std::map<std::string, Eigen::Isometry3d>& pose2) {
-        tcommon::TransformMap tm1, tm2;
-        for (const auto& p : pose1) { tm1[p.first] = p.second; }
-        for (const auto& p : pose2) { tm2[p.first] = p.second; }
-        self.setCollisionObjectsTransform(tm1, tm2);
+    auto cast_maps = [](tc::ContinuousContactManager& self, const tcommon::LinkIdTransformMap& pose1,
+                        const tcommon::LinkIdTransformMap& pose2) {
+        self.setCollisionObjectsTransform(pose1, pose2);
     };
     nb::class_<tc::ContinuousContactManager>(m, "ContinuousContactManager")
         .def("getName", &tc::ContinuousContactManager::getName)
