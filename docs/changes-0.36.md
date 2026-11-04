@@ -85,6 +85,18 @@ getLogger().set_level(LogLevel.err)
 handler_id = addLogRecordHandler(lambda record: print(record.level, record.message))
 ```
 
+Record handlers run synchronously on the thread that logs: upstream calls them after the
+logger returns, with no tesseract lock held (`logging.cpp` `dispatchHandlers`), so the
+console_bridge deadlock (a handler waiting for the GIL under console_bridge's global mutex) has
+no 0.36 equivalent, and main's delivery thread, `flushOutputHandlers()` and flush barrier are
+gone with it. A handler on an executor worker calls a `TaskComposerServer` like any other
+thread and waits for a reload; one on the reloading thread itself raises
+`TaskComposerServerBusyError`.
+
+descartes_light 0.36 still logs through console_bridge (`ladder_graph_solver.hpp`,
+`bgl_solver.hpp`): its output goes to stderr and never reaches `addLogRecordHandler` until
+[swri-robotics/descartes_light#130](https://github.com/swri-robotics/descartes_light/issues/130).
+
 See [tesseract_common logging](api/tesseract_common.md#logging).
 
 ## trajopt_sqp: constraint violations carry raw and weighted forms

@@ -10,7 +10,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 |---|---|---|
 | Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
 | Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
-| Unreleased | A Python `OutputHandler` gets its messages asynchronously, on a delivery thread | [`flushOutputHandlers()`](#python-outputhandlers-are-called-asynchronously) |
+| Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/tesseract_common.md#logging) |
 | Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | A collision constraint on a `Var` outside a `NodesVariables` raises `VarNotInVariableSetError` (a `ValueError`) at construction instead of segfaulting on its first `update()` | [Hand the `Node` over first](#collision-constraints-need-a-var-in-a-variable-set) |
@@ -67,21 +67,6 @@ isinstance(x, (CartesianTarget, JointTarget, StateTarget))
 ```
 
 `Target.__value__` is the union, for code that introspects it.
-
-### Python `OutputHandler`s are called asynchronously
-
-A Python `OutputHandler` was called inside console_bridge's output lock, on the thread that
-logged, and deadlocked against any other thread logging while it held the GIL. It now gets its
-messages on a delivery thread, a moment after they are logged. Code that logs, then reads what
-the handler recorded, waits first:
-
-```python
-tesseract_common.log(filename, line, level, "message")
-tesseract_common.flushOutputHandlers()
-assert handler.last_text == "message"
-```
-
-A handler's exception goes to `sys.unraisablehook` instead of the code that logged.
 
 ### `setPairCollisionCoeff` and `getPairCollisionCoeff` removed
 
