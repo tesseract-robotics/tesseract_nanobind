@@ -258,6 +258,22 @@ def _tree_graph():
     return g
 
 
+def test_joint_children_ids_str_reaches_single_overload():
+    """A `str` converts to a JointId and is also a sequence of `str`: it must reach the single-id form."""
+    g = sg.SceneGraph()
+    for name in ("link_1", "link_2", "link_3"):
+        assert g.addLink(sg.Link(name))
+    for name, parent, child in (("joint_1", "link_1", "link_2"), ("joint_2", "link_2", "link_3")):
+        joint = sg.Joint(name)
+        joint.parent_link_id = parent
+        joint.child_link_id = child
+        joint.type = sg.JointType.FIXED
+        assert g.addJoint(joint)
+    # the two upstream overloads traverse in different orders
+    assert sorted(g.getJointChildrenIds("joint_1")) == sorted(g.getJointChildrenIds(["joint_1"]))
+    assert sorted(g.getJointChildrenIds("joint_1")) == ["link_2", "link_3"]
+
+
 def test_joint_value_types_str_is_upstream_operator():
     """#215: the upstream operator<< formats (scene_graph/src/joint.cpp @ 0.35.0)."""
     assert str(sg.JointDynamics(0.5, 2)) == "damping=0.5 friction=2"

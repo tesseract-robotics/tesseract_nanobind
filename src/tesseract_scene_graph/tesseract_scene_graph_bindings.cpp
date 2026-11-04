@@ -345,15 +345,15 @@ NB_MODULE(_tesseract_scene_graph, m) {
              nb::overload_cast<const std::vector<tesseract::common::JointId>&>(&tsg::SceneGraph::getJointChildrenIds, nb::const_),
              "ids"_a)
         .def("getShortestPath", &tsg::SceneGraph::getShortestPath, "root"_a, "tip"_a)
-        .def("getAdjacencyMap", [](const tsg::SceneGraph& self, const std::vector<std::string>& link_names) {
-            // upstream's getVertex throws std::runtime_error for an unknown name (graph.cpp:1083-1090)
-            for (const auto& name : link_names)
-                if (!self.getLink(name))
-                    throw nb::key_error(("SceneGraph.getAdjacencyMap: no link named '" + name + "'").c_str());
-            return self.getAdjacencyMap(link_names);
-        }, "link_names"_a,
-        "Map each link that moves with one of `link_names` to that link name (graph.h:486). Each listed "
-        "link maps itself and every link below it, stopping at another listed link. An unknown name "
+        .def("getAdjacencyMap", [](const tsg::SceneGraph& self, const std::vector<tesseract::common::LinkId>& link_ids) {
+            // upstream's getVertex throws std::runtime_error for an unknown id (graph.cpp:1083-1090)
+            for (const auto& id : link_ids)
+                if (!self.getLink(id))
+                    throw nb::key_error(("SceneGraph.getAdjacencyMap: no link named '" + id.name() + "'").c_str());
+            return self.getAdjacencyMap(link_ids);
+        }, "link_ids"_a,
+        "Map each link that moves with one of `link_ids` to that link's id (graph.h:499). Each listed "
+        "link maps itself and every link below it, stopping at another listed link. An unknown id "
         "raises KeyError.")
         .def("saveDOT", &tsg::SceneGraph::saveDOT, "path"_a)
 
