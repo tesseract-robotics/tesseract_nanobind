@@ -9,13 +9,20 @@ from types import TracebackType
 
 import numpy as np
 import viser
+from loguru import logger
 from numpy.typing import ArrayLike, NDArray
 
 from tesseract_robotics.tesseract_command_language import CompositeInstruction
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 
-from .errors import NoEnvironmentError, UnknownJointError, ViewerCloseTimeoutError
+from .errors import (
+    NoEnvironmentError,
+    NoTrajectoryError,
+    UnknownJointError,
+    ViewerCloseTimeoutError,
+    ViewerPortInUseError,
+)
 from .geometry import visual_to_trimesh
 from .poses import isometry_to_pose, link_poses
 from .trajectory import Trajectory
@@ -62,16 +69,24 @@ class TesseractViewer:
 
         Args:
             host: Interface to bind.
-            port: TCP port to bind.
+            port: TCP port to bind; 0 lets the OS pick a free one (see `url`).
+
+        Raises:
+            ViewerPortInUseError: `port` is taken.
         """
         self._host = host
         self._server = viser.ViserServer(host=host, port=port, verbose=False)
+        # viser silently moves to the next free port; a documented URL must not lie.
+        if port != 0 and self._server.get_port() != port:
+            self._server.stop()
+            raise ViewerPortInUseError(
+                f"port {port} on {host} is in use: stop what holds it, or pass "
+                "TesseractViewer(port=...) with another port"
+            )
         self._closed = False
         self._env: Environment | None = None
         self._link_frames: dict[str, viser.FrameHandle] = {}
         self._visual_handles: list[viser.GlbHandle] = []
-        self._joint_names: list[str] = []
-        self._q: NDArray[np.float64] = np.zeros(0)
         self._plot_handles: list[viser.SceneNodeHandle] = []
         self._trajectory: Trajectory | None = None
         self._t_s = 0.0
@@ -107,6 +122,9 @@ class TesseractViewer:
     def update_environment(self, env: Environment) -> None:
         """Replace the scene with `env`'s links and visuals at its current state.
 
+        The current trajectory stays when `env` has all its joints, so a re-pushed
+        environment keeps playing; otherwise it is dropped with a warning.
+
         Args:
             env: Environment to draw; kept for later pose updates.
         """
@@ -127,9 +145,17 @@ class TesseractViewer:
                                 f"{frame_name}/visual_{i}_{j}", mesh, position=position, wxyz=wxyz
                             )
                         )
-            self._joint_names = list(env.getActiveJointNames())
-            self._q = np.asarray(env.getCurrentJointValues(), dtype=np.float64)
-            self._pose_links(self._joint_names, self._q)
+            traj = self._trajectory
+            if traj is not None and not set(traj.joint_names) <= set(env.getJointNames()):
+                logger.warning(
+                    f"dropping the trajectory: the new environment lacks some of "
+                    f"{list(traj.joint_names)}"
+                )
+                self._clear_trajectory()
+            self._pose_links(
+                env.getActiveJointNames(),
+                np.asarray(env.getCurrentJointValues(), dtype=np.float64),
+            )
 
     def update_joint_positions(self, joint_names: Sequence[str], q: ArrayLike) -> None:
         """Show the environment with the named joints at `q`; stops playback.
@@ -137,12 +163,14 @@ class TesseractViewer:
         Args:
             joint_names: Joints to set; others keep the environment's current values.
             q: Value per joint.
+
+        Raises:
+            NoEnvironmentError: no environment yet.
+            UnknownJointError: a name is not a joint of the environment.
         """
         with self._pose_lock:
+            self._pose_links(joint_names, np.asarray(q, dtype=np.float64))
             self._gui_play.value = False
-            self._joint_names = list(joint_names)
-            self._q = np.asarray(q, dtype=np.float64)
-            self._pose_links(self._joint_names, self._q)
 
     def update_trajectory(self, trajectory: CompositeInstruction | Trajectory) -> None:
         """Animate `trajectory` from its start; loops while `Loop` is on.
@@ -150,6 +178,10 @@ class TesseractViewer:
         Args:
             trajectory: Planned program or joint trajectory. A program's joint
                 waypoints carry no time, so their index is their time [s].
+
+        Raises:
+            NoEnvironmentError: no environment yet.
+            UnknownJointError: the trajectory names a joint the environment lacks.
         """
         traj = (
             trajectory
@@ -157,24 +189,29 @@ class TesseractViewer:
             else Trajectory.from_composite(trajectory)
         )
         with self._pose_lock:
+            # Posing first validates: a bad trajectory raises before anything changes.
+            self._pose_links(traj.joint_names, traj.sample(0.0))
             self._trajectory = traj
-        self._gui_time.max = max(traj.duration_s, TIME_SLIDER_STEP_S)
-        self._gui_time.disabled = False
-        self._t_s = 0.0
-        self._gui_time.value = 0.0
-        self.show_time(0.0)
-        self._gui_play.value = True
+            self._gui_time.max = max(traj.duration_s, TIME_SLIDER_STEP_S)
+            self._gui_time.disabled = False
+            self._t_s = 0.0
+            self._gui_time.value = 0.0
+            self._gui_play.value = True
 
     def show_time(self, t_s: float) -> None:
         """Pose the scene at `t_s` along the current trajectory.
 
         Args:
             t_s: Trajectory time [s], clamped to the trajectory.
+
+        Raises:
+            NoTrajectoryError: no trajectory loaded.
         """
-        traj = self._trajectory
-        if traj is None:
-            return
-        self._pose_links(list(traj.joint_names), traj.sample(t_s))
+        with self._pose_lock:
+            traj = self._trajectory
+            if traj is None:
+                raise NoTrajectoryError("call update_trajectory() first")
+            self._pose_links(traj.joint_names, traj.sample(t_s))
 
     def plot_trajectory(
         self,
@@ -274,9 +311,7 @@ class TesseractViewer:
 
     def _pose_links(self, joint_names: Sequence[str], q: NDArray[np.float64]) -> None:
         with self._pose_lock:
-            if self._env is None:
-                return
-            poses = link_poses(self._env, joint_names, q)
+            poses = link_poses(self._require_env(), joint_names, q)
             with self._server.atomic():
                 for link_name, (position, wxyz) in poses.items():
                     frame = self._link_frames[link_name]
@@ -287,14 +322,24 @@ class TesseractViewer:
         # The player sets the slider too; only a browser drag pauses and scrubs.
         if event.client is None:
             return
-        self._gui_play.value = False
-        self._t_s = self._gui_time.value
-        self.show_time(self._t_s)
+        with self._pose_lock:
+            # A drag already in flight when update_environment() dropped the trajectory.
+            if self._trajectory is None:
+                return
+            self._gui_play.value = False
+            self._t_s = self._gui_time.value
+            self.show_time(self._t_s)
 
     def _play(self) -> None:
         while not self._stop_player.wait(PLAYBACK_DT_S):
             with self._pose_lock:
-                self._tick()
+                try:
+                    self._tick()
+                except Exception:
+                    # No caller to raise to, e.g. the environment changed behind the viewer.
+                    # Pause so it logs once; Play or update_trajectory() try again.
+                    logger.exception("playback paused: this tick failed")
+                    self._gui_play.value = False
 
     def _tick(self) -> None:
         # Under the pose lock: a pause from another thread cannot interleave with a frame.
@@ -311,6 +356,13 @@ class TesseractViewer:
         self._t_s = t_s
         self._gui_time.value = t_s
         self.show_time(t_s)
+
+    def _clear_trajectory(self) -> None:
+        self._trajectory = None
+        self._t_s = 0.0
+        self._gui_time.value = 0.0
+        self._gui_time.max = EMPTY_TIME_MAX_S
+        self._gui_time.disabled = True
 
     def _clear_scene(self) -> None:
         for handle in self._visual_handles:
