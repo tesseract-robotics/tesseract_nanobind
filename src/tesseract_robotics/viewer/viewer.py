@@ -163,6 +163,7 @@ class TesseractViewer:
         self._t_s = 0.0
         self._gui_time.value = 0.0
         self.show_time(0.0)
+        self._gui_play.value = True
 
     def show_time(self, t_s: float) -> None:
         """Pose the scene at `t_s` along the current trajectory.
