@@ -618,6 +618,16 @@ class CollisionCacheData:
     @gradient_results_sets.setter
     def gradient_results_sets(self, arg: Sequence[GradientResultsSet], /) -> None: ...
 
+@overload
+def getGradient(dof_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], contact_result: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResult, margin: float, margin_buffer: float, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup) -> GradientResults:
+    """Gradient of one discrete contact at `dof_vals`."""
+
+@overload
+def getGradient(dof_vals0: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], dof_vals1: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], contact_result: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResult, margin: float, margin_buffer: float, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup) -> GradientResults:
+    """
+    Gradient of one continuous contact between `dof_vals0` and `dof_vals1`.
+    """
+
 class DiscreteCollisionEvaluator:
     def calcCollisions(self, dof_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], max_allowed: int) -> CollisionCacheData:
         """
