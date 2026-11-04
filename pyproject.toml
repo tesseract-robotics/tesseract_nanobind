@@ -17,6 +17,9 @@ dependencies = [
     "loguru>=0.7.0",
     "scipy>=1.17.1",         # Required for Eigen sparse matrix conversion in nanobind
     "aiohttp",               # Required for tesseract_robotics.viewer
+    "viser>=1.1.1",          # Required for tesseract_robotics.viewer
+    "trimesh>=4",            # Required for tesseract_robotics.viewer
+    "pillow",                # Required for tesseract_robotics.viewer
 ]
 
 authors = [
@@ -262,6 +265,12 @@ docs-build = { cmd = "zensical build --strict", env = { PYTHONPATH = "src" }, de
 # GIL hotspots (docs/developer/threading.md): py-spy samples the GIL-holding thread of a pytest
 # run to find bindings worth adding to scripts/nogil_entry_points.yaml. Part of the default env:
 # it profiles the extensions installed there.
+# tesseract_robotics.viewer.
+[tool.pixi.feature.viewer.dependencies]
+viser = ">=1.1.1"
+trimesh = ">=4"
+pillow = "*"
+
 [tool.pixi.feature.profile.dependencies]
 py-spy = ">=0.4.2"
 
@@ -289,8 +298,8 @@ audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=sho
 audit-typecheck = { cmd = "ty check scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
 
 [tool.pixi.environments]
-default = { features = ["profile"], solve-group = "default" }
-py312 = { features = ["py312"], solve-group = "py312" }
+default = { features = ["profile", "viewer"], solve-group = "default" }
+py312 = { features = ["py312", "viewer"], solve-group = "py312" }
 # Own solve group: libclang 22 must not move libcxx/llvm-openmp in the env CI builds wheels from.
 audit = { features = ["audit"], solve-group = "audit" }
 docs = { features = ["docs"], no-default-feature = true, solve-group = "docs" }
