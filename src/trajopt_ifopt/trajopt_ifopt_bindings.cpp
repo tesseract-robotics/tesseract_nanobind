@@ -44,6 +44,7 @@
 
 // trajopt_common
 #include <trajopt_common/collision_types.h>
+#include <trajopt_common/collision_utils.h>
 
 // tesseract_collision for CollisionCheckConfig (used by TrajOptCollisionConfig)
 #include <tesseract/collision/types.h>
@@ -1090,6 +1091,29 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def(nb::init<>())
         .def_rw("contact_results_map", &tc::CollisionCacheData::contact_results_map)
         .def_rw("gradient_results_sets", &tc::CollisionCacheData::gradient_results_sets);
+
+    // ========== trajopt_common::getGradient ==========
+    // 0.36 moved the per-contact gradient off the evaluators (getGradient / calcGradientData) to
+    // these free functions (collision_utils.h:69, :84). The C++ out-param is the return value.
+    m.def("getGradient",
+          [](const Eigen::VectorXd& dof_vals, const tesseract::collision::ContactResult& contact_result,
+             double margin, double margin_buffer, const tesseract::kinematics::JointGroup& manip) {
+              tc::GradientResults results;
+              tc::getGradient(results, dof_vals, contact_result, margin, margin_buffer, manip);
+              return results;
+          },
+          "dof_vals"_a, "contact_result"_a, "margin"_a, "margin_buffer"_a, "manip"_a,
+          "Gradient of one discrete contact at `dof_vals`.");
+    m.def("getGradient",
+          [](const Eigen::VectorXd& dof_vals0, const Eigen::VectorXd& dof_vals1,
+             const tesseract::collision::ContactResult& contact_result, double margin, double margin_buffer,
+             const tesseract::kinematics::JointGroup& manip) {
+              tc::GradientResults results;
+              tc::getGradient(results, dof_vals0, dof_vals1, contact_result, margin, margin_buffer, manip);
+              return results;
+          },
+          "dof_vals0"_a, "dof_vals1"_a, "contact_result"_a, "margin"_a, "margin_buffer"_a, "manip"_a,
+          "Gradient of one continuous contact between `dof_vals0` and `dof_vals1`.");
 
     // ========== DiscreteCollisionEvaluator (base class) ==========
     // The queries are bound here only; virtual dispatch serves every evaluator. getJointGroup
