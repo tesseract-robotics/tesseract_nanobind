@@ -7,7 +7,7 @@
 - **Python 3.12 is the minimum; Rhino 8 loses wheels** — `requires-python` rises from `>=3.9` to `>=3.12`. One `cp312-abi3` wheel per platform now covers 3.12, 3.13 and 3.14, including Rhino 9 (CPython 3.13). Rhino 8 (CPython 3.9) and Python 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them ([#369]; `docs/breaking-changes.md`).
 - **numpy 2.0 and scipy 1.17.1 are the minimum** — `numpy>=1.21.0` and `scipy>=1.7.0` were never tested. The scipy floor is the oldest scipy CI runs; numpy 1.x users stay on 0.35.0.8. `importlib-resources` is no longer a dependency: the viewer uses stdlib `importlib.resources` ([#369]).
 - **`planning.program.Target` and `emitters.core.events.Event` are `type` aliases** — `isinstance(x, Target)` and `typing.get_args(Target)` raise or return nothing; use `Target.__value__` or test the member classes ([#369]; `docs/breaking-changes.md`).
-- **`tesseract_robotics.viewer` is now backed by viser; the Three.js/aiohttp viewer is removed (#367)** — needs Python >= 3.11 (`viser`, `trimesh` and `pillow` install on those versions only; `aiohttp` and `importlib-resources` are gone). The viewer serves from construction and `viewer.url` is its address. See the [viewer guide](docs/user-guide/viewer.md).
+- **`tesseract_robotics.viewer` is now backed by viser; the Three.js/aiohttp viewer is removed (#367)** — `viser`, `trimesh` and `pillow` replace `aiohttp`. The viewer serves from construction and `viewer.url` is its address. See `docs/user-guide/viewer.md`.
 
   | before | after |
   | --- | --- |
