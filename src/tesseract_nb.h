@@ -33,6 +33,7 @@
 #include <nanobind/stl/map.h>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/set.h>
+#include <nanobind/stl/unordered_set.h>
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/unique_ptr.h>
