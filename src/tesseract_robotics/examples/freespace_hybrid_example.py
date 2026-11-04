@@ -43,12 +43,38 @@ from tesseract_robotics.planning import (
     sphere,
 )
 from tesseract_robotics.planning.profiles import (
+    TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
     create_ompl_default_profiles,
 )
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    TrajOptIfoptDefaultCompositeProfile,
+)
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TesseractViewer = None
 if "pytest" not in sys.modules:
     from tesseract_robotics.viewer import TesseractViewer
+
+
+def add_ifopt_profiles(profiles):
+    """Add the TrajOptIfopt composite profile of the C++ example's `if (ifopt_)` branch.
+
+    Collision cost and constraint both `TrajOptCollisionConfig(0.025, 20)` (25mm margin,
+    coeff 20, DISCRETE), and smoothing coeffs of 1; the smooth_* switches keep their defaults.
+
+    Args:
+        profiles: ProfileDictionary to add the composite profile to, under "FREESPACE".
+    """
+    composite = TrajOptIfoptDefaultCompositeProfile()
+    composite.collision_constraint_config = TrajOptCollisionConfig(0.025, 20.0)
+    composite.collision_cost_config = TrajOptCollisionConfig(0.025, 20.0)
+    composite.velocity_coeff = np.ones(1)
+    composite.acceleration_coeff = np.ones(1)
+    composite.jerk_coeff = np.ones(1)
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(
+        profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "FREESPACE", composite
+    )
 
 
 def run(
@@ -113,6 +139,8 @@ def run(
     # - Range: step size for tree extension
     # - Collision margin: 0.025m safety buffer (from C++ example)
     profiles = create_ompl_default_profiles()
+    if use_ifopt:
+        add_ifopt_profiles(profiles)
 
     # TaskComposer manages pipeline execution
     if composer is None:

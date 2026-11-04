@@ -66,6 +66,7 @@ import numpy as np
 
 from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
 from tesseract_robotics.planning.profiles import (
+    TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
     create_freespace_pipeline_profiles,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
@@ -85,6 +86,14 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultPlanProfile,
     TrajOptOSQPSolverProfile,
+)
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    ProfileDictionary_addTrajOptIfoptMoveProfile,
+    ProfileDictionary_addTrajOptIfoptSolverProfile,
+    TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultMoveProfile,
+    TrajOptIfoptOSQPSolverProfile,
 )
 from tesseract_robotics.tesseract_scene_graph import (
     Collision,
@@ -192,6 +201,61 @@ def create_car_seat_profiles():
         ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, name, composite)
         ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
         ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
+
+    return profiles
+
+
+def create_car_seat_ifopt_profiles():
+    """Create TrajOptIfopt profiles for `TrajOptIfoptPipeline`.
+
+    From the `if (ifopt_)` branch of the C++ example: the same collision, move and
+    solver settings as `create_car_seat_profiles`, on the TrajOptIfopt profile types.
+
+    Returns:
+        ProfileDictionary with TrajOptIfopt profiles for FREESPACE motions.
+    """
+    profiles = ProfileDictionary()
+
+    composite = TrajOptIfoptDefaultCompositeProfile()
+
+    # Collision constraint: margin=0, coeff=10
+    composite.collision_constraint_config = TrajOptCollisionConfig(0.0, 10)
+    composite.collision_constraint_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_constraint_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_constraint_config.collision_margin_buffer = 0.005
+
+    # Collision cost: margin=0.005, coeff=50
+    composite.collision_cost_config = TrajOptCollisionConfig(0.005, 50)
+    composite.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.LVS_CONTINUOUS
+    )
+    composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
+    composite.collision_cost_config.collision_margin_buffer = 0.01
+
+    move = TrajOptIfoptDefaultMoveProfile()
+    move.cartesian_cost_config.enabled = False
+    move.cartesian_constraint_config.enabled = True
+    move.joint_cost_config.enabled = False
+    move.joint_constraint_config.enabled = True
+
+    solver = TrajOptIfoptOSQPSolverProfile()
+    solver.opt_params.max_iterations = 200
+    solver.opt_params.min_approx_improve = 1e-3
+    solver.opt_params.min_trust_box_size = 1e-3
+
+    # C++ names its composite "FREESPACE"; MotionProgram's composite is "DEFAULT".
+    for name in ["DEFAULT", "FREESPACE"]:
+        ProfileDictionary_addTrajOptIfoptCompositeProfile(
+            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite
+        )
+        ProfileDictionary_addTrajOptIfoptMoveProfile(
+            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, move
+        )
+        ProfileDictionary_addTrajOptIfoptSolverProfile(
+            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver
+        )
 
     return profiles
 
@@ -348,7 +412,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     5. PLACE: Plan Pick1 -> Place1 (collision-aware transport)
 
     Args:
-        pipeline: Planning pipeline ("TrajOptPipeline" or "FreespacePipeline")
+        pipeline: Planning pipeline ("TrajOptPipeline", "TrajOptIfoptPipeline" or
+            "FreespacePipeline")
         num_planners: Number of parallel OMPL planners (for FreespacePipeline)
 
     Returns:
@@ -383,6 +448,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Create profiles based on pipeline type
     if "Freespace" in pipeline or "OMPL" in pipeline:
         profiles = create_freespace_pipeline_profiles(num_planners=num_planners)
+    elif pipeline == "TrajOptIfoptPipeline":
+        profiles = create_car_seat_ifopt_profiles()
     else:
         profiles = create_car_seat_profiles()
 
