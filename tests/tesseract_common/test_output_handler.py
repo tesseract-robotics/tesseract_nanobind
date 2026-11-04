@@ -295,12 +295,15 @@ def test_exit_while_threads_keep_logging():
 handler = Collect()
 tesseract_common.useOutputHandler(handler)
 
+started = threading.Event()
+
 def forever():
     while True:
         log("x")
+        started.set()
 
 threading.Thread(target=forever, daemon=True).start()
-time.sleep(0.2)
+assert started.wait(30)
 print("EXITING", flush=True)
 """)
     assert "EXITING" in out, out
@@ -331,6 +334,7 @@ def test_flush_waits_for_a_message_logged_while_drops_are_reported():
     """The delivery thread's drop notice was counted as queued only once its batch was delivered:
     a flush that started during that batch returned one message early."""
     out = _run("""
+in_block = threading.Event()
 release_block = threading.Event()
 at_last = threading.Event()
 release_last = threading.Event()
@@ -338,6 +342,7 @@ release_last = threading.Event()
 class Gated(Collect):
     def log(self, text, level, filename, line):
         if text == "BLOCK":
+            in_block.set()
             release_block.wait(30)
         if text == "m9999":
             at_last.set()
@@ -349,7 +354,7 @@ class Gated(Collect):
 handler = Gated()
 tesseract_common.useOutputHandler(handler)
 log("BLOCK")
-time.sleep(0.3)  # the delivery thread waits inside BLOCK
+assert in_block.wait(30)  # the delivery thread waits inside BLOCK
 for i in range(10500):  # the queue holds 10000: 500 are dropped
     log(f"m{i}")
 release_block.set()
@@ -376,18 +381,20 @@ def test_drops_are_reported_to_their_handler_after_it_is_uninstalled():
     """Drops counted while the handler fell behind were forgotten, without a notice or a stderr
     line, when no Python handler was installed by the time the queue ran empty."""
     out = _run("""
+in_block = threading.Event()
 release = threading.Event()
 
 class Blocks(Collect):
     def log(self, text, level, filename, line):
         if text == "BLOCK":
+            in_block.set()
             release.wait(30)
         super().log(text, level, filename, line)
 
 handler = Blocks()
 tesseract_common.useOutputHandler(handler)
 log("BLOCK")
-time.sleep(0.3)
+assert in_block.wait(30)
 for i in range(10500):
     log(f"m{i}")
 tesseract_common.restorePreviousOutputHandler()  # console_bridge's own handler again
@@ -401,18 +408,20 @@ print("NOTICES", notices)
 
 def test_drops_from_two_handlers_are_reported_to_each():
     out = _run("""
+in_block = threading.Event()
 release = threading.Event()
 
 class Blocks(Collect):
     def log(self, text, level, filename, line):
         if text == "BLOCK":
+            in_block.set()
             release.wait(30)
         super().log(text, level, filename, line)
 
 first, second = Blocks(), Collect()
 tesseract_common.useOutputHandler(first)
 log("BLOCK")
-time.sleep(0.3)
+assert in_block.wait(30)
 for i in range(10200):  # 10000 queued (BLOCK is taken): 200 dropped
     log(f"a{i}")
 tesseract_common.useOutputHandler(second)
@@ -482,25 +491,29 @@ def test_exit_prints_what_the_delivery_thread_has_not_delivered():
     LOG_DELIVERY_BATCH messages) was neither delivered nor printed, and neither were unreported
     drops."""
     out, err = _run_both("""
+in_block = threading.Event()
+in_spin = threading.Event()
 release = threading.Event()
 
 class Spins(tesseract_common.OutputHandler):
     def log(self, text, level, filename, line):
         if text == "BLOCK":
+            in_block.set()
             release.wait(30)
         if text == "SPIN":
+            in_spin.set()
             while True:
                 pass
 
 handler = Spins()
 tesseract_common.useOutputHandler(handler)
 log("BLOCK")
-time.sleep(0.3)
+assert in_block.wait(30)
 log("SPIN")
 for i in range(3):
     log(f"in-batch-{i}")  # queued behind SPIN, taken with it
 release.set()
-time.sleep(0.3)  # the delivery thread spins inside SPIN
+assert in_spin.wait(30)  # the delivery thread spins inside SPIN
 for i in range(3):
     log(f"queued-{i}")
 print("EXITING", flush=True)
