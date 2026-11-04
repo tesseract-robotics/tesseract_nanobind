@@ -316,7 +316,7 @@ build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build p
 # upstream (source-built) and packaged (feedstock-built) envs. Built with conda's
 # compilers, as the feedstocks are.
 [tool.pixi.feature.bindings-dev]
-platforms = ["osx-arm64", "linux-64"]
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 
 [tool.pixi.feature.bindings-dev.dependencies]
 python = "3.12.*"
@@ -345,6 +345,10 @@ clangxx_osx-arm64 = "19.*"
 gcc_linux-64 = "14.*"
 gxx_linux-64 = "14.*"
 
+[tool.pixi.feature.bindings-dev.target.linux-aarch64.dependencies]
+gcc_linux-aarch64 = "14.*"
+gxx_linux-aarch64 = "14.*"
+
 [tool.pixi.feature.bindings-dev.pypi-dependencies]
 numpy = ">=1.21.0"
 loguru = ">=0.7.0"
@@ -356,7 +360,7 @@ pyyaml = "*"
 # only their third-party deps — the union of the feedstock recipes' host sections —
 # and no tesseract packages.
 [tool.pixi.feature.upstream]
-platforms = ["osx-arm64", "linux-64"]
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 
 [tool.pixi.feature.upstream.dependencies]
 # third-party C++ deps (versions as pinned in the feedstocks' conda_build_config / .ci_support)
@@ -381,6 +385,8 @@ gmock = "*"
 xz = "*"
 osqp = "*"
 osqp-eigen = "*"
+# trajopt_sco / trajopt_sqp build their optional PIQP backend when they find it
+piqp = "0.6.4.*"  # the version trajopt_ext fetches when PIQP is missing
 qpoases = "*"
 ompl = "*"
 taskflow = ">=3.6,<3.8"  # run dep of trajopt; 3.8+ needs C++20
