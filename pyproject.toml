@@ -464,14 +464,14 @@ test-upstream = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q 
     "build-upstream",
 ], description = "Run the test suite against the upstream-main build" }
 
-# The 0.36 dev packages from `pixi run build-feedstock`, consumed from packaging/output
-# as a local channel ahead of tesseract-robotics / conda-forge. This is the publish
-# gate of tesseract_nanobind#162; the local channel is later swapped for
-# tesseract-robotics/label/dev. Local channels need a ./ prefix: a bare name is an
-# anaconda.org channel. Run `pixi run index-feedstock-channel` before solving.
+# The 0.36 dev packages built by the feedstocks' `dev` branches on CI and published
+# to the `dev` label of the tesseract-robotics channel (tesseract_nanobind#224). The
+# label wins over tesseract-robotics `main` (0.35) and conda-forge. For a local
+# feedstock build instead, point this at "./packaging/output" (the ./ prefix makes it
+# a local channel) and run `pixi run index-feedstock-channel` first.
 [tool.pixi.feature.packaged]
 platforms = ["osx-arm64"]
-channels = [{ channel = "./packaging/output", priority = 10 }]
+channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }]
 
 [tool.pixi.feature.packaged.dependencies]
 tesseract-robotics = "==0.36.0.dev20260929"
