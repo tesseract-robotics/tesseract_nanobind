@@ -18,12 +18,16 @@ from pathlib import Path
 
 _QUAL = r"(?:tesseract_robotics\.tesseract_common\._tesseract_common\.)?"
 # An id type name not already widened (`LinkId | str`) and not part of a longer name.
-# Mapping/dict keys stay exact: keys are invariant, so `Mapping[LinkId | str, X]` would
-# reject the `dict[LinkId, X]` the bindings hand out (SceneState.link_transforms).
+# Mapping/dict keys are left to `_widen_mappings`: keys are invariant, so
+# `Mapping[LinkId | str, X]` would reject the `dict[LinkId, X]` the bindings hand out
+# (SceneState.link_transforms); a parameter becomes `Mapping[LinkId, X] | Mapping[str, X]`.
 _NOT_KEY = r"(?<!Mapping\[)(?<!dict\[)"
 _ID = re.compile(rf"{_NOT_KEY}(?<![\w.])({_QUAL}(?:LinkId|JointId))(?![\w]| \| str)")
 _PAIR = re.compile(rf"{_NOT_KEY}(?<![\w.])({_QUAL}LinkIdPair)(?![\w]| \| tuple)")
 # The id classes' own dunders (`__eq__(self, arg: LinkId)`) already have a `str` overload.
+# `Mapping[<id>, ` opening a parameter's id-keyed mapping, with the str form of that key.
+_MAPPING = re.compile(rf"Mapping\[({_QUAL}(LinkIdPair|LinkId|JointId)), ")
+_KEY_AS_STR = {"LinkIdPair": "tuple[str, str]", "LinkId": "str", "JointId": "str"}
 _ID_CLASSES = re.compile(r"^class (LinkId|JointId|LinkIdPair)\b")
 _CLASS = re.compile(r"^class \w+")
 _DEF = re.compile(r"^\s*def \w+\(")
@@ -43,13 +47,41 @@ def _param_span(text: str, start: int) -> int | None:
     return None
 
 
+def _widen_mappings(params: str) -> str:
+    """`Mapping[<id>, V]` → `Mapping[<id>, V] | Mapping[<str key>, V]`, inner mappings first.
+
+    A mapping already followed by its str arm is left alone, so widening is idempotent.
+    """
+    out, pos = [], 0
+    for m in _MAPPING.finditer(params):
+        if m.start() < pos:
+            continue  # inside a mapping already rewritten
+        value_start = m.end()
+        close = _param_span("[" + params[value_start:], 0)
+        if close is None:
+            raise ValueError(f"unbalanced Mapping value: {params!r}")
+        value_end = value_start + close - 1
+        value = _widen_mappings(params[value_start:value_end])
+        key_as_str = _KEY_AS_STR[m.group(2)]
+        whole = f"Mapping[{m.group(1)}, {value}]"
+        tail = params[value_end + 1 :]
+        out.append(params[pos : m.start()])
+        if tail.startswith(f" | Mapping[{key_as_str}, "):
+            out.append(whole)
+        else:
+            out.append(f"{whole} | Mapping[{key_as_str}, {value}]")
+        pos = value_end + 1
+    out.append(params[pos:])
+    return "".join(out)
+
+
 def widen_def(text: str) -> str:
     """Widen the id annotations inside one `def`'s parameter list (one or more lines)."""
     open_paren = _DEF.match(text).end() - 1
     close_paren = _param_span(text, open_paren)
     if close_paren is None:
         raise ValueError(f"unbalanced parameter list: {text!r}")
-    params = text[open_paren:close_paren]
+    params = _widen_mappings(text[open_paren:close_paren])
     params = _PAIR.sub(r"\1 | tuple[str, str]", params)
     params = _ID.sub(r"\1 | str", params)
     return text[:open_paren] + params + text[close_paren:]
