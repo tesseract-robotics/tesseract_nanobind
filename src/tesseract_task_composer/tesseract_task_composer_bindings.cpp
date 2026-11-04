@@ -604,16 +604,49 @@ NB_MODULE(_tesseract_task_composer, m) {
         .value("PIPELINE", tp::TaskComposerNodeType::PIPELINE)
         .value("GRAPH", tp::TaskComposerNodeType::GRAPH);
 
-    auto node_ports = nb::class_<tp::TaskComposerNodePorts>(m, "TaskComposerNodePorts");
-    nb::enum_<tp::TaskComposerNodePorts::Type>(node_ports, "Type")
-        .value("SINGLE", tp::TaskComposerNodePorts::SINGLE)
-        .value("MULTIPLE", tp::TaskComposerNodePorts::MULTIPLE);
+    // A task's fixed port contract (task_composer_node_ports.h). The add* builders return the
+    // contract itself for chaining. inputSchema/outputSchema are not bound: PropertyTree has no binding.
+    using Ports = tp::TaskComposerNodePorts;
+    auto node_ports = nb::class_<Ports>(m, "TaskComposerNodePorts");
+    nb::enum_<Ports::Cardinality>(node_ports, "Cardinality")
+        .value("SINGLE", Ports::Cardinality::SINGLE)
+        .value("MULTIPLE", Ports::Cardinality::MULTIPLE);
+    nb::enum_<Ports::Requirement>(node_ports, "Requirement")
+        .value("REQUIRED", Ports::Requirement::REQUIRED)
+        .value("OPTIONAL", Ports::Requirement::OPTIONAL);
+    nb::enum_<Ports::Direction>(node_ports, "Direction")
+        .value("INPUT", Ports::Direction::INPUT)
+        .value("OUTPUT", Ports::Direction::OUTPUT);
+    auto port_definition = nb::class_<Ports::PortDefinition>(node_ports, "PortDefinition")
+        .def(nb::init<>())
+        .def("__init__", [](Ports::PortDefinition* self, Ports::Cardinality cardinality, Ports::Requirement requirement) {
+            new (self) Ports::PortDefinition{cardinality, requirement};
+        }, "cardinality"_a, "requirement"_a)
+        .def_rw("cardinality", &Ports::PortDefinition::cardinality)
+        .def_rw("requirement", &Ports::PortDefinition::requirement);
+    bind_value_equality(port_definition);
+    nb::class_<Ports::ValidationError>(node_ports, "ValidationError")
+        .def_ro("direction", &Ports::ValidationError::direction)
+        .def_ro("port", &Ports::ValidationError::port)
+        .def_ro("message", &Ports::ValidationError::message)
+        .def("path", &Ports::ValidationError::path)
+        .def("__str__", &Ports::ValidationError::toString);
     node_ports.def(nb::init<>())
-        .def_rw("input_required", &tp::TaskComposerNodePorts::input_required)
-        .def_rw("input_optional", &tp::TaskComposerNodePorts::input_optional)
-        .def_rw("output_required", &tp::TaskComposerNodePorts::output_required)
-        .def_rw("output_optional", &tp::TaskComposerNodePorts::output_optional)
-        .def("__str__", &tp::TaskComposerNodePorts::toString);
+        .def("addRequiredInput", &Ports::addRequiredInput, "name"_a, "cardinality"_a = Ports::Cardinality::SINGLE,
+             nb::rv_policy::reference_internal)
+        .def("addOptionalInput", &Ports::addOptionalInput, "name"_a, "cardinality"_a = Ports::Cardinality::SINGLE,
+             nb::rv_policy::reference_internal)
+        .def("addRequiredOutput", &Ports::addRequiredOutput, "name"_a, "cardinality"_a = Ports::Cardinality::SINGLE,
+             nb::rv_policy::reference_internal)
+        .def("addOptionalOutput", &Ports::addOptionalOutput, "name"_a, "cardinality"_a = Ports::Cardinality::SINGLE,
+             nb::rv_policy::reference_internal)
+        .def("inputs", &Ports::inputs, nb::rv_policy::copy, "Input port name -> PortDefinition.")
+        .def("outputs", &Ports::outputs, nb::rv_policy::copy, "Output port name -> PortDefinition.")
+        .def("validate", &Ports::validate, "inputs"_a, "outputs"_a,
+             "Every way `inputs` / `outputs` break the contract; empty when they satisfy it.")
+        .def("validateOrThrow", &Ports::validateOrThrow, "inputs"_a, "outputs"_a, "node_name"_a = std::string(),
+             "Raise RuntimeError listing every violation of the contract.")
+        .def("__str__", &Ports::toString);
     bind_value_equality(node_ports);
 
     // ========== TaskComposerNodeInfo ==========
@@ -631,8 +664,8 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def_rw("type", &tp::TaskComposerNodeInfo::type)
         .def_rw("type_hash_code", &tp::TaskComposerNodeInfo::type_hash_code)
         .def_rw("conditional", &tp::TaskComposerNodeInfo::conditional)
-        .def_rw("input_keys", &tp::TaskComposerNodeInfo::input_keys)
-        .def_rw("output_keys", &tp::TaskComposerNodeInfo::output_keys)
+        .def_rw("input_port_mappings", &tp::TaskComposerNodeInfo::input_port_mappings)
+        .def_rw("output_port_mappings", &tp::TaskComposerNodeInfo::output_port_mappings)
         .def_rw("triggers_abort", &tp::TaskComposerNodeInfo::triggers_abort)
         .def_rw("return_value", &tp::TaskComposerNodeInfo::return_value)
         .def_rw("status_code", &tp::TaskComposerNodeInfo::status_code)
@@ -837,13 +870,16 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("getInboundEdges", &tp::TaskComposerNode::getInboundEdges)
         .def("isConditional", &tp::TaskComposerNode::isConditional)
         .def("setConditional", &tp::TaskComposerNode::setConditional, "enable"_a)
-        .def("validatePorts", &tp::TaskComposerNode::validatePorts,
-             "Raise RuntimeError if a required port has no key or a key names no port.")
         .def("getInputPortMappings", &tp::TaskComposerNode::getInputPortMappings, nb::rv_policy::reference_internal)
         .def("getOutputPortMappings", &tp::TaskComposerNode::getOutputPortMappings, nb::rv_policy::reference_internal)
         .def("setPortMappings", &tp::TaskComposerNode::setPortMappings,
              "input_port_mappings"_a, "output_port_mappings"_a)
-        .def("getPorts", &tp::TaskComposerNode::getPorts)
+        // A copy of the fixed contract; None for a graph or pipeline, whose ports are dynamic.
+        .def("getPortContract", [](const tp::TaskComposerNode& self) -> std::optional<tp::TaskComposerNodePorts> {
+            const auto* ports = self.getPortContract();
+            if (ports == nullptr) return std::nullopt;
+            return *ports;
+        })
         .def("getDataStorage", &tp::TaskComposerNode::getDataStorage, "context"_a,
              "The context's data storage for a root node, else its parent graph's.")
         // results_map: node uuid -> info, e.g. context.task_infos.getInfoMap(); annotates the graph
@@ -918,10 +954,14 @@ NB_MODULE(_tesseract_task_composer, m) {
              "terminal_index"_a)
         .def("getAbortTerminal", &tp::TaskComposerGraph::getAbortTerminal)
         .def("getAbortTerminalIndex", &tp::TaskComposerGraph::getAbortTerminalIndex)
-        .def("setOverrideInputKeys", &tp::TaskComposerGraph::setOverrideInputKeys, "override_input_keys"_a)
-        .def("setOverrideOutputKeys", &tp::TaskComposerGraph::setOverrideOutputKeys, "override_output_keys"_a)
-        .def("getOverrideInputKeys", &tp::TaskComposerGraph::getOverrideInputKeys, nb::rv_policy::reference_internal)
-        .def("getOverrideOutputKeys", &tp::TaskComposerGraph::getOverrideOutputKeys, nb::rv_policy::reference_internal)
+        .def("setOverrideInputPortMappings", &tp::TaskComposerGraph::setOverrideInputPortMappings,
+             "override_input_port_mappings"_a)
+        .def("setOverrideOutputPortMappings", &tp::TaskComposerGraph::setOverrideOutputPortMappings,
+             "override_output_port_mappings"_a)
+        .def("getOverrideInputPortMappings", &tp::TaskComposerGraph::getOverrideInputPortMappings,
+             nb::rv_policy::reference_internal)
+        .def("getOverrideOutputPortMappings", &tp::TaskComposerGraph::getOverrideOutputPortMappings,
+             nb::rv_policy::reference_internal)
         .def("isValid", &tp::TaskComposerGraph::isValid, "(True, message) if valid, else (False, the reason).");
 
     nb::class_<tp::TaskComposerPipeline, tp::TaskComposerGraph>(m, "TaskComposerPipeline")
