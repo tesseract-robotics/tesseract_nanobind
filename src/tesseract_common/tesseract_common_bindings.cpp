@@ -1096,7 +1096,7 @@ NB_MODULE(_tesseract_common, m) {
     auto joint_state = nb::class_<tesseract::common::JointState>(m, "JointState")
         .def(nb::init<>())
         .def(nb::init<std::vector<tesseract::common::JointId>, const Eigen::VectorXd&>(), "joint_ids"_a, "position"_a)
-        .def_rw("joint_ids", &tesseract::common::JointState::joint_ids)
+        .def_rw("joint_ids", &tesseract::common::JointState::joint_ids, nb::rv_policy::copy)
         .def_rw("position", &tesseract::common::JointState::position)
         .def_rw("velocity", &tesseract::common::JointState::velocity)
         .def_rw("acceleration", &tesseract::common::JointState::acceleration)
@@ -1495,11 +1495,13 @@ NB_MODULE(_tesseract_common, m) {
     bind_value_equality(contact_managers_plugin_info);
 
     // ========== CalibrationInfo ==========
-    // joints is a TransformMap -> dict[str, Isometry3d], converted on every access: assign the
-    // whole field or use insert(); an in-place edit of the returned dict changes a copy.
+    // joints is a JointIdTransformMap -> dict[JointId, Isometry3d], copied on every access
+    // (rv_policy::copy: the default reference_internal would hand out ids that live in the map's
+    // nodes): assign the whole field or use insert(); an in-place edit of the returned dict
+    // changes a copy.
     auto calibration_info = nb::class_<tesseract::common::CalibrationInfo>(m, "CalibrationInfo")
         .def(nb::init<>())
-        .def_rw("joints", &tesseract::common::CalibrationInfo::joints,
+        .def_rw("joints", &tesseract::common::CalibrationInfo::joints, nb::rv_policy::copy,
                 "Joint name -> calibrated joint origin. A copy on read: assign the whole dict, or use insert.")
         .def("insert", &tesseract::common::CalibrationInfo::insert, "other"_a)
         .def("clear", &tesseract::common::CalibrationInfo::clear)
