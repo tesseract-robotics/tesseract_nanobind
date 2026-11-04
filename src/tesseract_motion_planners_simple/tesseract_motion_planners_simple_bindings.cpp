@@ -343,15 +343,15 @@ NB_MODULE(_tesseract_motion_planners_simple, m) {
     m.def("interpolate_waypoint", &tp::interpolate_waypoint, "start"_a, "stop"_a, "steps"_a,
           "Waypoints from `start` to `stop`: `steps + 1` of them, of the start's type.");
     m.def("getInterpolatedInstructions",
-          nb::overload_cast<const std::vector<std::string>&, const Eigen::MatrixXd&, const tcl::MoveInstructionPoly&>(
+          nb::overload_cast<const std::vector<tc::JointId>&, const Eigen::MatrixXd&, const tcl::MoveInstructionPoly&>(
               &tp::getInterpolatedInstructions),
-          "joint_names"_a, "states"_a, "base_instruction"_a,
+          "joint_ids"_a, "states"_a, "base_instruction"_a,
           "Move instructions for the columns of `states` after the first, each a child of "
           "`base_instruction`; the last is `base_instruction` itself.");
     m.def("getInterpolatedInstructions",
-          nb::overload_cast<const tc::VectorIsometry3d&, const std::vector<std::string>&, const Eigen::MatrixXd&,
+          nb::overload_cast<const tc::VectorIsometry3d&, const std::vector<tc::JointId>&, const Eigen::MatrixXd&,
                             const tcl::MoveInstructionPoly&>(&tp::getInterpolatedInstructions),
-          "poses"_a, "joint_names"_a, "states"_a, "base_instruction"_a,
+          "poses"_a, "joint_ids"_a, "states"_a, "base_instruction"_a,
           "Cartesian move instructions for the columns of `states` after the first, seeded with "
           "those states; the last is `base_instruction` itself.");
 
