@@ -3,7 +3,7 @@
 !!! warning "Unreleased"
     This page tracks the `upstream-main` branch, which builds against tesseract,
     trajopt and tesseract_planning `master` ahead of 0.36 (issue #141). Pinned at
-    tesseract `f4cc080`, trajopt `de9e941`, tesseract_planning `4efed5f`. Released
+    tesseract `2b79e91`, trajopt `a504b22`, tesseract_planning `a648382`. Released
     wheels (0.35.0.x) still expose the 0.35 API.
 
 ## Links and joints: names → ids

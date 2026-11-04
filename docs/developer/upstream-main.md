@@ -178,9 +178,11 @@ same strip upstream's own recipe carries.
 
 ## Binding status
 
-At tesseract `f4cc080`, trajopt `de9e941`, tesseract_planning `4efed5f` every
-binding module compiles (`pixi run -e upstream build-upstream` exits 0) and the test
-suite passes in the `upstream` env. The user-facing changes are
+At tesseract `2b79e91`, trajopt `a504b22`, tesseract_planning `a648382` every
+binding module compiles and the test suite passes (1001 passed, 3 skipped for
+pytest_benchmark), built with the system compilers against a colcon install of those
+commits on Ubuntu 24.04 (aarch64). The `upstream` pixi env was last run at tesseract
+`f4cc080`, trajopt `de9e941`, tesseract_planning `4efed5f`. The user-facing changes are
 in [API Changes: 0.35 → 0.36](../changes-0.36.md).
 
 | Module | Was | Resolution |

@@ -251,9 +251,9 @@ of 0.36. Nothing on the channel can build it yet:
 | Package | Channel | `upstream-main` needs |
 |---|---|---|
 | boost-plugin-loader | 0.4.3 | 0.4.5 |
-| tesseract-robotics | 0.35.0 | `master` @ `f4cc080` |
-| trajopt | 0.35.0 | `master` @ `de9e941` |
-| tesseract-robotics-planning | 0.35.0 | `master` @ `4efed5f` |
+| tesseract-robotics | 0.35.0 | `master` @ `2b79e91` |
+| trajopt | 0.35.0 | `master` @ `a504b22` |
+| tesseract-robotics-planning | 0.35.0 | `master` @ `a648382` |
 
 Two local loops exist, described in [Building against upstream main](upstream-main.md):
 

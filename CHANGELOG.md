@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-Builds against tesseract, trajopt and tesseract_planning 0.36, pinned ahead of its release at `master` (tesseract `f4cc080`, trajopt `de9e941`, tesseract_planning `4efed5f`). `docs/changes-0.36.md` has the 0.35 → 0.36 migration ([#141]).
+Builds against tesseract, trajopt and tesseract_planning 0.36, pinned ahead of its release at `master` (tesseract `2b79e91`, trajopt `a504b22`, tesseract_planning `a648382`). `docs/changes-0.36.md` has the 0.35 → 0.36 migration ([#141]).
 
 ### Breaking changes
 
