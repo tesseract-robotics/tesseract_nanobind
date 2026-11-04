@@ -157,7 +157,7 @@ evaluator = boxes.discrete_evaluator()
 group = evaluator.getJointGroup()
 del evaluator
 junk = churn()
-print(*group.getJointNames())
+print(*group.getJointIds())
 """,
     "continuous_evaluator_joint_group_outlives_evaluator": """
 from tests.trajopt_ifopt.scenes import OVERLAP_X, two_boxes_at
@@ -166,7 +166,7 @@ evaluator = boxes.lvs_discrete_evaluator()
 group = evaluator.getJointGroup()
 del evaluator
 junk = churn()
-print(*group.getJointNames())
+print(*group.getJointIds())
 """,
     "cart_line_info_outlives_constraint": """
 from tesseract_robotics.tesseract_common import Isometry3d
@@ -180,7 +180,7 @@ constraint = ti.CartLineConstraint(info, var, np.ones(6))
 held = constraint.getInfo()
 del constraint, info
 junk = churn()
-print(held.source_frame, held.target_frame, len(held.manip.getJointNames()))
+print(held.source_frame, held.target_frame, len(held.manip.getJointIds()))
 """,
     "ik_info_outlives_constraint": """
 from tesseract_robotics.tesseract_common import Isometry3d
@@ -196,7 +196,7 @@ constraint = ti.InverseKinematicsConstraint(
 held = constraint.getKinematicInfo()
 del constraint, info
 junk = churn()
-print(held.working_frame, held.tcp_frame, len(held.manip.getJointNames()))
+print(held.working_frame, held.tcp_frame, len(held.manip.getJointIds()))
 """,
 }
 

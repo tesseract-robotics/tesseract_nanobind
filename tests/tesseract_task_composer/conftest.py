@@ -59,10 +59,10 @@ def make_storage() -> Callable[[TaskComposerNode], TaskComposerDataStorage]:
     profiles = create_trajopt_default_profiles()
 
     def make(node: TaskComposerNode) -> TaskComposerDataStorage:
-        keys = node.getInputKeys()
-        port = "planning_input" if keys.has("planning_input") else "program"
+        keys = node.getInputPortMappings()
+        port = "planning_input" if keys.contains("planning_input") else "program"
         storage = TaskComposerDataStorage()
-        storage.setData(keys.get(port), AnyPoly_wrap_CompositeInstruction(composite))
+        storage.setData(keys.single(port), AnyPoly_wrap_CompositeInstruction(composite))
         storage.setData("environment", AnyPoly_wrap_EnvironmentConst(robot.env))
         storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
         return storage

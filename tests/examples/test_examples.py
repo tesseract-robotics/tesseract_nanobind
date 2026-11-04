@@ -455,7 +455,6 @@ def test_mesh_roundtrip_example():
     assert result["bytes"] == {
         "url": "box_2m.ply",
         "Mesh": [(12, 8)],
-        "SDFMesh": [(12, 8)],
         "ConvexMesh": [(6, 8)],
     }
 
@@ -463,7 +462,7 @@ def test_mesh_roundtrip_example():
     counts = [(34, 68), (15, 17), (15, 17), (2, 4)]
     flags = result["flags"]
     for source in ("path", "resource"):
-        assert flags[source] == {"Mesh": counts, "SDFMesh": counts, "ConvexMesh": counts}
+        assert flags[source] == {"Mesh": counts, "ConvexMesh": counts}
     assert flags["normals"] == [68, 17, 17, 4]
     assert flags["textures"] == [0, 0, 0, 1]
     assert flags["texture_bytes"] == 38212
@@ -474,7 +473,7 @@ def test_mesh_roundtrip_example():
     # == compares type, UUID, counts and scale (polygon_mesh.cpp:111-120), ConvexMesh also
     # its creation method (convex_mesh.cpp:80-86)
     rebuilt = result["constructors"]
-    assert list(rebuilt) == ["Mesh", "SDFMesh", "PolygonMesh", "ConvexMesh"]
+    assert list(rebuilt) == ["Mesh", "PolygonMesh", "ConvexMesh"]
     for name, parts in rebuilt.items():
         assert parts["counts"] == [(2, 4), (2, 4)], name
         assert parts["parts_kept"] == [True, True], name
@@ -566,7 +565,7 @@ def test_scene_graph_example():
         "dynamics": "damping=10 friction=5",
         "safety": "soft_upper_limit=1 soft_lower_limit=2 k_position=3 k_velocity=4",
         "calibration": "reference_position=1 rising=2 falling=3",
-        "mimic": "joint_name=joint_name offset=1 multiplier=2",
+        "mimic": "joint_id=joint_name offset=1 multiplier=2",
     }
     # the ACM is replaced, and the graph keeps the matrix object (graph.cpp:746-749)
     assert built["acm"] == {

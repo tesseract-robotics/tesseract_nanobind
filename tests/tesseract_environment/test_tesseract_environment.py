@@ -436,12 +436,12 @@ def test_link_collision_enabled_and_visibility():
 
 def test_get_link_transforms_overloads():
     env = _fresh_env()
-    assert len(env.getLinkTransforms()) == len(env.getLinkNames())
+    assert len(env.getLinkTransforms()) == len(env.getLinkIds())
 
     values = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     transforms = env.getLinkTransforms(_IIWA_JOINTS, values)
     assert isinstance(transforms, dict)
-    assert set(transforms) == set(env.getLinkNames())
+    assert set(transforms) == set(env.getLinkIds())
 
     with_floating = env.getLinkTransforms(_IIWA_JOINTS, values, {})
     np.testing.assert_allclose(
@@ -650,28 +650,28 @@ def test_get_current_joint_values_by_names():
 
 def test_link_names_by_joint_names():
     env = _fresh_env()
-    active_joints = env.getActiveJointNames()
-    assert set(env.getActiveLinkNames(active_joints)) == set(env.getActiveLinkNames())
-    assert set(env.getStaticLinkNames(active_joints)) == set(env.getStaticLinkNames())
+    active_joints = env.getActiveJointIds()
+    assert set(env.getActiveLinkIds(active_joints)) == set(env.getActiveLinkIds())
+    assert set(env.getStaticLinkIds(active_joints)) == set(env.getStaticLinkIds())
 
     downstream = {"link_7", "tool0"}
-    assert set(env.getActiveLinkNames(["joint_a7"])) == downstream
-    assert set(env.getStaticLinkNames(["joint_a7"])) == set(env.getLinkNames()) - downstream
+    assert set(env.getActiveLinkIds(["joint_a7"])) == downstream
+    assert set(env.getStaticLinkIds(["joint_a7"])) == set(env.getLinkIds()) - downstream
     # Any joint type: the fixed tool joint moves only tool0.
-    assert env.getActiveLinkNames(["joint_a7-tool0"]) == ["tool0"]
+    assert env.getActiveLinkIds(["joint_a7-tool0"]) == ["tool0"]
 
     with pytest.raises(ValueError, match="not_a_joint"):
-        env.getActiveLinkNames(["not_a_joint"])
+        env.getActiveLinkIds(["not_a_joint"])
     with pytest.raises(ValueError, match="not_a_joint"):
-        env.getStaticLinkNames(["not_a_joint"])
+        env.getStaticLinkIds(["not_a_joint"])
 
 
 def test_get_joint_group_from_joint_names():
     env = _fresh_env()
-    names = env.getGroupJointNames("manipulator")
+    names = env.getGroupJointIds("manipulator")
     group = env.getJointGroup("from_names", names)
     assert group.getName() == "from_names"
-    assert group.getJointNames() == names
+    assert group.getJointIds() == names
     np.testing.assert_allclose(
         group.calcFwdKin(_IIWA_VALUES)["tool0"].matrix,
         env.getJointGroup("manipulator").calcFwdKin(_IIWA_VALUES)["tool0"].matrix,
@@ -691,8 +691,8 @@ def test_get_contact_manager_by_name():
     continuous = env.getContinuousContactManager("BulletCastSimpleManager")
     assert discrete.getName() == "BulletDiscreteSimpleManager"
     assert continuous.getName() == "BulletCastSimpleManager"
-    assert set(discrete.getActiveCollisionObjects()) == set(env.getActiveLinkNames())
-    assert set(continuous.getActiveCollisionObjects()) == set(env.getActiveLinkNames())
+    assert set(discrete.getActiveCollisionObjects()) == set(env.getActiveLinkIds())
+    assert set(continuous.getActiveCollisionObjects()) == set(env.getActiveLinkIds())
 
     # A copy by name: the active managers stay the defaults.
     assert env.getDiscreteContactManager().getName() == "BulletDiscreteBVHManager"
@@ -726,10 +726,12 @@ def test_env_contact_allowed_validator_matches_acm():
     env = _fresh_env()
     validator = tesseract_environment.EnvironmentContactAllowedValidator(env.getSceneGraph())
     acm = env.getAllowedCollisionMatrix()
-    assert validator(*_ACM_ALLOWED_PAIR) is True
-    assert validator(*_ACM_DISALLOWED_PAIR) is False
+    assert validator(tesseract_common.LinkIdPair(*_ACM_ALLOWED_PAIR)) is True
+    assert validator(tesseract_common.LinkIdPair(*_ACM_DISALLOWED_PAIR)) is False
     for pair in (_ACM_ALLOWED_PAIR, _ACM_DISALLOWED_PAIR):
-        assert validator(*pair) == acm.isCollisionAllowed(*pair)
+        assert validator(tesseract_common.LinkIdPair(*pair)) == acm.isCollisionAllowed(
+            tesseract_common.LinkIdPair(*pair)
+        )
 
 
 def test_env_contact_allowed_validator_tracks_scene_graph():
@@ -743,7 +745,7 @@ def test_env_contact_allowed_validator_tracks_scene_graph():
             acm, tesseract_environment.ModifyAllowedCollisionsType.ADD
         )
     )
-    assert validator(*_ACM_DISALLOWED_PAIR) is True
+    assert validator(tesseract_common.LinkIdPair(*_ACM_DISALLOWED_PAIR)) is True
 
 
 def test_env_contact_allowed_validator_keeps_scene_graph_alive():
@@ -752,14 +754,14 @@ def test_env_contact_allowed_validator_keeps_scene_graph_alive():
     validator = tesseract_environment.EnvironmentContactAllowedValidator(scene_graph)
     del scene_graph
     gc.collect()
-    assert validator(*_ACM_ALLOWED_PAIR) is True
-    assert validator(*_ACM_DISALLOWED_PAIR) is False
+    assert validator(tesseract_common.LinkIdPair(*_ACM_ALLOWED_PAIR)) is True
+    assert validator(tesseract_common.LinkIdPair(*_ACM_DISALLOWED_PAIR)) is False
 
     env = _fresh_env()
     installed = env.getDiscreteContactManager().getContactAllowedValidator()
     del env
     gc.collect()
-    assert installed(*_ACM_ALLOWED_PAIR) is True
+    assert installed(tesseract_common.LinkIdPair(*_ACM_ALLOWED_PAIR)) is True
 
 
 def test_env_contact_allowed_validator_rejects_none():
@@ -780,8 +782,8 @@ def test_env_contact_allowed_validator_on_contact_manager():
         [validator, tesseract_common.ACMContactAllowedValidator()],
         tesseract_common.CombinedContactAllowedValidatorType.OR,
     )
-    assert combined(*_ACM_ALLOWED_PAIR) is True
-    assert combined(*_ACM_DISALLOWED_PAIR) is False
+    assert combined(tesseract_common.LinkIdPair(*_ACM_ALLOWED_PAIR)) is True
+    assert combined(tesseract_common.LinkIdPair(*_ACM_DISALLOWED_PAIR)) is False
 
 
 # gh-191: events reach Python callbacks as C++ stack references that dangle once the

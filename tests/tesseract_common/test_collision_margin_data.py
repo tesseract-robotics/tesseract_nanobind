@@ -32,22 +32,22 @@ def _pairs():
 
 def test_pair_data_from_dict():
     data = _pairs()
-    assert data.getCollisionMargin("a", "b") == _approx(MARGIN_AB)
-    assert data.getCollisionMargin("c", "a") == _approx(MARGIN_AC)
+    assert data.getCollisionMargin(("a", "b")) == _approx(MARGIN_AB)
+    assert data.getCollisionMargin(("c", "a")) == _approx(MARGIN_AC)
 
 
 def test_pair_data_from_dict_orders_keys():
     """The constructor orders each key, as setCollisionMargin does."""
     data = CollisionMarginPairData({("b", "a"): MARGIN_AB})
-    assert data.getCollisionMargin("a", "b") == _approx(MARGIN_AB)
+    assert data.getCollisionMargin(("a", "b")) == _approx(MARGIN_AB)
 
 
 def test_pair_data_increment_then_scale():
     data = _pairs()
     data.incrementMargins(INCREMENT)
     data.scaleMargins(SCALE)
-    assert data.getCollisionMargin("a", "b") == _approx((MARGIN_AB + INCREMENT) * SCALE)
-    assert data.getCollisionMargin("a", "c") == _approx((MARGIN_AC + INCREMENT) * SCALE)
+    assert data.getCollisionMargin(("a", "b")) == _approx((MARGIN_AB + INCREMENT) * SCALE)
+    assert data.getCollisionMargin(("a", "c")) == _approx((MARGIN_AC + INCREMENT) * SCALE)
     assert data.getMaxCollisionMargin() == _approx((MARGIN_AB + INCREMENT) * SCALE)
 
 
@@ -76,8 +76,8 @@ def test_pair_data_apply_modify_keeps_untouched_pairs():
     data.apply(
         CollisionMarginPairData({("b", "d"): MARGIN_BD}), CollisionMarginPairOverrideType.MODIFY
     )
-    assert data.getCollisionMargin("a", "b") == _approx(MARGIN_AB)
-    assert data.getCollisionMargin("b", "d") == _approx(MARGIN_BD)
+    assert data.getCollisionMargin(("a", "b")) == _approx(MARGIN_AB)
+    assert data.getCollisionMargin(("b", "d")) == _approx(MARGIN_BD)
     assert data.getMaxCollisionMargin() == _approx(MARGIN_BD)
 
 
@@ -86,8 +86,8 @@ def test_pair_data_apply_replace_drops_untouched_pairs():
     data.apply(
         CollisionMarginPairData({("b", "d"): MARGIN_BD}), CollisionMarginPairOverrideType.REPLACE
     )
-    assert data.getCollisionMargin("a", "b") is None
-    assert data.getCollisionMargin("b", "d") == _approx(MARGIN_BD)
+    assert data.getCollisionMargin(("a", "b")) is None
+    assert data.getCollisionMargin(("b", "d")) == _approx(MARGIN_BD)
 
 
 def test_pair_data_apply_none_changes_nothing():
@@ -95,7 +95,7 @@ def test_pair_data_apply_none_changes_nothing():
     data.apply(
         CollisionMarginPairData({("b", "d"): MARGIN_BD}), CollisionMarginPairOverrideType.NONE
     )
-    assert data.getCollisionMargin("b", "d") is None
+    assert data.getCollisionMargin(("b", "d")) is None
     assert data.getMaxCollisionMargin() == _approx(MARGIN_AB)
 
 

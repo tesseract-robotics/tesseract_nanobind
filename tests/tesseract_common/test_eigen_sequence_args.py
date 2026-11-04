@@ -140,7 +140,7 @@ def test_set_state_ref_accepts(form):
         support / "urdf" / "abb_irb2400.srdf",
         GeneralResourceLocator(),
     )
-    names = list(env.getJointGroup("manipulator").getJointNames())
+    names = list(env.getJointGroup("manipulator").getJointIds())
     env.setState(names, form(JOINTS))
     nptest.assert_array_equal(env.getCurrentJointValues(names), JOINTS)
 
@@ -207,7 +207,7 @@ def test_wrong_matrix_shape_raises_type_error():
 
 def test_wrong_joint_count_still_reaches_upstream_check(abb_env):
     """A 3-element list converts; the binding's own length check then rejects it."""
-    names = list(abb_env.getJointGroup("manipulator").getJointNames())
+    names = list(abb_env.getJointGroup("manipulator").getJointIds())
     with pytest.raises(ValueError, match="joint_values length"):
         abb_env.setState(names, [0.0, 0.0, 0.0])
 

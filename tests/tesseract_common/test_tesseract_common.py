@@ -379,7 +379,7 @@ def test_joint_trajectory_construct():
     traj = _trajectory()
     assert traj.description == "traj"
     assert [s.time for s in traj.states] == [0.0, 1.0, 2.0]
-    assert traj.states[1].joint_names == ["j1", "j2"]
+    assert traj.states[1].joint_ids == ["j1", "j2"]
 
     traj.states = [_joint_state(9.0)]
     traj.description = "other"
@@ -507,24 +507,26 @@ def test_acm_entries_ctor_roundtrip():
     acm = _acm()
     copy = tesseract_common.AllowedCollisionMatrix(acm.getAllAllowedCollisions())
     assert copy.getAllAllowedCollisions() == acm.getAllAllowedCollisions()
-    assert copy.isCollisionAllowed("link_b", "link_a")
+    assert copy.isCollisionAllowed(("link_b", "link_a"))
 
 
 def test_acm_entries_ctor_orders_keys():
-    """Upstream orders each key (allowed_collision_matrix.cpp, 0.35.0), so ("b", "a") is stored as ("a", "b")."""
+    """0.36 keys are canonical LinkIdPair (common/types.h OrderedIdPair): ("b", "a") is ("a", "b")."""
     acm = tesseract_common.AllowedCollisionMatrix({("link_b", "link_a"): "adjacent"})
-    assert acm.getAllAllowedCollisions() == {("link_a", "link_b"): "adjacent"}
-    assert acm.isCollisionAllowed("link_a", "link_b")
+    entries = acm.getAllAllowedCollisions()
+    assert entries == {tesseract_common.LinkIdPair("link_a", "link_b"): "adjacent"}
+    assert [k.orderedNameView() for k in entries] == [("link_a", "link_b")]
+    assert acm.isCollisionAllowed(("link_a", "link_b"))
 
 
 def test_acm_remove_allowed_collision_single_link():
     acm = _acm()
     acm.removeAllowedCollision("link_a")
-    assert not acm.isCollisionAllowed("link_a", "link_b")
-    assert not acm.isCollisionAllowed("link_a", "link_c")
+    assert not acm.isCollisionAllowed(("link_a", "link_b"))
+    assert not acm.isCollisionAllowed(("link_a", "link_c"))
     assert acm.getAllAllowedCollisions() == {
-        ("link_b", "link_d"): "adjacent",
-        ("link_c", "link_d"): "never",
+        tesseract_common.LinkIdPair("link_b", "link_d"): "adjacent",
+        tesseract_common.LinkIdPair("link_c", "link_d"): "never",
     }
 
 
@@ -537,13 +539,17 @@ def test_acm_reserve_keeps_entries():
 
 def test_acm_str():
     text = str(_acm())
-    for (link1, link2), reason in _acm().getAllAllowedCollisions().items():
+    for pair, reason in _acm().getAllAllowedCollisions().items():
+        link1, link2 = pair.orderedNameView()
         assert f"link={link1} link={link2} reason={reason}" in text
 
 
-def test_make_ordered_link_pair():
-    assert tesseract_common.makeOrderedLinkPair("b", "a") == ("a", "b")
-    assert tesseract_common.makeOrderedLinkPair("a", "b") == ("a", "b")
+def test_link_id_pair_orders_names():
+    # 0.36: makeOrderedLinkPair is gone; LinkIdPair canonicalizes (common/types.h OrderedIdPair)
+    pair = tesseract_common.LinkIdPair
+    assert pair("b", "a") == pair("a", "b")
+    assert pair("b", "a").orderedNameView() == ("a", "b")
+    assert pair("a", "b").orderedNameView() == ("a", "b")
 
 
 def test_get_allowed_collisions():

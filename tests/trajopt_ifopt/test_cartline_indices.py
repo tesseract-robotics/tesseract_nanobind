@@ -46,7 +46,7 @@ srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820
 env = Environment()
 assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)
 manip = env.getKinematicGroup("manipulator")
-joint_names = list(manip.getJointNames())
+joint_names = [str(j) for j in manip.getJointIds()]
 n = len(joint_names)
 nodes = ti.createNodesVariables("trajectory", joint_names, [np.full(n, 0.1)], ti.toBounds(manip.getLimits().joint_limits))
 identity = Isometry3d.Identity()

@@ -331,6 +331,7 @@ class TestChangeCollisionMarginsCommand:
         from tesseract_robotics.tesseract_common import (
             CollisionMarginPairData,
             CollisionMarginPairOverrideType,
+            LinkIdPair,
         )
 
         pair_data = CollisionMarginPairData({("link_1", "link_2"): 0.2})
@@ -338,7 +339,9 @@ class TestChangeCollisionMarginsCommand:
             0.05, pair_data, CollisionMarginPairOverrideType.REPLACE
         )
         assert cmd.getDefaultCollisionMargin() == 0.05
-        assert cmd.getCollisionMarginPairData().getCollisionMargins() == {("link_1", "link_2"): 0.2}
+        assert cmd.getCollisionMarginPairData().getCollisionMargins() == {
+            LinkIdPair("link_1", "link_2"): 0.2
+        }
         assert cmd.getCollisionMarginPairOverrideType() == CollisionMarginPairOverrideType.REPLACE
 
         defaulted = ChangeCollisionMarginsCommand(0.05, pair_data)
@@ -486,8 +489,8 @@ class TestAddTrajectoryLinkCommand:
     def test_getters(self):
         cmd = AddTrajectoryLinkCommand("traj_link", "world", _two_state_trajectory())
         assert isinstance(cmd, Command)
-        assert cmd.getLinkName() == "traj_link"
-        assert cmd.getParentLinkName() == "world"
+        assert cmd.getLinkId() == "traj_link"
+        assert cmd.getParentLinkId() == "world"
         assert len(cmd.getTrajectory()) == 2
         assert cmd.replaceAllowed() is False
         assert cmd.getMethod() == AddTrajectoryLinkCommand.Method.PER_STATE_OBJECTS
@@ -542,7 +545,7 @@ class TestAddTrajectoryLinkCommand:
         )
         assert env.applyCommand(cmd)
         assert env.getRevision() == revision + 1
-        assert "traj_link" in env.getLinkNames()
+        assert "traj_link" in env.getLinkIds()
 
 
 # gh-186: CommandType, the command history, applyCommands, init(commands) and the
@@ -630,7 +633,7 @@ class TestCommandHistory:
         assert type(history[0]) is tesseract_environment.AddSceneGraphCommand
         assert type(history[-1]) is ChangeLinkVisibilityCommand
         assert history[-1].getType() == tesseract_environment.CommandType.CHANGE_LINK_VISIBILITY
-        assert history[-1].getLinkName() == "link1"
+        assert history[-1].getLinkId() == "link1"
 
     def test_get_command_history_add_trajectory_link(self, env):
         """ADD_TRAJECTORY_LINK maps to AddTrajectoryLinkCommand (gh-167 left it to this issue)."""
@@ -640,7 +643,7 @@ class TestCommandHistory:
         last = env.getCommandHistory()[-1]
         assert type(last) is AddTrajectoryLinkCommand
         assert last.getType() == tesseract_environment.CommandType.ADD_TRAJECTORY_LINK
-        assert last.getLinkName() == "traj_link"
+        assert last.getLinkId() == "traj_link"
 
     def test_apply_commands_list(self, env):
         revision = env.getRevision()
@@ -648,7 +651,7 @@ class TestCommandHistory:
             [RemoveLinkCommand("link2"), ChangeLinkVisibilityCommand("link1", False)]
         )
         assert env.getRevision() == revision + 2
-        assert "link2" not in env.getLinkNames()
+        assert "link2" not in env.getLinkIds()
         assert env.getLinkVisibility("link1") is False
         assert [type(cmd) for cmd in env.getCommandHistory()[-2:]] == [
             RemoveLinkCommand,
@@ -661,8 +664,8 @@ class TestCommandHistory:
         del commands
         gc.collect()
         last_two = env.getCommandHistory()[-2:]
-        assert last_two[0].getLinkName() == "link2"
-        assert last_two[1].getLinkName() == "link1"
+        assert last_two[0].getLinkId() == "link2"
+        assert last_two[1].getLinkId() == "link1"
         assert last_two[1].getEnabled() is False
 
     def test_command_applied_event_commands_copy(self, env):
@@ -683,8 +686,8 @@ class TestCommandHistory:
         assert len(second) == len(first) + 1
         assert second_revision == first_revision + 1
         assert type(first[-1]) is ChangeLinkVisibilityCommand
-        assert first[-1].getLinkName() == "link1"
-        assert second[-1].getLinkName() == "link2"
+        assert first[-1].getLinkId() == "link1"
+        assert second[-1].getLinkId() == "link2"
 
     def test_init_from_command_history_roundtrip(self, iiwa_env):
         env = iiwa_env
@@ -695,8 +698,8 @@ class TestCommandHistory:
         env2 = Environment()
         assert env2.init(env.getCommandHistory())
         assert env2.isInitialized()
-        assert env2.getLinkNames() == env.getLinkNames()
-        assert env2.getJointNames() == env.getJointNames()
+        assert env2.getLinkIds() == env.getLinkIds()
+        assert env2.getJointIds() == env.getJointIds()
         assert env2.getRevision() == env.getRevision()
         assert [c.getType() for c in env2.getCommandHistory()] == [
             c.getType() for c in env.getCommandHistory()
@@ -727,7 +730,7 @@ class TestCommandHistory:
     def test_init_commands_keeps_scene_graph_overload(self, env):
         env2 = Environment()
         assert env2.init(env.getSceneGraph())
-        assert env2.getLinkNames() == env.getLinkNames()
+        assert env2.getLinkIds() == env.getLinkIds()
 
 
 class TestSetActiveContactManagerCommands:

@@ -112,7 +112,7 @@ def _cast_contact(set_cast):
         result.flattenMoveResults(flat)
         assert len(flat) == 1
         cr = flat[0]
-        return list(cr.cc_time), list(cr.cc_type), list(cr.link_names)
+        return list(cr.cc_time), list(cr.cc_type), list(cr.link_ids)
     finally:
         del checker
         del factory

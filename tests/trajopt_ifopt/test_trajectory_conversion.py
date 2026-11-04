@@ -30,5 +30,5 @@ def test_joint_trajectory_has_one_state_per_node():
     assert isinstance(trajectory, JointTrajectory)
     assert len(trajectory) == len(STATES)
     for state, expected in zip(trajectory, STATES):
-        assert list(state.joint_names) == JOINT_NAMES
+        assert [str(j) for j in state.joint_ids] == JOINT_NAMES
         np.testing.assert_array_equal(state.position, expected)

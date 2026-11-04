@@ -98,7 +98,7 @@ class TestOMPLSolverConfig:
         assert config.simplify is False
         assert config.simplify_time == 0.0
         assert config.optimize is True
-        assert config.getNumPlanners() == 0
+        assert len(config.planners) == 0
 
     def test_scalar_fields_read_write(self):
         """Scalar fields round-trip assigned values."""
@@ -124,13 +124,13 @@ class TestOMPLSolverConfig:
         assert config.simplify_time == pytest.approx(0.5)
 
     def test_add_and_clear_planners(self):
-        """addPlanner / getNumPlanners / clearPlanners manage the planner list."""
+        """addPlanner / len(planners) / clearPlanners manage the planner list."""
         config = OMPLSolverConfig()
         config.addPlanner(RRTConnectConfigurator())
         config.addPlanner(SBLConfigurator())
-        assert config.getNumPlanners() == 2
+        assert len(config.planners) == 2
         config.clearPlanners()
-        assert config.getNumPlanners() == 0
+        assert len(config.planners) == 0
 
 
 class TestOMPLMotionPlanner:
@@ -354,7 +354,7 @@ class TestFormatProgram:
         program = _joint_program(IRB2400_END[::-1].copy(), names=reversed_names)
         assert formatProgram(program, abb_irb2400_environment) is True
         wp = WaypointPoly_as_JointWaypointPoly(program[0].asMoveInstruction().getWaypoint())
-        assert list(wp.getNames()) == IRB2400_JOINTS
+        assert list(wp.getJointIds()) == IRB2400_JOINTS
         np.testing.assert_allclose(wp.getPosition(), IRB2400_END)
 
     def test_returns_false_when_already_formatted(self, abb_irb2400_environment):
@@ -448,7 +448,7 @@ class TestAssignSolution:
         wp = mi.getWaypoint()
         assert wp.isStateWaypoint()
         swp = WaypointPoly_as_StateWaypointPoly(wp)
-        assert list(swp.getNames()) == IRB2400_JOINTS
+        assert list(swp.getJointIds()) == IRB2400_JOINTS
         np.testing.assert_allclose(swp.getPosition(), IRB2400_END)
 
     def test_format_as_input_seeds_cartesian(self):

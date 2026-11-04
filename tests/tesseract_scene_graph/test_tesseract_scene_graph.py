@@ -249,8 +249,8 @@ def _tree_graph():
         ("joint_4", "link_2", "link_5", sg.JointType.REVOLUTE),
     ):
         joint = sg.Joint(name)
-        joint.parent_link_name = parent
-        joint.child_link_name = child
+        joint.parent_link_id = parent
+        joint.child_link_id = child
         joint.type = joint_type
         if joint_type in (sg.JointType.PLANAR, sg.JointType.REVOLUTE):
             joint.limits = sg.JointLimits(-1, 1, 1, 1, 1, 1)
@@ -286,7 +286,7 @@ def test_joint_value_types_str_is_upstream_operator():
         == "soft_upper_limit=1.5 soft_lower_limit=-1.5 k_position=3 k_velocity=4"
     )
     assert str(sg.JointCalibration(0.25, 1, 2)) == "reference_position=0.25 rising=1 falling=2"
-    assert str(sg.JointMimic(0.5, 2, "joint_a")) == "joint_name=joint_a offset=0.5 multiplier=2"
+    assert str(sg.JointMimic(0.5, 2, "joint_a")) == "joint_id=joint_a offset=0.5 multiplier=2"
 
 
 def test_joint_value_types_repr_unchanged():
@@ -349,10 +349,10 @@ def test_set_allowed_collision_matrix_shares_the_matrix():
     acm = tesseract_common.AllowedCollisionMatrix()
     acm.addAllowedCollision("link_1", "link_2", "adjacent")
     g.setAllowedCollisionMatrix(acm)
-    assert g.isCollisionAllowed("link_1", "link_2")
+    assert g.isCollisionAllowed(("link_1", "link_2"))
     # the graph keeps the Python object's shared_ptr: later edits to acm are edits to the graph's
     acm.addAllowedCollision("link_2", "link_3", "test")
-    assert g.isCollisionAllowed("link_2", "link_3")
+    assert g.isCollisionAllowed(("link_2", "link_3"))
 
 
 def test_set_allowed_collision_matrix_refuses_none():
@@ -361,8 +361,8 @@ def test_set_allowed_collision_matrix_refuses_none():
     g.addAllowedCollision("link_1", "link_2", "adjacent")
     with pytest.raises(TypeError):
         g.setAllowedCollisionMatrix(None)
-    assert g.isCollisionAllowed("link_1", "link_2")
-    assert not g.isCollisionAllowed("link_1", "link_3")
+    assert g.isCollisionAllowed(("link_1", "link_2"))
+    assert not g.isCollisionAllowed(("link_1", "link_3"))
 
 
 def test_get_adjacency_map():
