@@ -83,7 +83,9 @@ class Trajectory:
         """Build from a planned program, descending into child composites.
 
         State waypoints keep their time; joint waypoints carry none, so their index is
-        their time.
+        their time. So is a state waypoint's index when every time is zero: the program
+        was not time-parameterized and would otherwise have no duration. Columns follow
+        the first waypoint's joint order, whatever order later waypoints name them in.
 
         Args:
             composite: Planner output, e.g. `PlanningResult.raw_results`.
@@ -94,6 +96,7 @@ class Trajectory:
         Raises:
             EmptyTrajectoryError: no move instruction.
             UnplannedWaypointError: a move has a Cartesian waypoint.
+            TrajectoryShapeError: waypoints name different joints, or times decrease.
         """
         joint_names: list[str] | None = None
         rows: list[NDArray[np.float64]] = []
@@ -113,10 +116,17 @@ class Trajectory:
                 )
             if joint_names is None:
                 joint_names = list(names)
-            rows.append(np.asarray(q, dtype=np.float64).ravel())
+            row = dict(zip(names, np.asarray(q, dtype=np.float64).ravel()))
+            if row.keys() != set(joint_names):
+                raise TrajectoryShapeError(
+                    f"move {index} names joints {sorted(row)}, the first names {joint_names}"
+                )
+            rows.append(np.array([row[name] for name in joint_names]))
             times.append(t)
         if joint_names is None:
             raise EmptyTrajectoryError("no state or joint waypoint in the program")
+        if not any(times):
+            times = [float(index) for index in range(len(times))]
         return cls.build(joint_names, np.stack(rows), times)
 
     @property
