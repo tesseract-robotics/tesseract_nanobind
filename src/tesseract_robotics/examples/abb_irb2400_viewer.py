@@ -4,10 +4,14 @@ ABB IRB2400 motion planning example with viewer.
 This example demonstrates:
 - Loading robot from URDF/SRDF
 - OMPL motion planning
-- TrajOpt trajectory optimization (optional, used if available)
-- Time parameterization with TOTG (disabled - see note in code)
+- TrajOpt trajectory optimization
+- Time parameterization with TOTG
 - Trajectory visualization
 """
+
+from pathlib import Path
+
+import numpy as np
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
@@ -35,38 +39,23 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    ProfileDictionary_addTrajOptCompositeProfile,
+    ProfileDictionary_addTrajOptPlanProfile,
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultPlanProfile,
+    TrajOptMotionPlanner,
+)
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TOTGCompositeProfile,
 )
-from tesseract_robotics.viewer import TesseractViewer
-
-# TrajOpt imports - optional, skip if not available
-try:
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-        TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
-        TrajOptMotionPlanner,
-    )
-
-    TRAJOPT_AVAILABLE = True
-except ImportError:
-    TRAJOPT_AVAILABLE = False
-
-import sys
-from pathlib import Path
-
-import numpy as np
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
 
-def main():
-    HEADLESS = "pytest" in sys.modules
-
+def run():
     # --8<-- [start:load_robot]
     # Load robot
     locator = GeneralResourceLocator()
@@ -88,16 +77,7 @@ def main():
     manip_info.working_frame = "base_link"
     # --8<-- [end:load_robot]
 
-    viewer = None
-    if not HEADLESS:
-        viewer = TesseractViewer()
-        viewer.update_environment(t_env, [0, 0, 0])
-
     joint_names = [f"joint_{i + 1}" for i in range(6)]
-    if viewer:
-        viewer.update_joint_positions(joint_names, np.array([1, -0.2, 0.01, 0.3, -0.5, 1]))
-        viewer.start_serve_background()
-
     t_env.setState(joint_names, np.ones(6) * 0.1)
 
     # Define waypoints
@@ -148,74 +128,61 @@ def main():
     # --8<-- [end:plan_and_animate]
 
     # TrajOpt trajectory optimization for smooth trajectories
-    trajopt_success = False
-    if TRAJOPT_AVAILABLE:
-        print("TrajOpt available - running trajectory optimization...")
-        trajopt_plan_profile = TrajOptDefaultPlanProfile()
-        trajopt_composite_profile = TrajOptDefaultCompositeProfile()
+    trajopt_plan_profile = TrajOptDefaultPlanProfile()
+    trajopt_composite_profile = TrajOptDefaultCompositeProfile()
 
-        trajopt_profiles = ProfileDictionary()
-        # Use helper functions for cross-module profile registration
-        ProfileDictionary_addTrajOptPlanProfile(
-            trajopt_profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_plan_profile
-        )
-        ProfileDictionary_addTrajOptCompositeProfile(
-            trajopt_profiles,
-            TRAJOPT_DEFAULT_NAMESPACE,
-            "DEFAULT",
-            trajopt_composite_profile,
-        )
+    trajopt_profiles = ProfileDictionary()
+    # Use helper functions for cross-module profile registration
+    ProfileDictionary_addTrajOptPlanProfile(
+        trajopt_profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_plan_profile
+    )
+    ProfileDictionary_addTrajOptCompositeProfile(
+        trajopt_profiles,
+        TRAJOPT_DEFAULT_NAMESPACE,
+        "DEFAULT",
+        trajopt_composite_profile,
+    )
 
-        trajopt_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
+    trajopt_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
 
-        trajopt_request = PlannerRequest()
-        trajopt_request.instructions = interpolated_results_instruction
-        trajopt_request.env = t_env
-        trajopt_request.profiles = trajopt_profiles
+    trajopt_request = PlannerRequest()
+    trajopt_request.instructions = interpolated_results_instruction
+    trajopt_request.env = t_env
+    trajopt_request.profiles = trajopt_profiles
 
-        trajopt_response = trajopt_planner.solve(trajopt_request)
-        if trajopt_response.successful:
-            print("TrajOpt optimization successful!")
-            final_results_instruction = trajopt_response.results
-            trajopt_success = True
-        else:
-            print(f"TrajOpt optimization failed: {trajopt_response.message}")
-            print("Falling back to interpolated OMPL results")
-            final_results_instruction = interpolated_results_instruction
-    else:
-        print("TrajOpt not available - using interpolated OMPL results")
-        final_results_instruction = interpolated_results_instruction
+    trajopt_response = trajopt_planner.solve(trajopt_request)
+    assert trajopt_response.successful, f"TrajOpt failed: {trajopt_response.message}"
+    final_results_instruction = trajopt_response.results
 
-    # Time parameterization - only works with TrajOpt output (StateWaypointPoly)
-    # OMPL returns JointWaypointPoly which InstructionsTrajectory doesn't support
-    # 0.33 API: compute() takes (CompositeInstruction, Environment, ProfileDictionary)
-    if trajopt_success:
-        print("Running time parameterization on TrajOpt results...")
-        time_parameterization = TimeOptimalTrajectoryGeneration()
+    # Time parameterization of the TrajOpt output (StateWaypoints)
+    time_parameterization = TimeOptimalTrajectoryGeneration()
 
-        # Create profile with velocity/acceleration scaling
-        totg_profile = TOTGCompositeProfile()
-        totg_profile.max_velocity_scaling_factor = 1.0
-        totg_profile.max_acceleration_scaling_factor = 1.0
+    # Create profile with velocity/acceleration scaling
+    totg_profile = TOTGCompositeProfile()
+    totg_profile.max_velocity_scaling_factor = 1.0
+    totg_profile.max_acceleration_scaling_factor = 1.0
 
-        # Create profile dictionary
-        time_profiles = ProfileDictionary()
-        time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
+    # Create profile dictionary
+    time_profiles = ProfileDictionary()
+    time_profiles.addProfile("TOTG", "DEFAULT", totg_profile)
 
-        if time_parameterization.compute(final_results_instruction, t_env, time_profiles):
-            print("Time parameterization successful!")
-        else:
-            print("Time parameterization failed")
+    assert time_parameterization.compute(final_results_instruction, t_env, time_profiles)
 
-    # Trajectory visualization - util.py now supports both StateWaypointPoly and JointWaypointPoly
-    if viewer:
-        viewer.update_trajectory(final_results_instruction)
-        viewer.plot_trajectory(final_results_instruction, manip_info, axes_length=0.05)
-
-    planner_type = "OMPL + TrajOpt" if trajopt_success else "OMPL"
-    print(f"{planner_type} planning completed successfully!")
+    print("OMPL + TrajOpt planning completed successfully!")
     print(f"Number of waypoints: {final_results_instruction.size()}")
-    if viewer:
+    return {"env": t_env, "trajectory": final_results_instruction, "manip_info": manip_info}
+
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        viewer.update_trajectory(results["trajectory"])
+        viewer.plot_trajectory(results["trajectory"], results["manip_info"], axes_length=0.05)
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
 

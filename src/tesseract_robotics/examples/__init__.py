@@ -1,5 +1,5 @@
 # Examples package
-from .abb_irb2400_viewer import main as abb_irb2400_viewer
+from .abb_irb2400_viewer import run as abb_irb2400_viewer
 from .basic_cartesian_example import run as basic_cartesian_example
 from .car_seat_example import run as car_seat_example
 from .chain_example import run as chain_example
@@ -23,10 +23,10 @@ from .puzzle_piece_auxillary_axes_example import run as puzzle_piece_auxillary_a
 from .raster_example import run as raster_example
 from .scene_graph_example import run as scene_graph_example
 from .state_solver_example import run as state_solver_example
-from .shapes_viewer import main as shapes_viewer
+from .shapes_viewer import run as shapes_viewer
 from .tesseract_collision_example import main as tesseract_collision_example
 from .tesseract_kinematics_example import main as tesseract_kinematics_example
-from .tesseract_material_mesh_viewer import main as tesseract_material_mesh_viewer
+from .tesseract_material_mesh_viewer import run as tesseract_material_mesh_viewer
 from .trajectory_collision_example import run as trajectory_collision_example
 
 # from .twc_workcell_positioner_viewer import run as twc_workcell_positioner_viewer

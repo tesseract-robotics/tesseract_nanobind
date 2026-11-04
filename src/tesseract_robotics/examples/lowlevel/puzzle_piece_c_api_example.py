@@ -22,7 +22,6 @@ C++ reference values:
 """
 
 import csv
-import sys
 
 import numpy as np
 
@@ -41,10 +40,6 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultPlanProfile,
 )
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
@@ -111,7 +106,7 @@ def make_puzzle_tool_poses(robot):
     return poses
 
 
-def main():
+def run():
     # Load puzzle_piece_workcell: KUKA IIWA 7-DOF arm with grinder tool
     # URDF defines: part frame (workpiece), grinder_frame (TCP)
     robot = Robot.from_urdf(
@@ -230,16 +225,20 @@ def main():
     print("Planning successful!")
     print(f"Trajectory has {len(result)} waypoints")
 
-    # Optional: visualize with viewer
-    if TesseractViewer is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(robot.env, [0, 0, 0])
-        viewer.update_trajectory(result.raw_results)
-        viewer.start_serve_background()
-        input("Press Enter to exit...")
+    return {"env": robot.env, "success": True, "trajectory": result.raw_results}
 
-    return True
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        viewer.update_trajectory(results["trajectory"])
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
+    return results["success"]
 
 
 if __name__ == "__main__":

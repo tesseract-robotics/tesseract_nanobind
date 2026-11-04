@@ -22,9 +22,9 @@ Pipeline
    collision cost/constraint disabled, once with the default profile. The two
    trajectories share start/goal/waypoint-count; only collision handling
    differs.
-5. Animate the chosen trajectory in ``TesseractViewer``; press ``t``-Enter to
-   toggle (robot tints red for the colliding plan, green for the collision-
-   aware plan).
+5. Animate the chosen trajectory in ``TesseractViewer``; the "Trajectory"
+   dropdown switches between them (robot tints red for the colliding plan,
+   green for the collision-aware plan).
 
 Notes
 -----
@@ -67,9 +67,9 @@ from tesseract_robotics.tesseract_geometry import (
     createOctree,
 )
 
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
+# Labels of the viewer's trajectory dropdown.
+COLLIDING_LABEL = "colliding (red)"
+AWARE_LABEL = "collision-aware (green)"
 
 
 def _load_cloud_xyz(path: Path) -> np.ndarray:
@@ -339,69 +339,54 @@ def main() -> int:
     result = results["result"]
     robot = results["robot"]
 
-    if TesseractViewer is not None and "pytest" not in sys.modules:
-        viewer = TesseractViewer()
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
 
-        # Tint every robot link visual so the colour reflects which path
-        # the viewer is currently animating. The octree link has no
-        # Visual.material set, so it stays at the gltf-default grey.
-        red = np.array([0.85, 0.15, 0.15, 1.0])
-        green = np.array([0.15, 0.75, 0.25, 1.0])
+    # Tint every robot link visual so the colour reflects which path the
+    # viewer is currently animating. The octree link has no Visual.material
+    # set, so it keeps the default grey.
+    red = np.array([0.85, 0.15, 0.15, 1.0])
+    green = np.array([0.15, 0.75, 0.25, 1.0])
 
-        colliding_result = results["colliding_result"]
-        have_aware = result.successful and result.raw_results is not None
-        have_colliding = colliding_result.successful and colliding_result.raw_results is not None
+    colliding_result = results["colliding_result"]
+    have_aware = result.successful and result.raw_results is not None
+    have_colliding = colliding_result.successful and colliding_result.raw_results is not None
 
-        # The viewer prefers Visual.material.color over the mesh's intrinsic
-        # material when both are set. Mutating link.visual[i].material.color
-        # and re-calling update_environment is enough to recolor a URDF-loaded
-        # robot live — that's how we flip the IRB2400 between red and green
-        # without rebuilding anything.
-        def _tint_robot(rgba: np.ndarray) -> None:
-            for name in robot.env.getLinkNames():
-                if name == "pcd_octree":
-                    continue
-                for v in robot.env.getLink(name).visual:
-                    if v.material is not None:
-                        v.material.color = rgba
+    # The viewer prefers Visual.material.color over the mesh's intrinsic
+    # material. Mutating link.visual[i].material.color and re-calling
+    # update_environment recolours the URDF-loaded robot live.
+    def _tint_robot(rgba: np.ndarray) -> None:
+        for name in robot.env.getLinkNames():
+            if name == "pcd_octree":
+                continue
+            for v in robot.env.getLink(name).visual:
+                if v.material is not None:
+                    v.material.color = rgba
 
-        def render(show_colliding: bool) -> str:
-            # Trajectory is bundled into the same update_environment call
-            # rather than firing update_environment + update_trajectory
-            # separately. The two separate pushes race on the browser side:
-            # refresh_scene resets the joints to rest, and the trajectory
-            # message that arrives milliseconds later doesn't restart the
-            # animation cleanly.
-            if show_colliding:
-                _tint_robot(red)
-                traj = colliding_result.raw_results if have_colliding else None
-                viewer.update_environment(robot.env, [0, 0, 0], trajectory=traj)
-                return "colliding (red)"
-            _tint_robot(green)
-            viewer.update_environment(robot.env, [0, 0, 0], trajectory=result.raw_results)
-            return "collision-aware (green)"
-
-        # Start on the colliding variant so toggling visibly turns collision
-        # avoidance on. Fall through to the collision-aware view if the
-        # colliding plan failed (e.g. ContactCheckTask aborted).
-        show_colliding = have_colliding
-        showing = render(show_colliding)
-        viewer.start_serve_background()
-        print(f"Viewer at http://localhost:8000 — showing {showing}")
-        if have_aware and have_colliding:
-            print("Press 't' + Enter to toggle colliding / collision-aware; Enter alone to exit.")
-            while True:
-                cmd = input("> ").strip().lower()
-                if not cmd:
-                    break
-                if cmd in ("t", "toggle"):
-                    show_colliding = not show_colliding
-                    showing = render(show_colliding)
-                    print(f"Now showing: {showing}")
-                else:
-                    print("Unknown command; 't'+Enter to toggle, Enter to exit.")
+    def render(viewer: TesseractViewer, label: str) -> None:
+        if label == COLLIDING_LABEL:
+            _tint_robot(red)
+            viewer.update_environment(robot.env)
+            viewer.update_trajectory(colliding_result.raw_results)
         else:
-            input("Press Enter to exit...")
+            _tint_robot(green)
+            viewer.update_environment(robot.env)
+            viewer.update_trajectory(result.raw_results)
+
+    labels = [
+        label
+        for label, have in ((COLLIDING_LABEL, have_colliding), (AWARE_LABEL, have_aware))
+        if have
+    ]
+    with TesseractViewer() as viewer:
+        if labels:
+            # Start on the colliding variant so switching visibly turns collision avoidance on.
+            render(viewer, labels[0])
+            dropdown = viewer.server.gui.add_dropdown("Trajectory", labels, initial_value=labels[0])
+            dropdown.on_update(lambda _event: render(viewer, dropdown.value))
+        else:
+            viewer.update_environment(robot.env)
+        print(f"Viewer at {viewer.url} — switch trajectories with the 'Trajectory' dropdown")
+        input("Press Enter to exit...")
 
     return 0 if result.successful else 1
 

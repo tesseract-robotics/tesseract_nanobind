@@ -23,7 +23,6 @@ Robot Configuration:
 """
 
 import csv
-import sys
 
 import numpy as np
 
@@ -44,10 +43,6 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptOSQPSolverProfile,
 )
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
@@ -174,7 +169,7 @@ def create_profiles():
     return profiles
 
 
-def main():
+def run():
     """
     Main planning workflow:
     1. Load 9-DOF workcell (arm + positioner)
@@ -264,16 +259,20 @@ def main():
     print("Planning successful!")
     print(f"Trajectory has {len(result)} waypoints")
 
-    # Optional: visualize with viewer
-    if TesseractViewer is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(robot.env, [0, 0, 0])
-        viewer.update_trajectory(result.raw_results)
-        viewer.start_serve_background()
-        input("Press Enter to exit...")
+    return {"env": robot.env, "success": True, "trajectory": result.raw_results}
 
-    return True
+
+def main():
+    results = run()
+
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        viewer.update_trajectory(results["trajectory"])
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
+    return results["success"]
 
 
 if __name__ == "__main__":

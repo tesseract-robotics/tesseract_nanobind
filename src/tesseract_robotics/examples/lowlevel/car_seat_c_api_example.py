@@ -28,8 +28,6 @@ Mesh decomposition rationale:
 Based on: tesseract_examples/src/car_seat_example.cpp
 """
 
-import sys
-
 import numpy as np
 
 from tesseract_robotics.planning import (
@@ -67,11 +65,6 @@ from tesseract_robotics.tesseract_scene_graph import (
     Visual,
 )
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
-
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
@@ -483,13 +476,12 @@ def run():
 def main():
     results = run()
 
-    # Optional: visualize with viewer
-    if TesseractViewer is not None:
-        print("\nStarting viewer at http://localhost:8000")
-        viewer = TesseractViewer()
-        viewer.update_environment(results["robot"].env, [0, 0, 0])
+    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
         viewer.update_trajectory(results["place_result"].raw_results)
-        viewer.start_serve_background()
+        print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 
     print("\nDone!")

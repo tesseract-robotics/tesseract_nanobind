@@ -14,8 +14,6 @@ import argparse
 import math
 import os
 import re
-import sys
-import time
 from pathlib import Path
 from typing import override
 
@@ -23,7 +21,6 @@ import numpy as np
 
 from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.viewer import TesseractViewer
 
 
 def _find_twc_support() -> Path:
@@ -151,50 +148,28 @@ WORKCELLS = {
 }
 
 
-def animate_joints(viewer, workcell: str, duration: float = 30.0, fps: float = 30.0):
-    """Animate robot joints with sinusoidal motion."""
+def animation_rows(workcell: str, duration: float = 60.0, fps: float = 30.0):
+    """Sinusoidal joint motion, one row `[q..., t]` per frame.
+
+    Returns:
+        `(joint_names, rows)`.
+    """
     animated_joints = WORKCELLS[workcell]["joints"]
-
-    # Animation loop
-    dt = 1.0 / fps
-    start_time = time.time()
-
-    print(f"Animating joints for {duration}s... Press Ctrl+C to stop.")
-    try:
-        while time.time() - start_time < duration:
-            t = time.time() - start_time
-
-            # Compute joint positions using sinusoidal motion at different frequencies
-            names = []
-            positions = []
-            for i, (name, (lo, hi)) in enumerate(animated_joints.items()):
-                # Each joint oscillates at a different frequency for visual interest
-                freq = 0.2 + i * 0.05
-                mid = (lo + hi) / 2
-                amp = (hi - lo) / 2
-                pos = mid + amp * math.sin(2 * math.pi * freq * t)
-                names.append(name)
-                positions.append(pos)
-
-            viewer.update_joint_positions(names, np.array(positions))
-            time.sleep(dt)
-    except KeyboardInterrupt:
-        print("\nAnimation stopped.")
+    names = list(animated_joints)
+    rows = []
+    for t in np.arange(0.0, duration, 1.0 / fps):
+        row = []
+        for i, (lo, hi) in enumerate(animated_joints.values()):
+            # Each joint oscillates at a different frequency for visual interest
+            freq = 0.2 + i * 0.05
+            mid = (lo + hi) / 2
+            amp = (hi - lo) / 2
+            row.append(mid + amp * math.sin(2 * math.pi * freq * t))
+        rows.append([*row, t])
+    return names, np.array(rows)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="TWC Workcell Viewer")
-    parser.add_argument(
-        "workcell",
-        nargs="?",
-        default="rail",
-        choices=list(WORKCELLS.keys()),
-        help="Workcell to load (default: rail)",
-    )
-    args = parser.parse_args()
-
-    headless = "pytest" in sys.modules
-    workcell = args.workcell
+def run(workcell: str = "rail"):
     config = WORKCELLS[workcell]
 
     # --8<-- [start:load_workcell]
@@ -220,30 +195,37 @@ def main():
     else:
         print("SRDF not found, loading URDF only")
         success = t_env.init(urdf_content, locator)
-
-    if not success:
-        print("ERROR: Failed to initialize environment")
-        sys.exit(1)
+    assert success, f"failed to initialize the {workcell} workcell"
     # --8<-- [end:load_workcell]
 
     print(f"Environment initialized: {t_env.getName()}")
     print(f"Links: {len(list(t_env.getLinkNames()))}")
     print(f"Joints: {len(list(t_env.getJointNames()))}")
+    return {"env": t_env, "locator": locator, "workcell": workcell}
 
-    if not headless:
-        print("\nStarting viewer at http://127.0.0.1:8000 ...")
-        viewer = TesseractViewer()
-        viewer.update_environment(t_env, [0, 0, 0])
-        viewer.start_serve_background()
 
-        # Animate joints
-        animate_joints(viewer, workcell, duration=60.0)
+def main():
+    parser = argparse.ArgumentParser(description="TWC Workcell Viewer")
+    parser.add_argument(
+        "workcell",
+        nargs="?",
+        default="rail",
+        choices=list(WORKCELLS.keys()),
+        help="Workcell to load (default: rail)",
+    )
+    args = parser.parse_args()
+    results = run(args.workcell)
 
-        print("\nAnimation complete. Press Enter to exit...")
-        input()
-        viewer.close()
-    else:
-        print("twc_workcell_positioner_viewer.py: PASSED (headless)")
+    from tesseract_robotics.viewer import (  # viser: Python >= 3.11 (#369)
+        TesseractViewer,
+        Trajectory,
+    )
+
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["env"])
+        viewer.update_trajectory(Trajectory.from_rows(*animation_rows(args.workcell)))
+        print(f"Viewer at {viewer.url}")
+        input("Press Enter to exit...")
 
 
 if __name__ == "__main__":
