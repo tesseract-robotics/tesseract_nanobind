@@ -400,7 +400,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def("condensedSummary",
              [](const tc::ContactTrajectoryResults& self) { return self.condensedSummary().str(); })
         .def_rw("steps", &tc::ContactTrajectoryResults::steps)
-        .def_rw("joint_ids", &tc::ContactTrajectoryResults::joint_ids)
+        .def_rw("joint_ids", &tc::ContactTrajectoryResults::joint_ids, nb::rv_policy::copy)
         .def_rw("total_steps", &tc::ContactTrajectoryResults::total_steps);
 
     // ========== ContactResultValidator ==========
@@ -442,7 +442,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("pair_margin_data", &tc::ContactManagerConfig::pair_margin_data)
         .def_rw("acm", &tc::ContactManagerConfig::acm)
         .def_rw("acm_override_type", &tc::ContactManagerConfig::acm_override_type)
-        .def_rw("modify_object_enabled", &tc::ContactManagerConfig::modify_object_enabled)
+        .def_rw("modify_object_enabled", &tc::ContactManagerConfig::modify_object_enabled, nb::rv_policy::copy)
         .def("incrementMargins", &tc::ContactManagerConfig::incrementMargins, "increment"_a)
         .def("scaleMargins", &tc::ContactManagerConfig::scaleMargins, "scale"_a)
         .def("validate", &tc::ContactManagerConfig::validate);
