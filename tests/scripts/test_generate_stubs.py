@@ -19,11 +19,19 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_SCRIPT = REPO_ROOT / "scripts" / "generate_stubs.py"
 
-_spec = importlib.util.spec_from_file_location("generate_stubs", _SCRIPT)
-_mod = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_mod)
+
+def _load(name: str):
+    """`scripts/<name>.py` as module `name`; registered so a sibling script can import it."""
+    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_widen = _load("widen_implicit_id_stubs")
+_mod = _load("generate_stubs")
 
 MODULES = _mod.discover_modules()
 
@@ -58,6 +66,14 @@ def test_stub_is_valid_python(module):
 def test_stub_has_no_std_type_leak(module):
     leaks = PLATFORM_TYPE_LEAK.findall(_mod.stub_path(module).read_text(encoding="utf-8"))
     assert not leaks, f"unconverted std::/Eigen:: types in {module}: {leaks}"
+
+
+@pytest.mark.parametrize("module", MODULES)
+def test_stub_id_params_are_widened(module):
+    """generate_stubs.py widens `LinkId` / `JointId` / `LinkIdPair` parameters to the
+    `str` / `tuple` nanobind converts implicitly; a committed stub is its fixed point."""
+    text = _mod.stub_path(module).read_text(encoding="utf-8")
+    assert _widen.widen(text) == text
 
 
 def test_continuous_manager_geometry_getters_declared():

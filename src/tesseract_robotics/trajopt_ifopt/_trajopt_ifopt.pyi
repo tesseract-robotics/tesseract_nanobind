@@ -388,14 +388,18 @@ class CollisionCoeffData:
 
     def getDefaultCollisionCoeff(self) -> float: ...
 
-    def setCollisionCoeff(self, obj1: str, obj2: str, collision_coeff: float) -> None: ...
+    @overload
+    def setCollisionCoeff(self, obj1: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, obj2: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, collision_coeff: float) -> None: ...
 
-    def getCollisionCoeff(self, obj1: str, obj2: str) -> float: ...
+    @overload
+    def setCollisionCoeff(self, pair: tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair | tuple[str, str], collision_coeff: float) -> None: ...
 
-    def getCollisionCoeffPairData(self) -> dict[tuple[str, str], float]:
-        """Every pair with a coefficient: {(link_a, link_b): coeff}"""
+    def getCollisionCoeff(self, pair: tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair | tuple[str, str]) -> float: ...
 
-    def getPairsWithZeroCoeff(self) -> set[tuple[str, str]]:
+    def getCollisionCoeffPairData(self) -> dict[tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair, float]:
+        """Every pair with a coefficient: {LinkIdPair: coeff}"""
+
+    def getPairsWithZeroCoeff(self) -> set[tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair]:
         """The pairs whose coefficient is 0 (collision checking switched off)"""
 
 class TrajOptCollisionConfig:
@@ -550,10 +554,10 @@ class GradientResultsSet:
     def __init__(self, reserve: int) -> None: ...
 
     @property
-    def key(self) -> tuple[str, str]: ...
+    def key(self) -> tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair: ...
 
     @key.setter
-    def key(self, arg: tuple[str, str], /) -> None: ...
+    def key(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair | tuple[str, str], /) -> None: ...
 
     @property
     def shape_key(self) -> tuple[int, int]: ...
@@ -620,9 +624,6 @@ class DiscreteCollisionEvaluator:
         Check collisions at dof_vals, keeping at most max_allowed contacts per link pair; returns the contacts and their gradient result sets
         """
 
-    def getGradient(self, dofvals: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], contact_result: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResult) -> GradientResults:
-        """Gradient of one contact at dofvals"""
-
     def getJointGroup(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup: ...
 
     def getCollisionMarginBuffer(self) -> float: ...
@@ -649,9 +650,6 @@ class ContinuousCollisionEvaluator:
         """
         Check collisions along the segment dof_vals0 -> dof_vals1, keeping at most max_allowed contacts per link pair; returns the contacts and their gradient result sets
         """
-
-    def calcGradientData(self, dof_vals0: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], dof_vals1: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], contact_results: tesseract_robotics.tesseract_collision._tesseract_collision.ContactResult) -> GradientResults:
-        """Gradient of one contact along the segment dof_vals0 -> dof_vals1"""
 
     def getJointGroup(self) -> tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup: ...
 
@@ -749,18 +747,18 @@ class CartLineInfo:
     def manip(self, arg: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, /) -> None: ...
 
     @property
-    def source_frame(self) -> str:
+    def source_frame(self) -> tesseract_robotics.tesseract_common._tesseract_common.LinkId:
         """TCP frame"""
 
     @source_frame.setter
-    def source_frame(self, arg: str, /) -> None: ...
+    def source_frame(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, /) -> None: ...
 
     @property
-    def target_frame(self) -> str:
+    def target_frame(self) -> tesseract_robotics.tesseract_common._tesseract_common.LinkId:
         """Reference frame"""
 
     @target_frame.setter
-    def target_frame(self, arg: str, /) -> None: ...
+    def target_frame(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, /) -> None: ...
 
     @property
     def source_frame_offset(self) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
@@ -869,18 +867,18 @@ class InverseKinematicsInfo:
     def manip(self, arg: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.KinematicGroup, /) -> None: ...
 
     @property
-    def working_frame(self) -> str:
+    def working_frame(self) -> tesseract_robotics.tesseract_common._tesseract_common.LinkId:
         """Working frame (not currently used)"""
 
     @working_frame.setter
-    def working_frame(self, arg: str, /) -> None: ...
+    def working_frame(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, /) -> None: ...
 
     @property
-    def tcp_frame(self) -> str:
+    def tcp_frame(self) -> tesseract_robotics.tesseract_common._tesseract_common.LinkId:
         """TCP frame (not currently used)"""
 
     @tcp_frame.setter
-    def tcp_frame(self, arg: str, /) -> None: ...
+    def tcp_frame(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, /) -> None: ...
 
     @property
     def tcp_offset(self) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
