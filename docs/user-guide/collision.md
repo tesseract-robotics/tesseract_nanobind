@@ -156,7 +156,7 @@ manager = env.getDiscreteContactManager()
 # By joint group...
 results, contacts = checkTrajectory(manager, env.getJointGroup("manipulator"), traj, config)
 # ...or by state solver + joint names (same order as the trajectory columns)
-names = env.getGroupJointNames("manipulator")
+names = env.getGroupJointIds("manipulator")
 results, contacts = checkTrajectory(manager, env.getStateSolver(), names, traj, config)
 
 if results:  # ContactTrajectoryResults is truthy when any step collided

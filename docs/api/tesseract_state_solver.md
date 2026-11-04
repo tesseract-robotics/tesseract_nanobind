@@ -9,9 +9,9 @@ import numpy as np
 from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
 
 solver = OFKTStateSolver(scene_graph)
-names = solver.getActiveJointNames()
+names = solver.getActiveJointIds()
 
-solver.setState(np.zeros(len(names)))           # every active joint, in getActiveJointNames() order
+solver.setState(np.zeros(len(names)))           # every active joint, in getActiveJointIds() order
 solver.setState({names[0]: 0.3})                # by name
 solver.setState(names[:1], np.array([0.3]))     # names and values
 state = solver.getState()                       # current SceneState

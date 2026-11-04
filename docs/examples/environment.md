@@ -143,7 +143,7 @@ queries, timestamps, and TCP lookup.
 
 A `ReplaceJointCommand` turns `joint_a1` into a FLOATING joint at x = 1.25, the
 first step of upstream's floating-joint test (`state_solver_test_suite.h:766–820`).
-A floating joint has no joint value, so it leaves `getActiveJointNames()`; its
+A floating joint has no joint value, so it leaves `getActiveJointIds()`; its
 pose is read with `getCurrentFloatingJointValues()`, for all floating joints or
 for the names given. The command moves the revision from 3 to 4; the init
 revision stays 3.
@@ -173,7 +173,7 @@ joint adds no motion of its own.
 
 `getState` with arguments computes a state for other joint values and floating
 values and leaves the environment's own state as it was. `getLinkTransforms()`
-lists the current state in `getLinkNames()` order; with joint names and values
+lists the current state in `getLinkIds()` order; with joint names and values
 (and optionally floating values) it computes, like `getState`. Each agrees with
 `getState` within upstream's precision of 1e-6 (`tesseract_environment_unit.cpp:155–158`).
 
@@ -188,8 +188,8 @@ lists the current state in `getLinkNames()` order; with joint names and values
 ### Queries
 
 `getCurrentJointValues(names)` reads joint values in the order given.
-`getActiveLinkNames(joints)` lists the links those joints move, and
-`getStaticLinkNames(joints)` the rest. `getJointGroup(name, joints)` builds a
+`getActiveLinkIds(joints)` lists the links those joints move, and
+`getStaticLinkIds(joints)` the rest. `getJointGroup(name, joints)` builds a
 `JointGroup` over any joints, whose forward kinematics match the environment's.
 `getJointLimits` returns the URDF limits; the URDF parser sets an unspecified
 acceleration to half the velocity and an unspecified jerk to 1000
@@ -203,8 +203,8 @@ their commands.
 | query | result |
 |---|---|
 | `getCurrentJointValues(["joint_a3", "joint_a2"])` | [−0.785398, 0.785398] |
-| `getActiveLinkNames(["joint_a5"])` | `link_5`, `link_6`, `link_7`, `tool0` |
-| `getStaticLinkNames(["joint_a5"])` | `base`, `base_link`, `link_1` … `link_4` |
+| `getActiveLinkIds(["joint_a5"])` | `link_5`, `link_6`, `link_7`, `tool0` |
+| `getStaticLinkIds(["joint_a5"])` | `base`, `base_link`, `link_1` … `link_4` |
 | `getJointLimits("joint_a2")` | lower −2.0942, upper 2.0942, velocity 1.4834, acceleration 0.7417, jerk 1000 |
 
 !!! note "Timestamps"

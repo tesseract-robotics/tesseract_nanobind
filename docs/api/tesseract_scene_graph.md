@@ -26,9 +26,9 @@ link = graph.getLink("base_link")
 joint = graph.getJoint("joint_1")
 
 # Kinematic queries
-child_links = graph.getLinkChildrenNames("base_link")
-moved_links = graph.getJointChildrenNames("joint_1")              # links below joint_1
-moved_links = graph.getJointChildrenNames(["joint_1", "joint_2"])  # union, sorted, no duplicates
+child_links = graph.getLinkChildrenIds("base_link")
+moved_links = graph.getJointChildrenIds("joint_1")              # links below joint_1
+moved_links = graph.getJointChildrenIds(["joint_1", "joint_2"])    # union, no duplicates, unordered
 path = graph.getShortestPath("base_link", "tool0")
 root = graph.getRoot()
 
