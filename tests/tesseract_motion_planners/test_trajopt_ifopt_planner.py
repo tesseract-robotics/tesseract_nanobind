@@ -130,7 +130,7 @@ class TestTrajOptIfoptProfiles:
         """opt_params is exposed and reports the C++ SQP defaults."""
         profile = TrajOptIfoptOSQPSolverProfile()
         assert isinstance(profile.opt_params, SQPParameters)
-        assert profile.opt_params.max_iterations == 50
+        assert profile.opt_params.max_iter == 50
         assert profile.opt_params.max_qp_solver_failures == 3
 
     def test_solver_profile_opt_params_on_base_class(self):
@@ -140,12 +140,12 @@ class TestTrajOptIfoptProfiles:
     def test_solver_profile_opt_params_in_place(self):
         """In-place writes to opt_params reach the profile (reference, not copy)."""
         profile = TrajOptIfoptOSQPSolverProfile()
-        profile.opt_params.max_iterations = 5
+        profile.opt_params.max_iter = 5
         profile.opt_params.max_qp_solver_failures = 1
         profile.opt_params.initial_trust_box_size = 0.05
         profile.opt_params.max_time = 2.5
 
-        assert profile.opt_params.max_iterations == 5
+        assert profile.opt_params.max_iter == 5
         assert profile.opt_params.max_qp_solver_failures == 1
         assert profile.opt_params.initial_trust_box_size == 0.05
         assert profile.opt_params.max_time == 2.5
@@ -153,7 +153,7 @@ class TestTrajOptIfoptProfiles:
     def test_solver_profile_opt_params_assignment(self):
         """Assigning a whole SQPParameters copies its values onto the profile."""
         params = SQPParameters()
-        params.max_iterations = 11
+        params.max_iter = 11
         params.trust_shrink_ratio = 0.2
         params.trust_expand_ratio = 2.0
         params.cnt_tolerance = 1e-3
@@ -165,7 +165,7 @@ class TestTrajOptIfoptProfiles:
         profile = TrajOptIfoptOSQPSolverProfile()
         profile.opt_params = params
 
-        assert profile.opt_params.max_iterations == 11
+        assert profile.opt_params.max_iter == 11
         assert profile.opt_params.trust_shrink_ratio == 0.2
         assert profile.opt_params.trust_expand_ratio == 2.0
         assert profile.opt_params.cnt_tolerance == 1e-3
@@ -175,8 +175,8 @@ class TestTrajOptIfoptProfiles:
         assert profile.opt_params.inflate_constraints_individually is False
 
         # Assignment copies: later edits to the source do not leak into the profile.
-        params.max_iterations = 99
-        assert profile.opt_params.max_iterations == 11
+        params.max_iter = 99
+        assert profile.opt_params.max_iter == 11
 
     def test_composite_profile_collision_config_defaults(self):
         """Both collision configs are exposed as trajopt_common::TrajOptCollisionConfig."""
@@ -407,7 +407,7 @@ class TestTrajOptIfoptPlanner:
         composite_profile.collision_constraint_config.contact_manager_config.default_margin = 0.01
 
         solver_profile = TrajOptIfoptOSQPSolverProfile()
-        solver_profile.opt_params.max_iterations = 20
+        solver_profile.opt_params.max_iter = 20
         solver_profile.opt_params.max_qp_solver_failures = 5
         solver_profile.opt_params.initial_trust_box_size = 0.1
 

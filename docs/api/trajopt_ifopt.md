@@ -68,42 +68,43 @@ vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 
 Every class below is a `ConstraintSet`. It goes into a `TrajOptQPProblem` either as a
 constraint, with `addConstraintSet`, or as a cost, with `addCostSet(set, penalty_type)`. Every
-class is accepted as a constraint. As a cost, the set's row bounds decide the penalty type:
-`SQUARED` and `ABSOLUTE` need equality bounds on every row, `HINGE` one-sided bounds, and
-`addCostSet` raises otherwise. There is no cost without a penalty type. The last column lists
-what `addCostSet` accepts. On trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x
+class is accepted as a constraint and as a cost with any penalty type: every row must be an
+equality or bounded on one side, and a set may mix the two. A two-sided range row is refused by
+`addConstraintSet` and `addCostSet` alike. There is no cost without a penalty type. On trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x
 wheel bundles (`TrajOptQPProblem` first ships in 0.35.0.9; earlier releases bind only
 `IfoptQPProblem`), the SQP models only `SQUARED` costs as it charges them: it reads an `ABSOLUTE`
 or `HINGE` cost as 0 at every QP solution, and that cost's exact value ignores its coefficient
 (see [the QP problem](trajopt_sqp.md#the-qp-problem)). tesseract-robotics/trajopt#592 fixes both;
 the fix arrives only with a wheel built on a newer trajopt (none yet).
 
-| Class | Purpose | Row bounds | As a cost |
-|---|---|---|---|
-| `JointPosConstraint` (target) | Joint values at a waypoint | equality | `SQUARED`, `ABSOLUTE` |
-| `JointPosConstraint` (bounds) | Per-joint bounds at a waypoint | a range splits into two one-sided rows (the default) | `HINGE` if every row is one-sided; `SQUARED`, `ABSOLUTE` if every row is an equality |
-| `JointVelConstraint` | Joint velocity toward a target (zero for smoothing) | equality | `SQUARED`, `ABSOLUTE` |
-| `JointAccelConstraint` | Joint acceleration toward a target | equality | `SQUARED`, `ABSOLUTE` |
-| `JointJerkConstraint` | Joint jerk toward a target | equality | `SQUARED`, `ABSOLUTE` |
-| `CartPosConstraint` (pose) | TCP pose at a waypoint | equality | `SQUARED`, `ABSOLUTE` |
-| `CartPosConstraint` (per-axis) | TCP pose with free axes and bands | per axis | see [per-axis Cartesian constraints](../user-guide/low-level-sqp.md#per-axis-cartesian-constraints) |
-| `CartLineConstraint` | TCP on a line segment between two poses | equality | `SQUARED`, `ABSOLUTE` |
-| `DiscreteCollisionConstraint` | Collision at a waypoint | one-sided (upper) | `HINGE` |
-| `DiscreteCollisionNumericalConstraint` | The same, with a numerical Jacobian | one-sided (upper) | `HINGE` |
-| `ContinuousCollisionConstraint` | Collision along the segment between two waypoints | one-sided (upper) | `HINGE` |
-| `InverseKinematicsConstraint` | Joints toward an IK solution of a target pose | equality | `SQUARED`, `ABSOLUTE` |
-| `DiscreteCollisionConstraintD` | Collision at a waypoint, one row per contact (the TrajOpt-Ifopt planner's term) | one-sided (upper) | `HINGE` |
-| `ContinuousCollisionConstraintD` | Collision along a segment, one row per contact | one-sided (upper) | `HINGE` |
-| `ContinuousCollisionNumericalConstraint` | `ContinuousCollisionConstraint` with a numerical Jacobian | one-sided (upper) | `HINGE` |
+| Class | Purpose | Row bounds |
+|---|---|---|
+| `JointPosConstraint` (target) | Joint values at a waypoint | equality |
+| `JointPosConstraint` (bounds) | Per-joint bounds at a waypoint | a range splits into two one-sided rows (the default) |
+| `JointVelConstraint` | Joint velocity toward a target (zero for smoothing) | equality |
+| `JointAccelConstraint` | Joint acceleration toward a target | equality |
+| `JointJerkConstraint` | Joint jerk toward a target | equality |
+| `CartPosConstraint` (pose) | TCP pose at a waypoint | equality |
+| `CartPosConstraint` (per-axis) | TCP pose with free axes and bands | per axis |
+| `CartLineConstraint` | TCP on a line segment between two poses | equality |
+| `DiscreteCollisionConstraint` | Collision at a waypoint | one-sided (upper) |
+| `DiscreteCollisionNumericalConstraint` | The same, with a numerical Jacobian | one-sided (upper) |
+| `ContinuousCollisionConstraint` | Collision along the segment between two waypoints | one-sided (upper) |
+| `InverseKinematicsConstraint` | Joints toward an IK solution of a target pose | equality |
+| `DiscreteCollisionConstraintD` | Collision at a waypoint, one row per contact (the TrajOpt-Ifopt planner's term) | one-sided (upper) |
+| `ContinuousCollisionConstraintD` | Collision along a segment, one row per contact | one-sided (upper) |
+| `ContinuousCollisionNumericalConstraint` | `ContinuousCollisionConstraint` with a numerical Jacobian | one-sided (upper) |
 
 The `…D` sets are dynamic: `update()` recounts their rows from the contacts it finds, and resets
 their bounds to one upper bound per row.
 
-A range row kept whole (`RangeBoundHandling.KEEP_AS_IS`) goes into neither: `addCostSet` raises,
-and a constraint raises `Unsupported bounds type!` at the first `convexify()`. Measured on trajopt
-0.35.0: each form in the table was added to a `TrajOptQPProblem` as a constraint and with each
-penalty type, then set up and convexified. That measures acceptance, not how the SQP models the
-cost.
+A range row kept whole (`RangeBoundHandling.KEEP_AS_IS`) goes into neither: both add calls raise
+`rows must have equality or one-sided bounds!`. Measured on trajopt master (`a504b22`): sets with
+equality, one-sided, mixed and range rows were added to a `TrajOptQPProblem` as a constraint and
+with each penalty type, then set up and convexified. That measures acceptance, not how the SQP
+models the cost. trajopt 0.35.0 accepted less: `SQUARED` and `ABSOLUTE` costs only with equality
+rows, `HINGE` only with one-sided rows, and a range constraint failed only at the first
+`convexify()`.
 
 A constraint has a Jacobian only once it is linked to the optimization variables:
 `addConstraintSet` / `addCostSet` link it, or call `linkWithVariables(nodes)` yourself.

@@ -235,7 +235,7 @@ for i in range(0, n_steps, 3):  # Every third waypoint
 solver.params.initial_trust_box_size = 0.01
 
 # Fewer iterations per step
-solver.params.max_iterations = 5
+solver.params.max_iter = 5
 ```
 
 ### Better quality
@@ -248,7 +248,7 @@ n_steps = 20
 # (use ContinuousCollisionConstraint + LVSContinuousCollisionEvaluator)
 
 # More iterations
-solver.params.max_iterations = 50
+solver.params.max_iter = 50
 
 # Tighter convergence
 solver.params.min_approx_improve = 1e-5

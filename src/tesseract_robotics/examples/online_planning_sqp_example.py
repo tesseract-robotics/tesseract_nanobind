@@ -110,7 +110,7 @@ def build_optimization_problem(
     )
     problem.addConstraintSet(target_constraint)
 
-    # Add velocity cost (smooth motion): squared, which needs the set's equality bounds
+    # Add velocity cost (smooth motion), squared
     vel_target = np.zeros(len(joint_names))
     vel_constraint = ti.JointVelConstraint(vel_target, vars_list, np.ones(1), "JointVelocity")
     problem.addCostSet(vel_constraint, tsqp.CostPenaltyType.SQUARED)
