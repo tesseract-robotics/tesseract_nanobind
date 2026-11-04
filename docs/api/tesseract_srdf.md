@@ -26,7 +26,7 @@ model.calibration_info.empty()                  # True: this SRDF has no calibra
 ## Named TCPs (`group_tcps`)
 
 A named TCP is a transform with a name, stored per kinematic group. It is not a link: the
-physical tip links a group can solve for are `KinematicGroup.getAllPossibleTipLinkNames()`, and
+physical tip links a group can solve for are `KinematicGroup.getAllPossibleTipLinkIds()`, and
 a link is always passed as `ManipulatorInfo.tcp_frame`. A named TCP goes in
 `ManipulatorInfo.tcp_offset`, and the TCP pose is
 

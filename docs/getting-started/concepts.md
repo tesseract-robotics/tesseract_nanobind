@@ -50,7 +50,7 @@ from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
 
 # Get the kinematic group
 manip = env.getKinematicGroup("manipulator")
-joint_names = manip.getJointNames()
+joint_names = manip.getJointIds()
 
 # Forward kinematics
 joint_values = np.array([0.0, 0.5, -0.5, 0.0, 0.5, 0.0])
