@@ -25,6 +25,9 @@ from tesseract_robotics.tesseract_task_composer import (
 )
 
 PIPELINE = "TrajOptPipeline"
+# Upper bound on one PIPELINE run, s: the bound `waitFor` already used, with margin for a cold
+# plugin load on a loaded CI runner.
+RUN_TIMEOUT_S = 60
 
 
 def _copy_of(infos: TaskComposerNodeInfoContainer) -> TaskComposerNodeInfoContainer:
@@ -141,9 +144,13 @@ class TestFuture:
         if finish == "wait":
             future.wait()
         elif finish == "waitFor":
-            assert future.waitFor(datetime.timedelta(seconds=60)) == FutureStatus.ready
+            assert future.waitFor(datetime.timedelta(seconds=RUN_TIMEOUT_S)) == FutureStatus.ready
         else:
+            deadline = time.monotonic() + RUN_TIMEOUT_S
             while not future.ready():
+                assert time.monotonic() < deadline, (
+                    f"the run did not finish within {RUN_TIMEOUT_S} s"
+                )
                 time.sleep(0.05)
         assert (sys.getrefcount(node), sys.getrefcount(executor)) == (node_refs, executor_refs)
 
