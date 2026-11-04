@@ -256,6 +256,13 @@ class TestTrajOptSQPTypes:
 
         assert solver.params.initial_trust_box_size == 0.2
 
+    def test_sum_constraint_set_violations(self):
+        """trajopt 9be7dcd: cnt_tolerance tests a set's summed violations by default, or its largest row."""
+        params = tsqp.SQPParameters()
+        assert params.sum_constraint_set_violations is True
+        params.sum_constraint_set_violations = False
+        assert params.sum_constraint_set_violations is False
+
     def test_qp_solver_status(self):
         """Test QPSolverStatus enum."""
         assert tsqp.QPSolverStatus.INITIALIZED is not None
@@ -1458,3 +1465,36 @@ class TestConvexEvaluatorArguments:
         assert len(outcomes) == 2 * len(CONVEX_EVALUATORS), proc.stdout[-500:]
         for outcome in outcomes:
             assert outcome.startswith("RAISED") and "convexify()" in outcome, outcome
+
+
+@pytest.mark.skipif(not tsqp.HAS_PIQP, reason="trajopt was built without PIQP")
+class TestPIQPSolver:
+    """PIQP, trajopt's optional interior-point QP backend (trajopt 3b3eab1, d6d3891)."""
+
+    def test_settings_are_trajopts_defaults_and_writable(self):
+        solver = tsqp.PIQPSolver()
+        defaults = tsqp.PIQPSolver.defaultSettings()
+        assert solver.settings.eps_abs == defaults.eps_abs
+        assert solver.settings.max_iter == defaults.max_iter
+        solver.settings.eps_abs = 1e-6
+        solver.settings.kkt_solver = tsqp.PIQPKKTSolver.sparse_ldlt
+        assert solver.settings.eps_abs == 1e-6
+        assert solver.settings.kkt_solver == tsqp.PIQPKKTSolver.sparse_ldlt
+
+    def test_solves_the_python_cost_set(self):
+        """The problem TestTrajOptQPProblem.test_python_cost_set solves with OSQP."""
+        nodes = ti.createNodesVariables(
+            "trajectory",
+            ["j0"],
+            [np.array([1.95]) for _ in range(4)],
+            ti.toBounds(np.array([[-10.0, 10.0]])),
+        )
+        problem = tsqp.TrajOptQPProblem(nodes)
+        problem.addCostSet(_PinCost(index=2, target=2.0), tsqp.CostPenaltyType.SQUARED)
+        problem.setup()
+        solver = tsqp.TrustRegionSQPSolver(tsqp.PIQPSolver())
+
+        solver.solve(problem)
+
+        assert solver.getStatus() == tsqp.SQPStatus.NLP_CONVERGED
+        assert nodes.getValues()[2] == pytest.approx(2.0, abs=OSQP_ABSOLUTE_TOLERANCE)

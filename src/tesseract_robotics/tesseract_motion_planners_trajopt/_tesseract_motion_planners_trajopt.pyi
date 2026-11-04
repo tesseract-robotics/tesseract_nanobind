@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
+import tesseract_robotics.trajopt_sqp._trajopt_sqp
 
 
 class TrajOptCartesianWaypointConfig:
@@ -336,6 +337,18 @@ class TrajOptOSQPSolverProfile(TrajOptSolverProfile):
 
     @update_workspace.setter
     def update_workspace(self, arg: bool, /) -> None: ...
+
+class TrajOptPIQPSolverProfile(TrajOptSolverProfile):
+    def __init__(self) -> None: ...
+
+    @property
+    def settings(self) -> tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings:
+        """PIQP settings for each QP"""
+
+    @settings.setter
+    def settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
+
+HAS_PIQP: bool
 
 def ProfileDictionary_addTrajOptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptMoveProfile) -> None:
     """Add TrajOpt move profile to ProfileDictionary"""

@@ -23,4 +23,8 @@ __all__ = [  # noqa: F405
     "TrustRegionSQPSolver",
     # Classes - callbacks
     "SQPCallback",
+    # Whether trajopt was built with PIQP
+    "HAS_PIQP",
 ]
+if HAS_PIQP:  # noqa: F405
+    __all__ += ["PIQPKKTSolver", "PIQPSettings", "PIQPSolver"]  # noqa: F405

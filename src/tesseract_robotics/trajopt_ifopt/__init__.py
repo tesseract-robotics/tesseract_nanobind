@@ -12,6 +12,9 @@ __all__ = [  # noqa: F405
     "RangeBoundHandling",
     # Cartesian position constraint
     "CartPosConstraint",
+    # Cartesian axis constraints
+    "CartAxisConeConstraint",
+    "CartAxisAlignConstraint",
     # Joint constraints
     "JointPosConstraint",
     "JointVelConstraint",
