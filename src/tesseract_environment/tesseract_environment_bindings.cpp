@@ -538,7 +538,7 @@ NB_MODULE(_tesseract_environment, m) {
 
     // ========== RemoveJointCommand ==========
     auto remove_joint_command = nb::class_<te::RemoveJointCommand, te::Command>(m, "RemoveJointCommand")
-        .def(nb::init<std::string>(), "joint_name"_a)
+        .def(nb::init<tc::JointId>(), "joint_id"_a)
         .def("getJointId", &te::RemoveJointCommand::getJointId);
     bind_value_equality(remove_joint_command);
 
@@ -554,7 +554,7 @@ NB_MODULE(_tesseract_environment, m) {
 
     // ========== RemoveLinkCommand ==========
     auto remove_link_command = nb::class_<te::RemoveLinkCommand, te::Command>(m, "RemoveLinkCommand")
-        .def(nb::init<std::string>(), "link_name"_a)
+        .def(nb::init<tc::LinkId>(), "link_id"_a)
         .def("getLinkId", &te::RemoveLinkCommand::getLinkId);
     bind_value_equality(remove_link_command);
 
@@ -627,7 +627,7 @@ NB_MODULE(_tesseract_environment, m) {
 
     // ========== RemoveAllowedCollisionLinkCommand ==========
     auto remove_allowed_collision_link_command = nb::class_<te::RemoveAllowedCollisionLinkCommand, te::Command>(m, "RemoveAllowedCollisionLinkCommand")
-        .def(nb::init<std::string>(), "link_name"_a)
+        .def(nb::init<tc::LinkId>(), "link_id"_a)
         .def("getLinkId", &te::RemoveAllowedCollisionLinkCommand::getLinkId);
     bind_value_equality(remove_allowed_collision_link_command);
 
@@ -669,35 +669,35 @@ NB_MODULE(_tesseract_environment, m) {
 
     // ========== ChangeLinkCollisionEnabledCommand ==========
     auto change_link_collision_enabled_command = nb::class_<te::ChangeLinkCollisionEnabledCommand, te::Command>(m, "ChangeLinkCollisionEnabledCommand")
-        .def(nb::init<std::string, bool>(), "link_name"_a, "enabled"_a)
+        .def(nb::init<tc::LinkId, bool>(), "link_id"_a, "enabled"_a)
         .def("getLinkId", &te::ChangeLinkCollisionEnabledCommand::getLinkId)
         .def("getEnabled", &te::ChangeLinkCollisionEnabledCommand::getEnabled);
     bind_value_equality(change_link_collision_enabled_command);
 
     // ========== ChangeLinkVisibilityCommand ==========
     auto change_link_visibility_command = nb::class_<te::ChangeLinkVisibilityCommand, te::Command>(m, "ChangeLinkVisibilityCommand")
-        .def(nb::init<std::string, bool>(), "link_name"_a, "visible"_a)
+        .def(nb::init<tc::LinkId, bool>(), "link_id"_a, "visible"_a)
         .def("getLinkId", &te::ChangeLinkVisibilityCommand::getLinkId)
         .def("getEnabled", &te::ChangeLinkVisibilityCommand::getEnabled);
     bind_value_equality(change_link_visibility_command);
 
     // ========== ChangeJointOriginCommand ==========
     auto change_joint_origin_command = nb::class_<te::ChangeJointOriginCommand, te::Command>(m, "ChangeJointOriginCommand")
-        .def(nb::init<std::string, const Eigen::Isometry3d&>(), "joint_name"_a, "origin"_a)
+        .def(nb::init<tc::JointId, const Eigen::Isometry3d&>(), "joint_id"_a, "origin"_a)
         .def("getJointId", &te::ChangeJointOriginCommand::getJointId)
         .def("getOrigin", &te::ChangeJointOriginCommand::getOrigin);
     bind_value_equality(change_joint_origin_command);
 
     // ========== ChangeLinkOriginCommand ==========
     auto change_link_origin_command = nb::class_<te::ChangeLinkOriginCommand, te::Command>(m, "ChangeLinkOriginCommand")
-        .def(nb::init<std::string, const Eigen::Isometry3d&>(), "link_name"_a, "origin"_a)
+        .def(nb::init<tc::LinkId, const Eigen::Isometry3d&>(), "link_id"_a, "origin"_a)
         .def("getLinkId", &te::ChangeLinkOriginCommand::getLinkId)
         .def("getOrigin", &te::ChangeLinkOriginCommand::getOrigin);
     bind_value_equality(change_link_origin_command);
 
     // ========== MoveJointCommand ==========
     auto move_joint_command = nb::class_<te::MoveJointCommand, te::Command>(m, "MoveJointCommand")
-        .def(nb::init<std::string, std::string>(), "joint_name"_a, "parent_link"_a)
+        .def(nb::init<tc::JointId, tc::LinkId>(), "joint_id"_a, "parent_link"_a)
         .def("getJointId", &te::MoveJointCommand::getJointId)
         .def("getParentLink", &te::MoveJointCommand::getParentLink);
     bind_value_equality(move_joint_command);
