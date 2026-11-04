@@ -98,8 +98,9 @@ pixi install
 
 ## C++ Dependencies
 
-The tesseract C++ stack arrives as two conda packages (pinned `==0.35.0`), built by
-the [tesseract-robotics channel](https://anaconda.org/tesseract-robotics):
+The tesseract C++ stack arrives as two conda packages (pinned `==0.36.0.dev20260929`,
+from the channel's `dev` label), built by the
+[tesseract-robotics channel](https://anaconda.org/tesseract-robotics):
 
 | Package | What it provides |
 | ------- | ---------------- |

@@ -11,6 +11,57 @@ Two loops share the same pinned upstream SHAs:
 | inner | `pixi run -e upstream build-upstream` | upstream C++ from git checkouts, incrementally, then the bindings | day-to-day binding work |
 | outer | `pixi run build-feedstock` | conda packages, through the tesseract-robotics-packaging feedstocks | checking the release packaging; CI |
 
+## Status
+
+The main catch-up is done. The branch is rebased onto `origin/main` at `4e3982f0`,
+every change main made since the previous rebase is ported to the 0.36 API, and main's
+tests run against it: on osx-arm64 the full suite passes, 3087 tests, in the `default`
+env against the dev-label packages. The user-facing changes are in
+[API Changes: 0.35 → 0.36](../changes-0.36.md).
+
+- **The root env is on the 0.36 dev label.** `[tool.pixi.dependencies]` pins
+  `tesseract-robotics ==0.36.0.dev20260929`, `tesseract-robotics-planning
+  ==0.36.0.dev20260929` and `trajopt ==0.36.0.dev20260930` from
+  `tesseract-robotics/label/dev`, which the workspace channel list puts at priority
+  10, so the `default` env and the `py3xx` CI envs build the 0.36 bindings with no
+  source build. The label carries only the stack packages; everything else comes from
+  conda-forge as before.
+- **Feedstock CI publishes the dev stack.** The `dev` branches of the
+  boost-plugin-loader, tesseract-robotics, trajopt and tesseract-robotics-planning
+  feedstocks build boost-plugin-loader 0.5.0, then tesseract, trajopt and planning, on
+  linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, and upload each package to
+  `tesseract-robotics/label/dev`. Each feedstock reads that label as a
+  `channel_source`, so a stage links the packages the stage before it uploaded; a
+  per-repo CI cache could not feed the next feedstock. The `upstream` (source) and
+  `packaged` envs stay as the inner loop and as a cross-check of the published
+  packages.
+
+### Merging `pixi.lock` on a rebase
+
+`pixi.lock` conflicts on every rebase onto main: main re-locks its own envs, and this
+branch adds envs main does not have (`upstream`, `packaged`) or re-locks one both
+have (`default` and the `py3xx` envs, once they moved to the dev label). Text merges
+of the lock are never right; merge it per environment.
+
+1. **Start from main's lock.** Take the rebase target's side (stage 2,
+   `git show :2:pixi.lock`) as the base and add every environment that exists only in
+   the replayed commit (stage 3), with its platforms and the package records it
+   references (a small YAML script; `merge_pixi_lock.py` in the catch-up did this).
+   Main's envs keep main's solve.
+2. **Replace re-locked envs.** For an env both sides have but the branch re-locked,
+   replace main's entry with the branch's (stage 3) and add the package records it
+   needs. Main's solve of that env is the wrong one: it pins the 0.35 packages.
+3. **Canonicalise.** Run `pixi lock`. It rewrites the file in its own order, prunes
+   records nothing references and re-solves only what the manifest no longer
+   satisfies.
+4. **Check per env.** Compare each environment against main's lock (a script that
+   loads both files and prints `same` / `DIFF` / `only-new` / `only-ref` per env;
+   `check_lock_envs.py` in the catch-up). Every env the branch did not change must be
+   `same`; every `DIFF` must be one the branch meant to re-lock.
+
+Then `git add pixi.lock` and continue the rebase. Never resolve the lock with
+`git checkout --ours` / `--theirs`: either side alone drops the other's envs.
+
 ## Layout
 
 ```text
@@ -157,15 +208,17 @@ package supersedes it.
 ## Packaged stack (#162 step 0)
 
 `pixi run -e packaged test-packaged` builds the bindings against the
-`0.36.0.dev` packages in `packaging/output` and runs the suite. It is the gate
-before anything goes to the `tesseract-robotics` channel.
+`0.36.0.dev` packages and runs the suite. The `packaged` feature now reads
+`tesseract-robotics/label/dev`, the packages feedstock CI uploads; for a local
+feedstock build, point its channel at `./packaging/output` and run
+`pixi run index-feedstock-channel` first. It was the gate before anything went to the
+channel.
 
-**Result (2026-10-04, osx-arm64): 997 passed, 3 skipped, same as the
-source-built `upstream` env**, against tesseract `0.36.0.dev20260929 _1`,
+**Result (2026-10-04, osx-arm64, local feedstock builds): 997 passed, 3 skipped, same
+as the source-built `upstream` env**, against tesseract `0.36.0.dev20260929 _1`,
 trajopt `0.36.0.dev20260930 _0`, tesseract-robotics-planning
 `0.36.0.dev20260929 _1` and boost-plugin-loader `0.4.5`. The 3 skips are the
-benchmark modules (`pytest_benchmark` isn't in the env). Logs:
-`packaging/logs/test-packaged-2.log`.
+benchmark modules (`pytest_benchmark` isn't in the env).
 
 | Run | tesseract package | Result |
 |---|---|---|
@@ -193,7 +246,7 @@ in [API Changes: 0.35 → 0.36](../changes-0.36.md).
 | tesseract_command_language | waypoint constructors | `getJointIds` / `setJointIds`, constructors take `list[JointId]` |
 | tesseract_geometry | `sdf_mesh.h` removed | `SignedDistanceField` (cherry-picked #129) |
 | tesseract_task_composer | `task_composer_keys.h` removed | `TaskComposerPortMap`, `get{Input,Output}PortMappings`, `setPortMappings`; plugin-pin warning via `TESSERACT_LOG_WARN` (upstream no longer links console_bridge) |
-| trajopt_ifopt | two-id `getCollisionCoeff` removed | `getCollisionCoeff(pair)` |
+| trajopt_ifopt | two-id `getCollisionCoeff` removed; evaluator gradients moved to `trajopt_common::getGradient` | `getCollisionCoeff(pair)`; free `getGradient` (both overloads); `getPairsWithZeroCoeff` returns `set[LinkIdPair]` (`nanobind/stl/unordered_set.h`) |
 | trajopt_sqp | violations became a struct | `ConstraintViolations {raw, weighted}` |
 
 The `tesseract_robotics.planning` layer keeps `str` in its public signatures and
@@ -276,14 +329,14 @@ runs after ours, then called by a C++ worker during finalization.
 - `planning` and `viewer` convert ids with `.name()` where they leave tesseract
   (signatures, glTF/JSON payloads).
 
-## Default environment (gate 4)
+## Default environment
 
-This branch does not build against the 0.35.0 packages, by design, until 0.36 is
-packaged. `pixi run build` (default env) fails in at least 9 binding modules
-(`packaging/logs/default-build.log`): the id API (`tesseract::common::LinkId`,
-`JointId`, `getJointIds`, …), `tesseract/common/logging.h` and
-`tesseract/geometry/impl/signed_distance_field.h` do not exist in 0.35. `main` keeps
-building and testing against 0.35.0; this branch is tested only in the `upstream`
-env. The `CMakeLists.txt` visibility change is the one branch change that would
-also apply to the default env (harmless there: 0.35 registers cereal types in the
-headers).
+The `default` env pins the 0.36 dev packages from `tesseract-robotics/label/dev`
+(see [Status](#status)), so `pixi run build` and `pixi run test` build and test this
+branch with no source build. The bindings do not build against the 0.35.0 packages,
+by design: `pixi run build` against 0.35.0 fails in at least 9 binding modules,
+because the id API (`tesseract::common::LinkId`, `JointId`, `getJointIds`, …),
+`tesseract/common/logging.h` and `tesseract/geometry/impl/signed_distance_field.h`
+do not exist in 0.35. Released wheels (0.35.0.x) are built from `main`'s 0.35
+history. The `CMakeLists.txt` visibility change applies to every env (harmless
+against 0.35, which registers cereal types in the headers).
