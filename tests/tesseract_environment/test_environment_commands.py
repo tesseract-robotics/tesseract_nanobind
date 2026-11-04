@@ -15,8 +15,10 @@ from tesseract_robotics.tesseract_common import (
     ContactManagersPluginInfo,
     GeneralResourceLocator,
     Isometry3d,
+    JointId,
     JointState,
     JointTrajectory,
+    LinkId,
 )
 from tesseract_robotics.tesseract_environment import (
     AddContactManagersPluginInfoCommand,
@@ -87,6 +89,25 @@ class TestCommandImports:
 
     def test_command_base_class(self):
         assert Command is not None
+
+
+@pytest.mark.parametrize(
+    ("make", "getter", "expected"),
+    [
+        (lambda: RemoveJointCommand(JointId("j")), "getJointId", "j"),
+        (lambda: RemoveLinkCommand(LinkId("l")), "getLinkId", "l"),
+        (lambda: RemoveAllowedCollisionLinkCommand(LinkId("l")), "getLinkId", "l"),
+        (lambda: ChangeLinkCollisionEnabledCommand(LinkId("l"), True), "getLinkId", "l"),
+        (lambda: ChangeLinkVisibilityCommand(LinkId("l"), True), "getLinkId", "l"),
+        (lambda: ChangeJointOriginCommand(JointId("j"), Isometry3d.Identity()), "getJointId", "j"),
+        (lambda: ChangeLinkOriginCommand(LinkId("l"), Isometry3d.Identity()), "getLinkId", "l"),
+        (lambda: MoveJointCommand(JointId("j"), LinkId("p")), "getJointId", "j"),
+    ],
+)
+def test_command_ctors_take_ids(make, getter, expected):
+    """0.36 command constructors take JointId / LinkId, as the getters return them."""
+    command = make()
+    assert getattr(command, getter)() == expected
 
 
 class TestAddLinkCommand:
