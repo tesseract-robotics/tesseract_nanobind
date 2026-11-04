@@ -53,7 +53,7 @@ group = env.getJointGroup("manipulator")
 
 ### Jacobians
 
-`calcJacobian` has the four C++ overloads. `base_link_name` is the frame the
+`calcJacobian` has the four C++ overloads. `base_link_id` is the frame the
 Jacobian is expressed in; `link_point` is a point in the link frame (the
 Jacobian's reference point moves there), a NumPy array of 3 floats.
 

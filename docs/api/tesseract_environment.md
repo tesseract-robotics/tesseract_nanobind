@@ -121,8 +121,8 @@ group = env.getJointGroup("manipulator")
 wrist = env.getJointGroup("wrist", ["joint_5", "joint_6"])
 
 # Links moved by the given joints, and the links they leave fixed
-moving = env.getActiveLinkNames(["joint_5", "joint_6"])
-fixed = env.getStaticLinkNames(["joint_5", "joint_6"])
+moving = env.getActiveLinkIds(["joint_5", "joint_6"])
+fixed = env.getStaticLinkIds(["joint_5", "joint_6"])
 
 # Available groups
 groups = env.getGroupNames()
@@ -258,7 +258,7 @@ carry over from an earlier call; C++ appends to the map it is given.
 from tesseract_robotics.tesseract_collision import ContactRequest
 from tesseract_robotics.tesseract_environment import checkTrajectorySegment, checkTrajectoryState
 
-names = env.getGroupJointNames("manipulator")
+names = env.getGroupJointIds("manipulator")
 start = env.getState(names, start_joints).link_transforms  # dict[str, Isometry3d]
 end = env.getState(names, end_joints).link_transforms
 
@@ -458,7 +458,7 @@ already applied.
 
 ### AddTrajectoryLinkCommand
 
-Add a link, attached to `parent_link_name`, whose collision geometry covers the robot's
+Add a link, attached to `parent_link_id`, whose collision geometry covers the robot's
 links over a `JointTrajectory` (for example to keep a planned motion clear of other
 moving objects). Each state names the joints it sets.
 
