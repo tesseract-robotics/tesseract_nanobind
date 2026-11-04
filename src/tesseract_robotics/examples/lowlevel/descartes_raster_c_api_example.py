@@ -27,6 +27,7 @@ Related Examples:
 - tesseract_planning_lowlevel_c_api_example.py - OMPL+TrajOpt via planner API
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -280,7 +281,7 @@ def run():
     }
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -290,8 +291,8 @@ def main():
         viewer.update_trajectory(results["trajectory"])
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

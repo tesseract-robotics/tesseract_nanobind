@@ -15,6 +15,7 @@ Use this low-level approach when you need:
 - To bypass the TaskComposer config system
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -213,7 +214,7 @@ def run():
     }
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -224,8 +225,8 @@ def main():
         viewer.plot_trajectory(results["trajectory"], results["manip_info"], axes_length=0.05)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

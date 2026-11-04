@@ -1,5 +1,7 @@
 """Mesh viewer example demonstrating GLB and DAE mesh loading with materials."""
 
+import sys
+
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
@@ -52,7 +54,7 @@ def run():
     return {"env": t_env, "locator": locator}
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -61,7 +63,8 @@ def main():
         viewer.update_environment(results["env"])
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

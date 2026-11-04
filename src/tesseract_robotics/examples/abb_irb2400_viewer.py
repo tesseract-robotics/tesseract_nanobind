@@ -9,6 +9,7 @@ This example demonstrates:
 - Trajectory visualization
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -173,7 +174,7 @@ def run():
     return {"env": t_env, "trajectory": final_results_instruction, "manip_info": manip_info}
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -184,7 +185,8 @@ def main():
         viewer.plot_trajectory(results["trajectory"], results["manip_info"], axes_length=0.05)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

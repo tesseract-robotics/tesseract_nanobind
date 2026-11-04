@@ -23,6 +23,7 @@ Robot Configuration:
 """
 
 import csv
+import sys
 
 import numpy as np
 
@@ -262,7 +263,7 @@ def run():
     return {"env": robot.env, "success": True, "trajectory": result.raw_results}
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -272,9 +273,8 @@ def main():
         viewer.update_trajectory(results["trajectory"])
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
-    return results["success"]
+    return 0 if results["success"] else 1
 
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    sys.exit(main())

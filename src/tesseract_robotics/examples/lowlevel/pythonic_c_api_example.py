@@ -91,7 +91,7 @@ from tesseract_robotics.planning import (
 from tesseract_robotics.tesseract_common import Quaterniond
 
 
-def main():
+def main() -> int:
     print("=" * 60)
     print("Pythonic API Example")
     print("=" * 60)
@@ -276,9 +276,8 @@ def main():
     print("Example completed!")
     print("=" * 60)
 
-    return True
+    return 0 if result.successful else 1
 
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    sys.exit(main())

@@ -69,6 +69,8 @@ Related Examples:
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import (
@@ -301,7 +303,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     }
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -313,7 +315,8 @@ def main():
         input("Press Enter to exit...")
 
     print("\nDone!")
+    return 0 if results["pick_result"].successful and results["place_result"].successful else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

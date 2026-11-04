@@ -60,6 +60,8 @@ RELATED EXAMPLES
 - lowlevel/car_seat_c_api_example.py: low-level API version with detailed comments
 """
 
+import sys
+
 import numpy as np
 
 from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
@@ -476,7 +478,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     }
 
 
-def main():
+def main() -> int:
     results = run()
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
@@ -488,7 +490,8 @@ def main():
         input("Press Enter to exit...")
 
     print("\nDone!")
+    return 0 if results["pick_result"].successful and results["place_result"].successful else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

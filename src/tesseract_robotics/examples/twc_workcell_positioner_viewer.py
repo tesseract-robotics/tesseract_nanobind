@@ -14,6 +14,7 @@ import argparse
 import math
 import os
 import re
+import sys
 from pathlib import Path
 from typing import override
 
@@ -204,7 +205,7 @@ def run(workcell: str = "rail"):
     return {"env": t_env, "locator": locator, "workcell": workcell}
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description="TWC Workcell Viewer")
     parser.add_argument(
         "workcell",
@@ -226,7 +227,8 @@ def main():
         viewer.update_trajectory(Trajectory.from_rows(*animation_rows(args.workcell)))
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
