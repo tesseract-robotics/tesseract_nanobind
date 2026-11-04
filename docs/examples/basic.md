@@ -173,12 +173,20 @@ section [Point Clouds as Collision Obstacles](../user-guide/collision.md#point-c
 
 `run()` constructs a single two-waypoint `MotionProgram` and feeds it to
 `plan_freespace(...)` twice with different `ProfileDictionary` objects —
-the default `create_trajopt_default_profiles()` for the collision-aware
-run, and a copy with `collision_cost_config.enabled` /
+the default `create_trajopt_default_profiles()` plus a larger OSQP iteration
+budget for the collision-aware run, and a copy with `collision_cost_config.enabled` /
 `collision_constraint_config.enabled` flipped off for the colliding run.
 
 Same start/goal/waypoint count, same robot, same env; only the profile
 differs, which is what makes the result fair to eyeball.
+
+!!! note "Why a larger OSQP budget?"
+    Every voxel near the arm adds rows to TrajOpt's QP. On `sample.ply`, OSQP
+    converges in about 7k iterations at 0.04 m, 19k at 0.02 m and 42k at
+    0.01 m; its default cap is 8192. Past the cap the QP ends "maximum
+    iterations reached" and TrajOpt reports `OPT_FAILED`, so the example sets
+    `max_iter` on a `TrajOptOSQPSolverProfile`. A much denser cloud can still
+    hit the example's 65536 and fails the same way.
 
 !!! note "Why a permissive `ContactCheckProfile`?"
     `TrajOptPipeline` runs a `DiscreteContactCheckTask` *after* the

@@ -1,18 +1,13 @@
 # Viewer
 
-`tesseract_robotics.viewer` provides a web-based 3D viewer for scenes and trajectories, backed by Three.js. It started life as a standalone package and is now a first-class submodule of `tesseract_robotics`.
+`tesseract_robotics.viewer` draws a tesseract environment in your browser and animates planned trajectories. It is built on [viser](https://viser.studio). Tesseract owns the kinematics: every link is one viser frame posed from `env.getState(...)`, so rails, positioners, attached objects and environment commands need no separate handling.
 
-## Installation
-
-The viewer ships with the main package. No separate install step.
-
-```python
-from tesseract_robotics.viewer import TesseractViewer
-```
+!!! note "Python >= 3.11"
+    viser needs Python 3.11 or newer (`pip` installs it, with `trimesh` and `pillow`, on those versions only). On 3.9 and 3.10 the planning API works but `import tesseract_robotics.viewer` raises `ModuleNotFoundError`. Examples import the viewer inside `main()`, so their headless `run()` works on any version.
 
 ## Basic Usage
 
-Build an `Environment`, then hand it to the viewer and start the background HTTP server at `http://localhost:8000`:
+Build an `Environment`, then hand it to the viewer. The viewer serves from construction until `close()`, at `http://127.0.0.1:8000` by default:
 
 ```python
 --8<-- "src/tesseract_robotics/examples/shapes_viewer.py:setup"
@@ -21,6 +16,8 @@ Build an `Environment`, then hand it to the viewer and start the background HTTP
 ```python
 --8<-- "src/tesseract_robotics/examples/shapes_viewer.py:serve"
 ```
+
+`TesseractViewer(port=...)` picks another port; `port=0` lets the OS choose and `viewer.url` reports it. A taken port raises `ViewerPortInUseError` instead of moving on, because a URL you were given should stay true. `TesseractViewer(host="0.0.0.0")` exposes the viewer to your network; it has no authentication.
 
 ## Visualizing a Robot
 
@@ -32,7 +29,7 @@ Load a URDF/SRDF pair via `GeneralResourceLocator`, then push the environment in
 
 ## Animating a Planned Trajectory
 
-After running a motion planner, feed the resulting `CompositeInstruction` to `update_trajectory`. The viewer animates the robot using the timestamps baked into the trajectory:
+After running a motion planner, feed the resulting `CompositeInstruction` to `update_trajectory`:
 
 ```python
 --8<-- "src/tesseract_robotics/examples/abb_irb2400_viewer.py:plan_and_animate"
@@ -41,13 +38,70 @@ After running a motion planner, feed the resulting `CompositeInstruction` to `up
 Then push the result into the viewer (from the same example):
 
 ```python
-viewer.update_trajectory(final_results_instruction)
-viewer.plot_trajectory(final_results_instruction, manip_info, axes_length=0.05)
+viewer.update_environment(results["env"])
+viewer.update_trajectory(results["trajectory"])
+viewer.plot_trajectory(results["trajectory"], results["manip_info"], axes_length=0.05)
 ```
+
+Waypoint times decide the playback speed:
+
+| Waypoints | Time used |
+|---|---|
+| State waypoints with times (time-parameterized) | their own times |
+| State waypoints all at `t = 0` (not time-parameterized) | their index, one waypoint per second |
+| Joint waypoints (they carry no time) | their index, one waypoint per second |
+
+A trajectory you computed yourself goes through `Trajectory`:
+
+```python
+from tesseract_robotics.viewer import Trajectory
+
+viewer.update_trajectory(Trajectory.build(joint_names, positions, times_s))
+# or rows of [q_1, ..., q_J, t]
+viewer.update_trajectory(Trajectory.from_rows(joint_names, rows))
+```
+
+### Playback Controls
+
+The **Playback** folder in the viewer's control panel exists from construction, so it is there for a browser that connects late.
+
+| Control | Effect |
+|---|---|
+| **Play** | Run or pause. `update_trajectory` turns it on, `update_joint_positions` off |
+| **Time [s]** | Dragging pauses playback and scrubs |
+| **Speed** | Time multiplier; 0 holds the current time |
+| **Loop** | Restart at the end, or stop on the last waypoint |
+
+Re-pushing an environment that still has the trajectory's joints keeps it playing. An environment without them drops the trajectory with a logged warning.
+
+## Markers and Custom Scene Content
+
+The viewer draws links, visuals and `plot_trajectory`. Anything else goes straight to viser through `viewer.server`. See the [viser scene API](https://viser.studio/main/server/):
+
+```python
+viewer.server.scene.add_icosphere(
+    "/markers/target", radius=0.02, color=(255, 0, 0), position=(0.8, 0.0, 0.8)
+)
+viewer.server.gui.add_button("Replan")
+```
+
+Keep markers out of `/links/`, which `update_environment` replaces.
+
+## Shading
+
+| Geometry | Shading |
+|---|---|
+| Mesh whose file has smooth normals | The file's normals, corrected for a non-uniform URDF scale |
+| Mesh with facet-only or no normals (STL) | Auto-smoothed: neighbouring faces under 30 degrees share a normal, sharper edges stay creased |
+| Textured mesh | The file's normals; never auto-smoothed, since merging vertices would orphan its UVs |
+| Sphere, cylinder, capsule, cone | Auto-smoothed, so caps keep their edge |
+| Box, octree voxels | Flat |
+
+All materials are double-sided: sheet-metal meshes often mix face windings, which would otherwise show as holes. Colour comes from the URDF `<material>` on the visual, then the mesh's own material or texture, then tesseract's default grey.
 
 ## Industrial Workcells
 
-The Tesseract Robotics Workcell Collection (TWC) ships multi-robot positioner cells. The viewer supports both rail and positioner workcell topologies:
+The Tesseract Robotics Workcell Collection (TWC) ships rail and positioner cells. Trajectories over any subset of joints, in any order, pose by their own joint names:
 
 ```python
 --8<-- "src/tesseract_robotics/examples/twc_workcell_positioner_viewer.py:load_workcell"
@@ -61,22 +115,34 @@ The Tesseract Robotics Workcell Collection (TWC) ships multi-robot positioner ce
 
 ## API Quick Reference
 
-| Method | Purpose |
+| Member | Purpose |
 |---|---|
-| `TesseractViewer(server_address=("127.0.0.1", 8000))` | Create viewer instance; spawns background event loop thread |
-| `update_environment(tesseract_env, origin_offset=[0, 0, 0])` | Load or reload a scene |
-| `update_joint_positions(joint_names, joint_positions)` | Set stationary joint state (stops any animation) |
-| `update_trajectory(tesseract_trajectory)` | Animate a `CompositeInstruction` trajectory |
-| `update_trajectory_list(joint_names, trajectory)` | Animate a raw list-of-waypoints trajectory |
-| `plot_trajectory(tesseract_trajectory, manipulator_info)` | Draw trajectory path + waypoint axes in the scene |
-| `start_serve_background()` | Start HTTP server on `server_address`; returns once the port accepts connections, raises if it cannot bind |
-| `close()` | Close every client connection, release the port, join the background thread and close its event loop; idempotent |
-| `serve_forever()` | Start the server and block until Ctrl-C, then `close()` |
-| `add_axes_marker / add_arrow_marker / add_box_marker / add_sphere_marker / add_cylinder_marker / add_capsule_marker / add_lines_marker` | Add geometric markers to the scene |
-| `clear_all_markers / clear_markers_by_tags / clear_markers_by_name` | Remove markers |
-| `save(directory)` / `save_scene_gltf(fname)` / `save_scene_glb(fname)` | Export the scene for offline viewing |
+| `TesseractViewer(host="127.0.0.1", port=8000)` | Start serving; also a context manager that calls `close()` |
+| `url` | Address to open in a browser |
+| `server` | The `viser.ViserServer`, for markers and GUI |
+| `update_environment(env)` | Replace the scene with `env` at its current state |
+| `update_joint_positions(joint_names, q)` | Show a stationary pose; stops playback |
+| `update_trajectory(trajectory)` | Animate a `CompositeInstruction` or `Trajectory` from its start |
+| `show_time(t_s)` | Pose the scene at one trajectory time |
+| `plot_trajectory(trajectory, manip_info, axes_length=0.1, color=(255, 255, 255))` | Draw the TCP path with an axes triad per waypoint |
+| `close()` | Stop playback and serving, release the port; idempotent |
+| `serve_forever()` | Block until Ctrl-C, then `close()` |
 
-For the full API, see [`tesseract_robotics.viewer` source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/viewer/tesseract_viewer.py).
+Failures raise named errors from `tesseract_robotics.viewer.errors`:
+
+| Error | When |
+|---|---|
+| `ViewerPortInUseError` | The requested port is taken |
+| `NoEnvironmentError` | `update_joint_positions`, `update_trajectory` or `plot_trajectory` before `update_environment` |
+| `NoTrajectoryError` | `show_time` before `update_trajectory` |
+| `UnknownJointError` | A joint name the environment lacks |
+| `EmptyTrajectoryError` | A trajectory without waypoints |
+| `TrajectoryShapeError` | Names, positions and times disagree, times decrease, or a program's waypoints name different joints |
+| `UnplannedWaypointError` | A program still has a Cartesian waypoint |
+| `UnsupportedGeometryError` | A visual with no mesh form (`Plane`, ...) |
+| `ViewerCloseTimeoutError` | The playback thread did not stop in `close()` |
+
+A failure during playback has no caller to raise to: it logs the traceback and pauses. Play or `update_trajectory` try again.
 
 ## Examples
 

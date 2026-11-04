@@ -81,11 +81,9 @@ When a method returns a type from another module (e.g., `Environment.getKinemati
 
 ## Viewer Trajectory Visualization - RESOLVED
 
-The `tesseract_robotics.viewer` module now supports:
-1. Both `StateWaypointPoly` and `JointWaypointPoly` waypoints (fixed in util.py)
-2. Iterating over `CompositeInstruction` using `__getitem__` (SWIG's `flatten()` not needed)
+`tesseract_robotics.viewer.Trajectory.from_composite` reads both `StateWaypointPoly` and `JointWaypointPoly` waypoints, descending into child composites.
 
-**Status:** Trajectory visualization works with OMPL planning output.
+**Status:** Trajectory visualization works with OMPL planning output. The viewer moved to viser in #367; see [Viewer](../user-guide/viewer.md) and the changelog for the API changes.
 
 ## nanobind Reference Leaks
 

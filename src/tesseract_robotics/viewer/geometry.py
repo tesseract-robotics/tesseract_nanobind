@@ -15,9 +15,7 @@ from tesseract_robotics import tesseract_geometry as tg
 from tesseract_robotics.tesseract_scene_graph import Material, Visual
 
 from .errors import UnsupportedGeometryError
-from .tesseract_env_to_gltf import (
-    _octree_voxels as octree_voxels,
-)  # moves to octree.py with the old viewer (#367)
+from .octree import octree_voxels
 
 # Icosphere refinement level: 3 → 642 vertices, a round outline at robot-cell viewing
 # distances; its shading comes from _auto_smoothed.

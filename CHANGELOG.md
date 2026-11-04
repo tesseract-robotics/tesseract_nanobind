@@ -7,6 +7,20 @@
 - **Python 3.12 is the minimum; Rhino 8 loses wheels** — `requires-python` rises from `>=3.9` to `>=3.12`. One `cp312-abi3` wheel per platform now covers 3.12, 3.13 and 3.14, including Rhino 9 (CPython 3.13). Rhino 8 (CPython 3.9) and Python 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them ([#369]; `docs/breaking-changes.md`).
 - **numpy 2.0 and scipy 1.17.1 are the minimum** — `numpy>=1.21.0` and `scipy>=1.7.0` were never tested. The scipy floor is the oldest scipy CI runs; numpy 1.x users stay on 0.35.0.8. `importlib-resources` is no longer a dependency: the viewer uses stdlib `importlib.resources` ([#369]).
 - **`planning.program.Target` and `emitters.core.events.Event` are `type` aliases** — `isinstance(x, Target)` and `typing.get_args(Target)` raise or return nothing; use `Target.__value__` or test the member classes ([#369]; `docs/breaking-changes.md`).
+- **`tesseract_robotics.viewer` is now backed by viser; the Three.js/aiohttp viewer is removed (#367)** — needs Python >= 3.11 (`viser`, `trimesh` and `pillow` install on those versions only; `aiohttp` and `importlib-resources` are gone). The viewer serves from construction and `viewer.url` is its address. See the [viewer guide](docs/user-guide/viewer.md).
+
+  | before | after |
+  | --- | --- |
+  | `TesseractViewer(server_address=("127.0.0.1", 8000))` | `TesseractViewer(host="127.0.0.1", port=8000)`; a taken port raises `ViewerPortInUseError` |
+  | `update_environment(env, origin_offset)`, `update_environment(env, trajectory=)` | `update_environment(env)`, then `update_trajectory` |
+  | `update_trajectory_list(names, rows)` | `update_trajectory(Trajectory.from_rows(names, rows))` |
+  | `start_serve_background()` | removed; serving starts in the constructor |
+  | `add_{axes,arrow,box,sphere,cylinder,capsule,lines}_marker`, `clear_all_markers`, `clear_markers_by_tags`, `clear_markers_by_name`, `send_update_markers` | `viewer.server.scene` |
+  | `save`, `save_scene_gltf`, `save_scene_glb` | removed |
+  | `ssl_context`, `examples/shapes_viewer_ssl_webxr_headset.py` | removed; viser has no TLS or WebXR |
+
+  Calls in the wrong order raise instead of passing silently: `update_joint_positions` and `update_trajectory` before an environment (`NoEnvironmentError`), `show_time` without a trajectory (`NoTrajectoryError`).
+- **Example `main()`s return exit codes** — `0` on success, `1` when planning failed. They returned `True` (console scripts exited 1 on success) or a success flag (exited 0 on failure), so `tesseract_*_example` commands now report failure correctly. `tesseract_reeds_shepp_example` targets a new `main`.
 - **A Python `OutputHandler` gets its messages asynchronously** — on a delivery thread, in order, never inside console_bridge's output lock (see Fixed). Code that reads what a handler recorded calls the new `flushOutputHandlers()` first; a handler's exception goes to `sys.unraisablehook` instead of the code that logged. See breaking-changes.md.
 - **`CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed** — copies of `setCollisionCoeff` / `getCollisionCoeff` under names C++ does not have. Call the C++ names ([#298]).
 - **`CollisionCoeffData`, `TrajOptCollisionConfig` and `SQPParameters` compare by value and are unhashable** — `==` compared identity; `hash()`, `set` members and `dict` keys now raise `TypeError` ([#261](https://github.com/tesseract-robotics/tesseract_nanobind/issues/261)).

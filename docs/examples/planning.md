@@ -163,17 +163,12 @@ All examples can be visualized:
 ```python
 from tesseract_robotics.viewer import TesseractViewer
 
-viewer = TesseractViewer()
-viewer.update_environment(robot.env, [0, 0, 0])
-
-# Show trajectory
-if result.successful:
-    viewer.update_trajectory(result.raw_results)
-
-# Start server
-viewer.start_serve_background()
-print("Open http://localhost:8000 in browser")
-input("Press Enter to exit...")
+with TesseractViewer() as viewer:
+    viewer.update_environment(robot.env)
+    if result.successful:
+        viewer.update_trajectory(result.raw_results)
+    print(f"Viewer at {viewer.url}")
+    input("Press Enter to exit...")
 ```
 
 ## Next Steps
