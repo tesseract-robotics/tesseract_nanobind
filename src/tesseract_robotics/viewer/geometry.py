@@ -25,6 +25,15 @@ SPHERE_SUBDIVISIONS = 3
 # glTF RGBA as 0-255 bytes, the form trimesh's PBR material stores.
 RGBA_BYTE_MAX = 255
 
+# Auto-smooth crease [rad]: neighbours meeting at less than 30 deg share a normal, the
+# Blender auto-smooth default. Applied only to meshes whose file carries no smooth normals.
+SMOOTH_CREASE_ANGLE_RAD = float(np.radians(30.0))
+
+# Spread of a face's three vertex normals [-] below which they are one facet normal:
+# float32 noise from the mesh parser's vertex joining is 1.8e-5 on car_seat car.stl;
+# authored smooth normals (IRB2400 link_6) spread by 1e-2 and more.
+FACET_NORMAL_ATOL = 1e-4
+
 _DEFAULT_MATERIAL_NAME = Material.getDefaultMaterial().getName()
 
 
@@ -73,16 +82,47 @@ def _scaled_normals(mesh: tg.PolygonMesh) -> NDArray[np.float64] | None:
     return np.divide(scaled, length, out=np.zeros_like(scaled), where=length > 0.0)
 
 
+def _faceted(faces: NDArray[np.int64], normals: NDArray[np.float64]) -> bool:
+    # True when every face's vertex normals are its one facet normal (an STL), i.e. the
+    # file says nothing about how the surface curves between faces.
+    corners = normals[faces]
+    spread = np.maximum(
+        np.abs(corners[:, 1] - corners[:, 0]).max(axis=1),
+        np.abs(corners[:, 2] - corners[:, 0]).max(axis=1),
+    )
+    return bool((spread <= FACET_NORMAL_ATOL).all())
+
+
+def _auto_smoothed(vertices: NDArray[np.float64], faces: NDArray[np.int64]) -> trimesh.Trimesh:
+    # Merge coincident vertices, then cut the surface at creases: faces joined by
+    # sub-crease edges form a patch, and a vertex is duplicated once per patch it touches.
+    # Each patch then gets angle-weighted vertex normals. Untextured only: merging would
+    # orphan per-vertex UVs.
+    merged = trimesh.Trimesh(vertices, faces, process=True)
+    smooth_edges = merged.face_adjacency[merged.face_adjacency_angles < SMOOTH_CREASE_ANGLE_RAD]
+    patch = trimesh.graph.connected_component_labels(smooth_edges, node_count=len(merged.faces))
+    # One int64 key per (patch, vertex) corner; 1-D unique is ~10x faster than axis=0.
+    vertex_count = len(merged.vertices)
+    corner_keys = np.repeat(patch.astype(np.int64), 3) * vertex_count + merged.faces.ravel()
+    keys, corner_vertex = np.unique(corner_keys, return_inverse=True)
+    split = trimesh.Trimesh(
+        merged.vertices[keys % vertex_count], corner_vertex.reshape(-1, 3), process=False
+    )
+    return trimesh.Trimesh(
+        split.vertices, split.faces, vertex_normals=split.vertex_normals, process=False
+    )
+
+
 def _polygon_mesh(mesh: tg.PolygonMesh, visual_material: Material | None) -> trimesh.Trimesh:
     # The mesh parser already applied the URDF scale to the vertices; getScale() is
     # informational and must not be applied again.
     vertices = np.asarray(mesh.getVertices(), dtype=np.float64)
-    result = trimesh.Trimesh(
-        vertices,
-        _triangles(mesh.getFaces()),
-        vertex_normals=_scaled_normals(mesh),
-        process=False,
-    )
+    faces = _triangles(mesh.getFaces())
+    normals = _scaled_normals(mesh)
+    if not mesh.getTextures() and (normals is None or _faceted(faces, normals)):
+        result = _auto_smoothed(vertices, faces)
+    else:
+        result = trimesh.Trimesh(vertices, faces, vertex_normals=normals, process=False)
     user_color = visual_material is not None and visual_material.getName() != _DEFAULT_MATERIAL_NAME
     if user_color or not _has_own_material(mesh):
         color = (
@@ -90,10 +130,13 @@ def _polygon_mesh(mesh: tg.PolygonMesh, visual_material: Material | None) -> tri
             if visual_material is not None
             else Material.getDefaultMaterial().color
         )
-        result.visual = TextureVisuals(material=PBRMaterial(baseColorFactor=_rgba_bytes(color)))
+        result.visual = TextureVisuals(
+            material=PBRMaterial(baseColorFactor=_rgba_bytes(color), doubleSided=True)
+        )
         return result
     own = mesh.getMaterial()
     material = PBRMaterial(
+        doubleSided=True,
         baseColorFactor=_rgba_bytes(own.getBaseColorFactor()),
         metallicFactor=own.getMetallicFactor(),
         roughnessFactor=own.getRoughnessFactor(),
@@ -117,7 +160,9 @@ def _colored(mesh: trimesh.Trimesh, visual_material: Material | None) -> trimesh
         if visual_material is not None
         else Material.getDefaultMaterial().color
     )
-    mesh.visual = TextureVisuals(material=PBRMaterial(baseColorFactor=_rgba_bytes(color)))
+    mesh.visual = TextureVisuals(
+        material=PBRMaterial(baseColorFactor=_rgba_bytes(color), doubleSided=True)
+    )
     return mesh
 
 
