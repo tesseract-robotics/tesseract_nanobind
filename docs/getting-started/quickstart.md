@@ -139,15 +139,15 @@ See [`TaskComposer.get_available_pipelines()`](../user-guide/task-composer.md) f
 ```python
 from tesseract_robotics.viewer import TesseractViewer
 
-viewer = TesseractViewer()
-viewer.update_environment(robot.env, [0, 0, 0])
-if result.successful:
-    viewer.update_trajectory(result.raw_results)
-
-viewer.start_serve_background()
-print("Open http://localhost:8000 in your browser")
-input("Press Enter to exit...")
+with TesseractViewer() as viewer:
+    viewer.update_environment(robot.env)
+    if result.successful:
+        viewer.update_trajectory(result.raw_results)
+    print(f"Open {viewer.url} in your browser")
+    input("Press Enter to exit...")
 ```
+
+The viewer needs Python >= 3.11; see the [viewer guide](../user-guide/viewer.md).
 
 ## Installation
 

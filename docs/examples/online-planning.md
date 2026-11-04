@@ -180,17 +180,17 @@ for i in range(n_steps - 1):
 Animate a trajectory in the viewer:
 
 ```python
-from tesseract_robotics.viewer import TesseractViewer
+from tesseract_robotics.viewer import TesseractViewer, Trajectory
 
-viewer = TesseractViewer()
-viewer.update_environment(robot.env, [0, 0, 0])
-
-# Convert trajectory to viewer format (joints + time column)
+# Rows of joint values plus a time column
 dt = 0.1
-trajectory_list = [wp.tolist() + [i * dt] for i, wp in enumerate(trajectory)]
+rows = [wp.tolist() + [i * dt] for i, wp in enumerate(trajectory)]
 
-viewer.update_trajectory_list(joint_names, trajectory_list)
-viewer.start_serve_background()
+with TesseractViewer() as viewer:
+    viewer.update_environment(robot.env)
+    viewer.update_trajectory(Trajectory.from_rows(joint_names, rows))
+    print(f"Viewer at {viewer.url}")
+    input("Press Enter to exit...")
 ```
 
 ## Task Composer Alternative

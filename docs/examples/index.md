@@ -119,16 +119,11 @@ Most examples include visualization:
 ```python
 from tesseract_robotics.viewer import TesseractViewer
 
-viewer = TesseractViewer()
-viewer.update_environment(robot.env, [0, 0, 0])
-
-# Animate trajectory
-viewer.update_trajectory(result.raw_results)
-
-# Start web server
-viewer.start_serve_background()
-print("Open http://localhost:8000")
-input("Press Enter to exit...")
+with TesseractViewer() as viewer:  # serving from here until the block ends
+    viewer.update_environment(robot.env)
+    viewer.update_trajectory(result.raw_results)
+    print(f"Viewer at {viewer.url}")
+    input("Press Enter to exit...")
 ```
 
-Open `http://localhost:8000` in your browser to view.
+Open the printed URL in your browser. Requires Python >= 3.11; see the [viewer guide](../user-guide/viewer.md).

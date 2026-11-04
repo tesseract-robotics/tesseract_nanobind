@@ -35,3 +35,7 @@ class NoTrajectoryError(RuntimeError):
 
 class ViewerPortInUseError(OSError):
     """The requested port is taken; viser would have moved to the next free one."""
+
+
+class MalformedOctreeStreamError(ValueError):
+    """An OctoMap `.bt` stream has no header it needs, or its tree is cut short."""
