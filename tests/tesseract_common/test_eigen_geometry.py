@@ -1088,6 +1088,17 @@ def test_compose_each_is_the_per_transform_product_bitwise(m):
 
 
 @pytest.mark.parametrize("m", [0, 1, 500])
+def test_precompose_each_is_the_per_transform_product_on_the_left_bitwise(m):
+    right = _random_rigid(37)
+    stack = _random_stack(38, m)
+    composed = right.precompose_each(stack)
+    assert composed.shape == (m, 4, 4)
+    assert composed.dtype == np.float64 and composed.flags.c_contiguous
+    for i in range(m):
+        nptest.assert_array_equal(composed[i], (Isometry3d(stack[i]) * right).matrix)
+
+
+@pytest.mark.parametrize("m", [0, 1, 500])
 def test_apply_directions_each_rotates_row_i_by_transform_i_bitwise(m):
     stack = _random_stack(32, m)
     vectors = np.random.default_rng(m).normal(size=(m, 3))
@@ -1105,6 +1116,7 @@ def test_batched_stacks_read_strided_input_by_value():
     vectors = np.random.default_rng(33).normal(size=(8, 6))[:, ::2]
     left = _random_rigid(34)
     nptest.assert_array_equal(left.compose_each(wide), left.compose_each(np.array(wide)))
+    nptest.assert_array_equal(left.precompose_each(wide), left.precompose_each(np.array(wide)))
     nptest.assert_array_equal(
         apply_directions_each(wide, vectors),
         apply_directions_each(np.array(wide), np.array(vectors)),
@@ -1115,6 +1127,8 @@ def test_batched_stacks_read_strided_input_by_value():
 def test_batched_stacks_refuse_what_is_not_m_by_4_by_4(bad):
     with pytest.raises((TypeError, ValueError)):
         _random_rigid(35).compose_each(bad)
+    with pytest.raises((TypeError, ValueError)):
+        _random_rigid(35).precompose_each(bad)
     with pytest.raises((TypeError, ValueError)):
         apply_directions_each(bad, np.zeros((len(bad), 3)))
 
