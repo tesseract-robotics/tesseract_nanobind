@@ -19,7 +19,8 @@ from .tesseract_env_to_gltf import (
     _octree_voxels as octree_voxels,
 )  # moves to octree.py with the old viewer (#367)
 
-# Icosphere refinement level: 3 → 642 vertices, smooth at robot-cell viewing distances.
+# Icosphere refinement level: 3 → 642 vertices, a round outline at robot-cell viewing
+# distances; its shading comes from _auto_smoothed.
 SPHERE_SUBDIVISIONS = 3
 
 # glTF RGBA as 0-255 bytes, the form trimesh's PBR material stores.
@@ -154,6 +155,10 @@ def _polygon_mesh(mesh: tg.PolygonMesh, visual_material: Material | None) -> tri
     return result
 
 
+def _smooth(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+    return _auto_smoothed(mesh.vertices, mesh.faces)
+
+
 def _colored(mesh: trimesh.Trimesh, visual_material: Material | None) -> trimesh.Trimesh:
     color = (
         visual_material.color
@@ -198,20 +203,21 @@ def visual_to_trimesh(visual: Visual, link_name: str) -> list[trimesh.Trimesh]:
     if isinstance(geometry, tg.PolygonMesh):
         return [_polygon_mesh(geometry, material)]
     if isinstance(geometry, tg.Box):
+        # Boxes and octree voxels are all creases: no normals, so the browser flat-shades them.
         mesh = trimesh.creation.box((geometry.getX(), geometry.getY(), geometry.getZ()))
     elif isinstance(geometry, tg.Sphere):
-        mesh = trimesh.creation.icosphere(SPHERE_SUBDIVISIONS, geometry.getRadius())
+        mesh = _smooth(trimesh.creation.icosphere(SPHERE_SUBDIVISIONS, geometry.getRadius()))
     elif isinstance(geometry, tg.Cylinder):
-        mesh = trimesh.creation.cylinder(geometry.getRadius(), geometry.getLength())
+        mesh = _smooth(trimesh.creation.cylinder(geometry.getRadius(), geometry.getLength()))
     elif isinstance(geometry, tg.Capsule):
-        mesh = trimesh.creation.capsule(geometry.getLength(), geometry.getRadius())
+        mesh = _smooth(trimesh.creation.capsule(geometry.getLength(), geometry.getRadius()))
     elif isinstance(geometry, tg.Cone):
         # trimesh's cone has its base at z = 0; tesseract centres it on the origin. The
         # shift is applied to the vertex array: apply_translation / transform= on a
         # trimesh cone corrupt its z coordinates (trimesh 4.12).
         cone = trimesh.creation.cone(geometry.getRadius(), geometry.getLength())
         shift = np.array([0.0, 0.0, -0.5 * geometry.getLength()])
-        mesh = trimesh.Trimesh(np.asarray(cone.vertices) + shift, cone.faces, process=False)
+        mesh = _auto_smoothed(np.asarray(cone.vertices) + shift, cone.faces)
     elif isinstance(geometry, tg.Octree):
         mesh = _octree_mesh(geometry)
     else:
