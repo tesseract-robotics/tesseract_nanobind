@@ -953,16 +953,16 @@ NB_MODULE(_tesseract_command_language, m) {
     m.def("getJointPosition", [](const tp::WaypointPoly& waypoint) -> Eigen::VectorXd {
         return tp::getJointPosition(waypoint);
     }, "waypoint"_a, "The joint position of a joint or state waypoint; raises for a Cartesian waypoint.");
-    m.def("getJointPosition", [](const std::vector<std::string>& joint_names, const tp::WaypointPoly& waypoint) {
-        return tp::getJointPosition(joint_names, waypoint);
-    }, "joint_names"_a, "waypoint"_a, "The joint position ordered by `joint_names`.");
-    m.def("getJointNames", [](const tp::WaypointPoly& waypoint) { return tp::getJointNames(waypoint); },
-          "waypoint"_a, "The joint names of a joint or state waypoint; raises for a Cartesian waypoint.");
-    m.def("formatJointPosition", [](const std::vector<std::string>& joint_names, tp::WaypointPoly& waypoint) {
-        return tp::formatJointPosition(joint_names, waypoint);
-    }, "joint_names"_a, "waypoint"_a, "Reorder `waypoint` in place to `joint_names`; True if it was reordered.");
-    m.def("checkJointPositionFormat", &tp::checkJointPositionFormat, "joint_names"_a, "waypoint"_a,
-          "True if the waypoint's joints are ordered as `joint_names`.");
+    m.def("getJointPosition", [](const std::vector<tesseract::common::JointId>& joint_ids, const tp::WaypointPoly& waypoint) {
+        return tp::getJointPosition(joint_ids, waypoint);
+    }, "joint_ids"_a, "waypoint"_a, "The joint position ordered by `joint_ids`.");
+    m.def("getJointIds", [](const tp::WaypointPoly& waypoint) { return tp::getJointIds(waypoint); },
+          "waypoint"_a, "The joint ids of a joint or state waypoint; raises for a Cartesian waypoint.");
+    m.def("formatJointPosition", [](const std::vector<tesseract::common::JointId>& joint_ids, tp::WaypointPoly& waypoint) {
+        return tp::formatJointPosition(joint_ids, waypoint);
+    }, "joint_ids"_a, "waypoint"_a, "Reorder `waypoint` in place to `joint_ids`; True if it was reordered.");
+    m.def("checkJointPositionFormat", &tp::checkJointPositionFormat, "joint_ids"_a, "waypoint"_a,
+          "True if the waypoint's joints are ordered as `joint_ids`.");
     m.def("setJointPosition", [](tp::WaypointPoly& waypoint, const Eigen::Ref<const Eigen::VectorXd>& position) {
         return tp::setJointPosition(waypoint, position);
     }, "waypoint"_a, "position"_a, "Set the joint position in place; False for a Cartesian waypoint.");

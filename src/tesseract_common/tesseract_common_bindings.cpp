@@ -1201,13 +1201,9 @@ NB_MODULE(_tesseract_common, m) {
         });
     bind_value_equality(allowed_collision_matrix);
 
-    // The void out-param overload (types.h:59) has the same Python signature; this covers both.
-    m.def("makeOrderedLinkPair",
-          nb::overload_cast<const std::string&, const std::string&>(&tesseract::common::makeOrderedLinkPair),
-          "link_name1"_a, "link_name2"_a, "The pair with the lexicographically smaller link name first.");
-    // Links allowed to collide with any of `link_names`, in acm_entries' (unordered) iteration order.
+    // Links allowed to collide with any of `link_ids`, in acm_entries' (unordered) iteration order.
     m.def("getAllowedCollisions", &tesseract::common::getAllowedCollisions,
-          "link_names"_a, "acm_entries"_a, "remove_duplicates"_a = true);
+          "link_ids"_a, "acm_entries"_a, "remove_duplicates"_a = true);
 
     // ========== ContactAllowedValidator ==========
     // Abstract base. Determines whether two links are allowed to be in collision.

@@ -16,7 +16,6 @@ __all__ = [
     "ContactResult",
     "ContactResultVector",
     "ContactResultMap",
-    "UnorderedLinkPairError",
     "EmptyContactResultsError",
     "ContactRequest",
     "ContactResultValidator",
