@@ -530,10 +530,35 @@ A `LogRecord` carries `level`, `message`, `logger_name`, `component_name`,
 `attributes`, `timestamp`, `filename`, `line` and `function_name`. An exception
 raised by a handler is reported through `sys.unraisablehook`.
 
-!!! warning "Python handlers and C++ threads"
-    A Python handler takes the GIL on whichever thread logs. C++ code that joins
-    logging threads while the caller holds the GIL then deadlocks: drain an
-    executor's futures (`wait()`) before dropping it while a handler is registered.
+A handler sees every record in addition to the logger's sinks, which still write
+to stderr. To send tesseract's output to Python `logging` instead, replace the
+sinks: a record then goes to each sink whose level admits it, once.
+
+```python
+import logging
+from tesseract_robotics.tesseract_common import PythonLoggingSink, StderrSink, getLogger
+
+sink = PythonLoggingSink("myapp.tesseract")  # records go to logging.getLogger("myapp.tesseract")
+sink.set_pattern("%v (%s:%#)")              # spdlog pattern for the text; "%v" (the message) by default
+getLogger().sinks = [sink]                    # replaces stderr; assign before other threads log
+
+getLogger().sinks = [StderrSink()]            # back to stderr
+```
+
+Each Python `LogRecord` gets the level (spdlog `trace` maps to 5, below `DEBUG`),
+the source `pathname`, `lineno` and `funcName`, and the spdlog logger's name as
+the `spdlog_logger` attribute. Records the Python logger is not enabled for are
+dropped at the sink. A sink's own level (`set_level`) filters before that.
+
+Sinks are C++ objects that Python holds a share of: a logger that keeps one does
+not keep a Python object alive, so the default logger, which outlives the
+interpreter, holds nothing of Python's at exit.
+
+!!! warning "Python handlers, Python sinks and C++ threads"
+    A Python handler or `PythonLoggingSink` takes the GIL on whichever thread logs.
+    C++ code that joins logging threads while the caller holds the GIL then
+    deadlocks: drain an executor's futures (`wait()`) before dropping it while a
+    handler or Python sink is installed.
 
 !!! note "console_bridge API removed"
     `setLogLevel`, `getLogLevel`, `log`, `useOutputHandler`,
