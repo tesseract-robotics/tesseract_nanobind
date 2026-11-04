@@ -44,7 +44,8 @@ from tesseract_robotics.planning import (
 )
 from tesseract_robotics.planning.profiles import (
     TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
-    create_ompl_default_profiles,
+    create_freespace_ifopt_pipeline_profiles,
+    create_freespace_pipeline_profiles,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     ProfileDictionary_addTrajOptIfoptCompositeProfile,
@@ -85,7 +86,7 @@ def run(
     Args:
         pipeline: "FreespacePipeline" (OMPL only) or custom
         use_ifopt: If True, use "FreespaceIfoptPipeline" (OMPL + TrajOptIfopt smoothing)
-        num_planners: Number of parallel planners (unused, for API compat)
+        num_planners: Number of parallel OMPL planners (default: 2, as in C++)
         composer: Composer to plan with. Without one, each call builds a new
             composer and loads the task composer plugins again (seconds per
             call); build one with `TaskComposer.from_config()` and pass it to
@@ -130,11 +131,21 @@ def run(
         .move_to(StateTarget(joint_end, names=joint_names, profile="FREESPACE"))
     )
 
-    # OMPL profiles configure:
+    # Profiles for both stages, OMPL and the optimizer that smooths its path:
     # - Planner: RRTConnect (bidirectional, fast for freespace)
     # - Range: step size for tree extension
     # - Collision margin: 0.025m safety buffer (from C++ example)
-    profiles = create_ompl_default_profiles()
+    # OMPL profiles alone leave the optimizer on upstream defaults with no clearance margin,
+    # and the pipeline's contact check rejects the result (-0.3 mm on link_7, #103).
+    create_profiles = (
+        create_freespace_ifopt_pipeline_profiles
+        if use_ifopt
+        else create_freespace_pipeline_profiles
+    )
+    profiles = create_profiles(
+        num_planners=num_planners or 2,  # C++ uses 2
+        planner_range=0.01,  # C++ uses 0.01
+    )
     if use_ifopt:
         add_ifopt_profiles(profiles)
 
