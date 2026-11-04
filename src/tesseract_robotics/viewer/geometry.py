@@ -55,11 +55,28 @@ def _has_own_material(mesh: tg.PolygonMesh) -> bool:
     return not is_stl and mesh.getMaterial() is not None
 
 
+def _scaled_normals(mesh: tg.PolygonMesh) -> NDArray[np.float64] | None:
+    # The mesh parser multiplied the file normals n by the URDF scale S like the vertices
+    # (S n, unnormalized). A normal maps by the inverse transpose, n' = normalize(S^-1 n)
+    # = normalize(S^-2 (S n)). Without normals the browser flat-shades the mesh.
+    normals = mesh.getNormals()
+    if normals is None:
+        return None
+    scale = np.asarray(mesh.getScale(), dtype=np.float64)
+    scaled = np.asarray(normals, dtype=np.float64).reshape(-1, 3) / scale**2
+    return scaled / np.linalg.norm(scaled, axis=1, keepdims=True)
+
+
 def _polygon_mesh(mesh: tg.PolygonMesh, visual_material: Material | None) -> trimesh.Trimesh:
     # The mesh parser already applied the URDF scale to the vertices; getScale() is
     # informational and must not be applied again.
     vertices = np.asarray(mesh.getVertices(), dtype=np.float64)
-    result = trimesh.Trimesh(vertices, _triangles(mesh.getFaces()), process=False)
+    result = trimesh.Trimesh(
+        vertices,
+        _triangles(mesh.getFaces()),
+        vertex_normals=_scaled_normals(mesh),
+        process=False,
+    )
     user_color = visual_material is not None and visual_material.getName() != _DEFAULT_MATERIAL_NAME
     if user_color or not _has_own_material(mesh):
         color = (

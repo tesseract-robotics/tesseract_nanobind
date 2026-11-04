@@ -1,5 +1,9 @@
 """visual_to_trimesh: tesseract geometry in the visual frame."""
 
+import json
+import struct
+from pathlib import Path
+
 import numpy as np
 import pytest
 from trimesh.visual.texture import TextureVisuals
@@ -22,13 +26,17 @@ MESH_URDF = """
   </link>
   <link name="stl_link">
     <visual><geometry>
-      <mesh filename="package://tesseract/support/meshes/sphere_p25m.stl" scale="{scale} {scale} {scale}"/>
+      <mesh filename="package://tesseract/support/meshes/sphere_p25m.stl" scale="{scale}"/>
     </geometry></visual>
   </link>
   <joint name="j_dae" type="fixed"><parent link="world"/><child link="dae_link"/></joint>
   <joint name="j_stl" type="fixed"><parent link="world"/><child link="stl_link"/></joint>
 </robot>
 """
+
+
+# Unit-normal agreement [-]: float32 storage in tesseract (~6e-8) with headroom.
+NORMAL_ATOL = 1e-6
 
 
 def _visual(geometry, material=None):
@@ -39,9 +47,10 @@ def _visual(geometry, material=None):
     return visual
 
 
-def _mesh_env(scale=1.0):
+def _mesh_env(scale=(1.0, 1.0, 1.0)):
     env = Environment()
-    assert env.init(MESH_URDF.format(scale=scale), GeneralResourceLocator())
+    urdf = MESH_URDF.format(scale=" ".join(str(s) for s in scale))
+    assert env.init(urdf, GeneralResourceLocator())
     return env
 
 
@@ -80,7 +89,46 @@ def test_mesh_scale_applied():
         (mesh,) = visual_to_trimesh(visual, "stl_link")
         return mesh.extents
 
-    np.testing.assert_allclose(extents(2.0), 2.0 * extents(1.0))
+    np.testing.assert_allclose(extents((2.0, 2.0, 2.0)), 2.0 * extents((1.0, 1.0, 1.0)))
+
+
+def _stl_mesh(scale):
+    (visual,) = _mesh_env(scale).getLink("stl_link").visual
+    (mesh,) = visual_to_trimesh(visual, "stl_link")
+    return visual.geometry, mesh
+
+
+def test_mesh_keeps_tesseract_normals():
+    """Authored normals, not face-averaged ones: on IRB2400 link_6 they differ by ~0.07."""
+    locator = GeneralResourceLocator()
+    urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
+    env = Environment()
+    assert env.init(Path(urdf.getFilePath()), locator)
+    (visual,) = env.getLink("link_6").visual
+    (mesh,) = visual_to_trimesh(visual, "link_6")
+    np.testing.assert_allclose(
+        mesh.vertex_normals,
+        np.asarray(visual.geometry.getNormals()).reshape(-1, 3),
+        atol=NORMAL_ATOL,
+    )
+
+
+def test_mesh_normals_follow_non_uniform_scale():
+    """Normals transform by the inverse scale: n' = normalize(S^-1 n)."""
+    _, unit = _stl_mesh((1.0, 1.0, 1.0))
+    scale = np.array([1.0, 1.0, 2.0])
+    _, stretched = _stl_mesh(tuple(scale))
+    expected = unit.vertex_normals / scale
+    expected /= np.linalg.norm(expected, axis=1, keepdims=True)
+    np.testing.assert_allclose(stretched.vertex_normals, expected, atol=NORMAL_ATOL)
+
+
+def test_mesh_normals_reach_the_glb():
+    _, mesh = _stl_mesh((1.0, 1.0, 1.0))
+    glb = mesh.export(file_type="glb")
+    header_len = struct.unpack_from("<I", glb, 12)[0]
+    gltf = json.loads(glb[20 : 20 + header_len])
+    assert "NORMAL" in gltf["meshes"][0]["primitives"][0]["attributes"]
 
 
 def test_compound_mesh_one_per_submesh():
