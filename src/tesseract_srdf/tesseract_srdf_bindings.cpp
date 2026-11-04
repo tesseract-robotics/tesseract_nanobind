@@ -29,14 +29,14 @@ NB_MODULE(_tesseract_srdf, m) {
     nb::class_<ts::KinematicsInformation>(m, "KinematicsInformation")
         .def(nb::init<>())
         .def_rw("group_names", &ts::KinematicsInformation::group_names)
-        .def_rw("chain_groups", &ts::KinematicsInformation::chain_groups)
-        .def_rw("joint_groups", &ts::KinematicsInformation::joint_groups)
-        .def_rw("link_groups", &ts::KinematicsInformation::link_groups)
+        .def_rw("chain_groups", &ts::KinematicsInformation::chain_groups, nb::rv_policy::copy)
+        .def_rw("joint_groups", &ts::KinematicsInformation::joint_groups, nb::rv_policy::copy)
+        .def_rw("link_groups", &ts::KinematicsInformation::link_groups, nb::rv_policy::copy)
         // kinematics_plugin_info: tesseract::common::KinematicsPluginInfo, registered by the
         // tesseract_common module. Carries the fwd/inv IK-solver plugin config per group so a
         // group added via AddKinematicsInformationCommand resolves through getKinematicGroup().
         .def_rw("kinematics_plugin_info", &ts::KinematicsInformation::kinematics_plugin_info)
-        .def_rw("group_states", &ts::KinematicsInformation::group_states)
+        .def_rw("group_states", &ts::KinematicsInformation::group_states, nb::rv_policy::copy)
         // group_tcps: the C++ field is nested unordered_map (group name -> LinkId -> Isometry3d) with
         // Eigen::aligned_allocator on the inner map (Isometry3d alignment). nanobind's
         // default stl/unordered_map caster does not pattern-match against that allocator

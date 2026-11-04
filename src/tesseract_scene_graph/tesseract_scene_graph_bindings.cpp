@@ -251,9 +251,9 @@ NB_MODULE(_tesseract_scene_graph, m) {
     // ShortestPath
     nb::class_<tsg::ShortestPath>(m, "ShortestPath")
         .def(nb::init<>())
-        .def_rw("links", &tsg::ShortestPath::links)
-        .def_rw("joints", &tsg::ShortestPath::joints)
-        .def_rw("active_joints", &tsg::ShortestPath::active_joints)
+        .def_rw("links", &tsg::ShortestPath::links, nb::rv_policy::copy)
+        .def_rw("joints", &tsg::ShortestPath::joints, nb::rv_policy::copy)
+        .def_rw("active_joints", &tsg::ShortestPath::active_joints, nb::rv_policy::copy)
         .def("__str__", &stream_str<tsg::ShortestPath>);  // operator<< (graph.h:596)
 
     // SceneGraph (non-copyable)

@@ -124,8 +124,8 @@ NB_MODULE(_tesseract_state_solver, m) {
     nb::class_<tsg::SceneState> scene_state(m, "SceneState");
     scene_state
         .def(nb::init<>())
-        .def_rw("joints", &tsg::SceneState::joints)
-        .def_rw("floating_joints", &tsg::SceneState::floating_joints)
+        .def_rw("joints", &tsg::SceneState::joints, nb::rv_policy::copy)
+        .def_rw("floating_joints", &tsg::SceneState::floating_joints, nb::rv_policy::copy)
         .def_prop_rw("link_transforms",
             [](const tsg::SceneState& self) {
                 return LinkTransforms(self.link_transforms.begin(), self.link_transforms.end());
