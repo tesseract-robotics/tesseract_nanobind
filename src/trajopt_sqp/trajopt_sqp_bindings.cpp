@@ -15,6 +15,9 @@
 #include <trajopt_sqp/types.h>
 #include <trajopt_sqp/qp_solver.h>
 #include <trajopt_sqp/osqp_eigen_solver.h>
+#ifdef TRAJOPT_SQP_HAS_PIQP
+#include <trajopt_sqp/piqp_solver.h>
+#endif
 #include <trajopt_sqp/qp_problem.h>
 #include <trajopt_sqp/trajopt_qp_problem.h>
 #include <trajopt_sqp/trust_region_sqp_solver.h>
@@ -290,6 +293,9 @@ NB_MODULE(_trajopt_sqp, m) {
                 "Initial constraint scaling coefficient (default: 10)")
         .def_rw("inflate_constraints_individually", &tsqp::SQPParameters::inflate_constraints_individually,
                 "If true, only violated constraints are inflated (default: true)")
+        .def_rw("sum_constraint_set_violations", &tsqp::SQPParameters::sum_constraint_set_violations,
+                "If true, cnt_tolerance is tested against a set's summed row violations; if false, against its "
+                "largest row. Applied by TrustRegionSQPSolver.init() (default: true)")
         .def_rw("initial_trust_box_size", &tsqp::SQPParameters::initial_trust_box_size,
                 "Initial trust region size (default: 0.1)")
         .def_rw("log_results", &tsqp::SQPParameters::log_results, "Enable logging (unused)")
@@ -616,6 +622,62 @@ NB_MODULE(_trajopt_sqp, m) {
              "the call: a problem passed to solve() from Python arrives as that object; one a "
              "planner built in C++ arrives as a QPProblemView, which raises QPProblemExpiredError "
              "once the call has returned. sqp_results is a copy the callback may keep.");
+
+#ifdef TRAJOPT_SQP_HAS_PIQP
+    // ========== PIQP (optional: trajopt_sqp exports TRAJOPT_SQP_HAS_PIQP when built with it) ==========
+    nb::enum_<piqp::KKTSolver>(m, "PIQPKKTSolver", "PIQP's KKT system solver")
+        .value("dense_cholesky", piqp::KKTSolver::dense_cholesky)
+        .value("sparse_ldlt", piqp::KKTSolver::sparse_ldlt)
+        .value("sparse_ldlt_eq_cond", piqp::KKTSolver::sparse_ldlt_eq_cond)
+        .value("sparse_ldlt_ineq_cond", piqp::KKTSolver::sparse_ldlt_ineq_cond)
+        .value("sparse_ldlt_cond", piqp::KKTSolver::sparse_ldlt_cond)
+        .value("sparse_multistage", piqp::KKTSolver::sparse_multistage);
+
+    nb::class_<piqp::Settings<double>>(m, "PIQPSettings", "PIQP solver settings (piqp::Settings<double>)")
+        .def(nb::init<>(), "PIQP's own defaults")
+        .def_rw("rho_init", &piqp::Settings<double>::rho_init, "Initial primal proximal penalty")
+        .def_rw("delta_init", &piqp::Settings<double>::delta_init, "Initial augmented Lagrangian penalty")
+        .def_rw("eps_abs", &piqp::Settings<double>::eps_abs, "Absolute tolerance")
+        .def_rw("eps_rel", &piqp::Settings<double>::eps_rel, "Relative tolerance")
+        .def_rw("check_duality_gap", &piqp::Settings<double>::check_duality_gap, "Also stop on the duality gap")
+        .def_rw("eps_duality_gap_abs", &piqp::Settings<double>::eps_duality_gap_abs, "Absolute duality gap tolerance")
+        .def_rw("eps_duality_gap_rel", &piqp::Settings<double>::eps_duality_gap_rel, "Relative duality gap tolerance")
+        .def_rw("infeasibility_threshold", &piqp::Settings<double>::infeasibility_threshold, "Threshold for the infeasibility detection")
+        .def_rw("reg_lower_limit", &piqp::Settings<double>::reg_lower_limit, "Lower limit of the regularization")
+        .def_rw("reg_finetune_lower_limit", &piqp::Settings<double>::reg_finetune_lower_limit, "Fine-tune lower limit of the regularization")
+        .def_rw("reg_finetune_primal_update_threshold", &piqp::Settings<double>::reg_finetune_primal_update_threshold, "Primal updates before fine-tuning the regularization")
+        .def_rw("reg_finetune_dual_update_threshold", &piqp::Settings<double>::reg_finetune_dual_update_threshold, "Dual updates before fine-tuning the regularization")
+        .def_rw("max_iter", &piqp::Settings<double>::max_iter, "Maximum number of iterations")
+        .def_rw("max_factor_retires", &piqp::Settings<double>::max_factor_retires, "Maximum number of factorization retries")
+        .def_rw("preconditioner_scale_cost", &piqp::Settings<double>::preconditioner_scale_cost, "Scale the cost in the preconditioner")
+        .def_rw("preconditioner_reuse_on_update", &piqp::Settings<double>::preconditioner_reuse_on_update, "Reuse the preconditioner when the problem is updated")
+        .def_rw("preconditioner_iter", &piqp::Settings<double>::preconditioner_iter, "Preconditioner iterations")
+        .def_rw("tau", &piqp::Settings<double>::tau, "Maximum step size fraction to the boundary")
+        .def_rw("kkt_solver", &piqp::Settings<double>::kkt_solver, "KKT system solver")
+        .def_rw("iterative_refinement_always_enabled", &piqp::Settings<double>::iterative_refinement_always_enabled, "Always run iterative refinement")
+        .def_rw("iterative_refinement_eps_abs", &piqp::Settings<double>::iterative_refinement_eps_abs, "Iterative refinement absolute tolerance")
+        .def_rw("iterative_refinement_eps_rel", &piqp::Settings<double>::iterative_refinement_eps_rel, "Iterative refinement relative tolerance")
+        .def_rw("iterative_refinement_max_iter", &piqp::Settings<double>::iterative_refinement_max_iter, "Iterative refinement maximum iterations")
+        .def_rw("iterative_refinement_min_improvement_rate", &piqp::Settings<double>::iterative_refinement_min_improvement_rate, "Iterative refinement minimum improvement rate")
+        .def_rw("iterative_refinement_static_regularization_eps", &piqp::Settings<double>::iterative_refinement_static_regularization_eps, "Iterative refinement static regularization")
+        .def_rw("iterative_refinement_static_regularization_rel", &piqp::Settings<double>::iterative_refinement_static_regularization_rel, "Iterative refinement relative static regularization")
+        .def_rw("verbose", &piqp::Settings<double>::verbose, "Print solver progress")
+        .def_rw("compute_timings", &piqp::Settings<double>::compute_timings, "Measure the solver timings");
+
+    nb::class_<tsqp::PIQPSolver, tsqp::QPSolver>(m, "PIQPSolver", "PIQP-based (interior point) QP solver")
+        .def(nb::init<>(), "With trajopt's default PIQP settings")
+        .def_rw("settings", &tsqp::PIQPSolver::settings, "PIQP settings, applied when the solver is next set up")
+        .def_static("defaultSettings", [] {
+            piqp::Settings<double> settings;
+            tsqp::PIQPSolver::setDefaultPIQPSettings(settings);
+            return settings;
+        }, "The PIQP settings trajopt uses by default")
+        .def("reusedSetup", &tsqp::PIQPSolver::reusedSetup,
+             "Whether the last solve reused the previous setup (only the vectors changed)");
+    m.attr("HAS_PIQP") = true;
+#else
+    m.attr("HAS_PIQP") = false;
+#endif
 
     // ========== TrustRegionSQPSolver ==========
 

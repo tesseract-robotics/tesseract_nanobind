@@ -827,7 +827,8 @@ class CartLineConstraint(ConstraintSet):
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Calculate error values for given joint values"""
 
-    def getLinePoint(self, source_tf: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_tf1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_tf2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+    @staticmethod
+    def getLinePoint(source_tf: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_tf1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, target_tf2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
         """Find nearest point on line (uses SLERP for orientation)"""
 
     @property
@@ -836,6 +837,53 @@ class CartLineConstraint(ConstraintSet):
 
     @use_numeric_differentiation.setter
     def use_numeric_differentiation(self, arg: bool, /) -> None: ...
+
+class CartAxisConeConstraint(ConstraintSet):
+    """
+    Keeps the angle between a source link axis and a target link axis at most half_angle: one
+    one-sided row, phi(q) = atan2(|a_tgt x v|, a_tgt . v) <= half_angle, in radians. Rotation about
+    the source axis stays free. For half_angle near 0 use CartAxisAlignConstraint.
+    """
+
+    def __init__(self, position_var: Var, manip: "tesseract::kinematics::JointGroup", source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], half_angle: float, coeff: float = 1.0, name: str = 'CartAxisCone') -> None:
+        """
+        Axes are in their links' coordinates and normalized; 0 < half_angle < pi. Raises on an invalid
+        link, axis, half angle or coefficient.
+        """
+
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """The angle phi between the axes for the given joint values"""
+
+    def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> None:
+        """Set the cone axis, in target link coordinates"""
+
+    def getTargetAxis(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """The cone axis, normalized"""
+
+    def getHalfAngle(self) -> float:
+        """The cone half angle, in radians"""
+
+class CartAxisAlignConstraint(ConstraintSet):
+    """
+    Points a source link axis along a target link axis; rotation about the axis is free. Two
+    equality rows, in radians: the tilt angle times the unit tilt direction, zero only when the
+    axes coincide.
+    """
+
+    def __init__(self, position_var: Var, manip: "tesseract::kinematics::JointGroup", source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], coeff: float = 1.0, name: str = 'CartAxisAlign') -> None:
+        """
+        Axes are in their links' coordinates and normalized. Raises on an invalid link, axis or
+        coefficient.
+        """
+
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+        """The two tilt rows for the given joint values"""
+
+    def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> None:
+        """Set the axis to align with, in target link coordinates"""
+
+    def getTargetAxis(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """The axis to align with, normalized"""
 
 class DiscreteCollisionNumericalConstraint(ConstraintSet):
     def __init__(self, collision_evaluator: DiscreteCollisionEvaluator, position_var: Var, max_num_cnt: int = 1, fixed_sparsity: bool = False, name: str = 'DiscreteCollisionNumerical') -> None:

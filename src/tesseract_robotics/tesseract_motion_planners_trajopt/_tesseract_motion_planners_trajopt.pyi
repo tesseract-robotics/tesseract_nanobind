@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
+import tesseract_robotics.trajopt_sqp._trajopt_sqp
 
 
 class TrajOptCartesianWaypointConfig:
@@ -613,6 +614,18 @@ class TrajOptOSQPSolverProfile(TrajOptSolverProfile):
 
         `settings:` and `opt_params:` are merged into the profile's values: keys left out keep them (`settings: {max_iter: 321}` keeps eps_abs 1e-4). This is per struct; other profiles' from_yaml may replace a nested sub-config instead.
         """
+
+class TrajOptPIQPSolverProfile(TrajOptSolverProfile):
+    def __init__(self) -> None: ...
+
+    @property
+    def settings(self) -> tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings:
+        """PIQP settings for each QP"""
+
+    @settings.setter
+    def settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
+
+HAS_PIQP: bool
 
 def ProfileDictionary_addTrajOptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptMoveProfile) -> None:
     """Add TrajOpt move profile to ProfileDictionary"""

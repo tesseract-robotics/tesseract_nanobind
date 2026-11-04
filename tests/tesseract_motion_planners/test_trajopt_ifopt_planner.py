@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 import scipy.sparse
 
+from tesseract_robotics import tesseract_motion_planners_trajopt_ifopt as trajopt_ifopt_planners
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
@@ -303,8 +304,20 @@ class TestTrajOptIfoptPlanner:
         planner = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE)
         assert planner.getName() == TRAJOPT_IFOPT_NAMESPACE
 
-    def test_joint_to_joint_planning(self, kuka_iiwa_environment):
-        """Test planning from joint state to joint state."""
+    @pytest.mark.parametrize(
+        "solver_profile_name",
+        [
+            "TrajOptIfoptOSQPSolverProfile",
+            pytest.param(
+                "TrajOptIfoptPIQPSolverProfile",
+                marks=pytest.mark.skipif(
+                    not trajopt_ifopt_planners.HAS_PIQP, reason="trajopt was built without PIQP"
+                ),
+            ),
+        ],
+    )
+    def test_joint_to_joint_planning(self, kuka_iiwa_environment, solver_profile_name):
+        """Test planning from joint state to joint state, with each QP solver."""
         t_env, manip_info, joint_names = kuka_iiwa_environment
 
         # Set initial state
@@ -341,7 +354,7 @@ class TestTrajOptIfoptPlanner:
         composite_profile.velocity_coeff = np.ones(n_joints)
         composite_profile.acceleration_coeff = np.ones(n_joints)
         composite_profile.jerk_coeff = np.ones(n_joints)
-        solver_profile = TrajOptIfoptOSQPSolverProfile()
+        solver_profile = getattr(trajopt_ifopt_planners, solver_profile_name)()
 
         profiles = ProfileDictionary()
         ProfileDictionary_addTrajOptIfoptPlanProfile(

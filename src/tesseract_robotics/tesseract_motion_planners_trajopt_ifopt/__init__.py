@@ -63,4 +63,7 @@ __all__ = [
     "createJointJerkConstraint",
     "createJointPositionConstraint",
     "createJointVelocityConstraint",
+    "HAS_PIQP",
 ]
+if HAS_PIQP:  # noqa: F405
+    __all__ += ["TrajOptIfoptPIQPSolverProfile"]

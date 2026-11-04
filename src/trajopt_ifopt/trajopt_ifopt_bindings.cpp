@@ -40,6 +40,8 @@
 #include <trajopt_ifopt/constraints/collision/discrete_collision_numerical_constraint.h>
 #include <trajopt_ifopt/constraints/joint_jerk_constraint.h>
 #include <trajopt_ifopt/constraints/cartesian_line_constraint.h>
+#include <trajopt_ifopt/constraints/cartesian_axis_align_constraint.h>
+#include <trajopt_ifopt/constraints/cartesian_axis_cone_constraint.h>
 #include <trajopt_ifopt/constraints/inverse_kinematics_constraint.h>
 
 // trajopt_common
@@ -1385,6 +1387,43 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Find nearest point on line (uses SLERP for orientation)")
         .def_rw("use_numeric_differentiation", &ti::CartLineConstraint::use_numeric_differentiation,
                 "If true, use numeric differentiation (default: true)");
+
+    // ========== CartAxisConeConstraint (trajopt#602) ==========
+    nb::class_<ti::CartAxisConeConstraint, ti::ConstraintSet>(m, "CartAxisConeConstraint",
+        "Keeps the angle between a source link axis and a target link axis at most half_angle: one\n"
+        "one-sided row, phi(q) = atan2(|a_tgt x v|, a_tgt . v) <= half_angle, in radians. Rotation about\n"
+        "the source axis stays free. For half_angle near 0 use CartAxisAlignConstraint.")
+        .def(nb::init<std::shared_ptr<const ti::Var>, std::shared_ptr<const tesseract::kinematics::JointGroup>,
+                      tesseract::common::LinkId, const Eigen::Vector3d&, tesseract::common::LinkId,
+                      const Eigen::Vector3d&, double, double, std::string>(),
+             "position_var"_a, "manip"_a, "source_frame"_a, "source_axis"_a, "target_frame"_a, "target_axis"_a,
+             "half_angle"_a, "coeff"_a = 1.0, "name"_a = "CartAxisCone",
+             "Axes are in their links' coordinates and normalized; 0 < half_angle < pi. Raises on an invalid\n"
+             "link, axis, half angle or coefficient.")
+        .def("calcValues", &ti::CartAxisConeConstraint::calcValues, "joint_vals"_a,
+             "The angle phi between the axes for the given joint values")
+        .def("setTargetAxis", &ti::CartAxisConeConstraint::setTargetAxis, "target_axis"_a,
+             "Set the cone axis, in target link coordinates")
+        .def("getTargetAxis", &ti::CartAxisConeConstraint::getTargetAxis, "The cone axis, normalized")
+        .def("getHalfAngle", &ti::CartAxisConeConstraint::getHalfAngle, "The cone half angle, in radians");
+
+    // ========== CartAxisAlignConstraint (trajopt#602) ==========
+    nb::class_<ti::CartAxisAlignConstraint, ti::ConstraintSet>(m, "CartAxisAlignConstraint",
+        "Points a source link axis along a target link axis; rotation about the axis is free. Two\n"
+        "equality rows, in radians: the tilt angle times the unit tilt direction, zero only when the\n"
+        "axes coincide.")
+        .def(nb::init<std::shared_ptr<const ti::Var>, std::shared_ptr<const tesseract::kinematics::JointGroup>,
+                      tesseract::common::LinkId, const Eigen::Vector3d&, tesseract::common::LinkId,
+                      const Eigen::Vector3d&, double, std::string>(),
+             "position_var"_a, "manip"_a, "source_frame"_a, "source_axis"_a, "target_frame"_a, "target_axis"_a,
+             "coeff"_a = 1.0, "name"_a = "CartAxisAlign",
+             "Axes are in their links' coordinates and normalized. Raises on an invalid link, axis or\n"
+             "coefficient.")
+        .def("calcValues", &ti::CartAxisAlignConstraint::calcValues, "joint_vals"_a,
+             "The two tilt rows for the given joint values")
+        .def("setTargetAxis", &ti::CartAxisAlignConstraint::setTargetAxis, "target_axis"_a,
+             "Set the axis to align with, in target link coordinates")
+        .def("getTargetAxis", &ti::CartAxisAlignConstraint::getTargetAxis, "The axis to align with, normalized");
 
     // ========== DiscreteCollisionNumericalConstraint ==========
     nb::class_<DiscreteCollisionNumericalConstraintBinding, ti::ConstraintSet>(m, "DiscreteCollisionNumericalConstraint")

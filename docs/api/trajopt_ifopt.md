@@ -87,6 +87,8 @@ the fix arrives only with a wheel built on a newer trajopt (none yet).
 | `CartPosConstraint` (pose) | TCP pose at a waypoint | equality |
 | `CartPosConstraint` (per-axis) | TCP pose with free axes and bands | per axis |
 | `CartLineConstraint` | TCP on a line segment between two poses | equality |
+| `CartAxisConeConstraint` | A link axis within a half angle of a target axis; rotation about it free | one-sided (upper), in radians |
+| `CartAxisAlignConstraint` | A link axis along a target axis; rotation about it free | equality (two rows), in radians |
 | `DiscreteCollisionConstraint` | Collision at a waypoint | one-sided (upper) |
 | `DiscreteCollisionNumericalConstraint` | The same, with a numerical Jacobian | one-sided (upper) |
 | `ContinuousCollisionConstraint` | Collision along the segment between two waypoints | one-sided (upper) |

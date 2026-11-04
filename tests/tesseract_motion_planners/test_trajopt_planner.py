@@ -32,10 +32,12 @@ from tesseract_robotics.tesseract_motion_planners_simple import generateInterpol
 
 # TrajOpt imports - skip tests if not available
 try:
+    from tesseract_robotics import tesseract_motion_planners_trajopt as trajopt_planners
     from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         ProfileDictionary_addTrajOptCompositeProfile,
         ProfileDictionary_addTrajOptPlanProfile,
+        ProfileDictionary_addTrajOptSolverProfile,
         TrajOptCollisionConfig,
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultPlanProfile,
@@ -43,8 +45,10 @@ try:
     )
 
     TRAJOPT_AVAILABLE = True
+    HAS_PIQP = trajopt_planners.HAS_PIQP
 except ImportError:
     TRAJOPT_AVAILABLE = False
+    HAS_PIQP = False
 
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -191,8 +195,18 @@ class TestTrajOptMotionPlanner:
 class TestTrajOptPlanning:
     """Integration test for TrajOpt motion planning."""
 
-    def test_trajopt_freespace_joint_cart(self, lbr_iiwa_environment):
-        """Test TrajOpt planning from joint to cartesian waypoint."""
+    @pytest.mark.parametrize(
+        "solver_profile_name",
+        [
+            None,
+            pytest.param(
+                "TrajOptPIQPSolverProfile",
+                marks=pytest.mark.skipif(not HAS_PIQP, reason="trajopt was built without PIQP"),
+            ),
+        ],
+    )
+    def test_trajopt_freespace_joint_cart(self, lbr_iiwa_environment, solver_profile_name):
+        """Test TrajOpt planning from joint to cartesian waypoint (default solver, then PIQP)."""
         env, manip_info, joint_names = lbr_iiwa_environment
 
         # Start at joint position
@@ -235,6 +249,13 @@ class TestTrajOptPlanning:
         ProfileDictionary_addTrajOptCompositeProfile(
             profiles, TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", composite_profile
         )
+        if solver_profile_name is not None:
+            ProfileDictionary_addTrajOptSolverProfile(
+                profiles,
+                TRAJOPT_DEFAULT_NAMESPACE,
+                "TEST_PROFILE",
+                getattr(trajopt_planners, solver_profile_name)(),
+            )
 
         # Create planner and request
         test_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
