@@ -494,6 +494,16 @@ NB_MODULE(_tesseract_common, m) {
             }
             return out;
         }, "transforms"_a)
+        // `Isometry3d(stack[i]) * self` for every transform of an (M, 4, 4) stack: `compose_each`
+        // with self on the right ("pre" as in `pretranslate`); row i is bitwise the single product.
+        .def("precompose_each", [](const Eigen::Isometry3d& self, const TransformStackIn& stack) {
+            const std::size_t m = stack.shape(0);
+            TransformStackOut out = new_transform_stack(m);
+            for (std::size_t i = 0; i < m; ++i) {
+                Eigen::Map<RowMajor4d>(out.data() + 16 * i) = (stack_isometry(stack, i) * self).matrix();
+            }
+            return out;
+        }, "transforms"_a)
         // In-place composition mutators. Return self so callers can chain
         // (`iso.translate(v).rotate(q)`), matching Eigen's fluent C++ API.
         //
