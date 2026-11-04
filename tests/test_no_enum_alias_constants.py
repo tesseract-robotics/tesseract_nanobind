@@ -1,6 +1,6 @@
 """gh-176: no module attribute is a member of a bound enum (the SWIG-era `Enum_VALUE` copies).
 
-The enum class is the only way to a value: `ContactTestType.ALL`, `LogLevel.CONSOLE_BRIDGE_LOG_DEBUG`.
+The enum class is the only way to a value: `ContactTestType.ALL`, `LogLevel.debug`.
 """
 
 import enum

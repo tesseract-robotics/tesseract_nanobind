@@ -89,7 +89,7 @@ mapping (empty, `~`, a list, an unrelated mapping), which upstream loads as an e
 
 `createTaskComposerNode` and `createTaskComposerExecutor` raise `TaskComposerPluginError` (a
 `RuntimeError`) when the name is not configured, listing the configured names, or when its plugin
-fails to load or build; they never return `None`. Upstream only logs a console_bridge warning
+fails to load or build; they never return `None`. Upstream only logs a tesseract warning
 and returns null, so the warning on stderr carries the build failure's cause.
 `remove*Plugin` and `setDefault*Plugin` raise `KeyError` for an unknown name.
 
@@ -180,12 +180,8 @@ mid-run is safe and never blocks. A finished run's node and executor are release
 is seen done (`wait()`, `waitFor()` returning `FutureStatus.ready`, `ready()` returning `True`)
 or at the next `run`. A server run also holds the executor it runs on, so
 `TaskComposerServer.addExecutor` may replace it mid-run. At interpreter exit, runs still in
-flight, including runs started while waiting, are waited for (an `atexit` hook). A Python
-`OutputHandler` receives messages after they were logged, so the hook also waits until the
-handlers have received everything logged, and waits again for any run a handler started then.
-It waits for the handlers only within the log delivery's exit budget (2 s, shared with
-`tesseract_common`'s own exit hook): a stuck handler does not hold up exit, and what it did not
-receive goes to stderr.
+flight, including runs started while waiting (also by a Python log record handler on a
+worker), are waited for (an `atexit` hook).
 
 ### Node infos
 
@@ -269,17 +265,15 @@ server.loadConfig(config, GeneralResourceLocator())  # now allowed
 ```
 
 While a server is inside `loadConfig`, `addTask` or `addExecutor`, other threads wait for it,
-including a Python log handler on the `OutputHandler` delivery thread. Only calls from inside it
+including a Python log record handler on an executor worker. Only calls from inside it
 raise the same error: calls from a Python `ResourceLocator` that runs during the reload. A call
 made from inside another server's reload raises too while this server reloads: two reloads whose
 locators reach each other's server would wait for each other. Adding a task under a new name,
 and running a node you built yourself, are unaffected.
 
-A reload never waits for the log handlers, so a handler waiting for it always gets its turn.
-`flushOutputHandlers()` called inside a reload (from a `ResourceLocator`) raises
-`OutputHandlerFlushForbiddenError` (a `RuntimeError`, from `tesseract_common`) instead of
-waiting: the handler it would wait for may be waiting for that reload. Flush before or after
-`loadConfig`, not inside it.
+A reload never waits for the log handlers, so a handler waiting for it always gets its turn. A
+handler runs on the thread that logs: one called by the reloading thread itself (a record logged
+inside `loadConfig`) is a call from inside the reload and raises.
 
 ### TaskComposerLog
 

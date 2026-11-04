@@ -24,7 +24,7 @@ using LoadedLibraries = std::unordered_set<std::string>;
 LoadedLibraries snapshot_loaded_libraries();
 
 // Pin every library loaded since `before` for the process lifetime. A library that cannot be
-// pinned logs a console_bridge warning: this runs in a destructor, also while unwinding.
+// pinned logs a tesseract warning: this runs in a destructor, also while unwinding.
 void pin_libraries_loaded_since(const LoadedLibraries& before) noexcept;
 
 }  // namespace tesseract_nb

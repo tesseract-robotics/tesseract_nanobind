@@ -196,9 +196,8 @@ writer thread is safe. Until every `Environment` binding that takes its mutex re
 
 ## C++ threads that call Python at interpreter exit
 
-A thread CPython didn't start, such as the `OutputHandler` delivery thread
-(`src/tesseract_common/python_output_handler.h`), can be inside Python when the interpreter
-finalizes. Every call that takes the GIL then ends it: `PyGILState_Ensure`, `PyEval_RestoreThread`,
+A thread CPython didn't start, such as an executor worker running a Python log record handler,
+can be inside Python when the interpreter finalizes. Every call that takes the GIL then ends it: `PyGILState_Ensure`, `PyEval_RestoreThread`,
 and any Python code, since the eval loop gives the GIL away and takes it back. What "ends" means
 depends on the version and platform:
 
@@ -217,28 +216,19 @@ macOS, Windows and 3.14 never run the destructors; the 3.13 jobs did not hit it 
 The rule for such a thread: while it is inside a call that may take the GIL, none of its frames
 owns a Python reference, a GIL guard or an override ticket, and none is `noexcept`. Call Python
 through the C API from plain functions (`PyGILState_Ensure` / `PyGILState_Release` by hand,
-`PyObject_CallMethodObjArgs`, raw references), and never drop a Python reference in a destructor:
-the delivery thread's `HandlerRef` retires its reference to a list that a plain function drops
-with the GIL held. A thread ended mid-call leaves what it held allocated; Python is going away.
+`PyObject_CallMethodObjArgs`, raw references), and never drop a Python reference in a destructor.
+A thread ended mid-call leaves what it held allocated; Python is going away.
 
 ## Log handlers and the task-composer server gate
 
-A Python log handler runs on the delivery thread, never inside console_bridge's lock, so it calls
-a `TaskComposerServer` like any other thread: while another thread reloads the server
-(`loadConfig`, `addTask`, `addExecutor`), the handler waits on the server gate with the GIL
-released. That wait ends only if the reload never waits for the delivery thread. The one call
-that does is `flushOutputHandlers()`, which a Python `ResourceLocator` can make mid-load.
-
-So the invariant is enforced on the waiting side, not the handler side. `tesseract_common` keeps
-a per-thread *flush barrier* and exports it as the `_log_flush_barrier` capsule
-(`src/tesseract_common/log_flush_barrier.h`: `enter(holder)` / `leave()`). The server gate
-(`ServerMutation`) enters it around every mutation, and `flushOutputHandlers()` on a thread
-inside a barrier raises `OutputHandlerFlushForbiddenError`, naming the holder, instead of
-waiting. The dependency points the way the modules already do (task composer → common): common
-knows nothing about servers, only that some caller marked this thread as one a handler may wait
-for. The earlier design inverted it: common exported a "handler running here" depth, and the
-gate raised `TaskComposerServerBusyError` for any server call from a handler during a reload,
-which rejected every handler to forbid one flush.
+Upstream calls each log record handler synchronously on the thread that logs, after the logger
+returns and with no tesseract lock held (`logging.cpp` `dispatchHandlers`). A Python handler on an
+executor worker therefore calls a `TaskComposerServer` like any other thread: while another thread
+reloads the server (`loadConfig`, `addTask`, `addExecutor`), it waits on the server gate with the
+GIL released, and the reload never waits for it. A handler called by the reloading thread itself
+is a call from inside the reload and raises `TaskComposerServerBusyError`. main's delivery thread,
+`flushOutputHandlers()` and the flush barrier that kept a reload from waiting for it went with the
+console_bridge API (0.36).
 
 Tests: `tests/tesseract_task_composer/test_output_handler_deadlocks.py`
 (`TestServerReloadAgainstLogHandlers`).

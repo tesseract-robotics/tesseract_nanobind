@@ -3,7 +3,7 @@
 // not reach the bindings.
 #include "tesseract_task_composer/plugin_pinning.h"
 
-#include <console_bridge/console.h>
+#include <tesseract/common/logging.h>
 
 #include <cstdio>
 #include <mutex>
@@ -31,7 +31,7 @@ namespace {
 
 #if defined(__APPLE__) || defined(_WIN32)
 // Log a pinned library once: repeated createTaskComposer* calls stay quiet after warmup. stderr
-// rather than console_bridge's logInform, which tesseract's default threshold (ERROR) suppresses.
+// rather than a tesseract info message, which tesseract's default threshold (ERROR) suppresses.
 void report_pinned(const std::string& path) {
     const auto separator = path.find_last_of("/\\");
     const char* basename = separator == std::string::npos ? path.c_str() : path.c_str() + separator + 1;
@@ -40,16 +40,16 @@ void report_pinned(const std::string& path) {
 #endif
 
 #if defined(_WIN32)
-// The process's modules; empty after a console_bridge warning if they cannot be listed.
+// The process's modules; empty after a tesseract warning if they cannot be listed.
 std::vector<HMODULE> process_modules() {
     std::vector<HMODULE> modules(256);
     for (;;) {
         DWORD needed = 0;
         const auto capacity = static_cast<DWORD>(modules.size() * sizeof(HMODULE));
         if (!EnumProcessModules(GetCurrentProcess(), modules.data(), capacity, &needed)) {
-            CONSOLE_BRIDGE_logWarn("tesseract_nanobind: EnumProcessModules failed (error %lu); plugin "
-                                   "libraries loaded by this call are not pinned",
-                                   GetLastError());
+            TESSERACT_LOG_WARN("tesseract_nanobind: EnumProcessModules failed (error {}); plugin "
+                               "libraries loaded by this call are not pinned",
+                               GetLastError());
             return {};
         }
         if (needed <= capacity) {
@@ -60,16 +60,16 @@ std::vector<HMODULE> process_modules() {
     }
 }
 
-// The module's path in UTF-8; empty after a console_bridge warning if it cannot be read.
+// The module's path in UTF-8; empty after a tesseract warning if it cannot be read.
 std::string module_path(HMODULE module) {
     // The longest path Windows accepts (with the \\?\ prefix), in UTF-16 code units.
     constexpr DWORD MAX_LONG_PATH = 32768;
     std::wstring path(MAX_LONG_PATH, L'\0');
     const DWORD length = GetModuleFileNameW(module, path.data(), MAX_LONG_PATH);
     if (length == 0 || length == MAX_LONG_PATH) {
-        CONSOLE_BRIDGE_logWarn("tesseract_nanobind: GetModuleFileNameW failed (error %lu); a plugin "
-                               "library loaded by this call is not pinned",
-                               GetLastError());
+        TESSERACT_LOG_WARN("tesseract_nanobind: GetModuleFileNameW failed (error {}); a plugin "
+                           "library loaded by this call is not pinned",
+                           GetLastError());
         return {};
     }
     path.resize(length);
@@ -111,8 +111,7 @@ void pin_libraries_loaded_since(const LoadedLibraries& before) noexcept {
 #if defined(__APPLE__)
         // RTLD_NODELETE: a later dlclose leaves the library mapped. The handle is leaked.
         if (::dlopen(path.c_str(), RTLD_LAZY | RTLD_NODELETE) == nullptr) {
-            CONSOLE_BRIDGE_logWarn("tesseract_nanobind: failed to pin plugin library '%s': %s", path.c_str(),
-                                   dlerror());
+            TESSERACT_LOG_WARN("tesseract_nanobind: failed to pin plugin library '{}': {}", path, dlerror());
             continue;
         }
 #else
@@ -120,8 +119,8 @@ void pin_libraries_loaded_since(const LoadedLibraries& before) noexcept {
         // FreeLibrary calls follow.
         HMODULE module = nullptr;
         if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN, std::filesystem::u8path(path).c_str(), &module)) {
-            CONSOLE_BRIDGE_logWarn("tesseract_nanobind: failed to pin plugin library '%s' (error %lu)",
-                                   path.c_str(), GetLastError());
+            TESSERACT_LOG_WARN("tesseract_nanobind: failed to pin plugin library '{}' (error {})", path,
+                               GetLastError());
             continue;
         }
 #endif
