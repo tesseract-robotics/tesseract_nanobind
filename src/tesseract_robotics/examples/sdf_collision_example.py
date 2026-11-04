@@ -62,7 +62,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
-    ContactTestType_CLOSEST,
+    ContactTestType,
 )
 from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
 from tesseract_robotics.tesseract_geometry import (
@@ -337,7 +337,7 @@ def sweep(robot: Robot, positions) -> list[tuple[float, float | None, float]]:
         manager.setCollisionObjectsTransform(robot.env.getState().link_transforms)
 
         results = ContactResultMap()
-        manager.contactTest(results, ContactRequest(ContactTestType_CLOSEST))
+        manager.contactTest(results, ContactRequest(ContactTestType.CLOSEST))
         contacts = ContactResultVector()
         results.flattenMoveResults(contacts)
 

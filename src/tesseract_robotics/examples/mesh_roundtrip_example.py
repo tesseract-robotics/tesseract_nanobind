@@ -16,13 +16,12 @@ C++ Reference:
 
 Overview
 --------
-1. `createMeshFromBytes` / `createSDFMeshFromBytes` / `createConvexMeshFromBytes`
-   on the bytes of `box_2m.ply`.
+1. `createMeshFromBytes` / `createConvexMeshFromBytes` on the bytes of `box_2m.ply`.
 2. `tesseract_material_mesh.glb` through `create*MeshFromPath` and
    `create*MeshFromResource` with `normals`, `vertex_colors` and
    `material_and_texture` on: four meshes, the last one textured.
-3. That textured quad rebuilt through the full `Mesh`, `SDFMesh`, `PolygonMesh`
-   and `ConvexMesh` constructors, with a `MeshTexture` built from its texture
+3. That textured quad rebuilt through the full `Mesh`, `PolygonMesh` and
+   `ConvexMesh` constructors, with a `MeshTexture` built from its texture
    image and UVs; `getUUID` / `setUUID` and `ConvexMesh.CreationMethod`.
 4. `writeMeshToFile` to a temporary directory, reloaded with `createMeshFromPath`.
 5. `Isometry3d.apply_points` / `apply_directions` on the glb mesh's vertices and normals.
@@ -70,7 +69,6 @@ from tesseract_robotics.tesseract_geometry import (
     MeshTexture,
     PointCloud,
     PolygonMesh,
-    SDFMesh,
     createConvexMeshFromBytes,
     createConvexMeshFromPath,
     createConvexMeshFromResource,
@@ -78,9 +76,6 @@ from tesseract_robotics.tesseract_geometry import (
     createMeshFromPath,
     createMeshFromResource,
     createOctree,
-    createSDFMeshFromBytes,
-    createSDFMeshFromPath,
-    createSDFMeshFromResource,
 )
 from tesseract_robotics.tesseract_urdf import writeMeshToFile
 
@@ -128,14 +123,11 @@ def within_ply_precision(source, reloaded) -> bool:
 
 
 def load_bytes(box_path: Path) -> dict[str, Any]:
-    """Step 1: the three mesh types from the bytes of box_2m.ply."""
+    """Step 1: both mesh types from the bytes of box_2m.ply."""
     # --8<-- [start:from_bytes]
     data = box_path.read_bytes()
     # default triangulate=True, as the URDF parser loads meshes (urdf/src/mesh.cpp:84-88)
     meshes = createMeshFromBytes("box_2m.ply", data)
-    sdf_meshes = createSDFMeshFromBytes(
-        "box_2m.ply", data, UNIT_SCALE, True, False, False, False, False
-    )
     # triangulate=False keeps the six quads (tesseract_geometry_unit.cpp:806-811)
     convex_meshes = createConvexMeshFromBytes(
         "box_2m.ply", data, UNIT_SCALE, False, False, False, False, False
@@ -144,7 +136,6 @@ def load_bytes(box_path: Path) -> dict[str, Any]:
     return {
         "url": meshes[0].getResource().getUrl(),
         "Mesh": counts(meshes),
-        "SDFMesh": counts(sdf_meshes),
         "ConvexMesh": counts(convex_meshes),
         "meshes": meshes,
         "convex_meshes": convex_meshes,
@@ -161,12 +152,10 @@ def load_flags(locator: GeneralResourceLocator) -> dict[str, Any]:
     flags = (UNIT_SCALE, True, True, True, True, True)
     by_path = {
         "Mesh": createMeshFromPath(glb_path, *flags),
-        "SDFMesh": createSDFMeshFromPath(glb_path, *flags),
         "ConvexMesh": createConvexMeshFromPath(glb_path, *flags),
     }
     by_resource = {
         "Mesh": createMeshFromResource(resource, *flags),
-        "SDFMesh": createSDFMeshFromResource(resource, *flags),
         "ConvexMesh": createConvexMeshFromResource(resource, *flags),
     }
     # --8<-- [end:flags]
@@ -205,10 +194,6 @@ def rebuild(quad: Mesh) -> dict[str, Any]:
         "Mesh": (
             Mesh(vertices, faces, quad.getResource(), *common),
             Mesh(vertices, faces, quad.getFaceCount(), quad.getResource(), *common),
-        ),
-        "SDFMesh": (
-            SDFMesh(vertices, faces, quad.getResource(), *common),
-            SDFMesh(vertices, faces, quad.getFaceCount(), quad.getResource(), *common),
         ),
         "PolygonMesh": (
             PolygonMesh(vertices, faces, quad.getResource(), *common, GeometryType.POLYGON_MESH),
@@ -337,7 +322,7 @@ def run() -> dict[str, Any]:
             Path(directory),
         )
     return {
-        "bytes": {key: from_bytes[key] for key in ("url", "Mesh", "SDFMesh", "ConvexMesh")},
+        "bytes": {key: from_bytes[key] for key in ("url", "Mesh", "ConvexMesh")},
         "flags": {key: value for key, value in flagged.items() if key != "meshes"},
         "constructors": rebuild(flagged["meshes"][3]),
         "creation_method": creation_method(from_bytes["convex_meshes"][0]),
@@ -352,7 +337,7 @@ def main() -> None:
     result = run()
     loaded = result["bytes"]
     print(
-        f"From bytes ({loaded['url']}): Mesh {loaded['Mesh']}, SDFMesh {loaded['SDFMesh']}, "
+        f"From bytes ({loaded['url']}): Mesh {loaded['Mesh']}, "
         f"ConvexMesh (triangulate=False) {loaded['ConvexMesh']}  [(faces, vertices)]"
     )
     flags = result["flags"]
