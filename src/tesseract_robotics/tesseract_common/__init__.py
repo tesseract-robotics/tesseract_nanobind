@@ -75,6 +75,9 @@ __all__ = [
     # Logging (spdlog)
     "LogLevel",
     "Logger",
+    "LogSink",
+    "StderrSink",
+    "PythonLoggingSink",
     "LogRecord",
     "getLogger",
     "isLogLevelEnabled",

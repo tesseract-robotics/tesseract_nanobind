@@ -724,6 +724,39 @@ class LogLevel(enum.Enum):
 
     off = 6
 
+class LogSink:
+    """An spdlog sink: one place a Logger writes its records"""
+
+    def level(self) -> LogLevel: ...
+
+    def set_level(self, level: LogLevel) -> None:
+        """Drop records below this level at this sink only"""
+
+    def set_pattern(self, pattern: str) -> None:
+        """
+        Format records with an spdlog pattern (e.g. '%v (%g:%#)' for the message and its source)
+        """
+
+class StderrSink(LogSink):
+    """
+    Colored standard error, the kind of sink tesseract's default logger starts with
+    """
+
+    def __init__(self) -> None: ...
+
+class PythonLoggingSink(LogSink):
+    """
+    Writes each record to Python's logging module, on the logger named `name`, with its level,
+    source file, line and function; the text is the sink's pattern ('%v', the message, by default).
+    Records the Python logger is not enabled for are dropped there. Takes the GIL on the logging thread.
+    """
+
+    def __init__(self, name: str = 'tesseract') -> None: ...
+
+    @property
+    def name(self) -> str:
+        """The Python logger records go to"""
+
 class Logger:
     """A named spdlog logger (tesseract's default is 'tesseract')"""
 
@@ -734,6 +767,22 @@ class Logger:
     def set_level(self, level: LogLevel) -> None: ...
 
     def should_log(self, level: LogLevel) -> bool: ...
+
+    @property
+    def sinks(self) -> list[LogSink]:
+        """
+        The logger's sinks, as a list. Assign a new list to change them, before other threads
+        log (spdlog's sink list is not thread safe), e.g. at startup. A logger created later by
+        getLogger(name) copies the default logger's sinks.
+        """
+
+    @sinks.setter
+    def sinks(self, arg: Sequence, /) -> None: ...
+
+    def set_pattern(self, pattern: str) -> None:
+        """Set the pattern of every sink"""
+
+    def flush(self) -> None: ...
 
 class LogRecord:
     """One tesseract log event, as passed to a record handler"""
