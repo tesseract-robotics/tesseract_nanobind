@@ -76,9 +76,9 @@ void require_not_last_solver(const tcommon::PluginInfoContainer& group, const st
 // The link_point and base_link overloads of JointGroup::calcJacobian read link transforms with
 // operator[] behind an assert (joint_group.cpp:197-198, :234-235 @ 0.35.0): in a release build an
 // unknown name yields an uninitialized Isometry3d. Every overload checks its link names first.
-void require_link(const tk::JointGroup& group, const std::string& link_name) {
-    if (!group.hasLinkName(link_name))
-        throw nb::key_error(("no link '" + link_name + "' in joint group '" + group.getName() + "'").c_str());
+void require_link(const tk::JointGroup& group, const tcommon::LinkId& link_id) {
+    if (!group.hasLinkId(link_id))
+        throw nb::key_error(("no link '" + link_id.name() + "' in joint group '" + group.getName() + "'").c_str());
 }
 
 // Upstream defaults, named: the binding's keyword defaults must not drift from the headers.
@@ -93,10 +93,10 @@ void require_joint_count(Eigen::Index n_values, Eigen::Index n_joints) {
                                std::to_string(n_joints)).c_str());
 }
 
-void require_tip_link(const tk::ForwardKinematics& kin, const std::string& link_name) {
-    const auto tips = kin.getTipLinkNames();
-    if (std::find(tips.begin(), tips.end(), link_name) == tips.end())
-        throw nb::key_error(("no tip link '" + link_name + "' in forward kinematics '" + kin.getSolverName() + "'").c_str());
+void require_tip_link(const tk::ForwardKinematics& kin, const tcommon::LinkId& link_id) {
+    const auto tips = kin.getTipLinkIds();
+    if (std::find(tips.begin(), tips.end(), link_id) == tips.end())
+        throw nb::key_error(("no tip link '" + link_id.name() + "' in forward kinematics '" + kin.getSolverName() + "'").c_str());
 }
 
 // The harmonizers index qs (and position_limits' rows) with every redundancy_capable_joints entry
@@ -207,13 +207,13 @@ NB_MODULE(_tesseract_kinematics, m) {
         .def("clone", [](const tk::InverseKinematics& self) { return self.clone(); });
 
     // ========== JointGroup ==========
-    // One body for calcJacobian(q, link_name, link_point) and its alias calcJacobianWithPoint.
+    // One body for calcJacobian(q, link_id, link_point) and its alias calcJacobianWithPoint.
     auto jacobian_at_point = [](const tk::JointGroup& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
-                                const std::string& link_name,
+                                const tcommon::LinkId& link_id,
                                 const Eigen::Vector3d& link_point) {
-        require_link(self, link_name);
-        return self.calcJacobian(joint_angles, link_name, link_point);
+        require_link(self, link_id);
+        return self.calcJacobian(joint_angles, link_id, link_point);
     };
     nb::class_<tk::JointGroup>(m, "JointGroup")
         .def(nb::init<std::string, std::vector<tcommon::JointId>, const tsg::SceneGraph&, const tsg::SceneState&>(),
@@ -225,7 +225,7 @@ NB_MODULE(_tesseract_kinematics, m) {
             return std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>(result.begin(), result.end());
         }, "joint_angles"_a)
         // The four C++ overloads in header order (joint_group.h:96, :106, :117, :129). nanobind
-        // tells (q, link_name, link_point) from (q, base_link_name, link_name) by the third
+        // tells (q, link_id, link_point) from (q, base_link_id, link_id) by the third
         // argument's type. Unknown link names raise KeyError (require_link).
         .def("calcJacobian", [](const tk::JointGroup& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
@@ -283,13 +283,13 @@ NB_MODULE(_tesseract_kinematics, m) {
         // factory, alive as long as the group (gh-72).
         .def("__init__", [](tk::KinematicGroup* self,
                             std::string name,
-                            std::vector<std::string> joint_names,
+                            std::vector<tcommon::JointId> joint_ids,
                             const tk::InverseKinematics& inv_kin,
                             const tsg::SceneGraph& scene_graph,
                             const tsg::SceneState& scene_state) {
-            new (self) tk::KinematicGroup(std::move(name), std::move(joint_names), inv_kin.clone(),
+            new (self) tk::KinematicGroup(std::move(name), std::move(joint_ids), inv_kin.clone(),
                                           scene_graph, scene_state);
-        }, "name"_a, "joint_names"_a, "inv_kin"_a, "scene_graph"_a, "scene_state"_a, nb::keep_alive<1, 4>())
+        }, "name"_a, "joint_ids"_a, "inv_kin"_a, "scene_graph"_a, "scene_state"_a, nb::keep_alive<1, 4>())
         .def("calcInvKin", [](const tk::KinematicGroup& self,
                               const tk::KinGroupIKInputs& tip_link_poses,
                               const Eigen::Ref<const Eigen::VectorXd>& seed) {
@@ -450,51 +450,51 @@ NB_MODULE(_tesseract_kinematics, m) {
     m.def("numericalJacobian", [](const Eigen::Isometry3d& change_base,
                                   const tk::ForwardKinematics& kin,
                                   const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                  const std::string& link_name,
+                                  const tcommon::LinkId& link_id,
                                   const Eigen::Ref<const Eigen::Vector3d>& link_point) {
         require_joint_count(joint_values.size(), kin.numJoints());
-        require_tip_link(kin, link_name);
+        require_tip_link(kin, link_id);
         Eigen::MatrixXd jacobian(6, joint_values.size());
-        tk::numericalJacobian(jacobian, change_base, kin, joint_values, link_name, link_point);
+        tk::numericalJacobian(jacobian, change_base, kin, joint_values, link_id, link_point);
         return jacobian;
-    }, "change_base"_a, "kin"_a, "joint_values"_a, "link_name"_a, "link_point"_a,
+    }, "change_base"_a, "kin"_a, "joint_values"_a, "link_id"_a, "link_point"_a,
     "Finite-difference Jacobian of a tip link (step 1e-8 rad per joint, utils.cpp:44).\n\n"
     "Raises:\n"
     "    ValueError: joint_values does not have kin.numJoints() entries.\n"
-    "    KeyError: link_name is not a tip link of kin.");
+    "    KeyError: link_id is not a tip link of kin.");
     m.def("numericalJacobian", [](const Eigen::Isometry3d& change_base,
                                   const tk::JointGroup& joint_group,
                                   const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                  const std::string& link_name,
+                                  const tcommon::LinkId& link_id,
                                   const Eigen::Ref<const Eigen::Vector3d>& link_point) {
         require_joint_count(joint_values.size(), joint_group.numJoints());
-        require_link(joint_group, link_name);
+        require_link(joint_group, link_id);
         Eigen::MatrixXd jacobian(6, joint_values.size());
-        tk::numericalJacobian(jacobian, change_base, joint_group, joint_values, link_name, link_point);
+        tk::numericalJacobian(jacobian, change_base, joint_group, joint_values, link_id, link_point);
         return jacobian;
-    }, "change_base"_a, "joint_group"_a, "joint_values"_a, "link_name"_a, "link_point"_a,
+    }, "change_base"_a, "joint_group"_a, "joint_values"_a, "link_id"_a, "link_point"_a,
     "Finite-difference Jacobian of a link of joint_group (step 1e-8 rad per joint, utils.cpp:80).\n\n"
     "Raises:\n"
     "    ValueError: joint_values does not have joint_group.numJoints() entries.\n"
-    "    KeyError: link_name is not a link of joint_group.");
+    "    KeyError: link_id is not a link of joint_group.");
     m.def("numericalJacobian", [](const tk::JointGroup& joint_group,
                                   const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                                  const std::string& base_link_name,
+                                  const tcommon::LinkId& base_link_id,
                                   const Eigen::Isometry3d& base_link_offset,
-                                  const std::string& link_name,
+                                  const tcommon::LinkId& link_id,
                                   const Eigen::Isometry3d& link_offset) {
         require_joint_count(joint_values.size(), joint_group.numJoints());
-        require_link(joint_group, base_link_name);
-        require_link(joint_group, link_name);
+        require_link(joint_group, base_link_id);
+        require_link(joint_group, link_id);
         Eigen::MatrixXd jacobian(6, joint_values.size());
-        tk::numericalJacobian(jacobian, joint_group, joint_values, base_link_name, base_link_offset, link_name,
+        tk::numericalJacobian(jacobian, joint_group, joint_values, base_link_id, base_link_offset, link_id,
                               link_offset);
         return jacobian;
-    }, "joint_group"_a, "joint_values"_a, "base_link_name"_a, "base_link_offset"_a, "link_name"_a, "link_offset"_a,
-    "Finite-difference Jacobian of link_name relative to base_link_name, in the base link frame.\n\n"
+    }, "joint_group"_a, "joint_values"_a, "base_link_id"_a, "base_link_offset"_a, "link_id"_a, "link_offset"_a,
+    "Finite-difference Jacobian of link_id relative to base_link_id, in the base link frame.\n\n"
     "Raises:\n"
     "    ValueError: joint_values does not have joint_group.numJoints() entries.\n"
-    "    KeyError: base_link_name or link_name is not a link of joint_group.");
+    "    KeyError: base_link_id or link_id is not a link of joint_group.");
 
     m.def("isNearSingularity", [](const Eigen::Ref<const Eigen::MatrixXd>& jacobian, double threshold) {
         // The smallest singular value is svd.singularValues().tail(1) (utils.cpp:218): none for an empty matrix.
