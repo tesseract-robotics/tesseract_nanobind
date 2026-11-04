@@ -277,3 +277,41 @@ def test_materials_are_double_sided():
     mesh, _ = _folded_strip(fold_deg=10.0)
     (result,) = visual_to_trimesh(_visual(mesh), "l")
     assert result.visual.material.doubleSided
+
+
+# Angle-weighted normals vs the true radial on a level-3 icosphere [-]: 4.6e-3 measured
+# (0.26 deg), the facet averaging itself.
+SPHERE_NORMAL_ATOL = 5e-3
+
+
+def test_sphere_has_smooth_radial_normals():
+    (mesh,) = visual_to_trimesh(_visual(tg.Sphere(0.25)), "l")
+    assert "NORMAL" in _glb_attributes(mesh)
+    np.testing.assert_allclose(mesh.vertex_normals, mesh.vertices / 0.25, atol=SPHERE_NORMAL_ATOL)
+
+
+def test_cylinder_side_is_smooth_and_cap_edges_stay_creased():
+    (mesh,) = visual_to_trimesh(_visual(tg.Cylinder(0.1, 2.0)), "l")
+    assert "NORMAL" in _glb_attributes(mesh)
+    z_axis_component = np.abs(mesh.vertex_normals[:, 2])
+    # Every vertex belongs to a side patch (radial) or a cap patch (+-z), nothing between.
+    is_side = np.isclose(z_axis_component, 0.0, atol=NORMAL_ATOL)
+    is_cap = np.isclose(z_axis_component, 1.0, atol=NORMAL_ATOL)
+    assert (is_side | is_cap).all()
+    radial = mesh.vertices[is_side, :2] / 0.1
+    np.testing.assert_allclose(mesh.vertex_normals[is_side, :2], radial, atol=NORMAL_ATOL)
+
+
+@pytest.mark.parametrize(
+    "geometry", [tg.Capsule(0.1, 1.0), tg.Cone(0.1, 2.0)], ids=["capsule", "cone"]
+)
+def test_curved_primitives_carry_normals(geometry):
+    (mesh,) = visual_to_trimesh(_visual(geometry), "l")
+    assert "NORMAL" in _glb_attributes(mesh)
+    assert np.isfinite(mesh.vertex_normals).all()
+
+
+def test_box_stays_flat_shaded():
+    """No normals on the wire: the browser's flat shading is exactly a box's creases."""
+    (mesh,) = visual_to_trimesh(_visual(tg.Box(1.0, 2.0, 3.0)), "l")
+    assert "NORMAL" not in _glb_attributes(mesh)
