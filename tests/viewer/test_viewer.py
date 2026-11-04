@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from loguru import logger
 
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
@@ -20,6 +21,12 @@ from tesseract_robotics.tesseract_command_language import (
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer, Trajectory
+from tesseract_robotics.viewer.errors import (
+    NoEnvironmentError,
+    NoTrajectoryError,
+    UnknownJointError,
+    ViewerPortInUseError,
+)
 from tesseract_robotics.viewer.poses import link_poses
 from tesseract_robotics.viewer.viewer import PLAYBACK_DT_S
 
@@ -31,6 +38,18 @@ POSE_ATOL_M = 1e-12
 PLOT_ATOL_M = 1e-6
 # Wall time for the 30 Hz player to tick at least once [s]; generous for loaded CI.
 PLAYER_ADVANCE_TIMEOUT_S = 5.0
+
+# One revolute joint not in the IRB2400, to make a trajectory stale.
+OTHER_ROBOT_URDF = """
+<robot name="other" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
+  <link name="world"/>
+  <link name="arm"/>
+  <joint name="other_joint" type="revolute">
+    <parent link="world"/><child link="arm"/><axis xyz="0 0 1"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+</robot>
+"""
 
 JOINT_NAMES = [f"joint_{i + 1}" for i in range(6)]
 Q = np.array([0.3, -0.2, 0.1, 0.4, -0.5, 0.6])
@@ -252,3 +271,106 @@ def test_update_trajectory_restarts_playback(viewer, env):
     viewer.update_joint_positions(JOINT_NAMES, Q)
     viewer.update_trajectory(_two_waypoints())
     assert viewer._gui_play.value is True
+
+
+def _wait_for(condition):
+    deadline = time.monotonic() + PLAYER_ADVANCE_TIMEOUT_S
+    while not condition() and time.monotonic() < deadline:
+        time.sleep(PLAYBACK_DT_S)
+    assert condition()
+
+
+@pytest.fixture
+def other_env():
+    env = Environment()
+    assert env.init(OTHER_ROBOT_URDF, GeneralResourceLocator())
+    return env
+
+
+@pytest.fixture
+def log_messages():
+    messages: list[str] = []
+    sink = logger.add(messages.append, format="{level} {message}")
+    yield messages
+    logger.remove(sink)
+
+
+def test_update_trajectory_with_unknown_joint_keeps_the_previous_one(viewer, env):
+    viewer.update_environment(env)
+    good = _two_waypoints()
+    _load_paused(viewer, good)
+    bad = Trajectory.build(["no_such_joint"], [[0.0], [1.0]], [0.0, 1.0])
+    with pytest.raises(UnknownJointError):
+        viewer.update_trajectory(bad)
+    assert viewer._trajectory is good
+    assert viewer._gui_play.value is False
+    assert viewer._gui_time.max == good.duration_s
+
+
+def test_update_environment_with_other_joints_drops_the_trajectory(viewer, env, other_env):
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    viewer.update_environment(other_env)
+    assert viewer._trajectory is None
+    assert viewer._gui_time.disabled
+    time.sleep(3 * PLAYBACK_DT_S)
+    assert viewer._player.is_alive()
+    with pytest.raises(NoTrajectoryError):
+        viewer.show_time(0.0)
+
+
+def test_update_environment_with_the_same_joints_keeps_the_trajectory(viewer, env):
+    """The pointcloud example re-pushes a re-tinted environment."""
+    viewer.update_environment(env)
+    traj = _two_waypoints()
+    viewer.update_trajectory(traj)
+    viewer.update_environment(env)
+    assert viewer._trajectory is traj
+    assert viewer._gui_time.disabled is False
+
+
+def test_failing_tick_pauses_and_logs_and_player_survives(viewer, env, log_messages):
+    """An environment changed behind the viewer's back fails on the player thread."""
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    with viewer._pose_lock:
+        viewer._trajectory = Trajectory.build(["no_such_joint"], [[0.0], [1.0]], [0.0, 1.0])
+    _wait_for(lambda: viewer._gui_play.value is False)
+    assert viewer._player.is_alive()
+    assert any("no_such_joint" in m and m.startswith("ERROR") for m in log_messages)
+    # The player is still in service: a new trajectory plays.
+    viewer.update_trajectory(_two_waypoints())
+    _wait_for(lambda: viewer._gui_time.value > 0.0)
+
+
+def test_update_joint_positions_before_environment_raises(viewer):
+    with pytest.raises(NoEnvironmentError):
+        viewer.update_joint_positions(JOINT_NAMES, Q)
+
+
+def test_update_trajectory_before_environment_raises(viewer):
+    with pytest.raises(NoEnvironmentError):
+        viewer.update_trajectory(_two_waypoints())
+    assert viewer._trajectory is None
+
+
+def test_show_time_without_trajectory_raises(viewer, env):
+    viewer.update_environment(env)
+    with pytest.raises(NoTrajectoryError):
+        viewer.show_time(0.0)
+
+
+def test_busy_port_raises_instead_of_moving_on():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as holder:
+        holder.bind(("127.0.0.1", 0))
+        holder.listen()
+        port = holder.getsockname()[1]
+        with pytest.raises(ViewerPortInUseError, match=str(port)):
+            TesseractViewer(port=port)
+
+
+def test_port_zero_picks_a_free_port():
+    with TesseractViewer(port=0) as viewer:
+        port = viewer.server.get_port()
+        assert port != 0
+        assert viewer.url == f"http://127.0.0.1:{port}"

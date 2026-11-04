@@ -27,3 +27,11 @@ class ViewerCloseTimeoutError(RuntimeError):
 
 class NoEnvironmentError(RuntimeError):
     """A viewer call needs an environment; `update_environment` has not been called."""
+
+
+class NoTrajectoryError(RuntimeError):
+    """A viewer call needs a trajectory; `update_trajectory` has not been called."""
+
+
+class ViewerPortInUseError(OSError):
+    """The requested port is taken; viser would have moved to the next free one."""
