@@ -120,7 +120,7 @@ def test_inverse_kinematics_get_kinematic_info(iiwa: Iiwa):
     info = constraint.getKinematicInfo()
     assert info.working_frame == "base_link"
     assert info.tcp_frame == "tool0"
-    assert list(info.manip.getJointNames()) == iiwa.joint_names
+    assert [str(j) for j in info.manip.getJointIds()] == iiwa.joint_names
 
 
 def test_cart_line_get_line_and_info(iiwa: Iiwa):

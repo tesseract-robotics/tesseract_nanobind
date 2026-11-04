@@ -7,7 +7,7 @@ from tesseract_robotics.tesseract_common import LinkIdPair
 
 
 def _unordered(pairs):
-    return {frozenset(pair) for pair in pairs}
+    return {frozenset(pair.orderedNameView()) for pair in pairs}
 
 
 def test_pair_tables():
@@ -16,7 +16,7 @@ def test_pair_tables():
     data.setCollisionCoeff("a", "c", 2.0)
 
     table = data.getCollisionCoeffPairData()
-    assert {frozenset(pair): coeff for pair, coeff in table.items()} == {
+    assert {frozenset(pair.orderedNameView()): coeff for pair, coeff in table.items()} == {
         frozenset(("a", "b")): 0.0,
         frozenset(("a", "c")): 2.0,
     }

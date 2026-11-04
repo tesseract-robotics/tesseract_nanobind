@@ -110,4 +110,4 @@ def load_iiwa() -> Iiwa:
     env = Environment()
     assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)
     manip = env.getKinematicGroup("manipulator")
-    return Iiwa(env, manip, list(manip.getJointNames()), manip.getLimits().joint_limits)
+    return Iiwa(env, manip, [str(j) for j in manip.getJointIds()], manip.getLimits().joint_limits)

@@ -16,7 +16,7 @@ from tesseract_robotics.tesseract_command_language import (
     checkJointPositionFormat,
     clampToJointLimits,
     formatJointPosition,
-    getJointNames,
+    getJointIds,
     getJointPosition,
     isWithinJointLimits,
     makeTimeMonotonicallyIncreasing,
@@ -64,7 +64,7 @@ def test_to_joint_trajectory():
         [s.position for s in traj.states], [[0.0, 0.0], [0.1, 0.2], [0.3, 0.4]]
     )
     assert [s.time for s in traj.states] == [0.0, 1.0, 2.0]
-    assert traj[0].joint_names == NAMES
+    assert traj[0].joint_ids == NAMES
 
 
 def test_to_joint_trajectory_from_instruction_poly():
@@ -74,7 +74,7 @@ def test_to_joint_trajectory_from_instruction_poly():
 
 def test_joint_names_and_position():
     wp = WaypointPoly(JointWaypoint(NAMES, [1.0, 2.0]))
-    assert getJointNames(wp) == NAMES
+    assert getJointIds(wp) == NAMES
     assert list(getJointPosition(wp)) == [1.0, 2.0]
     assert list(getJointPosition(["j2", "j1"], wp)) == [2.0, 1.0]
 
@@ -84,7 +84,7 @@ def test_format_joint_position_reorders_in_place():
     assert not checkJointPositionFormat(["j2", "j1"], wp)
     assert formatJointPosition(["j2", "j1"], wp)
     assert checkJointPositionFormat(["j2", "j1"], wp)
-    assert getJointNames(wp) == ["j2", "j1"]
+    assert getJointIds(wp) == ["j2", "j1"]
     assert list(getJointPosition(wp)) == [2.0, 1.0]
 
 

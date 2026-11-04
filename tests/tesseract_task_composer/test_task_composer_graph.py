@@ -14,13 +14,13 @@ from tesseract_robotics.tesseract_task_composer import (
     TaskComposerContext,
     TaskComposerDataStorage,
     TaskComposerGraph,
-    TaskComposerKeys,
     TaskComposerNode,
     TaskComposerNodeInfo,
     TaskComposerNodeInfoContainer,
     TaskComposerNodePorts,
     TaskComposerNodeType,
     TaskComposerPipeline,
+    TaskComposerPortMap,
     TaskComposerTask,
 )
 
@@ -34,11 +34,23 @@ def _copy_of(infos: TaskComposerNodeInfoContainer) -> TaskComposerNodeInfoContai
     return copied
 
 
+def _required_inputs(node: TaskComposerNode) -> set[str]:
+    """The required input ports of `node`'s fixed contract (empty without a contract)."""
+    contract = node.getPortContract()
+    if contract is None:
+        return set()
+    return {
+        port
+        for port, definition in contract.inputs().items()
+        if definition.requirement == TaskComposerNodePorts.Requirement.REQUIRED
+    }
+
+
 def _task_with_required_inputs(pipeline: TaskComposerNode) -> TaskComposerNode:
     """A child task of `pipeline` that declares required input ports. Graphs and pipelines
-    declare none (upstream constructs them with empty TaskComposerNodePorts)."""
+    have no fixed contract (`getPortContract()` is None upstream)."""
     for child in pipeline.getNodes().values():
-        if child.getType() == TaskComposerNodeType.TASK and child.getPorts().input_required:
+        if child.getType() == TaskComposerNodeType.TASK and _required_inputs(child):
             return child
     raise AssertionError(f"{pipeline.getName()} has no task with required input ports")
 
@@ -156,18 +168,20 @@ class TestFuture:
 
 
 class TestNode:
-    """Type, ports, setters, `validatePorts`, `getDataStorage` and `run` (#318)."""
+    """Type, ports, setters, port-contract validation, `getDataStorage` and `run` (#318)."""
 
     def test_pipeline_type_and_ports(self, factory):
-        """A pipeline declares no ports (upstream skips port checks for graphs); its tasks do."""
+        """A pipeline has no fixed port contract (upstream skips port checks for graphs); its
+        tasks do."""
         node = factory.createTaskComposerNode(PIPELINE)
         assert node.getType() == TaskComposerNodeType.PIPELINE
-        assert node.getPorts() == TaskComposerNodePorts()
+        assert node.getPortContract() is None
         task = _task_with_required_inputs(node)
-        ports = task.getPorts()
+        ports = task.getPortContract()
         assert isinstance(ports, TaskComposerNodePorts)
-        assert set(ports.input_required) <= set(task.getInputKeys().data())
-        port = next(iter(ports.input_required))
+        required = _required_inputs(task)
+        assert required <= set(task.getInputPortMappings().data())
+        port = next(iter(required))
         assert port in str(ports)
 
     def test_set_name_and_namespace(self, factory):
@@ -189,10 +203,13 @@ class TestNode:
 
     def test_validate_ports_raises_on_missing_required_key(self, factory):
         task = _task_with_required_inputs(factory.createTaskComposerNode(PIPELINE))
-        task.validatePorts()
-        task.setInputKeys(TaskComposerKeys())
-        with pytest.raises(RuntimeError, match="missing required input port"):
-            task.validatePorts()
+        contract = task.getPortContract()
+        outputs = task.getOutputPortMappings()
+        contract.validateOrThrow(task.getInputPortMappings(), outputs, task.getName())
+        with pytest.raises(RuntimeError, match="required port is missing"):
+            contract.validateOrThrow(TaskComposerPortMap(), outputs, task.getName())
+        with pytest.raises(RuntimeError, match="required port is missing"):
+            task.setPortMappings(TaskComposerPortMap(), outputs)
 
     def test_get_data_storage_of_root_is_context_storage(self, factory):
         node = factory.createTaskComposerNode(PIPELINE)
@@ -226,6 +243,8 @@ class TestNode:
         pipeline = factory.createTaskComposerNode(PIPELINE)
         graph = TaskComposerGraph("g")
         graph.setTerminals([graph.addNode(pipeline)])
+        # 0.36 aborts a graph whose boundary does not supply its children's inputs.
+        graph.setPortMappings(pipeline.getInputPortMappings(), pipeline.getOutputPortMappings())
         context = TaskComposerContext("direct", make_storage(pipeline))
         graph.run(context)
         info = context.task_infos.getInfo(graph.getUUIDString())
@@ -335,8 +354,8 @@ class TestNodeInfo:
         info = context.task_infos.getInfo(node.getUUIDString())
         assert isinstance(info.start_time, datetime.datetime)
         assert info.start_time <= datetime.datetime.now()
-        assert info.input_keys == node.getInputKeys()
-        assert info.output_keys == node.getOutputKeys()
+        assert info.input_port_mappings == node.getInputPortMappings()
+        assert info.output_port_mappings == node.getOutputPortMappings()
         assert info.ns == node.getNamespace()
         assert info.conditional is node.isConditional()
         assert info.aborted is False
@@ -417,12 +436,16 @@ class TestGraphClasses:
 
     def test_override_keys(self):
         graph = TaskComposerGraph("g")
-        keys = TaskComposerKeys()
-        keys.add("p", "k")
-        graph.setOverrideInputKeys(keys)
-        graph.setOverrideOutputKeys(keys)
-        assert graph.getOverrideInputKeys() == keys
-        assert graph.getOverrideOutputKeys() == keys
+        # 0.36 rejects an override of a port the graph's boundary mappings do not declare.
+        boundary = TaskComposerPortMap()
+        boundary.set("p", "local_k")
+        graph.setPortMappings(boundary, boundary)
+        keys = TaskComposerPortMap()
+        keys.set("p", "k")
+        graph.setOverrideInputPortMappings(keys)
+        graph.setOverrideOutputPortMappings(keys)
+        assert graph.getOverrideInputPortMappings() == keys
+        assert graph.getOverrideOutputPortMappings() == keys
 
     def test_graph_built_in_python_runs(self, factory, executor, make_storage):
         """Two pipelines in sequence, the second on the first's output (#324)."""
@@ -437,6 +460,8 @@ class TestGraphClasses:
         assert graph.getTerminals() == [b]
         assert graph.getAbortTerminal() == str(uuid.UUID(int=0))
         assert graph.getAbortTerminalIndex() == -1
+        # 0.36: a graph is valid only once its boundary supplies its children's inputs.
+        graph.setPortMappings(first.getInputPortMappings(), second.getOutputPortMappings())
         assert graph.isValid()[0] is True
 
         future = executor.run(graph, make_storage(first))
@@ -487,12 +512,14 @@ class TestNodePorts:
 
     def test_fields_and_type_enum(self):
         ports = TaskComposerNodePorts()
-        ports.input_required = {"a": TaskComposerNodePorts.Type.SINGLE}
-        ports.output_optional = {"b": TaskComposerNodePorts.Type.MULTIPLE}
-        assert ports.input_required == {"a": TaskComposerNodePorts.Type.SINGLE}
-        assert ports.output_optional["b"] == TaskComposerNodePorts.Type.MULTIPLE
-        assert ports.input_optional == {}
-        assert ports.output_required == {}
+        ports.addRequiredInput("a", TaskComposerNodePorts.Cardinality.SINGLE)
+        ports.addOptionalOutput("b", TaskComposerNodePorts.Cardinality.MULTIPLE)
+        assert set(ports.inputs()) == {"a"}
+        assert ports.inputs()["a"].cardinality == TaskComposerNodePorts.Cardinality.SINGLE
+        assert ports.inputs()["a"].requirement == TaskComposerNodePorts.Requirement.REQUIRED
+        assert set(ports.outputs()) == {"b"}
+        assert ports.outputs()["b"].cardinality == TaskComposerNodePorts.Cardinality.MULTIPLE
+        assert ports.outputs()["b"].requirement == TaskComposerNodePorts.Requirement.OPTIONAL
 
 
 class TestValueEquality:
@@ -530,7 +557,7 @@ class TestValueEquality:
     def test_node_ports(self):
         a, b = TaskComposerNodePorts(), TaskComposerNodePorts()
         assert a == b
-        b.input_required = {"a": TaskComposerNodePorts.Type.SINGLE}
+        b.addRequiredInput("a", TaskComposerNodePorts.Cardinality.SINGLE)
         assert a != b
         with pytest.raises(TypeError):
             hash(a)

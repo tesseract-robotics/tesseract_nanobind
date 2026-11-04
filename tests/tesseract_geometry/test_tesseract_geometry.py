@@ -494,7 +494,6 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 MESH_CLASSES = [
     tesseract_geometry.Mesh,
-    tesseract_geometry.SDFMesh,
     tesseract_geometry.PolygonMesh,
     tesseract_geometry.ConvexMesh,
 ]
@@ -613,12 +612,12 @@ def test_convex_mesh_equality_compares_creation_method():
     assert a != b
 
 
-def test_convex_mesh_clone_resets_creation_method():
-    """Pins upstream: ConvexMesh::clone() calls a constructor, so the clone is DEFAULT (convex_mesh.cpp:77 @ 0.35.0)."""
+def test_convex_mesh_clone_keeps_creation_method():
+    """Pins upstream: ConvexMesh::clone() copies the creation method (convex_mesh.cpp:86 @ 0.36.0)."""
     CreationMethod = tesseract_geometry.ConvexMesh.CreationMethod
     geom = tesseract_geometry.ConvexMesh(SQUARE_VERTICES, SQUARE_FACES)
     geom.setCreationMethod(CreationMethod.MESH)
-    assert geom.clone().getCreationMethod() == CreationMethod.DEFAULT
+    assert geom.clone().getCreationMethod() == CreationMethod.MESH
 
 
 def test_urdf_make_convex_reports_converted():
@@ -646,11 +645,9 @@ def test_urdf_make_convex_reports_converted():
 
 
 # Whether the class's own operator== compares scale: PolygonMesh, Mesh and ConvexMesh do through
-# PolygonMesh::operator== (polygon_mesh.cpp:111-120); SDFMesh::operator== is Geometry's alone
-# (sdf_mesh.cpp:80-85 @ 0.35.0).
+# PolygonMesh::operator== (polygon_mesh.cpp:111-120). SDFMesh was removed in 0.36.
 COMPARES_SCALE = {
     tesseract_geometry.Mesh: True,
-    tesseract_geometry.SDFMesh: False,
     tesseract_geometry.PolygonMesh: True,
     tesseract_geometry.ConvexMesh: True,
 }
@@ -696,7 +693,6 @@ def test_create_mesh_from_bytes_defaults_match_path():
     [
         ("createMeshFromBytes", tesseract_geometry.Mesh),
         ("createConvexMeshFromBytes", tesseract_geometry.ConvexMesh),
-        ("createSDFMeshFromBytes", tesseract_geometry.SDFMesh),
     ],
 )
 def test_create_mesh_from_bytes_instance_types(fn, cls):
@@ -784,9 +780,7 @@ def test_create_mesh_from_resource_and_bytes_flags_match_path():
     "fn",
     [
         "createConvexMeshFromPath",
-        "createSDFMeshFromPath",
         "createConvexMeshFromResource",
-        "createSDFMeshFromResource",
     ],
 )
 def test_create_mesh_instances_accept_flags(fn):

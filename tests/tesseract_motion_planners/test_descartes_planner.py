@@ -567,7 +567,7 @@ class TestDescartesCreateKinematicGroup:
         t_env, manip_info, joint_names = abb_irb2400_environment
         group = DescartesDefaultMoveProfileD().createKinematicGroup(manip_info, t_env)
         assert isinstance(group, KinematicGroup)
-        assert list(group.getJointNames()) == joint_names
+        assert list(group.getJointIds()) == joint_names
 
     def test_on_a_python_profile(self, abb_irb2400_environment):
         t_env, manip_info, _ = abb_irb2400_environment

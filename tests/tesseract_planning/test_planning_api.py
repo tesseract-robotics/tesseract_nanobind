@@ -304,7 +304,8 @@ class TestRobot:
         assert all(type(n) is str for n in robot.get_joint_names("manipulator"))
         assert all(type(n) is str for n in robot.get_joint_limits("manipulator"))
         assert all(type(n) is str for n in robot.get_state().joint_names)
-        assert type(robot.get_manipulator_info("manipulator").tcp_frame.name()) is str
+        info = robot.get_manipulator_info("manipulator", "tool0", "base_link")
+        assert type(info.tcp_frame.name()) is str
 
     def test_get_state(self, robot):
         state = robot.get_state()
