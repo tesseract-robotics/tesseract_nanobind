@@ -223,12 +223,16 @@ def test_extension_has_single_vhacd_copy():
     2894 strong VHACD:: definitions there (macOS, 0.35.0)."""
     import tesseract_robotics.tesseract_collision._tesseract_collision as ext
 
-    proc = subprocess.run(
-        ["nm", "-C", str(Path(ext.__file__))], capture_output=True, text=True, check=True
-    )
+    # nm, then c++filt: conda's cctools nm (first on PATH in a conda env) has no -C
+    symbols = subprocess.run(
+        ["nm", str(Path(ext.__file__))], capture_output=True, text=True, check=True
+    ).stdout
+    demangled = subprocess.run(
+        ["c++filt"], input=symbols, capture_output=True, text=True, check=True
+    ).stdout
     strong = [
         line
-        for line in proc.stdout.splitlines()
+        for line in demangled.splitlines()
         if STRONG_DEFINITION.match(line) and VHACD_NAMESPACE.search(line)
     ]
     assert not strong, f"{len(strong)} strong VHACD:: definitions, e.g. {strong[:5]}"
