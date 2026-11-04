@@ -2,7 +2,8 @@
 
 The two evaluator bases bind their query methods, so Python sees which contacts and gradients
 a collision constraint works from. calcCollisions / calcCollisionData fill a C++ out-param; in
-Python they return a fresh CollisionCacheData.
+Python they return a fresh CollisionCacheData. 0.36 moved the per-contact gradient off the
+evaluators to the free function trajopt_common::getGradient, which returns GradientResults.
 """
 
 from __future__ import annotations
@@ -40,7 +41,10 @@ def test_get_gradient_is_non_zero(two_boxes: TwoBoxes):
     evaluator = two_boxes.discrete_evaluator()
     dof = np.array([OVERLAP_X])
     contact = _pair_results(evaluator.calcCollisions(dof, MAX_ALLOWED))[0]
-    gradient = evaluator.getGradient(dof, contact)
+    margin = evaluator.getCollisionMarginData().getCollisionMargin(PAIR)
+    gradient = ti.getGradient(
+        dof, contact, margin, evaluator.getCollisionMarginBuffer(), evaluator.getJointGroup()
+    )
     assert isinstance(gradient, ti.GradientResults)
     assert gradient.error > 0.0
     moving = [g for g in gradient.gradients if g.has_gradient]
@@ -60,7 +64,10 @@ def test_continuous_queries():
     data = evaluator.calcCollisionData(dof0, dof1, False, False, MAX_ALLOWED)
     assert isinstance(data, ti.CollisionCacheData)
     contact = _pair_results(data)[0]
-    gradient = evaluator.calcGradientData(dof0, dof1, contact)
+    margin = evaluator.getCollisionMarginData().getCollisionMargin(PAIR)
+    gradient = ti.getGradient(
+        dof0, dof1, contact, margin, evaluator.getCollisionMarginBuffer(), evaluator.getJointGroup()
+    )
     assert isinstance(gradient, ti.GradientResults)
     assert [str(j) for j in evaluator.getJointGroup().getJointIds()] == ["slider_joint"]
 
