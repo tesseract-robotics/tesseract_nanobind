@@ -135,11 +135,13 @@ public:
     }
     double getTotalExactCost() const override { return live().getTotalExactCost(); }
     Eigen::VectorXd getExactCosts() const override { return live().getExactCosts(); }
-    Eigen::VectorXd
+    tsqp::ConstraintViolations
     evaluateConvexConstraintViolations(const Eigen::Ref<const Eigen::VectorXd>& var_vals) const override {
         return live().evaluateConvexConstraintViolations(var_vals);
     }
-    Eigen::VectorXd getExactConstraintViolations() const override { return live().getExactConstraintViolations(); }
+    tsqp::ConstraintViolations getExactConstraintViolations() const override {
+        return live().getExactConstraintViolations();
+    }
     void scaleBoxSize(double& scale) override { live().scaleBoxSize(scale); }
     void setBoxSize(const Eigen::Ref<const Eigen::VectorXd>& box_size) override { live().setBoxSize(box_size); }
     void setConstraintMeritCoeff(const Eigen::Ref<const Eigen::VectorXd>& merit_coeff) override {
