@@ -1,5 +1,4 @@
 #include "tesseract_nb.h"
-#include "python_output_handler.h"
 #include <iterator>
 
 // tesseract_common headers (need eigen_types.h before opaque declarations)
@@ -210,7 +209,7 @@ void bindNameId(nb::module_& m, const char* py_name) {
 
 NB_MODULE(_tesseract_common, m) {
     m.doc() = "tesseract_common Python bindings (nanobind)";
-    register_python_error_translator();  // ResourceLocator and OutputHandler trampolines
+    register_python_error_translator();  // ResourceLocator trampoline
 
     // ========== Identity types (bound first: every link/joint-addressing API below takes them) ==========
     bindNameId<tesseract::common::LinkTag>(m, "LinkId");

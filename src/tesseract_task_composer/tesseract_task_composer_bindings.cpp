@@ -4,7 +4,6 @@
  */
 
 #include "tesseract_nb.h"
-#include "tesseract_common/log_flush_barrier.h"
 #include <future>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/vector.h>
@@ -109,7 +108,7 @@ std::string type_name(const std::type_index& type) {
 }
 
 // createTaskComposer{Node,Executor} never throw: an unknown name, a plugin symbol that fails to
-// load and a plugin factory that throws all log a console_bridge warning and return nullptr
+// load and a plugin factory that throws all log a tesseract warning and return nullptr
 // (task_composer_plugin_factory.cpp, 0.35.0). The binding raises this instead of returning None.
 struct TaskComposerPluginError : std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -131,7 +130,7 @@ std::unique_ptr<T> require_created(std::unique_ptr<T> created, const char* calle
                                       "' not found among the configured plugins: [" + names + "]");
     }
     throw TaskComposerPluginError(std::string(caller) + ": plugin '" + name +
-                                  "' is configured but failed to load or build; the console_bridge "
+                                  "' is configured but failed to load or build; the tesseract "
                                   "warning above gives the cause");
 }
 
@@ -143,7 +142,7 @@ std::unique_ptr<T> require_created(std::unique_ptr<T> created, const char* calle
         return created;
     }
     throw TaskComposerPluginError(std::string(caller) + ": '" + name + "' (class '" + info.class_name +
-                                  "') failed to load or build; the console_bridge warning above gives "
+                                  "') failed to load or build; the tesseract warning above gives "
                                   "the cause");
 }
 
@@ -250,10 +249,6 @@ void free_finished_runs() {
 // counted off: one step of Taskflow's teardown, microseconds unless the worker is preempted.
 constexpr auto EXIT_DRAIN_IDLE_POLL = std::chrono::milliseconds(1);
 
-// tesseract_common's flushOutputHandlers within the log delivery's exit budget, with the GIL held:
-// false when the budget ran out. Set once at module init.
-bool (*flush_output_handlers_at_exit)() = nullptr;
-
 // Wait for every run still in flight with the GIL released (a worker's log handler or a run
 // started meanwhile may need the GIL), before the interpreter tears down what they use. Other threads may start runs while it waits: repeat until none is left. A run is
 // done when its executor is idle, not when its future is ready: Taskflow sets the future first,
@@ -293,21 +288,11 @@ void wait_for_in_flight_runs() {
     }
 }
 
-// Registered with atexit. Python log handlers get their messages on tesseract_common's delivery
-// thread, after they were logged: a message delivered once the last run ended may start another.
-// So the drain then waits for the handlers to receive everything logged so far, and starts over
-// if they started a run. It waits for the handlers only within the log delivery's exit budget
-// (shared with its own exit hook, which runs next): a stuck handler does not hold up exit. Once
-// the budget is spent, the runs already started are waited for one last time, and the rest of the
-// messages go to stderr.
+// Registered with atexit. Python log record handlers run synchronously on the logging thread, so
+// every message logged by a run reached its handler before the run ended: no later delivery can
+// start another run.
 void wait_for_runs_at_exit() {
-    do {
-        wait_for_in_flight_runs();
-        if (!flush_output_handlers_at_exit()) {
-            wait_for_in_flight_runs();
-            return;
-        }
-    } while (!in_flight_runs().empty());
+    wait_for_in_flight_runs();
 }
 
 // The Python object of a C++ argument that Python passed in.
@@ -354,21 +339,15 @@ struct TaskComposerServerBusyError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-// tesseract_common's flush barrier (log_flush_barrier.h). Set once at module init.
-const tesseract_nb_common::LogFlushBarrierApi* log_flush_barrier = nullptr;
-
 // Upstream's server has no lock. loadConfig and addTask (mutations) hold the GIL, but give it up
 // inside Python callbacks they make (a ResourceLocator, a Python-owned task's deleter), where
 // other threads run; addExecutor (a mutation too) runs without the GIL, because destroying an
 // executor joins workers that may wait for the GIL. While a mutation runs, every other server
-// call (enter_server) on another thread waits for it with the GIL released, a Python log handler
-// on tesseract_common's delivery thread included, and raises only where waiting cannot end:
+// call (enter_server) on another thread waits for it with the GIL released, a Python log record
+// handler on a worker included, and raises only where waiting cannot end:
 // - on the mutating thread itself (a Python ResourceLocator inside the load);
 // - on a thread mutating another server: two loads whose ResourceLocators reach each other's
 //   server would wait for each other.
-// A mutation never waits for the delivery thread, so a handler waiting here always gets in: the
-// mutating thread is inside tesseract_common's flush barrier, where flushOutputHandlers (from a
-// Python ResourceLocator) raises instead of waiting for a handler that waits for this mutation.
 // Lock order: the GIL, then `mutex`. `mutex` is taken with the GIL held only by the mutating
 // thread (ServerMutation), and released before anything that can log or call Python; a waiter
 // releases the GIL before taking it. Nothing acquires the GIL while holding `mutex`.
@@ -413,14 +392,12 @@ void enter_server(const char* caller, const tp::TaskComposerServer& server) {
     }
 }
 
-// Marks a server busy for one mutation, also when it throws, and keeps the mutating thread in
-// tesseract_common's flush barrier meanwhile (`caller`, a string literal, names it there). Enter
-// the server (enter_server) first, with the GIL held since. A mutation that releases the GIL
+// Marks a server busy for one mutation, also when it throws. Enter the server (enter_server)
+// first, with the GIL held since. A mutation that releases the GIL
 // declares the release after this, so the gate is cleared with the GIL held.
 struct ServerMutation {
     ServerGate& gate;
-    ServerMutation(const char* caller, const tp::TaskComposerServer& server) : gate(server_gate(server)) {
-        log_flush_barrier->enter(caller);
+    explicit ServerMutation(const tp::TaskComposerServer& server) : gate(server_gate(server)) {
         std::lock_guard<std::mutex> lock(gate.mutex);
         gate.busy = true;
         gate.thread = std::this_thread::get_id();
@@ -430,7 +407,6 @@ struct ServerMutation {
     ServerMutation& operator=(const ServerMutation&) = delete;
     ~ServerMutation() {
         --server_mutations_on_this_thread;
-        log_flush_barrier->leave();
         {
             std::lock_guard<std::mutex> lock(gate.mutex);
             gate.busy = false;
@@ -530,20 +506,8 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Import the modules that bind the types this one takes and returns, so nanobind names
     // them in signatures (#312): ResourceLocator and AnyPoly's ProfileDictionary come from
     // common and command language, Environment and ContactResultMap from their own modules.
-    {
-        nb::module_ common = nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
-        auto barrier = nb::cast<nb::capsule>(common.attr("_log_flush_barrier"));
-        if (std::strcmp(barrier.name(), tesseract_nb_common::LOG_FLUSH_BARRIER_CAPSULE) != 0)
-            throw std::logic_error("tesseract_common._log_flush_barrier: unexpected capsule");
-        log_flush_barrier = static_cast<const tesseract_nb_common::LogFlushBarrierApi*>(barrier.data());
-        auto flush = nb::cast<nb::capsule>(common.attr("_flush_output_handlers_at_exit"));
-        if (std::strcmp(flush.name(), "tesseract_robotics.flush_output_handlers_at_exit") != 0)
-            throw std::logic_error("tesseract_common._flush_output_handlers_at_exit: unexpected capsule");
-        flush_output_handlers_at_exit = reinterpret_cast<bool (*)()>(flush.data());
-    }
-    // Runs still in flight at exit finish before the interpreter tears down (run_held). Registered
-    // after tesseract_common registers its own exit hook, so it runs first (atexit is last in,
-    // first out): while it waits, the Python log handlers still get their messages.
+    nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+    // Runs still in flight at exit finish before the interpreter tears down (run_held).
     nb::module_::import_("atexit").attr("register")(nb::cpp_function(&wait_for_runs_at_exit));
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
     nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
@@ -588,7 +552,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def("removeData", &tp::TaskComposerDataStorage::removeData, "key"_a)
         .def("remapData", &tp::TaskComposerDataStorage::remapData, "remapping"_a, "copy"_a = false,
              "Rename (or with copy=True, duplicate) entries old key -> new key. Returns False, with a "
-             "console_bridge error, at the first missing key.")
+             "tesseract error, at the first missing key.")
         .def("copyAsInputData", &tp::TaskComposerDataStorage::copyAsInputData, "data_storage"_a, "keys"_a,
              "override_keys"_a,
              "For each port in `keys`: self[key] = data_storage[override key, else key].")
@@ -1150,14 +1114,14 @@ NB_MODULE(_tesseract_task_composer, m) {
             free_finished_runs();
             enter_server("TaskComposerServer.loadConfig", self);
             require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
-            ServerMutation mutation("TaskComposerServer.loadConfig", self);
+            ServerMutation mutation(self);
             with_pinned_plugins([&] { self.loadConfig(config_path.value, locator); });
         }, "config_path"_a, "locator"_a)
         .def("loadConfig", [](Server& self, const std::string& config, const tc::ResourceLocator& locator) {
             free_finished_runs();
             enter_server("TaskComposerServer.loadConfig", self);
             require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
-            ServerMutation mutation("TaskComposerServer.loadConfig", self);
+            ServerMutation mutation(self);
             load_yaml_text("TaskComposerServer.loadConfig", config,
                            [&] { with_pinned_plugins([&] { self.loadConfig(config, locator); }); });
         }, "config"_a, "locator"_a)
@@ -1167,7 +1131,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         // never destroyed mid-run.
         .def("addExecutor", [](Server& self, const std::shared_ptr<tp::TaskComposerExecutor>& executor) {
             enter_server("TaskComposerServer.addExecutor", self);
-            ServerMutation mutation("TaskComposerServer.addExecutor", self);
+            ServerMutation mutation(self);
             nb::gil_scoped_release release;  // see ServerGate
             self.addExecutor(executor);
         }, "executor"_a)
@@ -1190,7 +1154,7 @@ NB_MODULE(_tesseract_task_composer, m) {
             enter_server("TaskComposerServer.addTask", self);
             if (self.hasTask(task->getName()))
                 require_tasks_replaceable("TaskComposerServer.addTask", self, { task->getName() });
-            ServerMutation mutation("TaskComposerServer.addTask", self);
+            ServerMutation mutation(self);
             record_python_added_task(self, task);
             self.addTaskPython(std::move(task));
         }, "task"_a,

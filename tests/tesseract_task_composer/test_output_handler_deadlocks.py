@@ -211,48 +211,6 @@ print("RELOADS", reloads > 0, future.context.isSuccessful(), sorted(set(errors))
         )
         assert "RELOADS True True []" in out, out
 
-    def test_reload_while_a_gil_holding_call_logs(self):
-        """The reload, without the GIL, logged into a Python handler: it held console_bridge's
-        mutex waiting for the GIL, while a thread holding the GIL logged and waited for that
-        mutex (a failed createTaskComposerNode logs before it raises)."""
-        out = _run("""
-import threading
-from tesseract_robotics import tesseract_common
-from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError, TaskComposerServer
-server = TaskComposerServer()
-server.loadConfig(config_path, GeneralResourceLocator())
-
-class Quiet(tesseract_common.OutputHandler):
-    def log(self, text, level, filename, line):
-        pass
-
-handler = Quiet()
-tesseract_common.useOutputHandler(handler)
-tesseract_common.setLogLevel(tesseract_common.LogLevel.CONSOLE_BRIDGE_LOG_DEBUG)
-stop = []
-reloads = []
-
-def reload_forever():
-    while not stop:
-        server.loadConfig(config_path, GeneralResourceLocator())
-        reloads.append(1)
-
-reloader = threading.Thread(target=reload_forever)
-reloader.start()
-failed = 0
-for _ in range(100):
-    try:
-        factory.createTaskComposerNode("NoSuchPlugin")
-    except TaskComposerPluginError:
-        failed += 1
-stop.append(True)
-reloader.join()
-tesseract_common.flushOutputHandlers()
-tesseract_common.restorePreviousOutputHandler()
-print("FAILED", failed, len(reloads) > 0)
-""")
-        assert "FAILED 100 True" in out, out
-
     def test_log_handler_waits_for_a_reload(self, tmp_path):
         """A server call from a Python log handler while another thread reloaded raised
         TaskComposerServerBusyError; it waits for the reload and gets its answer."""
@@ -278,39 +236,4 @@ print("RESULTS", results)
 """
         )
         assert "TOUCHED True" in out, out
-        assert "RESULTS [True]" in out, out
-
-    def test_flush_inside_a_reload_raises(self, tmp_path):
-        """flushOutputHandlers from a ResourceLocator mid-load waited for the handlers while a
-        handler waited for that load (a server call): it raises instead, and both finish."""
-        out = _run(
-            _TOUCH_SERVER
-            + f"""
-from tesseract_robotics.tesseract_common import OutputHandlerFlushForbiddenError
-
-class FlushMidLoad(ResourceLocator):
-    def __init__(self):
-        super().__init__()
-        self.inner = GeneralResourceLocator()
-        self.done = False
-
-    def locateResource(self, url):
-        if not self.done:
-            self.done = True
-            touch_mid_load()
-            try:
-                tesseract_common.flushOutputHandlers()
-                print("FLUSHED", flush=True)
-            except OutputHandlerFlushForbiddenError as e:
-                print("FORBIDDEN", "TaskComposerServer.loadConfig" in str(e), flush=True)
-        return self.inner.locateResource(url)
-
-server.loadConfig({_including_config(tmp_path)!r}, FlushMidLoad())
-tesseract_common.flushOutputHandlers()  # outside the load: waits as before
-tesseract_common.restorePreviousOutputHandler()
-print("RESULTS", results)
-"""
-        )
-        assert "TOUCHED True" in out, out
-        assert "FORBIDDEN True" in out, out
         assert "RESULTS [True]" in out, out
