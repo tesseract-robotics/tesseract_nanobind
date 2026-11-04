@@ -39,3 +39,7 @@ class ViewerPortInUseError(OSError):
 
 class MalformedOctreeStreamError(ValueError):
     """An OctoMap `.bt` stream has no header it needs, or its tree is cut short."""
+
+
+class StaleSceneError(RuntimeError):
+    """The environment gained or lost links since `update_environment`."""

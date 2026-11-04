@@ -19,6 +19,7 @@ from tesseract_robotics.tesseract_environment import Environment
 from .errors import (
     NoEnvironmentError,
     NoTrajectoryError,
+    StaleSceneError,
     UnknownJointError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
@@ -132,19 +133,29 @@ class TesseractViewer:
 
         Args:
             env: Environment to draw; kept for later pose updates.
+
+        Raises:
+            UnsupportedGeometryError: a visual has no mesh form; the current scene stays.
         """
+        # Converted before anything changes, and off the lock: playback runs on meanwhile.
+        scene_graph = env.getSceneGraph()
+        link_visuals = {
+            link_name: [
+                (isometry_to_pose(visual.origin), visual_to_trimesh(visual, link_name))
+                for visual in scene_graph.getLink(link_name).visual
+            ]
+            for link_name in env.getLinkNames()
+        }
         with self._pose_lock:
             self._clear_scene()
             self._env = env
-            scene_graph = env.getSceneGraph()
-            for link_name in env.getLinkNames():
+            for link_name, visuals in link_visuals.items():
                 frame_name = f"/links/{link_name}"
                 self._link_frames[link_name] = self._server.scene.add_frame(
                     frame_name, show_axes=False
                 )
-                for i, visual in enumerate(scene_graph.getLink(link_name).visual):
-                    position, wxyz = isometry_to_pose(visual.origin)
-                    for j, mesh in enumerate(visual_to_trimesh(visual, link_name)):
+                for i, ((position, wxyz), meshes) in enumerate(visuals):
+                    for j, mesh in enumerate(meshes):
                         self._visual_handles.append(
                             self._server.scene.add_mesh_trimesh(
                                 f"{frame_name}/visual_{i}_{j}", mesh, position=position, wxyz=wxyz
@@ -172,6 +183,7 @@ class TesseractViewer:
         Raises:
             NoEnvironmentError: no environment yet.
             UnknownJointError: a name is not a joint of the environment.
+            StaleSceneError: the environment gained or lost links; push it again.
         """
         with self._pose_lock:
             self._pose_links(joint_names, np.asarray(q, dtype=np.float64))
@@ -187,6 +199,7 @@ class TesseractViewer:
         Raises:
             NoEnvironmentError: no environment yet.
             UnknownJointError: the trajectory names a joint the environment lacks.
+            StaleSceneError: the environment gained or lost links; push it again.
         """
         traj = (
             trajectory
@@ -211,6 +224,7 @@ class TesseractViewer:
 
         Raises:
             NoTrajectoryError: no trajectory loaded.
+            StaleSceneError: the environment gained or lost links; push it again.
         """
         with self._pose_lock:
             traj = self._trajectory
@@ -282,11 +296,14 @@ class TesseractViewer:
         self._closed = True
         self._stop_player.set()
         self._player.join(PLAYER_JOIN_TIMEOUT_S)
-        self._server.stop()
         if self._player.is_alive():
+            self._server.stop()
             raise ViewerCloseTimeoutError(
                 f"player thread still running {PLAYER_JOIN_TIMEOUT_S} s after close()"
             )
+        # A push on another thread (a GUI callback) finishes before the server goes.
+        with self._pose_lock:
+            self._server.stop()
 
     def serve_forever(self) -> None:
         """Block until Ctrl-C, then `close()`."""
@@ -317,6 +334,13 @@ class TesseractViewer:
     def _pose_links(self, joint_names: Sequence[str], q: NDArray[np.float64]) -> None:
         with self._pose_lock:
             poses = link_poses(self._require_env(), joint_names, q)
+            if poses.keys() != self._link_frames.keys():
+                added = sorted(poses.keys() - self._link_frames.keys())
+                removed = sorted(self._link_frames.keys() - poses.keys())
+                raise StaleSceneError(
+                    f"environment links changed (added {added}, removed {removed}): "
+                    "call update_environment() again"
+                )
             with self._server.atomic():
                 for link_name, (position, wxyz) in poses.items():
                     frame = self._link_frames[link_name]
@@ -337,14 +361,18 @@ class TesseractViewer:
 
     def _play(self) -> None:
         while not self._stop_player.wait(PLAYBACK_DT_S):
-            with self._pose_lock:
-                try:
-                    self._tick()
-                except Exception:
-                    # No caller to raise to, e.g. the environment changed behind the viewer.
-                    # Pause so it logs once; Play or update_trajectory() try again.
-                    logger.exception("playback paused: this tick failed")
-                    self._gui_play.value = False
+            # Timed: a long push holds the lock, and close() must still be able to stop this.
+            if not self._pose_lock.acquire(timeout=PLAYBACK_DT_S):
+                continue
+            try:
+                self._tick()
+            except Exception:
+                # No caller to raise to, e.g. the environment changed behind the viewer.
+                # Pause so it logs once; Play or update_trajectory() try again.
+                logger.exception("playback paused: this tick failed")
+                self._gui_play.value = False
+            finally:
+                self._pose_lock.release()
 
     def _tick(self) -> None:
         # Under the pose lock: a pause from another thread cannot interleave with a frame.

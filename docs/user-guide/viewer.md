@@ -1,6 +1,6 @@
 # Viewer
 
-`tesseract_robotics.viewer` draws a tesseract environment in your browser and animates planned trajectories. It is built on [viser](https://viser.studio). Tesseract owns the kinematics: every link is one viser frame posed from `env.getState(...)`, so rails, positioners, attached objects and environment commands need no separate handling.
+`tesseract_robotics.viewer` draws a tesseract environment in your browser and animates planned trajectories. It is built on [viser](https://viser.studio). Tesseract owns the kinematics: every link is one viser frame posed from `env.getState(...)`, so rails, positioners and attached objects need no separate handling. After a command that adds or removes links, call `update_environment` again; until then pose updates raise `StaleSceneError`.
 
 !!! note "Python >= 3.11"
     viser needs Python 3.11 or newer (`pip` installs it, with `trimesh` and `pillow`, on those versions only). On 3.9 and 3.10 the planning API works but `import tesseract_robotics.viewer` raises `ModuleNotFoundError`. Examples import the viewer inside `main()`, so their headless `run()` works on any version.
@@ -76,7 +76,7 @@ Re-pushing an environment that still has the trajectory's joints keeps it playin
 
 ## Markers and Custom Scene Content
 
-The viewer draws links, visuals and `plot_trajectory`. Anything else goes straight to viser through `viewer.server`. See the [viser scene API](https://viser.studio/main/server/):
+The viewer draws links, visuals and `plot_trajectory`. Anything else goes straight to viser through `viewer.server`. See the [viser documentation](https://viser.studio):
 
 ```python
 viewer.server.scene.add_icosphere(
@@ -136,6 +136,7 @@ Failures raise named errors from `tesseract_robotics.viewer.errors`:
 | `NoEnvironmentError` | `update_joint_positions`, `update_trajectory` or `plot_trajectory` before `update_environment` |
 | `NoTrajectoryError` | `show_time` before `update_trajectory` |
 | `UnknownJointError` | A joint name the environment lacks |
+| `StaleSceneError` | The environment gained or lost links since `update_environment` |
 | `EmptyTrajectoryError` | A trajectory without waypoints |
 | `TrajectoryShapeError` | Names, positions and times disagree, times decrease, or a program's waypoints name different joints |
 | `UnplannedWaypointError` | A program still has a Cartesian waypoint |
