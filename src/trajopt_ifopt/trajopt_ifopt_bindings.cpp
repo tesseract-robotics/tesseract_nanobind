@@ -1105,9 +1105,6 @@ NB_MODULE(_trajopt_ifopt, m) {
              "dof_vals"_a, "max_allowed"_a,
              "Check collisions at dof_vals, keeping at most max_allowed contacts per link pair; "
              "returns the contacts and their gradient result sets")
-        .def("getGradient", &ti::DiscreteCollisionEvaluator::getGradient,
-             "dofvals"_a, "contact_result"_a,
-             "Gradient of one contact at dofvals")
         .def("getJointGroup", &ti::DiscreteCollisionEvaluator::getJointGroup,
              nb::rv_policy::reference_internal)
         .def("getCollisionMarginBuffer", &ti::DiscreteCollisionEvaluator::getCollisionMarginBuffer)
@@ -1158,9 +1155,6 @@ NB_MODULE(_trajopt_ifopt, m) {
              "dof_vals0"_a, "dof_vals1"_a, "vars0_fixed"_a, "vars1_fixed"_a, "max_allowed"_a,
              "Check collisions along the segment dof_vals0 -> dof_vals1, keeping at most max_allowed "
              "contacts per link pair; returns the contacts and their gradient result sets")
-        .def("calcGradientData", &ti::ContinuousCollisionEvaluator::calcGradientData,
-             "dof_vals0"_a, "dof_vals1"_a, "contact_results"_a,
-             "Gradient of one contact along the segment dof_vals0 -> dof_vals1")
         .def("getJointGroup", &ti::ContinuousCollisionEvaluator::getJointGroup,
              nb::rv_policy::reference_internal)
         .def("getCollisionMarginBuffer", &ti::ContinuousCollisionEvaluator::getCollisionMarginBuffer)
