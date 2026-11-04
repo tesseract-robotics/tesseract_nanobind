@@ -104,3 +104,52 @@ def test_from_composite_rejects_cartesian_waypoint():
     )
     with pytest.raises(UnplannedWaypointError):
         Trajectory.from_composite(composite)
+
+
+def test_from_composite_unparameterized_state_waypoints_use_index_time():
+    """Time parameterization not run: every state waypoint has t = 0 (descartes output)."""
+    composite = CompositeInstruction()
+    for q in ([0.0, 0.0], [1.0, 1.0], [2.0, 2.0]):
+        _append(composite, StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(NAMES, np.array(q))))
+    traj = Trajectory.from_composite(composite)
+    np.testing.assert_array_equal(traj.times_s, [0.0, 1.0, 2.0])
+    assert traj.duration_s == 2.0
+
+
+def test_from_composite_mixed_times_that_decrease_raise():
+    """A timed state waypoint then an index-timed joint waypoint: no consistent clock."""
+    composite = CompositeInstruction()
+    timed = StateWaypoint(NAMES, np.array([0.0, 0.0]))
+    timed.setTime(5.0)
+    _append(composite, StateWaypointPoly_wrap_StateWaypoint(timed))
+    untimed = JointWaypoint(NAMES, np.array([1.0, 1.0]))
+    _append(composite, JointWaypointPoly_wrap_JointWaypoint(untimed))
+    with pytest.raises(TrajectoryShapeError):
+        Trajectory.from_composite(composite)
+
+
+def test_from_composite_maps_columns_by_joint_name():
+    """The same pose with its names swapped is the same row."""
+    composite = CompositeInstruction()
+    first = StateWaypoint(["j1", "j2"], np.array([1.0, 2.0]))
+    second = StateWaypoint(["j2", "j1"], np.array([2.0, 1.0]))
+    for wp in (first, second):
+        _append(composite, StateWaypointPoly_wrap_StateWaypoint(wp))
+    np.testing.assert_array_equal(
+        Trajectory.from_composite(composite).positions, [[1.0, 2.0], [1.0, 2.0]]
+    )
+
+
+@pytest.mark.parametrize(
+    ("names", "q"),
+    [(["j1", "j3"], [1.0, 2.0]), (["j1", "j2", "j3"], [1.0, 2.0, 3.0]), (["j1"], [1.0])],
+    ids=["other-joint", "extra-joint", "missing-joint"],
+)
+def test_from_composite_rejects_a_different_joint_set(names, q):
+    composite = CompositeInstruction()
+    _append(
+        composite, StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(NAMES, np.array([0.0, 0.0])))
+    )
+    _append(composite, StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(names, np.array(q))))
+    with pytest.raises(TrajectoryShapeError, match="j1"):
+        Trajectory.from_composite(composite)
