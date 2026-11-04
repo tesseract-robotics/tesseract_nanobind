@@ -884,6 +884,19 @@ def test_pointcloud_octree_collision_example():
     tesseract_robotics.examples.pointcloud_octree_collision_example(cloud)
 
 
+@pytest.mark.basic
+@pytest.mark.parametrize("resolution", [0.02, 0.01], ids=["cli-default", "documented-fine"])
+def test_pointcloud_octree_fine_resolutions_plan(resolution):
+    """More voxels, more QP rows: OSQP needs ~19k / ~42k iterations here, past its default 8192."""
+    from pathlib import Path
+
+    cloud = Path(__file__).resolve().parents[2] / "docs" / "assets" / "sample.ply"
+    module = importlib.import_module(
+        "tesseract_robotics.examples.pointcloud_octree_collision_example"
+    )
+    assert module.run(cloud, resolution=resolution)["aware_contacts"] == 0
+
+
 @pytest.mark.planning
 def test_freespace_ompl_example():
     tesseract_robotics.examples.freespace_ompl_example()

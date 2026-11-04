@@ -51,7 +51,11 @@ from tesseract_robotics.planning import (
     create_obstacle,
     plan_freespace,
 )
-from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
+from tesseract_robotics.planning.profiles import (
+    TRAJOPT_DEFAULT_NAMESPACE,
+    TRAJOPT_PROFILE_NAMES,
+    create_trajopt_default_profiles,
+)
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
@@ -66,6 +70,12 @@ from tesseract_robotics.tesseract_geometry import (
     createMeshFromPath,
     createOctree,
 )
+
+# OSQP iteration cap for the collision-aware plan, 8 x OSQP's default 8192. Each voxel near
+# the arm adds QP rows; at the default cap the first QP of a fine octree ends "maximum
+# iterations reached" and TrajOpt reports OPT_FAILED. Measured to convergence on sample.ply:
+# 6.7k at 0.04 m, 19k at 0.02 m, 42k at 0.01 m.
+COLLISION_AWARE_OSQP_MAX_ITER = 65536
 
 # Labels of the viewer's trajectory dropdown.
 COLLIDING_LABEL = "colliding (red)"
@@ -144,6 +154,21 @@ def _count_traj_contacts(robot, manager, joint_names, planning_result) -> int:
     return n_collide
 
 
+def _trajopt_profiles_with_collision():
+    """Default TrajOpt profiles with an OSQP budget that fits a fine octree's QPs."""
+    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+        ProfileDictionary_addTrajOptSolverProfile,
+        TrajOptOSQPSolverProfile,
+    )
+
+    profiles = create_trajopt_default_profiles()
+    solver = TrajOptOSQPSolverProfile()
+    solver.settings.max_iter = COLLISION_AWARE_OSQP_MAX_ITER
+    for name in TRAJOPT_PROFILE_NAMES:
+        ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, solver)
+    return profiles
+
+
 def _trajopt_profiles_without_collision():
     """Build a TrajOpt ProfileDictionary with collision cost + constraint disabled.
 
@@ -153,11 +178,7 @@ def _trajopt_profiles_without_collision():
     to a smoothed joint-space straight line — the "naive" path that drives
     the wrist through the cloud.
     """
-    from tesseract_robotics.planning.profiles import (
-        TRAJOPT_DEFAULT_NAMESPACE,
-        TRAJOPT_PROFILE_NAMES,
-        _create_trajopt_profiles,
-    )
+    from tesseract_robotics.planning.profiles import _create_trajopt_profiles
     from tesseract_robotics.tesseract_command_language import ProfileDictionary
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         ProfileDictionary_addTrajOptCompositeProfile,
@@ -281,7 +302,7 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     # path up and over the cloud.
     print("Running plan_freespace (collision enabled)...")
     result = plan_freespace(
-        robot, program, profiles=create_trajopt_default_profiles(), composer=composer
+        robot, program, profiles=_trajopt_profiles_with_collision(), composer=composer
     )
     aware_contacts = _count_traj_contacts(robot, manager, joint_names, result)
     if result.successful:
