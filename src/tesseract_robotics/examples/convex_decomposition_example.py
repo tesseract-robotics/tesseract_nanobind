@@ -56,7 +56,7 @@ import argparse
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -399,7 +399,7 @@ def bounding_box(meshes) -> list[list[float]]:
     return [vertices.min(axis=0).tolist(), vertices.max(axis=0).tolist()]
 
 
-def run(argv: Optional[list[str]] = None, output_dir: Optional[Path] = None) -> dict[str, Any]:
+def run(argv: list[str] | None = None, output_dir: Path | None = None) -> dict[str, Any]:
     """Run the example; return every result the test asserts on.
 
     Args:
