@@ -15,20 +15,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find Python and nanobind
-find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
+find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
 
 # The tesseract C++ libs (and every dependency) are provided by the tesseract-robotics
-# conda packages installed under the C++ prefix; find_package() resolves them via the
-# CMAKE_PREFIX_PATH entry added below. Normally that prefix IS the active env
-# ($CONDA_PREFIX), but the cp39 wheel build (Rhino 8) splits them: the pcl→vtk closure
-# of the tesseract conda packages has no cp39 builds, so python 3.9 lives in a minimal
-# py39 env while the C++ stack comes from the py312 env, pointed to via
-# $TESSERACT_CPP_PREFIX. Precedence: TESSERACT_CPP_PREFIX, else CONDA_PREFIX.
-# (Non-empty checks, not DEFINED: CI exports the var as "" on non-3.9 jobs.)
-if(NOT "$ENV{TESSERACT_CPP_PREFIX}" STREQUAL "")
-  set(TESSERACT_CPP_PREFIX "$ENV{TESSERACT_CPP_PREFIX}")
-elseif(NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
+# conda packages installed in the active env; find_package() resolves them via the
+# CMAKE_PREFIX_PATH entry added below.
+if(NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
   set(TESSERACT_CPP_PREFIX "$ENV{CONDA_PREFIX}")
 endif()
 
@@ -411,8 +404,6 @@ message(STATUS "===============================================")
 # The tesseract-robotics conda packages ship them under <cpp-prefix>/share:
 #   support meshes/urdfs  -> share/tesseract/support (+ share/tesseract/package.xml)
 #   task_composer config  -> share/tesseract_planning/task_composer/config
-# TESSERACT_CPP_PREFIX (set above) is the active env, or the py312 env when
-# cross-building the cp39 wheel.
 if(DEFINED TESSERACT_CPP_PREFIX)
   set(TESSERACT_SUPPORT_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract/support")
   set(TASK_COMPOSER_CFG_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract_planning/task_composer/config")

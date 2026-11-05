@@ -36,15 +36,11 @@ jobs:
       # setuptools_scm guess-next-dev (e.g. 0.35.0.4.dev0) which — local segment stripped —
       # would publish as a stray dev release (see 0.35.0.3). Pin the version on tag builds.
       SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-      PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || '312' }}
+      PIXI_ENV: py312
     strategy:
       fail-fast: false  # release wheels: never let one flaky job cancel sibling builds — a partial matrix fragments the published set (see 0.35.0.2)
       matrix:
-        # 3.9 is the Rhino 8 build (Rhino embeds CPython 3.9): a minimal py39 env
-        # provides the interpreter while the C++ stack comes from the py312 env via
-        # TESSERACT_CPP_PREFIX — the tesseract conda packages' pcl→vtk closure has
-        # no cp39 builds, so the two can't co-install in one env.
-        python: ['3.9', '3.10', '3.11', '3.12']
+        python: ['3.12']
     defaults:
       run:
         shell: bash -el {0}
@@ -67,13 +63,9 @@ jobs:
         # shipped ABI-corrupted wheels (orocos-kdl built against Eigen 3.4 mixed
         # with Eigen-5 tesseract libs → heap corruption in every KDL code path).
         locked: true
-        # 3.9 needs BOTH envs: py39 supplies the interpreter, py312 the C++ stack.
-        environments: ${{ matrix.python == '3.9' && 'py39 py312' || env.PIXI_ENV }}
+        environments: ${{ env.PIXI_ENV }}
         activate-environment: ${{ env.PIXI_ENV }}
     - name: typecheck
-      # identical sources are typechecked by the 3.10/3.11/3.12 jobs; the minimal
-      # py39 env has no pyright
-      if: matrix.python != '3.9'
       working-directory: tesseract_nanobind
       run: pixi run typecheck
     # The build dir's CMakeCache holds absolute Xcode compiler and SDK paths: a cache from
@@ -93,27 +85,19 @@ jobs:
         key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
     - name: build wheel
       working-directory: tesseract_nanobind
-      env:
-        # 3.9: C++ stack from the py312 env (build scripts + CMakeLists.txt honor
-        # this; empty for other versions → falls back to the active env).
-        TESSERACT_CPP_PREFIX: ${{ matrix.python == '3.9' && format('{0}/tesseract_nanobind/.pixi/envs/py312', github.workspace) || '' }}
       run: pixi run -e ${{ env.PIXI_ENV }} build-wheel
     # ABI canary: install the just-built wheel into the pixi env and run the
     # kinematics tests against it. KDL jacobians cross the binding↔lib Eigen
     # boundary, so dep-set ABI rot (the eigen-5 lock incident) aborts here in
     # ~30s instead of surfacing as scattered segfaults in test-wheel 15 min later.
-    # (Not on 3.9: the minimal py39 env has no pytest/numpy — its wheel is
-    # exercised by the blocking 3.9 test-wheel job instead.)
     - name: wheel ABI canary (kinematics)
-      if: matrix.python != '3.9'
       working-directory: tesseract_nanobind
       run: |
         pixi run pip install --force-reinstall --no-deps wheelhouse/tesseract*.whl
         pixi run python -m pytest tests/tesseract_kinematics -x -q
     # gh-159: committed .pyi stubs must equal stubgen output of the wheel just built.
-    # Runs per platform + Python so platform- or version-dependent output fails here.
+    # Runs per platform so platform-dependent output fails here.
     - name: stub drift gate
-      if: matrix.python != '3.9'
       working-directory: tesseract_nanobind
       run: pixi run python scripts/generate_stubs.py --check
     - name: save nanobind wheel build cache
@@ -163,18 +147,15 @@ jobs:
   test-wheel:
     needs: build
     runs-on: macos-15
-    continue-on-error: ${{ matrix.continue_on_error }}
     strategy:
       fail-fast: false
       matrix:
         # 3.13/3.14 install the cp312-abi3 wheel (STABLE_ABI) to verify the
         # published support matrix on macOS, not just Linux. wheel != python.
-        # 3.9 is blocking: Rhino 8 embeds CPython 3.9 — that wheel must work.
         include:
-          - { python: '3.9',  wheel: '3.9',  continue_on_error: false }
-          - { python: '3.12', wheel: '3.12', continue_on_error: false }
-          - { python: '3.13', wheel: '3.12', continue_on_error: false }
-          - { python: '3.14', wheel: '3.12', continue_on_error: true }
+          - { python: '3.12', wheel: '3.12' }
+          - { python: '3.13', wheel: '3.12' }
+          - { python: '3.14', wheel: '3.12' }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -182,7 +163,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-          allow-prereleases: true
       - uses: actions/download-artifact@v4
         with:
           name: python-${{ matrix.wheel }}-macos-arm64

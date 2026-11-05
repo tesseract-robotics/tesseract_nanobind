@@ -39,18 +39,11 @@ jobs:
       # setuptools_scm guess-next-dev (e.g. 0.35.0.4.dev0) which — local segment stripped —
       # would publish as a stray dev release (see 0.35.0.3). Pin the version on tag builds.
       SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-      PIXI_ENV: py${{ matrix.python == '3.9' && '39' || matrix.python == '3.10' && '310' || matrix.python == '3.11' && '311' || '312' }}
-      # 3.9: C++ stack from the py312 env (CMakeLists.txt + build steps honor this;
-      # empty for other versions → falls back to the active env).
-      TESSERACT_CPP_PREFIX: ${{ matrix.python == '3.9' && format('{0}\tesseract_nanobind\.pixi\envs\py312', github.workspace) || '' }}
+      PIXI_ENV: py312
     strategy:
       fail-fast: false  # don't kill siblings on transient network failures
       matrix:
-        # 3.9 is the Rhino 8 build (Rhino embeds CPython 3.9): a minimal py39 env
-        # provides the interpreter while the C++ stack comes from the py312 env via
-        # TESSERACT_CPP_PREFIX — the tesseract conda packages' pcl→vtk closure has
-        # no cp39 builds, so the two can't co-install in one env.
-        python: ['3.9', '3.10', '3.11', '3.12']
+        python: ['3.12']
     defaults:
       run:
         shell: bash -el {0}  # Git Bash is pre-installed on windows-2022
@@ -78,8 +71,7 @@ jobs:
         # shipped ABI-corrupted wheels (orocos-kdl built against Eigen 3.4 mixed
         # with Eigen-5 tesseract libs → heap corruption in every KDL code path).
         locked: true
-        # 3.9 needs BOTH envs: py39 supplies the interpreter, py312 the C++ stack.
-        environments: ${{ matrix.python == '3.9' && 'py39 py312' || env.PIXI_ENV }}
+        environments: ${{ env.PIXI_ENV }}
         activate-environment: ${{ env.PIXI_ENV }}
 
     - name: activate MSVC
@@ -112,10 +104,7 @@ jobs:
         # exposed. cl.exe accepts - and / interchangeably.
         CXXFLAGS: "-bigobj"
       run: |
-        # C++ stack prefix: the active env, or the py312 env for the cp39 build
-        # (TESSERACT_CPP_PREFIX, set at job level; CMakeLists.txt reads it too).
-        CPP_PREFIX="${TESSERACT_CPP_PREFIX:-$CONDA_PREFIX}"
-        CONDA_LIB="$CPP_PREFIX/Library"
+        CONDA_LIB="$CONDA_PREFIX/Library"
         export CMAKE_PREFIX_PATH="$CONDA_LIB"
         export PATH="$CONDA_LIB/bin:$PATH"
 
@@ -142,8 +131,6 @@ jobs:
       working-directory: tesseract_nanobind
       run: |
         set -e
-        # Plugins + deps come from the C++ stack env (py312 for the cp39 build).
-        CPP_PREFIX="${TESSERACT_CPP_PREFIX:-$CONDA_PREFIX}"
         WHEEL_FILE=$(ls dist/tesseract*.whl)
         WHEEL_DIR=$(mktemp -d)
         unzip -q "$WHEEL_FILE" -d "$WHEEL_DIR"
@@ -160,7 +147,7 @@ jobs:
           tesseract_task_composer_factories \
           tesseract_task_composer_planning_factories \
           tesseract_task_composer_taskflow_factories; do
-          src="$CPP_PREFIX/Library/bin/${plugin}.dll"
+          src="$CONDA_PREFIX/Library/bin/${plugin}.dll"
           if [ -f "$src" ]; then
             cp "$src" "$PKG_DIR/${plugin}.dll"
             cp "$src" "$PKG_DIR/lib${plugin}.dll"
@@ -203,7 +190,7 @@ jobs:
 
         echo "=== delvewheel repair ==="
         mkdir -p wheelhouse
-        CONDA_BIN="${TESSERACT_CPP_PREFIX:-$CONDA_PREFIX}/Library/bin"
+        CONDA_BIN="$CONDA_PREFIX/Library/bin"
         # --analyze-existing: also scan the plugin factory DLLs we copied into
         # the package dir (delvewheel only walks .pyd imports by default, so
         # without this the plugins ship with unhashed dep names that Windows
@@ -217,18 +204,14 @@ jobs:
     # kinematics tests against it — same guard as linux/macos. Windows is
     # rhino's primary platform; KDL jacobians crossing the binding↔lib Eigen
     # boundary must be exercised here, not just on the other platforms.
-    # (Not on 3.9: the minimal py39 env has no pytest/numpy — its wheel is
-    # exercised by the blocking 3.9 test-wheel job instead.)
     - name: wheel ABI canary (kinematics)
-      if: matrix.python != '3.9'
       working-directory: tesseract_nanobind
       run: |
         pixi run pip install --force-reinstall --no-deps wheelhouse/tesseract*.whl
         pixi run python -m pytest tests/tesseract_kinematics -x -q
     # gh-159: committed .pyi stubs must equal stubgen output of the wheel just built.
-    # Runs per platform + Python so platform- or version-dependent output fails here.
+    # Runs per platform so platform-dependent output fails here.
     - name: stub drift gate
-      if: matrix.python != '3.9'
       working-directory: tesseract_nanobind
       run: pixi run python scripts/generate_stubs.py --check
 
@@ -247,18 +230,15 @@ jobs:
   test-wheel:
     needs: build
     runs-on: windows-2022
-    continue-on-error: ${{ matrix.continue_on_error }}
     strategy:
       fail-fast: false
       matrix:
         # 3.13/3.14 install the cp312-abi3 wheel (STABLE_ABI) to verify the
         # published support matrix on Windows, not just Linux. wheel != python.
-        # 3.9 is blocking: Rhino 8 embeds CPython 3.9 — that wheel must work.
         include:
-          - { python: '3.9',  wheel: '3.9',  continue_on_error: false }
-          - { python: '3.12', wheel: '3.12', continue_on_error: false }
-          - { python: '3.13', wheel: '3.12', continue_on_error: false }
-          - { python: '3.14', wheel: '3.12', continue_on_error: true }
+          - { python: '3.12', wheel: '3.12' }
+          - { python: '3.13', wheel: '3.12' }
+          - { python: '3.14', wheel: '3.12' }
     defaults:
       run:
         shell: bash -el {0}
@@ -270,7 +250,6 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
         architecture: x64
-        allow-prereleases: true
     - uses: actions/download-artifact@v4
       with:
         name: python-${{ matrix.wheel }}-windows-x64-pixi

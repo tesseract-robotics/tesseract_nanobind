@@ -10,12 +10,8 @@ build-backend = "scikit_build_core.build"
 name = "tesseract-robotics-nanobind"
 description = "Tesseract robotics Python bindings (nanobind)"
 readme = "README.md"
-# Floor is 3.9 for Rhino 8 (embeds CPython 3.9; cp39 wheels ship for macOS + Windows,
-# the platforms Rhino runs on). The tesseract C++ conda packages can't co-install with
-# python 3.9 (their pcl→vtk closure has no cp39 builds), so cp39 wheels are built from
-# the minimal py39 pixi env against the py312 env's C++ stack via TESSERACT_CPP_PREFIX
-# (see [tool.pixi.feature.py39] below and the wheels workflows).
-requires-python = ">=3.9"
+# One cp312-abi3 wheel per platform (wheel.py-api below) covers 3.12 and up, Rhino 9's CPython 3.13 included.
+requires-python = ">=3.12"
 # Runtime dependencies - keep in sync with requirements.txt
 dependencies = [
     "numpy>=1.21.0",
@@ -38,9 +34,6 @@ classifiers = [
     # "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python",
     # "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",   # Rhino 8 (macOS + Windows wheels)
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",  # covered by the cp312-abi3 wheel
     "Programming Language :: Python :: 3.14",  # covered by the cp312-abi3 wheel
@@ -165,7 +158,7 @@ channels = ["conda-forge", "tesseract-robotics"]
 platforms = ["osx-arm64", "linux-64", "win-64", "linux-aarch64"]
 
 [tool.pixi.dependencies]
-python = ">=3.10"  # conda tesseract stack (pcl→vtk) has no cp39 build
+python = ">=3.12"
 
 # Build tools
 cmake = ">=3.15,<4"
@@ -252,43 +245,12 @@ stubs-check = { cmd = "python scripts/generate_stubs.py --check", description = 
 build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build portable macOS wheel (delocate + plugins + YAML patch)" }
 
 
-# Python version features for CI matrix builds
-[tool.pixi.feature.py310.dependencies]
-python = "3.10.*"
-
-[tool.pixi.feature.py311.dependencies]
-python = "3.11.*"
-
+# The wheel workflows build in this env.
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
-# Rhino 8 embeds CPython 3.9, so cp39 wheels stay on the menu (macOS + Windows, the
-# platforms Rhino runs on). The tesseract C++ conda stack can't co-install with
-# python 3.9 (pcl→vtk has no cp39 builds), so this feature carries ONLY the 3.9
-# interpreter + wheel build tooling and is used with no-default-feature. The C++ libs
-# come from the py312 env via TESSERACT_CPP_PREFIX (CMakeLists.txt + build scripts).
-# scikit-build-core/nanobind from PyPI: conda-forge stopped producing cp39 builds.
-[tool.pixi.feature.py39.dependencies]
-python = "3.9.*"
-pip = "*"
-cmake = ">=3.15,<4"
-ninja = "*"
-git = "*" # setuptools-scm version derivation
-
-[tool.pixi.feature.py39.pypi-dependencies]
-scikit-build-core = ">=0.10,<1"
-nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this version (gh-159)
-setuptools-scm = ">=8"
-
-# build-wheel for the cp39 cross-build (tasks live in features; a no-default-feature
-# env doesn't inherit the default build-wheel task). Same scripts as the default task —
-# they pick up TESSERACT_CPP_PREFIX from the environment.
-[tool.pixi.feature.py39.target.osx-arm64.tasks]
-build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build portable cp39 macOS wheel against TESSERACT_CPP_PREFIX" }
-
-# Docs: Zensical and mkdocstrings>=1 need Python >=3.11, so they can't sit in the default
-# feature (the py310 env inherits it). The build reads the committed .pyi stubs through
-# PYTHONPATH=src, exactly like the Docs workflow, so this env carries no C++ stack.
+# Docs: the build reads the committed .pyi stubs through PYTHONPATH=src, exactly like the
+# Docs workflow, so this env carries no C++ stack.
 [tool.pixi.feature.docs.dependencies]
 python = "3.12.*"
 
@@ -332,14 +294,11 @@ audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GI
 # -o addopts drops the default --ignore=tests/audit; --noconftest skips tests/conftest.py,
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
-# ty takes its target from requires-python (>=3.9), not the audit env's pin: name 3.11 here.
+# ty takes its target from requires-python (>=3.12), not the audit env's pin: name 3.11 here.
 audit-typecheck = { cmd = "ty check --python-version 3.11 scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
 
 [tool.pixi.environments]
 default = { features = ["profile"], solve-group = "default" }
-py39 = { features = ["py39"], no-default-feature = true, solve-group = "py39" }
-py310 = { features = ["py310"], solve-group = "py310" }
-py311 = { features = ["py311"], solve-group = "py311" }
 py312 = { features = ["py312"], solve-group = "py312" }
 # Own solve group: libclang 22 must not move libcxx/llvm-openmp in the env CI builds wheels from.
 audit = { features = ["audit"], solve-group = "audit" }

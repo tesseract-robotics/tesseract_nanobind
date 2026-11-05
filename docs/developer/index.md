@@ -89,7 +89,6 @@ The workspace defines multiple Python environments for CI testing:
 pixi run test
 
 # Specific Python version
-pixi run -e py39 test
 pixi run -e py312 test
 ```
 
@@ -98,10 +97,7 @@ Environments defined in `pyproject.toml`:
 | Environment | Python | Usage |
 |-------------|--------|-------|
 | `default` | from lockfile | Local development |
-| `py39` | 3.9.x | CI matrix |
-| `py310` | 3.10.x | CI matrix |
-| `py311` | 3.11.x | CI matrix |
-| `py312` | 3.12.x | CI matrix |
+| `py312` | 3.12.x | CI wheel builds |
 
 ### Dependency Management
 
@@ -269,8 +265,7 @@ Stubs are generated, never hand-edited. Edits made by hand are lost at the next
 regeneration. Put documentation in the binding's docstring instead.
 
 **Drift gate (gh-159).** `pixi run stubs-check` exits 1 when a committed stub differs
-from what the build renders. CI runs it in every build job (all platforms, every Python
-except 3.9). Stubgen output depends on the nanobind version, so nanobind is pinned
+from what the build renders. CI runs it in every build job, on all platforms. Stubgen output depends on the nanobind version, so nanobind is pinned
 exactly in `pyproject.toml`. Bumping nanobind means regenerating the stubs in the same
 commit.
 

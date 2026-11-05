@@ -18,9 +18,9 @@ print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 
 **Supported platforms:** macOS (ARM), Linux (x86_64/aarch64), Windows (x64).
 
-**Python versions:** 3.9–3.14. Python 3.9 wheels ship for macOS and Windows only —
-they exist for [Rhino 8](https://www.rhino3d.com), which embeds CPython 3.9.
-3.13/3.14 are covered by the cp312 stable-ABI wheels.
+**Python versions:** 3.12–3.14, from one `cp312-abi3` stable-ABI wheel per platform.
+That includes Rhino 9, which embeds CPython 3.13. Rhino 8 (CPython 3.9) and Python
+3.10–3.11 stay on 0.35.0.8, the last release with wheels for them.
 
 ---
 
@@ -110,21 +110,6 @@ Everything else (trajopt, descartes-light, opw-kinematics, boost-plugin-loader,
 eigen, boost, ompl, bullet, fcl, …) arrives transitively, matched to how those
 feedstocks were built. Don't pin the transitive C++ deps in `pyproject.toml` —
 let the tesseract packages drive the resolution so the ABI stays coherent.
-
-### Python 3.9 (Rhino 8) cross-build
-
-The tesseract conda packages can't co-install with Python 3.9 (their pcl→vtk
-closure has no cp39 builds), so cp39 wheels are built from the minimal `py39`
-pixi env against the `py312` env's C++ stack:
-
-```bash
-pixi install -e py39 -e py312
-TESSERACT_CPP_PREFIX=$PWD/.pixi/envs/py312 pixi run -e py39 build-wheel
-```
-
-`TESSERACT_CPP_PREFIX` is honored by `CMakeLists.txt` and the wheel build
-scripts; the bundled C++ libs are python-version-agnostic, so the resulting
-cp39 wheel carries the same lib set as the others.
 
 ### Submodule (Optional)
 

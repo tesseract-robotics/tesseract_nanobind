@@ -2,7 +2,7 @@
 
 ## Installation
 
-**Platforms:** Linux x86_64 and macOS arm64 (Python 3.9-3.12). Windows x64 is in progress (see [#40](https://github.com/tesseract-robotics/tesseract_nanobind/issues/40)).
+**Platforms:** Linux x86_64 and aarch64, macOS arm64, Windows x64 (Python 3.12–3.14).
 
 ```bash
 pip install tesseract-robotics-nanobind

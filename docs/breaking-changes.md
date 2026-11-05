@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
 | Unreleased | A Python `OutputHandler` gets its messages asynchronously, on a delivery thread | [`flushOutputHandlers()`](#python-outputhandlers-are-called-asynchronously) |
 | Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
@@ -44,6 +45,17 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### Python 3.12 is the minimum
+
+`requires-python` is `>=3.12`. One `cp312-abi3` wheel per platform installs on CPython 3.12, 3.13
+and 3.14, so Rhino 9 (CPython 3.13) is covered. Rhino 8 embeds CPython 3.9 and has no newer wheels:
+
+```bash
+pip install "tesseract-robotics-nanobind==0.35.0.8"  # Rhino 8, Python 3.9 (macOS, Windows); Python 3.10-3.11
+```
+
+pip picks that release by itself on those Pythons, because later ones declare the floor.
 
 ### Python `OutputHandler`s are called asynchronously
 
