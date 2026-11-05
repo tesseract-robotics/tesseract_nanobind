@@ -43,3 +43,15 @@ class MalformedOctreeStreamError(ValueError):
 
 class StaleSceneError(RuntimeError):
     """The environment gained or lost links since `update_environment`."""
+
+
+class UnsupportedMoveTypeError(TypeError):
+    """A program move has a type whose TCP path the viewer cannot draw exactly (`CIRCULAR`)."""
+
+
+class MovingWorkingFrameError(ValueError):
+    """A MoveL's working frame moves with the group, so its line is not straight in world."""
+
+
+class NamedTcpOffsetError(TypeError):
+    """`ManipulatorInfo.tcp_offset` names a link; the path needs a transform."""

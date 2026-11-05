@@ -153,3 +153,30 @@ def test_from_composite_rejects_a_different_joint_set(names, q):
     _append(composite, StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(names, np.array(q))))
     with pytest.raises(TrajectoryShapeError, match="j1"):
         Trajectory.from_composite(composite)
+
+
+def test_build_defaults_to_joint_interpolation():
+    traj = Trajectory.build(["a"], [[0.0], [1.0]], [0.0, 1.0])
+    assert traj.move_types == (MoveInstructionType.FREESPACE, MoveInstructionType.FREESPACE)
+
+
+def test_from_rows_is_joint_interpolation():
+    traj = Trajectory.from_rows(["a"], [[0.0, 0.0], [1.0, 1.0]])
+    assert traj.move_types == (MoveInstructionType.FREESPACE, MoveInstructionType.FREESPACE)
+
+
+def test_build_rejects_a_move_type_count_that_disagrees():
+    with pytest.raises(TrajectoryShapeError):
+        Trajectory.build(["a"], [[0.0], [1.0]], [0.0, 1.0], (MoveInstructionType.LINEAR,))
+
+
+def test_from_composite_keeps_each_move_type():
+    composite = CompositeInstruction()
+    for move_type in (MoveInstructionType.FREESPACE, MoveInstructionType.LINEAR):
+        waypoint = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(["a"], np.zeros(1)))
+        move = MoveInstruction(waypoint, move_type)
+        composite.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move))
+    assert Trajectory.from_composite(composite).move_types == (
+        MoveInstructionType.FREESPACE,
+        MoveInstructionType.LINEAR,
+    )
