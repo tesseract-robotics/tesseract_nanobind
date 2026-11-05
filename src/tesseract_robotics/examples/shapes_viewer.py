@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import traceback
+from typing import override
 
 from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
 from tesseract_robotics.tesseract_environment import Environment
@@ -79,6 +80,7 @@ class TesseractSupportResourceLocator(ResourceLocator):
     def __init__(self):
         super().__init__()
 
+    @override
     def locateResource(self, url):
         try:
             if os.path.exists(url):
