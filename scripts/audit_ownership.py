@@ -180,8 +180,6 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
         "`str`/`repr` cover them.",
         "clock.hpp": "Process-global `StartClock`/`GetClock` timer for trajopt's own timing logs.",
         "config.hpp": "boost::program_options parameter registry for trajopt's command-line tools.",
-        "logging.hpp": "printf logging macros; verbosity is the `TRAJOPT_LOG_THRESH` environment "
-        "variable, read when the library loads.",
         "collision_utils.h": "Gradient and hashing helpers behind the collision constraints "
         "(`getHash`, `getGradient(GradientResults&, …)`, `debugPrintInfo`).",
         "cache.h": "LRU pool template holding `CollisionCacheData` inside the collision "
@@ -202,6 +200,8 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
         "nodes/*": NODES_NOT_API,
     },
     "tesseract/task_composer/planning/": {
+        "cereal_serialization.h": "Free `serialize` templates cereal finds by ADL; Python "
+        "serializes through `tesseract_serialization`.",
         "*_plugin_factories.h": PLUGIN_ANCHOR,
         "nodes/*": NODES_NOT_API,
     },
