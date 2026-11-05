@@ -92,10 +92,10 @@ def test_create_mesh_from_bytes_is_a_byte_buffer(core_reports):
     assert "createMeshFromBytes" not in {d.name for d in report.deviations}
 
 
-@pytest.mark.parametrize("name", ["createConvexMeshFromBytes", "createSDFMeshFromBytes"])
-def test_create_mesh_from_bytes_instances_are_template_instance_names(name):
-    """#210: the Bytes instances of createMeshFromBytes<T> join their Path / Resource siblings."""
-    assert audit.ACCEPTED_SYMBOLS[("tesseract_geometry", name)] == "template-instance-name"
+def test_create_mesh_from_bytes_instances_are_template_instance_names():
+    """#210: the Bytes instance of createMeshFromBytes<T> joins its Path / Resource siblings."""
+    key = ("tesseract_geometry", "createConvexMeshFromBytes")
+    assert audit.ACCEPTED_SYMBOLS[key] == "template-instance-name"
 
 
 @pytest.fixture(scope="module")
@@ -106,12 +106,11 @@ def core_reports():
 @pytest.mark.parametrize(
     ("module", "symbol", "rule"),
     [
-        # G2: Mesh/SDFMesh befriend cereal through their base PolygonMesh.
+        # G2: Mesh befriends cereal through its base PolygonMesh.
         ("tesseract_geometry", "Mesh.__init__", "serialization-default-ctor"),
-        ("tesseract_geometry", "SDFMesh.__init__", "serialization-default-ctor"),
         # G8 + Z1: one Python function per instance of a C++ template.
         ("tesseract_geometry", "createConvexMeshFromPath", "template-instance-name"),
-        ("tesseract_geometry", "createSDFMeshFromResource", "template-instance-name"),
+        ("tesseract_geometry", "createConvexMeshFromResource", "template-instance-name"),
         ("tesseract_serialization", "environment_to_xml", "template-instance-name"),
         ("tesseract_serialization", "scene_state_from_binary", "template-instance-name"),
         # S4: the vector fields convert to a fresh list on each access.

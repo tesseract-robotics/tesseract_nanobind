@@ -235,8 +235,7 @@ ACCEPTED_SYMBOLS = {
     ("tesseract_common", "Quaterniond.to_rpy"): "quaternion-rpy",
     ("tesseract_common", "EIGEN_DEFAULT_PREC"): "eigen-default-precision",
     **{
-        ("tesseract_geometry", f"create{t}MeshFrom{s}"): "template-instance-name"
-        for t in ("Convex", "SDF")
+        ("tesseract_geometry", f"createConvexMeshFrom{s}"): "template-instance-name"
         for s in ("Path", "Resource", "Bytes")
     },
     **{
@@ -286,7 +285,7 @@ ACCEPTED_SYMBOLS = {
     ("trajopt_ifopt", "calcNumericalCostGradient"): "ifopt-problem-only",
     ("trajopt_ifopt", "createNodesVariables"): "nodes-variables-factory",
     # tesseract_task_composer (#256 group 4; ledger phaseF-triage-tc.md). Instances of AnyPoly's
-    # forwarding ctor templates (any_poly.h:121, :138): Python-only names.
+    # forwarding ctor templates (any_poly.h:122, :139): Python-only names.
     **{
         ("tesseract_task_composer", f"AnyPoly_wrap_{t}"): "template-instance-name"
         for t in (
@@ -433,8 +432,8 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     # ifopt_utils.h:108 `(const double* x, Problem&, double)`; the `(Variables&,
     # ConstraintSet&, double)` overload is bound (#295).
     ("trajopt_ifopt", "calcNumericalConstraintGradient", "2-3"): "ifopt-problem-only",
-    # tesseract_task_composer (#256 group 4). any_poly.h:115 `AnyPoly(const AnyInterface&)`: the
-    # arity-1 forwarding ctor templates (:121, :138) are template-instance-name before this table.
+    # tesseract_task_composer (#256 group 4). any_poly.h:116 `AnyPoly(const AnyInterface&)`: the
+    # arity-1 forwarding ctor templates (:122, :139) are template-instance-name before this table.
     ("tesseract_task_composer", "AnyPoly.__init__", "1"): "type-erasure-interface",
     # taskflow_task_composer_executor.h:71 `(std::string name, const YAML::Node& config)`: no
     # YAML-text sibling, so `yaml-node` falls through to here (T1).

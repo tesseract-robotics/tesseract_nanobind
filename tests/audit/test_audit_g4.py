@@ -123,12 +123,27 @@ def test_class_extension_trait_has_no_row(g4_reports):
 
 
 def test_any_poly_ctor_rules_by_location(g4_reports):
-    """Each AnyPoly ctor gets its own rule; the overload-table key "1" must not hide :121/:138."""
+    """Each AnyPoly ctor gets its own rule; the overload-table key "1" must not hide the forwarding
+    ctor templates. Lines are read from the header, so an upstream edit above them moves both."""
+    lines = (audit.CONDA_INCLUDE / ANY_POLY_H).read_text(encoding="utf-8").splitlines()
+
+    def line_of(declaration: str) -> str:
+        [number] = [i for i, text in enumerate(lines, 1) if text.strip() == declaration]
+        return f"{ANY_POLY_H}:{number}"
+
     accepted = g4_reports[TC].accepted
     assert sorted((a.rule, a.location) for a in accepted if a.symbol == "AnyPoly.__init__") == [
-        ("template-instance-name", f"{ANY_POLY_H}:121"),
-        ("template-instance-name", f"{ANY_POLY_H}:138"),
-        ("type-erasure-interface", f"{ANY_POLY_H}:115"),
+        (
+            "template-instance-name",
+            line_of(
+                "AnyPoly(T&& value) : impl_(std::make_unique<AnyWrapper<std::decay_t<T>>>(std::forward<T>(value)))"
+            ),
+        ),
+        (
+            "template-instance-name",
+            line_of("AnyPoly(const T& value) : impl_(std::make_unique<AnyWrapper<T>>(value))"),
+        ),
+        ("type-erasure-interface", line_of("AnyPoly(const AnyInterface& impl);")),
     ]
 
 
