@@ -372,9 +372,9 @@ gcc_linux-64 = "14.*"
 gxx_linux-64 = "14.*"
 
 [tool.pixi.feature.bindings-dev.pypi-dependencies]
-numpy = ">=1.21.0"
+numpy = ">=2.0"
 loguru = ">=0.7.0"
-scipy = ">=1.7.0"
+scipy = ">=1.17.1"
 pyyaml = "*"
 
 # Inner loop for upstream main: the upstream/ submodules are compiled incrementally
