@@ -348,15 +348,23 @@ struct TaskComposerServerBusyError : std::runtime_error {
 // - on the mutating thread itself (a Python ResourceLocator inside the load);
 // - on a thread mutating another server: two loads whose ResourceLocators reach each other's
 //   server would wait for each other.
-// Lock order: the GIL, then `mutex`. `mutex` is taken with the GIL held only by the mutating
-// thread (ServerMutation), and released before anything that can log or call Python; a waiter
-// releases the GIL before taking it. Nothing acquires the GIL while holding `mutex`.
-// `busy` and `thread` are written with both the GIL and `mutex` held, so either one reads them.
+// A woken waiter needs the GIL to see the mutation ended, and a thread that reloads in a loop keeps
+// the GIL into its next reload unless the waiter has waited a switch interval for it. So a mutation
+// does not start while a call waits (enter_server_to_mutate), which bounds a waiting call to the
+// one mutation it found running, and a mutator waits for those calls only to take the GIL.
+// Lock order: the GIL, then `mutex`. `mutex` is taken with the GIL held only for a moment (to write
+// `busy`, `thread` or `waiters`) and released before anything that can log or call Python; a thread
+// that waits on `idle` releases the GIL before taking it. Nothing acquires the GIL while holding
+// `mutex`. `busy`, `thread` and `waiters` are written with both the GIL and `mutex` held, so either
+// one reads them.
 struct ServerGate {
     std::mutex mutex;
+    // Notified when `busy` clears and when `waiters` reaches zero.
     std::condition_variable idle;
     bool busy = false;
     std::thread::id thread;
+    // Calls that found the server busy and do not hold the GIL with it idle yet.
+    int waiters = 0;
 };
 
 // Mutations (ServerMutation) running on this thread, on any server.
@@ -376,24 +384,54 @@ ServerGate& server_gate(const tp::TaskComposerServer& server) {
 // caller releases the GIL. Callers free finished runs (which releases the GIL) before, never after.
 void enter_server(const char* caller, const tp::TaskComposerServer& server) {
     ServerGate& gate = server_gate(server);
-    while (gate.busy) {
-        if (gate.thread == std::this_thread::get_id())
-            throw TaskComposerServerBusyError(std::string(caller) +
-                                              ": called from inside this server's loadConfig, addTask or addExecutor "
-                                              "(a ResourceLocator)");
-        if (server_mutations_on_this_thread != 0)
-            throw TaskComposerServerBusyError(std::string(caller) +
-                                              ": called from inside another server's loadConfig, addTask or "
-                                              "addExecutor while this server is reloading: they could wait for "
-                                              "each other");
+    if (!gate.busy)
+        return;
+    if (gate.thread == std::this_thread::get_id())
+        throw TaskComposerServerBusyError(std::string(caller) +
+                                          ": called from inside this server's loadConfig, addTask or addExecutor "
+                                          "(a ResourceLocator)");
+    if (server_mutations_on_this_thread != 0)
+        throw TaskComposerServerBusyError(std::string(caller) +
+                                          ": called from inside another server's loadConfig, addTask or "
+                                          "addExecutor while this server is reloading: they could wait for "
+                                          "each other");
+    {
+        std::lock_guard<std::mutex> lock(gate.mutex);
+        ++gate.waiters;
+    }
+    {
         nb::gil_scoped_release release;
         std::unique_lock<std::mutex> lock(gate.mutex);
         gate.idle.wait(lock, [&] { return !gate.busy; });
     }
+    // The GIL is back and no mutation started: none does while `waiters` counts this call.
+    bool last;
+    {
+        std::lock_guard<std::mutex> lock(gate.mutex);
+        last = --gate.waiters == 0;
+    }
+    if (last)
+        gate.idle.notify_all();
 }
 
-// Marks a server busy for one mutation, also when it throws. Enter the server (enter_server)
-// first, with the GIL held since. A mutation that releases the GIL
+// Enter the server to mutate it: enter_server, and no call is waiting for the server either. A
+// waiting call needs only the GIL, which this releases, so the wait ends. Then mark the server busy
+// (ServerMutation) with the GIL held since.
+void enter_server_to_mutate(const char* caller, const tp::TaskComposerServer& server) {
+    ServerGate& gate = server_gate(server);
+    enter_server(caller, server);
+    while (gate.waiters != 0) {
+        {
+            nb::gil_scoped_release release;
+            std::unique_lock<std::mutex> lock(gate.mutex);
+            gate.idle.wait(lock, [&] { return gate.waiters == 0; });
+        }
+        enter_server(caller, server);
+    }
+}
+
+// Marks a server busy for one mutation, also when it throws. Enter the server
+// (enter_server_to_mutate) first, with the GIL held since. A mutation that releases the GIL
 // declares the release after this, so the gate is cleared with the GIL held.
 struct ServerMutation {
     ServerGate& gate;
@@ -449,9 +487,9 @@ bool is_python_added_task(const tp::TaskComposerServer& server, const tp::TaskCo
 // The one invariant for server tasks: a task is not replaced while a run or Python can reach it.
 // Raise TaskComposerServerBusyError if any of `names` (tasks of `server`) is the node of an
 // unfinished run, on any executor or path, or a task the server owns has a live Python wrapper
-// (a getTask() result, which does not own it). Call after enter_server, with the GIL held since;
-// the caller then marks the server busy (ServerMutation), which keeps every other server call
-// waiting until the replacement is done.
+// (a getTask() result, which does not own it). Call after enter_server_to_mutate, with the GIL
+// held since; the caller then marks the server busy (ServerMutation), which keeps every other
+// server call waiting until the replacement is done.
 void require_tasks_replaceable(const char* caller, const tp::TaskComposerServer& server,
                                const std::vector<std::string>& names) {
     std::string running;
@@ -1112,14 +1150,14 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def(nb::init<>())
         .def("loadConfig", [](Server& self, const tesseract_nb::StrictPath& config_path, const tc::ResourceLocator& locator) {
             free_finished_runs();
-            enter_server("TaskComposerServer.loadConfig", self);
+            enter_server_to_mutate("TaskComposerServer.loadConfig", self);
             require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
             ServerMutation mutation(self);
             with_pinned_plugins([&] { self.loadConfig(config_path.value, locator); });
         }, "config_path"_a, "locator"_a)
         .def("loadConfig", [](Server& self, const std::string& config, const tc::ResourceLocator& locator) {
             free_finished_runs();
-            enter_server("TaskComposerServer.loadConfig", self);
+            enter_server_to_mutate("TaskComposerServer.loadConfig", self);
             require_tasks_replaceable("TaskComposerServer.loadConfig", self, self.getAvailableTasks());
             ServerMutation mutation(self);
             load_yaml_text("TaskComposerServer.loadConfig", config,
@@ -1130,7 +1168,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         // mutation (ServerGate). A run holds its executor (run_held), so a replaced executor is
         // never destroyed mid-run.
         .def("addExecutor", [](Server& self, const std::shared_ptr<tp::TaskComposerExecutor>& executor) {
-            enter_server("TaskComposerServer.addExecutor", self);
+            enter_server_to_mutate("TaskComposerServer.addExecutor", self);
             ServerMutation mutation(self);
             nb::gil_scoped_release release;  // see ServerGate
             self.addExecutor(executor);
@@ -1151,7 +1189,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         // under a name a by-name run is using would free that run's task.
         .def("addTask", [](Server& self, std::shared_ptr<tp::TaskComposerNode> task) {
             free_finished_runs();
-            enter_server("TaskComposerServer.addTask", self);
+            enter_server_to_mutate("TaskComposerServer.addTask", self);
             if (self.hasTask(task->getName()))
                 require_tasks_replaceable("TaskComposerServer.addTask", self, { task->getName() });
             ServerMutation mutation(self);

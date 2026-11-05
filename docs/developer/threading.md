@@ -225,10 +225,24 @@ Upstream calls each log record handler synchronously on the thread that logs, af
 returns and with no tesseract lock held (`logging.cpp` `dispatchHandlers`). A Python handler on an
 executor worker therefore calls a `TaskComposerServer` like any other thread: while another thread
 reloads the server (`loadConfig`, `addTask`, `addExecutor`), it waits on the server gate with the
-GIL released, and the reload never waits for it. A handler called by the reloading thread itself
-is a call from inside the reload and raises `TaskComposerServerBusyError`. main's delivery thread,
-`flushOutputHandlers()` and the flush barrier that kept a reload from waiting for it went with the
-console_bridge API (0.36).
+GIL released. A handler called by the reloading thread itself is a call from inside the reload and
+raises `TaskComposerServerBusyError`. main's delivery thread, `flushOutputHandlers()` and the flush
+barrier that kept a reload from waiting for it went with the console_bridge API (0.36).
+
+A reload waits for no handler's work, but it does not start while a call waits on the gate. A woken
+waiter has to take the GIL to see that the reload ended. A thread reloading in a loop keeps the GIL
+into its next reload unless the waiter has already waited a switch interval (5 ms) for it, and then
+the waiter sees that reload running and waits again. A worker's one log record could outlast dozens
+of reloads this way, and a run could take minutes. Anything between reloads that gives up the GIL or
+outlasts the switch interval hides it: a `print`, a `time.sleep`, or a slow `GeneralResourceLocator()`
+(70 ms in an editable install on the conda packages, 0.1 ms in a wheel). So a reload first waits for
+the calls already on the gate to take the GIL. That wait ends: they need nothing but the GIL, which
+the reload releases for it, and no reload starts until they are through, so a call waits for at most
+the one reload it found running.
+
+A reload still holds the GIL throughout, except in the Python callbacks it makes. A handler on another
+thread that needs the GIL gets it at the next of those or between reloads, so each record logged
+during a reload can cost up to one reload.
 
 Tests: `tests/tesseract_task_composer/test_output_handler_deadlocks.py`
 (`TestServerReloadAgainstLogHandlers`).

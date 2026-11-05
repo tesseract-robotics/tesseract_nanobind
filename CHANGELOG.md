@@ -127,6 +127,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Fixed
 
+- **A server call no longer waits through back-to-back reloads** — a call that waited for `loadConfig`, `addTask` or `addExecutor` woke up needing the GIL, which a thread reloading in a loop kept into its next reload, so the call could wait for as many reloads as the thread started. A reload now lets the calls already waiting go first, which bounds a call to the one reload it found running.
 - **A `Var` or `Node` read out of a variable set keeps the set alive** — `Node.getVar` / `addVar`, `NodesVariables.getNode` / `getNodes` and `Var.getParent` tie the result to its source, and a `Node` handed to `NodesVariables` keeps the set alive; `var.getParent()` after the set was dropped read freed memory ([#297]).
 - **`NodesVariables.getNode` / `getNodes` return usable `Node`s while the caller still holds the handed-over ones** — they returned the caller's relinquished object, on which every method raised `TypeError`. A `Node` given twice, or one already in a set, raises `NodeOwnershipError` (a `ValueError`) and leaves every `Node` with the caller ([#297]).
 - **Linking a constraint to a variable set that does not hold its `Var`s raises `VarNotInVariableSetError`** — from `linkWithVariables` and from `TrajOptQPProblem.addConstraintSet` / `addCostSet`; a standalone `Var` or one from another set put the Jacobian's columns out of range ([#297]).

@@ -175,9 +175,79 @@ def touch_mid_load():
 """
 
 
+# Several rounds of several callers: the GIL's handover at the end of a reload is a race, which a
+# caller on an unfair gate wins now and then, but not every caller of every round.
+ROUNDS = 5
+CALLERS = 8
+# How long a started caller gets to reach the gate, and a caller that was waiting there to finish
+# its call. Generous for a loaded machine; the second only costs time on a failure.
+SETTLE_S = 0.5
+THROUGH_DEADLINE_S = 5
+
+
+def _waiting_calls_script(tmp_path) -> str:
+    """A server, a config that loads fast and calls the ResourceLocator mid-load (at its
+    `!include`), and callers that block on the server until that load ends."""
+    import yaml
+
+    import tesseract_robotics
+
+    config = yaml.safe_load(tesseract_robotics.get_task_composer_config_path().read_text())
+    plugins = config["task_composer_plugins"]
+    included = tmp_path / "plugins.yaml"
+    # No executors or tasks: a reload is the gate and the locator, not the plugin loading.
+    included.write_text(
+        yaml.safe_dump({key: plugins[key] for key in ("search_paths", "search_libraries")})
+    )
+    # A plain absolute path: see _including_config.
+    text = f"task_composer_plugins: !include {included}"
+    return f"""
+import threading
+import time
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, ResourceLocator
+from tesseract_robotics.tesseract_task_composer import TaskComposerServer
+ROUNDS = {ROUNDS}
+CALLERS = {CALLERS}
+config = {text!r}
+server = TaskComposerServer()
+done = []
+through = []
+
+class MidLoad(ResourceLocator):
+    def __init__(self):
+        super().__init__()
+        self.inner = GeneralResourceLocator()
+        self.mid_load = None
+
+    def locateResource(self, url):
+        mid_load, self.mid_load = self.mid_load, None
+        if mid_load is not None:
+            mid_load()
+        return self.inner.locateResource(url)
+
+locator = MidLoad()
+
+def call_server():
+    server.hasTask("TrajOptPipeline")
+    done.append(True)
+
+def start_callers_and_let_them_reach_the_gate(callers):
+    for caller in callers:
+        caller.start()
+    time.sleep({SETTLE_S})
+
+def record_calls_through():
+    # This reload is running, so a call that has not got through waits for it, whatever the wait.
+    deadline = time.monotonic() + {THROUGH_DEADLINE_S}
+    while len(done) < CALLERS and time.monotonic() < deadline:
+        time.sleep(0.01)
+    through.append(len(done))
+"""
+
+
 class TestServerReloadAgainstLogHandlers:
     """A Python log handler on another thread calls the server like any other thread: it waits
-    for a reload, and the reload never waits for it, so that wait always ends."""
+    for a reload, and the reload waits for it only to take the GIL, so that wait always ends."""
 
     def test_reload_while_workers_log_into_python(self):
         """loadConfig logged through console_bridge with the GIL held, while a worker held
@@ -242,3 +312,27 @@ print("RESULTS", results)
         )
         assert "TOUCHED True" in out, out
         assert "RESULTS [True]" in out, out
+
+    def test_waiting_calls_get_through_between_back_to_back_reloads(self, tmp_path):
+        """A call waiting for a reload woke up when it ended and then needed the GIL, which the
+        reloading thread kept into its next reload: the call saw that reload running and waited
+        again, for as many reloads as the thread kept starting. Every call waiting when a reload
+        ends now gets through before the next one starts."""
+        out = _run(
+            _waiting_calls_script(tmp_path)
+            + """
+for _ in range(ROUNDS):
+    done.clear()
+    callers = [threading.Thread(target=call_server) for _ in range(CALLERS)]
+    locator.mid_load = lambda: start_callers_and_let_them_reach_the_gate(callers)
+    server.loadConfig(config, locator)
+    # Back to back, as a `while not future.ready()` loop does: no Python that gives up the GIL.
+    locator.mid_load = record_calls_through
+    server.loadConfig(config, locator)
+    for caller in callers:
+        caller.join()
+print("THROUGH", through)
+""",
+            planning=False,
+        )
+        assert f"THROUGH {[CALLERS] * ROUNDS}" in out, out
