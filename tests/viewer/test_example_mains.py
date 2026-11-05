@@ -97,6 +97,21 @@ def _canned_results() -> dict[str, object]:
     }
 
 
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "lowlevel.puzzle_piece_auxillary_axes_c_api_example",
+        "lowlevel.puzzle_piece_c_api_example",
+        "lowlevel.tesseract_planning_composer_c_api_example",
+    ],
+)
+def test_main_exits_one_when_run_reports_failure(module_name, monkeypatch):
+    """These run()s return False when planning fails; main must not index it."""
+    module = importlib.import_module(f"tesseract_robotics.examples.{module_name}")
+    monkeypatch.setattr(module, "run", lambda: False)
+    assert module.main() == 1
+
+
 @pytest.mark.parametrize("path", VIEWER_MAIN_FILES, ids=_module_name)
 def test_viewer_main_returns_an_exit_code(path):
     """`sys.exit(True)` is exit 1: a console script's `main` must return an int."""
