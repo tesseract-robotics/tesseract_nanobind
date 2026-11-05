@@ -905,6 +905,13 @@ def test_car_seat_example():
 
 
 @pytest.mark.planning
+def test_car_seat_ifopt_example():
+    # run() asserts both plans succeed. The puzzle's ifopt run has no end-to-end test: it
+    # peaks at 3.2 GiB until the conda package ships tesseract_planning#787.
+    tesseract_robotics.examples.car_seat_example(pipeline="TrajOptIfoptPipeline")
+
+
+@pytest.mark.planning
 def test_puzzle_piece_auxillary_axes_example():
     tesseract_robotics.examples.puzzle_piece_auxillary_axes_example()
 
@@ -927,6 +934,11 @@ def test_online_planning_sqp_example():
 @pytest.mark.planning
 def test_freespace_hybrid_example():
     tesseract_robotics.examples.freespace_hybrid_example()
+
+
+@pytest.mark.planning
+def test_freespace_hybrid_ifopt_example():
+    assert tesseract_robotics.examples.freespace_hybrid_example(use_ifopt=True)["success"]
 
 
 @pytest.mark.planning

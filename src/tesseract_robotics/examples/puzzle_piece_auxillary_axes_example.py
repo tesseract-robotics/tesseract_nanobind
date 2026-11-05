@@ -107,6 +107,7 @@ from tesseract_robotics.planning import (
     Robot,
     TaskComposer,
 )
+from tesseract_robotics.planning.profiles import TRAJOPT_IFOPT_DEFAULT_NAMESPACE
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     CollisionEvaluatorType,
@@ -117,6 +118,15 @@ from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultPlanProfile,
     TrajOptOSQPSolverProfile,
 )
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    ProfileDictionary_addTrajOptIfoptCompositeProfile,
+    ProfileDictionary_addTrajOptIfoptMoveProfile,
+    ProfileDictionary_addTrajOptIfoptSolverProfile,
+    TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultMoveProfile,
+    TrajOptIfoptOSQPSolverProfile,
+)
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
@@ -213,9 +223,11 @@ def create_profiles():
     composite.collision_cost_config.enabled = True
     composite.collision_cost_config.contact_manager_config.default_margin = 0.025  # 25mm margin
     composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+    composite.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(1.0)
 
     # Solver profile: OSQP with C++ settings
     solver = TrajOptOSQPSolverProfile()
+    solver.settings.adaptive_rho = 0
     solver.opt_params.max_iter = 200
     solver.opt_params.min_approx_improve = 1e-3
     solver.opt_params.min_trust_box_size = 1e-3
@@ -223,6 +235,46 @@ def create_profiles():
     ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, "CARTESIAN", plan)
     ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
     ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, "DEFAULT", solver)
+    return profiles
+
+
+def create_ifopt_profiles():
+    """Create TrajOptIfopt profiles for `TrajOptIfoptPipeline`.
+
+    From the `if (ifopt_)` branch of the C++ example: the same move and composite
+    settings as `create_profiles`, and an OSQP solver whose `adaptive_rho` line is
+    commented out upstream, so the OSQP settings stay at their defaults.
+
+    Returns:
+        ProfileDictionary with TrajOptIfopt profiles for the CARTESIAN moves.
+    """
+    profiles = ProfileDictionary()
+
+    move = TrajOptIfoptDefaultMoveProfile()
+    move.joint_cost_config.enabled = False
+    move.cartesian_cost_config.enabled = False
+    move.cartesian_constraint_config.enabled = True
+    move.cartesian_constraint_config.coeff = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
+
+    composite = TrajOptIfoptDefaultCompositeProfile()
+    composite.collision_constraint_config.enabled = False
+    composite.collision_cost_config = TrajOptCollisionConfig(0.025, 1.0)  # 25mm margin, coeff 1
+    composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
+
+    solver = TrajOptIfoptOSQPSolverProfile()
+    solver.opt_params.max_iterations = 200
+    solver.opt_params.min_approx_improve = 1e-3
+    solver.opt_params.min_trust_box_size = 1e-3
+
+    ProfileDictionary_addTrajOptIfoptMoveProfile(
+        profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "CARTESIAN", move
+    )
+    ProfileDictionary_addTrajOptIfoptCompositeProfile(
+        profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "DEFAULT", composite
+    )
+    ProfileDictionary_addTrajOptIfoptSolverProfile(
+        profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, "DEFAULT", solver
+    )
     return profiles
 
 
@@ -297,7 +349,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     warmup_time = time.time() - warmup_start
     print(f"Plugin warmup: {warmup_time:.2f}s")
 
-    profiles = create_profiles()
+    profiles = create_ifopt_profiles() if pipeline == "TrajOptIfoptPipeline" else create_profiles()
 
     # Plan: actual optimization time
     plan_start = time.time()

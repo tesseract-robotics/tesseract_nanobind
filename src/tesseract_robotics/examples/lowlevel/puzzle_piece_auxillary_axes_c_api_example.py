@@ -116,6 +116,64 @@ def make_puzzle_tool_poses(robot):
     return poses
 
 
+def create_profiles():
+    """TrajOpt profiles from the C++ example (yaw-free Cartesian constraint, collision cost, OSQP).
+
+    Returns:
+        ProfileDictionary with TrajOpt profiles for the CARTESIAN moves and the DEFAULT composite.
+    """
+    profiles = ProfileDictionary()
+
+    # TrajOpt plan profile: waypoint-level constraints
+    trajopt_plan_profile = TrajOptDefaultPlanProfile()
+    trajopt_plan_profile.joint_cost_config.enabled = False  # No joint-space costs
+    trajopt_plan_profile.cartesian_cost_config.enabled = False  # Using constraints instead
+    trajopt_plan_profile.cartesian_constraint_config.enabled = True
+
+    # CRITICAL: coeff[5]=0 for yaw (rz) freedom
+    # This allows aux axes to rotate workpiece while maintaining TCP position
+    # [x, y, z, rx, ry, rz] - position constrained, roll/pitch constrained, yaw FREE
+    trajopt_plan_profile.cartesian_constraint_config.coeff = np.array(
+        [5.0, 5.0, 5.0, 2.0, 2.0, 0.0]
+    )
+
+    # TrajOpt composite profile: trajectory-level collision settings
+    trajopt_composite_profile = TrajOptDefaultCompositeProfile()
+    trajopt_composite_profile.collision_constraint_config.enabled = (
+        False  # Soft cost, not hard constraint
+    )
+    trajopt_composite_profile.collision_cost_config.enabled = True
+    # 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig
+    trajopt_composite_profile.collision_cost_config.contact_manager_config.default_margin = (
+        0.025  # 25mm collision margin
+    )
+    trajopt_composite_profile.collision_cost_config.collision_check_config.type = (
+        CollisionEvaluatorType.DISCRETE  # was SINGLE_TIMESTEP
+    )
+    trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(
+        1.0
+    )
+
+    # Solver profile: OSQP with C++ settings
+    trajopt_solver_profile = TrajOptOSQPSolverProfile()
+    trajopt_solver_profile.settings.adaptive_rho = 0
+    trajopt_solver_profile.opt_params.max_iter = 200
+    trajopt_solver_profile.opt_params.min_approx_improve = 1e-3
+    trajopt_solver_profile.opt_params.min_trust_box_size = 1e-3
+
+    # Register profiles with TrajOpt task namespace
+    ProfileDictionary_addTrajOptPlanProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile
+    )
+    ProfileDictionary_addTrajOptCompositeProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
+    )
+    ProfileDictionary_addTrajOptSolverProfile(
+        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_solver_profile
+    )
+    return profiles
+
+
 def main():
     """
     Main planning workflow:
@@ -190,54 +248,7 @@ def main():
     print(f"Program has {len(program)} Cartesian waypoints")
 
     # Configure TrajOpt for 9-DOF Cartesian planning
-    profiles = ProfileDictionary()
-
-    # TrajOpt plan profile: waypoint-level constraints
-    trajopt_plan_profile = TrajOptDefaultPlanProfile()
-    trajopt_plan_profile.joint_cost_config.enabled = False  # No joint-space costs
-    trajopt_plan_profile.cartesian_cost_config.enabled = False  # Using constraints instead
-    trajopt_plan_profile.cartesian_constraint_config.enabled = True
-
-    # CRITICAL: coeff[5]=0 for yaw (rz) freedom
-    # This allows aux axes to rotate workpiece while maintaining TCP position
-    # [x, y, z, rx, ry, rz] - position constrained, roll/pitch constrained, yaw FREE
-    trajopt_plan_profile.cartesian_constraint_config.coeff = np.array(
-        [5.0, 5.0, 5.0, 2.0, 2.0, 0.0]
-    )
-
-    # TrajOpt composite profile: trajectory-level collision settings
-    trajopt_composite_profile = TrajOptDefaultCompositeProfile()
-    trajopt_composite_profile.collision_constraint_config.enabled = (
-        False  # Soft cost, not hard constraint
-    )
-    trajopt_composite_profile.collision_cost_config.enabled = True
-    # 0.33 API: TrajOptCollisionConfig replaces CollisionCostConfig
-    trajopt_composite_profile.collision_cost_config.contact_manager_config.default_margin = (
-        0.025  # 25mm collision margin
-    )
-    trajopt_composite_profile.collision_cost_config.collision_check_config.type = (
-        CollisionEvaluatorType.DISCRETE  # was SINGLE_TIMESTEP
-    )
-    trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(
-        1.0
-    )
-
-    # Solver profile: OSQP with C++ settings
-    trajopt_solver_profile = TrajOptOSQPSolverProfile()
-    trajopt_solver_profile.opt_params.max_iter = 200
-    trajopt_solver_profile.opt_params.min_approx_improve = 1e-3
-    trajopt_solver_profile.opt_params.min_trust_box_size = 1e-3
-
-    # Register profiles with TrajOpt task namespace
-    ProfileDictionary_addTrajOptPlanProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "CARTESIAN", trajopt_plan_profile
-    )
-    ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile
-    )
-    ProfileDictionary_addTrajOptSolverProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_solver_profile
-    )
+    profiles = create_profiles()
 
     print("Running TrajOpt planner with 9 DOF (7 arm + 2 auxiliary axes)...")
 
