@@ -951,7 +951,7 @@ def test_online_planning_sqp_example():
 
 @pytest.mark.planning
 def test_freespace_hybrid_example():
-    tesseract_robotics.examples.freespace_hybrid_example()
+    assert tesseract_robotics.examples.freespace_hybrid_example()["success"]
 
 
 @pytest.mark.planning
@@ -1030,7 +1030,7 @@ def test_lowlevel_puzzle_piece_auxillary_axes_example():
 @pytest.mark.lowlevel
 @pytest.mark.planning
 def test_lowlevel_pythonic_example():
-    tesseract_robotics.examples.pythonic_c_api_example()
+    assert tesseract_robotics.examples.pythonic_c_api_example() == 0
 
 
 @pytest.mark.lowlevel
