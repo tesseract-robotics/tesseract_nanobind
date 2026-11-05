@@ -14,11 +14,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 # Runtime dependencies - keep in sync with requirements.txt
 dependencies = [
-    "numpy>=1.21.0",
+    "numpy>=2.0",
     "loguru>=0.7.0",
-    "scipy>=1.7.0",          # Required for Eigen sparse matrix conversion in nanobind
+    "scipy>=1.17.1",         # Required for Eigen sparse matrix conversion in nanobind
     "aiohttp",               # Required for tesseract_robotics.viewer
-    "importlib-resources",   # Required for tesseract_robotics.viewer
 ]
 
 authors = [
@@ -205,9 +204,9 @@ patchelf = "*"
 
 [tool.pixi.pypi-dependencies]
 # Note: tesseract-robotics-nanobind NOT here - use `pixi run install` (pip install -e .)
-numpy = ">=1.21.0"
+numpy = ">=2.0"
 loguru = ">=0.7.0"
-scipy = ">=1.7.0"              # Required for nanobind Eigen sparse matrix conversion
+scipy = ">=1.17.1"             # Required for nanobind Eigen sparse matrix conversion
 
 # Type checking
 pyright = ">=1.1"
