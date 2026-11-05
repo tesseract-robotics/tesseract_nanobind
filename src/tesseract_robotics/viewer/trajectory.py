@@ -11,6 +11,7 @@ from numpy.typing import ArrayLike, NDArray
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     InstructionPoly_as_MoveInstructionPoly,
+    MoveInstructionType,
     WaypointPoly_as_JointWaypointPoly,
     WaypointPoly_as_StateWaypointPoly,
 )
@@ -26,15 +27,21 @@ class Trajectory:
         joint_names: Joint name per column of `positions`.
         positions: `(N, J)` joint values, one row per waypoint.
         times_s: `(N,)` non-decreasing waypoint times [s].
+        move_types: Per waypoint, the motion arriving at it; the first arrives from nowhere.
     """
 
     joint_names: tuple[str, ...]
     positions: NDArray[np.float64]
     times_s: NDArray[np.float64]
+    move_types: tuple[MoveInstructionType, ...]
 
     @classmethod
     def build(
-        cls, joint_names: Sequence[str], positions: ArrayLike, times_s: ArrayLike
+        cls,
+        joint_names: Sequence[str],
+        positions: ArrayLike,
+        times_s: ArrayLike,
+        move_types: Sequence[MoveInstructionType] | None = None,
     ) -> Trajectory:
         """Validate and build a trajectory.
 
@@ -42,6 +49,8 @@ class Trajectory:
             joint_names: Joint name per column.
             positions: `(N, J)` joint values.
             times_s: `(N,)` waypoint times [s].
+            move_types: `(N,)` motion arriving at each waypoint. Default: joint
+                interpolation, which is all joint values alone can say.
 
         Returns:
             The trajectory.
@@ -60,7 +69,10 @@ class Trajectory:
             )
         if np.any(np.diff(t) < 0.0):
             raise TrajectoryShapeError("waypoint times decrease")
-        return cls(tuple(joint_names), q, t)
+        moves = (MoveInstructionType.FREESPACE,) * len(q) if move_types is None else move_types
+        if len(moves) != len(q):
+            raise TrajectoryShapeError(f"{len(moves)} move types for {len(q)} waypoints")
+        return cls(tuple(joint_names), q, t, tuple(moves))
 
     @classmethod
     def from_rows(cls, joint_names: Sequence[str], rows: ArrayLike) -> Trajectory:
@@ -101,9 +113,11 @@ class Trajectory:
         joint_names: list[str] | None = None
         rows: list[NDArray[np.float64]] = []
         times: list[float] = []
+        move_types: list[MoveInstructionType] = []
         moves = [i for i in composite.flatten() if i.isMoveInstruction()]
         for index, instruction in enumerate(moves):
-            wp = InstructionPoly_as_MoveInstructionPoly(instruction).getWaypoint()
+            move = InstructionPoly_as_MoveInstructionPoly(instruction)
+            wp = move.getWaypoint()
             if wp.isStateWaypoint():
                 state = WaypointPoly_as_StateWaypointPoly(wp)
                 names, q, t = state.getNames(), state.getPosition(), state.getTime()
@@ -123,11 +137,12 @@ class Trajectory:
                 )
             rows.append(np.array([row[name] for name in joint_names]))
             times.append(t)
+            move_types.append(move.getMoveType())
         if joint_names is None:
             raise EmptyTrajectoryError("no state or joint waypoint in the program")
         if not any(times):
             times = [float(index) for index in range(len(times))]
-        return cls.build(joint_names, np.stack(rows), times)
+        return cls.build(joint_names, np.stack(rows), times, move_types)
 
     @property
     def duration_s(self) -> float:

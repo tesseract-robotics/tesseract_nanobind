@@ -43,10 +43,12 @@ from tesseract_robotics.viewer.errors import (
     StaleSceneError,
     UnknownJointError,
     UnsupportedGeometryError,
+    UnsupportedMoveTypeError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
 )
 from tesseract_robotics.viewer.poses import link_poses
+from tesseract_robotics.viewer.tcp_path import tcp_path
 from tesseract_robotics.viewer.viewer import PLAYBACK_DT_S
 
 # Seconds to wait for the server socket to accept a TCP connection after start.
@@ -291,7 +293,27 @@ def test_plot_trajectory_adds_path_and_axes(viewer, env):
     assert len(axes.batched_positions) == 3
     tcp = env.getKinematicGroup("manipulator").calcFwdKin(Q)["tool0"]
     np.testing.assert_allclose(axes.batched_positions[-1], tcp.translation, atol=PLOT_ATOL_M)
-    assert len(path.points) == 3
+    expected = tcp_path(env, traj, manip).segments
+    np.testing.assert_allclose(path.points, expected, atol=PLOT_ATOL_M)
+
+
+def test_plot_trajectory_single_waypoint_draws_axes_only(viewer, env):
+    viewer.update_environment(env)
+    manip = ManipulatorInfo("manipulator", "base_link", "tool0")
+    viewer.plot_trajectory(Trajectory.build(JOINT_NAMES, [Q], [0.0]), manip)
+    path, axes = viewer._plot_handles
+    assert len(path.points) == 0
+    assert len(axes.batched_positions) == 1
+
+
+def test_plot_trajectory_failure_draws_nothing(viewer, env):
+    viewer.update_environment(env)
+    manip = ManipulatorInfo("manipulator", "base_link", "tool0")
+    circular = (MoveInstructionType.FREESPACE, MoveInstructionType.CIRCULAR)
+    traj = Trajectory.build(JOINT_NAMES, [np.zeros(6), Q], [0.0, 1.0], circular)
+    with pytest.raises(UnsupportedMoveTypeError):
+        viewer.plot_trajectory(traj, manip)
+    assert viewer._plot_handles == []
 
 
 def test_close_joins_player():

@@ -20,12 +20,12 @@ from .errors import (
     NoEnvironmentError,
     NoTrajectoryError,
     StaleSceneError,
-    UnknownJointError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
 )
 from .geometry import visual_to_trimesh
 from .poses import isometry_to_pose, link_poses
+from .tcp_path import tcp_path
 from .trajectory import Trajectory
 
 # Loopback by default: the viewer has no auth, so exposing it is an explicit choice.
@@ -240,16 +240,21 @@ class TesseractViewer:
         axes_length: float = PLOT_AXES_LENGTH_M,
         color: tuple[int, int, int] = PLOT_COLOR_RGB,
     ) -> None:
-        """Draw the TCP path of `trajectory` with an axes triad per waypoint.
+        """Draw the TCP path `trajectory` commands, with an axes triad per waypoint.
+
+        See `tcp_path` for how each move type is drawn. Nothing is drawn if it raises.
 
         Args:
             trajectory: Planned program or joint trajectory.
-            manip_info: Kinematic group (`manipulator`) and TCP link (`tcp_frame`).
+            manip_info: Group (`manipulator`), TCP (`tcp_frame`, `tcp_offset`), `working_frame`.
             axes_length: Triad axis length [m].
             color: Path colour, 8-bit RGB.
 
         Raises:
             UnknownJointError: the group has a joint the trajectory lacks.
+            NamedTcpOffsetError: `tcp_offset` is a link name.
+            UnsupportedMoveTypeError: a move is neither `LINEAR` nor `FREESPACE`.
+            MovingWorkingFrameError: a `LINEAR` move's working frame moves with the group.
         """
         env = self._require_env()
         traj = (
@@ -257,29 +262,18 @@ class TesseractViewer:
             if isinstance(trajectory, Trajectory)
             else Trajectory.from_composite(trajectory)
         )
-        kin = env.getKinematicGroup(manip_info.manipulator)
-        group_joints = list(kin.getJointNames())
-        missing = set(group_joints) - set(traj.joint_names)
-        if missing:
-            raise UnknownJointError(f"trajectory lacks group joints: {sorted(missing)}")
-        columns = [traj.joint_names.index(name) for name in group_joints]
-        poses = [
-            isometry_to_pose(kin.calcFwdKin(q[columns])[manip_info.tcp_frame])
-            for q in traj.positions
-        ]
-        positions = np.stack([p for p, _ in poses])
-        wxyzs = np.stack([w for _, w in poses])
+        path = tcp_path(env, traj, manip_info)
         n = len(self._plot_handles) // 2
         self._plot_handles.append(
-            self._server.scene.add_spline_catmull_rom(
-                f"/plot/{n}/path", positions, color=color, thickness=PLOT_PATH_THICKNESS_M
+            self._server.scene.add_line_segments(
+                f"/plot/{n}/path", path.segments, color, thickness=PLOT_PATH_THICKNESS_M
             )
         )
         self._plot_handles.append(
             self._server.scene.add_batched_axes(
                 f"/plot/{n}/axes",
-                wxyzs,
-                positions,
+                path.wxyzs,
+                path.positions,
                 axes_length=axes_length,
                 axes_radius=axes_length * PLOT_AXES_RADIUS_RATIO,
             )
