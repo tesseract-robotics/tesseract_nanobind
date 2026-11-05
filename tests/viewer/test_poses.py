@@ -62,7 +62,7 @@ def test_subset_joint_names(env):
 
 
 def test_every_link_posed(env):
-    assert set(link_poses(env, JOINT_NAMES, Q)) == set(env.getLinkNames())
+    assert set(link_poses(env, JOINT_NAMES, Q)) == {lid.name() for lid in env.getLinkIds()}
 
 
 def test_unknown_joint_raises(env):

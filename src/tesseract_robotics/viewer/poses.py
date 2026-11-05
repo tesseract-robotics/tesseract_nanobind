@@ -45,8 +45,8 @@ def link_poses(env: Environment, joint_names: Sequence[str], q: ArrayLike) -> di
     Raises:
         UnknownJointError: a name is not a joint of `env`.
     """
-    unknown = set(joint_names) - set(env.getJointNames())
+    unknown = set(joint_names) - {jid.name() for jid in env.getJointIds()}
     if unknown:
         raise UnknownJointError(f"not joints of the environment: {sorted(unknown)}")
     state = env.getState(list(joint_names), np.asarray(q, dtype=np.float64))
-    return {link: isometry_to_pose(iso) for link, iso in state.link_transforms.items()}
+    return {link.name(): isometry_to_pose(iso) for link, iso in state.link_transforms.items()}
