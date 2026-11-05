@@ -24,6 +24,7 @@ from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
+    LinkId,
 )
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import KinematicGroup
@@ -160,3 +161,20 @@ def test_default_ctor_still_constrains_all_six(cart_pos: CartPosFixture):
         ti.RangeBoundHandling.KEEP_AS_IS,
     )
     assert c.getRows() == 6
+
+
+def test_both_ctors_take_link_ids(cart_pos: CartPosFixture):
+    """cartesian_position_constraint.h:55-64 name `LinkId`; `str` converts implicitly."""
+    frames = (LinkId("tool0"), LinkId("base_link"))
+    offsets = (Isometry3d.Identity(), Isometry3d.Identity())
+    default = ti.CartPosConstraint(cart_pos.var, cart_pos.manip, *frames, *offsets)
+    assert default.getRows() == 6
+    per_axis = ti.CartPosConstraint(
+        cart_pos.var,
+        np.ones(6),
+        ti.toBounds(BAND_LOWER, BAND_UPPER),
+        cart_pos.manip,
+        *frames,
+        *offsets,
+    )
+    assert per_axis.getRows() > 0

@@ -160,7 +160,7 @@ class RobotConfig(enum.Enum):
 
     FUB = 7
 
-def getRobotConfig(joint_group: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, base_link: str, tcp_frame: str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], sign_correction: Annotated[NDArray[numpy.int32], dict(shape=(2), order='C')] | Sequence[int] = [1, 1]) -> RobotConfig:
+def getRobotConfig(joint_group: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, base_link: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, tcp_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], sign_correction: Annotated[NDArray[numpy.int32], dict(shape=(2), order='C')] | Sequence[int] = [1, 1]) -> RobotConfig:
     """
     Configuration of a six-axis arm. The last six joint values are the arm's; `sign_correction` flips the sign of joint 3 and joint 5 for the manufacturer's convention.
     """

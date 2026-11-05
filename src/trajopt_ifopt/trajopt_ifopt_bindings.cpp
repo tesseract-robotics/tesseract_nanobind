@@ -885,8 +885,8 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("__init__", [](CartPosConstraintBinding* self,
                             std::shared_ptr<const ti::Var> position_var,
                             std::shared_ptr<const tesseract::kinematics::JointGroup> manip,
-                            std::string source_frame,
-                            std::string target_frame,
+                            tesseract::common::LinkId source_frame,
+                            tesseract::common::LinkId target_frame,
                             const Eigen::Isometry3d& source_frame_offset,
                             const Eigen::Isometry3d& target_frame_offset,
                             const std::string& name,
@@ -907,8 +907,8 @@ NB_MODULE(_trajopt_ifopt, m) {
                             const Eigen::VectorXd& coeffs,
                             const std::vector<ti::Bounds>& bounds,
                             std::shared_ptr<const tesseract::kinematics::JointGroup> manip,
-                            std::string source_frame,
-                            std::string target_frame,
+                            tesseract::common::LinkId source_frame,
+                            tesseract::common::LinkId target_frame,
                             const Eigen::Isometry3d& source_frame_offset,
                             const Eigen::Isometry3d& target_frame_offset,
                             const std::string& name,
@@ -1311,14 +1311,14 @@ NB_MODULE(_trajopt_ifopt, m) {
     using JointGroupConstPtr = std::shared_ptr<const tesseract::kinematics::JointGroup>;
     nb::class_<ti::CartLineInfo>(m, "CartLineInfo")
         .def(nb::init<>())
-        .def(nb::init<JointGroupConstPtr, std::string, std::string, const Eigen::Isometry3d&,
+        .def(nb::init<JointGroupConstPtr, tesseract::common::LinkId, tesseract::common::LinkId, const Eigen::Isometry3d&,
                       const Eigen::Isometry3d&, const Eigen::Isometry3d&, const Eigen::VectorXi&>(),
              "manip"_a, "source_frame"_a, "target_frame"_a, "target_frame_offset1"_a,
              "target_frame_offset2"_a, "source_frame_offset"_a, "indices"_a,
              "Create the info of a line from target_frame_offset1 to target_frame_offset2")
         .def("__init__",
-             [](ti::CartLineInfo* self, JointGroupConstPtr manip, std::string source_frame,
-                std::string target_frame, const Eigen::Isometry3d& target_frame_offset1,
+             [](ti::CartLineInfo* self, JointGroupConstPtr manip, tesseract::common::LinkId source_frame,
+                tesseract::common::LinkId target_frame, const Eigen::Isometry3d& target_frame_offset1,
                 const Eigen::Isometry3d& target_frame_offset2, const Eigen::Isometry3d& source_frame_offset) {
                  new (self) ti::CartLineInfo(std::move(manip), std::move(source_frame), std::move(target_frame),
                                              target_frame_offset1, target_frame_offset2, source_frame_offset);
@@ -1327,8 +1327,8 @@ NB_MODULE(_trajopt_ifopt, m) {
              "target_frame_offset2"_a, "source_frame_offset"_a,
              "Create the info of a line, constraining all 6 indices")
         .def("__init__",
-             [](ti::CartLineInfo* self, JointGroupConstPtr manip, std::string source_frame,
-                std::string target_frame, const Eigen::Isometry3d& target_frame_offset1,
+             [](ti::CartLineInfo* self, JointGroupConstPtr manip, tesseract::common::LinkId source_frame,
+                tesseract::common::LinkId target_frame, const Eigen::Isometry3d& target_frame_offset1,
                 const Eigen::Isometry3d& target_frame_offset2) {
                  new (self) ti::CartLineInfo(std::move(manip), std::move(source_frame), std::move(target_frame),
                                              target_frame_offset1, target_frame_offset2);
@@ -1420,12 +1420,12 @@ NB_MODULE(_trajopt_ifopt, m) {
     using KinematicGroupConstPtr = std::shared_ptr<const tesseract::kinematics::KinematicGroup>;
     nb::class_<ti::InverseKinematicsInfo>(m, "InverseKinematicsInfo")
         .def(nb::init<>())
-        .def(nb::init<KinematicGroupConstPtr, std::string, std::string, const Eigen::Isometry3d&>(),
+        .def(nb::init<KinematicGroupConstPtr, tesseract::common::LinkId, tesseract::common::LinkId, const Eigen::Isometry3d&>(),
              "manip"_a, "working_frame"_a, "tcp_frame"_a, "tcp_offset"_a,
              "Create IK info; raises if manip has no link tcp_frame")
         .def("__init__",
-             [](ti::InverseKinematicsInfo* self, KinematicGroupConstPtr manip, std::string working_frame,
-                std::string tcp_frame) {
+             [](ti::InverseKinematicsInfo* self, KinematicGroupConstPtr manip, tesseract::common::LinkId working_frame,
+                tesseract::common::LinkId tcp_frame) {
                  new (self) ti::InverseKinematicsInfo(std::move(manip), std::move(working_frame),
                                                       std::move(tcp_frame));
              },

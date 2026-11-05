@@ -508,7 +508,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def("applyContactManagerConfig", &tc::DiscreteContactManager::applyContactManagerConfig, "config"_a)
         .def("getCollisionMarginData", &tc::DiscreteContactManager::getCollisionMarginData)
         .def("addCollisionObject",
-             [](tc::DiscreteContactManager& self, const std::string& name, int mask_id,
+             [](tc::DiscreteContactManager& self, const tcommon::LinkId& name, int mask_id,
                 const std::vector<std::shared_ptr<const tg::Geometry>>& shapes,
                 const tcommon::VectorIsometry3d& shape_poses, bool enabled) {
                  return self.addCollisionObject(
@@ -545,7 +545,7 @@ NB_MODULE(_tesseract_collision, m) {
         .def("disableCollisionObject", &tc::ContinuousContactManager::disableCollisionObject, "name"_a)
         .def("isCollisionObjectEnabled", &tc::ContinuousContactManager::isCollisionObjectEnabled, "name"_a)
         .def("addCollisionObject",
-             [](tc::ContinuousContactManager& self, const std::string& name, int mask_id,
+             [](tc::ContinuousContactManager& self, const tcommon::LinkId& name, int mask_id,
                 const std::vector<std::shared_ptr<const tg::Geometry>>& shapes,
                 const tcommon::VectorIsometry3d& shape_poses, bool enabled) {
                  return self.addCollisionObject(
