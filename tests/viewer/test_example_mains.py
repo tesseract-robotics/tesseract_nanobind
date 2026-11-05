@@ -1,6 +1,7 @@
-"""Every example's `main()`: the viewer half the `run()` tests in tests/examples never reach.
+"""Every viewer example's `main()`: the half the `run()` tests in tests/examples never reach.
 
-Lives here for the Python >= 3.11 gate in conftest.py. Slow: most mains plan.
+Planning is tests/examples' job: mains that plan get a canned result here. Lives here for
+the Python >= 3.11 gate in conftest.py.
 """
 
 from __future__ import annotations
@@ -9,21 +10,43 @@ import ast
 import importlib
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 import tesseract_robotics.examples
+from tesseract_robotics.tesseract_command_language import (
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionType,
+    StateWaypoint,
+    StateWaypointPoly_wrap_StateWaypoint,
+)
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
+from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
-# The pointcloud example's default cloud is found relative to a source checkout; the wheel
-# tests import an installed package.
-SAMPLE_CLOUD = Path(__file__).resolve().parents[2] / "docs" / "assets" / "sample.ply"
-
 # Needs ws/src/tesseract_ros_workcell (`git submodule update --init`), absent from CI's
 # wheel tests; hand-checked instead. Not a pytest skip: awaiting a go for one.
 NEEDS_SUBMODULE = {"twc_workcell_positioner_viewer"}
+
+# Mains that keep their real run(): it plans nothing through a planner, and the main reads
+# the example's own scene (online_planning_sqp: its gantry and estop zones).
+REAL_RUN = {
+    "geometry_showcase_example",
+    "lowlevel.scene_graph_c_api_example",
+    "online_planning_sqp_example",
+    "scene_graph_example",
+    "shapes_viewer",
+    "tesseract_material_mesh_viewer",
+}
+
+JOINT_NAMES = [f"joint_{i + 1}" for i in range(6)]
+# Two IRB2400 configurations for the canned plan [rad].
+CANNED_Q = np.array([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.3, -0.2, 0.1, 0.4, -0.5, 0.6]])
 
 # Trajectory positions the fake input() shows, as fractions of the duration.
 SWEEP_FRACTIONS = np.linspace(0.0, 1.0, 5)
@@ -45,6 +68,35 @@ MAIN_FILES = [p for p in EXAMPLE_FILES if _main_def(p) is not None]
 VIEWER_MAIN_FILES = [p for p in MAIN_FILES if "TesseractViewer" in p.read_text(encoding="utf-8")]
 
 
+def _canned_results() -> dict[str, object]:
+    # Every key a planning main reads from run(), holding real viewer inputs.
+    locator = GeneralResourceLocator()
+    urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
+    srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf")
+    env = Environment()
+    assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)
+
+    composite = CompositeInstruction()
+    for q in CANNED_Q:
+        waypoint = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(JOINT_NAMES, q))
+        move = MoveInstruction(waypoint, MoveInstructionType.FREESPACE)
+        composite.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move))
+
+    planned = SimpleNamespace(successful=True, raw_results=composite)
+    return {
+        "env": env,
+        "robot": SimpleNamespace(env=env),
+        "success": True,
+        "trajectory": composite,
+        "manip_info": ManipulatorInfo("manipulator", "base_link", "tool0"),
+        "result": planned,
+        "colliding_result": planned,
+        "pick_result": planned,
+        "place_result": planned,
+        "trajectories": [planned],
+    }
+
+
 @pytest.mark.parametrize("path", VIEWER_MAIN_FILES, ids=_module_name)
 def test_viewer_main_returns_an_exit_code(path):
     """`sys.exit(True)` is exit 1: a console script's `main` must return an int."""
@@ -58,7 +110,7 @@ def test_viewer_main_returns_an_exit_code(path):
 @pytest.mark.viewer
 @pytest.mark.parametrize(
     "module_name",
-    [_module_name(p) for p in MAIN_FILES if _module_name(p) not in NEEDS_SUBMODULE],
+    [_module_name(p) for p in VIEWER_MAIN_FILES if _module_name(p) not in NEEDS_SUBMODULE],
 )
 def test_main_runs_and_exits_zero(module_name, monkeypatch, tmp_path):
     viewers: list[TesseractViewer] = []
@@ -81,10 +133,13 @@ def test_main_runs_and_exits_zero(module_name, monkeypatch, tmp_path):
     monkeypatch.setattr("tesseract_robotics.viewer.TesseractViewer", AnyPortViewer)
     monkeypatch.setattr("builtins.input", fake_input)
     monkeypatch.setattr(sys, "argv", [module_name])
-    monkeypatch.setenv("TESSERACT_NANOBIND_SAMPLE_CLOUD", str(SAMPLE_CLOUD))
     monkeypatch.chdir(tmp_path)
 
     # import_module: the package re-exports each example's run() under the module's name.
-    exit_code = importlib.import_module(f"tesseract_robotics.examples.{module_name}").main()
+    module = importlib.import_module(f"tesseract_robotics.examples.{module_name}")
+    if module_name not in REAL_RUN:
+        results = _canned_results()
+        monkeypatch.setattr(module, "run", lambda *_args, **_kwargs: results)
 
-    assert exit_code is None or (type(exit_code) is int and exit_code == 0)
+    assert module.main() == 0
+    assert viewers, "main returned without opening the viewer"
