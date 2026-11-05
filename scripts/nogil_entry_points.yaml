@@ -104,6 +104,10 @@ tesseract_urdf:
 
 tesseract_geometry:
   module:
+    writeSignedDistanceFieldVDB: >-
+      Encodes the whole grid; the field is discretized first with the GIL held, because a sampler
+      may be Python, so the released region is pure C++.
+    writeSignedDistanceFieldNVDB: See writeSignedDistanceFieldVDB.
     createMeshFromPath: >-
       File IO plus assimp parsing, like parseURDFFile; milliseconds per mesh (gil-hotspots).
     createConvexMeshFromPath: See createMeshFromPath; plus a convex hull.
@@ -138,6 +142,9 @@ tesseract_collision:
 
 tesseract_environment:
   Environment:
+    link_transforms_batch: >-
+      Forward kinematics over every row of a joint-value array, pure C++ into a buffer allocated
+      before the release; the arguments are validated with the GIL held.
     applyCommand: >-
       The AddLink, AddSceneGraph and AddTrajectoryLink overloads build collision geometry,
       seconds for mesh- or SDF-heavy links. Event callbacks re-acquire the GIL (see the
@@ -163,3 +170,9 @@ tesseract_environment:
     checkTrajectoryState: One discrete check; called in loops.
     _find_tcp_offset_on_native_thread: >-
       Private test oracle (gh-183): joins a native thread that must take the GIL itself.
+
+tesseract_common:
+  module:
+    removeLogRecordHandler: >-
+      Mandatory, not a speed-up: upstream waits for the handler's in-flight calls on other threads,
+      which need the GIL to run a Python handler, so holding it here deadlocks.
