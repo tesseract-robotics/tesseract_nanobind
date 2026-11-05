@@ -223,8 +223,7 @@ def test_environment_command_histories_compare_by_value():
     """A list compares element-wise, each element as its own derived class. Separately built
     environments hold distinct command objects, so this is value equality, not list identity."""
     history_a, history_b = _history(NO_GEOMETRY_URDF), _history(NO_GEOMETRY_URDF)
-    assert len(history_a) == len(history_b)  # zip(strict=True) is 3.10+; the floor is 3.9
-    assert all(x is not y for x, y in zip(history_a, history_b))
+    assert all(x is not y for x, y in zip(history_a, history_b, strict=True))
     assert history_a == history_b
 
 

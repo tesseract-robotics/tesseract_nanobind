@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Union
 
 from tesseract_robotics.planning import Pose
 
@@ -111,7 +110,9 @@ class Note:
     text: str
 
 
-Event = Union[JointMove, CartesianMove, Dwell, WaitDigital, SetDigital, SetAnalog, ToolChange, Note]
+type Event = (
+    JointMove | CartesianMove | Dwell | WaitDigital | SetDigital | SetAnalog | ToolChange | Note
+)
 
 
 def _event_repr(event: Event) -> str:

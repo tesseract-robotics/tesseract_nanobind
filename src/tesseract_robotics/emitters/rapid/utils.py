@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from enum import Enum, IntEnum
+from enum import IntEnum, StrEnum
 from math import pi
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class RapidType(str, Enum):
+class RapidType(StrEnum):
     """RAPID variable-declaration storage classes.
 
     `CONST` — value fixed at declaration; cannot reassign at runtime.
@@ -38,12 +38,6 @@ class RapidType(str, Enum):
     CONST = "CONST"
     VAR = "VAR"
     PERS = "PERS"
-
-    def __str__(self) -> str:
-        # Override so f"{RapidType.CONST}" emits "CONST" in Python 3.9–3.12.
-        # Python 3.11+ changed (str, Enum) format behavior; explicit __str__
-        # gives consistent rendering across versions.
-        return self.value
 
 
 def get_quat(q: Sequence[float]) -> Sequence[float]:

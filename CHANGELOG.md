@@ -5,6 +5,7 @@
 ### Breaking changes
 
 - **Python 3.12 is the minimum; Rhino 8 loses wheels** — `requires-python` rises from `>=3.9` to `>=3.12`. One `cp312-abi3` wheel per platform now covers 3.12, 3.13 and 3.14, including Rhino 9 (CPython 3.13). Rhino 8 (CPython 3.9) and Python 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them ([#369]; `docs/breaking-changes.md`).
+- **`planning.program.Target` and `emitters.core.events.Event` are `type` aliases** — `isinstance(x, Target)` and `typing.get_args(Target)` raise or return nothing; use `Target.__value__` or test the member classes ([#369]; `docs/breaking-changes.md`).
 - **A Python `OutputHandler` gets its messages asynchronously** — on a delivery thread, in order, never inside console_bridge's output lock (see Fixed). Code that reads what a handler recorded calls the new `flushOutputHandlers()` first; a handler's exception goes to `sys.unraisablehook` instead of the code that logged. See breaking-changes.md.
 - **`CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed** — copies of `setCollisionCoeff` / `getCollisionCoeff` under names C++ does not have. Call the C++ names ([#298]).
 - **`CollisionCoeffData`, `TrajOptCollisionConfig` and `SQPParameters` compare by value and are unhashable** — `==` compared identity; `hash()`, `set` members and `dict` keys now raise `TypeError` ([#261](https://github.com/tesseract-robotics/tesseract_nanobind/issues/261)).
@@ -31,6 +32,7 @@
 
 ### Changes
 
+- **Sources target Python 3.12** — ruff `target-version = "py312"` without `FA102`, PEP 695 aliases and generics, `StrEnum` for `RapidType`, `zip(strict=True)` in tests. The GIL-hotspot tooling tests move back to `tests/test_gil_hotspots.py`, in the wheel suite; the `devtools-test` task is gone ([#369]).
 - **Wheels build on 3.12 only, and every `test-wheel` leg blocks** — the 3.9, 3.10 and 3.11 builds and the cp39 cross-build (`TESSERACT_CPP_PREFIX`, the `py39` env) are gone; CMake takes the C++ stack from `CONDA_PREFIX`. Python 3.14 no longer may fail ([#369]).
 - **macOS CI runs on `macos-15`** — GitHub retires the `macos-14` image on 2026-11-02 and cancels its jobs during the scheduled brownouts before that (actions/runner-images#13518). Wheels keep the `macosx_14_0` tag: `build_macos_wheel.sh` pins `MACOSX_DEPLOYMENT_TARGET=14.0`, and the bundled libraries come from the locked pixi env. The wheel build cache key names the Xcode developer dir and SDK path: a build dir configured on another toolchain fails to configure.
 - **The Windows wheel job no longer installs `zip` from Chocolatey** — the wheel is repacked with Python's `zipfile`, so a Chocolatey feed outage (a 504 failed #353's build) no longer fails the job.
