@@ -169,7 +169,7 @@ NB_MODULE(_tesseract_motion_planners, m) {
         .value("FUB", tp::RobotConfig::FUB);
 
     m.def("getRobotConfig",
-          [](const tk::JointGroup& joint_group, const std::string& base_link, const std::string& tcp_frame,
+          [](const tk::JointGroup& joint_group, const tc::LinkId& base_link, const tc::LinkId& tcp_frame,
              const Eigen::Ref<const Eigen::VectorXd>& joint_values, const Eigen::Vector2i& sign_correction) {
               return tp::getRobotConfig<double>(joint_group, base_link, tcp_frame, joint_values, sign_correction);
           },

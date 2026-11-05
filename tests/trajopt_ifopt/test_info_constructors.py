@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_common import Isometry3d, LinkId
 
 from .scenes import Iiwa
 
@@ -75,3 +75,31 @@ def test_inverse_kinematics_info_all_fields(iiwa: Iiwa):
 def test_inverse_kinematics_info_default_offset(iiwa: Iiwa):
     info = ti.InverseKinematicsInfo(iiwa.manip, "base_link", "tool0")
     np.testing.assert_allclose(info.tcp_offset.matrix, np.eye(4))
+
+
+def test_cart_line_info_takes_link_ids(iiwa: Iiwa):
+    """cartesian_line_constraint.h:54-56 names `LinkId`; the getters hand out the same type."""
+    frames = (LinkId("tool0"), LinkId("base_link"))
+    full = ti.CartLineInfo(
+        iiwa.manip,
+        *frames,
+        _translated(),
+        _translated(x=LINE_LENGTH),
+        _translated(z=TCP_LENGTH),
+        np.array([0, 1, 2]),
+    )
+    no_indices = ti.CartLineInfo(
+        iiwa.manip, *frames, _translated(), _translated(x=LINE_LENGTH), _translated(z=TCP_LENGTH)
+    )
+    defaults = ti.CartLineInfo(iiwa.manip, *frames, _translated(), _translated(x=LINE_LENGTH))
+    for info in (full, no_indices, defaults):
+        assert (info.source_frame, info.target_frame) == frames
+
+
+def test_inverse_kinematics_info_takes_link_ids(iiwa: Iiwa):
+    """inverse_kinematics_constraint.h:51-53 names `LinkId`."""
+    frames = (LinkId("base_link"), LinkId("tool0"))
+    full = ti.InverseKinematicsInfo(iiwa.manip, *frames, _translated(z=TCP_LENGTH))
+    defaults = ti.InverseKinematicsInfo(iiwa.manip, *frames)
+    for info in (full, defaults):
+        assert (info.working_frame, info.tcp_frame) == frames

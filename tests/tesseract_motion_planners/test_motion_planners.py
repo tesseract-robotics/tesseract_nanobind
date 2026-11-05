@@ -31,6 +31,7 @@ from tesseract_robotics.tesseract_command_language import (
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
+    LinkId,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
@@ -538,6 +539,12 @@ class TestRobotConfig:
         manip = abb_irb2400_environment.getKinematicGroup("manipulator")
         # j5 = 0 → flip (F); j3 = 0 < π/2 → up (U); tool0 in front of j1 (T).
         assert getRobotConfig(manip, "base_link", "tool0", np.zeros(6)) == RobotConfig.FUT
+
+    def test_takes_the_link_ids_a_getter_returns(self, abb_irb2400_environment):
+        """robot_config.h:75-76 takes `LinkId`; `str` reaches it by implicit conversion."""
+        manip = abb_irb2400_environment.getKinematicGroup("manipulator")
+        config = getRobotConfig(manip, manip.getBaseLinkId(), LinkId("tool0"), np.zeros(6))
+        assert config == RobotConfig.FUT
 
     def test_ik_solutions_have_distinct_configs(self, abb_irb2400_environment):
         # The IRB2400 joint-3 limits leave the two wrist configurations of the elbow-up,
