@@ -6,6 +6,8 @@ crosses that module boundary as `nanobind::python_error`, and a caller must be a
 defect in its own set (`IndexError` here) from trajopt's `std::runtime_error` (`RuntimeError`).
 """
 
+from typing import override
+
 import numpy as np
 import pytest
 import scipy.sparse
@@ -25,19 +27,24 @@ class _RaisingSet(ti.ConstraintSet):
     def __init__(self):
         super().__init__("raising", 1)
 
+    @override
     def getValues(self) -> np.ndarray:
         raise IndexError("raised by a Python getValues")
 
+    @override
     def getBounds(self) -> list:
         return [ti.Bounds(0.0, 0.0)]
 
+    @override
     def getJacobian(self):
         n = len(self.getVariables().getValues())
         return scipy.sparse.csr_matrix(([1.0], ([0], [PINNED_INDEX])), shape=(1, n))
 
+    @override
     def update(self) -> int:
         return self.getRows()
 
+    @override
     def getCoefficients(self) -> np.ndarray:
         return np.ones(1)
 

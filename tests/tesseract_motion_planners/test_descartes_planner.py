@@ -4,6 +4,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import pytest
@@ -264,6 +265,7 @@ class TestPythonEdgeEvaluator:
         class JointDistanceEdgeEvaluator(DescartesEdgeEvaluatorD):
             """Cost = L2 norm of joint-space delta; always valid."""
 
+            @override
             def evaluate(self, start, end):
                 call_counter["n"] += 1
                 delta = end.values - start.values
@@ -281,14 +283,17 @@ class TestPythonEdgeEvaluator:
                 # the same Python instance for every edge it evaluates.
                 self._edge_evaluator = JointDistanceEdgeEvaluator()
 
+            @override
             def createWaypointSampler(self, move_instruction, composite_manip_info, env):
                 return self._inner.createWaypointSampler(
                     move_instruction, composite_manip_info, env
                 )
 
+            @override
             def createEdgeEvaluator(self, move_instruction, composite_manip_info, env):
                 return self._edge_evaluator
 
+            @override
             def createStateEvaluator(self, move_instruction, composite_manip_info, env):
                 return self._inner.createStateEvaluator(move_instruction, composite_manip_info, env)
 
@@ -400,9 +405,11 @@ class TestDescartesWaypointSamplerStr:
 
     def test_python_sampler_keeps_its_own_str(self):
         class NamedSampler(DescartesWaypointSamplerD):
+            @override
             def sample(self):
                 return []
 
+            @override
             def __str__(self):
                 return "named"
 

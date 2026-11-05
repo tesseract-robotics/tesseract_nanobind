@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 import numpy as np
 import pytest
 import scipy.sparse
@@ -45,18 +47,23 @@ class _ScaledIdentity(ti.ConstraintSet):
         super().__init__("scaled_identity", n)
         self._n, self._scale = n, scale
 
+    @override
     def getValues(self):
         return np.asarray(self.getVariables().getValues())
 
+    @override
     def getBounds(self):
         return [ti.Bounds(0.0, 0.0)] * self._n
 
+    @override
     def getJacobian(self):
         return scipy.sparse.identity(self._n, format="csr") * self._scale
 
+    @override
     def update(self):
         return self._n
 
+    @override
     def getCoefficients(self):
         return np.ones(self._n)
 

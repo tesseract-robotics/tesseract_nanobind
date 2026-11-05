@@ -10,6 +10,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import pytest
@@ -159,6 +160,7 @@ class EchoProfile(SimplePlannerMoveProfile):
         super().__init__()
         self.calls = 0
 
+    @override
     def generate(
         self,
         prev_instruction,
@@ -177,6 +179,7 @@ class ProfileError(Exception):
 
 
 class RaisingProfile(SimplePlannerMoveProfile):
+    @override
     def generate(
         self,
         prev_instruction,
@@ -207,6 +210,7 @@ def test_generate_receives_the_planner_arguments(irb2400_env, manip_info):
     seen = {}
 
     class Recorder(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
@@ -242,6 +246,7 @@ def test_handled_nested_error_is_not_raised(irb2400_env, manip_info):
     seen = []
 
     class Outer(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
@@ -261,6 +266,7 @@ def test_handled_nested_error_is_not_raised_for_a_later_cpp_failure(irb2400_env,
     """The nested solve's handled error must not stand in for a later C++ profile's failure."""
 
     class Outer(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
@@ -294,6 +300,7 @@ def test_last_generate_error_is_raised(irb2400_env, manip_info):
         pass
 
     class Outer(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
@@ -327,6 +334,7 @@ def test_generate_without_override_raises(irb2400_env, manip_info):
 )
 def test_generate_wrong_return_type_raises(irb2400_env, manip_info, result, named):
     class WrongType(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
@@ -362,6 +370,7 @@ def _set_cartesian_waypoint(instruction):
 )
 def test_generate_last_instruction_must_match_base(irb2400_env, manip_info, change, field):
     class Changes(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
@@ -385,6 +394,7 @@ def test_python_profile_matches_cpp_profile(irb2400_env, manip_info):
     """An override built from the bound helpers emits what the C++ fixed-size profile does."""
 
     class FixedSize(SimplePlannerMoveProfile):
+        @override
         def generate(
             self, prev_instruction, prev_seed, base_instruction, next_instruction, env, mi
         ):
