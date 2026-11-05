@@ -13,6 +13,7 @@ that holds the GIL fails deterministically, never passes vacuously.
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import override
 
@@ -29,7 +30,10 @@ from .tesseract_time_parameterization.test_time_parameterization import (
 )
 
 LONG_SWITCH_INTERVAL = 100.0
-ATTEMPTS = 200
+# [s] A fast call opens only a short window for the main thread to wake into, and a loaded runner
+# can miss any fixed number of them. A call that holds the GIL fails after this long, however many
+# calls fit in it.
+RELEASE_BUDGET_S = 10.0
 
 
 def assert_releases_gil(call):
@@ -38,8 +42,9 @@ def assert_releases_gil(call):
     state = {"done": False, "calls": 0, "error": None}
 
     def worker():
+        deadline = time.monotonic() + RELEASE_BUDGET_S
         try:
-            for _ in range(ATTEMPTS):
+            while time.monotonic() < deadline:
                 call()
                 state["calls"] += 1
                 if main_ran.is_set():
