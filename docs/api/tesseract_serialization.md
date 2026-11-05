@@ -28,13 +28,12 @@ path suffix: there is no format detection. For a binary file, write the bytes of
 `task_composer_log_to_file` returns `None`. The other `*_file` helpers take a `str`
 and return `True` as upstream does.
 
-!!! warning "A `TaskComposerLog` holding planner profiles cannot be serialized"
-    The planner profile types (TrajOpt, OMPL, Descartes, ...) are not registered
-    with this module's cereal registry in the 0.35 bindings. Serializing a log
-    whose `initial_data` or `context` holds a `ProfileDictionary` with planner
-    profiles raises `RuntimeError` ("Trying to save an unregistered polymorphic
-    type"). Store an empty `ProfileDictionary` in the log and rebuild the
-    profiles when you replay it.
+!!! note "A `TaskComposerLog` can hold planner profiles"
+    This module registers every planner profile type (TrajOpt, TrajOptIfopt, OMPL,
+    Descartes, the simple planner, the task-composer planning profiles and time
+    parameterization), so a log whose `initial_data` or `context` holds them
+    round-trips on every platform. A process that loads an archive needs nothing but
+    this module: importing it links the planner libraries.
 
 ::: tesseract_robotics.tesseract_serialization
     options:

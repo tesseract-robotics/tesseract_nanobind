@@ -131,7 +131,7 @@ parameter. nanobind then converts subclasses and names the type in the signature
 
 ## TrajOpt Planner
 
-TrajOpt bindings are optional and auto-detected at build time.
+TrajOpt bindings are always built; CMake stops if the component is missing.
 
 ### Usage (0.33 API)
 

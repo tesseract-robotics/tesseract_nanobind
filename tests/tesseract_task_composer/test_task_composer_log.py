@@ -1,10 +1,18 @@
 """TaskComposerLog: a run recorded for replay (#325) and its equality (#261)."""
 
 import gc
+import subprocess
 import sys
+from collections import Counter
 
 import pytest
 
+from tesseract_robotics.planning.profiles import (
+    create_descartes_default_profiles,
+    create_ompl_default_profiles,
+    create_trajopt_default_profiles,
+    create_trajopt_ifopt_default_profiles,
+)
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_serialization import (
     task_composer_log_from_binary,
@@ -23,6 +31,34 @@ from tesseract_robotics.tesseract_task_composer import (
 )
 
 PIPELINE = "TrajOptPipeline"
+PLANNER_PROFILES = (
+    create_descartes_default_profiles,
+    create_ompl_default_profiles,
+    create_trajopt_default_profiles,
+    create_trajopt_ifopt_default_profiles,
+)
+
+
+def _profiles_log(profiles: ProfileDictionary) -> TaskComposerLog:
+    """A log holding only `profiles`: no environment, so its XML is small."""
+    storage = TaskComposerDataStorage("profiles only")
+    storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
+    log = TaskComposerLog("planner profiles")
+    log.initial_data = storage
+    log.context = TaskComposerContext("ctx")
+    return log
+
+
+def _archive_content(xml: str) -> Counter[str]:
+    """What an XML archive holds, regardless of order.
+
+    Reserializing a loaded log is not byte-identical: its maps are `unordered_map`s that iterate
+    differently after a reload, and cereal numbers polymorphic types and shared pointers in the
+    order it meets them, writing shared data at its first use. Those numbers and the indentation
+    are what change, so they are left out.
+    """
+    lines = (line.strip() for line in xml.splitlines())
+    return Counter(line for line in lines if not line.startswith(("<id>", "<polymorphic_id>")))
 
 
 def _assert_same_storage(a: TaskComposerDataStorage, b: TaskComposerDataStorage) -> None:
@@ -57,8 +93,7 @@ def _assert_same_log(a: TaskComposerLog, b: TaskComposerLog) -> None:
 def run_log(factory, make_storage):
     """A log filled from a real TrajOptPipeline run, as upstream records a run for replay.
 
-    The run uses the planners' default profiles: an archive can only hold the profile types
-    whose cereal registrations this module carries, and it carries none of the planners'.
+    The run uses the planners' default profiles: `profiles` is an empty dictionary.
     """
     executor = factory.createTaskComposerExecutor("TaskflowExecutor")
     node = factory.createTaskComposerNode(PIPELINE)
@@ -166,9 +201,36 @@ class TestSerialization:
         with pytest.raises(FileNotFoundError):
             task_composer_log_from_file(tmp_path / "missing.xml")
 
-    def test_unregistered_profile_type_raises(self, factory, make_storage):
-        """Planner profiles are not registered with this module's cereal registry."""
+    @pytest.mark.parametrize("build_profiles", PLANNER_PROFILES, ids=lambda b: b.__name__)
+    def test_planner_profiles_round_trip(self, build_profiles):
+        """Every planner's profile types archive on every platform (#161)."""
+        log = _profiles_log(build_profiles())
+        xml = task_composer_log_to_xml(log)
+        loaded = task_composer_log_from_xml(xml)
+        _assert_same_log(log, loaded)
+        assert _archive_content(task_composer_log_to_xml(loaded)) == _archive_content(xml)
+        assert task_composer_log_from_binary(task_composer_log_to_binary(log)) is not None
+
+    def test_pipeline_storage_with_profiles_round_trips(self, factory, make_storage):
+        """The storage a real pipeline is given: program, environment and TrajOpt profiles."""
         log = TaskComposerLog("with trajopt profiles")
         log.initial_data = make_storage(factory.createTaskComposerNode(PIPELINE))
-        with pytest.raises(RuntimeError, match="unregistered polymorphic type"):
-            task_composer_log_to_xml(log)
+        log.context = TaskComposerContext("ctx")
+        _assert_same_log(log, task_composer_log_from_binary(task_composer_log_to_binary(log)))
+
+    def test_profiles_load_without_importing_a_planner(self, tmp_path):
+        """A replay process needs nothing but this module: loading must not depend on which
+        planner libraries happen to be in the process (#161)."""
+        path = tmp_path / "profiles.tclx"
+        task_composer_log_to_file(_profiles_log(create_trajopt_default_profiles()), path)
+        script = (
+            "import sys\n"
+            "from tesseract_robotics.tesseract_serialization import task_composer_log_from_file\n"
+            "log = task_composer_log_from_file(sys.argv[1])\n"
+            "print(sorted(log.initial_data.getData()))\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(path)], capture_output=True, text=True, check=False
+        )
+        assert result.returncode == 0, result.stderr
+        assert "['profiles']" in result.stdout

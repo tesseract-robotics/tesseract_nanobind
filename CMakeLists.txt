@@ -264,97 +264,71 @@ set_target_properties(_ompl_base PROPERTIES
   VISIBILITY_INLINES_HIDDEN OFF)
 install(TARGETS _ompl_base LIBRARY DESTINATION tesseract_robotics/ompl_base)
 
-# Add tesseract_motion_planners_descartes module (optional - only if descartes component was built)
-find_package(tesseract_planning QUIET COMPONENTS motion_planners_descartes)
-find_package(descartes_light QUIET)
-if(tesseract_planning_motion_planners_descartes_FOUND AND descartes_light_FOUND)
-  message(STATUS "tesseract_motion_planners descartes component found - building bindings")
-  add_tesseract_nanobind_extension(
-    tesseract_motion_planners_descartes
-    src/tesseract_motion_planners_descartes/tesseract_motion_planners_descartes_bindings.cpp
-    tesseract::motion_planners_descartes
-    tesseract::motion_planners
-    tesseract::environment
-    tesseract::command_language
-    tesseract::collision
-    tesseract::common
-  )
-else()
-  message(STATUS "tesseract_motion_planners descartes component not found - skipping bindings")
-endif()
+# Add tesseract_motion_planners_descartes module
+find_package(tesseract_planning REQUIRED COMPONENTS motion_planners_descartes)
+find_package(descartes_light REQUIRED)
+add_tesseract_nanobind_extension(
+  tesseract_motion_planners_descartes
+  src/tesseract_motion_planners_descartes/tesseract_motion_planners_descartes_bindings.cpp
+  tesseract::motion_planners_descartes
+  tesseract::motion_planners
+  tesseract::environment
+  tesseract::command_language
+  tesseract::collision
+  tesseract::common
+)
 
-# Add tesseract_motion_planners_trajopt module (optional - only if trajopt component was built)
-find_package(tesseract_planning QUIET COMPONENTS motion_planners_trajopt)
-find_package(trajopt QUIET)
-if(tesseract_planning_motion_planners_trajopt_FOUND AND trajopt_FOUND)
-  message(STATUS "tesseract_motion_planners trajopt component found - building bindings")
-  add_tesseract_nanobind_extension(
-    tesseract_motion_planners_trajopt
-    src/tesseract_motion_planners_trajopt/tesseract_motion_planners_trajopt_bindings.cpp
-    tesseract::motion_planners_trajopt
-    tesseract::motion_planners
-    tesseract::environment
-    tesseract::command_language
-    tesseract::common
-    trajopt::trajopt
-  )
-else()
-  message(STATUS "tesseract_motion_planners trajopt component not found - skipping bindings")
-endif()
+# Add tesseract_motion_planners_trajopt module
+find_package(tesseract_planning REQUIRED COMPONENTS motion_planners_trajopt)
+find_package(trajopt REQUIRED)
+add_tesseract_nanobind_extension(
+  tesseract_motion_planners_trajopt
+  src/tesseract_motion_planners_trajopt/tesseract_motion_planners_trajopt_bindings.cpp
+  tesseract::motion_planners_trajopt
+  tesseract::motion_planners
+  tesseract::environment
+  tesseract::command_language
+  tesseract::common
+  trajopt::trajopt
+)
 
-# Add tesseract_motion_planners_trajopt_ifopt module (optional - only if trajopt_ifopt component was built)
-find_package(tesseract_planning QUIET COMPONENTS motion_planners_trajopt_ifopt)
-find_package(trajopt_ifopt QUIET)
-find_package(trajopt_sqp QUIET)
-find_package(trajopt_common QUIET)
-if(tesseract_planning_motion_planners_trajopt_ifopt_FOUND AND trajopt_ifopt_FOUND AND trajopt_sqp_FOUND)
-  message(STATUS "tesseract_motion_planners trajopt_ifopt component found - building bindings")
-  add_tesseract_nanobind_extension(
-    tesseract_motion_planners_trajopt_ifopt
-    src/tesseract_motion_planners_trajopt_ifopt/tesseract_motion_planners_trajopt_ifopt_bindings.cpp
-    tesseract::motion_planners_trajopt_ifopt
-    tesseract::motion_planners
-    tesseract::environment
-    tesseract::command_language
-    tesseract::common
-    trajopt::trajopt_ifopt
-    trajopt::trajopt_sqp
-  )
-else()
-  message(STATUS "tesseract_motion_planners trajopt_ifopt component not found - skipping bindings")
-endif()
+# Add tesseract_motion_planners_trajopt_ifopt module
+find_package(tesseract_planning REQUIRED COMPONENTS motion_planners_trajopt_ifopt)
+find_package(trajopt_ifopt REQUIRED)
+find_package(trajopt_sqp REQUIRED)
+find_package(trajopt_common REQUIRED)
+add_tesseract_nanobind_extension(
+  tesseract_motion_planners_trajopt_ifopt
+  src/tesseract_motion_planners_trajopt_ifopt/tesseract_motion_planners_trajopt_ifopt_bindings.cpp
+  tesseract::motion_planners_trajopt_ifopt
+  tesseract::motion_planners
+  tesseract::environment
+  tesseract::command_language
+  tesseract::common
+  trajopt::trajopt_ifopt
+  trajopt::trajopt_sqp
+)
 
 # Add trajopt_ifopt module (variables, constraints, costs for IFOPT-based trajectory optimization)
-find_package(trajopt_common QUIET)
-if(trajopt_ifopt_FOUND AND trajopt_common_FOUND)
-  message(STATUS "trajopt_ifopt found - building bindings for variables/constraints/costs")
-  add_tesseract_nanobind_extension(
-    trajopt_ifopt
-    src/trajopt_ifopt/trajopt_ifopt_bindings.cpp
-    trajopt::trajopt_ifopt
-    trajopt::trajopt_common
-    tesseract::kinematics
-    tesseract::environment
-    tesseract::collision
-    tesseract::common
-  )
-else()
-  message(STATUS "trajopt_ifopt/trajopt_common not found - skipping bindings")
-endif()
+add_tesseract_nanobind_extension(
+  trajopt_ifopt
+  src/trajopt_ifopt/trajopt_ifopt_bindings.cpp
+  trajopt::trajopt_ifopt
+  trajopt::trajopt_common
+  tesseract::kinematics
+  tesseract::environment
+  tesseract::collision
+  tesseract::common
+)
 
 # Add trajopt_sqp module (SQP solver with stepSQPSolver for real-time planning)
-if(trajopt_sqp_FOUND)
-  message(STATUS "trajopt_sqp found - building SQP solver bindings")
-  add_tesseract_nanobind_extension(
-    trajopt_sqp
-    src/trajopt_sqp/trajopt_sqp_bindings.cpp
-    trajopt::trajopt_sqp
-    trajopt::trajopt_ifopt
-    tesseract::common
-  )
-else()
-  message(STATUS "trajopt_sqp not found - skipping bindings")
-endif()
+add_tesseract_nanobind_extension(
+  trajopt_sqp
+  src/trajopt_sqp/trajopt_sqp_bindings.cpp
+  trajopt::trajopt_sqp
+  trajopt::trajopt_ifopt
+  tesseract::common
+)
 
 # Find and add tesseract_time_parameterization
 find_package(tesseract_planning REQUIRED COMPONENTS time_parameterization time_parameterization_isp time_parameterization_totg time_parameterization_kdl time_parameterization_ruckig)
@@ -397,6 +371,24 @@ add_tesseract_nanobind_extension(
   tesseract::command_language
   tesseract::common
 )
+
+# Registers the planners' cereal types with the serialization module: it has to see every planner,
+# and their targets are imported above.
+target_sources(_tesseract_serialization PRIVATE src/tesseract_serialization/planner_cereal_registration.cpp)
+target_link_libraries(_tesseract_serialization PRIVATE
+  tesseract::motion_planners_simple
+  tesseract::motion_planners_ompl
+  tesseract::motion_planners_descartes
+  tesseract::motion_planners_trajopt
+  tesseract::motion_planners_trajopt_ifopt
+  tesseract::task_composer_planning_nodes
+  tesseract::time_parameterization_isp
+  tesseract::time_parameterization_kdl
+  tesseract::time_parameterization_ruckig
+  tesseract::time_parameterization_totg
+)
+# MSVC: the registrations and archives exceed the default COFF section limit (C1128).
+target_compile_options(_tesseract_serialization PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 
 message(STATUS "============= Build Configuration =============")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
