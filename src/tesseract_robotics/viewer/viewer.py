@@ -373,6 +373,10 @@ class TesseractViewer:
         traj = self._trajectory
         if traj is None or not self._gui_play.value:
             return
+        # viser wrote a browser drag to the slider; its callback is waiting on the pose lock
+        # and reads the slider, so writing it here would lose the drag.
+        if self._gui_time.value != self._t_s:
+            return
         t_s = self._t_s + PLAYBACK_DT_S * self._gui_speed.value
         if t_s > traj.duration_s:
             if self._gui_loop.value:

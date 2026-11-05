@@ -5,6 +5,7 @@ import socket
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import msgspec
 import numpy as np
@@ -643,6 +644,21 @@ def test_late_client_after_a_swap_sees_only_the_new_scene(viewer, env, other_env
     links = {n for n in _names(messages, "FrameMessage") if n.startswith("/links/")}
     assert links == {"/links/world", "/links/arm"}
     assert _names(messages, "GlbMessage") == []
+
+
+def test_player_tick_does_not_overwrite_a_drag_waiting_on_the_lock(viewer, env):
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    drag_to_s = 1.5
+    with viewer._pose_lock:  # keeps the player thread out; the ticks are ours
+        viewer._tick()
+        # What viser does on its event loop before the drag callback can take the lock.
+        viewer._gui_time._impl.value = drag_to_s
+        viewer._tick()
+        assert viewer._gui_time.value == drag_to_s
+        viewer._on_time_dragged(SimpleNamespace(client=object()))
+    assert viewer._t_s == drag_to_s
+    assert viewer._gui_play.value is False
 
 
 def test_browser_drag_pauses_and_scrubs(viewer, env):
