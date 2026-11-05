@@ -362,3 +362,23 @@ group = evaluator.getJointGroup()
 gradient = ti.getGradient(dof_vals, contact, margin, buffer, group)
 gradient = ti.getGradient(dof_vals0, dof_vals1, contact, margin, buffer, group)
 ```
+
+## Serialization: a `TaskComposerLog` holds planner profiles
+
+Saving a log whose data storage holds planner profiles raised `RuntimeError` ("Trying to save an
+unregistered polymorphic type") on macOS and Windows. On Linux it saved, but a process without that
+planner's library in it could not load the result. Now it round-trips on every platform, in any
+process: `tesseract_serialization` links the planner libraries and registers their types, so
+importing it loads OMPL, Descartes and TrajOpt too.
+
+```python
+# 0.35: store an empty dictionary and rebuild the profiles on replay
+storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(ProfileDictionary()))
+
+# 0.36: the profiles are in the archive
+storage.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
+task_composer_log_to_file(log, "failing_plan.tclx")
+```
+
+Building the bindings now requires the Descartes, TrajOpt and TrajOptIfopt components; CMake stops
+if one is missing instead of skipping its modules.

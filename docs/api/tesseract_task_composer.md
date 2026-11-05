@@ -296,10 +296,13 @@ task_composer_log_to_file(log, "failing_plan.tclx")
 replay = task_composer_log_from_file("failing_plan.tclx")
 ```
 
-The archive holds only types registered with `tesseract_serialization`'s cereal registry: a data
-storage holding planner profiles (`TrajOptDefaultMoveProfile`, …) raises `RuntimeError`
-("unregistered polymorphic type"). A loaded log is not `==` to the original: `AnyPoly` compares
-`shared_ptr` payloads (environment, profiles, nested data storages) by pointer.
+The archive holds planner profiles (`TrajOptDefaultMoveProfile`, …) as well as the program and
+environment; `tesseract_serialization` registers them on every platform. A data storage holding an
+environment is large: tens of MB as XML for a robot with meshes, so prefer the binary form.
+A loaded log is not `==` to the original: `AnyPoly` compares `shared_ptr` payloads (environment,
+profiles, nested data storages) by pointer. Nor is its XML byte-identical when saved again: the
+storage's `unordered_map` iterates differently after a reload, and cereal numbers types and
+pointers in the order it meets them. The content is the same.
 
 ### DOT Graph Export
 
