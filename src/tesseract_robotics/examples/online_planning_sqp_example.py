@@ -341,7 +341,7 @@ def main() -> int:
     if not results.get("trajectories"):
         return 0 if results["success"] else 1
 
-    from tesseract_robotics.viewer import (  # viser: Python >= 3.11 (#369)
+    from tesseract_robotics.viewer import (
         TesseractViewer,
         Trajectory,
     )

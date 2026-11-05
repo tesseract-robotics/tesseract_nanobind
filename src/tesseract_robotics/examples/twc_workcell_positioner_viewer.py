@@ -217,7 +217,7 @@ def main() -> int:
     args = parser.parse_args()
     results = run(args.workcell)
 
-    from tesseract_robotics.viewer import (  # viser: Python >= 3.11 (#369)
+    from tesseract_robotics.viewer import (
         TesseractViewer,
         Trajectory,
     )

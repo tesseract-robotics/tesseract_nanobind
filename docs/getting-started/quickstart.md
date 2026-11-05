@@ -147,7 +147,7 @@ with TesseractViewer() as viewer:
     input("Press Enter to exit...")
 ```
 
-The viewer needs Python >= 3.11; see the [viewer guide](../user-guide/viewer.md).
+See the [viewer guide](../user-guide/viewer.md).
 
 ## Installation
 

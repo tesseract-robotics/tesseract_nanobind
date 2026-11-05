@@ -126,4 +126,4 @@ with TesseractViewer() as viewer:  # serving from here until the block ends
     input("Press Enter to exit...")
 ```
 
-Open the printed URL in your browser. Requires Python >= 3.11; see the [viewer guide](../user-guide/viewer.md).
+Open the printed URL in your browser; see the [viewer guide](../user-guide/viewer.md).

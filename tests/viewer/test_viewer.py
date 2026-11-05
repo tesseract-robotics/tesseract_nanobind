@@ -599,7 +599,7 @@ async def _listen(socket_, window_s=REPLAY_WINDOW_S):
     while (remaining := deadline - time.monotonic()) > 0:
         try:
             messages += _decode_frame(await asyncio.wait_for(socket_.recv(), remaining))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             break
     return messages
 

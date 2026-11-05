@@ -1,7 +1,6 @@
 """Every viewer example's `main()`: the half the `run()` tests in tests/examples never reach.
 
-Planning is tests/examples' job: mains that plan get a canned result here. Lives here for
-the Python >= 3.11 gate in conftest.py.
+Planning is tests/examples' job: mains that plan get a canned result here.
 """
 
 from __future__ import annotations
