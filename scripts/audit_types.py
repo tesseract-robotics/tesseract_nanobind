@@ -60,9 +60,20 @@ EIGEN_CLASSES = {
     "Eigen::Hyperplane<double, 3>": "Hyperplane3d",
     "Eigen::ParametrizedLine<double, 3>": "ParametrizedLine3d",
 }
-# Records a binding converts to a Python builtin, by canonical spelling: Geometry.getUUID /
-# setUUID and JointTrajectory.uuid use the canonical string (boost::uuids::to_string).
-CONVERTED_RECORDS = {"boost::uuids::uuid": ("str",)}
+# Types a binding converts or renames, by canonical spelling: Geometry.getUUID / setUUID and
+# JointTrajectory.uuid use the canonical string (boost::uuids::to_string).
+CONVERTED_RECORDS = {
+    "boost::uuids::uuid": ("str",),
+    "spdlog::level::level_enum": ("class", "LogLevel"),  # no tesseract header declares it
+}
+# Instances of the id templates tesseract_common binds, by canonical spelling. A typedef is lost
+# at depth (`vector<JointId>` is `vector<NameId<JointTag>>`), so the instance names the class.
+ID_INSTANCES = {
+    "tesseract::common::NameId<tesseract::common::LinkTag>": "LinkId",
+    "tesseract::common::NameId<tesseract::common::JointTag>": "JointId",
+    "tesseract::common::OrderedIdPair<tesseract::common::LinkTag>": "LinkIdPair",
+}
+ID_TEMPLATES = frozenset({"NameId", "OrderedIdPair"})
 # Eigen wrappers a binding passes as the matrix they view.
 EIGEN_VIEWS = frozenset({"Ref", "Map"})
 STD_SEQUENCES = frozenset({"vector", "list", "deque"})
@@ -76,6 +87,13 @@ STD_NAMESPACES = frozenset({"std", "__gnu_cxx"})
 # os.PathLike`): the path annotation covers the string parameter, never the reverse.
 STR_KEY = ("str",)
 PATH_KEY = ("path",)
+# Id classes tesseract_common binds with an implicit conversion, and its source. Their stubs are
+# widened to `LinkId | str` by scripts/widen_implicit_id_stubs.py: one C++ type, keyed as the id.
+IMPLICIT_ID_SOURCES = {
+    ("class", "LinkId"): STR_KEY,
+    ("class", "JointId"): STR_KEY,
+    ("class", "LinkIdPair"): ("tuple", STR_KEY, STR_KEY),
+}
 
 
 def record_path(decl: ci.Cursor) -> str:
@@ -172,7 +190,12 @@ def cpp_key(t: ci.Type) -> TypeKey:
     converted = CONVERTED_RECORDS.get(t.spelling.removeprefix("const "))
     if converted is not None:
         return converted
+    spelling = t.spelling.removeprefix("const ")
+    if spelling in ID_INSTANCES:
+        return ("class", ID_INSTANCES[spelling])
     decl = t.get_declaration()
+    if decl.spelling in ID_TEMPLATES:
+        return None  # `NameId<Tag>` inside the template: which id depends on the instance
     if decl.kind == ci.CursorKind.ENUM_DECL:
         return ("class", record_path(decl))
     if decl.kind not in RECORD_KINDS and decl.kind != ci.CursorKind.CLASS_TEMPLATE:
@@ -262,7 +285,8 @@ def py_key(node: ast.expr | None) -> TypeKey:
         arrays = [k for k in keys if k[0] == "ndarray"]
         if len(arrays) == 1 and all(k in arrays or _is_number_sequence(k) for k in keys):
             return arrays[0]
-        return _union(keys)
+        widened = {source for k in keys if (source := _implicit_source(k)) is not None}
+        return _union(k for k in keys if k not in widened)
     node = members[0]
     if isinstance(node, ast.Subscript):
         name = (_dotted(node.value) or "").rpartition(".")[2]
@@ -293,7 +317,19 @@ def py_key(node: ast.expr | None) -> TypeKey:
         return PY_SCALARS[leaf]
     if leaf == "NDArray":
         return ("ndarray", None)
+    if leaf == "Callable":
+        return ("callable",)  # `nb::callable`: stubgen writes it without parameters
     return ("class", _class_name(dotted))
+
+
+def _implicit_source(key: TypeKey) -> TypeKey:
+    """The union member a stub widens `key` with: the conversion's source for an id class, and a
+    mapping's key swapped for that source. None for a key that is not widened."""
+    if key is None:
+        return None
+    if key[0] == "map" and key[1] in IMPLICIT_ID_SOURCES:
+        return ("map", IMPLICIT_ID_SOURCES[key[1]], key[2])
+    return IMPLICIT_ID_SOURCES.get(key)
 
 
 def _is_number_sequence(key: TypeKey) -> bool:

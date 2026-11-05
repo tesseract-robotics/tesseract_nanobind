@@ -80,6 +80,8 @@ def test_every_mapping_rule_gives_the_stub_key(typed_cpp, typed_py):
         ("AddTrajectoryLinkCommand.Method", ("class", "AddTrajectoryLinkCommand.Method")),
         ("fixture_remote._fixture_remote.Runner", ("class", "Runner")),
         ("NDArray", ("ndarray", None)),
+        ("Callable", ("callable",)),
+        ("Callable[[int], None]", ("callable",)),
         # An Eigen argument's input spelling (tesseract_nb.h): the array, or a sequence of numbers.
         (
             "Annotated[NDArray[numpy.float64], dict(shape=(3))] | Sequence[float]",
@@ -99,10 +101,37 @@ def test_every_mapping_rule_gives_the_stub_key(typed_cpp, typed_py):
         ),
         ("object", None),
         ('"tesseract::fixture::Owner"', None),  # an unbound C++ type: no key
+        # A nanobind implicit conversion scripts/widen_implicit_id_stubs.py spells in the stub:
+        # one C++ parameter type, keyed as the id class.
+        ("LinkId | str", ("class", "LinkId")),
+        ("JointId | str | None", ("class", "JointId")),
+        ("LinkIdPair | tuple[str, str]", ("class", "LinkIdPair")),
+        ("Sequence[JointId | str]", ("seq", ("class", "JointId"))),
+        ("Mapping[LinkId, float] | Mapping[str, float]", ("map", ("class", "LinkId"), ("float",))),
+        (
+            "Mapping[LinkIdPair, float] | Mapping[tuple[str, str], float]",
+            ("map", ("class", "LinkIdPair"), ("float",)),
+        ),
+        # Not that widening: a union of other classes, or of mappings with different values.
+        ("Item | str", ("union", ("class", "Item"), ("str",))),
+        (
+            "Mapping[LinkId, float] | Mapping[str, int]",
+            ("union", ("map", ("class", "LinkId"), ("float",)), ("map", ("str",), ("int",))),
+        ),
     ],
 )
 def test_py_key(annotation, key):
     assert types.py_key(ast.parse(annotation, mode="eval").body) == key
+
+
+def test_widened_id_parameter_covers_the_id_not_a_string():
+    """A stub's `LinkId | str` covers a C++ `LinkId`. A plain `str` does not: the binding then
+    takes a `std::string`, and passing the `LinkId` a getter returned raises TypeError."""
+    link_id = frozenset({("class", "LinkId")})
+    widened = types.py_key(ast.parse("LinkId | str", mode="eval").body)
+    assert types.verdict(link_id, widened) is True
+    assert types.verdict(link_id, ("str",)) is False
+    assert types.verdict(frozenset({("str",)}), widened) is False
 
 
 def test_unknown_nested_in_a_key_is_neither_a_match_nor_a_mismatch():
