@@ -144,7 +144,7 @@ class TesseractViewer:
                 (isometry_to_pose(visual.origin), visual_to_trimesh(visual, link_name))
                 for visual in scene_graph.getLink(link_name).visual
             ]
-            for link_name in env.getLinkNames()
+            for link_name in (lid.name() for lid in env.getLinkIds())
         }
         with self._pose_lock:
             self._clear_scene()
@@ -162,14 +162,16 @@ class TesseractViewer:
                             )
                         )
             traj = self._trajectory
-            if traj is not None and not set(traj.joint_names) <= set(env.getJointNames()):
+            if traj is not None and not set(traj.joint_names) <= {
+                jid.name() for jid in env.getJointIds()
+            }:
                 logger.warning(
                     f"dropping the trajectory: the new environment lacks some of "
                     f"{list(traj.joint_names)}"
                 )
                 self._clear_trajectory()
             self._pose_links(
-                env.getActiveJointNames(),
+                [jid.name() for jid in env.getActiveJointIds()],
                 np.asarray(env.getCurrentJointValues(), dtype=np.float64),
             )
 

@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tesseract_robotics.tesseract_command_language import MoveInstructionType
-from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.tesseract_common import Isometry3d, LinkId, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import JointGroup
 from tesseract_robotics.tesseract_scene_graph import JointType
@@ -73,17 +73,17 @@ def sample_count(delta: NDArray[np.float64], revolute: NDArray[np.bool_]) -> int
 
 def _tcp_offset(manip_info: ManipulatorInfo) -> Isometry3d:
     offset = manip_info.tcp_offset
-    if isinstance(offset, str):
-        raise NamedTcpOffsetError(f"tcp_offset names link {offset!r}; give a transform")
+    if isinstance(offset, LinkId):
+        raise NamedTcpOffsetError(f"tcp_offset names link {offset.name()!r}; give a transform")
     return offset
 
 
 def _check_move_types(trajectory: Trajectory, kin: JointGroup, manip_info: ManipulatorInfo) -> None:
     for index, move_type in enumerate(trajectory.move_types[1:], start=1):
         if move_type == MoveInstructionType.LINEAR:
-            if kin.isActiveLinkName(manip_info.working_frame):
+            if kin.isActiveLinkId(manip_info.working_frame):
                 raise MovingWorkingFrameError(
-                    f"move {index} is linear in {manip_info.working_frame!r}, which group "
+                    f"move {index} is linear in {manip_info.working_frame.name()!r}, which group "
                     f"{manip_info.manipulator!r} moves: not a straight line in world"
                 )
         elif move_type != MoveInstructionType.FREESPACE:
@@ -114,7 +114,7 @@ def tcp_path(env: Environment, trajectory: Trajectory, manip_info: ManipulatorIn
     """
     # FK only: a kinematic group would demand an IK solver the path has no use for.
     kin = env.getJointGroup(manip_info.manipulator)
-    group_joints = list(kin.getJointNames())
+    group_joints = [jid.name() for jid in kin.getJointIds()]
     missing = set(group_joints) - set(trajectory.joint_names)
     if missing:
         raise UnknownJointError(f"trajectory lacks group joints: {sorted(missing)}")

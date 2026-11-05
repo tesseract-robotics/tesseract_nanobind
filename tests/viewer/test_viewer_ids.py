@@ -1,7 +1,4 @@
-"""The viewer turns id-based tesseract results into JSON: ids must cross as str (#141)."""
-
-import asyncio
-import json
+"""The viewer turns id-based tesseract results into plain data: ids cross as str (#141)."""
 
 import numpy as np
 import pytest
@@ -15,9 +12,9 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionPoly_wrap_MoveInstruction,
     MoveInstructionType,
 )
-from tesseract_robotics.viewer.tesseract_env_to_gltf import tesseract_env_to_gltf
-from tesseract_robotics.viewer.tesseract_viewer_aio import TesseractViewerAIO
-from tesseract_robotics.viewer.util import tesseract_trajectory_to_list, trajectory_list_to_json
+from tesseract_robotics.viewer.poses import link_poses
+from tesseract_robotics.viewer.tcp_path import tcp_path
+from tesseract_robotics.viewer.trajectory import Trajectory
 
 
 @pytest.fixture(scope="module")
@@ -33,35 +30,20 @@ def trajectory(robot):
         wp = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, q))
         mi = MoveInstruction(wp, MoveInstructionType.FREESPACE)
         program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
-    return program
+    return Trajectory.from_composite(program)
 
 
-def test_env_to_gltf_names_links_and_joints_by_str(robot, trajectory):
-    gltf = json.loads(tesseract_env_to_gltf(robot.env, trajectory=trajectory))
-    link_names = {
-        n["extras"]["tesseract_link"]["name"]
-        for n in gltf["nodes"]
-        if "tesseract_link" in n.get("extras", {})
-    }
-    assert "base_link" in link_names
-    assert "link_tool0" in {n["name"] for n in gltf["nodes"]}
+def test_trajectory_carries_joint_names_as_str(robot, trajectory):
+    assert all(type(n) is str for n in trajectory.joint_names)
+    assert list(trajectory.joint_names) == robot.get_joint_names("manipulator")
 
 
-def test_trajectory_json_carries_joint_names_as_str(robot, trajectory):
-    joint_names, traj = tesseract_trajectory_to_list(trajectory)
-    assert all(type(n) is str for n in joint_names)
-    payload = json.loads(trajectory_list_to_json(joint_names, traj))
-    assert payload["joint_names"] == robot.get_joint_names("manipulator")
+def test_link_poses_are_keyed_by_str(robot, trajectory):
+    poses = link_poses(robot.env, trajectory.joint_names, trajectory.positions[0])
+    assert all(type(link) is str for link in poses)
+    assert "base_link" in poses
 
 
-def test_plot_trajectory_marker_parents_on_root_link_str(robot, trajectory):
-    viewer = TesseractViewerAIO()
-    viewer.t_env = robot.env
+def test_tcp_path_takes_the_tcp_frame_as_str(robot, trajectory):
     manip = robot.get_manipulator_info("manipulator", "tool0", "base_link")
-
-    async def plot():
-        await viewer.plot_trajectory(trajectory, manip, update_now=False)
-
-    asyncio.run(plot())
-    markers = json.loads(viewer.markers_json)["markers"]
-    assert {m["parent_link_name"] for m in markers} == {"base_link"}
+    assert tcp_path(robot.env, trajectory, manip).segments.shape[0] > 0

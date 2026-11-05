@@ -19,6 +19,11 @@ from tesseract_robotics.tesseract_command_language import (
 from .errors import EmptyTrajectoryError, TrajectoryShapeError, UnplannedWaypointError
 
 
+def _names(waypoint) -> list[str]:
+    """Joint names of a state or joint waypoint: the viewer works in `str`, tesseract in ids."""
+    return [jid.name() for jid in waypoint.getJointIds()]
+
+
 @dataclass(frozen=True)
 class Trajectory:
     """Joint positions over time.
@@ -120,10 +125,10 @@ class Trajectory:
             wp = move.getWaypoint()
             if wp.isStateWaypoint():
                 state = WaypointPoly_as_StateWaypointPoly(wp)
-                names, q, t = state.getNames(), state.getPosition(), state.getTime()
+                names, q, t = _names(state), state.getPosition(), state.getTime()
             elif wp.isJointWaypoint():
                 joint = WaypointPoly_as_JointWaypointPoly(wp)
-                names, q, t = joint.getNames(), joint.getPosition(), float(index)
+                names, q, t = _names(joint), joint.getPosition(), float(index)
             else:
                 raise UnplannedWaypointError(
                     f"move {index} has a Cartesian waypoint; plan it first"

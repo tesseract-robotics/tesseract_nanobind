@@ -29,6 +29,7 @@ from tesseract_robotics.tesseract_command_language import (
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
+    LinkId,
     ManipulatorInfo,
 )
 from tesseract_robotics.tesseract_environment import (
@@ -109,8 +110,8 @@ def _add_link(env, name, geometry):
     visual.geometry = geometry
     link.addVisual(visual)
     joint = Joint(f"{name}_joint")
-    joint.parent_link_name = "base_link"
-    joint.child_link_name = name
+    joint.parent_link_id = LinkId("base_link")
+    joint.child_link_id = LinkId(name)
     joint.type = JointType.FIXED
     joint.parent_to_joint_origin_transform = Isometry3d()
     assert env.applyCommand(AddLinkCommand(link, joint))
@@ -149,7 +150,7 @@ def test_context_manager_closes():
 
 def test_one_frame_per_link(viewer, env):
     viewer.update_environment(env)
-    assert set(viewer._link_frames) == set(env.getLinkNames())
+    assert set(viewer._link_frames) == {lid.name() for lid in env.getLinkIds()}
 
 
 def test_link_without_visuals_has_frame_and_no_mesh(viewer, env):
@@ -170,7 +171,9 @@ def test_update_environment_twice_no_duplicates(viewer, env):
 
 def test_frames_posed_from_current_state(viewer, env):
     viewer.update_environment(env)
-    expected = link_poses(env, env.getActiveJointNames(), env.getCurrentJointValues())
+    expected = link_poses(
+        env, [jid.name() for jid in env.getActiveJointIds()], env.getCurrentJointValues()
+    )
     np.testing.assert_allclose(
         viewer._link_frames["tool0"].position, expected["tool0"][0], atol=POSE_ATOL_M
     )
@@ -630,7 +633,9 @@ def test_late_client_gets_the_scene_and_playback_controls(viewer, env):
     viewer.update_environment(env)
     _load_paused(viewer, _two_waypoints())
     messages = _late_client_replay(viewer)
-    assert set(_names(messages, "FrameMessage")) >= {f"/links/{n}" for n in env.getLinkNames()}
+    assert set(_names(messages, "FrameMessage")) >= {
+        f"/links/{lid.name()}" for lid in env.getLinkIds()
+    }
     assert len(_names(messages, "GlbMessage")) == len(viewer._visual_handles) > 0
     assert [m for m in messages if m["type"] == "GuiSliderMessage"]
     assert [m for m in messages if m["type"] == "GuiCheckboxMessage"]

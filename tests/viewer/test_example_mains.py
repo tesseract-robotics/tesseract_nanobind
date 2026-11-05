@@ -41,6 +41,7 @@ REAL_RUN = {
     "scene_graph_example",
     "shapes_viewer",
     "tesseract_material_mesh_viewer",
+    "sdf_collision_example",
 }
 
 JOINT_NAMES = [f"joint_{i + 1}" for i in range(6)]

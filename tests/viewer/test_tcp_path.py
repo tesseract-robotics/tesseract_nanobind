@@ -9,6 +9,7 @@ from tesseract_robotics.tesseract_command_language import MoveInstructionType as
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
+    LinkId,
     ManipulatorInfo,
 )
 from tesseract_robotics.tesseract_environment import Environment
@@ -180,7 +181,7 @@ def test_group_joint_missing_from_the_trajectory_raises(env, manip):
 def test_rail_and_arm_stay_on_the_path():
     env = _load("online_planning_example")
     kin = env.getKinematicGroup("manipulator")
-    names = list(kin.getJointNames())
+    names = [jid.name() for jid in kin.getJointIds()]
     goal = np.zeros(len(names))
     goal[:2] = [2.0, 1.0]  # the gantry's prismatic axes [m]
     goal[2:] = 0.5
@@ -188,7 +189,7 @@ def test_rail_and_arm_stay_on_the_path():
     path = tcp_path(env, _traj(names, [np.zeros(len(names)), goal]), manip)
 
     fine = np.linspace(0.0, 1.0, FINER * len(path.segments) + 1)
-    truth = np.stack([kin.calcFwdKin(s * goal)["tool0"].translation for s in fine])
+    truth = np.stack([kin.calcFwdKin(s * goal)[LinkId("tool0")].translation for s in fine])
     assert _distance_to_polyline(truth, path.segments).max() < DRAWN_PATH_ATOL_M
 
 
@@ -198,7 +199,7 @@ def test_group_without_an_ik_solver_has_a_path():
     urdf = locator.locateResource(PUZZLE_URDF)
     srdf = locator.locateResource(PUZZLE_SRDF)
     assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)
-    names = list(env.getJointGroup("manipulator_aux").getJointNames())
+    names = [jid.name() for jid in env.getJointGroup("manipulator_aux").getJointIds()]
     q = np.zeros(len(names))
     manip = ManipulatorInfo("manipulator_aux", "world", "grinder_frame")
     assert tcp_path(env, _traj(names, [q, q + 0.1]), manip).segments.shape[0] > 1

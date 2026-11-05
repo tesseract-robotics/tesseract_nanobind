@@ -86,11 +86,6 @@ from tesseract_robotics.tesseract_scene_graph import (
     Visual,
 )
 
-# Viewer (skip import during testing)
-TesseractViewer = None
-if "pytest" not in sys.modules:
-    from tesseract_robotics.viewer import TesseractViewer
-
 # Obstacle: a ball of this radius with a bore of this radius drilled along z.
 BALL_RADIUS = 0.25
 BORE_RADIUS = 0.08
@@ -466,7 +461,7 @@ def sweep_trajectory(period: float = 4.0, steps: int = 60):
     """
     A probe_x trajectory that dives into the obstacle and backs out again, for the viewer.
 
-    ``update_trajectory_list`` wants one row per waypoint, joint values first and the timestamp
+    ``Trajectory.from_rows`` wants one row per waypoint, joint values first and the timestamp
     last, so this is a plain list of ``[probe_x, t]``. Built by hand rather than planned: the
     point is to watch the probe cross the margin band, not to solve anything.
     """
@@ -479,32 +474,21 @@ def sweep_trajectory(period: float = 4.0, steps: int = 60):
 
 def main() -> int:
     results = run()
-    robot = results["robot"]
 
-    if TesseractViewer is None or "pytest" in sys.modules:
-        return 0
+    from tesseract_robotics.viewer import TesseractViewer, Trajectory
 
-    viewer = TesseractViewer()
-    # Bundle the trajectory into the same update_environment call rather than pushing the
-    # scene and the trajectory separately - the two race on the browser side, and a
-    # refresh_scene that lands after the trajectory resets the animation to rest.
-    viewer.update_environment(robot.env, [0, 0, 0])
-    viewer.update_trajectory_list(["probe_x"], sweep_trajectory())
-    viewer.start_serve_background()
-
-    print("Viewer at http://localhost:8000")
-    print(
-        "The orange voxel shell is the field's zero level set (display only); the grey sphere\n"
-        "is the probe. The field itself is what the contact manager queries - the shell is\n"
-        "just the sampled grid made visible."
-    )
-    print("Press Enter to exit.")
-    try:
-        input("> ")
-    except (EOFError, KeyboardInterrupt):
-        pass
+    with TesseractViewer() as viewer:
+        viewer.update_environment(results["robot"].env)
+        viewer.update_trajectory(Trajectory.from_rows(["probe_x"], sweep_trajectory()))
+        print(f"Viewer at {viewer.url}")
+        print(
+            "The orange voxel shell is the field's zero level set (display only); the grey sphere\n"
+            "is the probe. The field itself is what the contact manager queries - the shell is\n"
+            "just the sampled grid made visible."
+        )
+        input("Press Enter to exit...")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())
