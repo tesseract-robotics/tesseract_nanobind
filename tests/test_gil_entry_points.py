@@ -14,6 +14,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import pytest
@@ -80,6 +81,7 @@ class _PythonLocator(ResourceLocator):
         self._inner = TesseractSupportResourceLocator()
         self.urls = []
 
+    @override
     def locateResource(self, url):
         self.urls.append(url)
         return self._inner.locateResource(url)

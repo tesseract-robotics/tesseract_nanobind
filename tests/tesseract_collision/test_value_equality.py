@@ -3,6 +3,8 @@
 Each class binds its C++ operator==/operator!= as __eq__/__ne__ and sets __hash__ = None.
 """
 
+from typing import override
+
 import pytest
 
 from tesseract_robotics.tesseract_collision import (
@@ -91,6 +93,7 @@ def test_contact_result_tolerance_comes_from_cpp():
 
 
 class _AcceptAll(ContactResultValidator):
+    @override
     def __call__(self, result):
         return True
 

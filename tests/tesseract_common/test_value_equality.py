@@ -5,6 +5,8 @@ ResourceLocator and Resource keep identity equality: their C++ operator== return
 unconditionally (resource_locator.cpp:46, :206, 0.35.0).
 """
 
+from typing import override
+
 import numpy as np
 import pytest
 
@@ -168,11 +170,13 @@ def test_kinematic_limits_of_different_shapes_are_unequal():
 
 
 class _LocatorA(ResourceLocator):
+    @override
     def locateResource(self, url):
         return None
 
 
 class _LocatorB(ResourceLocator):
+    @override
     def locateResource(self, url):
         return BytesResource(url, b"b")
 
