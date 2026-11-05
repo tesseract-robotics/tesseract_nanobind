@@ -473,7 +473,10 @@ def match(
         and renamed.get(sym.qualified, name) != name
     }
     unalias = {p: c for c, p in alias.items()}
-    py = _unaliased_api(py, unalias)  # parameter types name classes as C++ does
+    # Parameter types name classes as C++ does; `cpp_key` already names an id instance as Python.
+    py = _unaliased_api(
+        py, {p: c for p, c in unalias.items() if p not in audit_types.ID_INSTANCES.values()}
+    )
     # Top-level classes this stub lacks but another extension binds: their members are
     # compared against that extension's stub (#232). An own rename wins over a leaf hit there.
     elsewhere: dict[str, PyApi] = {}
