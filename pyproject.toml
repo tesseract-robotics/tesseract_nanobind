@@ -12,7 +12,6 @@ description = "Tesseract robotics Python bindings (nanobind)"
 readme = "README.md"
 # One cp312-abi3 wheel per platform (wheel.py-api below) covers 3.12 and up, Rhino 9's CPython 3.13 included.
 requires-python = ">=3.12"
-# Runtime dependencies - keep in sync with requirements.txt
 dependencies = [
     "numpy>=2.0",
     "loguru>=0.7.0",

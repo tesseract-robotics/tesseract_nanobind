@@ -81,13 +81,13 @@ Running `pixi run build` executes `build-cpp` → `install` automatically. Runni
 
 ### Environments
 
-The workspace defines multiple Python environments for CI testing:
+The default environment is for local development; `py312` is the one CI builds wheels in:
 
 ```bash
 # Default environment (Python from pixi.lock)
 pixi run test
 
-# Specific Python version
+# The wheel build environment
 pixi run -e py312 test
 ```
 
