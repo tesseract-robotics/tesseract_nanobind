@@ -61,7 +61,7 @@ Key Concepts
 import math
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import numpy as np
 
@@ -344,6 +344,7 @@ class DropPairValidator(ContactResultValidator):
         self.link_pair = link_pair
         self.seen: list[tuple[str, str]] = []
 
+    @override
     def __call__(self, result: ContactResult) -> bool:
         link_pair = makeOrderedLinkPair(*result.link_names)
         self.seen.append(link_pair)

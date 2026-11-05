@@ -17,6 +17,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import override
 
 import numpy as np
 
@@ -63,6 +64,7 @@ class TwcResourceLocator(ResourceLocator):
         super().__init__()
         self._twc_support_path = twc_support_path
 
+    @override
     def locateResource(self, url: str):
         # Direct file path - return as-is
         if Path(url).exists():
