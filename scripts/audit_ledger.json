@@ -42,9 +42,6 @@
     "DiscreteContactManager.setCollisionObjectsTransform": {
       "issue": "#141"
     },
-    "tesseract/collision/cereal_serialization.h": {
-      "wont_fix": "Free `serialize` templates cereal finds by ADL; Python serializes through `tesseract_serialization`."
-    },
     "tesseract/collision/common.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
     },
@@ -346,9 +343,6 @@
     "strFormat": {
       "wont_fix": "Python `str` covers it."
     },
-    "tesseract/common/cereal_serialization.h": {
-      "wont_fix": "Free `serialize` templates cereal finds by ADL; Python serializes through `tesseract_serialization`."
-    },
     "tesseract/common/clone_cache.h": {
       "wont_fix": "No reason recorded (phaseB PE-M13)."
     },
@@ -472,9 +466,6 @@
     },
     "readSignedDistanceFieldVDB": {
       "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
-    },
-    "tesseract/geometry/cereal_serialization.h": {
-      "wont_fix": "Free `serialize` templates cereal finds by ADL; Python serializes through `tesseract_serialization`."
     }
   },
   "tesseract_kinematics": {
@@ -623,12 +614,6 @@
   "tesseract_serialization": {
     "Serialization": {
       "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` … functions."
-    },
-    "dynamic_init_dummy_tesseract_environment_cereal": {
-      "wont_fix": "`CEREAL_FORCE_DYNAMIC_INIT` registration anchor: no API."
-    },
-    "dynamic_init_tesseract_environment_cereal": {
-      "wont_fix": "`CEREAL_FORCE_DYNAMIC_INIT` registration anchor: no API."
     }
   },
   "tesseract_srdf": {

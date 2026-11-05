@@ -110,3 +110,15 @@ void kinds(bool b,
            std::function<void(int)> fn,
            const boost::uuids::uuid& id);
 }  // namespace tesseract::typed
+
+// What a tesseract cereal_serialization.h ends with where its registrations live in the library.
+#include <cereal/types/polymorphic.hpp>
+CEREAL_FORCE_DYNAMIC_INIT(tesseract_typed_cereal)
+
+namespace tesseract::typed
+{
+template <class Archive>
+std::string save_minimal(const Archive&, const Item&);
+template <class Archive>
+void load_minimal(const Archive&, Item&, const std::string&);
+}  // namespace tesseract::typed

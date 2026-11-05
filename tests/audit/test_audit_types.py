@@ -141,6 +141,16 @@ def test_unknown_nested_in_a_key_is_neither_a_match_nor_a_mismatch():
     assert types.verdict(None, ("str",)) is None
 
 
+def test_cereal_force_dynamic_init_is_not_api(typed_cpp):
+    """Upstream writes the macro by platform (`#if defined(_WIN32) || defined(__APPLE__)`), so
+    counting its expansion made a header's rows depend on the machine running the audit."""
+    assert not [name for name in typed_cpp if "dynamic_init" in name]
+
+
+def test_cereal_minimal_hooks_are_not_api(typed_cpp):
+    assert not {"save_minimal", "load_minimal"} & set(typed_cpp)
+
+
 def test_typedef_name_is_an_accepted_key(typed_cpp):
     """`Items` is bound as an opaque class: the typedef's name matches besides `seq[Item]`."""
     [ov] = typed_cpp["take"].overloads
