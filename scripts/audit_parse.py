@@ -148,7 +148,7 @@ def parse_tu(
 # libclang spells this parameter's pointee type so; the spec accepts it bound as a `str` return.
 STRINGSTREAM = "std::stringstream"
 # cereal serialization hooks, member or free function: not API.
-CEREAL_HOOKS = frozenset({"serialize", "load", "save"})
+CEREAL_HOOKS = frozenset({"serialize", "load", "save", "load_minimal", "save_minimal"})
 # EIGEN_MAKE_ALIGNED_OPERATOR_NEW expands to these in every aligned tesseract type: memory
 # management, not API (spec amendment A4).
 ALLOCATION_OPERATORS = frozenset(
@@ -174,7 +174,8 @@ OSTREAM_DECL = "basic_ostream"
 # Namespaces that audited headers reopen to specialise library templates
 # (`std::hash<LinkNamesPair>` in tesseract/common/types.h, `YAML::convert<PluginInfo>` in
 # tesseract/common/yaml_extensions.h): not module API.
-FOREIGN_NAMESPACES = frozenset({"std", "YAML"})
+# `cereal`: specializations and the `CEREAL_FORCE_DYNAMIC_INIT` expansion, not tesseract API.
+FOREIGN_NAMESPACES = frozenset({"std", "YAML", "cereal"})
 FUNCTION_KINDS = frozenset({ci.CursorKind.FUNCTION_DECL, ci.CursorKind.FUNCTION_TEMPLATE})
 METHOD_KINDS = frozenset(
     {ci.CursorKind.CXX_METHOD, ci.CursorKind.FUNCTION_TEMPLATE, ci.CursorKind.CONVERSION_FUNCTION}
@@ -905,7 +906,8 @@ def cpp_api(
     def visit(scope: ci.Cursor) -> None:
         for c in scope.get_children():
             if c.kind == ci.CursorKind.NAMESPACE:
-                if c.spelling not in FOREIGN_NAMESPACES:
+                # An anonymous namespace has internal linkage: nothing outside the TU names it.
+                if c.spelling not in FOREIGN_NAMESPACES and not c.is_anonymous():
                     visit(c)
                 continue
             if c.location.file is None or Path(c.location.file.name).resolve() not in headers:

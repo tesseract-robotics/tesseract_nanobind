@@ -200,8 +200,6 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
         "nodes/*": NODES_NOT_API,
     },
     "tesseract/task_composer/planning/": {
-        "cereal_serialization.h": "Free `serialize` templates cereal finds by ADL; Python "
-        "serializes through `tesseract_serialization`.",
         "*_plugin_factories.h": PLUGIN_ANCHOR,
         "nodes/*": NODES_NOT_API,
     },
