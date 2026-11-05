@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import clang.cindex as ci
-import tomllib
 from audit_match import Gap, ModuleReport
 from audit_ownership import (
     ANY_PREFIX,

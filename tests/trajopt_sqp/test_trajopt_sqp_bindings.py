@@ -14,6 +14,7 @@ Updated for 0.34 API:
 import subprocess
 import sys
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import pytest
@@ -904,20 +905,25 @@ class _PinCost(ti.ConstraintSet):
         self._index = index
         self._target = target
 
+    @override
     def getValues(self) -> np.ndarray:
         x = np.array(self.getVariables().getValues())
         return np.array([x[self._index] - self._target])
 
+    @override
     def getBounds(self) -> list:
         return [ti.Bounds(0.0, 0.0)]
 
+    @override
     def getJacobian(self):
         n = len(self.getVariables().getValues())
         return scipy.sparse.csr_matrix(([1.0], ([0], [self._index])), shape=(1, n))
 
+    @override
     def update(self) -> int:
         return self.getRows()
 
+    @override
     def getCoefficients(self) -> np.ndarray:
         return np.ones(1)
 

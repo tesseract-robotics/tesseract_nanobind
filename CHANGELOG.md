@@ -4,6 +4,9 @@
 
 ### Breaking changes
 
+- **Python 3.12 is the minimum; Rhino 8 loses wheels** — `requires-python` rises from `>=3.9` to `>=3.12`. One `cp312-abi3` wheel per platform now covers 3.12, 3.13 and 3.14, including Rhino 9 (CPython 3.13). Rhino 8 (CPython 3.9) and Python 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them ([#369]; `docs/breaking-changes.md`).
+- **numpy 2.0 and scipy 1.17.1 are the minimum** — `numpy>=1.21.0` and `scipy>=1.7.0` were never tested. The scipy floor is the oldest scipy CI runs; numpy 1.x users stay on 0.35.0.8. `importlib-resources` is no longer a dependency: the viewer uses stdlib `importlib.resources` ([#369]).
+- **`planning.program.Target` and `emitters.core.events.Event` are `type` aliases** — `isinstance(x, Target)` and `typing.get_args(Target)` raise or return nothing; use `Target.__value__` or test the member classes ([#369]; `docs/breaking-changes.md`).
 - **A Python `OutputHandler` gets its messages asynchronously** — on a delivery thread, in order, never inside console_bridge's output lock (see Fixed). Code that reads what a handler recorded calls the new `flushOutputHandlers()` first; a handler's exception goes to `sys.unraisablehook` instead of the code that logged. See breaking-changes.md.
 - **`CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed** — copies of `setCollisionCoeff` / `getCollisionCoeff` under names C++ does not have. Call the C++ names ([#298]).
 - **`CollisionCoeffData`, `TrajOptCollisionConfig` and `SQPParameters` compare by value and are unhashable** — `==` compared identity; `hash()`, `set` members and `dict` keys now raise `TypeError` ([#261](https://github.com/tesseract-robotics/tesseract_nanobind/issues/261)).
@@ -32,6 +35,8 @@
 
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
 - **car_seat runs on `TrajOptIfoptPipeline`, and freespace_hybrid's ifopt run uses the C++ profiles** — `car_seat_example.run(pipeline="TrajOptIfoptPipeline")` uses the new `create_car_seat_ifopt_profiles()`, the C++ `if (ifopt_)` branch (LVS_CONTINUOUS cost and constraint). `freespace_hybrid_example.run(use_ifopt=True)` registered no ifopt composite profile and planned with the planner defaults. The new `add_ifopt_profiles()` adds the C++ composite: cost and constraint `TrajOptCollisionConfig(0.025, 20)`, smoothing coeffs of 1. With the #787 fix, car_seat clones 40 → 4 contact managers and its trajectories stay bitwise identical.
+- **Sources target Python 3.12** — ruff `target-version = "py312"` without `FA102`, PEP 695 aliases and generics, `StrEnum` for `RapidType`, `zip(strict=True)` in tests. The GIL-hotspot tooling tests move back to `tests/test_gil_hotspots.py`, in the wheel suite; the `devtools-test` task is gone ([#369]).
+- **Wheels build on 3.12 only, and every `test-wheel` leg blocks** — the 3.9, 3.10 and 3.11 builds and the cp39 cross-build (`TESSERACT_CPP_PREFIX`, the `py39` env) are gone; CMake takes the C++ stack from `CONDA_PREFIX`. Python 3.14 no longer may fail ([#369]).
 - **macOS CI runs on `macos-15`** — GitHub retires the `macos-14` image on 2026-11-02 and cancels its jobs during the scheduled brownouts before that (actions/runner-images#13518). Wheels keep the `macosx_14_0` tag: `build_macos_wheel.sh` pins `MACOSX_DEPLOYMENT_TARGET=14.0`, and the bundled libraries come from the locked pixi env. The wheel build cache key names the Xcode developer dir and SDK path: a build dir configured on another toolchain fails to configure.
 - **The Windows wheel job no longer installs `zip` from Chocolatey** — the wheel is repacked with Python's `zipfile`, so a Chocolatey feed outage (a 504 failed #353's build) no longer fails the job.
 - **The Linux test-wheel job logs memory every 10 s** — free memory and the five largest processes, so a runner that dies mid-suite ("received a shutdown signal", three times on x64) shows whether memory ran out.
@@ -580,6 +585,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#296]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/296
 [#297]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/297
 [#298]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/298
+[#369]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/369
 [#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273

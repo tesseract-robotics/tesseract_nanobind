@@ -2,6 +2,7 @@ import io
 import os
 from inspect import currentframe, getframeinfo
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import numpy.testing as nptest
@@ -34,6 +35,7 @@ class _TestOutputHandler(tesseract_common.OutputHandler):
         super().__init__()
         self.last_text = None
 
+    @override
     def log(self, text, level, filename, line):
         self.last_text = text
 
@@ -287,6 +289,7 @@ class _RecordingLocator(tesseract_common.ResourceLocator):
         self.hits = hits
         self.asked = []
 
+    @override
     def locateResource(self, url):
         self.asked.append(url)
         if url in self.hits:

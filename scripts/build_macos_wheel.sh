@@ -26,18 +26,12 @@ cd "$PROJECT_ROOT"
 export MACOSX_DEPLOYMENT_TARGET=14.0
 
 # The tesseract C++ libs + plugin factories are provided by the tesseract-robotics
-# conda packages (no more colcon ws/install tree). Normally they live in the active
-# env ($CONDA_PREFIX); the cp39 wheel build (Rhino 8) runs from a minimal py39 env
-# and points TESSERACT_CPP_PREFIX at the py312 env that carries the C++ stack
-# (pcl→vtk has no cp39 builds, so the two can't co-install). CMakeLists.txt honors
-# the same variable.
-CPP_PREFIX="${TESSERACT_CPP_PREFIX:-$CONDA_PREFIX}"
-export TESSERACT_CPP_PREFIX="$CPP_PREFIX"
-LIB_DIR="$CPP_PREFIX/lib"
+# conda packages in the active env (no more colcon ws/install tree).
+LIB_DIR="$CONDA_PREFIX/lib"
 
 # Set library paths
-export DYLD_LIBRARY_PATH="$CPP_PREFIX/lib"
-export CMAKE_PREFIX_PATH="$CPP_PREFIX"
+export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib"
+export CMAKE_PREFIX_PATH="$CONDA_PREFIX"
 
 if $DEV_MODE; then
     echo "Building dev wheel (no delocate)..."

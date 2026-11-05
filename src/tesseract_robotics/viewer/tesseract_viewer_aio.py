@@ -1,11 +1,11 @@
 import asyncio
 import hashlib
+import importlib.resources
 import json
 import mimetypes
 import traceback
 
 import aiohttp
-import importlib_resources
 import numpy as np
 from aiohttp import web as aiohttp_web
 
@@ -62,7 +62,7 @@ class _TrackedProtocol(asyncio.Protocol):
 
 class _TesseractViewerAIOServer:
     def __init__(self):
-        self._static_pkg = importlib_resources.files("tesseract_robotics.viewer.resources.static")
+        self._static_pkg = importlib.resources.files("tesseract_robotics.viewer.resources.static")
         self.scene_gltf = None
         self.scene_glb = None
         self.trajectory_json = None
@@ -256,7 +256,7 @@ class _TesseractViewerAIOServer:
         self._closing = False
 
     async def get_static_file(self, filename):
-        with importlib_resources.as_file(self._static_pkg / filename) as f_path:
+        with importlib.resources.as_file(self._static_pkg / filename) as f_path:
             with open(f_path, "rb") as f:
                 contents = f.read()
         return aiohttp_web.Response(body=contents, content_type=mimetypes.guess_type(filename)[0])

@@ -10,6 +10,8 @@ Verifies that Python subclasses of ConstraintSet work correctly:
 
 from __future__ import annotations
 
+from typing import override
+
 import numpy as np
 import scipy.sparse
 
@@ -32,6 +34,7 @@ class SimpleConstraint(ConstraintSet):
         super().__init__(name, 2)
         self._targets = np.array([1.0, 2.0])
 
+    @override
     def getValues(self) -> np.ndarray:
         variables = self.getVariables()
         if variables is None:
@@ -39,17 +42,21 @@ class SimpleConstraint(ConstraintSet):
         x = np.array(variables.getValues())
         return x[:2] - self._targets
 
+    @override
     def getBounds(self) -> list:
         return [Bounds(0.0, 0.0), Bounds(0.0, 0.0)]
 
+    @override
     def getJacobian(self):
         variables = self.getVariables()
         n_vars = len(variables.getValues()) if variables is not None else 2
         return scipy.sparse.csr_matrix(([1.0, 1.0], ([0, 1], [0, 1])), shape=(2, n_vars))
 
+    @override
     def update(self) -> int:
         return self.getRows()
 
+    @override
     def getCoefficients(self) -> np.ndarray:
         return np.ones(2)
 
@@ -61,6 +68,7 @@ class ScalarCost(ConstraintSet):
         super().__init__(name, 1)
         self._n_vars = n_vars
 
+    @override
     def getValues(self) -> np.ndarray:
         variables = self.getVariables()
         if variables is None:
@@ -68,9 +76,11 @@ class ScalarCost(ConstraintSet):
         x = np.array(variables.getValues())
         return np.array([0.5 * np.dot(x, x)])
 
+    @override
     def getBounds(self) -> list:
         return [Bounds(0.0, 0.0)]
 
+    @override
     def getJacobian(self):
         variables = self.getVariables()
         if variables is None:
@@ -78,9 +88,11 @@ class ScalarCost(ConstraintSet):
         x = np.array(variables.getValues())
         return scipy.sparse.csr_matrix(x.reshape(1, -1))
 
+    @override
     def update(self) -> int:
         return 1
 
+    @override
     def getCoefficients(self) -> np.ndarray:
         return np.ones(1)
 

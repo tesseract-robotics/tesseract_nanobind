@@ -4,6 +4,7 @@ import gc
 import subprocess
 import sys
 from pathlib import Path
+from typing import override
 
 import pytest
 import yaml
@@ -40,6 +41,7 @@ class _DelegatingResourceLocator(ResourceLocator):
         self._inner = GeneralResourceLocator()
         self.urls: list[str] = []
 
+    @override
     def locateResource(self, url):
         self.urls.append(url)
         return self._inner.locateResource(url)

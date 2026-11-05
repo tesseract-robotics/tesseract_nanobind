@@ -87,13 +87,13 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
 
     ```yaml
     include:
-      - { python: '3.13', wheel: '3.12', continue_on_error: false }
-      - { python: '3.14', wheel: '3.12', continue_on_error: true }
+      - { python: '3.13', wheel: '3.12' }
+      - { python: '3.14', wheel: '3.12' }
     ```
 
     The download step then pulls `python-${{ matrix.wheel }}-macos-arm64` (the
-    `cp312-abi3` artifact) and installs it on a 3.13/3.14 interpreter
-    (`allow-prereleases: true`). Before PR #98 only Linux did this; macOS and
+    `cp312-abi3` artifact) and installs it on a 3.13/3.14 interpreter. Every leg
+    blocks. Before PR #98 only Linux did this; macOS and
     Windows tested 3.9 + 3.12 only, leaving the cross-platform abi3 claim
     *asserted* but not *verified*. Now all three platforms verify it.
 

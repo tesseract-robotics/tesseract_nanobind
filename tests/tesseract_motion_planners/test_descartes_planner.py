@@ -4,6 +4,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import pytest
@@ -264,6 +265,7 @@ class TestPythonEdgeEvaluator:
         class JointDistanceEdgeEvaluator(DescartesEdgeEvaluatorD):
             """Cost = L2 norm of joint-space delta; always valid."""
 
+            @override
             def evaluate(self, start, end):
                 call_counter["n"] += 1
                 delta = end.values - start.values
@@ -281,14 +283,17 @@ class TestPythonEdgeEvaluator:
                 # the same Python instance for every edge it evaluates.
                 self._edge_evaluator = JointDistanceEdgeEvaluator()
 
+            @override
             def createWaypointSampler(self, move_instruction, composite_manip_info, env):
                 return self._inner.createWaypointSampler(
                     move_instruction, composite_manip_info, env
                 )
 
+            @override
             def createEdgeEvaluator(self, move_instruction, composite_manip_info, env):
                 return self._edge_evaluator
 
+            @override
             def createStateEvaluator(self, move_instruction, composite_manip_info, env):
                 return self._inner.createStateEvaluator(move_instruction, composite_manip_info, env)
 
@@ -400,9 +405,11 @@ class TestDescartesWaypointSamplerStr:
 
     def test_python_sampler_keeps_its_own_str(self):
         class NamedSampler(DescartesWaypointSamplerD):
+            @override
             def sample(self):
                 return []
 
+            @override
             def __str__(self):
                 return "named"
 
@@ -445,8 +452,8 @@ class TestDescartesToolPoseSamplers:
     def test_sample_tool_fixed_axes(self, sampler, axis):
         expected = sampleToolAxis(self.POSE, np.array(axis), 0.5, -1.0, 1.0)
         samples = sampler(self.POSE, 0.5, -1.0, 1.0)
-        assert len(samples) == len(expected) == 5  # zip(strict=True) is 3.10+; the floor is 3.9
-        for sample, other in zip(samples, expected):
+        assert len(samples) == 5
+        for sample, other in zip(samples, expected, strict=True):
             np.testing.assert_allclose(sample.matrix, other.matrix)
 
 

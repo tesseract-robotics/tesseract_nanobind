@@ -6,6 +6,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import override
 
 import numpy as np
 import pytest
@@ -507,6 +508,7 @@ class _RecordingCallback(SQPCallback):
         self.keep_going = keep_going
         self.iterations = []
 
+    @override
     def execute(self, problem, sqp_results):
         self.iterations.append(sqp_results.overall_iteration)
         return self.keep_going
@@ -552,6 +554,7 @@ class TestTrajOptIfoptSolverCallbacks:
         seen = []
 
         class Recorder(SQPCallback):
+            @override
             def execute(self, problem, sqp_results):
                 # `problem` is valid only during the call: check it here, never keep it.
                 seen.append(
@@ -744,9 +747,11 @@ class TestTrajOptIfoptProfileHooks:
                 super().__init__("tagged", 1)
                 self.tag = "mine"
 
+            @override
             def getValues(self):
                 return np.zeros(1)
 
+            @override
             def getBounds(self):
                 return [ti.Bounds(0.0, 0.0)]
 
@@ -906,19 +911,24 @@ class _ZeroCost(ti.ConstraintSet):
         super().__init__("python_zero_cost", 1)
         self.value_calls = 0
 
+    @override
     def getValues(self):
         self.value_calls += 1
         return np.zeros(1)
 
+    @override
     def getBounds(self):
         return [ti.Bounds(0.0, 0.0)]
 
+    @override
     def getJacobian(self):
         return scipy.sparse.csr_matrix((1, self.getVariables().getRows()))
 
+    @override
     def update(self):
         return self.getRows()
 
+    @override
     def getCoefficients(self):
         return np.ones(1)
 
@@ -935,6 +945,7 @@ class _DelegatingMoveProfile(TrajOptIfoptMoveProfile):
         self._inner.joint_cost_config.enabled = False
         self._inner.joint_constraint_config.enabled = True
 
+    @override
     def create(self, move_instruction, composite_manip_info, env, index):
         self.indices.append(index)
         return self._inner.create(move_instruction, composite_manip_info, env, index)
@@ -949,6 +960,7 @@ class _AddingCompositeProfile(TrajOptIfoptCompositeProfile):
         self.seen = None
         self._inner = _smoothing_composite_profile(n_joints)
 
+    @override
     def create(self, composite_manip_info, env, nodes, fixed_indices):
         self.seen = (len(nodes), list(fixed_indices))
         terms = self._inner.create(composite_manip_info, env, nodes, fixed_indices)
@@ -1396,6 +1408,7 @@ class TestTrajOptIfoptPythonProfiles:
         t_env, manip_info, joint_names = kuka_iiwa_environment
 
         class Raising(TrajOptIfoptMoveProfile):
+            @override
             def create(self, move_instruction, composite_manip_info, env, index):
                 raise _ProfileError("from move create")
 
@@ -1407,6 +1420,7 @@ class TestTrajOptIfoptPythonProfiles:
         t_env, manip_info, joint_names = kuka_iiwa_environment
 
         class Raising(TrajOptIfoptCompositeProfile):
+            @override
             def create(self, composite_manip_info, env, nodes, fixed_indices):
                 raise _ProfileError("from composite create")
 
@@ -1418,6 +1432,7 @@ class TestTrajOptIfoptPythonProfiles:
         t_env, manip_info, joint_names = kuka_iiwa_environment
 
         class NoNode(TrajOptIfoptMoveProfile):
+            @override
             def create(self, move_instruction, composite_manip_info, env, index):
                 return TrajOptIfoptWaypointInfo()
 
@@ -1429,6 +1444,7 @@ class TestTrajOptIfoptPythonProfiles:
         t_env, manip_info, joint_names = kuka_iiwa_environment
 
         class WrongType(TrajOptIfoptMoveProfile):
+            @override
             def create(self, move_instruction, composite_manip_info, env, index):
                 return None
 
@@ -1457,6 +1473,7 @@ class TestTrajOptIfoptPythonProfiles:
                 super().__init__()
                 self._inner = _smoothing_composite_profile(len(joint_names))
 
+            @override
             def create(self, composite_manip_info, env, nodes, fixed_indices):
                 if mutation == "addVar":
                     nodes[1].addVar("extra", ["e0", "e1"], np.ones(2), [ti.Bounds(-1.0, 1.0)] * 2)

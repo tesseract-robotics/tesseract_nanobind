@@ -7,6 +7,7 @@ import gc
 import subprocess
 import sys
 import threading
+from typing import override
 
 import pytest
 
@@ -33,6 +34,7 @@ def _validator_class():
             self.accept = accept
             self.seen = []
 
+        @override
         def __call__(self, result):
             self.seen.append(tuple(result.link_names))
             return self.accept(result)
