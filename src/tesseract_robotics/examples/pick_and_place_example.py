@@ -306,7 +306,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
 def main() -> int:
     results = run()
 
-    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+    from tesseract_robotics.viewer import TesseractViewer
 
     with TesseractViewer() as viewer:
         viewer.update_environment(results["robot"].env)

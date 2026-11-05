@@ -360,7 +360,7 @@ def main() -> int:
     result = results["result"]
     robot = results["robot"]
 
-    from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
+    from tesseract_robotics.viewer import TesseractViewer
 
     # Tint every robot link visual so the colour reflects which path the
     # viewer is currently animating. The octree link has no Visual.material

@@ -2,9 +2,6 @@
 
 `tesseract_robotics.viewer` draws a tesseract environment in your browser and animates planned trajectories. It is built on [viser](https://viser.studio). Tesseract owns the kinematics: every link is one viser frame posed from `env.getState(...)`, so rails, positioners and attached objects need no separate handling. After a command that adds or removes links, call `update_environment` again; until then pose updates raise `StaleSceneError`.
 
-!!! note "Python >= 3.11"
-    viser needs Python 3.11 or newer (`pip` installs it, with `trimesh` and `pillow`, on those versions only). On 3.9 and 3.10 the planning API works but `import tesseract_robotics.viewer` raises `ModuleNotFoundError`. Examples import the viewer inside `main()`, so their headless `run()` works on any version.
-
 ## Basic Usage
 
 Build an `Environment`, then hand it to the viewer. The viewer serves from construction until `close()`, at `http://127.0.0.1:8000` by default:
