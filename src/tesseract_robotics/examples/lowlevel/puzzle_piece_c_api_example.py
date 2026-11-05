@@ -231,6 +231,8 @@ def run():
 
 def main() -> int:
     results = run()
+    if not results:
+        return 1
 
     from tesseract_robotics.viewer import TesseractViewer  # viser: Python >= 3.11 (#369)
 
