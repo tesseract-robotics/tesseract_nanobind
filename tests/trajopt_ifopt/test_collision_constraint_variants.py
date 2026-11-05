@@ -7,8 +7,6 @@ of DiscreteCollisionNumericalConstraint. Bound, Python can build the planner's p
 
 from __future__ import annotations
 
-from typing import TypeVar
-
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
@@ -20,10 +18,9 @@ from .scenes import BOX_SIZE, OVERLAP_X, TwoBoxes, two_boxes_at
 SECOND_X = 0.15
 
 
-ConstraintT = TypeVar("ConstraintT", bound=ti.ConstraintSet)
-
-
-def _linked(constraint: ConstraintT, nodes: ti.NodesVariables) -> ConstraintT:
+def _linked[ConstraintT: ti.ConstraintSet](
+    constraint: ConstraintT, nodes: ti.NodesVariables
+) -> ConstraintT:
     constraint.linkWithVariables(nodes)
     constraint.update()
     return constraint

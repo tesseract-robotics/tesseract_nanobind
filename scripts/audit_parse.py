@@ -6,7 +6,7 @@ import os
 import sysconfig
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
@@ -203,7 +203,7 @@ RAW_BUFFER_POINTEES = frozenset(
 )
 
 
-class Kind(str, Enum):
+class Kind(StrEnum):
     """What a report row refers to."""
 
     CLASS = "class"

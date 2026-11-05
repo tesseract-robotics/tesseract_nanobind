@@ -9,6 +9,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Release | What breaks | Use instead |
 |---|---|---|
 | Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
+| Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
 | Unreleased | A Python `OutputHandler` gets its messages asynchronously, on a delivery thread | [`flushOutputHandlers()`](#python-outputhandlers-are-called-asynchronously) |
 | Unreleased | `CollisionCoeffData.setPairCollisionCoeff` / `getPairCollisionCoeff` removed | [The C++ names](#setpaircollisioncoeff-and-getpaircollisioncoeff-removed) |
 | Unreleased | `CollisionCoeffData`, `TrajOptCollisionConfig`, `SQPParameters` compare by value and are unhashable | [A stable key, or `id()`](#trajopt-value-types-compare-by-value-and-are-unhashable) |
@@ -56,6 +57,16 @@ pip install "tesseract-robotics-nanobind==0.35.0.8"  # Rhino 8, Python 3.9 (macO
 ```
 
 pip picks that release by itself on those Pythons, because later ones declare the floor.
+
+### `Target` and `Event` are `type` aliases
+
+`planning.program.Target` and `emitters.core.events.Event` use the `type` statement. Annotations are unaffected; `isinstance(x, Target)` raises `TypeError`.
+
+```python
+isinstance(x, (CartesianTarget, JointTarget, StateTarget))
+```
+
+`Target.__value__` is the union, for code that introspects it.
 
 ### Python `OutputHandler`s are called asynchronously
 
