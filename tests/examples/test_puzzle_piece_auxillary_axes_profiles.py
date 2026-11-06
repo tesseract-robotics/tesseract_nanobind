@@ -74,7 +74,7 @@ def test_profiles_match_cpp_example(port):
     assert solver.opt_params.min_trust_box_size == CPP_MIN_TRUST_BOX_SIZE
 
 
-# C++ `if (ifopt_)` branch: opt_params.max_iterations = 200; the adaptive_rho line is
+# C++ `if (ifopt_)` branch: opt_params.max_iter = 200; the adaptive_rho line is
 # commented out there, so the OSQP settings stay at their defaults.
 CPP_IFOPT_MAX_ITERATIONS = 200
 
@@ -114,7 +114,7 @@ def test_ifopt_profiles_match_upstream():
     solver_name, solver = found[TrajOptIfoptOSQPSolverProfile]
     assert solver_name == "DEFAULT"
     expected_solver = TrajOptIfoptOSQPSolverProfile()
-    expected_solver.opt_params.max_iterations = CPP_IFOPT_MAX_ITERATIONS
+    expected_solver.opt_params.max_iter = CPP_IFOPT_MAX_ITERATIONS
     expected_solver.opt_params.min_approx_improve = CPP_MIN_APPROX_IMPROVE
     expected_solver.opt_params.min_trust_box_size = CPP_MIN_TRUST_BOX_SIZE
     # Equality covers opt_params and every OSQP setting, adaptive_rho included.

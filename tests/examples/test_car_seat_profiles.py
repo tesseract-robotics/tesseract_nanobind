@@ -32,7 +32,7 @@ CPP_COST_COEFF = 50.0
 CPP_COST_MARGIN_BUFFER = 0.01  # m
 # C++: collision_check_config.longest_valid_segment_length = 0.1 for both, in joint-space units.
 CPP_LONGEST_VALID_SEGMENT_LENGTH = 0.1
-# C++: opt_params.max_iterations = 200, min_approx_improve = min_trust_box_size = 1e-3.
+# C++: opt_params.max_iter = 200, min_approx_improve = min_trust_box_size = 1e-3.
 CPP_MAX_ITERATIONS = 200
 CPP_MIN_APPROX_IMPROVE = 1e-3
 CPP_MIN_TRUST_BOX_SIZE = 1e-3
@@ -76,7 +76,7 @@ def test_ifopt_profiles_match_upstream():
         assert move.joint_constraint_config.enabled
 
     expected_solver = TrajOptIfoptOSQPSolverProfile()
-    expected_solver.opt_params.max_iterations = CPP_MAX_ITERATIONS
+    expected_solver.opt_params.max_iter = CPP_MAX_ITERATIONS
     expected_solver.opt_params.min_approx_improve = CPP_MIN_APPROX_IMPROVE
     expected_solver.opt_params.min_trust_box_size = CPP_MIN_TRUST_BOX_SIZE
     for solver in found[TrajOptIfoptOSQPSolverProfile]:
