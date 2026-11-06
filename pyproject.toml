@@ -177,9 +177,9 @@ git = "*"  # needed by setuptools-scm for version derivation; CI pixi envs don't
 # (tesseract_nanobind#161). Every C++ dependency (boost, eigen, ompl, bullet, fcl, …)
 # arrives transitively as a run/host dep of these packages, matched to how the
 # feedstocks were built; don't pin those here (an explicit eigen pin deadlocks the solve).
-tesseract-robotics = "==0.36.0.dev20260929"
-tesseract-robotics-planning = "==0.36.0.dev20260929"
-trajopt = "==0.36.0.dev20260930"
+tesseract-robotics = "==0.36.0.dev20261103"
+tesseract-robotics-planning = "==0.36.0.dev20261014"
+trajopt = "==0.36.0.dev20261013"
 # header-only, no run_exports, run dep unpinned in the planning recipe: match the
 # taskflow tesseract-robotics-planning was built with (its rendered_recipe.yaml)
 taskflow = "3.11.*"
@@ -457,9 +457,9 @@ platforms = ["osx-arm64"]
 channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }]
 
 [tool.pixi.feature.packaged.dependencies]
-tesseract-robotics = "==0.36.0.dev20260929"
-tesseract-robotics-planning = "==0.36.0.dev20260929"
-trajopt = "==0.36.0.dev20260930"
+tesseract-robotics = "==0.36.0.dev20261103"
+tesseract-robotics-planning = "==0.36.0.dev20261014"
+trajopt = "==0.36.0.dev20261013"
 # header-only, no run_exports, run dep unpinned in the planning recipe: match the
 # taskflow tesseract-robotics-planning was built with (its rendered_recipe.yaml)
 taskflow = "3.11.*"
