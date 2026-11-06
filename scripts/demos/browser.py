@@ -13,13 +13,15 @@ import tempfile
 import threading
 import time
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from types import TracebackType
+from typing import Any
 
 from PIL import Image
-from websockets.sync.client import ClientConnection, connect
+from websockets.sync.client import connect
+from websockets.sync.connection import Connection
 
 REPO = Path(__file__).resolve().parents[2]
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
@@ -49,7 +51,7 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
 
 
 @contextmanager
-def serve(root: Path) -> Iterator[int]:
+def serve(root: Path) -> Generator[int]:
     """Serve `root` for the context; yields the port."""
     handler = functools.partial(_QuietHandler, directory=str(root))
     with StaticServer(("127.0.0.1", 0), handler) as server:
@@ -65,7 +67,7 @@ def serve(root: Path) -> Iterator[int]:
 class Page:
     """One Chrome tab. Events that arrive between replies collect in `events`."""
 
-    def __init__(self, socket_: ClientConnection) -> None:
+    def __init__(self, socket_: Connection) -> None:
         self._socket = socket_
         self._next_id = 0
         self.events: list[dict] = []
@@ -81,7 +83,7 @@ class Page:
                 return reply["result"]
             self.events.append(reply)
 
-    def evaluate(self, expression: str, *, wait: bool = False) -> object:
+    def evaluate(self, expression: str, *, wait: bool = False) -> Any:  # What the page returned.
         result = self.call(
             "Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=wait
         )
@@ -151,7 +153,7 @@ class Browser:
         self._profile.cleanup()
 
     @contextmanager
-    def page(self) -> Iterator[Page]:
+    def page(self) -> Generator[Page]:
         """The tab, for one connection."""
         with connect(self._page_socket(), max_size=None) as socket_:
             yield Page(socket_)
