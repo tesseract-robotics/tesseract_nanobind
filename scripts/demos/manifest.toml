@@ -1,9 +1,11 @@
-# Gallery manifest: every top-level viewer example, published or excluded with a reason.
+# Demo manifest: every top-level viewer example, published or excluded with a reason.
+# `page` is the docs page, under docs/, whose section includes the player.
 # `published` means a person has looked at the recording (#379); nothing else sets it.
-# A camera is enough for `pixi run gallery-record` to record an excluded entry, for review.
+# A camera is enough for `pixi run demo-record` to record an excluded entry, for review.
 
 [[example]]
 module = "car_seat_example"
+page = "examples/planning.md"
 title = "Car seat"
 blurb = "Picks a seat off a conveyor and places it through a car's door opening, on a rail-mounted robot."
 status = "excluded"
@@ -16,6 +18,7 @@ fov_rad = 0.6109
 
 [[example]]
 module = "abb_irb2400_viewer"
+page = "examples/planning.md"
 title = "ABB IRB2400"
 blurb = "Plans a move on the ABB IRB2400 and draws its TCP path."
 status = "excluded"
@@ -23,6 +26,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "basic_cartesian_example"
+page = "examples/planning.md"
 title = "Basic Cartesian"
 blurb = "A Cartesian path planned with TrajOpt."
 status = "excluded"
@@ -30,6 +34,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "chain_example"
+page = "examples/planning.md"
 title = "Chained raster"
 blurb = "A raster planned with Descartes and refined with TrajOpt."
 status = "excluded"
@@ -37,6 +42,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "freespace_hybrid_example"
+page = "examples/planning.md"
 title = "Freespace hybrid"
 blurb = "OMPL finds a path around an obstacle; TrajOpt smooths it."
 status = "excluded"
@@ -44,6 +50,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "freespace_ompl_example"
+page = "examples/planning.md"
 title = "Freespace OMPL"
 blurb = "Freespace motion around an obstacle, planned with OMPL."
 status = "excluded"
@@ -51,6 +58,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "geometry_showcase_example"
+page = "examples/basic.md"
 title = "Geometry showcase"
 blurb = "Every geometry type the environment holds: box, sphere, cylinder, mesh and more."
 status = "excluded"
@@ -58,6 +66,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "glass_upright_example"
+page = "examples/planning.md"
 title = "Glass upright"
 blurb = "Moves a tool while an orientation constraint keeps it upright."
 status = "excluded"
@@ -65,6 +74,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "online_planning_example"
+page = "examples/online-planning.md"
 title = "Online planning"
 blurb = "Replans the trajectory while an obstacle moves."
 status = "excluded"
@@ -72,6 +82,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "online_planning_sqp_example"
+page = "examples/online-planning.md"
 title = "Online planning, SQP"
 blurb = "Real-time replanning through the low-level SQP API."
 status = "excluded"
@@ -79,6 +90,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "pick_and_place_example"
+page = "examples/planning.md"
 title = "Pick and place"
 blurb = "Picks a box, attaches it to the tool and places it on a shelf."
 status = "excluded"
@@ -86,6 +98,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "pointcloud_octree_collision_example"
+page = "examples/basic.md"
 title = "Point cloud collision"
 blurb = "Plans around an obstacle known only as a point cloud, through an octree."
 status = "excluded"
@@ -93,6 +106,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "puzzle_piece_auxillary_axes_example"
+page = "examples/planning.md"
 title = "Puzzle piece"
 blurb = "A 9-DOF Cartesian toolpath: a robot and two auxiliary axes grind a part's edge."
 status = "excluded"
@@ -100,6 +114,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "raster_example"
+page = "examples/planning.md"
 title = "Raster"
 blurb = "An industrial raster pattern, as used for welding or milling."
 status = "excluded"
@@ -107,6 +122,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "scene_graph_example"
+page = "examples/basic.md"
 title = "Scene graph"
 blurb = "A robot built from a scene graph."
 status = "excluded"
@@ -114,6 +130,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "sdf_collision_example"
+page = "examples/collision.md"
 title = "SDF collision"
 blurb = "A probe swept through a signed distance field."
 status = "excluded"
@@ -121,6 +138,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "shapes_viewer"
+page = "examples/geometry.md"
 title = "Shapes"
 blurb = "Primitive shapes in the viewer."
 status = "excluded"
@@ -128,6 +146,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "tesseract_material_mesh_viewer"
+page = "examples/geometry.md"
 title = "Material mesh"
 blurb = "A mesh with materials and textures."
 status = "excluded"
@@ -135,6 +154,7 @@ reason = "Not yet recorded."
 
 [[example]]
 module = "twc_workcell_positioner_viewer"
+page = "user-guide/viewer.md"
 title = "TWC workcell"
 blurb = "An industrial workcell with a positioner."
 status = "excluded"

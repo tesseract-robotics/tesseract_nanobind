@@ -145,7 +145,6 @@ nav:
     - Viewer: user-guide/viewer.md
   - Examples:
     - examples/index.md
-    - Gallery: examples/gallery.md
     - Basic Examples: examples/basic.md
     - Geometry Examples: examples/geometry.md
     - Kinematics Examples: examples/kinematics.md
@@ -219,7 +218,7 @@ extra_css:
 
 extra_javascript:
   - javascripts/mathjax.js
-  - javascripts/gallery.js
+  - javascripts/demos.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 copyright: Copyright &copy; 2024-2026 Tesseract Robotics

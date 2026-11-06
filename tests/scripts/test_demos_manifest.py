@@ -1,4 +1,4 @@
-"""The gallery manifest covers every viewer example, and its entries obey their rules."""
+"""The demo manifest covers every viewer example, and its entries obey their rules."""
 
 import sys
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 EXAMPLES_DIR = REPO / "src/tesseract_robotics/examples"
-sys.path.insert(0, str(REPO / "scripts/gallery"))
+sys.path.insert(0, str(REPO / "scripts/demos"))
 
 import manifest  # noqa: E402
 
@@ -23,18 +23,31 @@ HERO_QUERY = (
 CAMERA = {"position": [1.0, 2.0, 3.0], "look_at": [0.0, 0.0, 0.0], "fov_rad": 0.6}
 PUBLISHED = {
     "module": "m",
+    "page": "examples/planning.md",
     "title": "T",
     "blurb": "B",
     "status": "published",
     "camera": CAMERA,
 }
-EXCLUDED = {"module": "m", "title": "T", "blurb": "B", "status": "excluded", "reason": "R"}
+EXCLUDED = {
+    "module": "m",
+    "page": "p.md",
+    "title": "T",
+    "blurb": "B",
+    "status": "excluded",
+    "reason": "R",
+}
 
 
 def test_every_viewer_example_has_exactly_one_entry():
     examples = manifest.viewer_examples(EXAMPLES_DIR)
     assert len(examples) == VIEWER_EXAMPLE_COUNT
     assert {entry.module for entry in manifest.load_manifest()} == examples
+
+
+def test_every_entry_names_a_docs_page_that_exists():
+    for entry in manifest.load_manifest():
+        assert (REPO / "docs" / entry.page).is_file(), entry.module
 
 
 def test_a_new_viewer_example_is_noticed(tmp_path):
@@ -78,7 +91,7 @@ def test_an_unknown_status_is_rejected():
 
 
 def test_repeated_entries_are_rejected(tmp_path):
-    table = '[[example]]\nmodule="m"\ntitle="T"\nblurb="B"\nstatus="excluded"\nreason="R"\n'
+    table = '[[example]]\nmodule="m"\npage="p.md"\ntitle="T"\nblurb="B"\nstatus="excluded"\nreason="R"\n'
     path = tmp_path / "manifest.toml"
     path.write_text(table + table)
     with pytest.raises(manifest.ManifestEntryError, match="repeat"):

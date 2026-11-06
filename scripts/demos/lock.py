@@ -1,4 +1,4 @@
-"""The gallery lock file: what each recording was made from, and the hash of what came out.
+"""The demo lock file: what each recording was made from, and the hash of what came out.
 
 Committed, while the recordings stay out of git. Standard library only, like `manifest.py`.
 """
@@ -10,7 +10,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-LOCK_PATH = Path(__file__).with_name("gallery.lock.json")
+LOCK_PATH = Path(__file__).with_name("demos.lock.json")
 # Bumped when the lock's layout changes.
 LOCK_VERSION = 1
 
@@ -42,17 +42,23 @@ class RecordingLock:
 
 
 @dataclass(frozen=True)
-class GalleryLock:
+class DemoLock:
     """The embedded client and every recording."""
 
     viser_version: str
     client_sha256: str
     recordings: dict[str, RecordingLock]
+    # Module to the hash of its poster. A re-record drops the entry: the poster no longer matches.
+    posters: dict[str, str]
 
     @classmethod
     def build(
-        cls, viser_version: str, client_sha256: str, recordings: dict[str, RecordingLock]
-    ) -> GalleryLock:
+        cls,
+        viser_version: str,
+        client_sha256: str,
+        recordings: dict[str, RecordingLock],
+        posters: dict[str, str],
+    ) -> DemoLock:
         """Validate that every recording plays in this client.
 
         Raises:
@@ -67,7 +73,7 @@ class GalleryLock:
             raise ClientMismatchError(
                 f"made with another viser than {viser_version}: {stale}; re-record them"
             )
-        return cls(viser_version, client_sha256, recordings)
+        return cls(viser_version, client_sha256, recordings, posters)
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -75,7 +81,7 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def read_lock(path: Path = LOCK_PATH) -> GalleryLock:
+def read_lock(path: Path = LOCK_PATH) -> DemoLock:
     """Read and validate the lock.
 
     Raises:
@@ -88,10 +94,10 @@ def read_lock(path: Path = LOCK_PATH) -> GalleryLock:
         )
         for module, entry in raw["recordings"].items()
     }
-    return GalleryLock.build(raw["viser_version"], raw["client_sha256"], recordings)
+    return DemoLock.build(raw["viser_version"], raw["client_sha256"], recordings, raw["posters"])
 
 
-def write_lock(lock: GalleryLock, path: Path = LOCK_PATH) -> None:
+def write_lock(lock: DemoLock, path: Path = LOCK_PATH) -> None:
     """Write the lock with sorted keys, so a re-record diffs by recording."""
     document = {"lock_version": LOCK_VERSION, **asdict(lock)}
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", "utf-8")

@@ -1,4 +1,4 @@
-"""Record gallery entries into `docs/demos/` and update the lock. `pixi run gallery-record`."""
+"""Record demo entries into `docs/demos/` and update the lock. `pixi run demo-record`."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import viser
 from lock import (
     LOCK_PATH,
     BuildIdentity,
-    GalleryLock,
+    DemoLock,
     RecordingLock,
     read_lock,
     sha256_bytes,
@@ -143,18 +143,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--only", nargs="*", default=[], help="entries to record; default all")
     args = parser.parse_args(argv)
     selected = select(load_manifest(), args.only)
-    # Partial runs keep what's there, and GalleryLock.build refuses a mixed viser.
-    previous = read_lock().recordings if args.only and LOCK_PATH.exists() else {}
+    # Partial runs keep what's there, and DemoLock.build refuses a mixed viser.
+    previous = read_lock() if args.only and LOCK_PATH.exists() else None
 
     # One composer: every from_config() reloads the plugins (~4.3 s).
     composer = TaskComposer.from_config()
-    recordings = dict(previous)
+    recordings = dict(previous.recordings) if previous else {}
+    posters = dict(previous.posters) if previous else {}
     for entry in selected:
         data = record_scene(entry, SCENES[entry.module](composer))
         recordings[entry.module] = store(entry, data, DEMOS_DIR, fps=RECORD_FPS_HZ)
+        posters.pop(entry.module, None)
         print(f"{entry.module}: {len(data) / 1e6:.1f} MB")
     client_sha256 = install_client(DEMOS_DIR)
-    write_lock(GalleryLock.build(viser.__version__, client_sha256, recordings))
+    write_lock(DemoLock.build(viser.__version__, client_sha256, recordings, posters))
     return 0
 
 
