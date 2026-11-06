@@ -234,8 +234,8 @@ build = { depends-on = [
     "install",
 ], description = "Install bindings against the conda tesseract C++ libs" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
-gallery-record = { cmd = "python scripts/gallery/record.py", description = "Regenerate the gallery recordings into docs/demos/ and update the lock; --only NAME... for some" }
-gallery-page = { cmd = "python scripts/gallery/page.py", description = "Regenerate docs/examples/gallery.md from the manifest and the lock" }
+demo-record = { cmd = "python scripts/demos/record.py", description = "Regenerate the demo recordings into docs/demos/ and update the lock; --only NAME... for some" }
+demo-posters = { cmd = "python scripts/demos/poster.py", description = "Capture each recording's moving poster in headless Chrome and add its hash to the lock; --only NAME... for some" }
 docs-dotgraphs = { cmd = "python scripts/generate_pipeline_dotgraphs.py", depends-on = [
     "install",
 ], description = "Regenerate pipeline DOT graph SVGs embedded in the docs (requires graphviz)" }
@@ -343,8 +343,9 @@ zensical = ">=0.0.70"
 mkdocstrings = { version = ">=1.0", extras = ["python"] }
 
 [tool.pixi.feature.docs.tasks]
-docs = { cmd = "zensical serve --dev-addr=localhost:8000 --open", env = { PYTHONPATH = "src" }, description = "Live docs server with incremental rebuilds" }
-docs-build = { cmd = "zensical build --strict", env = { PYTHONPATH = "src" }, description = "Build static docs to site/ with the same strict check as CI" }
+docs = { cmd = "zensical serve --dev-addr=localhost:8000 --open", depends-on = ["demo-players"], env = { PYTHONPATH = "src" }, description = "Live docs server with incremental rebuilds" }
+demo-players = { cmd = "python scripts/demos/players.py", description = "Generate the player snippets the docs pages include; --preview adds recordings awaiting review" }
+docs-build = { cmd = "zensical build --strict", depends-on = ["demo-players"], env = { PYTHONPATH = "src" }, description = "Build static docs to site/ with the same strict check as CI" }
 
 # GIL hotspots (docs/developer/threading.md): py-spy samples the GIL-holding thread of a pytest
 # run to find bindings worth adding to scripts/nogil_entry_points.yaml. Part of the default env:

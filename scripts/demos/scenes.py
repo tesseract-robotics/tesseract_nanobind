@@ -1,4 +1,4 @@
-"""What each gallery entry shows: the phases to play and the paths to draw."""
+"""What each demo shows: the phases to play and the paths to draw."""
 
 from __future__ import annotations
 

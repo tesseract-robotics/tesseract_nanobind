@@ -1,5 +1,7 @@
 # tesseract_robotics
 
+--8<-- "docs/demos/players/hero.html"
+
 Python bindings for the Tesseract Motion Planning Framework.
 
 ## Overview

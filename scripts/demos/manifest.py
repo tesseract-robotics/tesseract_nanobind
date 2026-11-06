@@ -1,4 +1,4 @@
-"""The gallery manifest: one entry per viewer example, published or excluded with a reason.
+"""The demo manifest: one entry per viewer example, published or excluded with a reason.
 
 Standard library only: the docs build reads this without installing the package.
 """
@@ -61,9 +61,10 @@ class Camera:
 
 @dataclass(frozen=True)
 class Entry:
-    """One viewer example in the gallery."""
+    """One viewer example's demo."""
 
     module: str
+    page: str
     title: str
     blurb: str
     status: Status
@@ -83,7 +84,7 @@ class Entry:
             raise ManifestEntryError(f"entry without a module: {raw}")
         try:
             status = Status(raw.get("status"))
-            title, blurb = raw["title"], raw["blurb"]
+            page, title, blurb = raw["page"], raw["title"], raw["blurb"]
         except (ValueError, KeyError) as bad:
             raise ManifestEntryError(f"{module}: bad or missing field: {bad}") from bad
         camera = Camera.build(module, raw["camera"]) if "camera" in raw else None
@@ -94,7 +95,7 @@ class Entry:
             raise ManifestEntryError(f"{module}: published, yet has a reason to leave it out")
         if status is Status.EXCLUDED and not reason:
             raise ManifestEntryError(f"{module}: an excluded entry needs a reason")
-        return cls(module, title, blurb, status, reason, camera, raw.get("floor_size_m"))
+        return cls(module, page, title, blurb, status, reason, camera, raw.get("floor_size_m"))
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> list[Entry]:
@@ -112,7 +113,7 @@ def load_manifest(path: Path = MANIFEST_PATH) -> list[Entry]:
 
 
 def viewer_examples(examples_dir: Path) -> set[str]:
-    """The top-level examples that open a viewer; `lowlevel/` is out of the gallery's scope."""
+    """The top-level examples that open a viewer; `lowlevel/` is out of scope."""
     return {
         path.stem for path in examples_dir.glob("*.py") if VIEWER_MARKER in path.read_text("utf-8")
     }

@@ -109,6 +109,8 @@ See the source at
 
 ## Multi-Step with Task Composer (Car Seat)
 
+--8<-- "docs/demos/players/car_seat_example.html"
+
 Complex multi-phase sequence: an 8-DOF system (linear carriage + 7-axis arm)
 picks a car seat, attaches it via scene graph manipulation, then places it
 in a vehicle body. The snippet below is the core sequential-planning loop.

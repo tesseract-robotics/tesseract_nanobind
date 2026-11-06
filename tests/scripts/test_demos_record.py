@@ -1,4 +1,4 @@
-"""The gallery recorder, on a scene that needs no planner."""
+"""The demo recorder, on a scene that needs no planner."""
 
 import hashlib
 import importlib
@@ -10,7 +10,7 @@ import pytest
 import viser
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "scripts/gallery"))
+sys.path.insert(0, str(REPO / "scripts/demos"))
 
 import lock  # noqa: E402
 import manifest  # noqa: E402
@@ -24,7 +24,7 @@ from tesseract_robotics.viewer import RecordingPhase, Trajectory  # noqa: E402
 FPS_HZ = 10.0
 CAMERA = manifest.Camera((3.0, 3.0, 2.0), (0.0, 0.0, 0.5), 0.6)
 ENTRY = manifest.Entry(
-    "shapes_viewer", "T", "B", manifest.Status.EXCLUDED, "in review", CAMERA, None
+    "shapes_viewer", "p.md", "T", "B", manifest.Status.EXCLUDED, "in review", CAMERA, None
 )
 
 
@@ -67,15 +67,18 @@ def test_the_client_is_the_installed_vipers_own(tmp_path):
 def test_a_recording_from_another_viser_cannot_join_the_lock():
     identity = lock.BuildIdentity("0.1", "0.0.0", "abc")
     with pytest.raises(lock.ClientMismatchError, match="shapes_viewer"):
-        lock.GalleryLock.build(
-            viser.__version__, "client", {"shapes_viewer": lock.RecordingLock(identity, "d", 1)}
+        lock.DemoLock.build(
+            viser.__version__,
+            "client",
+            {"shapes_viewer": lock.RecordingLock(identity, "d", 1)},
+            {},
         )
 
 
 def test_the_lock_round_trips(tmp_path):
     identity = lock.BuildIdentity("0.1", viser.__version__, "abc")
-    written = lock.GalleryLock.build(
-        viser.__version__, "client", {"m": lock.RecordingLock(identity, "d", 1)}
+    written = lock.DemoLock.build(
+        viser.__version__, "client", {"m": lock.RecordingLock(identity, "d", 1)}, {"m": "p"}
     )
     path = tmp_path / "lock.json"
     lock.write_lock(written, path)
@@ -88,7 +91,9 @@ def test_an_unknown_entry_raises():
 
 
 def test_an_entry_without_a_camera_raises(scene):
-    no_camera = manifest.Entry("shapes_viewer", "T", "B", manifest.Status.EXCLUDED, "r", None, None)
+    no_camera = manifest.Entry(
+        "shapes_viewer", "p.md", "T", "B", manifest.Status.EXCLUDED, "r", None, None
+    )
     with pytest.raises(record.MissingCameraError):
         record.select([no_camera], ["shapes_viewer"])
     with pytest.raises(record.MissingCameraError):

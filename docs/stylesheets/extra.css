@@ -102,8 +102,8 @@
   font-size: 0.85em;
 }
 
-/* Gallery players: one aspect, the one each camera is reviewed at. */
-.gallery-player {
+/* Demo players: one aspect, the one each camera is reviewed at. */
+.demo-player {
   aspect-ratio: 16 / 9;
   background: #141414 center / cover no-repeat;
   border: 0;
@@ -112,11 +112,35 @@
   cursor: pointer;
   display: block;
   font: inherit;
+  overflow: hidden;
   padding: 0;
+  position: relative;
   width: 100%;
 }
 
-.gallery-player iframe {
+/* Top-aligned: the player's control bar takes the strip below, so a click doesn't shift the view. */
+.demo-player img {
+  display: block;
+  width: 100%;
+}
+
+.demo-play {
+  background: rgb(0 0 0 / 70%);
+  border-radius: 1rem;
+  left: 50%;
+  padding: 0.4rem 1rem;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.demo-player:hover .demo-play,
+.demo-player:focus-visible .demo-play {
+  background: var(--md-primary-fg-color);
+}
+
+.demo-player iframe {
   border: 0;
   display: block;
   height: 100%;

@@ -54,5 +54,5 @@ packaging/SDKs/
 packaging/logs/
 upstream/build/
 
-# Gallery recordings: built by `pixi run gallery-record`, pinned by scripts/gallery/gallery.lock.json
+# Demo recordings, posters and player snippets: generated, and pinned by scripts/demos/demos.lock.json
 docs/demos/
