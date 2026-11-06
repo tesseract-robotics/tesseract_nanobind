@@ -93,7 +93,10 @@ How a feedstock builds:
 - `recipe/conda_build_config.yaml` sets `channel_sources: tesseract-robotics,conda-forge`
   (so each feedstock links the stack packages published before it) and
   `channel_targets: tesseract-robotics main` (so uploads land on the `main`
-  label).
+  label). The `dev` branches of the forks use
+  `channel_sources: tesseract-robotics/label/dev,tesseract-robotics,conda-forge`
+  and `channel_targets: tesseract-robotics dev`, so a stage links what the stage
+  before it uploaded to the `dev` label, and uploads go there too.
 - Each package carries `run_exports` pinned to `x.x`, so anything built
   against `tesseract-robotics 0.35.0` requires `0.35.*` at run time.
 
@@ -107,6 +110,18 @@ builds pin a Python version (`bullet-cpp`, `ompl`) or pull in `vtk-base`, which
 does (`pcl`), and none of them had a Python 3.15 build in the version ranges the
 stack needs (#223). Dropping VTK also removes most of the wheel's bundled
 payload (#106).
+
+What each fork changes on its `dev` branch:
+
+| Fork | Build flags | Other changes |
+|---|---|---|
+| `pcl` | `WITH_VTK=OFF`, `WITH_QT=OFF`, `WITH_OPENGL=OFF`, `BUILD_visualization=OFF`, `BUILD_tools=OFF` | pins `libboost_devel: '1.88'` and `eigen_abi_devel: '5.0.1'` to match the stack |
+| `bullet` | `BUILD_PYBULLET=OFF` | one output, `bullet-cpp`; the `pybullet` and `bullet` outputs are gone |
+| `ompl` | `OMPL_BUILD_PYBINDINGS=OFF` | same two pins as `pcl`; `keep-portable-shebang.patch` |
+
+`keep-portable-shebang.patch` exists because, with `python` out of host, OMPL's
+`install_python` macro writes the build tool's Python into its script shebangs. The
+patch keeps `#!/usr/bin/env python3`.
 
 ## pixi environments: where each one gets its C++
 
