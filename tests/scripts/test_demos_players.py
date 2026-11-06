@@ -49,7 +49,8 @@ def test_a_published_entry_gets_a_click_to_load_player_with_its_identity():
     text = players.snippets(ENTRIES, LOCK)["shown.html"]
     assert 'data-src="../../demos/client/index.html?playbackPath=../recordings/shown.viser' in text
     assert "0.35" in text
-    assert "viser 1.1.1" in text
+    # A dependency: the lock states its version, readers need not.
+    assert "viser 1.1.1" not in text
     assert "<iframe" not in text
 
 
