@@ -6,26 +6,18 @@ Seeks the real player in headless Chrome, so a poster shows what a click on it w
 from __future__ import annotations
 
 import argparse
-import base64
 import io
-import json
-import socket
-import subprocess
 import sys
-import tempfile
 import time
-import urllib.request
 from pathlib import Path
-from types import TracebackType
 
+from browser import Browser, BrowserError, Page
 from lock import DemoLock, read_lock, sha256_bytes, write_lock
 from manifest import Entry, load_manifest, player_query
 from PIL import Image
-from websockets.sync.client import ClientConnection, connect
 
 REPO = Path(__file__).resolve().parents[2]
 DEMOS_DIR = REPO / "docs/demos"
-CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 # Player size in the docs [CSS px]: the content column at 16:9, as the page's CSS lays it out.
 PLAYER_WIDTH_PX = 688
 PLAYER_HEIGHT_PX = 387
@@ -39,7 +31,6 @@ POSTER_FRACTION = 0.7
 # How long the client gets to download and decode a recording [s].
 LOAD_TIMEOUT_S = 90.0
 LOAD_POLL_S = 0.25
-CHROME_START_TIMEOUT_S = 15.0
 # Settling time for the player after a pause click [s].
 PAUSE_SETTLE_S = 0.3
 # A static scene has no timeline to say it has loaded: it counts as drawn once two frames this
@@ -69,11 +60,10 @@ _HIDE_FLOATING_BUTTON = """(() => {
   document.querySelector('button[aria-label="Show scene tree"]').parentElement.style.visibility =
     'hidden';
 })()"""
-_NEXT_PAINT = "new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
 
 
-class PosterCaptureError(RuntimeError):
-    """A poster cannot be made: no client, or no timeline."""
+class PosterCaptureError(BrowserError):
+    """A poster cannot be made: no timeline, or a recording that never loads."""
 
 
 def encode_png(frame: Image.Image) -> bytes:
@@ -110,138 +100,42 @@ def player_ready(state: dict | None, *, static: bool) -> bool:
     return not state["loading"] if static else state["duration_s"] > 0.0
 
 
-class _Page:
-    """One Chrome tab over the DevTools protocol."""
+def capture(browser: Browser, entry: Entry) -> bytes:
+    """Seek `entry`'s recording to the poster frame and capture it.
 
-    def __init__(self, socket_: ClientConnection) -> None:
-        self._socket = socket_
-        self._next_id = 0
-
-    def call(self, method: str, **params: object) -> dict:
-        self._next_id += 1
-        self._socket.send(json.dumps({"id": self._next_id, "method": method, "params": params}))
-        while True:
-            reply = json.loads(self._socket.recv())
-            if reply.get("id") == self._next_id:
-                if "error" in reply:
-                    raise PosterCaptureError(f"{method}: {reply['error']}")
-                return reply["result"]
-
-    def evaluate(self, expression: str, *, wait: bool = False) -> object:
-        result = self.call(
-            "Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=wait
+    Raises:
+        PosterCaptureError: the player never appeared, or the entry has no camera.
+    """
+    if entry.camera is None:
+        raise PosterCaptureError(f"{entry.module} has no camera")
+    query = player_query(entry.module, entry.camera)
+    url = f"http://127.0.0.1:{browser.port}/client/index.html?{query}"
+    with browser.page() as page:
+        page.call("Page.enable")
+        page.call(
+            "Emulation.setDeviceMetricsOverride",
+            width=PLAYER_WIDTH_PX,
+            height=PLAYER_HEIGHT_PX,
+            deviceScaleFactor=DEVICE_SCALE,
+            mobile=False,
         )
-        if "exceptionDetails" in result:
-            raise PosterCaptureError(f"page script failed: {result['exceptionDetails']}")
-        return result["result"].get("value")
-
-    def click(self, x: float, y: float) -> None:
-        self.call("Input.dispatchMouseEvent", type="mouseMoved", x=x, y=y)
-        for kind in ("mousePressed", "mouseReleased"):
-            self.call("Input.dispatchMouseEvent", type=kind, x=x, y=y, button="left", clickCount=1)
-
-    def screenshot(self) -> Image.Image:
-        self.evaluate(_NEXT_PAINT, wait=True)
-        data = self.call("Page.captureScreenshot", format="png")["data"]
-        return Image.open(io.BytesIO(base64.b64decode(data))).convert("RGB")
-
-
-class _Browser:
-    """A static file server and headless Chrome, for as long as the context lasts."""
-
-    def __init__(self, root: Path) -> None:
-        if not CHROME.exists():
-            raise PosterCaptureError(f"Chrome not found at {CHROME}")
-        self._root = root
-
-    def __enter__(self) -> _Browser:
-        self._port, self._cdp_port = _free_port(), _free_port()
-        self._profile = tempfile.TemporaryDirectory(dir=REPO / ".scratch", prefix="poster-")
-        self._server = subprocess.Popen(
-            [sys.executable, "-m", "http.server", str(self._port), "--bind", "127.0.0.1"],
-            cwd=self._root,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        self._chrome = subprocess.Popen(
-            [
-                str(CHROME),
-                "--headless=new",
-                "--no-first-run",
-                "--use-angle=metal",
-                "--enable-gpu",
-                "--ignore-gpu-blocklist",
-                f"--remote-debugging-port={self._cdp_port}",
-                f"--user-data-dir={self._profile.name}",
-                "about:blank",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        self._chrome.terminate()
-        self._server.terminate()
-        self._chrome.wait()
-        self._server.wait()
-        self._profile.cleanup()
-
-    def capture(self, entry: Entry) -> bytes:
-        """Seek `entry`'s recording to the poster frame and capture it.
-
-        Raises:
-            PosterCaptureError: the player never appeared, or the entry has no camera.
-        """
-        if entry.camera is None:
-            raise PosterCaptureError(f"{entry.module} has no camera")
-        query = player_query(entry.module, entry.camera)
-        url = f"http://127.0.0.1:{self._port}/client/index.html?{query}"
-        with connect(self._page_socket(), max_size=None) as socket_:
-            page = _Page(socket_)
-            page.call("Page.enable")
-            page.call(
-                "Emulation.setDeviceMetricsOverride",
-                width=PLAYER_WIDTH_PX,
-                height=PLAYER_HEIGHT_PX,
-                deviceScaleFactor=DEVICE_SCALE,
-                mobile=False,
-            )
-            page.call("Page.navigate", url=url)
-            state = _wait_for_player(page, entry)
-            if entry.static:
-                require_still(state, entry.module)
-                return encode_png(_settled_frame(page, entry.module))
-            require_timeline(state, entry.module)
-            page.click(*state["pause"])
-            time.sleep(PAUSE_SETTLE_S)
-            x, y, width, height = state["track"]
-            # The control bar stays off the poster: the page draws it on click.
-            scene_px = round(state["bar_top_px"] * DEVICE_SCALE)
-            page.click(x + POSTER_FRACTION * width, y + height / 2)
-            frame = page.screenshot()
-        return encode_png(frame.crop((0, 0, frame.width, scene_px)))
-
-    def _page_socket(self) -> str:
-        deadline = time.monotonic() + CHROME_START_TIMEOUT_S
-        url = f"http://127.0.0.1:{self._cdp_port}/json"
-        while True:
-            try:
-                with urllib.request.urlopen(url) as reply:
-                    targets = json.load(reply)
-                return next(t for t in targets if t["type"] == "page")["webSocketDebuggerUrl"]
-            except OSError as error:
-                if time.monotonic() > deadline:
-                    raise PosterCaptureError(f"Chrome did not start: {error}") from error
-                time.sleep(LOAD_POLL_S)
+        page.call("Page.navigate", url=url)
+        state = _wait_for_player(page, entry)
+        if entry.static:
+            require_still(state, entry.module)
+            return encode_png(_settled_frame(page, entry.module))
+        require_timeline(state, entry.module)
+        page.click(*state["pause"])
+        time.sleep(PAUSE_SETTLE_S)
+        x, y, width, height = state["track"]
+        # The control bar stays off the poster: the page draws it on click.
+        scene_px = round(state["bar_top_px"] * DEVICE_SCALE)
+        page.click(x + POSTER_FRACTION * width, y + height / 2)
+        frame = page.screenshot()
+    return encode_png(frame.crop((0, 0, frame.width, scene_px)))
 
 
-def _wait_for_player(page: _Page, entry: Entry) -> dict:
+def _wait_for_player(page: Page, entry: Entry) -> dict:
     deadline = time.monotonic() + LOAD_TIMEOUT_S
     while time.monotonic() < deadline:
         state = page.evaluate(_PLAYER_STATE)
@@ -251,7 +145,7 @@ def _wait_for_player(page: _Page, entry: Entry) -> dict:
     raise PosterCaptureError(f"{entry.module}: no recording after {LOAD_TIMEOUT_S} s")
 
 
-def _settled_frame(page: _Page, module: str) -> Image.Image:
+def _settled_frame(page: Page, module: str) -> Image.Image:
     page.evaluate(_HIDE_FLOATING_BUTTON)
     deadline = time.monotonic() + STILL_TIMEOUT_S
     frame = page.screenshot()
@@ -261,12 +155,6 @@ def _settled_frame(page: _Page, module: str) -> Image.Image:
         if frame.tobytes() == previous.tobytes():
             return frame
     raise PosterCaptureError(f"{module}: still changing after {STILL_TIMEOUT_S} s")
-
-
-def _free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
 
 
 def to_capture(
@@ -292,10 +180,10 @@ def main(argv: list[str] | None = None) -> int:
     posters_dir.mkdir(parents=True, exist_ok=True)
     entries = {entry.module: entry for entry in load_manifest()}
     wanted = to_capture(list(entries), set(lock.recordings), set(posters), only=args.only)
-    with _Browser(DEMOS_DIR) as browser:
+    with Browser(DEMOS_DIR) as browser:
         for module in wanted:
             entry = entries[module]
-            data = browser.capture(entry)
+            data = capture(browser, entry)
             (posters_dir / f"{entry.module}.png").write_bytes(data)
             posters[entry.module] = sha256_bytes(data)
             print(f"{entry.module}: {len(data) / 1e6:.2f} MB")
