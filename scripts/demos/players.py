@@ -28,6 +28,8 @@ PAGE_SOURCE_TO_DOCS = "../"
 # The docs home sits at the root both ways.
 HOME_TO_ROOT = ""
 BYTES_PER_MB = 1e6
+# The label shows one decimal [MB]: below this it would say 0.0.
+SMALLEST_SHOWN_MB = 0.1
 _INCLUDE = re.compile(r'^--8<-- "docs/demos/players/(\w+)\.html"$', re.MULTILINE)
 
 
@@ -39,13 +41,20 @@ class MissingPosterError(RuntimeError):
     """An entry with a player has no poster in the lock: it would show as an empty box."""
 
 
+def size_text(size_bytes: int) -> str:
+    """A download size for the player's label, which never reads as nothing."""
+    if size_bytes < SMALLEST_SHOWN_MB * BYTES_PER_MB:
+        return f"under {SMALLEST_SHOWN_MB} MB"
+    return f"{size_bytes / BYTES_PER_MB:.1f} MB"
+
+
 def _player(entry: Entry, lock: DemoLock, url_root: str, source_root: str) -> str:
     assert entry.camera is not None  # Entry.build: a published or recorded entry has one.
     recording = lock.recordings[entry.module]
     src = f"{url_root}demos/client/index.html?{player_query(entry.module, entry.camera)}"
     poster = f"{source_root}demos/posters/{entry.module}.png"
     action = "Open" if entry.static else "Play"
-    label = html.escape(f"{action} {entry.title} ({recording.size_bytes / BYTES_PER_MB:.1f} MB)")
+    label = html.escape(f"{action} {entry.title} ({size_text(recording.size_bytes)})")
     identity = recording.identity
     return (
         f'<button class="demo-player" type="button" data-src="{html.escape(src)}">'

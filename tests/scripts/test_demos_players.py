@@ -137,3 +137,11 @@ def test_a_static_player_offers_to_open_not_to_play():
     text = players.snippets([still], LOCK)["shown.html"]
     assert ">Open Still (" in text
     assert "Play" not in text
+
+
+@pytest.mark.parametrize(
+    ("size_bytes", "text"),
+    [(2_000_000, "2.0 MB"), (100_000, "0.1 MB"), (22_000, "under 0.1 MB")],
+)
+def test_the_download_size_never_reads_zero(size_bytes, text):
+    assert players.size_text(size_bytes) == text

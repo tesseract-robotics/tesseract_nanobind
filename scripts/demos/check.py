@@ -227,7 +227,6 @@ def _check_player(
         f"wheel: page scroll {page.evaluate('window.scrollY') - scroll_before:+.0f} px, "
         f"scene {changed_fraction(orbited, _player_pixels(page, rect)):.1%}"
     )
-    report.failures.extend(failed_demo_requests(page.events))
     report.failures.extend(
         f"exception: {event['params']['exceptionDetails']['text']}"
         for event in page.events
@@ -274,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                     _check_player(page, base, path, module, static, report)
                 except PlayerCheckError as error:
                     report.failures.append(str(error))
+                report.failures.extend(failed_demo_requests(page.events))
                 verdict = "FAIL" if report.failures else "ok"
                 print(
                     f"{verdict:4} {label}: {'; '.join(report.notes + report.failures)}", flush=True
