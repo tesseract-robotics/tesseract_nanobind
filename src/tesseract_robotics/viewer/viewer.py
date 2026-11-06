@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass
 from types import TracebackType
 
 import numpy as np
@@ -19,6 +20,7 @@ from tesseract_robotics.tesseract_environment import Environment
 from .errors import (
     NoEnvironmentError,
     NoTrajectoryError,
+    RecordingFpsError,
     StaleSceneError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
@@ -53,6 +55,20 @@ PLOT_COLOR_RGB = (255, 255, 255)
 PLOT_AXES_RADIUS_RATIO = 0.05
 # TCP path line thickness [m]: 2 mm, visible at robot scale.
 PLOT_PATH_THICKNESS_M = 0.002
+# Recording rate [Hz]: the player's own 30 Hz, so a recording moves as the live view does.
+RECORD_FPS_HZ = 30.0
+
+
+@dataclass(frozen=True)
+class RecordingPhase:
+    """One stretch of a recording: `trajectory`, posed by `env`.
+
+    `env` has the same links as the viewer's scene, but may differ in how they connect:
+    a part fixed in the cell during a pick and carried by the tool during a place.
+    """
+
+    env: Environment
+    trajectory: CompositeInstruction | Trajectory
 
 
 class TesseractViewer:
@@ -280,6 +296,64 @@ class TesseractViewer:
                 axes_radius=axes_length * PLOT_AXES_RADIUS_RATIO,
             )
         )
+
+    def record(self, phases: Sequence[RecordingPhase], *, fps: float = RECORD_FPS_HZ) -> bytes:
+        """Record `phases` in order as `.viser` file content, for viser's static client.
+
+        The scene as it stands (environment, `plot_trajectory`, `server.scene` additions)
+        becomes the recording's start, so add those first. Playback waits meanwhile, and
+        the live scene returns to its poses afterwards.
+
+        Args:
+            phases: What to play; empty records the scene as it stands, with no timeline.
+            fps: Frames per second [Hz].
+
+        Returns:
+            The file's bytes.
+
+        Raises:
+            RecordingFpsError: `fps` is not positive.
+            NoEnvironmentError: no environment yet.
+            UnknownJointError: a trajectory names a joint its phase's environment lacks.
+            StaleSceneError: a phase's environment has other links than the scene.
+        """
+        if not fps > 0.0:
+            raise RecordingFpsError(f"fps must be positive, got {fps}")
+        trajectories = [
+            phase.trajectory
+            if isinstance(phase.trajectory, Trajectory)
+            else Trajectory.from_composite(phase.trajectory)
+            for phase in phases
+        ]
+        dt_s = 1.0 / fps
+        with self._pose_lock:
+            live_env = self._require_env()
+            # Copies: viser updates a frame's pose arrays in place.
+            live_poses = {
+                name: (frame.position.copy(), frame.wxyz.copy())
+                for name, frame in self._link_frames.items()
+            }
+            serializer = self._server.get_scene_serializer()
+            try:
+                clock_s = 0.0
+                for phase, traj in zip(phases, trajectories, strict=True):
+                    self._env = phase.env
+                    # One frame between phases, so the next one's start is seen.
+                    start_s = clock_s + dt_s if clock_s > 0.0 else clock_s
+                    times_s = np.append(np.arange(0.0, traj.duration_s, dt_s), traj.duration_s)
+                    for t_s in times_s:
+                        at_s = start_s + float(t_s)
+                        serializer.insert_sleep(at_s - clock_s)
+                        clock_s = at_s
+                        self._pose_links(traj.joint_names, traj.sample(float(t_s)))
+            finally:
+                # Also on failure: an unserialized recording stays registered with viser.
+                data = serializer.serialize()
+                self._env = live_env
+            for name, (position, wxyz) in live_poses.items():
+                self._link_frames[name].position = position
+                self._link_frames[name].wxyz = wxyz
+            return data
 
     def close(self) -> None:
         """Stop the player, stop serving and release the port. Idempotent.

@@ -127,6 +127,8 @@ All materials are double-sided: sheet-metal meshes often mix face windings, whic
 
 ## Industrial Workcells
 
+--8<-- "docs/demos/players/twc_workcell_positioner_viewer.html"
+
 The Tesseract Robotics Workcell Collection (TWC) ships rail and positioner cells. Trajectories over any subset of joints, in any order, pose by their own joint names:
 
 ```python
@@ -138,6 +140,23 @@ The Tesseract Robotics Workcell Collection (TWC) ships rail and positioner cells
     ```bash
     git submodule update --init
     ```
+
+## Recording
+
+`record` writes the scene and its motion to a `.viser` file, which viser's static client plays in a browser with no Python running. The demos in these docs are made this way.
+
+```python
+from pathlib import Path
+
+from tesseract_robotics.viewer import RecordingPhase, TesseractViewer
+
+with TesseractViewer(port=0) as viewer:
+    viewer.update_environment(robot.env)
+    data = viewer.record([RecordingPhase(robot.env, result.raw_results)])
+Path("plan.viser").write_bytes(data)
+```
+
+Each `RecordingPhase` pairs a trajectory with the environment it runs in, so a recording can join a pick, with the part on the table, to a place, with the part on the tool. Add a floor and `plot_trajectory` paths first: `record` keeps what is already in the scene. With no phases it records the scene as it stands, and the client shows no timeline.
 
 ## API Quick Reference
 
@@ -151,6 +170,7 @@ The Tesseract Robotics Workcell Collection (TWC) ships rail and positioner cells
 | `update_trajectory(trajectory)` | Animate a `CompositeInstruction` or `Trajectory` from its start |
 | `show_time(t_s)` | Pose the scene at one trajectory time |
 | `plot_trajectory(trajectory, manip_info, axes_length=0.1, color=(255, 255, 255))` | Draw the commanded [TCP path](#tcp-path) with an axes triad per waypoint |
+| `record(phases, *, fps=30.0)` | The `.viser` bytes of the scene playing `phases`; see [Recording](#recording) |
 | `close()` | Stop playback and serving, release the port; idempotent |
 | `serve_forever()` | Block until Ctrl-C, then `close()` |
 
@@ -170,6 +190,7 @@ Failures raise named errors from `tesseract_robotics.viewer.errors`:
 | `UnsupportedMoveTypeError` | `plot_trajectory` with a move that is neither `LINEAR` nor `FREESPACE` |
 | `MovingWorkingFrameError` | `plot_trajectory` with a `LINEAR` move in a working frame the group moves |
 | `NamedTcpOffsetError` | `plot_trajectory` with a `tcp_offset` that names a link |
+| `RecordingFpsError` | `record` with an `fps` that is not positive |
 | `ViewerCloseTimeoutError` | The playback thread did not stop in `close()` |
 
 A failure during playback has no caller to raise to: it logs the traceback and pauses. Play or `update_trajectory` try again.

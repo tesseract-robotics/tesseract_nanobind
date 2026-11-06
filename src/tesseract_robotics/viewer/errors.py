@@ -41,6 +41,10 @@ class MalformedOctreeStreamError(ValueError):
     """An OctoMap `.bt` stream has no header it needs, or its tree is cut short."""
 
 
+class RecordingFpsError(ValueError):
+    """`record` got a frame rate that is not positive."""
+
+
 class StaleSceneError(RuntimeError):
     """The environment gained or lost links since `update_environment`."""
 

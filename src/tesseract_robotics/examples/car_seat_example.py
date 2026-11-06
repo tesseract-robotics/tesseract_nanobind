@@ -385,7 +385,7 @@ def plan_motion(
     return result
 
 
-def run(pipeline="TrajOptPipeline", num_planners=None):
+def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
     """Execute the car seat pick-and-place workflow.
 
     Workflow phases (from C++ CarSeatExample::run()):
@@ -401,7 +401,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
         num_planners: Number of parallel OMPL planners (for FreespacePipeline)
 
     Returns:
-        dict: {pick_result, place_result, robot, joint_names} for testing/viz
+        dict: {pick_result, place_result, pick_env, robot, joint_names} for testing/viz
     """
     # === PHASE 0: LOAD ROBOT ===
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
@@ -427,7 +427,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     robot.set_joints(POSITIONS["Home"])
 
-    composer = TaskComposer.from_config()
+    composer = composer or TaskComposer.from_config()
 
     # Create profiles based on pipeline type
     if "Freespace" in pipeline or "OMPL" in pipeline:
@@ -448,6 +448,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Update environment state to Pick1, then reparent seat_1 to end_effector
     print("\n=== ATTACH SEAT ===")
     robot.set_joints(POSITIONS["Pick1"])
+    # Before the attach: the seat still rests on its conveyor here, for showing the pick.
+    pick_env = robot.env.clone()
     attach_seat(robot, "seat_1")
 
     # === PHASE 4: PLACE MOTION ===
@@ -461,6 +463,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     return {
         "pick_result": pick_result,
         "place_result": place_result,
+        "pick_env": pick_env,
         "robot": robot,
         "joint_names": joint_names,
     }

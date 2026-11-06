@@ -70,21 +70,6 @@ jobs:
     - name: typecheck
       working-directory: tesseract_nanobind
       run: pixi run typecheck
-    # The build dir's CMakeCache holds absolute Xcode compiler and SDK paths: a cache from
-    # another toolchain (macos-14's Xcode_15.4) fails to configure, so the key names it.
-    - name: toolchain key
-      id: toolchain
-      run: echo "key=$( { xcode-select -p; xcrun --show-sdk-path; } | shasum | cut -c1-12 )" >> "$GITHUB_OUTPUT"
-    # Cache the scikit-build dir so a warm build skips the ~15-20 min nanobind
-    # recompile (incremental cmake). Per-python; any source/config/dep change
-    # invalidates it (pixi.lock is hashed: objects compiled against one conda lib
-    # set must not be relinked against another).
-    - name: restore nanobind wheel build cache
-      id: nanobind-build-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: tesseract_nanobind/build
-        key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
     - name: build wheel
       working-directory: tesseract_nanobind
       run: pixi run -e ${{ env.PIXI_ENV }} build-wheel
@@ -102,12 +87,6 @@ jobs:
     - name: stub drift gate
       working-directory: tesseract_nanobind
       run: pixi run python scripts/generate_stubs.py --check
-    - name: save nanobind wheel build cache
-      if: steps.nanobind-build-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: tesseract_nanobind/build
-        key: nanobind-wheel-build-macos-py${{ matrix.python }}-${{ steps.toolchain.outputs.key }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
     # actions/upload-artifact@v4 intermittently fails on macOS arm64 runners with
     # "Failed to CreateArtifact: Request timeout" (~1/3 of uploads) — a long-standing
     # open GitHub bug (actions/upload-artifact#569, #527) inherent to arm64 mac runners'
@@ -154,40 +133,59 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13/3.14/3.15 install the cp312-abi3 wheel (STABLE_ABI) to verify the
-        # published support matrix on macOS, not just Linux. wheel != python.
-        include:
-          - { python: '3.12', wheel: '3.12' }
-          - { python: '3.13', wheel: '3.12' }
-          - { python: '3.14', wheel: '3.12' }
-          - { python: '3.15', wheel: '3.12' }
+        # One cp312-abi3 binary per platform. PRs test it on 3.12; pushes to main, tags and manual
+        # runs test every supported Python before anything can publish.
+        # wheel-3xx have no libomp, like a uv environment, so the wheel's copy must load.
+        # wheel-openmp is the conda consumer: its env's libomp must load instead (#136).
+        include: ${{ github.event_name == 'pull_request' && fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312"}]') || fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312"},{"python":"3.13","wheel":"3.12","env":"wheel-313"},{"python":"3.14","wheel":"3.12","env":"wheel-314"},{"python":"3.15","wheel":"3.12","env":"wheel-315"},{"python":"3.12","wheel":"3.12","env":"wheel-openmp"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
           path: tesseract_nanobind
-      - uses: actions/setup-python@v5
+      - name: fetch the TWC workcell the rail tests load
+        run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+      - name: setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.0
         with:
-          python-version: ${{ matrix.python }}
+          pixi-version: v0.70.1
+          manifest-path: tesseract_nanobind/pyproject.toml
+          cache: true
+          locked: true
+          environments: ${{ matrix.env }}
+          activate-environment: ${{ matrix.env }}
       - uses: actions/download-artifact@v4
         with:
           name: python-${{ matrix.wheel }}-macos-arm64
           path: wheelhouse/
-      - name: install wheel in virgin env
-        run: |
-          python -m venv test_env
-          source test_env/bin/activate
-          pip install wheelhouse/tesseract*.whl
+      - name: install wheel in lean env
+        run: uv pip install wheelhouse/tesseract*.whl
       - name: smoke test
         run: |
-          source test_env/bin/activate
           python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
           python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
+      - name: one OpenMP runtime (#136)
+        run: |
+          python - <<'EOF'
+          import ctypes
+          import numpy
+          import tesseract_robotics
+          from tesseract_robotics import tesseract_motion_planners_descartes
+          dyld = ctypes.CDLL(None)
+          dyld._dyld_get_image_name.restype = ctypes.c_char_p
+          images = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]
+          omp = [i for i in images if i.rsplit("/", 1)[-1] == "libomp.dylib"]
+          print("libomp images:", omp)
+          assert len(omp) == 1, omp
+          expected = "/lib/libomp.dylib" if "${{ matrix.env }}" == "wheel-openmp" else "/.dylibs/libomp.dylib"
+          assert omp[0].endswith(expected), (omp[0], expected)
+          EOF
       - name: run full tests
         # Serial (no xdist): planning tests (OMPL/TrajOpt) segfault under xdist
         # on macOS — fork+OpenMP threads don't mix. Linux handles it fine.
+        env:
+          TWC_SUPPORT_PATH: ${{ github.workspace }}/tesseract_nanobind/ws/src/tesseract_ros_workcell/twc_support
         run: |
-          source test_env/bin/activate
-          pip install pytest scipy pyyaml
+          uv pip install pytest scipy pyyaml
           cd tesseract_nanobind
           pytest tests \
             --ignore=tests/benchmarks \

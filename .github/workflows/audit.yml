@@ -1,14 +1,24 @@
 name: Binding audit
 
-# No `paths:` filter, as in docs.yml and for the same reason: the audit's inputs are the
-# binding TUs and everything they #include (headers come through pixi.lock), the committed
-# stubs and package __init__.py files, the audit scripts, their tests and the report. A
-# filter is a hand-kept copy of that set; once it drifts, a change stops being audited
-# without any failure. The job takes about 10 minutes with the env cached.
+# On pull requests, only when its inputs change: the binding TUs and stubs (src/), the headers
+# they include (pixi.lock), and the audit's own scripts, tests, report and config. Headers come
+# through pixi.lock, so a new input outside this list would stop being audited on PRs without any
+# failure; pushes to main and tags always run, and catch that before a release.
 on:
   pull_request:
+    paths:
+      - 'src/**'
+      - 'pixi.lock'
+      - 'pyproject.toml'
+      - 'scripts/audit*'
+      - 'tests/audit/**'
+      - 'docs/developer/binding-api-audit.md'
+      - '.github/workflows/audit.yml'
   push:
     branches: [main]
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 permissions:

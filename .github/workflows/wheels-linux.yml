@@ -115,34 +115,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { python: '3.12', wheel: '3.12', arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.12', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
-          - { python: '3.13', wheel: '3.12', arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.13', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
-          - { python: '3.14', wheel: '3.12', arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.14', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
-          - { python: '3.15', wheel: '3.12', arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.15', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
+        # One cp312-abi3 binary per platform. PRs test it on 3.12; pushes to main, tags and manual
+        # runs test every supported Python before anything can publish.
+        include: ${{ github.event_name == 'pull_request' && fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"aarch64","runner":"ubuntu-24.04-arm"}]') || fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"aarch64","runner":"ubuntu-24.04-arm"},{"python":"3.13","wheel":"3.12","env":"wheel-313","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.13","wheel":"3.12","env":"wheel-313","arch":"aarch64","runner":"ubuntu-24.04-arm"},{"python":"3.14","wheel":"3.12","env":"wheel-314","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.14","wheel":"3.12","env":"wheel-314","arch":"aarch64","runner":"ubuntu-24.04-arm"},{"python":"3.15","wheel":"3.12","env":"wheel-315","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.15","wheel":"3.12","env":"wheel-315","arch":"aarch64","runner":"ubuntu-24.04-arm"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
           path: tesseract_nanobind
-      - uses: actions/setup-python@v5
+      - name: fetch the TWC workcell the rail tests load
+        run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+      - name: setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.0
         with:
-          python-version: ${{ matrix.python }}
+          pixi-version: v0.70.1
+          manifest-path: tesseract_nanobind/pyproject.toml
+          cache: true
+          locked: true
+          environments: ${{ matrix.env }}
+          activate-environment: ${{ matrix.env }}
       - uses: actions/download-artifact@v4
         with:
           name: python-${{ matrix.wheel }}-linux-${{ matrix.arch }}
           path: wheelhouse/
-      - name: install wheel in virgin env
-        run: |
-          python -m venv test_env
-          source test_env/bin/activate
-          pip install wheelhouse/tesseract*.whl
+      - name: install wheel in lean env
+        run: uv pip install wheelhouse/tesseract*.whl
       - name: debug libs
         run: |
-          source test_env/bin/activate
           PKG_DIR=$(python -c "import tesseract_robotics; from pathlib import Path; print(Path(tesseract_robotics.__file__).parent)")
           echo "Package dir: $PKG_DIR"
           echo "--- .so files in package (count) ---"
@@ -159,7 +157,6 @@ jobs:
           echo "--- End missing deps check ---"
       - name: smoke test
         run: |
-          source test_env/bin/activate
           python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
           python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
       - name: dual-libstdc++ regression guard
@@ -171,7 +168,6 @@ jobs:
         # minimal numpy-first env.init + jacobian path runs clean. Explicit
         # ordered del until the gh-72 keep_alive teardown fix (#118) lands.
         run: |
-          source test_env/bin/activate
           PKG_DIR=$(python -c "import tesseract_robotics; from pathlib import Path; print(Path(tesseract_robotics.__file__).parent)")
           if ls "$PKG_DIR"/libstdc++.so* 2>/dev/null; then
             echo "::error::wheel bundles libstdc++ — gh-119 regression"; exit 1
@@ -195,9 +191,10 @@ jobs:
           del J, kg, env
           EOF
       - name: run full tests
+        env:
+          TWC_SUPPORT_PATH: ${{ github.workspace }}/tesseract_nanobind/ws/src/tesseract_ros_workcell/twc_support
         run: |
-          source test_env/bin/activate
-          pip install pytest pytest-xdist scipy pyyaml
+          uv pip install pytest pytest-xdist scipy pyyaml
           cd tesseract_nanobind
           # The x64 runner has died mid-suite three times ("received a shutdown signal",
           # #354/#353/#358). Memory and the largest processes every 10 s, so the log of the

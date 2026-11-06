@@ -14,7 +14,9 @@ pixi run python -m tesseract_robotics.examples.freespace_ompl_example
 
 ## Freespace OMPL
 
-Basic OMPL planning between joint configurations using the ABB IRB2400:
+--8<-- "docs/demos/players/freespace_ompl_example.html"
+
+Basic OMPL planning between joint configurations using the KUKA LBR iiwa 14 R820:
 
 ```bash
 tesseract_freespace_ompl_example
@@ -24,6 +26,8 @@ See the source at
 [`freespace_ompl_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_ompl_example.py).
 
 ## Basic Cartesian
+
+--8<-- "docs/demos/players/basic_cartesian_example.html"
 
 Cartesian straight-line motion with TrajOpt, past an obstacle built from point-cloud data: the
 C++ example's octomap, a 1 m cube of points voxelised into 1000 boxes of 0.1 m — the collision
@@ -39,6 +43,8 @@ See the source at
 
 ## Glass Upright (Orientation Constraint)
 
+--8<-- "docs/demos/players/glass_upright_example.html"
+
 Keep end-effector orientation constrained (e.g. carrying a glass of water) —
 demonstrates 6-DOF Cartesian constraints inside a TrajOpt program:
 
@@ -50,6 +56,8 @@ See the source at
 [`glass_upright_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/glass_upright_example.py).
 
 ## Pick and Place
+
+--8<-- "docs/demos/players/pick_and_place_example.html"
 
 Complete pick and place workflow with object attachment. A KUKA IIWA picks a
 box from a table, the box is reparented to `iiwa_tool0` via
@@ -69,6 +77,8 @@ Full source:
 [`pick_and_place_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pick_and_place_example.py).
 
 ## Raster Pattern
+
+--8<-- "docs/demos/players/raster_example.html"
 
 Industrial raster pattern for welding / painting / milling. Multiple linear
 passes with freespace transitions between segments. The example builds the
@@ -98,6 +108,8 @@ Full source:
 
 ## Hybrid Planning (OMPL + TrajOpt)
 
+--8<-- "docs/demos/players/freespace_hybrid_example.html"
+
 OMPL finds a feasible path, TrajOpt smooths and optimizes it:
 
 ```bash
@@ -108,6 +120,8 @@ See the source at
 [`freespace_hybrid_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_hybrid_example.py).
 
 ## Multi-Step with Task Composer (Car Seat)
+
+--8<-- "docs/demos/players/car_seat_example.html"
 
 Complex multi-phase sequence: an 8-DOF system (linear carriage + 7-axis arm)
 picks a car seat, attaches it via scene graph manipulation, then places it
@@ -128,6 +142,8 @@ Full source:
 
 ## Descartes + TrajOpt Chaining
 
+--8<-- "docs/demos/players/chain_example.html"
+
 The `CartesianPipeline` runs Descartes (sampling-based, ladder-graph IK
 selection) followed by TrajOpt (smoothing). The snippet below shows the
 program + pipeline assembly:
@@ -147,6 +163,8 @@ Full source:
 
 ## 9-DOF with External Axis (Puzzle Piece)
 
+--8<-- "docs/demos/players/puzzle_piece_auxillary_axes_example.html"
+
 Cartesian toolpath planning with a 9-DOF system (robot + positioner + rail):
 
 ```bash
@@ -157,6 +175,8 @@ See the source at
 [`puzzle_piece_auxillary_axes_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/puzzle_piece_auxillary_axes_example.py).
 
 ## Visualization
+
+--8<-- "docs/demos/players/abb_irb2400_viewer.html"
 
 All examples can be visualized:
 
