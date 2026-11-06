@@ -413,7 +413,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
         num_planners: Number of parallel OMPL planners (for FreespacePipeline)
 
     Returns:
-        dict: {pick_result, place_result, robot, joint_names} for testing/viz
+        dict: {pick_result, place_result, pick_env, robot, joint_names} for testing/viz
     """
     # === PHASE 0: LOAD ROBOT ===
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
@@ -460,6 +460,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Update environment state to Pick1, then reparent seat_1 to end_effector
     print("\n=== ATTACH SEAT ===")
     robot.set_joints(POSITIONS["Pick1"])
+    # Before the attach: the seat still rests on its conveyor here, for showing the pick.
+    pick_env = robot.env.clone()
     attach_seat(robot, "seat_1")
 
     # === PHASE 4: PLACE MOTION ===
@@ -473,6 +475,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     return {
         "pick_result": pick_result,
         "place_result": place_result,
+        "pick_env": pick_env,
         "robot": robot,
         "joint_names": joint_names,
     }
