@@ -148,6 +148,7 @@ public:
     void setConstraintMeritCoeff(const Eigen::Ref<const Eigen::VectorXd>& merit_coeff) override {
         live().setConstraintMeritCoeff(merit_coeff);
     }
+    void setSumConstraintSetViolations(bool sum) override { live().setSumConstraintSetViolations(sum); }
     void print() const override { live().print(); }
     Eigen::Index getNumNLPVars() const override { return live().getNumNLPVars(); }
     Eigen::Index getNumNLPConstraints() const override { return live().getNumNLPConstraints(); }

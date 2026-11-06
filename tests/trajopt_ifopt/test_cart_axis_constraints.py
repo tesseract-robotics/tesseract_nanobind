@@ -6,13 +6,14 @@ times the unit tilt direction, so their norm is phi. Rotation about the axis is 
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_common import FilesystemPath, GeneralResourceLocator
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import KinematicGroup
 
@@ -45,12 +46,12 @@ class AxisFixture:
 @pytest.fixture
 def axes() -> AxisFixture:
     locator = GeneralResourceLocator()
-    urdf = FilesystemPath(
+    urdf = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
         ).getFilePath()
     )
-    srdf = FilesystemPath(
+    srdf = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
         ).getFilePath()

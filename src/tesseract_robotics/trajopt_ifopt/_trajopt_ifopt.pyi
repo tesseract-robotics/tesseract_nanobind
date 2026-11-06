@@ -560,10 +560,10 @@ class GradientResultsSet:
     def key(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair | tuple[str, str], /) -> None: ...
 
     @property
-    def shape_key(self) -> tuple[int, int]: ...
+    def shape_key(self) -> tuple[tuple[int, int], tuple[int, int]]: ...
 
     @shape_key.setter
-    def shape_key(self, arg: tuple[int, int], /) -> None: ...
+    def shape_key(self, arg: tuple[tuple[int, int], tuple[int, int]], /) -> None: ...
 
     @property
     def coeff(self) -> float: ...
@@ -845,16 +845,16 @@ class CartAxisConeConstraint(ConstraintSet):
     the source axis stays free. For half_angle near 0 use CartAxisAlignConstraint.
     """
 
-    def __init__(self, position_var: Var, manip: "tesseract::kinematics::JointGroup", source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], half_angle: float, coeff: float = 1.0, name: str = 'CartAxisCone') -> None:
+    def __init__(self, position_var: Var, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], half_angle: float, coeff: float = 1.0, name: str = 'CartAxisCone') -> None:
         """
         Axes are in their links' coordinates and normalized; 0 < half_angle < pi. Raises on an invalid
         link, axis, half angle or coefficient.
         """
 
-    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The angle phi between the axes for the given joint values"""
 
-    def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> None:
+    def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> None:
         """Set the cone axis, in target link coordinates"""
 
     def getTargetAxis(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
@@ -870,16 +870,16 @@ class CartAxisAlignConstraint(ConstraintSet):
     axes coincide.
     """
 
-    def __init__(self, position_var: Var, manip: "tesseract::kinematics::JointGroup", source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], coeff: float = 1.0, name: str = 'CartAxisAlign') -> None:
+    def __init__(self, position_var: Var, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], coeff: float = 1.0, name: str = 'CartAxisAlign') -> None:
         """
         Axes are in their links' coordinates and normalized. Raises on an invalid link, axis or
         coefficient.
         """
 
-    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
+    def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The two tilt rows for the given joint values"""
 
-    def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]) -> None:
+    def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> None:
         """Set the axis to align with, in target link coordinates"""
 
     def getTargetAxis(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
