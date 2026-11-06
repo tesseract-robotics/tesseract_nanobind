@@ -15,9 +15,7 @@
 #include <trajopt_sqp/types.h>
 #include <trajopt_sqp/qp_solver.h>
 #include <trajopt_sqp/osqp_eigen_solver.h>
-#ifdef TRAJOPT_SQP_HAS_PIQP
 #include <trajopt_sqp/piqp_solver.h>
-#endif
 #include <trajopt_sqp/qp_problem.h>
 #include <trajopt_sqp/trajopt_qp_problem.h>
 #include <trajopt_sqp/trust_region_sqp_solver.h>
@@ -623,8 +621,7 @@ NB_MODULE(_trajopt_sqp, m) {
              "planner built in C++ arrives as a QPProblemView, which raises QPProblemExpiredError "
              "once the call has returned. sqp_results is a copy the callback may keep.");
 
-#ifdef TRAJOPT_SQP_HAS_PIQP
-    // ========== PIQP (optional: trajopt_sqp exports TRAJOPT_SQP_HAS_PIQP when built with it) ==========
+    // ========== PIQP ==========
     nb::enum_<piqp::KKTSolver>(m, "PIQPKKTSolver", "PIQP's KKT system solver")
         .value("dense_cholesky", piqp::KKTSolver::dense_cholesky)
         .value("sparse_ldlt", piqp::KKTSolver::sparse_ldlt)
@@ -674,10 +671,6 @@ NB_MODULE(_trajopt_sqp, m) {
         }, "The PIQP settings trajopt uses by default")
         .def("reusedSetup", &tsqp::PIQPSolver::reusedSetup,
              "Whether the last solve reused the previous setup (only the vectors changed)");
-    m.attr("HAS_PIQP") = true;
-#else
-    m.attr("HAS_PIQP") = false;
-#endif
 
     // ========== TrustRegionSQPSolver ==========
 

@@ -426,7 +426,7 @@ gmock = "*"
 xz = "*"
 osqp = "*"
 osqp-eigen = "*"
-# trajopt_sco / trajopt_sqp build their optional PIQP backend when they find it
+# trajopt_sco / trajopt_sqp build their PIQP backend when they find it; the bindings require it
 piqp = "0.6.4.*"  # the version trajopt_ext fetches when PIQP is missing
 qpoases = "*"
 ompl = "*"

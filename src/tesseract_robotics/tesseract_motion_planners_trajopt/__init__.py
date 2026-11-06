@@ -28,7 +28,5 @@ __all__ = [
     "TrajOptOSQPSolverProfile",
     "TrajOptPlanProfile",
     "TrajOptSolverProfile",
-    "HAS_PIQP",
+    "TrajOptPIQPSolverProfile",
 ]
-if HAS_PIQP:  # noqa: F405
-    __all__ += ["TrajOptPIQPSolverProfile"]

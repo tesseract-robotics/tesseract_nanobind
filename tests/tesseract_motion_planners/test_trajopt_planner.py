@@ -45,10 +45,8 @@ try:
     )
 
     TRAJOPT_AVAILABLE = True
-    HAS_PIQP = trajopt_planners.HAS_PIQP
 except ImportError:
     TRAJOPT_AVAILABLE = False
-    HAS_PIQP = False
 
 
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
@@ -199,10 +197,7 @@ class TestTrajOptPlanning:
         "solver_profile_name",
         [
             None,
-            pytest.param(
-                "TrajOptPIQPSolverProfile",
-                marks=pytest.mark.skipif(not HAS_PIQP, reason="trajopt was built without PIQP"),
-            ),
+            "TrajOptPIQPSolverProfile",
         ],
     )
     def test_trajopt_freespace_joint_cart(self, lbr_iiwa_environment, solver_profile_name):

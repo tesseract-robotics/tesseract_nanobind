@@ -389,7 +389,6 @@ class TrajOptIfoptPIQPSolverProfile(TrajOptIfoptSolverProfile):
     @qp_settings.setter
     def qp_settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
 
-HAS_PIQP: bool
 
 def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
     """Add TrajOptIfopt move profile to ProfileDictionary"""
