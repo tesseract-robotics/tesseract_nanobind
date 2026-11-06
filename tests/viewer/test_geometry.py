@@ -212,6 +212,27 @@ def test_visual_color_overrides_mesh_material():
         np.testing.assert_array_equal(_base_color(mesh), [255, 0, 0, 255])
 
 
+def _tinted_box(alpha):
+    material = Material("tint")
+    material.color = np.array([0.8, 0.0, 0.0, alpha])
+    return visual_to_trimesh(_visual(tg.Box(1.0, 1.0, 1.0), material), "l")[0]
+
+
+def _glb_material(mesh):
+    glb = mesh.export(file_type="glb")
+    json_length = struct.unpack_from("<I", glb, 12)[0]
+    return json.loads(glb[20 : 20 + json_length])["materials"][0]
+
+
+def test_a_translucent_color_reaches_the_glb_as_blended():
+    # glTF ignores alpha unless alphaMode says otherwise: a 5 % estop zone hid the robot in it.
+    assert _glb_material(_tinted_box(0.05))["alphaMode"] == "BLEND"
+
+
+def test_an_opaque_color_stays_opaque():
+    assert _glb_material(_tinted_box(1.0)).get("alphaMode", "OPAQUE") == "OPAQUE"
+
+
 def test_textured_mesh_keeps_uv():
     (visual,) = _mesh_env().getLink("dae_link").visual
     textured = [
