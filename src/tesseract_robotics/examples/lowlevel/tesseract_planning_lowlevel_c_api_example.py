@@ -100,9 +100,8 @@ def run():
         * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
     )
 
-    # Create the input command program instructions. Note the use of explicit
-    # construction of the CartesianWaypointPoly using *_wrap_CartesianWaypoint
-    # functions. This is required because the Python bindings do not support
+    # Create the input command program instructions. Note the explicit
+    # CartesianWaypointPoly construction: the Python bindings do not support
     # implicit conversion from CartesianWaypoint to CartesianWaypointPoly.
     start_instruction = MoveInstruction(
         CartesianWaypointPoly(wp1),
@@ -115,9 +114,9 @@ def run():
         "DEFAULT",
     )
 
-    # Create the input command program. Note the use of *_wrap_MoveInstruction
-    # functions. This is required because the Python bindings do not support
-    # implicit conversion from MoveInstruction to MoveInstructionPoly.
+    # Create the input command program. Note the explicit MoveInstructionPoly
+    # construction: the Python bindings do not support implicit conversion from
+    # MoveInstruction to MoveInstructionPoly.
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
     program.push_back(MoveInstructionPoly(start_instruction))

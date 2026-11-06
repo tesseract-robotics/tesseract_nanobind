@@ -191,8 +191,7 @@ collision_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 collision_config.collision_check_config.longest_valid_segment_length = 0.05  # For LVS modes
 ```
 
-`TrajOptCollisionConfig` lives in `trajopt_ifopt` (trajopt_common) and is
-re-exported from `tesseract_motion_planners_trajopt`, so either import works.
+`TrajOptCollisionConfig` lives in `trajopt_ifopt` (trajopt_common); import it from there.
 
 The margin is the clearance the term drives toward; it lives in
 `contact_manager_config.default_margin`, which the constructor's first argument sets.
@@ -504,9 +503,9 @@ the C++ reader's error.
     )
 
     composite = TrajOptIfoptDefaultCompositeProfile.from_yaml("smooth_jerks: false\n")
-    solver = TrajOptIfoptOSQPSolverProfile.from_yaml("opt_params:\n  max_iterations: 7\n")
+    solver = TrajOptIfoptOSQPSolverProfile.from_yaml("opt_params:\n  max_iter: 7\n")
     assert not composite.smooth_jerks
-    assert solver.opt_params.max_iterations == 7
+    assert solver.opt_params.max_iter == 7
     ```
 
 === "Task composer"

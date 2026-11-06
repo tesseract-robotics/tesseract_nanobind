@@ -18,9 +18,7 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 ```
 
 !!! note "`TrajOptCollisionConfig` lives in `trajopt_ifopt`"
-    It's defined in `tesseract_robotics.trajopt_ifopt` (trajopt_common) and
-    re-exported from `tesseract_motion_planners_trajopt` for convenience. Import
-    from either location.
+    It's defined in `tesseract_robotics.trajopt_ifopt` (trajopt_common); import it from there.
 
 ## TrajOptMotionPlanner
 
@@ -160,9 +158,7 @@ only at contact and TrajOpt settles paths on the obstacle's surface.
 ### CollisionEvaluatorType
 
 !!! note "Module Location"
-    `CollisionEvaluatorType` lives in
-    `tesseract_robotics.tesseract_collision` (re-exported from the TrajOpt
-    module for convenience).
+    `CollisionEvaluatorType` lives in `tesseract_robotics.tesseract_collision`.
 
 | Type | Description | Speed |
 |------|-------------|-------|

@@ -289,8 +289,8 @@ This means `package://tesseract/support/urdf/...` URLs work out of the box.
 
 ### Type Erasure Pattern
 
-The command language uses type erasure extensively. In Python, module-level utility functions
-are needed to create and cast instructions and waypoints:
+The command language uses type erasure extensively. In Python, the `*Poly` constructors wrap
+instructions and waypoints, and the `as*` methods cast them back:
 
 ```python
 from tesseract_robotics.tesseract_command_language import (
@@ -306,10 +306,9 @@ move_instr = program[0].asMoveInstruction()
 state_wp = move_instr.getWaypoint().asStateWaypoint()
 ```
 
-`ProfileDictionary` has similar accessor functions per type:
+`ProfileDictionary` takes a profile from any planner module:
 
 ```python
-
 profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", ompl_profile)
 ```
 
