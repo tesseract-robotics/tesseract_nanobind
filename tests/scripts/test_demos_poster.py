@@ -33,3 +33,33 @@ def test_the_player_state_without_a_timeline_raises():
 
 def test_the_poster_is_not_stretched_on_a_4k_screen():
     assert poster.PLAYER_WIDTH_PX * poster.DEVICE_SCALE >= poster.LARGEST_BOX_PHYSICAL_PX
+
+
+def test_a_still_with_a_timeline_raises():
+    # A manifest entry says static, yet the recording moves: one of the two is wrong.
+    with pytest.raises(poster.PosterCaptureError):
+        poster.require_still({"duration_s": 2.0}, "m")
+
+
+@pytest.mark.parametrize(
+    ("state", "static", "ready"),
+    [
+        (None, False, False),
+        (None, True, False),
+        ({"duration_s": 0.0, "loading": False}, False, False),
+        ({"duration_s": 3.0, "loading": False}, False, True),
+        ({"duration_s": 0.0, "loading": True}, True, False),
+        ({"duration_s": 0.0, "loading": False}, True, True),
+    ],
+)
+def test_when_the_player_counts_as_loaded(state, static, ready):
+    assert poster.player_ready(state, static=static) is ready
+
+
+def test_a_bare_run_leaves_reviewed_posters_alone():
+    recorded, posed = {"new", "done"}, {"done"}
+    assert poster.to_capture(["new", "done", "unrecorded"], recorded, posed, only=[]) == ["new"]
+
+
+def test_naming_an_entry_recaptures_it():
+    assert poster.to_capture(["new", "done"], {"new", "done"}, {"done"}, only=["done"]) == ["done"]

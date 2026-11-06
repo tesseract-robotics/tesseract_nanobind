@@ -382,3 +382,15 @@ Each gives its own decomposition. The default-constructed
 The decomposition shipped with tesseract support, `car_seat/collision/seat_*.stl`,
 was made with other, unrecorded parameters. It is reported, not compared.
 
+## Signed Distance Field
+
+--8<-- "docs/demos/players/sdf_collision_example.html"
+
+A concave obstacle as a `tesseract_geometry.SignedDistanceField`: a ball with a bore through it,
+which no convex hull can represent. A probe sweeps into it and back, so its contact distances
+cross the margin band. The voxel shell shows the field's zero level set; the contact manager
+queries the field itself.
+
+```bash
+tesseract_sdf_collision_example
+```

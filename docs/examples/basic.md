@@ -47,6 +47,8 @@ See the source at
 
 ## Scene Graph Example
 
+--8<-- "docs/demos/players/scene_graph_example.html"
+
 Manipulate the scene graph (add/remove objects):
 
 ```bash
@@ -111,6 +113,8 @@ They default to `True`; set on a `Link` before `addLink`, the graph reads them b
 
 ## Geometry Showcase
 
+--8<-- "docs/demos/players/geometry_showcase_example.html"
+
 All available geometry types (Box, Sphere, Cylinder, Capsule, Cone, Mesh,
 ConvexMesh, Plane, Octree):
 
@@ -137,6 +141,8 @@ See the source at
     Loading from bytes, normals and textures, and writing PLY: [Geometry Examples](geometry.md).
 
 ## Point cloud → Octree Example
+
+--8<-- "docs/demos/players/pointcloud_octree_collision_example.html"
 
 Loads a binary PLY point cloud, builds a `tesseract_geometry.Octree`, attaches
 it as a collision obstacle in front of an ABB IRB2400, and then runs **the

@@ -53,6 +53,9 @@ from tesseract_robotics.tesseract_common import Isometry3d
 
 # --8<-- [end:setup]
 
+# Waypoint spacing when the viewer plays the final solve [s]. The solver's steps carry no time.
+VIEWER_STEP_S = 0.1
+
 
 # --8<-- [start:problem]
 def build_optimization_problem(
@@ -309,6 +312,22 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     }
 
 
+def style_for_viewer(env) -> None:
+    """Show the human in red and hide the robot's estop zone."""
+    scene = env.getSceneGraph()
+    for v in scene.getLink("human_estop_zone").visual:
+        if v.material:
+            v.material.color = np.array([0.8, 0.0, 0.0, 0.7])
+    scene.getLink("robot_estop_zone").visual.clear()
+
+
+def final_rows(results, *, steps=12):
+    """The final solve as `Trajectory.from_rows` wants it: `[q..., t]` per waypoint."""
+    n_joints = len(results["joint_names"])
+    traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
+    return [wp.tolist() + [i * VIEWER_STEP_S] for i, wp in enumerate(traj_final)]
+
+
 def main() -> int:
     results = run(verbose=False)
 
@@ -351,25 +370,11 @@ def main() -> int:
     print("Human: red cylinder at FINAL position (static in viewer)")
 
     env = results["robot"].env
-    scene = env.getSceneGraph()
-
-    human_link = scene.getLink("human_estop_zone")
-    for v in human_link.visual:
-        if v.material:
-            v.material.color = np.array([0.8, 0.0, 0.0, 0.7])
-
-    robot_zone = scene.getLink("robot_estop_zone")
-    robot_zone.visual.clear()
-
-    n_joints = len(results["joint_names"])
-    steps = 12
-    traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
-    dt = 0.1
-    rows = [wp.tolist() + [i * dt] for i, wp in enumerate(traj_final)]
+    style_for_viewer(env)
 
     with TesseractViewer() as viewer:
         viewer.update_environment(env)
-        viewer.update_trajectory(Trajectory.from_rows(results["joint_names"], rows))
+        viewer.update_trajectory(Trajectory.from_rows(results["joint_names"], final_rows(results)))
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 

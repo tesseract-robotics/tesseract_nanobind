@@ -96,3 +96,20 @@ def test_repeated_entries_are_rejected(tmp_path):
     path.write_text(table + table)
     with pytest.raises(manifest.ManifestEntryError, match="repeat"):
         manifest.load_manifest(path)
+
+
+def _raw_entry(**extra):
+    return {
+        "module": "m",
+        "page": "p.md",
+        "title": "T",
+        "blurb": "B",
+        "status": "excluded",
+        "reason": "in review",
+        **extra,
+    }
+
+
+def test_an_entry_is_animated_unless_it_says_static():
+    assert manifest.Entry.build(_raw_entry()).static is False
+    assert manifest.Entry.build(_raw_entry(static=True)).static is True

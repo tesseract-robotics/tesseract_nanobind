@@ -71,6 +71,8 @@ class Entry:
     reason: str | None
     camera: Camera | None
     floor_size_m: float | None
+    # Nothing moves: the player opens on the scene, with no timeline.
+    static: bool = False
 
     @classmethod
     def build(cls, raw: dict[str, Any]) -> Entry:
@@ -95,7 +97,17 @@ class Entry:
             raise ManifestEntryError(f"{module}: published, yet has a reason to leave it out")
         if status is Status.EXCLUDED and not reason:
             raise ManifestEntryError(f"{module}: an excluded entry needs a reason")
-        return cls(module, page, title, blurb, status, reason, camera, raw.get("floor_size_m"))
+        return cls(
+            module,
+            page,
+            title,
+            blurb,
+            status,
+            reason,
+            camera,
+            raw.get("floor_size_m"),
+            raw.get("static", False),
+        )
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> list[Entry]:

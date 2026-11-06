@@ -128,3 +128,12 @@ def test_the_first_content_on_the_docs_home_is_the_hero():
     lines = [line for line in _page_text("index.md").splitlines() if line.strip()]
     assert lines[0].startswith("# ")
     assert lines[1] == f'--8<-- "docs/demos/players/{players.HERO_SNIPPET}"'
+
+
+def test_a_static_player_offers_to_open_not_to_play():
+    still = manifest.Entry(
+        SHOWN.module, SHOWN.page, "Still", "B.", SHOWN.status, None, CAMERA, None, static=True
+    )
+    text = players.snippets([still], LOCK)["shown.html"]
+    assert ">Open Still (" in text
+    assert "Play" not in text

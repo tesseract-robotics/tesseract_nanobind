@@ -4,6 +4,8 @@ Real-time trajectory replanning with moving obstacles.
 
 ## Overview
 
+--8<-- "docs/demos/players/online_planning_example.html"
+
 Online planning continuously replans as the environment changes:
 
 ```mermaid
@@ -36,6 +38,8 @@ initial solve, on an Apple M1 Max with trajopt 0.35.0. The machine was shared at
 treat them as indicative, and run the example to get local numbers.
 
 ## Low-Level SQP Example
+
+--8<-- "docs/demos/players/online_planning_sqp_example.html"
 
 Real-time replanning at about 70 Hz using discrete collision. The snippets below
 are the real shipped source, split into three regions: `setup`, `problem`,

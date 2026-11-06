@@ -44,7 +44,8 @@ def _player(entry: Entry, lock: DemoLock, url_root: str, source_root: str) -> st
     recording = lock.recordings[entry.module]
     src = f"{url_root}demos/client/index.html?{player_query(entry.module, entry.camera)}"
     poster = f"{source_root}demos/posters/{entry.module}.png"
-    label = html.escape(f"Play {entry.title} ({recording.size_bytes / BYTES_PER_MB:.1f} MB)")
+    action = "Open" if entry.static else "Play"
+    label = html.escape(f"{action} {entry.title} ({recording.size_bytes / BYTES_PER_MB:.1f} MB)")
     identity = recording.identity
     return (
         f'<button class="demo-player" type="button" data-src="{html.escape(src)}">'
