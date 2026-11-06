@@ -85,9 +85,10 @@ def _free_port() -> int:
 
 
 def _assert_port_free(port: int) -> None:
-    # Binding without SO_REUSEADDR succeeds only if the listener is gone.
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", port))
+    # What close() promises: a viewer can serve on the port again; ViewerPortInUseError if not.
+    # A bind without SO_REUSEADDR is stricter than that: an accepted connection still winding
+    # down holds the port too, though it is no listener.
+    TesseractViewer(port=port).close()
 
 
 def _irb2400():
@@ -195,8 +196,9 @@ def test_serve_forever_closes_on_keyboard_interrupt(monkeypatch):
         socket.create_connection(("127.0.0.1", port), timeout=CONNECT_TIMEOUT_S).close()
         raise KeyboardInterrupt
 
-    monkeypatch.setattr("tesseract_robotics.viewer.viewer.time.sleep", interrupt)
-    viewer.serve_forever()
+    with monkeypatch.context() as patch:
+        patch.setattr("tesseract_robotics.viewer.viewer.time.sleep", interrupt)
+        viewer.serve_forever()
     _assert_port_free(port)
 
 

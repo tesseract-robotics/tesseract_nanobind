@@ -115,6 +115,8 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Changes
 
+- **spdlog sinks bound** — `Logger.sinks` reads and replaces a logger's spdlog sinks, `StderrSink` is tesseract's default console sink, and `PythonLoggingSink(name)` writes each record to Python `logging` (level, source file, line and function on the `LogRecord`; text from the sink's spdlog pattern). Replacing the default logger's `StderrSink` with a `PythonLoggingSink` sends tesseract's output to Python once; a record handler alone sees each record while stderr still prints it. Sinks are C++-owned and Python holds a share, so a logger keeping one keeps no Python object alive. `Logger.set_pattern()` and `Logger.flush()` are bound too.
+- **Logging test no longer leaks at exit** — `test_handler_exception_reaches_unraisablehook` kept the hook's arguments, whose traceback frames held the test's own locals: a cycle that kept a `LogRecord` and the `Logger` alive past interpreter exit, which nanobind reported as leaked. It now keeps the exception's type and text.
 - **`JointTrajectory.insert(index, state)` and `del traj[i]` / `del traj[a:b]`**, in Python's list forms, as `CompositeInstruction` has ([#269]).
 - **`TrajOptCollisionConfig(margin, coeff, request, type, longest_valid_segment_length, check_program_mode)`** — the full upstream constructor; the two-argument form still works ([#251]).
 - **The binding audit reports trailing defaulted parameters Python cannot pass** — a C++ overload with defaulted parameters counts as covered only if a covering Python overload accepts all of them; otherwise the gap names the unreachable ones. `OFKTStateSolver(scene_graph, prefix)` is accepted under `upstream-broken-default` ([#251], [tesseract#1384]).

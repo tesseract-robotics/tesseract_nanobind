@@ -463,7 +463,9 @@ None.
 | `LinkIdPair.__hash__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
 | `LinkIdPair.__init__` | overload | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | 1 | won't fix: Takes `(link_id1, link_id2)`, the source of the implicit conversion from a tuple. |
 | `LogLevel` | enum | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::level::level_enum`, the type of `getLogger(name).set_level`; no tesseract header declares it. |
+| `LogSink` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::sinks::sink`, the type of `Logger.sinks`; no tesseract header declares it. |
 | `Logger` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::logger`, the type `getLogger` returns; no tesseract header declares it. |
+| `StderrSink` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::sinks::stderr_color_sink_mt`, the sink tesseract's default logger starts with; no tesseract header declares it. |
 | `apply_directions_each` | function | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
 
 ### Accepted

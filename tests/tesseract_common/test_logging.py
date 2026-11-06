@@ -2,8 +2,8 @@
 
 Upstream tesseract (dc289659, #1367) logs through spdlog instead of console_bridge, so the
 console_bridge bindings (`setLogLevel`, `useOutputHandler`, ...) were removed: they no longer
-reached it. The spdlog-backed API mirrors upstream: `getLogger(name)` for the level,
-`addLogRecordHandler` for custom sinks.
+reached it. The spdlog-backed API mirrors upstream: `getLogger(name)` for the logger, its level
+and its sinks (`StderrSink`, `PythonLoggingSink`), `addLogRecordHandler` for a callable.
 """
 
 import subprocess
@@ -17,6 +17,9 @@ from tesseract_robotics.tesseract_common import LogLevel
 # GeneralResourceLocator logs TESSERACT_LOG_WARN("Resource not handled: ...") for a
 # relative path and returns None.
 UNHANDLED = "relative/not/handled.stl"
+
+# seconds a script that must not deadlock gets; generous for a loaded CI runner's imports
+DEADLOCK_TIMEOUT_S = 60
 
 
 def _warn_once():
@@ -36,6 +39,69 @@ def test_log_level_silences_tesseract(capfd, logger):
     _warn_once()
     _, err = capfd.readouterr()
     assert "Resource not handled" not in err
+
+
+@pytest.fixture
+def sinks(logger):
+    """The default logger's sinks, restored after the test."""
+    previous = logger.sinks
+    yield previous
+    logger.sinks = previous
+
+
+def test_default_logger_writes_to_one_stderr_sink(sinks):
+    assert len(sinks) == 1
+    assert isinstance(sinks[0], tesseract_common.StderrSink)
+
+
+def test_python_logging_sink_replaces_stderr(capfd, caplog, logger, sinks):
+    """With only a PythonLoggingSink, a tesseract warning reaches Python logging once and stderr not at all."""
+    logger.set_level(LogLevel.warn)
+    logger.sinks = [tesseract_common.PythonLoggingSink("tesseract.cpp")]
+    with caplog.at_level("WARNING", logger="tesseract.cpp"):
+        _warn_once()
+    _, err = capfd.readouterr()
+    assert UNHANDLED not in err
+    (record,) = [r for r in caplog.records if UNHANDLED in r.getMessage()]
+    assert record.name == "tesseract.cpp"
+    assert record.levelname == "WARNING"
+    assert record.pathname.endswith(".cpp") and record.lineno > 0
+    assert record.spdlog_logger == "tesseract"
+
+
+def test_python_logging_sink_pattern_and_levels(caplog, logger, sinks):
+    """The sink's pattern makes the text; a sink level and the Python logger's level both filter."""
+    logger.set_level(LogLevel.warn)
+    sink = tesseract_common.PythonLoggingSink("tesseract.cpp")
+    sink.set_pattern("%v (%s:%#)")
+    logger.sinks = [sink]
+    with caplog.at_level("WARNING", logger="tesseract.cpp"):
+        _warn_once()
+        (record,) = [r for r in caplog.records if UNHANDLED in r.getMessage()]
+        assert record.getMessage().endswith(f"({record.filename}:{record.lineno})")
+
+        caplog.clear()
+        sink.set_level(LogLevel.err)
+        _warn_once()
+        assert not [r for r in caplog.records if UNHANDLED in r.getMessage()]
+    sink.set_level(LogLevel.trace)
+    with caplog.at_level("ERROR", logger="tesseract.cpp"):
+        _warn_once()
+        assert not [r for r in caplog.records if UNHANDLED in r.getMessage()]
+
+
+def test_only_tesseract_sinks_can_be_assigned(logger, sinks):
+    with pytest.raises(TypeError):
+        logger.sinks = [object()]
+    assert logger.sinks == sinks or len(logger.sinks) == len(sinks)
+
+
+def test_stderr_sink_restores_the_default_output(capfd, logger, sinks):
+    logger.set_level(LogLevel.warn)
+    logger.sinks = [tesseract_common.StderrSink()]
+    _warn_once()
+    _, err = capfd.readouterr()
+    assert UNHANDLED in err
 
 
 def test_default_logger_is_named_tesseract_and_round_trips_its_level(logger):
@@ -77,7 +143,11 @@ def test_removed_handler_receives_nothing(logger):
 def test_handler_exception_reaches_unraisablehook(monkeypatch, logger):
     logger.set_level(LogLevel.warn)
     reported = []
-    monkeypatch.setattr(sys, "unraisablehook", reported.append)
+    # Keep the type and text, not the hook's arguments: their traceback's frames hold this test's
+    # locals (reported among them), a cycle that keeps the record and logger alive past exit.
+    monkeypatch.setattr(
+        sys, "unraisablehook", lambda u: reported.append((type(u.exc_value), str(u.exc_value)))
+    )
 
     def broken(record):
         raise RuntimeError("handler bug")
@@ -88,8 +158,7 @@ def test_handler_exception_reaches_unraisablehook(monkeypatch, logger):
     finally:
         tesseract_common.removeLogRecordHandler(handler_id)
 
-    assert [type(u.exc_value) for u in reported] == [RuntimeError]
-    assert str(reported[0].exc_value) == "handler bug"
+    assert reported == [(RuntimeError, "handler bug")]
 
 
 def test_a_handler_left_registered_is_released_before_interpreter_exit():
@@ -103,6 +172,71 @@ def test_a_handler_left_registered_is_released_before_interpreter_exit():
     result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert "leaked" not in result.stderr
+
+
+def test_a_python_sink_left_installed_is_released_before_interpreter_exit():
+    """The default logger outlives Python, so the sink it holds must be let go at exit."""
+    script = (
+        "import logging\n"
+        "from tesseract_robotics import tesseract_common as tc\n"
+        "logging.basicConfig()\n"
+        "tc.getLogger().sinks = [tc.PythonLoggingSink('tesseract.cpp')]\n"
+        f"tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
+    )
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert "leaked" not in result.stderr
+    # routed once, through Python logging, not also by spdlog's stderr sink
+    assert result.stderr.count("Resource not handled") == 1
+    assert "WARNING:tesseract.cpp:" in result.stderr
+
+
+def test_a_python_sink_does_not_deadlock_a_thread_holding_the_gil():
+    """A record in flight lets the GIL go in Python; another thread then calls into the sink."""
+    script = (
+        "import logging, threading, time\n"
+        "from tesseract_robotics import tesseract_common as tc\n"
+        "entered = threading.Event()\n"
+        "class Slow(logging.Handler):\n"
+        "    def emit(self, record):\n"
+        "        entered.set()\n"
+        "        time.sleep(0.2)\n"
+        "python_logger = logging.getLogger('tesseract.cpp')\n"
+        "python_logger.addHandler(Slow())\n"
+        "logger = tc.getLogger()\n"
+        "logger.sinks = [tc.PythonLoggingSink('tesseract.cpp')]\n"
+        f"t = threading.Thread(target=tc.GeneralResourceLocator().locateResource, args=({UNHANDLED!r},))\n"
+        "t.start()\n"
+        "assert entered.wait(30)\n"
+        "logger.flush()\n"
+        "t.join()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=DEADLOCK_TIMEOUT_S
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_a_python_logging_handler_can_call_code_that_logs():
+    """A handler that reaches tesseract logs again on the thread already inside the sink."""
+    script = (
+        "import logging\n"
+        "from tesseract_robotics import tesseract_common as tc\n"
+        "seen = []\n"
+        "class Reenter(logging.Handler):\n"
+        "    def emit(self, record):\n"
+        "        seen.append(record.getMessage())\n"
+        "        if len(seen) == 1:\n"
+        f"            tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
+        "logging.getLogger('tesseract.cpp').addHandler(Reenter())\n"
+        "tc.getLogger().sinks = [tc.PythonLoggingSink('tesseract.cpp')]\n"
+        f"tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
+        "assert len(seen) == 2, seen\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=DEADLOCK_TIMEOUT_S
+    )
+    assert result.returncode == 0, result.stderr
 
 
 REMOVED_NAMES = [
