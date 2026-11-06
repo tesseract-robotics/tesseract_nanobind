@@ -345,6 +345,8 @@ mkdocstrings = { version = ">=1.0", extras = ["python"] }
 
 [tool.pixi.feature.docs.tasks]
 docs = { cmd = "zensical serve --dev-addr=localhost:8000 --open", depends-on = ["demo-players"], env = { PYTHONPATH = "src" }, description = "Live docs server with incremental rebuilds" }
+demo-fetch = { cmd = "python scripts/demos/fetch.py", description = "Fetch the published demo files from their release, verified against the lock; --stage DIR names local files by hash for upload" }
+demo-check-site = { cmd = "python scripts/demos/check_site.py", description = "Check every demo file the built site references exists; the Docs workflow runs it too" }
 demo-players = { cmd = "python scripts/demos/players.py", description = "Generate the player snippets the docs pages include; --preview adds recordings awaiting review" }
 docs-build = { cmd = "zensical build --strict", depends-on = ["demo-players"], env = { PYTHONPATH = "src" }, description = "Build static docs to site/ with the same strict check as CI" }
 
