@@ -87,7 +87,7 @@ done
 # instead: ldd is recursive, so one pass over the objects actually loaded at runtime
 # — the extension modules (subpackage *.so) plus the dlopen'd plugin factories —
 # yields the full transitive set of libs they need (tesseract_*, boost, ompl, fcl,
-# vtk via urdf→pcl_io, …). This mirrors what delocate does automatically on macOS.
+# pcl_io via urdf, …). This mirrors what delocate does automatically on macOS.
 echo "Bundling tesseract libs + transitive deps..."
 seeds=()
 while IFS= read -r ext; do seeds+=("$ext"); done < <(find "$PKG_DIR" -name "*.so" -type f)

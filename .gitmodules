@@ -28,3 +28,12 @@
 [submodule "upstream/tesseract_planning"]
 	path = upstream/tesseract_planning
 	url = https://github.com/tesseract-robotics/tesseract_planning.git
+[submodule "packaging/pcl-feedstock"]
+	path = packaging/pcl-feedstock
+	url = https://github.com/jf---/pcl-feedstock.git
+[submodule "packaging/bullet-feedstock"]
+	path = packaging/bullet-feedstock
+	url = https://github.com/jf---/bullet-feedstock.git
+[submodule "packaging/ompl-feedstock"]
+	path = packaging/ompl-feedstock
+	url = https://github.com/jf---/ompl-feedstock.git
