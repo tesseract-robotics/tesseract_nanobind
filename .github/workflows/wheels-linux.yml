@@ -118,6 +118,8 @@ jobs:
           - { python: '3.13', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
           - { python: '3.14', wheel: '3.12', arch: x64,   runner: ubuntu-24.04 }
           - { python: '3.14', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
+          - { python: '3.15', wheel: '3.12', arch: x64,   runner: ubuntu-24.04 }
+          - { python: '3.15', wheel: '3.12', arch: aarch64, runner: ubuntu-24.04-arm }
     steps:
       - uses: actions/checkout@v4
         with:

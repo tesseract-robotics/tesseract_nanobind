@@ -37,6 +37,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",  # covered by the cp312-abi3 wheel
     "Programming Language :: Python :: 3.14",  # covered by the cp312-abi3 wheel
+    "Programming Language :: Python :: 3.15",  # covered by the cp312-abi3 wheel
     "Programming Language :: C++",
     "Programming Language :: Python :: Implementation :: CPython",
     "License :: OSI Approved :: Apache Software License",
@@ -153,9 +154,11 @@ quote-style = "double"
 name = "tesseract_robotics_dev"
 # tesseract-robotics ships the prebuilt tesseract C++ libs + CMake configs. The 0.36 dev
 # packages (all four platforms) live on its `dev` label, built by the feedstocks' `dev`
-# branches on CI; the label wins for those four packages only (it carries nothing else).
-# conda-forge stays ahead of tesseract-robotics `main` so common deps (boost, eigen, ompl,
-# …) resolve from there exactly as the tesseract feedstocks were built against.
+# branches on CI. The label also carries forks of three conda-forge packages: pcl without
+# VTK, and bullet-cpp and ompl without a Python pin. Those two pins and VTK's are what kept
+# Python 3.15 from solving. The label wins for every package it carries.
+# conda-forge stays ahead of tesseract-robotics `main` so common deps (boost, eigen, …)
+# resolve from there exactly as the tesseract feedstocks were built against.
 channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
 platforms = ["osx-arm64", "linux-64", "win-64", "linux-aarch64"]
 
@@ -289,6 +292,18 @@ build-wheel = { cmd = "zsh scripts/build_macos_wheel.sh", description = "Build p
 # The wheel workflows build in this env.
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
+
+# Newest Python: builds the bindings and runs the suite against it. Wheels stay cp312-abi3.
+[tool.pixi.feature.py315.dependencies]
+python = "3.15.*"
+trimesh = ">=4"
+pillow = "*"
+
+# Instead of the viewer feature: viser 1.1.1 caps websockets <17, and conda-forge's py315
+# websockets starts at 17.1. PyPI has a pure 16.x wheel. Back to the viewer feature once a
+# viser release with the <18 cap reaches conda-forge.
+[tool.pixi.feature.py315.pypi-dependencies]
+viser = ">=1.1.1"
 
 # Docs: the build reads the committed .pyi stubs through PYTHONPATH=src, exactly like the
 # Docs workflow, so this env carries no C++ stack.
@@ -454,6 +469,7 @@ default = { features = ["profile", "viewer"], solve-group = "default" }
 upstream = { features = ["bindings-dev", "upstream", "viewer"], no-default-feature = true, solve-group = "upstream" }
 packaged = { features = ["bindings-dev", "packaged", "viewer"], no-default-feature = true, solve-group = "packaged" }
 py312 = { features = ["py312", "viewer"], solve-group = "py312" }
+py315 = { features = ["py315"], solve-group = "py315" }
 # Own solve group: libclang 22 must not move libcxx/llvm-openmp in the env CI builds wheels from.
 audit = { features = ["audit"], solve-group = "audit" }
 docs = { features = ["docs"], no-default-feature = true, solve-group = "docs" }
