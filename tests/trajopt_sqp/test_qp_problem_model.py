@@ -66,6 +66,19 @@ def test_set_variables_round_trips(problem: tsqp.TrajOptQPProblem):
     np.testing.assert_array_equal(problem.getVariableValues(), x)
 
 
+def test_set_sum_constraint_set_violations_picks_sum_or_largest_row(
+    problem: tsqp.TrajOptQPProblem,
+):
+    x = np.array(problem.getVariableValues())
+    x[:N_DOF] = START + np.array([0.2, 0.1])  # the Start set's two rows, violated unequally
+    problem.setVariables(x)
+
+    problem.setSumConstraintSetViolations(True)
+    assert problem.getExactConstraintViolations().raw[0] == pytest.approx(0.3)
+    problem.setSumConstraintSetViolations(False)
+    assert problem.getExactConstraintViolations().raw[0] == pytest.approx(0.2)
+
+
 def test_set_variables_wrong_length_raises(problem: tsqp.TrajOptQPProblem):
     with pytest.raises(tsqp.VariablesSizeError, match=str(problem.getNumNLPVars())):
         problem.setVariables(np.zeros(problem.getNumNLPVars() - 1))

@@ -515,6 +515,9 @@
     },
     "isValidState": {
       "issue": "#333"
+    },
+    "tesseract/motion_planners/piqp/settings_utils.h": {
+      "issue": "#373"
     }
   },
   "tesseract_motion_planners_descartes": {
@@ -576,6 +579,15 @@
     "TrajOptDefaultPlanProfile": {
       "issue": "#335"
     },
+    "TrajOptPIQPSolverProfile.__eq__": {
+      "issue": "#373"
+    },
+    "TrajOptPIQPSolverProfile.__init__": {
+      "issue": "#373"
+    },
+    "TrajOptPIQPSolverProfile.__ne__": {
+      "issue": "#373"
+    },
     "TrajOptPlanProfile": {
       "issue": "#335"
     }
@@ -595,6 +607,15 @@
     },
     "TrajOptIfoptDefaultPlanProfile": {
       "issue": "#335"
+    },
+    "TrajOptIfoptPIQPSolverProfile.__eq__": {
+      "issue": "#373"
+    },
+    "TrajOptIfoptPIQPSolverProfile.__init__": {
+      "issue": "#373"
+    },
+    "TrajOptIfoptPIQPSolverProfile.__ne__": {
+      "issue": "#373"
     },
     "TrajOptIfoptPlanProfile": {
       "issue": "#335"
@@ -702,6 +723,15 @@
     }
   },
   "trajopt_ifopt": {
+    "CartAxisAlignConstraint.calcJacobianBlock": {
+      "issue": "#373"
+    },
+    "CartAxisConeConstraint.calcJacobianBlock": {
+      "issue": "#373"
+    },
+    "CartAxisKinematics": {
+      "issue": "#373"
+    },
     "CollisionCoeffData.hasZeroCoeff": {
       "issue": "#373"
     },
@@ -720,7 +750,7 @@
     "Var.__init__": {
       "wont_fix": "`Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297)."
     },
-    "cantorHash": {
+    "appendGradientResultsSets": {
       "wont_fix": "Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`."
     },
     "debugPrintInfo": {
@@ -729,11 +759,29 @@
     "getHash": {
       "wont_fix": "Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`."
     },
+    "getShapePairKey": {
+      "wont_fix": "Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`."
+    },
     "removeInvalidContactResults": {
       "wont_fix": "Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`."
     }
   },
   "trajopt_sqp": {
+    "PIQPKKTSolver": {
+      "wont_fix": "piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings."
+    },
+    "PIQPSettings": {
+      "wont_fix": "piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings."
+    },
+    "PIQPSolver.defaultSettings": {
+      "wont_fix": "Returning form of `setDefaultPIQPSettings`, whose out-param Python can't use."
+    },
+    "PIQPSolver.setDefaultPIQPSettings": {
+      "wont_fix": "Fills an out-param; `PIQPSolver.defaultSettings()` returns the same settings."
+    },
+    "PIQPSolver.solver": {
+      "issue": "#373"
+    },
     "QPSolverStatus.QP_ERROR": {
       "issue": "#330"
     },
