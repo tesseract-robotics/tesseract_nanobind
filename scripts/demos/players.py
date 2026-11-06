@@ -43,7 +43,7 @@ def _player(entry: Entry, lock: DemoLock, url_root: str, source_root: str) -> st
     assert entry.camera is not None  # Entry.build: a published or recorded entry has one.
     recording = lock.recordings[entry.module]
     src = f"{url_root}demos/client/index.html?{player_query(entry.module, entry.camera)}"
-    poster = f"{source_root}demos/posters/{entry.module}.webp"
+    poster = f"{source_root}demos/posters/{entry.module}.png"
     label = html.escape(f"Play {entry.title} ({recording.size_bytes / BYTES_PER_MB:.1f} MB)")
     identity = recording.identity
     return (

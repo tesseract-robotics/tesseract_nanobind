@@ -1,6 +1,6 @@
-"""Capture each recording's moving poster from the static client. `pixi run demo-posters`.
+"""Capture each recording's poster image from the static client. `pixi run demo-posters`.
 
-Scrubs the real player in headless Chrome, so a poster shows what a click on it will play.
+Seeks the real player in headless Chrome, so a poster shows what a click on it will play.
 """
 
 from __future__ import annotations
@@ -18,10 +18,8 @@ import urllib.request
 from pathlib import Path
 from types import TracebackType
 
-import numpy as np
 from lock import DemoLock, read_lock, sha256_bytes, write_lock
 from manifest import Entry, load_manifest, player_query
-from numpy.typing import NDArray
 from PIL import Image
 from websockets.sync.client import ClientConnection, connect
 
@@ -33,12 +31,8 @@ PLAYER_WIDTH_PX = 688
 PLAYER_HEIGHT_PX = 387
 # Render density [-]: sharp on most screens, without the size of a full 2x retina capture.
 DEVICE_SCALE = 1.5
-# Poster motion: faster than real time, so the story fits a glance.
-POSTER_SPEEDUP = 2.0
-POSTER_FPS_HZ = 10.0
-# WebP quality [0-100] and effort [0-6]: judged by eye and size on `car_seat`.
-WEBP_QUALITY = 70
-WEBP_METHOD = 6
+# Where on the timeline the poster is taken [-]: late enough that the motion has happened.
+POSTER_FRACTION = 0.7
 # How long the client gets to download and decode a recording [s].
 LOAD_TIMEOUT_S = 90.0
 LOAD_POLL_S = 0.25
@@ -65,41 +59,24 @@ _NEXT_PAINT = "new Promise(r => requestAnimationFrame(() => requestAnimationFram
 
 
 class PosterCaptureError(RuntimeError):
-    """A poster cannot be made: no client, no timeline, or nothing to encode."""
+    """A poster cannot be made: no client, or no timeline."""
 
 
-def frame_fractions(duration_s: float) -> NDArray[np.float64]:
-    """Timeline positions of a poster's frames, as fractions of the duration.
+def encode_png(frame: Image.Image) -> bytes:
+    """Encode the poster frame."""
+    out = io.BytesIO()
+    frame.save(out, format="PNG", optimize=True)
+    return out.getvalue()
+
+
+def require_timeline(state: dict, module: str) -> None:
+    """Check the player reports a timeline to seek along.
 
     Raises:
         PosterCaptureError: the timeline has no duration.
     """
-    if not duration_s > 0.0:
-        raise PosterCaptureError(f"nothing to animate over a {duration_s} s timeline")
-    intervals = max(round(duration_s / POSTER_SPEEDUP * POSTER_FPS_HZ), 1)
-    return np.linspace(0.0, 1.0, intervals + 1)
-
-
-def encode_webp(frames: list[Image.Image]) -> bytes:
-    """Encode `frames` as a looping animated WebP at `POSTER_FPS_HZ`.
-
-    Raises:
-        PosterCaptureError: no frames.
-    """
-    if not frames:
-        raise PosterCaptureError("no frames to encode")
-    out = io.BytesIO()
-    frames[0].save(
-        out,
-        format="WEBP",
-        save_all=True,
-        append_images=frames[1:],
-        duration=round(1000.0 / POSTER_FPS_HZ),
-        loop=0,
-        quality=WEBP_QUALITY,
-        method=WEBP_METHOD,
-    )
-    return out.getvalue()
+    if not state["duration_s"] > 0.0:
+        raise PosterCaptureError(f"{module}: nothing to seek along")
 
 
 class _Page:
@@ -185,7 +162,7 @@ class _Browser:
         self._profile.cleanup()
 
     def capture(self, entry: Entry) -> bytes:
-        """Scrub `entry`'s recording frame by frame into a poster.
+        """Seek `entry`'s recording to the poster frame and capture it.
 
         Raises:
             PosterCaptureError: the player never appeared, or the entry has no camera.
@@ -206,17 +183,15 @@ class _Browser:
             )
             page.call("Page.navigate", url=url)
             state = _wait_for_player(page, entry.module)
+            require_timeline(state, entry.module)
             page.click(*state["pause"])
             time.sleep(PAUSE_SETTLE_S)
             x, y, width, height = state["track"]
             # The control bar stays off the poster: the page draws it on click.
             scene_px = round(state["bar_top_px"] * DEVICE_SCALE)
-            frames = []
-            for fraction in frame_fractions(state["duration_s"]):
-                page.click(x + float(fraction) * width, y + height / 2)
-                frame = page.screenshot()
-                frames.append(frame.crop((0, 0, frame.width, scene_px)))
-        return encode_webp(frames)
+            page.click(x + POSTER_FRACTION * width, y + height / 2)
+            frame = page.screenshot()
+        return encode_png(frame.crop((0, 0, frame.width, scene_px)))
 
     def _page_socket(self) -> str:
         deadline = time.monotonic() + CHROME_START_TIMEOUT_S
@@ -262,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
             if entry.module not in lock.recordings or (args.only and entry.module not in args.only):
                 continue
             data = browser.capture(entry)
-            (posters_dir / f"{entry.module}.webp").write_bytes(data)
+            (posters_dir / f"{entry.module}.png").write_bytes(data)
             posters[entry.module] = sha256_bytes(data)
             print(f"{entry.module}: {len(data) / 1e6:.2f} MB")
     write_lock(DemoLock.build(lock.viser_version, lock.client_sha256, lock.recordings, posters))

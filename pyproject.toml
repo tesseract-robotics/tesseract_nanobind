@@ -235,7 +235,7 @@ build = { depends-on = [
 ], description = "Install bindings against the conda tesseract C++ libs" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
 demo-record = { cmd = "python scripts/demos/record.py", description = "Regenerate the demo recordings into docs/demos/ and update the lock; --only NAME... for some" }
-demo-posters = { cmd = "python scripts/demos/poster.py", description = "Capture each recording's moving poster in headless Chrome and add its hash to the lock; --only NAME... for some" }
+demo-posters = { cmd = "python scripts/demos/poster.py", description = "Capture each recording's poster image in headless Chrome and add its hash to the lock; --only NAME... for some" }
 docs-dotgraphs = { cmd = "python scripts/generate_pipeline_dotgraphs.py", depends-on = [
     "install",
 ], description = "Regenerate pipeline DOT graph SVGs embedded in the docs (requires graphviz)" }

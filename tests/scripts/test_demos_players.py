@@ -53,17 +53,17 @@ def test_a_published_entry_gets_a_click_to_load_player_with_its_identity():
     assert "<iframe" not in text
 
 
-def test_a_player_shows_its_moving_poster_until_clicked():
+def test_a_player_shows_its_poster_image_until_clicked():
     text = players.snippets(ENTRIES, LOCK)["shown.html"]
     # Source-relative: the docs builder rewrites an <img src> for the page's URL, unlike data-src.
-    assert '<img src="../demos/posters/shown.webp"' in text
+    assert '<img src="../demos/posters/shown.png"' in text
     assert 'loading="lazy"' in text
 
 
 def test_the_hero_resolves_from_the_site_root():
     text = players.snippets(ENTRIES, LOCK)[players.HERO_SNIPPET]
     assert 'data-src="demos/client/index.html?' in text
-    assert f'<img src="demos/posters/{players.HERO_MODULE}.webp"' in text
+    assert f'<img src="demos/posters/{players.HERO_MODULE}.png"' in text
 
 
 def test_an_excluded_entry_has_an_empty_snippet():
