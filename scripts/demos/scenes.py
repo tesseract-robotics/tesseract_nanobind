@@ -98,7 +98,6 @@ def _sdf(_composer: TaskComposer) -> Scene:
 
 
 def _twc(_composer: TaskComposer) -> Scene:
-    # The positioner cell: the rail cell draws no rail (#380).
     example = _example("twc_workcell_positioner_viewer")
     env = example.run(TWC_CELL)["env"]
     return Scene(

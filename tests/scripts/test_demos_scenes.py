@@ -43,8 +43,7 @@ def test_a_scripted_scene_plays_one_trajectory_in_its_environment(module):
     assert isinstance(scene.phases[0].trajectory, Trajectory)
 
 
-def test_the_twc_scene_is_the_positioner_cell_not_the_rail():
-    # The rail cell draws no rail (#380).
+def test_the_twc_scene_is_the_positioner_cell():
     scene = SCENES["twc_workcell_positioner_viewer"](None)
     assert "positioner" in scene.env.getName()
 
