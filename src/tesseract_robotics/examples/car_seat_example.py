@@ -80,17 +80,11 @@ from tesseract_robotics.tesseract_environment import (
 )
 from tesseract_robotics.tesseract_geometry import createMeshFromResource
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptSolverProfile,
     TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    ProfileDictionary_addTrajOptIfoptMoveProfile,
-    ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
@@ -181,7 +175,7 @@ def create_car_seat_profiles():
     composite.collision_cost_config.collision_margin_buffer = 0.01
 
     # === Plan/Move Profile ===
-    plan = TrajOptDefaultPlanProfile()
+    plan = TrajOptDefaultMoveProfile()
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.joint_cost_config.enabled = False
@@ -194,9 +188,9 @@ def create_car_seat_profiles():
     solver.opt_params.min_trust_box_size = 1e-3
 
     for name in ["DEFAULT", "FREESPACE"]:
-        ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, name, composite)
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_NS, name, plan)
-        ProfileDictionary_addTrajOptSolverProfile(profiles, TRAJOPT_NS, name, solver)
+        profiles.addProfile(TRAJOPT_NS, name, composite)
+        profiles.addProfile(TRAJOPT_NS, name, plan)
+        profiles.addProfile(TRAJOPT_NS, name, solver)
 
     return profiles
 
@@ -243,15 +237,9 @@ def create_car_seat_ifopt_profiles():
 
     # C++ names its composite "FREESPACE"; MotionProgram's composite is "DEFAULT".
     for name in ["DEFAULT", "FREESPACE"]:
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptIfoptMoveProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, move
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, move)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver)
 
     return profiles
 
@@ -397,7 +385,7 @@ def plan_motion(
     return result
 
 
-def run(pipeline="TrajOptPipeline", num_planners=None):
+def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
     """Execute the car seat pick-and-place workflow.
 
     Workflow phases (from C++ CarSeatExample::run()):
@@ -413,7 +401,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
         num_planners: Number of parallel OMPL planners (for FreespacePipeline)
 
     Returns:
-        dict: {pick_result, place_result, robot, joint_names} for testing/viz
+        dict: {pick_result, place_result, pick_env, robot, joint_names} for testing/viz
     """
     # === PHASE 0: LOAD ROBOT ===
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
@@ -439,7 +427,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     robot.set_joints(POSITIONS["Home"])
 
-    composer = TaskComposer.from_config()
+    composer = composer or TaskComposer.from_config()
 
     # Create profiles based on pipeline type
     if "Freespace" in pipeline or "OMPL" in pipeline:
@@ -460,6 +448,8 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     # Update environment state to Pick1, then reparent seat_1 to end_effector
     print("\n=== ATTACH SEAT ===")
     robot.set_joints(POSITIONS["Pick1"])
+    # Before the attach: the seat still rests on its conveyor here, for showing the pick.
+    pick_env = robot.env.clone()
     attach_seat(robot, "seat_1")
 
     # === PHASE 4: PLACE MOTION ===
@@ -473,6 +463,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
     return {
         "pick_result": pick_result,
         "place_result": place_result,
+        "pick_env": pick_env,
         "robot": robot,
         "joint_names": joint_names,
     }

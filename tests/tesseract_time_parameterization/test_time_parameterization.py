@@ -18,28 +18,27 @@ from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
-    WaypointPoly_as_StateWaypointPoly,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
-    ConstantTCPSpeedCompositeProfile,
     ConstantTCPSpeedParameterization,
+    ConstantTCPSpeedParameterizationCompositeProfile,
     InstructionsTrajectory,
-    ISPCompositeProfile,
-    ISPMoveProfile,
     IterativeSplineParameterization,
+    IterativeSplineParameterizationCompositeProfile,
+    IterativeSplineParameterizationMoveProfile,
     RuckigTrajectorySmoothing,
     RuckigTrajectorySmoothingCompositeProfile,
     ScalingsLengthError,
     StaleTrajectoryError,
     TimeOptimalTrajectoryGeneration,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
     TimeParameterization,
-    TOTGCompositeProfile,
     rescaleTimings,
 )
 
@@ -77,10 +76,10 @@ class TestIterativeSplineParameterization:
 
 
 class TestTOTGCompositeProfile:
-    """Test TOTGCompositeProfile."""
+    """Test TimeOptimalTrajectoryGenerationCompositeProfile."""
 
     def test_default_constructor(self):
-        profile = TOTGCompositeProfile()
+        profile = TimeOptimalTrajectoryGenerationCompositeProfile()
         assert profile is not None
         assert profile.max_velocity_scaling_factor == 1.0
         assert profile.max_acceleration_scaling_factor == 1.0
@@ -88,14 +87,14 @@ class TestTOTGCompositeProfile:
         assert profile.min_angle_change == 0.001
 
     def test_custom_constructor(self):
-        profile = TOTGCompositeProfile(0.5, 0.5, 0.05, 0.002)
+        profile = TimeOptimalTrajectoryGenerationCompositeProfile(0.5, 0.5, 0.05, 0.002)
         assert profile.max_velocity_scaling_factor == 0.5
         assert profile.max_acceleration_scaling_factor == 0.5
         assert profile.path_tolerance == 0.05
         assert profile.min_angle_change == 0.002
 
     def test_override_limits(self):
-        profile = TOTGCompositeProfile()
+        profile = TimeOptimalTrajectoryGenerationCompositeProfile()
         profile.override_limits = True
         profile.velocity_limits = np.column_stack((-np.ones(6), np.ones(6)))
         profile.acceleration_limits = np.column_stack((-np.ones(6) * 2, np.ones(6) * 2))
@@ -105,31 +104,31 @@ class TestTOTGCompositeProfile:
 
 
 class TestISPCompositeProfile:
-    """Test ISPCompositeProfile."""
+    """Test IterativeSplineParameterizationCompositeProfile."""
 
     def test_default_constructor(self):
-        profile = ISPCompositeProfile()
+        profile = IterativeSplineParameterizationCompositeProfile()
         assert profile is not None
         assert profile.add_points is True
         assert profile.max_velocity_scaling_factor == 1.0
         assert profile.max_acceleration_scaling_factor == 1.0
 
     def test_custom_constructor(self):
-        profile = ISPCompositeProfile(0.5, 0.5)
+        profile = IterativeSplineParameterizationCompositeProfile(0.5, 0.5)
         assert profile.max_velocity_scaling_factor == 0.5
         assert profile.max_acceleration_scaling_factor == 0.5
 
     def test_add_points_setting(self):
-        profile = ISPCompositeProfile()
+        profile = IterativeSplineParameterizationCompositeProfile()
         profile.add_points = False
         assert profile.add_points is False
 
 
 class TestISPMoveProfile:
-    """Test ISPMoveProfile."""
+    """Test IterativeSplineParameterizationMoveProfile."""
 
     def test_default_constructor(self):
-        profile = ISPMoveProfile()
+        profile = IterativeSplineParameterizationMoveProfile()
         assert profile is not None
         assert profile.max_velocity_scaling_factor == 1.0
         assert profile.max_acceleration_scaling_factor == 1.0
@@ -156,11 +155,11 @@ class TestInstructionsTrajectory:
         for pos in positions:
             wp = StateWaypoint(joint_names, pos)
             mi = MoveInstruction(
-                StateWaypointPoly_wrap_StateWaypoint(wp),
-                MoveInstructionType_FREESPACE,
+                StateWaypointPoly(wp),
+                MoveInstructionType.FREESPACE,
                 "DEFAULT",
             )
-            program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
+            program.push_back(MoveInstructionPoly(mi))
 
         assert len(program) == 3
 
@@ -188,7 +187,7 @@ class TestConstantTCPSpeedParameterization:
 
 class TestConstantTCPSpeedCompositeProfile:
     def test_default_construction(self):
-        p = ConstantTCPSpeedCompositeProfile()
+        p = ConstantTCPSpeedParameterizationCompositeProfile()
         assert p is not None
         # Defaults (from C++ header)
         assert p.max_translational_velocity == pytest.approx(1.0)
@@ -199,7 +198,7 @@ class TestConstantTCPSpeedCompositeProfile:
         assert p.max_acceleration_scaling_factor == pytest.approx(1.0)
 
     def test_full_constructor(self):
-        p = ConstantTCPSpeedCompositeProfile(
+        p = ConstantTCPSpeedParameterizationCompositeProfile(
             max_translational_velocity=0.5,
             max_rotational_velocity=0.8,
             max_translational_acceleration=1.5,
@@ -216,13 +215,13 @@ class TestConstantTCPSpeedCompositeProfile:
 
     def test_constructor_scaling_defaults(self):
         # scaling factors default to 1.0 when omitted
-        p = ConstantTCPSpeedCompositeProfile(0.2, 0.3, 0.4, 0.5)
+        p = ConstantTCPSpeedParameterizationCompositeProfile(0.2, 0.3, 0.4, 0.5)
         assert p.max_translational_velocity == pytest.approx(0.2)
         assert p.max_velocity_scaling_factor == pytest.approx(1.0)
         assert p.max_acceleration_scaling_factor == pytest.approx(1.0)
 
     def test_member_assignment(self):
-        p = ConstantTCPSpeedCompositeProfile()
+        p = ConstantTCPSpeedParameterizationCompositeProfile()
         p.max_translational_velocity = 0.123
         p.max_velocity_scaling_factor = 0.5
         assert p.max_translational_velocity == pytest.approx(0.123)
@@ -244,10 +243,8 @@ def _move(position, time=None):
     swp = StateWaypoint(ABB_JOINTS, np.asarray(position, dtype=np.float64))
     if time is not None:
         swp.setTime(time)
-    return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(
-            StateWaypointPoly_wrap_StateWaypoint(swp), MoveInstructionType_FREESPACE, "DEFAULT"
-        )
+    return MoveInstructionPoly(
+        MoveInstruction(StateWaypointPoly(swp), MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 
@@ -267,7 +264,7 @@ def _abb_program(num=10, span=1.0):
         p = np.zeros(6)
         p[0] = i * span / num
         p[1] = 0.5 * i * span / num
-        program.appendMoveInstruction(_move(p))
+        program.push_back(_move(p))
     return program
 
 
@@ -305,7 +302,7 @@ def test_compute_signature_names_python_environment():
 def test_instructions_trajectory_keeps_program_alive():
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(_manipulator_info())
-    program.appendMoveInstruction(_move(np.zeros(6)))
+    program.push_back(_move(np.zeros(6)))
     refs = sys.getrefcount(program)
     traj = InstructionsTrajectory(program)
     assert sys.getrefcount(program) == refs + 1
@@ -334,7 +331,7 @@ def test_instructions_trajectory_raises_after_program_append(method):
     traj = InstructionsTrajectory(program)
     # 5 appends: without the guard the read returned stale values, with no error
     for i in range(5):
-        program.appendMoveInstruction(_move(np.full(6, 2.0 + i)))
+        program.push_back(_move(np.full(6, 2.0 + i)))
     with pytest.raises(StaleTrajectoryError, match="build a new InstructionsTrajectory"):
         getattr(traj, method)(*_TRAJECTORY_CALLS[method])
 
@@ -370,8 +367,8 @@ def test_instructions_trajectory_stale_read_does_not_crash(appends):
     code = f"""
 import numpy as np
 from tesseract_robotics.tesseract_command_language import (
-    CompositeInstruction, MoveInstruction, MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE, StateWaypoint, StateWaypointPoly_wrap_StateWaypoint,
+    CompositeInstruction, MoveInstruction, MoveInstructionPoly,
+    MoveInstructionType, StateWaypoint, StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     InstructionsTrajectory, StaleTrajectoryError,
@@ -380,17 +377,17 @@ from tesseract_robotics.tesseract_time_parameterization import (
 def move(x):
     p = np.zeros(6)
     p[0] = x
-    swp = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint([f"joint_{{i}}" for i in range(1, 7)], p))
-    return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(swp, MoveInstructionType_FREESPACE, "DEFAULT")
+    swp = StateWaypointPoly(StateWaypoint([f"joint_{{i}}" for i in range(1, 7)], p))
+    return MoveInstructionPoly(
+        MoveInstruction(swp, MoveInstructionType.FREESPACE, "DEFAULT")
     )
 
 program = CompositeInstruction("DEFAULT")
 for i in range(11):
-    program.appendMoveInstruction(move(0.2 * i))
+    program.push_back(move(0.2 * i))
 traj = InstructionsTrajectory(program)
 for i in range({appends}):
-    program.appendMoveInstruction(move(10.0 + i))
+    program.push_back(move(10.0 + i))
 try:
     traj.getPosition(0)
 except StaleTrajectoryError:
@@ -411,7 +408,7 @@ def test_instructions_trajectory_unmutated_program_reads_and_writes_through():
     np.testing.assert_array_equal(traj.getVelocity(3), velocity)
     assert traj.getTimeFromStart(3) == 7.0
     # setData wrote into the user's program, not a copy
-    waypoint = WaypointPoly_as_StateWaypointPoly(program[3].asMoveInstruction().getWaypoint())
+    waypoint = program[3].asMoveInstruction().getWaypoint().asStateWaypoint()
     assert waypoint.getTime() == 7.0
     assert InstructionsTrajectory(program).getTimeFromStart(3) == 7.0
 
@@ -419,19 +416,19 @@ def test_instructions_trajectory_unmutated_program_reads_and_writes_through():
 def test_instructions_trajectory_rebuilt_after_append_works():
     program = _abb_program()
     InstructionsTrajectory(program)
-    program.appendMoveInstruction(_move(np.full(6, 2.0)))
+    program.push_back(_move(np.full(6, 2.0)))
     traj = InstructionsTrajectory(program)
     assert traj.size() == 12
     np.testing.assert_array_equal(traj.getPosition(11), np.full(6, 2.0))
 
 
 # ---------------------------------------------------------------------------
-# #280: ISPCompositeProfile.minimum_time_delta
+# #280: IterativeSplineParameterizationCompositeProfile.minimum_time_delta
 # ---------------------------------------------------------------------------
 
 
 def test_isp_composite_profile_minimum_time_delta():
-    profile = ISPCompositeProfile()
+    profile = IterativeSplineParameterizationCompositeProfile()
     assert profile.minimum_time_delta == sys.float_info.epsilon
     profile.minimum_time_delta = 1e-3
     assert profile.minimum_time_delta == 1e-3
@@ -450,7 +447,7 @@ def _two_segment_program():
         segment = CompositeInstruction("DEFAULT")
         segment.setManipulatorInfo(_manipulator_info())
         for t in times:
-            segment.appendMoveInstruction(_move(np.full(6, 0.1 * t), time=t))
+            segment.push_back(_move(np.full(6, 0.1 * t), time=t))
         program.push_back(segment)
     return program
 
@@ -507,7 +504,7 @@ class TestRuckigTrajectorySmoothing:
     def test_compute_respects_jerk_limit(self, abb_env):
         program = _abb_program()
         profiles = ProfileDictionary()
-        profiles.addProfile("TOTG", "DEFAULT", TOTGCompositeProfile())
+        profiles.addProfile("TOTG", "DEFAULT", TimeOptimalTrajectoryGenerationCompositeProfile())
         assert TimeOptimalTrajectoryGeneration().compute(program, abb_env, profiles)
         # TOTG limits velocity and acceleration only: its output exceeds the jerk limit below,
         # so the bound checked at the end is Ruckig's doing.
@@ -531,10 +528,10 @@ class TestRuckigTrajectorySmoothing:
 
 # (class, field, value that differs from the default)
 PROFILE_FIELD_CHANGES = [
-    (TOTGCompositeProfile, "path_tolerance", 0.05),
-    (ISPCompositeProfile, "add_points", False),
-    (ISPMoveProfile, "max_velocity_scaling_factor", 0.5),
-    (ConstantTCPSpeedCompositeProfile, "max_translational_velocity", 0.5),
+    (TimeOptimalTrajectoryGenerationCompositeProfile, "path_tolerance", 0.05),
+    (IterativeSplineParameterizationCompositeProfile, "add_points", False),
+    (IterativeSplineParameterizationMoveProfile, "max_velocity_scaling_factor", 0.5),
+    (ConstantTCPSpeedParameterizationCompositeProfile, "max_translational_velocity", 0.5),
     (RuckigTrajectorySmoothingCompositeProfile, "duration_extension_fraction", 1.5),
 ]
 

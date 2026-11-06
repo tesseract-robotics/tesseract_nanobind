@@ -91,14 +91,15 @@ def test_module_in_both_tables_raises(monkeypatch):
 
 
 def test_table_entry_that_is_not_a_binding_raises():
-    modules = [m for m in own.binding_modules() if m != "ompl_base"]
-    with pytest.raises(own.UnknownModuleError, match="ompl_base"):
+    modules = [m for m in own.binding_modules() if m != "tesseract_srdf"]
+    with pytest.raises(own.UnknownModuleError, match="tesseract_srdf"):
         own.check_coverage(modules)
 
 
-def test_unaudited_module_raises_with_its_reason():
-    with pytest.raises(own.UnauditedModuleError, match="#258"):
-        audit.resolve_module("ompl_base")
+def test_unaudited_module_raises_with_its_reason(monkeypatch):
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_srdf", ("Binds a probe.", ()))
+    with pytest.raises(own.UnauditedModuleError, match="Binds a probe"):
+        audit.resolve_module("tesseract_srdf")
 
 
 def test_main_checks_coverage_before_parsing(monkeypatch):
@@ -118,7 +119,6 @@ def test_owner_prefixes_come_from_the_tables_only():
     prefixes = own.owner_prefixes()
     assert prefixes["tesseract_motion_planners_simple"] == ("tesseract/motion_planners/simple/",)
     assert prefixes["trajopt_ifopt"] == ("trajopt_ifopt/", "trajopt_common/")
-    assert prefixes["ompl_base"] == ()
     assert set(prefixes) == set(own.binding_modules())
 
 
@@ -159,12 +159,14 @@ def test_coverage_counts_the_binding_modules():
     assert own.coverage().total == len(own.binding_modules())
 
 
-def test_unaudited_rows_ordered_by_group_then_name():
-    """The reasons carry the group (`#256 group N`); `ompl_base`'s removal reason sorts last."""
-    rows = list(own.coverage().unaudited.items())
-    assert rows == sorted(rows, key=lambda mr: (mr[1], mr[0]))
-    assert [m for m, _ in rows][:-1] == []  # groups 1-4 are audited
-    assert rows[-1][0] == "ompl_base"
+def test_unaudited_rows_ordered_by_reason_then_name(monkeypatch):
+    """Rows sort by reason, then module; every binding module is audited, so these are probes."""
+    assert own.coverage().unaudited == {}
+    for module in ("tesseract_srdf", "tesseract_urdf"):
+        monkeypatch.delitem(own.AUDITED_HEADER_PREFIX, module)
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_urdf", ("a", ()))
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_srdf", ("b", ()))
+    assert list(own.coverage().unaudited) == ["tesseract_urdf", "tesseract_srdf"]
 
 
 CLASH = {

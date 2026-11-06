@@ -13,6 +13,7 @@ AUDITED_MODULES = (
     "tesseract_collision",
     "tesseract_environment",
     "tesseract_scene_graph",
+    "tesseract_command_language",
 )
 
 

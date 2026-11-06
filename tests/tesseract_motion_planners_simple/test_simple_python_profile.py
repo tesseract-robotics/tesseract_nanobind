@@ -17,20 +17,15 @@ import pytest
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     InstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
     MoveInstructionPoly,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_CIRCULAR,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
+    MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_JointWaypointPoly,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -101,10 +96,10 @@ def manip_info():
 
 
 def _joint_move(position, profile=PROFILE):
-    return MoveInstructionPoly_wrap_MoveInstruction(
+    return MoveInstructionPoly(
         MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, position)),
-            MoveInstructionType_FREESPACE,
+            JointWaypointPoly(JointWaypoint(IRB2400_JOINTS, position)),
+            MoveInstructionType.FREESPACE,
             profile,
         )
     )
@@ -119,10 +114,10 @@ def _cart_move(env, position, profile=PROFILE, seeded=False):
     waypoint = CartesianWaypoint(pose)
     if seeded:
         waypoint.setSeed(JointState(IRB2400_JOINTS, position))
-    return MoveInstructionPoly_wrap_MoveInstruction(
+    return MoveInstructionPoly(
         MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(waypoint),
-            MoveInstructionType_LINEAR,
+            CartesianWaypointPoly(waypoint),
+            MoveInstructionType.LINEAR,
             profile,
         )
     )
@@ -131,15 +126,15 @@ def _cart_move(env, position, profile=PROFILE, seeded=False):
 def _position(instruction):
     waypoint = instruction.getWaypoint()
     if waypoint.isJointWaypoint():
-        return WaypointPoly_as_JointWaypointPoly(waypoint).getPosition()
-    return WaypointPoly_as_StateWaypointPoly(waypoint).getPosition()
+        return waypoint.asJointWaypoint().getPosition()
+    return waypoint.asStateWaypoint().getPosition()
 
 
 def _request(env, manip_info, profile, end=IRB2400_END):
     program = CompositeInstruction(PROFILE)
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(_joint_move(IRB2400_START))
-    program.appendMoveInstruction(_joint_move(end))
+    program.push_back(_joint_move(IRB2400_START))
+    program.push_back(_joint_move(end))
     profiles = ProfileDictionary()
     profiles.addProfile(PLANNER_NAME, PROFILE, profile)
     request = PlannerRequest()
@@ -277,15 +272,15 @@ def test_handled_nested_error_is_not_raised_for_a_later_cpp_failure(irb2400_env,
             assert not nested.successful
             return [base_instruction]
 
-    circular = MoveInstructionPoly_wrap_MoveInstruction(
+    circular = MoveInstructionPoly(
         MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(IRB2400_JOINTS, np.full(6, 0.1))),
-            MoveInstructionType_CIRCULAR,
+            JointWaypointPoly(JointWaypoint(IRB2400_JOINTS, np.full(6, 0.1))),
+            MoveInstructionType.CIRCULAR,
             "CPP",
         )
     )
     request = _request(irb2400_env, manip_info, Outer())
-    request.instructions.appendMoveInstruction(circular)
+    request.instructions.push_back(circular)
     # upstream's fixed-size profile rejects a circular move: the plan fails for a C++ reason
     request.profiles.addProfile(PLANNER_NAME, "CPP", SimplePlannerFixedSizeMoveProfile())
     response = SimpleMotionPlanner(PLANNER_NAME).solve(request)
@@ -353,16 +348,14 @@ def test_generate_wrong_return_type_raises(irb2400_env, manip_info, result, name
 
 
 def _set_cartesian_waypoint(instruction):
-    instruction.setWaypoint(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(Isometry3d.Identity()))
-    )
+    instruction.setWaypoint(CartesianWaypointPoly(CartesianWaypoint(Isometry3d.Identity())))
 
 
 # upstream asserts these in debug builds only (simple_motion_planner.cpp:250-253)
 @pytest.mark.parametrize(
     ("change", "field"),
     [
-        (lambda i: i.setMoveType(MoveInstructionType_LINEAR), "move type"),
+        (lambda i: i.setMoveType(MoveInstructionType.LINEAR), "move type"),
         (_set_cartesian_waypoint, "waypoint type"),
         (lambda i: i.setProfile("OTHER"), "profile"),
         (lambda i: i.setPathProfile("OTHER"), "path profile"),
@@ -520,12 +513,11 @@ _CHILD_PREAMBLE = textwrap.dedent(
     from tesseract_robotics.tesseract_command_language import (
         CompositeInstruction,
         JointWaypoint,
-        JointWaypointPoly_wrap_JointWaypoint,
+        JointWaypointPoly,
         MoveInstruction,
-        MoveInstructionPoly_wrap_MoveInstruction,
-        MoveInstructionType_FREESPACE,
+        MoveInstructionPoly,
+        MoveInstructionType,
         ProfileDictionary,
-        WaypointPoly_as_JointWaypointPoly,
     )
     from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
     from tesseract_robotics.tesseract_environment import Environment
@@ -553,16 +545,14 @@ _CHILD_PREAMBLE = textwrap.dedent(
         return env
 
     def joint_move(position):
-        return MoveInstructionPoly_wrap_MoveInstruction(
-            MoveInstruction(
-                JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(JOINTS, np.array(position))),
-                MoveInstructionType_FREESPACE,
+        return MoveInstructionPoly(MoveInstruction(
+                JointWaypointPoly(JointWaypoint(JOINTS, np.array(position))),
+                MoveInstructionType.FREESPACE,
                 "PY_PROFILE",
-            )
-        )
+            ))
 
     def position(instruction):
-        return list(WaypointPoly_as_JointWaypointPoly(instruction.getWaypoint()).getPosition())
+        return list(instruction.getWaypoint().asJointWaypoint().getPosition())
     """
 )
 
@@ -603,8 +593,8 @@ _STORED_BASE_INSTRUCTION = textwrap.dedent(
     keeper = Keeper()
     program = CompositeInstruction("PY_PROFILE")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(joint_move([0.0] * 6))
-    program.appendMoveInstruction(joint_move(END))
+    program.push_back(joint_move([0.0] * 6))
+    program.push_back(joint_move(END))
     profiles = ProfileDictionary()
     profiles.addProfile("SIMPLE", "PY_PROFILE", keeper)
     request = PlannerRequest()
@@ -658,8 +648,8 @@ _SUPER_GENERATE = textwrap.dedent(
     # through solve, the error comes out of SimpleMotionPlanner.solve with its type
     program = CompositeInstruction("PY_PROFILE")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(start)
-    program.appendMoveInstruction(end)
+    program.push_back(start)
+    program.push_back(end)
     profiles = ProfileDictionary()
     profiles.addProfile("SIMPLE", "PY_PROFILE", CallsUp())
     request = PlannerRequest()
@@ -707,8 +697,8 @@ _BAD_GENERATE_RESULTS = textwrap.dedent(
         assert issubclass(error_type, ValueError)
         program = CompositeInstruction("PY_PROFILE")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(joint_move([0.0] * 6))
-        program.appendMoveInstruction(joint_move(END))
+        program.push_back(joint_move([0.0] * 6))
+        program.push_back(joint_move(END))
         profiles = ProfileDictionary()
         profiles.addProfile("SIMPLE", "PY_PROFILE", Returns(make))
         request = PlannerRequest()

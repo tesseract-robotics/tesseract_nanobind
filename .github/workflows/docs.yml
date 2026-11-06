@@ -39,8 +39,17 @@ jobs:
     - name: Install dependencies
       run: pip install -r docs/requirements.txt
 
+    - name: Fetch demo files, verified against the lock
+      run: python scripts/demos/fetch.py
+
+    - name: Generate demo players
+      run: python scripts/demos/players.py
+
     - name: Build docs (strict)
       run: PYTHONPATH=src zensical build --strict
+
+    - name: Check every demo file the site references exists
+      run: python scripts/demos/check_site.py
 
     - name: Upload artifact
       if: github.ref == 'refs/heads/main'

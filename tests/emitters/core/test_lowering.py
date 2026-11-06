@@ -20,12 +20,11 @@ from tesseract_robotics.emitters.core.lowering import lower
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_CIRCULAR,
-    MoveInstructionType_LINEAR,
+    MoveInstructionPoly,
+    MoveInstructionType,
     SetToolInstruction,
     TimerInstruction,
     TimerInstructionType,
@@ -33,9 +32,9 @@ from tesseract_robotics.tesseract_command_language import (
 )
 
 
-def _cart_move(pose, move_type=MoveInstructionType_LINEAR, profile="P"):
-    wp = CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
-    return MoveInstructionPoly_wrap_MoveInstruction(MoveInstruction(wp, move_type, profile))
+def _cart_move(pose, move_type=MoveInstructionType.LINEAR, profile="P"):
+    wp = CartesianWaypointPoly(CartesianWaypoint(pose))
+    return MoveInstructionPoly(MoveInstruction(wp, move_type, profile))
 
 
 def _composite(*instructions):
@@ -72,7 +71,7 @@ def test_wait_time_lowers_to_dwell() -> None:
 
 def test_circular_raises() -> None:
     with pytest.raises(UnsupportedInstructionError, match="CIRCULAR"):
-        lower(_composite(_cart_move(Pose.from_xyz(0.5, 0, 0.5), MoveInstructionType_CIRCULAR)))
+        lower(_composite(_cart_move(Pose.from_xyz(0.5, 0, 0.5), MoveInstructionType.CIRCULAR)))
 
 
 def test_empty_raises() -> None:

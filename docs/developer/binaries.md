@@ -197,7 +197,7 @@ flowchart LR
 | Runner | `ubuntu-22.04` (x86_64), `ubuntu-22.04-arm` (aarch64) | `macos-14` (arm64) | `windows-2022` (x64) |
 | Python builds | 3.12 (x86_64, aarch64) | 3.12 | 3.12 |
 | Entry point | `pixi run build-wheel` → `scripts/build_linux_wheel.sh` | `pixi run build-wheel` → `scripts/build_macos_wheel.sh` | inline workflow steps with MSVC v143 |
-| Repair | `ldd` closure copied next to the package, `patchelf --set-rpath '$ORIGIN'` | `delocate-wheel`, then a walk over the plugins rewriting `@rpath/` to `@loader_path/` | `delvewheel repair --analyze-existing` |
+| Repair | `ldd` closure copied next to the package, `patchelf --set-rpath '$ORIGIN'` | `scripts/repair_macos_wheel.py`: walks the closure from the extension modules and plugins, rewrites references to `@loader_path/`, re-signs, and refuses anything left outside the wheel except `libomp` | `delvewheel repair --analyze-existing` |
 | Bundled libraries | `tesseract_robotics/` | `tesseract_robotics/.dylibs/` | `tesseract_robotics/` (plugins), `tesseract_robotics_nanobind.libs/` (dependencies) |
 | Never bundled | `libstdc++`, `libgcc_s`, system libraries, `libpython` | | |
 | Platform gotchas | [Linux wheels](linux-wheels.md) | [macOS wheels](macos-wheels.md) | [Windows wheels](windows-wheels.md) |
@@ -214,9 +214,12 @@ deliberately left to the host, so the real floor is the host's gcc runtime;
 
 - **ABI canary.** Each build job installs the wheel it just built into the
   pixi env and runs `tests/tesseract_kinematics`.
-- **`test-wheel` job.** A plain virtualenv on a fresh runner, outside pixi,
-  installs the wheel and runs the full test suite. The abi3 wheel is tested on
-  3.12, 3.13, 3.14 and 3.15. Linux
+- **`test-wheel` job.** A lean pixi env on a fresh runner (Python and `uv` from
+  conda, no C++ stack) installs the wheel with `uv pip install` and runs the full
+  test suite. Pull requests test the abi3 wheel on 3.12; pushes to `main`, tags and
+  manual runs test it on 3.12, 3.13, 3.14 and 3.15. macOS also checks that one
+  `libomp` loads, and the full matrix adds `wheel-openmp`, where the env provides
+  it. Linux
   also checks that no library is "not found" and that only one libstdc++ is
   mapped.
 
@@ -318,9 +321,10 @@ The `dev` track uploads to its own label, so the `main` label keeps serving the
 
     - **`manylinux` tag.** The Linux script renames the file but does not run
       auditwheel or rewrite `Tag:` in `.dist-info/WHEEL`.
-    - **`RECORD`.** On Linux and macOS, plugins and patched YAMLs are added
-      after `pip wheel` / `delocate`, and the wheel is re-zipped without
-      regenerating `RECORD`. Windows runs `delvewheel` last, which rewrites it.
+    - **`RECORD`.** On Linux, plugins and patched YAMLs are added after
+      `pip wheel`, and the wheel is re-zipped without regenerating `RECORD`.
+      macOS rewrites it last in `repair_macos_wheel.py`; Windows runs
+      `delvewheel` last, which rewrites it.
     - **OPW plugin name.** `abb_irb2400_plugins.yaml` asks for
       `tesseract_kinematics_opw_factories`, but the library is
       `libtesseract_kinematics_opw_factory`. The Windows workflow ships aliases

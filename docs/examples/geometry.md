@@ -132,3 +132,23 @@ resolution. The eight corners of the 2 m box plus the origin fill nine 1 cm voxe
 ```python title="mesh_roundtrip_example.py"
 --8<-- "src/tesseract_robotics/examples/mesh_roundtrip_example.py:point_cloud"
 ```
+
+## Shapes
+
+--8<-- "docs/demos/players/shapes_viewer.html"
+
+Primitive shapes from a URDF, in the viewer. Drag to orbit.
+
+```bash
+tesseract_shapes_viewer
+```
+
+## Material Mesh
+
+--8<-- "docs/demos/players/tesseract_material_mesh_viewer.html"
+
+GLB and DAE meshes that keep their materials and textures.
+
+```bash
+tesseract_material_mesh_viewer
+```

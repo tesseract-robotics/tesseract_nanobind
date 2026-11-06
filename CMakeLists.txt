@@ -244,26 +244,6 @@ add_tesseract_nanobind_extension(
   tesseract::common
 )
 
-# Add ompl_base module (SE2, Reeds-Shepp, Dubins state spaces)
-# Note: OMPL uses old-style CMake variables, not modern targets
-find_package(ompl REQUIRED)
-nanobind_add_module(
-  _ompl_base
-  STABLE_ABI
-  NB_STATIC
-  src/ompl_base/ompl_base_bindings.cpp
-)
-target_precompile_headers(_ompl_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/tesseract_nb.h)
-target_include_directories(_ompl_base PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${OMPL_INCLUDE_DIRS}
-)
-target_link_libraries(_ompl_base PRIVATE ${OMPL_LIBRARIES})
-set_target_properties(_ompl_base PROPERTIES
-  CXX_VISIBILITY_PRESET default
-  VISIBILITY_INLINES_HIDDEN OFF)
-install(TARGETS _ompl_base LIBRARY DESTINATION tesseract_robotics/ompl_base)
-
 # Add tesseract_motion_planners_descartes module
 find_package(tesseract_planning REQUIRED COMPONENTS motion_planners_descartes)
 find_package(descartes_light REQUIRED)

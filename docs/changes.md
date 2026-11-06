@@ -311,6 +311,13 @@ QPSolverStatus.UNITIALIZED
 CostPenaltyType.SQUARED
 ```
 
+!!! note "Since 0.35"
+    Six of these names no longer match: every `trajopt_sqp` enumerator is now the
+    `UPPER_SNAKE` form of its C++ name (#330). `SQPStatus.NLP_CONVERGED` is
+    `SQPStatus.CONVERGED`, `QPSolverStatus.UNITIALIZED` is `QPSolverStatus.UNINITIALIZED`;
+    see [breaking changes](breaking-changes.md#six-trajopt_sqp-enumerators-renamed-to-their-c-names)
+    for the full table.
+
 ### `ConstraintType` enum removed
 
 The `ConstraintType` enum from `trajopt_sqp` no longer exists. If you referenced it, remove the usage.

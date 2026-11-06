@@ -55,10 +55,74 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 - **`TaskComposerConfigError`** — a `str` config that does not load in `TaskComposerPluginFactory(str, locator)`, its `loadConfig` and `TaskComposerServer.loadConfig` raises `TaskComposerConfigError`, a `ValueError` subclass, instead of a bare `ValueError`; so does YAML text without a top-level `task_composer_plugins` mapping (empty, `~`, a list, an unrelated mapping), which upstream loaded silently as an empty config ([#337]).
 - **Task-composer value types compare by value** — `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` bind `==` and are unhashable ([#261]).
 
+- **SWIG-era `MoveInstructionType_*` constants removed** — `tesseract_command_language` exported `MoveInstructionType_LINEAR`, `MoveInstructionType_FREESPACE` and `MoveInstructionType_CIRCULAR`, copies of the enum members kept from the SWIG bindings; C++ has none of them. Importing one raises `ImportError`, reading one as a module attribute raises `AttributeError`; the enum members are the same objects. The package's hand-kept `__all__` is gone too, so `from tesseract_robotics.tesseract_command_language import *` exports every public name of the extension (`toJointTrajectory`, `moveFilter`, …), not a stale subset. The module joins the #176 no-alias guard ([#275]).
+
+  | before | after |
+  | --- | --- |
+  | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
+
+- **`assign*Waypoint` and `ProfileDictionary_addProfile` removed** — `MoveInstruction` and `MoveInstructionPoly` lose `assignCartesianWaypoint`, `assignJointWaypoint` and `assignStateWaypoint`, SWIG-era copies of `setWaypoint` (C++ 0.33 removed them); `tesseract_command_language.ProfileDictionary_addProfile(d, ns, name, p)` is gone, since `d.addProfile(ns, name, p)` takes every module's profiles. Nothing in the repository called them ([#276]).
+
+- **SWIG-era Poly helpers and `appendMoveInstruction` removed** — the 14 module functions `CartesianWaypointPoly_wrap_CartesianWaypoint`, `JointWaypointPoly_wrap_JointWaypoint`, `StateWaypointPoly_wrap_StateWaypoint`, `MoveInstructionPoly_wrap_MoveInstruction`, `InstructionPoly_as_*` (7) and `WaypointPoly_as_*` (3), and `CompositeInstruction.appendMoveInstruction`, duplicated a constructor or method; C++ has none of them. Every in-repo caller moved to the native form. `wp.as…Waypoint()` returns a reference into the waypoint where `WaypointPoly_as_*` returned a copy: edits through it reach the program; `copy.copy(wp.as…Waypoint())` is the copy ([#328]).
+
+  | before | after |
+  | --- | --- |
+  | `CartesianWaypointPoly_wrap_CartesianWaypoint(wp)` (also `Joint…`, `State…`) | `CartesianWaypointPoly(wp)` |
+  | `MoveInstructionPoly_wrap_MoveInstruction(mi)` | `MoveInstructionPoly(mi)` |
+  | `InstructionPoly_as_MoveInstructionPoly(ip)` | `ip.asMoveInstruction()` |
+  | `InstructionPoly_as_CompositeInstruction(ip)` (also `Wait`, `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) | `ip.asCompositeInstruction()` (`asWaitInstruction()`, …) |
+  | `WaypointPoly_as_CartesianWaypointPoly(wp)` (also `Joint…`, `State…`) | `wp.asCartesianWaypoint()` (a reference) |
+  | `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
+
+- **Time-parameterization profiles bound under their C++ names** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` are now `TimeOptimalTrajectoryGenerationCompositeProfile`, `IterativeSplineParameterizationCompositeProfile`, `IterativeSplineParameterizationMoveProfile` and `ConstantTCPSpeedParameterizationCompositeProfile`, as every other planner profile is (#187). No alias: the old names raise `ImportError`. The package's `__all__` is gone; `import *` exports every public name of the extension ([#329]).
+
+  | before | after |
+  | --- | --- |
+  | `TOTGCompositeProfile` | `TimeOptimalTrajectoryGenerationCompositeProfile` |
+  | `ISPCompositeProfile` | `IterativeSplineParameterizationCompositeProfile` |
+  | `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
+  | `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
+
+- **Six `trajopt_sqp` enumerators renamed to their C++ names** — every `SQPStatus` and `QPSolverStatus` member is now the `UPPER_SNAKE` form of its C++ `kCamelCase` name. This reverses the 0.34 "Python names preserved" choice for the six whose kept name differed from C++ (one was a typo). No aliases: the old names raise `AttributeError`, and code comparing `status.name` against an old string now silently fails to match — search for those strings ([#330]).
+
+  | before | after |
+  | --- | --- |
+  | `SQPStatus.NLP_CONVERGED` | `SQPStatus.CONVERGED` |
+  | `SQPStatus.OPT_TIME_LIMIT` | `SQPStatus.TIME_LIMIT` |
+  | `SQPStatus.QP_SOLVER_ERROR` | `SQPStatus.QP_SOLVE_FAILED` |
+  | `SQPStatus.CALLBACK_STOPPED` | `SQPStatus.STOPPED_BY_CALLBACK` |
+  | `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
+  | `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
+
+- **Planner-module compatibility names removed: `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the 0.28 `…PlanProfile` names, trajopt's 0.28 re-exports and the packages' `__all__`** — `ProfileDictionary.addProfile(ns, name, profile)` takes a profile from every planner module, including a Python subclass of a trampolined profile, so the 15 helper functions are gone ([#334]). The eight `…PlanProfile` aliases of the 0.33 `…MoveProfile` classes are gone, and so are `TrajOptCollisionConfig` / `CollisionEvaluatorType` in `tesseract_motion_planners_trajopt`. `tesseract_motion_planners_trajopt_ifopt` keeps its config re-exports (`TrajOptCollisionConfig`, `CollisionEvaluatorType`, `SQPParameters`). The six `tesseract_motion_planners*` packages lose their `__all__`; `import *` now exports every public name, e.g. `OMPLRealVectorMoveProfile` and `RNG_setSeed` from the OMPL package, which its old list left out ([#335]).
+
+  | before | after |
+  | --- | --- |
+  | `ProfileDictionary_addTrajOptMoveProfile(pd, ns, name, p)` (all 10 `ProfileDictionary_add…`) | `pd.addProfile(ns, name, p)` |
+  | `OMPLMoveProfile_as_ProfileConstPtr(p)`, `cast_DescartesMoveProfileD(p)` (all 5 casts) | `p` |
+  | `TrajOptDefaultPlanProfile` (all 8 `…PlanProfile` names) | `TrajOptDefaultMoveProfile` |
+  | `from …tesseract_motion_planners_trajopt import TrajOptCollisionConfig` | `from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig` |
+  | `from …tesseract_motion_planners_trajopt import CollisionEvaluatorType` | `from tesseract_robotics.tesseract_collision import CollisionEvaluatorType` |
+
+- **`create_time_optimal_parameterization` and `create_iterative_spline_parameterization` take no arguments** — `path_tolerance`, `min_angle_change` and `add_points` were accepted and silently ignored since 0.33 moved them into the composite profiles. Passing one now raises `TypeError`; set the field on the profile instead.
+
+  | before | after |
+  | --- | --- |
+  | `create_time_optimal_parameterization(path_tolerance=0.05, min_angle_change=0.01)` | `create_time_optimal_parameterization()`, and `TimeOptimalTrajectoryGenerationCompositeProfile().path_tolerance = 0.05` (`.min_angle_change`) |
+  | `create_iterative_spline_parameterization(add_points=False)` | `create_iterative_spline_parameterization()`, and `IterativeSplineParameterizationCompositeProfile().add_points = False` |
+
+- **`tesseract_robotics.ompl_base` removed** — the module, its hand-written stub and `reeds_shepp_example.py` / `tesseract_reeds_shepp_example`. It wrapped five OMPL headers directly, and nothing in the package used it; OMPL stays a dependency of the OMPL planner, which loads it in C++. Use OMPL's own Python bindings for `State`, `RealVectorBounds`, `SE2StateSpace`, `ReedsSheppStateSpace` or `DubinsStateSpace` ([#258]).
+
 ### Changes
 
 - **spdlog sinks bound** — `Logger.sinks` reads and replaces a logger's spdlog sinks, `StderrSink` is tesseract's default console sink, and `PythonLoggingSink(name)` writes each record to Python `logging` (level, source file, line and function on the `LogRecord`; text from the sink's spdlog pattern). Replacing the default logger's `StderrSink` with a `PythonLoggingSink` sends tesseract's output to Python once; a record handler alone sees each record while stderr still prints it. Sinks are C++-owned and Python holds a share, so a logger keeping one keeps no Python object alive. `Logger.set_pattern()` and `Logger.flush()` are bound too.
 - **Logging test no longer leaks at exit** — `test_handler_exception_reaches_unraisablehook` kept the hook's arguments, whose traceback frames held the test's own locals: a cycle that kept a `LogRecord` and the `Logger` alive past interpreter exit, which nanobind reported as leaked. It now keeps the exception's type and text.
+- **`JointTrajectory.insert(index, state)` and `del traj[i]` / `del traj[a:b]`**, in Python's list forms, as `CompositeInstruction` has ([#269]).
+- **`TrajOptCollisionConfig(margin, coeff, request, type, longest_valid_segment_length, check_program_mode)`** — the full upstream constructor; the two-argument form still works ([#251]).
+- **The binding audit reports trailing defaulted parameters Python cannot pass** — a C++ overload with defaulted parameters counts as covered only if a covering Python overload accepts all of them; otherwise the gap names the unreachable ones. `OFKTStateSolver(scene_graph, prefix)` is accepted under `upstream-broken-default` ([#251], [tesseract#1384]).
+- **The README and docs show the examples running (#379)** — the README opens on a `car_seat` poster that links to the live viewer, and the docs home and example pages embed players that load on click. They play, scrub and orbit from static files, with no Python server. Examples moves up to directly after Installation, and the README's Development section moves to the [developer guide](https://tesseract-robotics.github.io/tesseract_nanobind/developer/).
+- **`TesseractViewer.record` writes a `.viser` file (#379)** — `record(phases, *, fps=30.0)` returns the scene playing a sequence of `RecordingPhase(env, trajectory)`, through a public API. `RecordingFpsError` names a bad `fps`.
+- **Demo tooling (#379)** — `demo-record`, `demo-posters`, `demo-players`, `demo-check`, `demo-fetch` and `demo-check-site`. Recordings live in the `demo-assets` release under their hashes, pinned by `scripts/demos/demos.lock.json`, so they stay out of git history. The Docs workflow fetches and verifies them, and fails when the built site references a file it lacks.
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
 - **car_seat runs on `TrajOptIfoptPipeline`, and freespace_hybrid's ifopt run uses the C++ profiles** — `car_seat_example.run(pipeline="TrajOptIfoptPipeline")` uses the new `create_car_seat_ifopt_profiles()`, the C++ `if (ifopt_)` branch (LVS_CONTINUOUS cost and constraint). `freespace_hybrid_example.run(use_ifopt=True)` registered no ifopt composite profile and planned with the planner defaults. The new `add_ifopt_profiles()` adds the C++ composite: cost and constraint `TrajOptCollisionConfig(0.025, 20)`, smoothing coeffs of 1. With the #787 fix, car_seat clones 40 → 4 contact managers and its trajectories stay bitwise identical.
 - **Sources target Python 3.12** — ruff `target-version = "py312"` without `FA102`, PEP 695 aliases and generics, `StrEnum` for `RapidType`, `zip(strict=True)` in tests. The GIL-hotspot tooling tests move back to `tests/test_gil_hotspots.py`, in the wheel suite; the `devtools-test` task is gone ([#369]).
@@ -126,9 +190,13 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 - **`NodesVariables(name, nodes)` and the `Var` constructors** — Python builds variable sets with several vars or per-node bounds; the `Node`s hand over ownership. `Var.getParent` / `Node.getParent` ([#297]).
 - **`QPProblem` convex model and `setVariables`** — `getHessian`, `getGradient`, `getConstraintMatrix`, `getBoundsLower`, `getBoundsUpper`, `getConstraintMeritCoeff`, and `setVariables(x)`, which raises `VariablesSizeError` unless `len(x) == getNumNLPVars()` ([#282]).
 - **`QPSolver` update interface** — `updateHessianMatrix`, `updateGradient`, `updateLowerBound`, `updateUpperBound`, `updateBounds`, `updateLinearConstraintsMatrix` and `setWarmStart(problem)` on the base; `OSQPEigenSolver.setWarmStart` takes a `bool` (the OSQP option) or a `QPProblem` ([#283]).
+- **`from_yaml` examples for every planner** — `docs/user-guide/planning.md` gains "Profiles from YAML": one checked example each for the simple, OMPL, TrajOpt, TrajOpt-Ifopt and task-composer planning profiles, with the merge-versus-replace rule for nested configs ([#331]).
 
 ### Fixed
 
+- **macOS wheels load one OpenMP runtime, and repair without delocate** — in a conda or pixi environment the wheel loaded a second `libomp`, so Descartes aborted with `OMP: Error #15` or segfaulted above one thread. Images now look in the environment's `lib` first, then at the bundled copy, so uv and pip environments keep working. `scripts/repair_macos_wheel.py` replaces `delocate-wheel`, which took about 15 minutes of each macOS CI build, and rewrites `RECORD`, which missed 14 files and had 4 stale hashes. `test-wheel` runs in lean pixi envs and installs with uv, with no venv; pull requests test 3.12 and pushes to main and tags test every Python ([#136], [#377]).
+- **The TWC rail cell draws its rail (#380)** — the example's `load_urdf` restores what the stale upstream URDF lacks: the rail mesh on `rail_base_link` and the 0.2 m joint origin from its xacro. The carriage now stays on the rail across the 10 m joint limit, which only the 12 m mesh holds.
+- **Translucent materials render translucent in the viewer (#379)** — glTF ignores alpha unless `alphaMode` is `BLEND`, so a URDF's 5 % estop zone drew solid and hid the robot inside it.
 - **A server call no longer waits through back-to-back reloads** — a call that waited for `loadConfig`, `addTask` or `addExecutor` woke up needing the GIL, which a thread reloading in a loop kept into its next reload, so the call could wait for as many reloads as the thread started. A reload now lets the calls already waiting go first, which bounds a call to the one reload it found running.
 - **A `Var` or `Node` read out of a variable set keeps the set alive** — `Node.getVar` / `addVar`, `NodesVariables.getNode` / `getNodes` and `Var.getParent` tie the result to its source, and a `Node` handed to `NodesVariables` keeps the set alive; `var.getParent()` after the set was dropped read freed memory ([#297]).
 - **`NodesVariables.getNode` / `getNodes` return usable `Node`s while the caller still holds the handed-over ones** — they returned the caller's relinquished object, on which every method raised `TypeError`. A `Node` given twice, or one already in a set, raises `NodeOwnershipError` (a `ValueError`) and leaves every `Node` with the caller ([#297]).
@@ -609,8 +677,11 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#241]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/241
 [#232]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/232
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
+[tesseract#1384]: https://github.com/tesseract-robotics/tesseract/issues/1384
+[#251]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/251
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
+[#258]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/258
 [#282]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/282
 [#283]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/283
 [#284]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/284
@@ -629,6 +700,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#297]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/297
 [#298]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/298
 [#369]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/369
+[#136]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/136
+[#377]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/377
 [#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273
@@ -781,3 +854,10 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#336]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/336
 [#337]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/337
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
+[#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275
+[#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276
+[#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328
+[#329]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/329
+[#330]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/330
+[#334]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/334
+[#335]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/335

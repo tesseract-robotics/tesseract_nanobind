@@ -40,6 +40,16 @@ def _rgba_bytes(rgba: NDArray[np.float64]) -> NDArray[np.uint8]:
     return np.round(np.clip(rgba, 0.0, 1.0) * RGBA_BYTE_MAX).astype(np.uint8)
 
 
+def _alpha_mode(rgba: NDArray[np.uint8]) -> str:
+    # glTF draws a material opaque whatever its alpha, unless told to blend.
+    return "BLEND" if rgba[3] < RGBA_BYTE_MAX else "OPAQUE"
+
+
+def _color_material(color: NDArray[np.float64]) -> PBRMaterial:
+    rgba = _rgba_bytes(color)
+    return PBRMaterial(baseColorFactor=rgba, alphaMode=_alpha_mode(rgba), doubleSided=True)
+
+
 def _triangles(faces: NDArray[np.int32]) -> NDArray[np.int64]:
     """Tesseract `[n, i_0, ..., i_{n-1}, ...]` faces as triangles, fanning each polygon.
 
@@ -129,14 +139,14 @@ def _polygon_mesh(mesh: tg.PolygonMesh, visual_material: Material | None) -> tri
             if visual_material is not None
             else Material.getDefaultMaterial().color
         )
-        result.visual = TextureVisuals(
-            material=PBRMaterial(baseColorFactor=_rgba_bytes(color), doubleSided=True)
-        )
+        result.visual = TextureVisuals(material=_color_material(color))
         return result
     own = mesh.getMaterial()
+    base_color = _rgba_bytes(own.getBaseColorFactor())
     material = PBRMaterial(
         doubleSided=True,
-        baseColorFactor=_rgba_bytes(own.getBaseColorFactor()),
+        baseColorFactor=base_color,
+        alphaMode=_alpha_mode(base_color),
         metallicFactor=own.getMetallicFactor(),
         roughnessFactor=own.getRoughnessFactor(),
     )
@@ -163,9 +173,7 @@ def _colored(mesh: trimesh.Trimesh, visual_material: Material | None) -> trimesh
         if visual_material is not None
         else Material.getDefaultMaterial().color
     )
-    mesh.visual = TextureVisuals(
-        material=PBRMaterial(baseColorFactor=_rgba_bytes(color), doubleSided=True)
-    )
+    mesh.visual = TextureVisuals(material=_color_material(color))
     return mesh
 
 

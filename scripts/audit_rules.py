@@ -65,12 +65,15 @@ ACCEPTED = {
     "eigen-default-precision": "`EIGEN_DEFAULT_PREC` re-exports "
     "`Eigen::NumTraits<double>::dummy_precision()` (1e-12) so Python compares with Eigen's "
     "own default tolerance instead of a duplicated literal.",
+    "upstream-broken-default": "A trailing defaulted parameter that upstream rejects for every "
+    "non-default value stays unbound until upstream fixes it: `OFKTStateSolver(scene_graph, "
+    "prefix)` throws for any non-empty prefix (tesseract-robotics/tesseract#1384).",
     "template-instance-name": "Python cannot spell a C++ template argument, so each instance of "
     "a function template gets its own function named after the type (`createMeshFromPath<ConvexMesh>` "
     "→ `createConvexMeshFromPath`, `Serialization::toArchiveStringXML<Environment>` → "
     "`environment_to_xml`); for a library's generic class name, the library prefix plus the "
     "instance suffix (`descartes_light::State<double>` → `DescartesStateD`), because the generic "
-    "name collides with other bound classes (`ompl_base.State`).",
+    "name says nothing about the library it comes from.",
     "copied-vector-field-mutator": "A `std::vector` field converts to a fresh Python list on each "
     "access, so `obj.field.append(x)` edits a copy; `add…`/`clear…` methods mutate the C++ vector.",
     "boost-graph-property-tag": "Boost Graph property tags (`vertex_link_t`, …) select the "
@@ -224,6 +227,11 @@ ACCEPTED = {
     "`checkRequestReason(request) -> str` (empty for a valid request) beside the bound "
     "`checkRequest(request) -> bool`: an `out-param` tuple would make `if checkRequest(req):` "
     "pass an invalid request, since a non-empty tuple is truthy (decision C2).",
+}
+# Trailing defaulted C++ parameters left unbound under a named rule (#251):
+# (module, name, unreachable parameter names) -> ACCEPTED key.
+ACCEPTED_DEFAULTS = {
+    ("tesseract_state_solver", "OFKTStateSolver.__init__", ("prefix",)): "upstream-broken-default",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {

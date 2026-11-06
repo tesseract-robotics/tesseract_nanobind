@@ -8,16 +8,16 @@ import numpy as np
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
     InstructionsTrajectory,
-    ISPCompositeProfile,
     IterativeSplineParameterization,
+    IterativeSplineParameterizationCompositeProfile,
 )
 
 
@@ -36,11 +36,11 @@ def create_straight_trajectory():
         p = np.zeros((6,), dtype=np.float64)
         p[0] = i * (max_ / num)
         swp = StateWaypoint(joint_names, p)
-        program.appendMoveInstruction(
-            MoveInstructionPoly_wrap_MoveInstruction(
+        program.push_back(
+            MoveInstructionPoly(
                 MoveInstruction(
-                    StateWaypointPoly_wrap_StateWaypoint(swp),
-                    MoveInstructionType_FREESPACE,
+                    StateWaypointPoly(swp),
+                    MoveInstructionType.FREESPACE,
                 )
             )
         )
@@ -48,11 +48,11 @@ def create_straight_trajectory():
     p = np.zeros((6,), dtype=np.float64)
     p[0] = max_
     swp = StateWaypoint(joint_names, p)
-    program.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
+    program.push_back(
+        MoveInstructionPoly(
             MoveInstruction(
-                StateWaypointPoly_wrap_StateWaypoint(swp),
-                MoveInstructionType_FREESPACE,
+                StateWaypointPoly(swp),
+                MoveInstructionType.FREESPACE,
             )
         )
     )
@@ -68,8 +68,8 @@ def test_isp_constructor():
 
 
 def test_isp_profile():
-    """Test ISPCompositeProfile settings."""
-    profile = ISPCompositeProfile()
+    """Test IterativeSplineParameterizationCompositeProfile settings."""
+    profile = IterativeSplineParameterizationCompositeProfile()
     assert profile.add_points is True
 
     profile.add_points = False

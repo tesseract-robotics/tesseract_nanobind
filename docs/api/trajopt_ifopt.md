@@ -200,8 +200,8 @@ directly (see [changes](../changes.md)).
 
 ## Config / Bounds
 
-- `TrajOptCollisionConfig(margin, coeff)` — re-exported here and from
-  `tesseract_motion_planners_trajopt`.
+- `TrajOptCollisionConfig(margin, coeff, request, type, longest_valid_segment_length, check_program_mode)`
+  — the four trailing parameters default as in C++.
 - `CollisionCoeffData` — per-pair collision coefficient data. `getCollisionCoeffPairData()`
   returns `{(link_a, link_b): coeff}`, `getPairsWithZeroCoeff()` the switched-off pairs.
 - `CollisionCoeffData` and `TrajOptCollisionConfig` compare by value and are unhashable.

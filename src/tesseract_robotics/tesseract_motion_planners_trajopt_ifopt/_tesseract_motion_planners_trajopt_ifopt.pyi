@@ -1,7 +1,7 @@
 """tesseract_motion_planners_trajopt_ifopt Python bindings"""
 
 from collections.abc import Sequence
-from typing import Annotated, TypeAlias
+from typing import Annotated
 
 import numpy
 from numpy.typing import NDArray
@@ -182,8 +182,6 @@ class TrajOptIfoptMoveProfile(tesseract_robotics.tesseract_command_language._tes
     def create(self, move_instruction: tesseract_robotics.tesseract_command_language._tesseract_command_language.MoveInstructionPoly, composite_manip_info: tesseract_robotics.tesseract_common._tesseract_common.ManipulatorInfo, env: tesseract_robotics.tesseract_environment._tesseract_environment.Environment, index: int) -> TrajOptIfoptWaypointInfo:
         """Build the waypoint info the planner adds for this move instruction"""
 
-TrajOptIfoptPlanProfile: TypeAlias = TrajOptIfoptMoveProfile
-
 class TrajOptIfoptCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def __init__(self) -> None: ...
 
@@ -264,8 +262,6 @@ class TrajOptIfoptDefaultMoveProfile(TrajOptIfoptMoveProfile):
 
     @classmethod
     def __init_subclass__(cls: type, **kwargs: object) -> None: ...
-
-TrajOptIfoptDefaultPlanProfile: TypeAlias = TrajOptIfoptDefaultMoveProfile
 
 class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
     def __init__(self) -> None: ...
@@ -388,18 +384,6 @@ class TrajOptIfoptPIQPSolverProfile(TrajOptIfoptSolverProfile):
 
     @qp_settings.setter
     def qp_settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
-
-def ProfileDictionary_addTrajOptIfoptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
-    """Add TrajOptIfopt move profile to ProfileDictionary"""
-
-def ProfileDictionary_addTrajOptIfoptPlanProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptMoveProfile) -> None:
-    """Add TrajOptIfopt plan profile to ProfileDictionary (legacy alias)"""
-
-def ProfileDictionary_addTrajOptIfoptCompositeProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptCompositeProfile) -> None:
-    """Add TrajOptIfopt composite profile to ProfileDictionary"""
-
-def ProfileDictionary_addTrajOptIfoptSolverProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptIfoptSolverProfile) -> None:
-    """Add TrajOptIfopt solver profile to ProfileDictionary"""
 
 def createJointPositionConstraint(joint_waypoint: tesseract_robotics.tesseract_command_language._tesseract_command_language.JointWaypointPoly, var: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
     """

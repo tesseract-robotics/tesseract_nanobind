@@ -8,16 +8,16 @@ import numpy as np
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
     InstructionsTrajectory,
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
 )
 
 
@@ -36,11 +36,11 @@ def create_straight_trajectory():
         p = np.zeros((6,), dtype=np.float64)
         p[0] = i * (max_ / num)
         swp = StateWaypoint(joint_names, p)
-        program.appendMoveInstruction(
-            MoveInstructionPoly_wrap_MoveInstruction(
+        program.push_back(
+            MoveInstructionPoly(
                 MoveInstruction(
-                    StateWaypointPoly_wrap_StateWaypoint(swp),
-                    MoveInstructionType_FREESPACE,
+                    StateWaypointPoly(swp),
+                    MoveInstructionType.FREESPACE,
                 )
             )
         )
@@ -48,11 +48,11 @@ def create_straight_trajectory():
     p = np.zeros((6,), dtype=np.float64)
     p[0] = max_
     swp = StateWaypoint(joint_names, p)
-    program.appendMoveInstruction(
-        MoveInstructionPoly_wrap_MoveInstruction(
+    program.push_back(
+        MoveInstructionPoly(
             MoveInstruction(
-                StateWaypointPoly_wrap_StateWaypoint(swp),
-                MoveInstructionType_FREESPACE,
+                StateWaypointPoly(swp),
+                MoveInstructionType.FREESPACE,
             )
         )
     )
@@ -71,8 +71,8 @@ def test_totg_constructor():
 
 
 def test_totg_profile_default():
-    """Test TOTGCompositeProfile default values."""
-    profile = TOTGCompositeProfile()
+    """Test TimeOptimalTrajectoryGenerationCompositeProfile default values."""
+    profile = TimeOptimalTrajectoryGenerationCompositeProfile()
     assert profile.max_velocity_scaling_factor == 1.0
     assert profile.max_acceleration_scaling_factor == 1.0
     assert profile.path_tolerance == 0.1
@@ -81,8 +81,8 @@ def test_totg_profile_default():
 
 
 def test_totg_profile_custom():
-    """Test TOTGCompositeProfile with custom values."""
-    profile = TOTGCompositeProfile(0.5, 0.5, 0.05, 0.002)
+    """Test TimeOptimalTrajectoryGenerationCompositeProfile with custom values."""
+    profile = TimeOptimalTrajectoryGenerationCompositeProfile(0.5, 0.5, 0.05, 0.002)
     assert profile.max_velocity_scaling_factor == 0.5
     assert profile.max_acceleration_scaling_factor == 0.5
     assert profile.path_tolerance == 0.05
@@ -90,8 +90,8 @@ def test_totg_profile_custom():
 
 
 def test_totg_profile_limits():
-    """Test TOTGCompositeProfile with override limits."""
-    profile = TOTGCompositeProfile()
+    """Test TimeOptimalTrajectoryGenerationCompositeProfile with override limits."""
+    profile = TimeOptimalTrajectoryGenerationCompositeProfile()
     profile.override_limits = True
 
     max_vel = 2.088

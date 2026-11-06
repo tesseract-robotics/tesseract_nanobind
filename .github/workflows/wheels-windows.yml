@@ -85,13 +85,6 @@ jobs:
     - name: pip build tools
       run: python -m pip install --upgrade pip delvewheel
 
-    - name: restore nanobind wheel build cache
-      id: nanobind-build-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: tesseract_nanobind/build
-        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
-
     - name: build nanobind wheel
       working-directory: tesseract_nanobind
       env:
@@ -105,6 +98,8 @@ jobs:
         # must match that ABI rather than override it), leaving the bare slash
         # exposed. cl.exe accepts - and / interchangeably.
         CXXFLAGS: "-bigobj"
+        # The default generator took 9 to 19 minutes; Ninja compiles the modules in parallel.
+        CMAKE_GENERATOR: Ninja
       run: |
         CONDA_LIB="$CONDA_PREFIX/Library"
         export CMAKE_PREFIX_PATH="$CONDA_LIB"
@@ -121,13 +116,6 @@ jobs:
         echo "LIB=$LIB"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
-
-    - name: save nanobind wheel build cache
-      if: steps.nanobind-build-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: tesseract_nanobind/build
-        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
 
     - name: bundle plugins then delvewheel repair
       working-directory: tesseract_nanobind
@@ -237,13 +225,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13/3.14/3.15 install the cp312-abi3 wheel (STABLE_ABI) to verify the
-        # published support matrix on Windows, not just Linux. wheel != python.
-        include:
-          - { python: '3.12', wheel: '3.12' }
-          - { python: '3.13', wheel: '3.12' }
-          - { python: '3.14', wheel: '3.12' }
-          - { python: '3.15', wheel: '3.12' }
+        # One cp312-abi3 binary per platform. PRs test it on 3.12; pushes to main, tags and manual
+        # runs test every supported Python before anything can publish.
+        include: ${{ github.event_name == 'pull_request' && fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312"}]') || fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312"},{"python":"3.13","wheel":"3.12","env":"wheel-313"},{"python":"3.14","wheel":"3.12","env":"wheel-314"},{"python":"3.15","wheel":"3.12","env":"wheel-315"}]') }}
     defaults:
       run:
         shell: bash -el {0}
@@ -251,26 +235,32 @@ jobs:
     - uses: actions/checkout@v4
       with:
         path: tesseract_nanobind
-    - uses: actions/setup-python@v5
+    - name: fetch the TWC workcell the rail tests load
+      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
       with:
-        python-version: ${{ matrix.python }}
-        architecture: x64
+        pixi-version: v0.70.1
+        manifest-path: tesseract_nanobind/pyproject.toml
+        cache: true
+        locked: true
+        environments: ${{ matrix.env }}
+        activate-environment: ${{ matrix.env }}
     - uses: actions/download-artifact@v4
       with:
         name: python-${{ matrix.wheel }}-windows-x64-pixi
         path: wheelhouse
 
-    - name: install wheel in clean venv
+    - name: install wheel in lean env
+      # zstandard and pyyaml have no cp315 wheels, so they compile from source on 3.15, and
+      # conda-forge's Windows Python 3.15 keeps Python.h in include/python, where setuptools
+      # doesn't look. cl.exe reads extra options from CL. Dash form: MSYS rewrites a leading /I.
       run: |
-        python -m venv test_env
-        source test_env/Scripts/activate
-        python -m pip install --upgrade pip
-        pip install wheelhouse/tesseract*.whl
-        pip install pytest pytest-xdist scipy pyyaml
+        export CL="-I$(cygpath -w "$CONDA_PREFIX/include/python")"
+        uv pip install wheelhouse/tesseract*.whl pytest pytest-xdist scipy pyyaml
 
     - name: smoke test
       run: |
-        source test_env/Scripts/activate
         python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
         python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
         python -c "from tesseract_robotics import trajopt_ifopt; print('trajopt_ifopt OK')"
@@ -282,8 +272,9 @@ jobs:
       # that rationale predates delvewheel --analyze-existing, the PATH-prepend
       # fix, and the uniform conda plugin DLLs. Windows is rhino's primary
       # platform: this is core product coverage, not optional.
+      env:
+        TWC_SUPPORT_PATH: ${{ github.workspace }}/tesseract_nanobind/ws/src/tesseract_ros_workcell/twc_support
       run: |
-        source test_env/Scripts/activate
         cd tesseract_nanobind
         pytest tests -n auto \
           --ignore=tests/benchmarks \

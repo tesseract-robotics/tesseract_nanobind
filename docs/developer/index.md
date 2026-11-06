@@ -6,6 +6,20 @@ This project uses [pixi](https://pixi.sh) exclusively for package management. Pi
 
 The tesseract C++ libraries are not built here: they are prebuilt conda packages from the `tesseract-robotics` channel. [How the binaries are built](binaries.md) traces every binary from the upstream source to the PyPI wheel.
 
+### First-Time Setup
+
+Install pixi ([docs](https://pixi.sh/latest/#installation)), then clone and build:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | bash
+
+git clone --recurse-submodules https://github.com/tesseract-robotics/tesseract_nanobind.git
+cd tesseract_nanobind
+pixi run build
+```
+
+`pixi run build` resolves the environment, which pulls the prebuilt C++ libraries, and compiles only the nanobind extensions.
+
 ### Available Tasks
 
 ```bash
@@ -16,17 +30,30 @@ pixi task list
 |------|-------------|--------------|
 | `build` | Build bindings | alias for `install` |
 | `install` | Install bindings | editable `pip install -e . --no-build-isolation` against the conda tesseract libs |
-| `test` | Run tests | pytest with xdist parallel (depends on `install`) |
+| `test` | Run tests | pytest with xdist parallel, excluding benchmarks (depends on `install`) |
+| `test-benchmark` | Run benchmarks | benchmark tests, serial |
 | `build-wheel` | Portable wheel | `scripts/build_linux_wheel.sh` / `build_macos_wheel.sh` (see [binaries](binaries.md)) |
 | `typecheck` | Type check | pyright on `src/tesseract_robotics/` |
 | `lint` | Lint | ruff check |
 | `fmt` | Format | ruff format |
+| `stubs` | Regenerate stubs | the committed `.pyi` stubs; see [Stub Generation](#stub-generation) |
+| `stubs-check` | Check stubs | fails if committed stubs differ from the built modules |
 | `docs` | Live docs | mkdocs serve with auto-reload |
 | `docs-build` | Build docs | Static site to `site/` |
+| `demo-record`, `demo-posters`, `demo-check` | Demo recordings | see [Demo Recordings](#demo-recordings) |
+| `demo-players`, `demo-fetch`, `demo-check-site` (`-e docs`) | Demo files in the docs | see [Demo Recordings](#demo-recordings) |
+| `docs-dotgraphs` | Pipeline graphs | regenerates the pipeline DOT graph SVGs (requires graphviz) |
 | `check-changelog` | Check changelog | `CHANGELOG.md` release structure (the Docs workflow runs it too) |
 | `audit-gil` (`-e audit`) | GIL audit | Every GIL release in the bindings against `scripts/nogil_entry_points.yaml`; see [Threading and the GIL](threading.md) |
 | `audit-test` (`-e audit`) | Audit contract tests | `tests/audit`, which needs libclang |
 | `gil-hotspots` | GIL hotspots | Records benchmarks and tests with `py-spy --gil`, ranks the bindings that hold the GIL ([Finding candidates](threading.md#finding-candidates)) |
+
+### Running Tests
+
+```bash
+pixi run test                              # full suite, parallel
+pixi shell && pytest tests -x --testmon    # incremental (only changed)
+```
 
 ### Daily Workflow
 
@@ -130,6 +157,15 @@ CONDA_PREFIX=$(pwd)/.pixi/envs/default pip install -e . --no-build-isolation
 
 Using `pixi run` handles this automatically.
 
+### Building Portable Wheels
+
+Editable installs bake absolute paths, so they aren't portable. For distributable wheels:
+
+```bash
+pixi run build-wheel                  # bundles native deps (Linux: patchelf, macOS: scripts/repair_macos_wheel.py)
+pip install wheelhouse/tesseract*.whl
+```
+
 ---
 
 ## Architecture
@@ -192,7 +228,7 @@ tesseract_nanobind/
 │   ├── gil_entry_points.py    # nogil_entry_points.yaml loader
 │   ├── nogil_entry_points.yaml # Every binding that releases the GIL, and why
 │   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
-│   ├── build_macos_wheel.sh   # Portable macOS wheel (delocate)
+│   ├── build_macos_wheel.sh   # Portable macOS wheel
 │   └── build_upstream.sh      # 0.36 inner loop: build upstream/ into the env
 ├── upstream/                  # tesseract, trajopt, tesseract_planning, bpl submodules (0.36)
 └── packaging/                 # forked feedstock submodules (0.36 outer loop)
@@ -228,7 +264,6 @@ Uses pyright configured via `pyrightconfig.json`. Key design decisions:
 
 - **Python code is type-checked** — the `planning/` module and other pure Python code
 - **Auto-generated stubs are excluded** — nanobind generates `.pyi` stubs with C++ type artifacts
-- **Hand-written stub exception** — `ompl_base/_ompl_base.pyi` is manually maintained
 
 When adding new bindings, declare inheritance in nanobind to get correct stubs:
 
@@ -293,6 +328,35 @@ pre-commit install --hook-type pre-push
 | typecheck (`pixi run typecheck`, pyright) | pre-push | Type check |
 
 Skip when needed: `git commit --no-verify` / `git push --no-verify`
+
+---
+
+## Demo Recordings
+
+The players on the example pages are static files, with no Python server behind them. `car_seat` leads the README and the docs home. Status: local playback, scrubbing and orbiting are `confirmed` by `demo-check` in headless Chrome on a Mac; the deployed site is `under verification` until `demo-check --url` has run against it. Phones and other browsers are untested.
+
+`scripts/demos/manifest.toml` holds one entry per viewer example, published or excluded with a reason. `published` means a person looked at the recording; a test fails when a viewer example has no entry.
+
+```bash
+pixi run demo-record --only MODULE    # docs/demos/{recordings,client}; updates the lock, drops that poster
+pixi run demo-posters                 # a poster for each recording without one; --only MODULE re-captures
+pixi run -e docs demo-players --preview
+env PYTHONPATH=src pixi run -e docs zensical build --strict
+pixi run demo-check --preview         # drive every player in Chrome
+```
+
+To add a demo: give it a camera in the manifest and a builder in `scripts/demos/scenes.py`, record it, capture its poster, and add `--8<-- "docs/demos/players/MODULE.html"` under its heading on its page. After review, set `status = "published"` and delete `reason`.
+
+**Hosting.** Recordings stay out of git, since each re-record would add its full size to history. The `demo-assets` release holds each file named by its SHA-256, and `scripts/demos/demos.lock.json` pins the hashes, so a re-record adds assets and older commits still build. To publish: `pixi run demo-fetch --stage DIR`, `gh release upload demo-assets DIR/* --clobber`, which is safe because the names are hashes. The tag has no digits on purpose: the wheel workflows and `setuptools_scm` act only on numeric tags. Upload before pushing, or the Docs workflow fails at its fetch step. Pages serves its own copies, which the build places in the site; nothing links to the release.
+
+Things that are not obvious:
+
+- A re-record is a new recording, because the planners are randomized. It needs a new review.
+- A floor's position and size are baked in at record time. A camera is only a query parameter, so tuning one needs a new poster and no re-record.
+- The docs builder rewrites `<img src>` relative to the source `.md` and leaves `data-src` alone, which is why `players.py` keeps two prefixes. Neither is checked at build time; `demo-check-site` is the guard.
+- `demo-check` serves from an in-process server with a large listen backlog. `http.server`'s default of 5 dropped 12 requests in 30 loads of `planning.md`, which asks for 10 posters at once.
+- glTF draws a material opaque whatever its alpha, unless `alphaMode` says `BLEND`. The viewer sets it for any alpha below 1.
+- Once a player is open, the scroll wheel zooms the scene and the page stays put. A reader scrolling past a closed player is unaffected.
 
 ---
 

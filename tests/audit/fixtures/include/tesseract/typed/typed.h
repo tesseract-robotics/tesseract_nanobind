@@ -88,6 +88,10 @@ public:
 };
 
 // One parameter per mapping rule; the stub spells each one as nanobind does.
+// #251: trailing defaults a Python overload can or cannot pass.
+int shortReach(int a, int b = 0);
+int fullReach(int a, int b = 0);
+int outReach(int a, int& out, int b = 0);
 void kinds(bool b,
            int i,
            std::size_t n,

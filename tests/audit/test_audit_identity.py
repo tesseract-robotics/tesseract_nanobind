@@ -53,7 +53,7 @@ def test_bound_classes_rejects_a_tu_without_function_bodies():
 def test_bound_classes_reads_each_nb_class():
     tu = audit.parse_tu(audit.binding_source("tesseract_time_parameterization"), bodies=True)
     bound = audit.bound_classes(tu)
-    assert bound["TOTGCompositeProfile"] == (
+    assert bound["TimeOptimalTrajectoryGenerationCompositeProfile"] == (
         "tesseract::time_parameterization::TimeOptimalTrajectoryGenerationCompositeProfile"
     )
     assert bound["TimeOptimalTrajectoryGeneration"] == (

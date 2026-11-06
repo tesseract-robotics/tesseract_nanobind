@@ -19,14 +19,12 @@ import numpy as np
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -39,7 +37,7 @@ from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
-    OMPLRealVectorPlanProfile,
+    OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
     RRTConnectConfigurator,
 )
@@ -47,17 +45,14 @@ from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    ProfileDictionary_addTrajOptIfoptPlanProfile,
-    ProfileDictionary_addTrajOptIfoptSolverProfile,
     TrajOptIfoptDefaultCompositeProfile,
-    TrajOptIfoptDefaultPlanProfile,
+    TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptOSQPSolverProfile,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
-    ISPCompositeProfile,
     IterativeSplineParameterization,
+    IterativeSplineParameterizationCompositeProfile,
 )
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
@@ -105,21 +100,21 @@ def run():
 
     # Create move instructions
     start_instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-        MoveInstructionType_FREESPACE,
+        CartesianWaypointPoly(wp1),
+        MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     plan_f1 = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-        MoveInstructionType_FREESPACE,
+        CartesianWaypointPoly(wp2),
+        MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
 
     # Create program
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+    program.push_back(MoveInstructionPoly(start_instruction))
+    program.push_back(MoveInstructionPoly(plan_f1))
 
     # === OMPL Planning ===
     print("Running OMPL planner...")
@@ -134,7 +129,7 @@ def run():
     ompl_solver_config.optimize = False
     ompl_solver_config.addPlanner(RRTConnectConfigurator())
 
-    ompl_profile = OMPLRealVectorPlanProfile()
+    ompl_profile = OMPLRealVectorMoveProfile()
     ompl_profile.solver_config = ompl_solver_config
 
     ompl_profiles = ProfileDictionary()
@@ -157,7 +152,7 @@ def run():
     print("Running TrajOptIfopt optimizer...")
 
     # Create profiles with velocity/accel coefficients sized for 6-DOF robot
-    plan_profile = TrajOptIfoptDefaultPlanProfile()
+    plan_profile = TrajOptIfoptDefaultMoveProfile()
     composite_profile = TrajOptIfoptDefaultCompositeProfile()
     composite_profile.velocity_coeff = np.ones(6)
     composite_profile.acceleration_coeff = np.ones(6)
@@ -166,15 +161,9 @@ def run():
     solver_profile.setAdaptiveRhoInterval(OSQP_ADAPTIVE_RHO_INTERVAL)
 
     trajopt_profiles = ProfileDictionary()
-    ProfileDictionary_addTrajOptIfoptPlanProfile(
-        trajopt_profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-    )
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        trajopt_profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-    )
-    ProfileDictionary_addTrajOptIfoptSolverProfile(
-        trajopt_profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-    )
+    trajopt_profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+    trajopt_profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+    trajopt_profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
     trajopt_request = PlannerRequest()
     trajopt_request.instructions = interpolated
@@ -201,7 +190,7 @@ def run():
     time_param = IterativeSplineParameterization()
 
     # Create profile with velocity/acceleration scaling
-    isp_profile = ISPCompositeProfile()
+    isp_profile = IterativeSplineParameterizationCompositeProfile()
     isp_profile.max_velocity_scaling_factor = 1.0
     isp_profile.max_acceleration_scaling_factor = 1.0
 
@@ -217,9 +206,9 @@ def run():
     trajopt_results = trajopt_results_instruction.getInstructions()
     print(f"\nTrajectory has {len(trajopt_results)} waypoints:")
     for i, instr in enumerate(trajopt_results):
-        move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+        move_instr = instr.asMoveInstruction()
         wp_poly = move_instr.getWaypoint()
-        wp = WaypointPoly_as_StateWaypointPoly(wp_poly)
+        wp = wp_poly.asStateWaypoint()
         pos = wp.getPosition().flatten()
         time = wp.getTime()
         if i < 3 or i >= len(trajopt_results) - 2:

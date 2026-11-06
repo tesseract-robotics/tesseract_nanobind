@@ -38,6 +38,35 @@ from tesseract_robotics.planning import (
     sphere,
 )
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
+from tesseract_robotics.tesseract_collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactResultVector,
+    ContactTestType,
+)
+
+
+class FixtureStateInCollisionError(RuntimeError):
+    """A benchmark's start or goal state collides, so the planner could never solve it."""
+
+
+def assert_state_collision_free(robot: Robot, joint_names: list[str], joints: np.ndarray) -> None:
+    """Raise when `joints` collides: an obstacle edit fails here, not inside OMPL (#341).
+
+    Raises:
+        FixtureStateInCollisionError: names the links and the distance of each contact.
+    """
+    env = robot.env
+    manager = env.getDiscreteContactManager()
+    manager.setActiveCollisionObjects(env.getActiveLinkIds())
+    manager.setCollisionObjectsTransform(env.getState(joint_names, joints).link_transforms)
+    contacts = ContactResultMap()
+    manager.contactTest(contacts, ContactRequest(ContactTestType.ALL))
+    results = ContactResultVector()
+    contacts.flattenMoveResults(results)
+    hits = [(list(r.link_ids), r.distance) for r in results if r.distance < 0.0]
+    if hits:
+        raise FixtureStateInCollisionError(f"{joints} collides: {hits}")
 
 
 def setup_robot_with_obstacles(num_obstacles: int = 1):
@@ -49,7 +78,7 @@ def setup_robot_with_obstacles(num_obstacles: int = 1):
         (0.5, 0, 0.55),  # center
         (0.4, 0.2, 0.45),  # front-left
         (0.4, -0.2, 0.45),  # front-right
-        (0.6, 0.1, 0.65),  # back-upper
+        (0.6, 0.0, 0.65),  # back-upper; 41 mm clear of link_5 at the goal (#341)
         (0.3, 0, 0.35),  # low-center
     ]
 
@@ -80,6 +109,8 @@ def freespace_problem(num_obstacles: int = 1):
     joint_start = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
     joint_end = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 
+    assert_state_collision_free(robot, joint_names, joint_start)
+    assert_state_collision_free(robot, joint_names, joint_end)
     robot.set_joints(joint_start, joint_names=joint_names)
 
     program = (
@@ -150,6 +181,25 @@ class TestFirstSolutionScaling:
         )
         benchmark.extra_info["mode"] = "optimize=False"
         benchmark.extra_info["num_planners"] = num_planners
+
+
+def test_collision_check_raises_for_a_colliding_state():
+    """#341: the invariant fires, naming the links, on the state the old `sphere_3` overlapped."""
+    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    create_obstacle(
+        robot, name="probe", geometry=sphere(0.12), transform=Pose.from_xyz(0.6, 0.1, 0.65)
+    )
+    joint_names = robot.get_joint_names("manipulator")
+    goal = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+    with pytest.raises(FixtureStateInCollisionError, match="probe"):
+        assert_state_collision_free(robot, joint_names, goal)
+
+
+@pytest.mark.parametrize("num_obstacles", [1, 3, 5])
+def test_problem_states_are_collision_free(num_obstacles):
+    """#341: `freespace_problem` builds only when both states clear every obstacle."""
+    robot, _ = freespace_problem(num_obstacles)
+    assert robot is not None
 
 
 class TestHarderProblemScaling:

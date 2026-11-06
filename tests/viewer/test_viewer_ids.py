@@ -7,9 +7,9 @@ from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
 )
 from tesseract_robotics.viewer.poses import link_poses
@@ -27,9 +27,9 @@ def trajectory(robot):
     joints = robot.get_joint_names("manipulator")
     program = CompositeInstruction()
     for q in (np.zeros(len(joints)), np.full(len(joints), 0.1)):
-        wp = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, q))
+        wp = JointWaypointPoly(JointWaypoint(joints, q))
         mi = MoveInstruction(wp, MoveInstructionType.FREESPACE)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
+        program.push_back(MoveInstructionPoly(mi))
     return Trajectory.from_composite(program)
 
 

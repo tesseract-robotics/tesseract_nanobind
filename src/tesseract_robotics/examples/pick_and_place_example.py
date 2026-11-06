@@ -88,10 +88,9 @@ from tesseract_robotics.planning.profiles import create_freespace_pipeline_profi
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    TrajOptCollisionConfig,
     TrajOptDefaultCompositeProfile,
 )
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"
 
@@ -132,7 +131,7 @@ def create_profiles():
     composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.05
     composite.collision_cost_config.collision_margin_buffer = 0.01
 
-    ProfileDictionary_addTrajOptCompositeProfile(profiles, TRAJOPT_NS, "DEFAULT", composite)
+    profiles.addProfile(TRAJOPT_NS, "DEFAULT", composite)
     return profiles
 
 
@@ -160,6 +159,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
         dict with keys:
             - pick_result: PlanningResult for pick phase
             - place_result: PlanningResult for place phase
+            - pick_env: Environment before the attach
             - robot: Robot instance with attached box
             - joint_names: List of 7 KUKA IIWA joint names
     """
@@ -244,6 +244,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     pick_final = pick_result.trajectory[-1].positions
     robot.set_joints(pick_final, joint_names=joint_names)
 
+    # Before the attach: the box still rests on the table here, for showing the pick.
+    pick_env = robot.env.clone()
+
     # Create FIXED joint to attach box to tool flange
     # Origin offset: box center is box_size/2 below tool (in tool Z direction)
     attach_joint = create_fixed_joint(
@@ -298,6 +301,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     return {
         "pick_result": pick_result,
         "place_result": place_result,
+        "pick_env": pick_env,
         "robot": robot,
         "joint_names": joint_names,
     }

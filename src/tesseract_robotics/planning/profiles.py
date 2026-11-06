@@ -68,7 +68,7 @@ def _create_trajopt_profiles():
     from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
+        TrajOptDefaultMoveProfile,
     )
 
     composite = TrajOptDefaultCompositeProfile()
@@ -103,7 +103,7 @@ def _create_trajopt_profiles():
     composite.collision_cost_config.collision_check_config.longest_valid_segment_length = 0.1
     composite.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(50.0)
 
-    plan = TrajOptDefaultPlanProfile()
+    plan = TrajOptDefaultMoveProfile()
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.joint_cost_config.enabled = False
@@ -129,7 +129,7 @@ def _create_trajopt_upright_profiles():
     from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
+        TrajOptDefaultMoveProfile,
     )
 
     composite = TrajOptDefaultCompositeProfile()
@@ -156,7 +156,7 @@ def _create_trajopt_upright_profiles():
     composite.acceleration_coeff = np.ones(1)
     composite.smooth_jerks = False
 
-    plan = TrajOptDefaultPlanProfile()
+    plan = TrajOptDefaultMoveProfile()
     plan.joint_cost_config.enabled = False
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
@@ -242,18 +242,15 @@ def create_trajopt_ifopt_default_profiles(
         profile_names, so an edit applies to every registered name:
 
         composite = profiles.getProfile(
-            TrajOptIfoptDefaultCompositeProfile().getKey(),
+            TrajOptIfoptDefaultCompositeProfile.createKey(),
             TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
             "DEFAULT",
         )
         composite.collision_constraint_config.max_num_cnt = 3
     """
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptPlanProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
         TrajOptIfoptDefaultCompositeProfile,
-        TrajOptIfoptDefaultPlanProfile,
+        TrajOptIfoptDefaultMoveProfile,
         TrajOptIfoptOSQPSolverProfile,
     )
 
@@ -269,7 +266,7 @@ def create_trajopt_ifopt_default_profiles(
     composite.smooth_accelerations = False
     composite.smooth_jerks = False
 
-    plan = TrajOptIfoptDefaultPlanProfile()
+    plan = TrajOptIfoptDefaultMoveProfile()
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.joint_cost_config.enabled = False
@@ -280,15 +277,9 @@ def create_trajopt_ifopt_default_profiles(
     # Register under all requested names
     profiles = ProfileDictionary()
     for name in profile_names:
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, plan
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver)
 
     return profiles
 
@@ -336,10 +327,6 @@ def create_trajopt_default_profiles(
             profile_names=["MY_PROFILE"]
         )
     """
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-    )
 
     if profile_names is None:
         profile_names = TRAJOPT_PROFILE_NAMES
@@ -349,10 +336,8 @@ def create_trajopt_default_profiles(
     # Register under all requested names
     profiles = ProfileDictionary()
     for name in profile_names:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
     return profiles
 
@@ -381,10 +366,6 @@ def create_trajopt_upright_profiles(
         profiles = create_trajopt_upright_profiles()
         result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
     """
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-    )
 
     if profile_names is None:
         profile_names = ["UPRIGHT"]
@@ -393,10 +374,8 @@ def create_trajopt_upright_profiles(
 
     profiles = ProfileDictionary()
     for name in profile_names:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
     return profiles
 
@@ -467,8 +446,7 @@ def create_ompl_default_profiles(
         )
     """
     from tesseract_robotics.tesseract_motion_planners_ompl import (
-        OMPLRealVectorPlanProfile,
-        ProfileDictionary_addOMPLProfile,
+        OMPLRealVectorMoveProfile,
         RRTConnectConfigurator,
     )
 
@@ -481,7 +459,7 @@ def create_ompl_default_profiles(
         num_planners = min(4, _get_cpu_count())
 
     # Create ONE profile with the configured settings
-    profile = OMPLRealVectorPlanProfile()
+    profile = OMPLRealVectorMoveProfile()
     profile.solver_config.planning_time = planning_time
     profile.solver_config.max_solutions = max_solutions
     profile.solver_config.optimize = optimize
@@ -503,7 +481,7 @@ def create_ompl_default_profiles(
     # Register under all requested names
     profiles = ProfileDictionary()
     for name in profile_names:
-        ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, name, profile)
+        profiles.addProfile(OMPL_DEFAULT_NAMESPACE, name, profile)
 
     return profiles
 
@@ -670,10 +648,8 @@ def create_descartes_default_profiles(
         profiles = create_descartes_default_profiles(move_profile=my_profile)
     """
     from tesseract_robotics.tesseract_motion_planners_descartes import (
-        DescartesDefaultPlanProfileD,
+        DescartesDefaultMoveProfileD,
         DescartesLadderGraphSolverProfileD,
-        cast_DescartesPlanProfileD,
-        cast_DescartesSolverProfileD,
     )
 
     if profile_names is None:
@@ -701,7 +677,7 @@ def create_descartes_default_profiles(
             )
         plan_profile = move_profile
     else:
-        plan_profile = DescartesDefaultPlanProfileD()
+        plan_profile = DescartesDefaultMoveProfileD()
         if enable_collision is not None:
             plan_profile.enable_collision = enable_collision
         if enable_edge_collision is not None:
@@ -723,11 +699,11 @@ def create_descartes_default_profiles(
         if use_redundant_joint_solutions is not None:
             plan_profile.use_redundant_joint_solutions = use_redundant_joint_solutions
 
-    base_plan = cast_DescartesPlanProfileD(plan_profile)
+    base_plan = plan_profile
 
     solver_profile = DescartesLadderGraphSolverProfileD()
     solver_profile.num_threads = num_threads
-    base_solver = cast_DescartesSolverProfileD(solver_profile)
+    base_solver = solver_profile
 
     # Register under all requested names
     profiles = ProfileDictionary()
@@ -753,10 +729,6 @@ def _add_trajopt_to_profiles(
     profile_names: list[str] | None = None,
 ) -> None:
     """Add TrajOpt profiles to existing ProfileDictionary (internal helper)."""
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-    )
 
     if profile_names is None:
         profile_names = TRAJOPT_PROFILE_NAMES
@@ -765,10 +737,8 @@ def _add_trajopt_to_profiles(
 
     # Register under all requested names
     for name in profile_names:
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptPlanProfile(profiles, TRAJOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, name, plan)
 
 
 def create_freespace_pipeline_profiles(
@@ -848,11 +818,8 @@ def _add_trajopt_ifopt_to_profiles(
 ) -> None:
     """Add TrajOptIfopt profiles to existing ProfileDictionary (internal helper)."""
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptPlanProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
         TrajOptIfoptDefaultCompositeProfile,
-        TrajOptIfoptDefaultPlanProfile,
+        TrajOptIfoptDefaultMoveProfile,
         TrajOptIfoptOSQPSolverProfile,
     )
 
@@ -864,7 +831,7 @@ def _add_trajopt_ifopt_to_profiles(
     composite.smooth_accelerations = False
     composite.smooth_jerks = False
 
-    plan = TrajOptIfoptDefaultPlanProfile()
+    plan = TrajOptIfoptDefaultMoveProfile()
     plan.cartesian_cost_config.enabled = False
     plan.cartesian_constraint_config.enabled = True
     plan.joint_cost_config.enabled = False
@@ -873,15 +840,9 @@ def _add_trajopt_ifopt_to_profiles(
     solver = TrajOptIfoptOSQPSolverProfile()
 
     for name in profile_names:
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite
-        )
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, plan
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, composite)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, plan)
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, name, solver)
 
 
 def create_freespace_ifopt_pipeline_profiles(
@@ -1063,23 +1024,16 @@ def create_descartes_pipeline_profiles(
 # =============================================================================
 
 
-def create_time_optimal_parameterization(
-    path_tolerance: float = 0.1,
-    min_angle_change: float = 0.001,
-) -> Any:
+def create_time_optimal_parameterization() -> Any:
     """Create Time-Optimal Trajectory Generation (TOTG) parameterization.
 
     TOTG finds the time-optimal trajectory that respects velocity, acceleration,
     and jerk limits. It uses a numerical integration approach to find the fastest
     trajectory along a given geometric path.
 
-    Args:
-        path_tolerance: Path deviation tolerance in radians (default: 0.1)
-            Controls how closely the time-parameterized trajectory follows
-            the original path. Smaller values = closer following but slower.
-        min_angle_change: Minimum angle change in radians (default: 0.001)
-            Used to detect linear segments vs curves. Smaller values = more
-            sensitive curve detection.
+    The path tolerance, minimum angle change and limits are fields of
+    `TimeOptimalTrajectoryGenerationCompositeProfile` (`path_tolerance`,
+    `min_angle_change`, ...), which `compute` looks up in the profile dictionary.
 
     Returns:
         TimeOptimalTrajectoryGeneration instance
@@ -1088,21 +1042,22 @@ def create_time_optimal_parameterization(
         from tesseract_robotics.planning.profiles import (
             create_time_optimal_parameterization
         )
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
         from tesseract_robotics.tesseract_time_parameterization import (
-            InstructionsTrajectory
+            TimeOptimalTrajectoryGenerationCompositeProfile
         )
 
-        # Create time parameterization
-        totg = create_time_optimal_parameterization(path_tolerance=0.05)
+        totg = create_time_optimal_parameterization()
 
-        # Apply to trajectory
-        trajectory = InstructionsTrajectory(program)
-        success = totg.compute(
-            trajectory,
-            velocity_limits,
-            acceleration_limits,
-            jerk_limits
+        # The limits live in the profile, looked up under the parameterization's
+        # name ("TOTG") and the program's profile name
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            totg.getName(), "DEFAULT", TimeOptimalTrajectoryGenerationCompositeProfile()
         )
+
+        # Edits `program` (a CompositeInstruction of StateWaypoints) in place
+        success = totg.compute(program, env, profiles)
 
     Reference:
         Kunz & Stilman, "Time-Optimal Trajectory Generation for Path Following
@@ -1112,26 +1067,19 @@ def create_time_optimal_parameterization(
         TimeOptimalTrajectoryGeneration,
     )
 
-    # 0.33 API: path_tolerance and min_angle_change are now in profile
-    # Constructor only takes name
-    _ = path_tolerance, min_angle_change  # Acknowledge but ignore for now
     return TimeOptimalTrajectoryGeneration()
 
 
-def create_iterative_spline_parameterization(
-    add_points: bool = True,
-) -> Any:
+def create_iterative_spline_parameterization() -> Any:
     """Create Iterative Spline Parameterization (ISP).
 
     ISP iteratively fits a spline to the trajectory while respecting velocity,
     acceleration, and jerk limits. Generally faster than TOTG but may produce
     slower trajectories.
 
-    Args:
-        add_points: Whether to add intermediate points (default: True)
-            If True, adds waypoints between existing ones to better satisfy
-            constraints. If False, only uses existing waypoints (faster but
-            may violate limits).
+    Whether to add intermediate points, and the limits, are fields of
+    `IterativeSplineParameterizationCompositeProfile` (`add_points`, ...), which
+    `compute` looks up in the profile dictionary.
 
     Returns:
         IterativeSplineParameterization instance
@@ -1140,21 +1088,22 @@ def create_iterative_spline_parameterization(
         from tesseract_robotics.planning.profiles import (
             create_iterative_spline_parameterization
         )
+        from tesseract_robotics.tesseract_command_language import ProfileDictionary
         from tesseract_robotics.tesseract_time_parameterization import (
-            InstructionsTrajectory
+            IterativeSplineParameterizationCompositeProfile
         )
 
-        # Create time parameterization
-        isp = create_iterative_spline_parameterization(add_points=True)
+        isp = create_iterative_spline_parameterization()
 
-        # Apply to trajectory
-        trajectory = InstructionsTrajectory(program)
-        success = isp.compute(
-            trajectory,
-            velocity_limits,
-            acceleration_limits,
-            jerk_limits
+        # The limits live in the profile, looked up under the parameterization's
+        # name ("ISP") and the program's profile name
+        profiles = ProfileDictionary()
+        profiles.addProfile(
+            isp.getName(), "DEFAULT", IterativeSplineParameterizationCompositeProfile()
         )
+
+        # Edits `program` (a CompositeInstruction of StateWaypoints) in place
+        success = isp.compute(program, env, profiles)
 
     Note:
         ISP is typically faster to compute than TOTG, but TOTG produces
@@ -1165,6 +1114,4 @@ def create_iterative_spline_parameterization(
         IterativeSplineParameterization,
     )
 
-    # 0.33 API: add_points is now in profile, constructor only takes name
-    _ = add_points  # Acknowledge but ignore for now
     return IterativeSplineParameterization()

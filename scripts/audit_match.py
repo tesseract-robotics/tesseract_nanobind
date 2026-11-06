@@ -59,6 +59,7 @@ from audit_parse import (
 )
 from audit_rules import (
     ACCEPTED_CPP_OVERLOADS,
+    ACCEPTED_DEFAULTS,
     ACCEPTED_PY_OVERLOADS,
     ACCEPTED_SYMBOLS,
     EIGEN_VALUE_WRAPPERS,
@@ -119,6 +120,9 @@ class Gap:
     kind: Kind
     location: str
     arity: str = NOT_AN_OVERLOAD
+    # Trailing defaulted parameters no covering Python overload accepts (#251); empty: the
+    # whole overload is missing.
+    unreachable: tuple[str, ...] = ()
 
 
 @dataclass
@@ -142,6 +146,8 @@ class Cover:
 
     rule: str  # "exact" or an ACCEPTED rule
     typed: bool  # every compared parameter type is known; False: covered by arity alone
+    # Trailing defaulted parameters beyond the longest covering Python overload (#251)
+    unreachable: tuple[str, ...] = ()
 
 
 def _fits(
@@ -223,8 +229,14 @@ def _yaml_sibling(
     return False
 
 
-def _covered(rule: str, fits: Mapping[PyOverload, bool]) -> Cover | None:
-    return Cover(rule, any(fits.values())) if fits else None
+def _covered(rule: str, fits: Mapping[PyOverload, bool], names: tuple[str, ...]) -> Cover | None:
+    """`names`: the C++ parameters of the Python form; those past the longest fitting Python
+    overload's maximum arity cannot be passed from Python (#251)."""
+    if not fits:
+        return None
+    his = [p.arity.hi for p in fits]
+    reach = None if None in his else max(h for h in his if h is not None)
+    return Cover(rule, any(fits.values()), names[reach:] if reach is not None else ())
 
 
 def _cover(
@@ -239,17 +251,18 @@ def _cover(
     if ov.out_params:
         reduced = ov.arity.reduced(len(ov.out_params))
         fits = _fits(ov.returned_out_params(), reduced, pys, ancestors)
+        names = ov.returned_out_names()
         if set(ov.out_params) == {STRINGSTREAM}:
             if cover := _covered(
-                "stringstream", {p: t for p, t in fits.items() if p.returns == "str"}
+                "stringstream", {p: t for p, t in fits.items() if p.returns == "str"}, names
             ):
                 return cover
         tuples = {p: t for p, t in fits.items() if p.returns.startswith("tuple[")}
-        if cover := _covered("out-param", tuples):
+        if cover := _covered("out-param", tuples, names):
             return cover
         if ov.returns_void and len(ov.out_params) == 1 and fits:
             return _covered(
-                "out-param", fits
+                "out-param", fits, names
             )  # nothing else to return: the out-param is the result
     if ov.raw_buffer:
         return None  # no Python overload binds a raw pointer; matching arity proves nothing
@@ -262,8 +275,9 @@ def _cover(
                 for p, t in fits.items()
                 if all(i < len(p.params) and p.params[i] == "bytes" for i in ov.byte_buffers)
             },
+            ov.names,
         )
-    return _covered(ov.mapped or "exact", fits)
+    return _covered(ov.mapped or "exact", fits, ov.names)
 
 
 def _protocol_rule(name: str, cpp: dict[str, CppSymbol], tu_names: frozenset[str]) -> str | None:
@@ -530,6 +544,13 @@ def match(
                 fallbacks += not how.typed
                 if how.rule != "exact":
                     accepted.append(Accepted(name, how.rule, ov.location))
+                if not how.unreachable:
+                    continue
+                if rule := ACCEPTED_DEFAULTS.get((module, name, how.unreachable)):
+                    accepted.append(Accepted(name, rule, ov.location))
+                else:
+                    gaps.append(Gap(name, sym.kind, ov.location, str(ov.arity), how.unreachable))
+                    ok = False
         covered += ok
 
     deviations: list[Deviation] = []

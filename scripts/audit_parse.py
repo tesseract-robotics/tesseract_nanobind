@@ -264,10 +264,15 @@ class CppOverload:
     # takes a `std::vector<std::reference_wrapper<T>>`: a view a sibling overload builds (R4)
     reference_wrapper_view: bool = False
     yaml_position: int | None = None  # index into `params` of the first `YAML::Node` parameter
+    names: tuple[str, ...] = ()  # C++ parameter names, parallel to `params`
 
     def returned_out_params(self) -> tuple[frozenset[TypeKey] | None, ...]:
         """`params` of the Python form that returns the out-params."""
         return tuple(k for i, k in enumerate(self.params) if i not in self.out_positions)
+
+    def returned_out_names(self) -> tuple[str, ...]:
+        """`names` of the Python form that returns the out-params."""
+        return tuple(n for i, n in enumerate(self.names) if i not in self.out_positions)
 
 
 @dataclass
@@ -284,10 +289,12 @@ class CppSymbol:
 
 
 def header_rel(path: Path) -> str:
-    """A header path relative to the conda include dir or the repo."""
+    """A header path relative to the conda include dir or the repo; else absolute (an SDK header)."""
     path = path.resolve()
-    base = CONDA_INCLUDE if path.is_relative_to(CONDA_INCLUDE) else REPO_ROOT
-    return path.relative_to(base).as_posix()
+    for base in (CONDA_INCLUDE, REPO_ROOT):
+        if path.is_relative_to(base):
+            return path.relative_to(base).as_posix()
+    return path.as_posix()
 
 
 def location(cursor: ci.Cursor) -> str:
@@ -521,7 +528,7 @@ def _names_unbound_dependency(
     namespace (`ompl::base::PlannerPtr`), or in one of `not_api`, the owned not-API
     headers this TU includes but does not audit (`trajopt::TermInfo`, `_not_api_headers`).
     A class some module binds (`is_bound`, by qualified name; not a template instance) has a
-    Python form wherever it is declared (`sco::BasicTrustRegionSQPParameters`, `ompl::base::State` while #258 is open)."""
+    Python form wherever it is declared (`sco::BasicTrustRegionSQPParameters`)."""
     t = t.get_canonical()
     while t.kind in (ci.TypeKind.POINTER, ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
         t = t.get_pointee().get_canonical()
@@ -754,6 +761,7 @@ def _overload(
         params=keys,
         out_positions=out_positions,
         yaml_position=yaml_position,
+        names=tuple(p.spelling for _, p in python_params),
     )
 
 

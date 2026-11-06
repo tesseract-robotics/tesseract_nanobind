@@ -1,7 +1,7 @@
 """tesseract_motion_planners_trajopt Python bindings"""
 
 from collections.abc import Sequence
-from typing import Annotated, TypeAlias
+from typing import Annotated
 
 import numpy
 from numpy.typing import NDArray
@@ -96,8 +96,6 @@ class TrajOptMoveProfile(tesseract_robotics.tesseract_command_language._tesserac
     @staticmethod
     def createKey() -> int: ...
 
-TrajOptPlanProfile: TypeAlias = TrajOptMoveProfile
-
 class TrajOptCompositeProfile(tesseract_robotics.tesseract_command_language._tesseract_command_language.Profile):
     def getKey(self) -> int: ...
 
@@ -144,8 +142,6 @@ class TrajOptDefaultMoveProfile(TrajOptMoveProfile):
 
         Nested sub-configs are replaced, not merged: a key naming one rebuilds it from that struct's own defaults, so fields left out lose the profile's values. This is per struct; here `cartesian_cost_config:` and `joint_cost_config:` come back enabled (the waypoint config default), where the profile's are disabled.
         """
-
-TrajOptDefaultPlanProfile: TypeAlias = TrajOptDefaultMoveProfile
 
 class TrajOptDefaultCompositeProfile(TrajOptCompositeProfile):
     def __init__(self) -> None: ...
@@ -624,18 +620,6 @@ class TrajOptPIQPSolverProfile(TrajOptSolverProfile):
 
     @settings.setter
     def settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
-
-def ProfileDictionary_addTrajOptMoveProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptMoveProfile) -> None:
-    """Add TrajOpt move profile to ProfileDictionary"""
-
-def ProfileDictionary_addTrajOptPlanProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptMoveProfile) -> None:
-    """Add TrajOpt plan profile to ProfileDictionary (legacy alias)"""
-
-def ProfileDictionary_addTrajOptCompositeProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptCompositeProfile) -> None:
-    """Add TrajOpt composite profile to ProfileDictionary"""
-
-def ProfileDictionary_addTrajOptSolverProfile(dict: tesseract_robotics.tesseract_command_language._tesseract_command_language.ProfileDictionary, ns: str, profile_name: str, profile: TrajOptSolverProfile) -> None:
-    """Add TrajOpt solver profile to ProfileDictionary"""
 
 class TrajOptMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...

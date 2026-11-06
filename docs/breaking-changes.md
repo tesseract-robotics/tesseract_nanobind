@@ -29,6 +29,14 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `TaskComposerNode.saveDotgraph` raises `OSError` instead of returning `False`, and returns `None` | [Catch `OSError`](#taskcomposernodesavedotgraph-raises-oserror) |
 | Unreleased | `TaskComposerKeys.get` of a list port returns `list[str]`; `TaskComposerNodeInfo` fields are writable | [Task composer value types](#task-composer-value-types-compare-by-value-and-are-unhashable) |
 | Unreleased | `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` compare by value and are unhashable | [A stable key, or `id()`](#task-composer-value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `tesseract_command_language.MoveInstructionType_*` constants removed | [The `MoveInstructionType` members](#swig-era-moveinstructiontype_-constants-removed) |
+| Unreleased | `MoveInstruction(Poly).assign{Cartesian,Joint,State}Waypoint`, `ProfileDictionary_addProfile` removed | [`setWaypoint`, `addProfile`](#assignwaypoint-and-profiledictionary_addprofile-removed) |
+| Unreleased | `*_wrap_*`, `InstructionPoly_as_*`, `WaypointPoly_as_*`, `CompositeInstruction.appendMoveInstruction` removed; `wp.as…Waypoint()` is a reference | [Constructors and `as…()` methods](#swig-era-poly-helpers-and-appendmoveinstruction-removed) |
+| Unreleased | `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile`, `ConstantTCPSpeedCompositeProfile` renamed | [The C++ names](#time-parameterization-profiles-renamed-to-their-c-names) |
+| Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
+| Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `tesseract_motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
+| Unreleased | `create_time_optimal_parameterization(path_tolerance, min_angle_change)`, `create_iterative_spline_parameterization(add_points)`: the ignored arguments are removed | [Set the composite profile's fields](#time-parameterization-factories-take-no-arguments) |
+| Unreleased | `tesseract_robotics.ompl_base` and `tesseract_reeds_shepp_example` removed | [`ompl_base` removed](#ompl_base-removed) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -291,6 +299,168 @@ part in its equality.
 `TaskComposerKeys.get(port)` returns what the port holds, `str` or `list[str]`; it raised
 `RuntimeError` for a list port before (#313). `TaskComposerNodeInfo`'s fields are read-write
 (#319).
+
+### SWIG-era `MoveInstructionType_*` constants removed
+
+`tesseract_command_language` no longer exports a module constant per `MoveInstructionType` value.
+The three constants were copies kept from the SWIG bindings; C++ has none of them, and
+`MoveInstructionType` is bound as an enum whose members are the same objects (#275, as #176 and
+#214 did for the other modules). Importing one now raises
+`ImportError: cannot import name 'MoveInstructionType_LINEAR' from 'tesseract_robotics.tesseract_command_language'`;
+reading one as an attribute raises `AttributeError`.
+
+The package's `__all__` list is gone as well: `from tesseract_robotics.tesseract_command_language import *`
+now exports every public name of the extension instead of a hand-kept subset.
+
+| before | after |
+| --- | --- |
+| `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
+| `from tesseract_robotics.tesseract_command_language import MoveInstructionType_LINEAR` | `from tesseract_robotics.tesseract_command_language import MoveInstructionType` |
+
+### `assign*Waypoint` and `ProfileDictionary_addProfile` removed
+
+Seven Python-only names duplicated a bound method (#276). `assignCartesianWaypoint`,
+`assignJointWaypoint` and `assignStateWaypoint` on `MoveInstruction` and `MoveInstructionPoly`
+did what `setWaypoint` does; C++ 0.33 removed them. `ProfileDictionary_addProfile` worked around
+a cross-module limitation that no longer exists: `ProfileDictionary.addProfile` accepts a profile
+from any planner module, including a Python subclass of a trampolined profile.
+
+| before | after |
+| --- | --- |
+| `mi.assignCartesianWaypoint(wp)` (also `assignJointWaypoint`, `assignStateWaypoint`) | `mi.setWaypoint(wp)` |
+| `ProfileDictionary_addProfile(d, ns, name, profile)` | `d.addProfile(ns, name, profile)` |
+
+### SWIG-era Poly helpers and `appendMoveInstruction` removed
+
+`tesseract_command_language` kept 15 Python-only names from the SWIG bindings (#328). Each
+duplicated a constructor or method; C++ has none of them. Importing one raises `ImportError`,
+calling `appendMoveInstruction` raises `AttributeError`.
+
+| before | after |
+| --- | --- |
+| `CartesianWaypointPoly_wrap_CartesianWaypoint(wp)` | `CartesianWaypointPoly(wp)` |
+| `JointWaypointPoly_wrap_JointWaypoint(wp)` | `JointWaypointPoly(wp)` |
+| `StateWaypointPoly_wrap_StateWaypoint(wp)` | `StateWaypointPoly(wp)` |
+| `MoveInstructionPoly_wrap_MoveInstruction(mi)` | `MoveInstructionPoly(mi)` |
+| `InstructionPoly_as_MoveInstructionPoly(ip)` | `ip.asMoveInstruction()` |
+| `InstructionPoly_as_CompositeInstruction(ip)` | `ip.asCompositeInstruction()` |
+| `InstructionPoly_as_WaitInstruction(ip)` (also `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) | `ip.asWaitInstruction()` (`asTimerInstruction()`, …) |
+| `WaypointPoly_as_CartesianWaypointPoly(wp)` | `wp.asCartesianWaypoint()` |
+| `WaypointPoly_as_JointWaypointPoly(wp)` | `wp.asJointWaypoint()` |
+| `WaypointPoly_as_StateWaypointPoly(wp)` | `wp.asStateWaypoint()` |
+| `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
+
+**Reference, not copy.** `WaypointPoly_as_*` returned a copy of the stored waypoint;
+`wp.as…Waypoint()` returns a reference into it. An edit through the result now changes the
+waypoint, and so the program that holds it:
+
+```python
+mi.getWaypoint().asCartesianWaypoint().setTransform(target)  # edits mi
+snapshot = copy.copy(mi.getWaypoint().asCartesianWaypoint())  # an independent copy
+```
+
+`InstructionPoly.as…()` returns a copy, as the helpers did.
+
+### Time-parameterization profiles renamed to their C++ names
+
+The four time-parameterization profiles were bound under abbreviated names. They now carry
+their C++ names, as every other planner profile does (#329, following #187). There is no
+alias: importing an old name raises `ImportError`. The `tesseract_time_parameterization`
+package's `__all__` list, which named the old classes, is gone as well.
+
+| before | after |
+| --- | --- |
+| `TOTGCompositeProfile` | `TimeOptimalTrajectoryGenerationCompositeProfile` |
+| `ISPCompositeProfile` | `IterativeSplineParameterizationCompositeProfile` |
+| `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
+| `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
+
+The earlier Unreleased entries for these profiles (value equality, `createKey()`,
+`minimum_time_delta`) apply under the new names.
+
+### Six `trajopt_sqp` enumerators renamed to their C++ names
+
+trajopt 0.34 renamed its enumerators to `kCamelCase`; the bindings kept the old Python names.
+For most of them the old name already was the `UPPER_SNAKE` form of the C++ name
+(`kRunning` → `RUNNING`). For six it was not, so they now follow the same rule (#330). There
+are no aliases. Code that reads an old member raises `AttributeError`; code that compares
+`status.name` to an old string (`status.name == "NLP_CONVERGED"`) no longer matches and
+raises nothing, so search for the strings as well as the attributes.
+
+| before | after |
+| --- | --- |
+| `SQPStatus.NLP_CONVERGED` | `SQPStatus.CONVERGED` |
+| `SQPStatus.OPT_TIME_LIMIT` | `SQPStatus.TIME_LIMIT` |
+| `SQPStatus.QP_SOLVER_ERROR` | `SQPStatus.QP_SOLVE_FAILED` |
+| `SQPStatus.CALLBACK_STOPPED` | `SQPStatus.STOPPED_BY_CALLBACK` |
+| `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
+| `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
+
+### Planner-module compatibility names removed
+
+The four planner modules kept names from older APIs that C++ does not have (#334, #335).
+They are gone with no deprecation cycle, as in #176 and #214. Importing one raises
+`ImportError`.
+
+**Profile helpers (#334).** Each one either put a profile in a `ProfileDictionary` or upcast it
+to `Profile` so it could go in. `ProfileDictionary.addProfile` takes every planner's profiles
+directly, including a Python subclass of `DescartesMoveProfileD`:
+
+| before | after |
+| --- | --- |
+| `ProfileDictionary_addOMPLProfile(pd, ns, name, p)`, `ProfileDictionary_addOMPLMoveProfile(…)` | `pd.addProfile(ns, name, p)` |
+| `ProfileDictionary_addTrajOpt{Move,Plan,Composite,Solver}Profile(pd, ns, name, p)` | `pd.addProfile(ns, name, p)` |
+| `ProfileDictionary_addTrajOptIfopt{Move,Plan,Composite,Solver}Profile(pd, ns, name, p)` | `pd.addProfile(ns, name, p)` |
+| `OMPLMoveProfile_as_ProfileConstPtr(p)`, `OMPLPlanProfile_as_ProfileConstPtr(p)` | `p` |
+| `cast_DescartesMoveProfileD(p)`, `cast_DescartesPlanProfileD(p)`, `cast_DescartesSolverProfileD(p)` | `p` |
+
+**0.28 profile names (#335).** Tesseract 0.33 renamed the planner move profiles; the old names
+were kept as aliases:
+
+| before | after |
+| --- | --- |
+| `OMPLPlanProfile` | `OMPLMoveProfile` |
+| `OMPLRealVectorPlanProfile` | `OMPLRealVectorMoveProfile` |
+| `TrajOptPlanProfile` | `TrajOptMoveProfile` |
+| `TrajOptDefaultPlanProfile` | `TrajOptDefaultMoveProfile` |
+| `TrajOptIfoptPlanProfile` | `TrajOptIfoptMoveProfile` |
+| `TrajOptIfoptDefaultPlanProfile` | `TrajOptIfoptDefaultMoveProfile` |
+| `DescartesPlanProfileD` | `DescartesMoveProfileD` |
+| `DescartesDefaultPlanProfileD` | `DescartesDefaultMoveProfileD` |
+
+**trajopt's 0.28 re-exports (#335).** `tesseract_motion_planners_trajopt` no longer re-exports
+`TrajOptCollisionConfig` or `CollisionEvaluatorType`. Import them from their own modules,
+`tesseract_robotics.trajopt_ifopt` and `tesseract_robotics.tesseract_collision`.
+`tesseract_motion_planners_trajopt_ifopt` keeps its re-exports (`TrajOptCollisionConfig`,
+`CollisionEvaluatorType`, `SQPParameters`), so its profile fields are still configured from one
+import.
+
+**`__all__` (#335).** The six `tesseract_motion_planners*` packages lose their hand-kept `__all__`.
+`from … import *` now exports every public name of the extension. The OMPL list had named only
+the legacy aliases, so a star import gave `OMPLRealVectorPlanProfile` but not
+`OMPLRealVectorMoveProfile`.
+
+### `ompl_base` removed
+
+`tesseract_robotics.ompl_base` wrapped five OMPL headers directly and nothing in the package used it. The module, its stub, `reeds_shepp_example.py` and the `tesseract_reeds_shepp_example` script are gone. OMPL itself stays: the OMPL planner loads it in C++.
+
+For `State`, `RealVectorBounds`, `SE2StateSpace`, `ReedsSheppStateSpace` or `DubinsStateSpace`, use OMPL's own Python bindings.
+
+### Time-parameterization factories take no arguments
+
+`create_time_optimal_parameterization` accepted `path_tolerance` and `min_angle_change`, and
+`create_iterative_spline_parameterization` accepted `add_points`, but neither used them: since
+0.33 these settings are fields of the composite profiles that `compute` looks up in the
+`ProfileDictionary`, and the algorithm objects the factories return have none. The arguments are
+gone, so a call that passes one raises `TypeError` instead of silently doing nothing.
+
+| before | after |
+| --- | --- |
+| `create_time_optimal_parameterization(path_tolerance=0.05)` | `profile = TimeOptimalTrajectoryGenerationCompositeProfile()`, `profile.path_tolerance = 0.05` |
+| `create_time_optimal_parameterization(min_angle_change=0.01)` | `profile.min_angle_change = 0.01` on the same profile |
+| `create_iterative_spline_parameterization(add_points=False)` | `profile = IterativeSplineParameterizationCompositeProfile()`, `profile.add_points = False` |
+
+Add the profile with `profiles.addProfile(algorithm.getName(), "DEFAULT", profile)`.
 
 ## 0.35.0.9
 

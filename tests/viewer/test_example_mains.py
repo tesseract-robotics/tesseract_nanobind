@@ -18,18 +18,18 @@ import tesseract_robotics.examples
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
-# Needs ws/src/tesseract_ros_workcell (`git submodule update --init`), absent from CI's
-# wheel tests; hand-checked instead. Not a pytest skip: awaiting a go for one.
+# Its main takes a cell from argv and needs ws/src/tesseract_ros_workcell, so it stays out of
+# this canned run. tests/examples/test_twc_rail.py loads both of its cells for real.
 NEEDS_SUBMODULE = {"twc_workcell_positioner_viewer"}
 
 # Mains that keep their real run(): it plans nothing through a planner, and the main reads
@@ -78,9 +78,9 @@ def _canned_results() -> dict[str, object]:
 
     composite = CompositeInstruction()
     for q in CANNED_Q:
-        waypoint = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(JOINT_NAMES, q))
+        waypoint = StateWaypointPoly(StateWaypoint(JOINT_NAMES, q))
         move = MoveInstruction(waypoint, MoveInstructionType.FREESPACE)
-        composite.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move))
+        composite.push_back(MoveInstructionPoly(move))
 
     planned = SimpleNamespace(successful=True, raw_results=composite)
     return {
