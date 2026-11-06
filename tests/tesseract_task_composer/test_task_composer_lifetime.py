@@ -12,6 +12,12 @@ import pytest
 # A run lasts well under a second here; a hang (dropping the executor mid-run, a re-entrant
 # container lock) never ends. Generous enough for a loaded machine: plugin loading alone is ~5 s.
 TIMEOUT_S = 60
+# Seconds. The reload race repeats whole plugin reloads for 15 runs: 36 to 54 s on Windows runners,
+# and one row passed 60 (PR #375). Three times the worst pass seen.
+RELOAD_RACE_TIMEOUT_S = 180
+# Seconds. The child dumps its stacks and exits this long before the parent would kill it, so a
+# real hang reports where it stuck: a parent's timeout kill leaves no trace.
+HANG_DUMP_MARGIN_S = 30
 
 # The TrajOpt freespace problem of conftest.make_storage, for a fresh interpreter.
 _PREAMBLE = """
@@ -108,14 +114,14 @@ def gated_storage(node):
 """
 
 
-def _run(script: str, *, planning: bool = True) -> str:
+def _run(script: str, *, planning: bool = True, timeout_s: int = TIMEOUT_S) -> str:
     """Run `script` in a fresh interpreter; return its stdout, failing on a crash or a hang."""
     source = (_PREAMBLE if planning else "") + script
     proc = subprocess.run(
         [sys.executable, "-c", source],
         capture_output=True,
         text=True,
-        timeout=TIMEOUT_S,
+        timeout=timeout_s,
         check=False,
     )
     # nanobind's leak report after an uncaught exception, and the plugin pinning notices on
@@ -574,7 +580,12 @@ print("REPLACED", server.hasTask("Child"))
         """A run registered only after releasing the GIL: a reload on another thread could free
         the task between the lookup and the registration. Runs and reads on this thread wait for
         the other thread's reload instead of raising."""
-        out = _run("""
+        dump_after_s = RELOAD_RACE_TIMEOUT_S - HANG_DUMP_MARGIN_S
+        script = f"""
+import faulthandler
+faulthandler.dump_traceback_later({dump_after_s}, exit=True)
+"""
+        script += """
 import threading
 from tesseract_robotics.tesseract_task_composer import TaskComposerServerBusyError
 server = TaskComposerServer()
@@ -603,7 +614,8 @@ for _ in range(15):
 stop.append(True)
 reloader.join()
 print("SUCCESS", all(results), len(results), stats["reloads"] > 0)
-""")
+"""
+        out = _run(script, timeout_s=RELOAD_RACE_TIMEOUT_S)
         assert "SUCCESS True 15 True" in out, out
 
     def test_server_is_busy_while_loading(self, tmp_path):
