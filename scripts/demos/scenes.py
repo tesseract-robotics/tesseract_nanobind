@@ -13,7 +13,7 @@ from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import RecordingPhase, Trajectory
 
 # The TWC cell the demo shows.
-TWC_CELL = "positioner"
+TWC_CELL = "rail"
 
 
 @dataclass(frozen=True)

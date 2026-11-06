@@ -54,9 +54,9 @@ def test_a_scripted_scene_plays_one_trajectory_in_its_environment(module):
 
 
 @needs_twc
-def test_the_twc_scene_is_the_positioner_cell():
+def test_the_twc_scene_is_the_rail_cell():
     scene = SCENES["twc_workcell_positioner_viewer"](None)
-    assert "positioner" in scene.env.getName()
+    assert "rail" in scene.env.getName()
 
 
 def test_the_sqp_rows_are_the_final_solve_with_a_timestamp_last():

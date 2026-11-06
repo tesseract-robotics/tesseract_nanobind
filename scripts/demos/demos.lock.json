@@ -20,7 +20,7 @@
     "sdf_collision_example": "0691c49222f81abc619b16e60243361d1551b1142a7c259fb437e817338bbaec",
     "shapes_viewer": "524cb376fae42a9f685998139f8af44551f3a41d47fe154bf97ca44b77261de9",
     "tesseract_material_mesh_viewer": "75a5db7e08bae9b87b87fd36f3723c8ca9a31e59ff3af870e6e40e57ae66cf43",
-    "twc_workcell_positioner_viewer": "79f93edf20dcecfd4c206812c81f3d8baef188da1d493e3a44daf67b7690a0aa"
+    "twc_workcell_positioner_viewer": "31fd639c313321808795685b3fd4c70f4a73b7198dd8ec4b499aa540b58a613a"
   },
   "recordings": {
     "abb_irb2400_viewer": {
@@ -187,12 +187,12 @@
     },
     "twc_workcell_positioner_viewer": {
       "identity": {
-        "inputs_sha256": "9863a18b7c15036f4997f133f9c8e7c4fcd38944bca90530bddf8415f301f4da",
+        "inputs_sha256": "a1e7d5757b11fbec90003dcfc6e513fc3b395562a7b9f179c6cdf9552818e595",
         "package_version": "0.35.0.9.dev554",
         "viser_version": "1.1.1"
       },
-      "recording_sha256": "83599f393f5df4e978467ef92e706c997512dc9e54dae3b2c8b0fac7401e39aa",
-      "size_bytes": 6266849
+      "recording_sha256": "1e2ead15637b5ab1790f3cbf0fdd360eec848f85ceaec0dcf6c02bc0a169925e",
+      "size_bytes": 6231418
     }
   },
   "viser_version": "1.1.1"

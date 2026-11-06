@@ -212,10 +212,10 @@ fov_rad = 0.6109
 module = "twc_workcell_positioner_viewer"
 page = "user-guide/viewer.md"
 title = "TWC workcell"
-blurb = "An industrial workcell with a positioner."
+blurb = "An industrial workcell: a robot on a 12 m rail, beside a positioner."
 status = "published"
-floor_size_m = 12.0
+floor_size_m = 18.0
 [example.camera]
-position = [8, 6, 5.5]
-look_at = [0, 0, 1.1]
+position = [8.5, 8.0, 5.0]
+look_at = [0.0, -0.8, 0.9]
 fov_rad = 0.6109
