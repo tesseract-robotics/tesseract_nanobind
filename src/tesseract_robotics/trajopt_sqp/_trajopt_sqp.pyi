@@ -603,6 +603,11 @@ class QPProblem:
     def getExactConstraintViolations(self) -> ConstraintViolations:
         """Get current exact constraint violations"""
 
+    def setSumConstraintSetViolations(self, sum: bool) -> None:
+        """
+        Reduce a merit unit's row violations to their sum (True) or to the largest (False) in ConstraintViolations.raw. TrustRegionSQPSolver.init() overwrites this with SQPParameters.sum_constraint_set_violations.
+        """
+
     def scaleBoxSize(self, scale: float) -> None:
         """Uniformly scale the trust region box size"""
 
