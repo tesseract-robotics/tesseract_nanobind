@@ -141,7 +141,7 @@ Run within pixi: `pixi run python your_script.py` or enter `pixi shell` first.
 
 Pixi installs `llvm-openmp` from conda-forge. If you have Homebrew's libomp installed, library conflicts can cause crashes. The pixi environment isolates this, but running outside `pixi shell` may pick up the wrong library.
 
-A second duplication survives *inside* a conda or pixi environment, because the published macOS wheel carries its own delocated `libomp.dylib`. `numpy` loads and initialises the environment's copy at import; the wheel's copy is mapped when `tesseract_robotics` is imported and stays idle until something opens an OpenMP parallel region. Descartes' ladder solver is the first thing that does, so it aborts with `OMP: Error #15` where the rest of a suite passes — and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. The mechanism, the measurement and the packaging fix are in [macOS Wheel Gotchas](../developer/macos-wheels.md).
+Wheels up to 0.35.0.9 carry their own `libomp.dylib`, and inside a conda or pixi environment that makes two runtimes: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Newer wheels use the environment's `libomp` when it has one and their bundled copy otherwise, so uv and pip environments work too. The mechanism and the fix are in [macOS Wheel Gotchas](../developer/macos-wheels.md).
 
 ### Scattered Segfaults / "double free or corruption"
 

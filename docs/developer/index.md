@@ -192,7 +192,7 @@ tesseract_nanobind/
 │   ├── gil_entry_points.py    # nogil_entry_points.yaml loader
 │   ├── nogil_entry_points.yaml # Every binding that releases the GIL, and why
 │   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
-│   ├── build_macos_wheel.sh   # Portable macOS wheel (delocate)
+│   ├── build_macos_wheel.sh   # Portable macOS wheel
 │   └── build_upstream.sh      # 0.36 inner loop: build upstream/ into the env
 ├── upstream/                  # tesseract, trajopt, tesseract_planning, bpl submodules (0.36)
 └── packaging/                 # forked feedstock submodules (0.36 outer loop)

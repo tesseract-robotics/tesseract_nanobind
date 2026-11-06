@@ -171,7 +171,7 @@ def _configure_environment():
 
     # Plugin search paths - env var, bundled plugins, or $CONDA_PREFIX/lib (editable)
     # Linux:   pkg_dir (all deps bundled in package root with $ORIGIN rpath)
-    # macOS:   .dylibs (delocate-repaired)
+    # macOS:   .dylibs (scripts/repair_macos_wheel.py)
     # Windows: pkg_dir (plugin factory DLLs bundled there; delvewheel libs go to
     #          sibling tesseract_robotics.libs/ but plugin dlopen targets pkg_dir)
     plugin_path = os.environ.get("TESSERACT_PLUGIN_PATH")  # explicit override

@@ -240,10 +240,10 @@ jobs:
         # 3.13/3.14/3.15 install the cp312-abi3 wheel (STABLE_ABI) to verify the
         # published support matrix on Windows, not just Linux. wheel != python.
         include:
-          - { python: '3.12', wheel: '3.12' }
-          - { python: '3.13', wheel: '3.12' }
-          - { python: '3.14', wheel: '3.12' }
-          - { python: '3.15', wheel: '3.12' }
+          - { python: '3.12', wheel: '3.12', env: wheel-312 }
+          - { python: '3.13', wheel: '3.12', env: wheel-313 }
+          - { python: '3.14', wheel: '3.12', env: wheel-314 }
+          - { python: '3.15', wheel: '3.12', env: wheel-315 }
     defaults:
       run:
         shell: bash -el {0}
@@ -251,26 +251,25 @@ jobs:
     - uses: actions/checkout@v4
       with:
         path: tesseract_nanobind
-    - uses: actions/setup-python@v5
+    - name: setup pixi
+      uses: prefix-dev/setup-pixi@v0.8.0
       with:
-        python-version: ${{ matrix.python }}
-        architecture: x64
+        pixi-version: v0.70.1
+        manifest-path: tesseract_nanobind/pyproject.toml
+        cache: true
+        locked: true
+        environments: ${{ matrix.env }}
+        activate-environment: ${{ matrix.env }}
     - uses: actions/download-artifact@v4
       with:
         name: python-${{ matrix.wheel }}-windows-x64-pixi
         path: wheelhouse
 
-    - name: install wheel in clean venv
-      run: |
-        python -m venv test_env
-        source test_env/Scripts/activate
-        python -m pip install --upgrade pip
-        pip install wheelhouse/tesseract*.whl
-        pip install pytest pytest-xdist scipy pyyaml
+    - name: install wheel in lean env
+      run: uv pip install wheelhouse/tesseract*.whl pytest pytest-xdist scipy pyyaml
 
     - name: smoke test
       run: |
-        source test_env/Scripts/activate
         python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
         python -c "from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_scene_graph"
         python -c "from tesseract_robotics import trajopt_ifopt; print('trajopt_ifopt OK')"
@@ -283,7 +282,6 @@ jobs:
       # fix, and the uniform conda plugin DLLs. Windows is rhino's primary
       # platform: this is core product coverage, not optional.
       run: |
-        source test_env/Scripts/activate
         cd tesseract_nanobind
         pytest tests -n auto \
           --ignore=tests/benchmarks \
