@@ -533,9 +533,8 @@ def test_close_raises_when_the_player_is_wedged(monkeypatch):
     assert not viewer._player.is_alive()
 
 
-def test_close_waits_out_a_long_push_on_another_thread(monkeypatch):
-    """A long push holds the pose lock past the join timeout; close() must not call it wedged."""
-    monkeypatch.setattr("tesseract_robotics.viewer.viewer.PLAYER_JOIN_TIMEOUT_S", 2 * PLAYBACK_DT_S)
+def test_close_waits_out_a_long_push_on_another_thread():
+    """A held pose lock does not keep the player from exiting; close() then waits for the push."""
     viewer = TesseractViewer(port=0)
     holding = threading.Event()
     release = threading.Event()
@@ -545,16 +544,22 @@ def test_close_waits_out_a_long_push_on_another_thread(monkeypatch):
             holding.set()
             release.wait()
 
-    pusher = threading.Thread(target=long_push)
-    pusher.start()
-    assert holding.wait(PLAYER_ADVANCE_TIMEOUT_S)
-    time.sleep(2 * PLAYBACK_DT_S)  # The player is now waiting on the pose lock.
     errors = []
-    closer = threading.Thread(target=_capture, args=(viewer.close, errors))
-    closer.start()
-    time.sleep(6 * PLAYBACK_DT_S)  # Longer than the join timeout.
-    assert closer.is_alive(), "close() must wait for the push before stopping the server"
-    release.set()
+    # Daemons: a failed test must not leave a thread that blocks interpreter exit.
+    pusher = threading.Thread(target=long_push, daemon=True)
+    closer = threading.Thread(target=_capture, args=(viewer.close, errors), daemon=True)
+    pusher.start()
+    try:
+        assert holding.wait(PLAYER_ADVANCE_TIMEOUT_S)
+        time.sleep(2 * PLAYBACK_DT_S)  # The player is now waiting on the pose lock.
+        closer.start()
+        viewer._player.join(PLAYER_ADVANCE_TIMEOUT_S)
+        assert not viewer._player.is_alive(), "a held pose lock must not wedge the player"
+        # The push still holds the lock, so a correct close() outlasts any window.
+        closer.join(6 * PLAYBACK_DT_S)
+        assert closer.is_alive(), "close() must wait for the push before stopping the server"
+    finally:
+        release.set()
     closer.join(PLAYER_ADVANCE_TIMEOUT_S)
     pusher.join(PLAYER_ADVANCE_TIMEOUT_S)
     assert not closer.is_alive()
