@@ -237,7 +237,7 @@ def create_car_seat_ifopt_profiles():
     move.joint_constraint_config.enabled = True
 
     solver = TrajOptIfoptOSQPSolverProfile()
-    solver.opt_params.max_iterations = 200
+    solver.opt_params.max_iter = 200
     solver.opt_params.min_approx_improve = 1e-3
     solver.opt_params.min_trust_box_size = 1e-3
 

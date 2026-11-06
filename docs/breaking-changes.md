@@ -89,7 +89,7 @@ now raise `TypeError: unhashable type`:
 | before | after |
 | --- | --- |
 | `seen = {config}` | `seen = {id(config)}` |
-| `cache[params] = result` | key on the fields you vary, e.g. `cache[params.max_iterations] = result` |
+| `cache[params] = result` | key on the fields you vary, e.g. `cache[params.max_iter] = result` |
 
 ### Collision constraints need a `Var` in a variable set
 

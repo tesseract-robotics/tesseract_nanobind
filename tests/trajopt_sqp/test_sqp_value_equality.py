@@ -11,7 +11,7 @@ def test_sqp_parameters():
     a, b = tsqp.SQPParameters(), tsqp.SQPParameters()
     assert a == b
     assert not (a != b)
-    b.max_iterations = a.max_iterations + 1
+    b.max_iter = a.max_iter + 1
     assert a != b
 
 

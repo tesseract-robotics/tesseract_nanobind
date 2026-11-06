@@ -258,7 +258,7 @@ def create_ifopt_profiles():
     composite.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 
     solver = TrajOptIfoptOSQPSolverProfile()
-    solver.opt_params.max_iterations = 200
+    solver.opt_params.max_iter = 200
     solver.opt_params.min_approx_improve = 1e-3
     solver.opt_params.min_trust_box_size = 1e-3
 
