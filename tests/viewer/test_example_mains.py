@@ -18,10 +18,10 @@ import tesseract_robotics.examples
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
+    MoveInstructionPoly,
     MoveInstructionType,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
@@ -78,9 +78,9 @@ def _canned_results() -> dict[str, object]:
 
     composite = CompositeInstruction()
     for q in CANNED_Q:
-        waypoint = StateWaypointPoly_wrap_StateWaypoint(StateWaypoint(JOINT_NAMES, q))
+        waypoint = StateWaypointPoly(StateWaypoint(JOINT_NAMES, q))
         move = MoveInstruction(waypoint, MoveInstructionType.FREESPACE)
-        composite.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(move))
+        composite.push_back(MoveInstructionPoly(move))
 
     planned = SimpleNamespace(successful=True, raw_results=composite)
     return {

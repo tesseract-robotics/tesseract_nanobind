@@ -289,13 +289,13 @@ def test_real_unbound_dependency_rows(g3_reports, module, symbol):
 @pytest.mark.parametrize(
     ("module", "symbol"),
     [
-        # `ompl::base::State` is bound by `ompl_base` until #258 removes it: a Python form.
+        # #258 removed `ompl_base`: `ompl::base::State` has no Python form any more.
         (OMPL, "OMPLMoveProfile.createStateExtractor"),
         (OMPL, "OMPLRealVectorMoveProfile.createStateExtractor"),
     ],
 )
-def test_real_bindable_rows_stay_gaps(g3_reports, module, symbol):
-    assert symbol in gap_symbols(g3_reports[module])
+def test_ompl_state_rows_are_no_gaps(g3_reports, module, symbol):
+    assert symbol not in gap_symbols(g3_reports[module])
 
 
 @pytest.mark.parametrize(

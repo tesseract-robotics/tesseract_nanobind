@@ -72,7 +72,6 @@ tesseract_pick_and_place_example = "tesseract_robotics.examples.pick_and_place_e
 tesseract_plugin_configuration_example = "tesseract_robotics.examples.plugin_configuration_example:main"
 tesseract_puzzle_piece_auxillary_axes_example = "tesseract_robotics.examples.puzzle_piece_auxillary_axes_example:main"
 tesseract_raster_example = "tesseract_robotics.examples.raster_example:main"
-tesseract_reeds_shepp_example = "tesseract_robotics.examples.reeds_shepp_example:main"
 tesseract_scene_graph_example = "tesseract_robotics.examples.scene_graph_example:main"
 tesseract_sdf_collision_example = "tesseract_robotics.examples.sdf_collision_example:main"
 tesseract_shapes_viewer = "tesseract_robotics.examples.shapes_viewer:main"

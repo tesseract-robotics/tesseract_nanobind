@@ -198,10 +198,11 @@ def test_syntax_error_raises_header_parse_error():
         audit.parse_tu(FIXTURES / "broken_bindings.cpp")
 
 
-def test_binding_modules_are_the_23_extension_modules():
+def test_binding_modules_are_the_22_extension_modules():
     modules = audit.binding_modules()
-    assert len(modules) == 23
-    assert {"tesseract_collision", "ompl_base", "trajopt_sqp"} <= set(modules)
+    assert len(modules) == 22
+    assert {"tesseract_collision", "trajopt_sqp"} <= set(modules)
+    assert "ompl_base" not in modules  # #258
 
 
 def test_unknown_module_raises():
@@ -209,10 +210,11 @@ def test_unknown_module_raises():
         audit.resolve_module("tesseract_nope")
 
 
-def test_unmapped_module_raises():
+def test_unmapped_module_raises(monkeypatch):
     """#256: a binding module listed in UNAUDITED_MODULES is refused with its reason."""
-    with pytest.raises(audit.UnauditedModuleError, match="not audited: To be removed"):
-        audit.resolve_module("ompl_base")
+    monkeypatch.setitem(audit.UNAUDITED_MODULES, "tesseract_srdf", ("Binds a probe.", ()))
+    with pytest.raises(audit.UnauditedModuleError, match="not audited: Binds a probe"):
+        audit.resolve_module("tesseract_srdf")
 
 
 @pytest.mark.parametrize("module", FIRST_PASS)
@@ -882,7 +884,7 @@ def test_json_has_coverage(fixture_report):
 def test_coverage_of_the_real_tables():
     coverage = audit.coverage()
     assert coverage.audited == tuple(sorted(audit.AUDITED_HEADER_PREFIX))
-    assert coverage.unaudited["ompl_base"] == audit.UNAUDITED_MODULES["ompl_base"][0]
+    assert coverage.unaudited == {}
     assert len(coverage.audited) + len(coverage.unaudited) == len(audit.binding_modules())
 
 

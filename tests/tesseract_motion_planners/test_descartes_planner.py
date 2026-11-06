@@ -12,14 +12,12 @@ import pytest
 from tesseract_robotics.tesseract_collision import ACMOverrideType, ContactManagerConfig
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_LINEAR,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
@@ -36,7 +34,6 @@ from tesseract_robotics.tesseract_kinematics import KinematicGroup
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
-    DescartesDefaultPlanProfileD,
     DescartesEdgeEvaluatorD,
     DescartesLadderGraphSolverProfileD,
     DescartesMotionPlannerD,
@@ -46,8 +43,6 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesStateSampleD,
     DescartesWaypointSamplerD,
     ProfileOverrideNotDispatchedError,
-    cast_DescartesMoveProfileD,
-    cast_DescartesPlanProfileD,
     sampleFixed,
     sampleToolAxis,
     sampleToolXAxis,
@@ -87,14 +82,14 @@ class TestDescartesProfiles:
     """Test Descartes profile types."""
 
     def test_default_plan_profile(self):
-        profile = DescartesDefaultPlanProfileD()
+        profile = DescartesDefaultMoveProfileD()
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
 
     def test_default_plan_profile_attributes(self):
-        """Test DescartesDefaultPlanProfileD attributes."""
-        profile = DescartesDefaultPlanProfileD()
+        """Test DescartesDefaultMoveProfileD attributes."""
+        profile = DescartesDefaultMoveProfileD()
 
         # Test pose sampling attributes
         profile.target_pose_fixed = False
@@ -127,7 +122,7 @@ class TestDescartesProfiles:
 
     def test_default_plan_profile_contact_manager_config(self):
         """vertex_contact_manager_config / edge_contact_manager_config round-trip."""
-        profile = DescartesDefaultPlanProfileD()
+        profile = DescartesDefaultMoveProfileD()
 
         # Both fields are exposed and return a ContactManagerConfig.
         assert isinstance(profile.vertex_contact_manager_config, ContactManagerConfig)
@@ -194,31 +189,31 @@ class TestDescartesPlanning:
         )
 
         start_instruction = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_LINEAR,
+            CartesianWaypointPoly(wp1),
+            MoveInstructionType.LINEAR,
             "TEST_PROFILE",
         )
         start_instruction.setManipulatorInfo(manip_info)
 
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_LINEAR,
+            CartesianWaypointPoly(wp2),
+            MoveInstructionType.LINEAR,
             "TEST_PROFILE",
         )
         plan_f1.setManipulatorInfo(manip_info)
 
         program = CompositeInstruction()
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         # Interpolate the program (Descartes requires seed trajectory)
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
         # Setup Descartes profiles
-        plan_profile = DescartesDefaultPlanProfileD()
+        plan_profile = DescartesDefaultMoveProfileD()
         # Use cast helper to convert to Profile for ProfileDictionary
-        plan_profile_base = cast_DescartesPlanProfileD(plan_profile)
+        plan_profile_base = plan_profile
 
         profiles = ProfileDictionary()
         profiles.addProfile(DESCARTES_DEFAULT_NAMESPACE, "TEST_PROFILE", plan_profile_base)
@@ -240,10 +235,10 @@ class TestDescartesPlanning:
         count = 0
         for instr in results:
             if instr.isMoveInstruction():
-                move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+                move_instr = instr.asMoveInstruction()
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
-                    state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+                    state_wp = wp.asStateWaypoint()
                     assert len(state_wp.getJointIds()) == 6  # ABB IRB2400 has 6 joints
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 6
@@ -310,23 +305,23 @@ class TestPythonEdgeEvaluator:
         )
 
         start_instruction = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_LINEAR,
+            CartesianWaypointPoly(wp1),
+            MoveInstructionType.LINEAR,
             "PY_EDGE_PROFILE",
         )
         start_instruction.setManipulatorInfo(manip_info)
 
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_LINEAR,
+            CartesianWaypointPoly(wp2),
+            MoveInstructionType.LINEAR,
             "PY_EDGE_PROFILE",
         )
         plan_f1.setManipulatorInfo(manip_info)
 
         program = CompositeInstruction()
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
@@ -335,7 +330,7 @@ class TestPythonEdgeEvaluator:
         profiles.addProfile(
             DESCARTES_DEFAULT_NAMESPACE,
             "PY_EDGE_PROFILE",
-            cast_DescartesMoveProfileD(py_profile),
+            py_profile,
         )
 
         planner = DescartesMotionPlannerD(DESCARTES_DEFAULT_NAMESPACE)
@@ -354,12 +349,12 @@ class TestPythonEdgeEvaluator:
 def _cartesian_move(pose, manip_info, profile="TEST_PROFILE"):
     """A LINEAR MoveInstructionPoly to `pose` carrying `manip_info`."""
     instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose)),
-        MoveInstructionType_LINEAR,
+        CartesianWaypointPoly(CartesianWaypoint(pose)),
+        MoveInstructionType.LINEAR,
         profile,
     )
     instruction.setManipulatorInfo(manip_info)
-    return MoveInstructionPoly_wrap_MoveInstruction(instruction)
+    return MoveInstructionPoly(instruction)
 
 
 def _fixed_pose_program(manip_info, profile="TEST_PROFILE"):
@@ -372,7 +367,7 @@ def _fixed_pose_program(manip_info, profile="TEST_PROFILE"):
             * Translation3d(0.8, y, 0.8)
             * Quaterniond.from_xyzw(0, -1.0, 0, 0)
         )
-        program.appendMoveInstruction(_cartesian_move(pose, manip_info, profile))
+        program.push_back(_cartesian_move(pose, manip_info, profile))
     return program
 
 
@@ -472,7 +467,7 @@ class TestDescartesMotionPlannerBase:
         profiles.addProfile(
             DESCARTES_DEFAULT_NAMESPACE,
             "TEST_PROFILE",
-            cast_DescartesMoveProfileD(DescartesDefaultMoveProfileD()),
+            DescartesDefaultMoveProfileD(),
         )
         request = PlannerRequest()
         request.instructions = program
@@ -618,7 +613,7 @@ class TestDescartesConcreteProfileOverrides:
 
     def test_alias_is_covered(self):
         with pytest.raises(ProfileOverrideNotDispatchedError):
-            type("Overrides", (DescartesDefaultPlanProfileD,), {"createEdgeEvaluator": None})
+            type("Overrides", (DescartesDefaultMoveProfileD,), {"createEdgeEvaluator": None})
 
     def test_subclass_without_hooks_is_allowed(self):
         class Configured(DescartesDefaultMoveProfileD):

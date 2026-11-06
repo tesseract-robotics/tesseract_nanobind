@@ -55,8 +55,69 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 - **`TaskComposerConfigError`** — a `str` config that does not load in `TaskComposerPluginFactory(str, locator)`, its `loadConfig` and `TaskComposerServer.loadConfig` raises `TaskComposerConfigError`, a `ValueError` subclass, instead of a bare `ValueError`; so does YAML text without a top-level `task_composer_plugins` mapping (empty, `~`, a list, an unrelated mapping), which upstream loaded silently as an empty config ([#337]).
 - **Task-composer value types compare by value** — `AnyPoly`, `TaskComposerKeys`, `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`, `TaskComposerContext`, `TaskComposerNodePorts`, `TaskComposerLog` bind `==` and are unhashable ([#261]).
 
+- **SWIG-era `MoveInstructionType_*` constants removed** — `tesseract_command_language` exported `MoveInstructionType_LINEAR`, `MoveInstructionType_FREESPACE` and `MoveInstructionType_CIRCULAR`, copies of the enum members kept from the SWIG bindings; C++ has none of them. Importing one raises `ImportError`, reading one as a module attribute raises `AttributeError`; the enum members are the same objects. The package's hand-kept `__all__` is gone too, so `from tesseract_robotics.tesseract_command_language import *` exports every public name of the extension (`toJointTrajectory`, `moveFilter`, …), not a stale subset. The module joins the #176 no-alias guard ([#275]).
+
+  | before | after |
+  | --- | --- |
+  | `MoveInstructionType_LINEAR` (also `_FREESPACE`, `_CIRCULAR`) | `MoveInstructionType.LINEAR` (`.FREESPACE`, `.CIRCULAR`) |
+
+- **`assign*Waypoint` and `ProfileDictionary_addProfile` removed** — `MoveInstruction` and `MoveInstructionPoly` lose `assignCartesianWaypoint`, `assignJointWaypoint` and `assignStateWaypoint`, SWIG-era copies of `setWaypoint` (C++ 0.33 removed them); `tesseract_command_language.ProfileDictionary_addProfile(d, ns, name, p)` is gone, since `d.addProfile(ns, name, p)` takes every module's profiles. Nothing in the repository called them ([#276]).
+
+- **SWIG-era Poly helpers and `appendMoveInstruction` removed** — the 14 module functions `CartesianWaypointPoly_wrap_CartesianWaypoint`, `JointWaypointPoly_wrap_JointWaypoint`, `StateWaypointPoly_wrap_StateWaypoint`, `MoveInstructionPoly_wrap_MoveInstruction`, `InstructionPoly_as_*` (7) and `WaypointPoly_as_*` (3), and `CompositeInstruction.appendMoveInstruction`, duplicated a constructor or method; C++ has none of them. Every in-repo caller moved to the native form. `wp.as…Waypoint()` returns a reference into the waypoint where `WaypointPoly_as_*` returned a copy: edits through it reach the program; `copy.copy(wp.as…Waypoint())` is the copy ([#328]).
+
+  | before | after |
+  | --- | --- |
+  | `CartesianWaypointPoly_wrap_CartesianWaypoint(wp)` (also `Joint…`, `State…`) | `CartesianWaypointPoly(wp)` |
+  | `MoveInstructionPoly_wrap_MoveInstruction(mi)` | `MoveInstructionPoly(mi)` |
+  | `InstructionPoly_as_MoveInstructionPoly(ip)` | `ip.asMoveInstruction()` |
+  | `InstructionPoly_as_CompositeInstruction(ip)` (also `Wait`, `Timer`, `SetAnalog`, `SetDigital`, `SetTool`) | `ip.asCompositeInstruction()` (`asWaitInstruction()`, …) |
+  | `WaypointPoly_as_CartesianWaypointPoly(wp)` (also `Joint…`, `State…`) | `wp.asCartesianWaypoint()` (a reference) |
+  | `program.appendMoveInstruction(mi)` | `program.push_back(mi)` |
+
+- **Time-parameterization profiles bound under their C++ names** — `TOTGCompositeProfile`, `ISPCompositeProfile`, `ISPMoveProfile` and `ConstantTCPSpeedCompositeProfile` are now `TimeOptimalTrajectoryGenerationCompositeProfile`, `IterativeSplineParameterizationCompositeProfile`, `IterativeSplineParameterizationMoveProfile` and `ConstantTCPSpeedParameterizationCompositeProfile`, as every other planner profile is (#187). No alias: the old names raise `ImportError`. The package's `__all__` is gone; `import *` exports every public name of the extension ([#329]).
+
+  | before | after |
+  | --- | --- |
+  | `TOTGCompositeProfile` | `TimeOptimalTrajectoryGenerationCompositeProfile` |
+  | `ISPCompositeProfile` | `IterativeSplineParameterizationCompositeProfile` |
+  | `ISPMoveProfile` | `IterativeSplineParameterizationMoveProfile` |
+  | `ConstantTCPSpeedCompositeProfile` | `ConstantTCPSpeedParameterizationCompositeProfile` |
+
+- **Six `trajopt_sqp` enumerators renamed to their C++ names** — every `SQPStatus` and `QPSolverStatus` member is now the `UPPER_SNAKE` form of its C++ `kCamelCase` name. This reverses the 0.34 "Python names preserved" choice for the six whose kept name differed from C++ (one was a typo). No aliases: the old names raise `AttributeError`, and code comparing `status.name` against an old string now silently fails to match — search for those strings ([#330]).
+
+  | before | after |
+  | --- | --- |
+  | `SQPStatus.NLP_CONVERGED` | `SQPStatus.CONVERGED` |
+  | `SQPStatus.OPT_TIME_LIMIT` | `SQPStatus.TIME_LIMIT` |
+  | `SQPStatus.QP_SOLVER_ERROR` | `SQPStatus.QP_SOLVE_FAILED` |
+  | `SQPStatus.CALLBACK_STOPPED` | `SQPStatus.STOPPED_BY_CALLBACK` |
+  | `QPSolverStatus.UNITIALIZED` | `QPSolverStatus.UNINITIALIZED` |
+  | `QPSolverStatus.QP_ERROR` | `QPSolverStatus.FAILED` |
+
+- **Planner-module compatibility names removed: `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the 0.28 `…PlanProfile` names, trajopt's 0.28 re-exports and the packages' `__all__`** — `ProfileDictionary.addProfile(ns, name, profile)` takes a profile from every planner module, including a Python subclass of a trampolined profile, so the 15 helper functions are gone ([#334]). The eight `…PlanProfile` aliases of the 0.33 `…MoveProfile` classes are gone, and so are `TrajOptCollisionConfig` / `CollisionEvaluatorType` in `tesseract_motion_planners_trajopt`. `tesseract_motion_planners_trajopt_ifopt` keeps its config re-exports (`TrajOptCollisionConfig`, `CollisionEvaluatorType`, `SQPParameters`). The six `tesseract_motion_planners*` packages lose their `__all__`; `import *` now exports every public name, e.g. `OMPLRealVectorMoveProfile` and `RNG_setSeed` from the OMPL package, which its old list left out ([#335]).
+
+  | before | after |
+  | --- | --- |
+  | `ProfileDictionary_addTrajOptMoveProfile(pd, ns, name, p)` (all 10 `ProfileDictionary_add…`) | `pd.addProfile(ns, name, p)` |
+  | `OMPLMoveProfile_as_ProfileConstPtr(p)`, `cast_DescartesMoveProfileD(p)` (all 5 casts) | `p` |
+  | `TrajOptDefaultPlanProfile` (all 8 `…PlanProfile` names) | `TrajOptDefaultMoveProfile` |
+  | `from …tesseract_motion_planners_trajopt import TrajOptCollisionConfig` | `from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig` |
+  | `from …tesseract_motion_planners_trajopt import CollisionEvaluatorType` | `from tesseract_robotics.tesseract_collision import CollisionEvaluatorType` |
+
+- **`create_time_optimal_parameterization` and `create_iterative_spline_parameterization` take no arguments** — `path_tolerance`, `min_angle_change` and `add_points` were accepted and silently ignored since 0.33 moved them into the composite profiles. Passing one now raises `TypeError`; set the field on the profile instead.
+
+  | before | after |
+  | --- | --- |
+  | `create_time_optimal_parameterization(path_tolerance=0.05, min_angle_change=0.01)` | `create_time_optimal_parameterization()`, and `TimeOptimalTrajectoryGenerationCompositeProfile().path_tolerance = 0.05` (`.min_angle_change`) |
+  | `create_iterative_spline_parameterization(add_points=False)` | `create_iterative_spline_parameterization()`, and `IterativeSplineParameterizationCompositeProfile().add_points = False` |
+
+- **`tesseract_robotics.ompl_base` removed** — the module, its hand-written stub and `reeds_shepp_example.py` / `tesseract_reeds_shepp_example`. It wrapped five OMPL headers directly, and nothing in the package used it; OMPL stays a dependency of the OMPL planner, which loads it in C++. Use OMPL's own Python bindings for `State`, `RealVectorBounds`, `SE2StateSpace`, `ReedsSheppStateSpace` or `DubinsStateSpace` ([#258]).
+
 ### Changes
 
+- **`JointTrajectory.insert(index, state)` and `del traj[i]` / `del traj[a:b]`**, in Python's list forms, as `CompositeInstruction` has ([#269]).
+- **`TrajOptCollisionConfig(margin, coeff, request, type, longest_valid_segment_length, check_program_mode)`** — the full upstream constructor; the two-argument form still works ([#251]).
+- **The binding audit reports trailing defaulted parameters Python cannot pass** — a C++ overload with defaulted parameters counts as covered only if a covering Python overload accepts all of them; otherwise the gap names the unreachable ones. `OFKTStateSolver(scene_graph, prefix)` is accepted under `upstream-broken-default` ([#251], [tesseract#1384]).
 - **The README and docs show the examples running (#379)** — the README opens on a `car_seat` poster that links to the live viewer, and the docs home and example pages embed players that load on click. They play, scrub and orbit from static files, with no Python server. Examples moves up to directly after Installation, and the README's Development section moves to the [developer guide](https://tesseract-robotics.github.io/tesseract_nanobind/developer/).
 - **`TesseractViewer.record` writes a `.viser` file (#379)** — `record(phases, *, fps=30.0)` returns the scene playing a sequence of `RecordingPhase(env, trajectory)`, through a public API. `RecordingFpsError` names a bad `fps`.
 - **Demo tooling (#379)** — `demo-record`, `demo-posters`, `demo-players`, `demo-check`, `demo-fetch` and `demo-check-site`. Recordings live in the `demo-assets` release under their hashes, pinned by `scripts/demos/demos.lock.json`, so they stay out of git history. The Docs workflow fetches and verifies them, and fails when the built site references a file it lacks.
@@ -127,6 +188,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 - **`NodesVariables(name, nodes)` and the `Var` constructors** — Python builds variable sets with several vars or per-node bounds; the `Node`s hand over ownership. `Var.getParent` / `Node.getParent` ([#297]).
 - **`QPProblem` convex model and `setVariables`** — `getHessian`, `getGradient`, `getConstraintMatrix`, `getBoundsLower`, `getBoundsUpper`, `getConstraintMeritCoeff`, and `setVariables(x)`, which raises `VariablesSizeError` unless `len(x) == getNumNLPVars()` ([#282]).
 - **`QPSolver` update interface** — `updateHessianMatrix`, `updateGradient`, `updateLowerBound`, `updateUpperBound`, `updateBounds`, `updateLinearConstraintsMatrix` and `setWarmStart(problem)` on the base; `OSQPEigenSolver.setWarmStart` takes a `bool` (the OSQP option) or a `QPProblem` ([#283]).
+- **`from_yaml` examples for every planner** — `docs/user-guide/planning.md` gains "Profiles from YAML": one checked example each for the simple, OMPL, TrajOpt, TrajOpt-Ifopt and task-composer planning profiles, with the merge-versus-replace rule for nested configs ([#331]).
 
 ### Fixed
 
@@ -613,8 +675,11 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#241]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/241
 [#232]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/232
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
+[tesseract#1384]: https://github.com/tesseract-robotics/tesseract/issues/1384
+[#251]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/251
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
+[#258]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/258
 [#282]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/282
 [#283]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/283
 [#284]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/284
@@ -787,3 +852,10 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#336]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/336
 [#337]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/337
 [#338]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/338
+[#275]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/275
+[#276]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/276
+[#328]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/328
+[#329]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/329
+[#330]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/330
+[#334]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/334
+[#335]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/335

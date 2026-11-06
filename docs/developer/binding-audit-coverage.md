@@ -1,6 +1,6 @@
 # Binding audit coverage and ownership
 
-22 of the 23 binding modules are audited: the 10 core modules and the 12 planning and trajopt modules (#256). The only unaudited module is `ompl_base`, which binds OMPL rather than tesseract and is to be removed (#258). Every open row of the [Binding API Audit](binding-api-audit.md) (a gap, a deviation or a quoted C++ name) has a recorded outcome in `scripts/audit_ledger.json`: an open issue or a won't-fix reason. `tests/audit/test_audit_ledger.py` checks this in both directions on every PR. Every other difference between a header and its stub is accepted under one of the 54 named rules below, and each rule's text is printed in the report.
+All 22 binding modules are audited: the 10 core modules and the 12 planning and trajopt modules (#256). Every open row of the [Binding API Audit](binding-api-audit.md) (a gap, a deviation or a quoted C++ name) has a recorded outcome in `scripts/audit_ledger.json`: an open issue or a won't-fix reason. `tests/audit/test_audit_ledger.py` checks this in both directions on every PR. Every other difference between a header and its stub is accepted under one of the 54 named rules below, and each rule's text is printed in the report.
 
 A binding module that is in neither module table fails the run before anything is parsed. A rule-table entry whose rule has no text fails at import. A ledger entry whose row is gone fails the ledger test. Nothing is accepted silently.
 
@@ -103,7 +103,7 @@ Every other declaration in the TU is used only to resolve Python names.
 | table | maps | meaning |
 |---|---|---|
 | `AUDITED_HEADER_PREFIX` | module → prefixes | audited |
-| `UNAUDITED_MODULES` | module → (reason, prefixes) | not audited; listed in the report with the reason. Holds only `ompl_base` |
+| `UNAUDITED_MODULES` | module → (reason, prefixes) | not audited; listed in the report with the reason. Empty since #258 removed `ompl_base` |
 
 Every prefix ends with `/`. A module may own several prefixes. `trajopt_ifopt` also owns `trajopt_common/`, because it registers `TrajOptCollisionConfig`. `tesseract_motion_planners_trajopt` owns classic TrajOpt's `trajopt_sco/` and `trajopt/`, and `tesseract_motion_planners_descartes` owns `descartes_light/`: Python reaches each of these libraries only through that planner.
 

@@ -16,11 +16,11 @@ import numpy as np
 
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
@@ -34,22 +34,19 @@ from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
-    OMPLRealVectorPlanProfile,
-    ProfileDictionary_addOMPLProfile,
+    OMPLRealVectorMoveProfile,
 )
 from tesseract_robotics.tesseract_motion_planners_simple import (
     generateInterpolatedProgram,
 )
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
     TrajOptDefaultCompositeProfile,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptMotionPlanner,
 )
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
 )
 
 OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
@@ -93,25 +90,25 @@ def run():
         * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
     )
     start_instruction = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-        MoveInstructionType_FREESPACE,
+        CartesianWaypointPoly(wp1),
+        MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     plan_f1 = MoveInstruction(
-        CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-        MoveInstructionType_FREESPACE,
+        CartesianWaypointPoly(wp2),
+        MoveInstructionType.FREESPACE,
         "DEFAULT",
     )
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+    program.push_back(MoveInstructionPoly(start_instruction))
+    program.push_back(MoveInstructionPoly(plan_f1))
 
     # --8<-- [start:plan_and_animate]
     # OMPL planning
-    plan_profile = OMPLRealVectorPlanProfile()
+    plan_profile = OMPLRealVectorMoveProfile()
     profiles = ProfileDictionary()
-    ProfileDictionary_addOMPLProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
+    profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", plan_profile)
 
     request = PlannerRequest()
     request.instructions = program
@@ -129,20 +126,12 @@ def run():
     # --8<-- [end:plan_and_animate]
 
     # TrajOpt trajectory optimization for smooth trajectories
-    trajopt_plan_profile = TrajOptDefaultPlanProfile()
+    trajopt_plan_profile = TrajOptDefaultMoveProfile()
     trajopt_composite_profile = TrajOptDefaultCompositeProfile()
 
     trajopt_profiles = ProfileDictionary()
-    # Use helper functions for cross-module profile registration
-    ProfileDictionary_addTrajOptPlanProfile(
-        trajopt_profiles, TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_plan_profile
-    )
-    ProfileDictionary_addTrajOptCompositeProfile(
-        trajopt_profiles,
-        TRAJOPT_DEFAULT_NAMESPACE,
-        "DEFAULT",
-        trajopt_composite_profile,
-    )
+    trajopt_profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_plan_profile)
+    trajopt_profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "DEFAULT", trajopt_composite_profile)
 
     trajopt_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
 
@@ -159,7 +148,7 @@ def run():
     time_parameterization = TimeOptimalTrajectoryGeneration()
 
     # Create profile with velocity/acceleration scaling
-    totg_profile = TOTGCompositeProfile()
+    totg_profile = TimeOptimalTrajectoryGenerationCompositeProfile()
     totg_profile.max_velocity_scaling_factor = 1.0
     totg_profile.max_acceleration_scaling_factor = 1.0
 

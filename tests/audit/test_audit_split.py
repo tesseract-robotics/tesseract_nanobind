@@ -127,7 +127,7 @@ def test_cli_defines_only_main():
 # `_gap_arity` joins this set when #251 lands (0b plan Task 0 table).
 REPORT = {
     "REPORT_PATH", "LIMITATION", "_git", "libclang_version", "provenance", "_table",
-    "render_markdown", "to_json", "_unaudited_patterns", "_where",
+    "render_markdown", "to_json", "_unaudited_patterns", "_where", "_gap_arity",
     # D10 outcome ledger
     "LEDGER_PATH", "ISSUE_REF", "LEDGER_FIELDS", "NO_OUTCOME", "MalformedLedgerError",
     "LedgerEntry", "_unique_keys", "_ledger_entry", "load_ledger", "_issue_cell", "_with_outcome",
@@ -139,9 +139,8 @@ def test_report_defines_exactly():
     assert not defined_names("audit_match") & REPORT
 
 
-# `ACCEPTED_DEFAULTS` joins this set when #251 lands.
 RULES = {
-    "PROTOCOL_MEMBERS", "PROTOCOL_RULES", "ACCEPTED", "ACCEPTED_SYMBOLS",
+    "PROTOCOL_MEMBERS", "PROTOCOL_RULES", "ACCEPTED", "ACCEPTED_SYMBOLS", "ACCEPTED_DEFAULTS",
     # #256 group 1
     "TEMPLATE_INSTANCES", "TEMPLATE_INSTANCE_RULE", "ACCEPTED_CPP_OVERLOADS",
     "ACCEPTED_PY_OVERLOADS", "POLY_ALTERNATIVES", "WHOLE_SYMBOL_ABSENT_OK",

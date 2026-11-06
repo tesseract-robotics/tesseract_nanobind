@@ -23,7 +23,7 @@ Each subdirectory contains C++ binding code that wraps the corresponding tessera
 - `tesseract_task_composer/` - Task composition framework
 - `tesseract_time_parameterization/` - Time parameterization
 - `trajopt_ifopt/`, `trajopt_sqp/` - TrajOpt optimization
-- `ifopt/`, `ompl_base/` - Third-party bindings
+- `ifopt/` - Third-party bindings
 
 ## Shared Header
 - `tesseract_nb.h` - Common nanobind includes and macros

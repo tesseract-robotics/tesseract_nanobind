@@ -18,13 +18,11 @@ from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
-    InstructionPoly_as_CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
@@ -36,16 +34,11 @@ from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    ProfileDictionary_addTrajOptIfoptMoveProfile,
-    ProfileDictionary_addTrajOptIfoptPlanProfile,
-    ProfileDictionary_addTrajOptIfoptSolverProfile,
     ProfileOverrideNotDispatchedError,
     TrajOptIfoptCartesianWaypointConfig,
     TrajOptIfoptCompositeProfile,
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
-    TrajOptIfoptDefaultPlanProfile,
     TrajOptIfoptJointWaypointConfig,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptMoveProfile,
@@ -98,7 +91,7 @@ class TestTrajOptIfoptProfiles:
     """Test TrajOptIfopt profile types."""
 
     def test_default_plan_profile(self):
-        profile = TrajOptIfoptDefaultPlanProfile()
+        profile = TrajOptIfoptDefaultMoveProfile()
         assert profile is not None
         assert profile.getKey() is not None
 
@@ -278,20 +271,14 @@ class TestTrajOptIfoptProfiles:
         """Test adding TrajOptIfopt profiles to ProfileDictionary."""
         profiles = ProfileDictionary()
 
-        plan_profile = TrajOptIfoptDefaultPlanProfile()
+        plan_profile = TrajOptIfoptDefaultMoveProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
         solver_profile = TrajOptIfoptOSQPSolverProfile()
 
         # Add profiles using helper functions
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-        )
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
         assert profiles is not None
 
@@ -326,23 +313,23 @@ class TestTrajOptIfoptPlanner:
 
         # Create instructions
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
         )
 
         # Create program
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instr))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(end_instr))
+        program.push_back(MoveInstructionPoly(start_instr))
+        program.push_back(MoveInstructionPoly(end_instr))
 
         # Interpolate program
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
         # Create profiles with proper velocity coefficients
-        plan_profile = TrajOptIfoptDefaultPlanProfile()
+        plan_profile = TrajOptIfoptDefaultMoveProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
         # Initialize coefficients to match DOF count (7 for KUKA IIWA)
         n_joints = len(joint_names)
@@ -352,15 +339,9 @@ class TestTrajOptIfoptPlanner:
         solver_profile = getattr(trajopt_ifopt_planners, solver_profile_name)()
 
         profiles = ProfileDictionary()
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-        )
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
         # Create request
         request = PlannerRequest()
@@ -386,21 +367,21 @@ class TestTrajOptIfoptPlanner:
         wp1 = JointWaypoint(joint_names, start_pos)
         wp2 = JointWaypoint(joint_names, end_pos)
         start_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp1), MoveInstructionType.FREESPACE, "DEFAULT"
         )
         end_instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2), MoveInstructionType_FREESPACE, "DEFAULT"
+            JointWaypointPoly(wp2), MoveInstructionType.FREESPACE, "DEFAULT"
         )
 
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instr))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(end_instr))
+        program.push_back(MoveInstructionPoly(start_instr))
+        program.push_back(MoveInstructionPoly(end_instr))
 
         interpolated = generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
         n_joints = len(joint_names)
-        plan_profile = TrajOptIfoptDefaultPlanProfile()
+        plan_profile = TrajOptIfoptDefaultMoveProfile()
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
         composite_profile.velocity_coeff = np.ones(n_joints)
         composite_profile.acceleration_coeff = np.ones(n_joints)
@@ -420,15 +401,9 @@ class TestTrajOptIfoptPlanner:
         solver_profile.opt_params.initial_trust_box_size = 0.1
 
         profiles = ProfileDictionary()
-        ProfileDictionary_addTrajOptIfoptPlanProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile
-        )
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-        )
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", plan_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite_profile)
+        profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
 
         request = PlannerRequest()
         request.instructions = interpolated
@@ -448,10 +423,8 @@ END_POS = np.array([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0])
 
 def _joint_move(joint_names, position):
     """A FREESPACE MoveInstructionPoly to a constrained joint waypoint."""
-    waypoint = JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joint_names, position))
-    return MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(waypoint, MoveInstructionType_FREESPACE, "DEFAULT")
-    )
+    waypoint = JointWaypointPoly(JointWaypoint(joint_names, position))
+    return MoveInstructionPoly(MoveInstruction(waypoint, MoveInstructionType.FREESPACE, "DEFAULT"))
 
 
 def _interpolated_program(t_env, manip_info, joint_names):
@@ -459,8 +432,8 @@ def _interpolated_program(t_env, manip_info, joint_names):
     t_env.setState(joint_names, START_POS)
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(_joint_move(joint_names, START_POS))
-    program.appendMoveInstruction(_joint_move(joint_names, END_POS))
+    program.push_back(_joint_move(joint_names, START_POS))
+    program.push_back(_joint_move(joint_names, END_POS))
     return generateInterpolatedProgram(program, t_env, 3.14, 1.0, 3.14, 30)
 
 
@@ -469,9 +442,9 @@ def _move_instructions(composite):
     moves = []
     for instruction in composite:
         if instruction.isCompositeInstruction():
-            moves.extend(_move_instructions(InstructionPoly_as_CompositeInstruction(instruction)))
+            moves.extend(_move_instructions(instruction.asCompositeInstruction()))
         elif instruction.isMoveInstruction():
-            moves.append(InstructionPoly_as_MoveInstructionPoly(instruction))
+            moves.append(instruction.asMoveInstruction())
     return moves
 
 
@@ -489,18 +462,11 @@ def _smoothing_composite_profile(n_joints):
 
 def _request(t_env, manip_info, joint_names, solver_profile):
     profiles = ProfileDictionary()
-    ProfileDictionary_addTrajOptIfoptPlanProfile(
-        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", TrajOptIfoptDefaultPlanProfile()
+    profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", TrajOptIfoptDefaultMoveProfile())
+    profiles.addProfile(
+        TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", _smoothing_composite_profile(len(joint_names))
     )
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        profiles,
-        TRAJOPT_IFOPT_NAMESPACE,
-        "DEFAULT",
-        _smoothing_composite_profile(len(joint_names)),
-    )
-    ProfileDictionary_addTrajOptIfoptSolverProfile(
-        profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile
-    )
+    profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", solver_profile)
     request = PlannerRequest()
     request.instructions = _interpolated_program(t_env, manip_info, joint_names)
     request.env = t_env
@@ -984,13 +950,9 @@ class _AddingCompositeProfile(TrajOptIfoptCompositeProfile):
 def _python_profile_request(t_env, manip_info, joint_names, move=None, composite=None):
     request = _request(t_env, manip_info, joint_names, TrajOptIfoptOSQPSolverProfile())
     if move is not None:
-        ProfileDictionary_addTrajOptIfoptMoveProfile(
-            request.profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", move
-        )
+        request.profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", move)
     if composite is not None:
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            request.profiles, TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite
-        )
+        request.profiles.addProfile(TRAJOPT_IFOPT_NAMESPACE, "DEFAULT", composite)
     return request
 
 
@@ -1053,9 +1015,6 @@ _TASK_COMPOSER_RELEASE = textwrap.dedent(
         TaskComposer,
         create_trajopt_ifopt_default_profiles,
     )
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-    )
 
     class AddingComposite(TrajOptIfoptCompositeProfile):
         def __init__(self):
@@ -1077,9 +1036,7 @@ _TASK_COMPOSER_RELEASE = textwrap.dedent(
     )
     profiles = create_trajopt_ifopt_default_profiles()
     composite = AddingComposite()
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(
-        profiles, "TrajOptIfoptMotionPlannerTask", "DEFAULT", composite
-    )
+    profiles.addProfile("TrajOptIfoptMotionPlannerTask", "DEFAULT", composite)
     composer = TaskComposer.from_config()
     result = composer.plan(robot, program, pipeline="TrajOptIfoptPipeline", profiles=profiles)
     assert result.successful, result.message
@@ -1100,10 +1057,10 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
     from tesseract_robotics.tesseract_command_language import (
         CompositeInstruction,
         JointWaypoint,
-        JointWaypointPoly_wrap_JointWaypoint,
+        JointWaypointPoly,
         MoveInstruction,
-        MoveInstructionPoly_wrap_MoveInstruction,
-        MoveInstructionType_FREESPACE,
+        MoveInstructionPoly,
+        MoveInstructionType,
         ProfileDictionary,
     )
     from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
@@ -1111,9 +1068,6 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
     from tesseract_robotics.tesseract_motion_planners import PlannerRequest
     from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptMoveProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
         TrajOptIfoptMotionPlanner,
         TrajOptIfoptOSQPSolverProfile,
         TrajOptIfoptWaypointInfoInUseError,
@@ -1146,29 +1100,23 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
     joints = list(env.getJointGroup("manipulator").getJointIds())
 
     def move(position):
-        return MoveInstructionPoly_wrap_MoveInstruction(
-            MoveInstruction(
-                JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.array(position))),
-                MoveInstructionType_FREESPACE,
+        return MoveInstructionPoly(MoveInstruction(
+                JointWaypointPoly(JointWaypoint(joints, np.array(position))),
+                MoveInstructionType.FREESPACE,
                 "DEFAULT",
-            )
-        )
+            ))
 
     for keep in ("info", "node"):
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(move([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]))
-        program.appendMoveInstruction(move([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0]))
+        program.push_back(move([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]))
+        program.push_back(move([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0]))
         profiles = ProfileDictionary()
         keeper = Keeper(keep)
         ns = "TrajOptIfoptMotionPlannerTask"
-        ProfileDictionary_addTrajOptIfoptMoveProfile(profiles, ns, "DEFAULT", keeper)
-        ProfileDictionary_addTrajOptIfoptCompositeProfile(
-            profiles, ns, "DEFAULT", TrajOptIfoptDefaultCompositeProfile()
-        )
-        ProfileDictionary_addTrajOptIfoptSolverProfile(
-            profiles, ns, "DEFAULT", TrajOptIfoptOSQPSolverProfile()
-        )
+        profiles.addProfile(ns, "DEFAULT", keeper)
+        profiles.addProfile(ns, "DEFAULT", TrajOptIfoptDefaultCompositeProfile())
+        profiles.addProfile(ns, "DEFAULT", TrajOptIfoptOSQPSolverProfile())
         request = PlannerRequest()
         request.env = env
         request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 5)
@@ -1199,10 +1147,10 @@ _SUPER_CREATE = textwrap.dedent(
 
     from tesseract_robotics.tesseract_command_language import (
         JointWaypoint,
-        JointWaypointPoly_wrap_JointWaypoint,
+        JointWaypointPoly,
         MoveInstruction,
-        MoveInstructionPoly_wrap_MoveInstruction,
-        MoveInstructionType_FREESPACE,
+        MoveInstructionPoly,
+        MoveInstructionType,
     )
     from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
     from tesseract_robotics.tesseract_environment import Environment
@@ -1228,13 +1176,11 @@ _SUPER_CREATE = textwrap.dedent(
     )
     manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
     joints = list(env.getJointGroup("manipulator").getJointIds())
-    move = MoveInstructionPoly_wrap_MoveInstruction(
-        MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.zeros(len(joints)))),
-            MoveInstructionType_FREESPACE,
+    move = MoveInstructionPoly(MoveInstruction(
+            JointWaypointPoly(JointWaypoint(joints, np.zeros(len(joints)))),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
-        )
-    )
+        ))
     for call in (
         lambda: MoveCallsUp().create(move, manip_info, env, 0),
         lambda: CompositeCallsUp().create(manip_info, env, [], []),
@@ -1261,10 +1207,10 @@ _KEEP_FROM_CREATE = textwrap.dedent(
     from tesseract_robotics.tesseract_command_language import (
         CompositeInstruction,
         JointWaypoint,
-        JointWaypointPoly_wrap_JointWaypoint,
+        JointWaypointPoly,
         MoveInstruction,
-        MoveInstructionPoly_wrap_MoveInstruction,
-        MoveInstructionType_FREESPACE,
+        MoveInstructionPoly,
+        MoveInstructionType,
         ProfileDictionary,
     )
     from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
@@ -1272,9 +1218,6 @@ _KEEP_FROM_CREATE = textwrap.dedent(
     from tesseract_robotics.tesseract_motion_planners import PlannerRequest
     from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
     from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-        ProfileDictionary_addTrajOptIfoptCompositeProfile,
-        ProfileDictionary_addTrajOptIfoptMoveProfile,
-        ProfileDictionary_addTrajOptIfoptSolverProfile,
         TrajOptIfoptMotionPlanner,
         TrajOptIfoptOSQPSolverProfile,
     )
@@ -1307,27 +1250,21 @@ _KEEP_FROM_CREATE = textwrap.dedent(
     joints = list(env.getJointGroup("manipulator").getJointIds())
 
     def move(position):
-        return MoveInstructionPoly_wrap_MoveInstruction(
-            MoveInstruction(
-                JointWaypointPoly_wrap_JointWaypoint(JointWaypoint(joints, np.array(position))),
-                MoveInstructionType_FREESPACE,
+        return MoveInstructionPoly(MoveInstruction(
+                JointWaypointPoly(JointWaypoint(joints, np.array(position))),
+                MoveInstructionType.FREESPACE,
                 "DEFAULT",
-            )
-        )
+            ))
 
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(move([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]))
-    program.appendMoveInstruction(move([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0]))
+    program.push_back(move([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]))
+    program.push_back(move([0.5, 0.3, 0.0, -1.2, 0.0, 0.5, 0.0]))
     ns = "TrajOptIfoptMotionPlannerTask"
     profiles = ProfileDictionary()
-    ProfileDictionary_addTrajOptIfoptMoveProfile(
-        profiles, ns, "DEFAULT", TrajOptIfoptDefaultMoveProfile()
-    )
-    ProfileDictionary_addTrajOptIfoptCompositeProfile(profiles, ns, "DEFAULT", Keeping())
-    ProfileDictionary_addTrajOptIfoptSolverProfile(
-        profiles, ns, "DEFAULT", TrajOptIfoptOSQPSolverProfile()
-    )
+    profiles.addProfile(ns, "DEFAULT", TrajOptIfoptDefaultMoveProfile())
+    profiles.addProfile(ns, "DEFAULT", Keeping())
+    profiles.addProfile(ns, "DEFAULT", TrajOptIfoptOSQPSolverProfile())
     request = PlannerRequest()
     request.env = env
     request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 5)

@@ -370,6 +370,33 @@ def _trajectory(n=3):
     return tesseract_common.JointTrajectory([_joint_state(float(i)) for i in range(n)], "traj")
 
 
+def test_joint_trajectory_insert_is_list_insert():
+    """#269: `insert` takes a Python index: negative counts from the end, out of range clamps."""
+    traj = _trajectory(3)
+    expected = [0.0, 1.0, 2.0]
+    for index, time in ((1, 10.0), (-1, 11.0), (100, 12.0), (-100, 13.0)):
+        traj.insert(index, _joint_state(time))
+        expected.insert(index, time)
+        assert [traj[i].time for i in range(len(traj))] == expected
+
+
+@pytest.mark.parametrize(
+    "key", [0, -1, slice(0, 2), slice(None, None, 2), slice(None, None, -1), slice(2, 2)]
+)
+def test_joint_trajectory_delitem_is_list_delitem(key):
+    """#269: `erase` in its Python form, for an index and a slice."""
+    traj = _trajectory(5)
+    expected = [0.0, 1.0, 2.0, 3.0, 4.0]
+    del traj[key]
+    del expected[key]
+    assert [traj[i].time for i in range(len(traj))] == expected
+
+
+def test_joint_trajectory_delitem_out_of_range_raises():
+    with pytest.raises(IndexError):
+        del _trajectory(1)[1]
+
+
 def test_joint_trajectory_construct():
     empty = tesseract_common.JointTrajectory()
     assert empty.description == ""

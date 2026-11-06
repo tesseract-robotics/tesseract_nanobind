@@ -37,8 +37,8 @@ def _scope_type(arg: ci.Cursor) -> str:
 
 def bound_classes(tu: ci.TranslationUnit) -> dict[str, str]:
     """Top-level Python class name -> qualified C++ class, as the binding's `nb::class_` and
-    `nb::enum_` constructions in the TU's main file say (`TOTGCompositeProfile` ->
-    `tesseract::time_parameterization::TimeOptimalTrajectoryGenerationCompositeProfile`).
+    `nb::enum_` constructions in the TU's main file say (`DescartesStateD` ->
+    `descartes_light::State<double>`).
 
     A template instance maps to its template (`Planner<double>` -> `…::Planner`), as
     `cpp_api` keys it. Nested classes (bound into a `class_`, not the module) are skipped.

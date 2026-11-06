@@ -203,11 +203,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .value("FREESPACE", tp::MoveInstructionType::FREESPACE)
         .value("CIRCULAR", tp::MoveInstructionType::CIRCULAR);
 
-    // For SWIG compatibility
-    m.attr("MoveInstructionType_LINEAR") = tp::MoveInstructionType::LINEAR;
-    m.attr("MoveInstructionType_FREESPACE") = tp::MoveInstructionType::FREESPACE;
-    m.attr("MoveInstructionType_CIRCULAR") = tp::MoveInstructionType::CIRCULAR;
-
     // ========== CompositeInstructionOrder enum ==========
     nb::enum_<tp::CompositeInstructionOrder>(m, "CompositeInstructionOrder")
         .value("ORDERED", tp::CompositeInstructionOrder::ORDERED)
@@ -351,19 +346,6 @@ NB_MODULE(_tesseract_command_language, m) {
     bind_value_equality(state_waypoint_poly);
     bind_copy(state_waypoint_poly);
 
-    // ========== Helper functions for Poly wrapping (SWIG compatibility) ==========
-    m.def("CartesianWaypointPoly_wrap_CartesianWaypoint", [](const tp::CartesianWaypoint& wp) {
-        return tp::CartesianWaypointPoly(wp);
-    }, "waypoint"_a);
-
-    m.def("JointWaypointPoly_wrap_JointWaypoint", [](const tp::JointWaypoint& wp) {
-        return tp::JointWaypointPoly(wp);
-    }, "waypoint"_a);
-
-    m.def("StateWaypointPoly_wrap_StateWaypoint", [](const tp::StateWaypoint& wp) {
-        return tp::StateWaypointPoly(wp);
-    }, "waypoint"_a);
-
     // ========== InstructionPoly ==========
     auto instruction_poly = nb::class_<tp::InstructionPoly>(m, "InstructionPoly")
         .def(nb::init<>())
@@ -434,7 +416,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getWaypoint", [](tp::MoveInstructionPoly& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)
-        // Note: 0.33 removed assignCartesianWaypoint etc. Use setWaypoint instead
         .def("setWaypoint", [](tp::MoveInstructionPoly& self, const tp::CartesianWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a, "Set waypoint from CartesianWaypointPoly")
@@ -444,16 +425,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("setWaypoint", [](tp::MoveInstructionPoly& self, const tp::StateWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a, "Set waypoint from StateWaypointPoly")
-        // SWIG-compatible aliases
-        .def("assignCartesianWaypoint", [](tp::MoveInstructionPoly& self, const tp::CartesianWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignJointWaypoint", [](tp::MoveInstructionPoly& self, const tp::JointWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignStateWaypoint", [](tp::MoveInstructionPoly& self, const tp::StateWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
         .def("getMoveType", &tp::MoveInstructionPoly::getMoveType)
         .def("setMoveType", &tp::MoveInstructionPoly::setMoveType, "move_type"_a)
         .def("getProfile", &tp::MoveInstructionPoly::getProfile, "ns"_a = "")
@@ -493,72 +464,6 @@ NB_MODULE(_tesseract_command_language, m) {
     bind_copy(move_instruction_poly);
     bind_uuid(move_instruction_poly);
 
-    // Helper for SWIG compatibility
-    m.def("MoveInstructionPoly_wrap_MoveInstruction", [](const tp::MoveInstruction& mi) {
-        return tp::MoveInstructionPoly(mi);
-    }, "instruction"_a);
-
-    // Helper functions to convert Poly types using the new 0.33 .as<T>() API
-    m.def("InstructionPoly_as_MoveInstructionPoly", [](tp::InstructionPoly& ip) -> tp::MoveInstructionPoly {
-        if (!ip.isMoveInstruction())
-            throw std::runtime_error("InstructionPoly is not a MoveInstruction");
-        return ip.as<tp::MoveInstructionPoly>();
-    }, "instruction"_a);
-
-    m.def("InstructionPoly_as_CompositeInstruction", [](tp::InstructionPoly& ip) -> tp::CompositeInstruction {
-        if (!ip.isCompositeInstruction())
-            throw std::runtime_error("InstructionPoly is not a CompositeInstruction");
-        return ip.as<tp::CompositeInstruction>();
-    }, "instruction"_a);
-
-    m.def("InstructionPoly_as_WaitInstruction", [](tp::InstructionPoly& ip) -> tp::WaitInstruction {
-        if (!tp::isWaitInstruction(ip))
-            throw std::runtime_error("InstructionPoly is not a WaitInstruction");
-        return ip.as<tp::WaitInstruction>();
-    }, "instruction"_a);
-
-    m.def("InstructionPoly_as_TimerInstruction", [](tp::InstructionPoly& ip) -> tp::TimerInstruction {
-        if (!tp::isTimerInstruction(ip))
-            throw std::runtime_error("InstructionPoly is not a TimerInstruction");
-        return ip.as<tp::TimerInstruction>();
-    }, "instruction"_a);
-
-    m.def("InstructionPoly_as_SetAnalogInstruction", [](tp::InstructionPoly& ip) -> tp::SetAnalogInstruction {
-        if (!tp::isSetAnalogInstruction(ip))
-            throw std::runtime_error("InstructionPoly is not a SetAnalogInstruction");
-        return ip.as<tp::SetAnalogInstruction>();
-    }, "instruction"_a);
-
-    m.def("InstructionPoly_as_SetDigitalInstruction", [](tp::InstructionPoly& ip) -> tp::SetDigitalInstruction {
-        if (!tp::isSetDigitalInstruction(ip))
-            throw std::runtime_error("InstructionPoly is not a SetDigitalInstruction");
-        return ip.as<tp::SetDigitalInstruction>();
-    }, "instruction"_a);
-
-    m.def("InstructionPoly_as_SetToolInstruction", [](tp::InstructionPoly& ip) -> tp::SetToolInstruction {
-        if (!tp::isSetToolInstruction(ip))
-            throw std::runtime_error("InstructionPoly is not a SetToolInstruction");
-        return ip.as<tp::SetToolInstruction>();
-    }, "instruction"_a);
-
-    m.def("WaypointPoly_as_StateWaypointPoly", [](tp::WaypointPoly& wp) -> tp::StateWaypointPoly {
-        if (!wp.isStateWaypoint())
-            throw std::runtime_error("WaypointPoly is not a StateWaypoint");
-        return wp.as<tp::StateWaypointPoly>();
-    }, "waypoint"_a);
-
-    m.def("WaypointPoly_as_CartesianWaypointPoly", [](tp::WaypointPoly& wp) -> tp::CartesianWaypointPoly {
-        if (!wp.isCartesianWaypoint())
-            throw std::runtime_error("WaypointPoly is not a CartesianWaypoint");
-        return wp.as<tp::CartesianWaypointPoly>();
-    }, "waypoint"_a);
-
-    m.def("WaypointPoly_as_JointWaypointPoly", [](tp::WaypointPoly& wp) -> tp::JointWaypointPoly {
-        if (!wp.isJointWaypoint())
-            throw std::runtime_error("WaypointPoly is not a JointWaypoint");
-        return wp.as<tp::JointWaypointPoly>();
-    }, "waypoint"_a);
-
     // ========== MoveInstruction ==========
     // The C++ ctors take a WaypointPoly; the per-type overloads name what callers pass
     // (rule poly-alternative-overloads). Without a path profile, C++ sets it to `profile`
@@ -590,7 +495,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getWaypoint", [](tp::MoveInstruction& self) -> tp::WaypointPoly& {
             return self.getWaypoint();
         }, nb::rv_policy::reference_internal)
-        // Note: 0.33 removed assign*Waypoint methods - use setWaypoint or direct getWaypoint() assignment
         .def("setWaypoint", [](tp::MoveInstruction& self, const tp::CartesianWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a)
@@ -598,16 +502,6 @@ NB_MODULE(_tesseract_command_language, m) {
             self.getWaypoint() = wp;
         }, "waypoint"_a)
         .def("setWaypoint", [](tp::MoveInstruction& self, const tp::StateWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        // SWIG-compatible aliases
-        .def("assignCartesianWaypoint", [](tp::MoveInstruction& self, const tp::CartesianWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignJointWaypoint", [](tp::MoveInstruction& self, const tp::JointWaypointPoly& wp) {
-            self.getWaypoint() = wp;
-        }, "waypoint"_a)
-        .def("assignStateWaypoint", [](tp::MoveInstruction& self, const tp::StateWaypointPoly& wp) {
             self.getWaypoint() = wp;
         }, "waypoint"_a)
         .def("getMoveType", &tp::MoveInstruction::getMoveType)
@@ -806,10 +700,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("push_back", [](tp::CompositeInstruction& self, const tp::SetToolInstruction& si) {
             self.push_back(tp::InstructionPoly(si));
         }, "instruction"_a)
-        // SWIG-compatible alias
-        .def("appendMoveInstruction", [](tp::CompositeInstruction& self, const tp::MoveInstructionPoly& mi) {
-            self.push_back(mi);
-        }, "mi"_a)
         // list.insert form: the index becomes an iterator. One overload per alternative, as push_back.
         .def("insert", composite_insert<tp::InstructionPoly>(), "index"_a, "instruction"_a)
         .def("insert", composite_insert<tp::MoveInstructionPoly>(), "index"_a, "instruction"_a)
@@ -910,7 +800,7 @@ NB_MODULE(_tesseract_command_language, m) {
 
     // ========== ProfileDictionary ==========
     // Note: ProfileDictionary moved to tesseract_common in 0.33
-    // Note: key is now std::size_t (hash), use Profile::createKey<T>() to get it
+    // Note: key is std::size_t (a type hash); Python gets it from the static X.createKey() (#273)
     nb::class_<tc::ProfileDictionary>(m, "ProfileDictionary")
         .def(nb::init<>())
         .def("addProfile", nb::overload_cast<const std::string&, const std::string&, const tc::Profile::ConstPtr&>(
@@ -930,16 +820,6 @@ NB_MODULE(_tesseract_command_language, m) {
         .def("getAllProfileEntries", &tc::ProfileDictionary::getAllProfileEntries,
              "ns -> key -> profile name -> profile. A copy of the maps; the profiles are shared.")
         .def("clear", &tc::ProfileDictionary::clear);
-
-    // Helper function to add profiles from other modules (cross-module inheritance workaround)
-    // This casts Profile::ConstPtr from other modules to the base type
-    m.def("ProfileDictionary_addProfile", [](tc::ProfileDictionary& dict,
-                                              const std::string& ns,
-                                              const std::string& profile_name,
-                                              tc::Profile::ConstPtr profile) {
-        dict.addProfile(ns, profile_name, profile);
-    }, "dict"_a, "ns"_a, "profile_name"_a, "profile"_a,
-    "Add a profile to the dictionary (cross-module helper)");
 
     // ========== utils.h ==========
     // WaypointPoly forms only: upstream deletes the template siblings so a typed waypoint is never

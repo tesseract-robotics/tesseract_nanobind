@@ -23,15 +23,13 @@ from tesseract_robotics.emitters.rapid import (
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_CIRCULAR,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
+    MoveInstructionPoly,
+    MoveInstructionType,
     SetAnalogInstruction,
     SetDigitalInstruction,
     SetToolInstruction,
@@ -46,26 +44,26 @@ _PROFILES = {"P": _PROFILE}
 
 def _cart_waypoint_poly(pose: Pose):
     # Pose IS-A Isometry3d (subclass) — passed directly, no wrapping needed.
-    return CartesianWaypointPoly_wrap_CartesianWaypoint(CartesianWaypoint(pose))
+    return CartesianWaypointPoly(CartesianWaypoint(pose))
 
 
 def _joint_waypoint_poly(joints_rad, names):
     jw = JointWaypoint()
     jw.setJointIds(names)
     jw.setPosition(np.asarray(joints_rad, dtype=np.float64))
-    return JointWaypointPoly_wrap_JointWaypoint(jw)
+    return JointWaypointPoly(jw)
 
 
-def _move(waypoint_poly, *, profile: str = "P", move_type=MoveInstructionType_LINEAR):
+def _move(waypoint_poly, *, profile: str = "P", move_type=MoveInstructionType.LINEAR):
     """Build a `MoveInstructionPoly` from a typed waypoint poly.
 
     Uses the 3-arg `MoveInstruction(waypoint, type, profile)` SWIG-compat
-    overload, then wraps via `MoveInstructionPoly_wrap_MoveInstruction` —
+    overload, then wraps via `MoveInstructionPoly` —
     the canonical pattern from the existing `tests/tesseract_command_language`
     test suite.
     """
     mi = MoveInstruction(waypoint_poly, move_type, profile)
-    return MoveInstructionPoly_wrap_MoveInstruction(mi)
+    return MoveInstructionPoly(mi)
 
 
 def _composite_with(*instructions) -> CompositeInstruction:
@@ -101,7 +99,7 @@ def test_linear_cartesian_lowers_to_movel():
 def test_freespace_cartesian_lowers_to_movej():
     pose = Pose.from_xyz_quat([0.5, 0.0, 0.62], [0, 0, 0, 1])
     composite = _composite_with(
-        _move(_cart_waypoint_poly(pose), move_type=MoveInstructionType_FREESPACE)
+        _move(_cart_waypoint_poly(pose), move_type=MoveInstructionType.FREESPACE)
     )
     out = emit_rapid(composite, _PROFILES)
 
@@ -182,7 +180,7 @@ def test_nested_composite_walks_recursively():
 def test_circular_move_raises_unsupported():
     pose = Pose.from_xyz_quat([0.5, 0.0, 0.5], [0, 0, 0, 1])
     composite = _composite_with(
-        _move(_cart_waypoint_poly(pose), move_type=MoveInstructionType_CIRCULAR)
+        _move(_cart_waypoint_poly(pose), move_type=MoveInstructionType.CIRCULAR)
     )
     with pytest.raises(UnsupportedInstructionError, match="CIRCULAR"):
         emit_rapid(composite, _PROFILES)

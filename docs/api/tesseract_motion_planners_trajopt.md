@@ -10,19 +10,15 @@ Best for Cartesian paths and trajectory refinement.
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
-    TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
-    TrajOptPlanProfile, TrajOptCompositeProfile,
-    TrajOptCollisionConfig,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptCompositeProfile,
+    TrajOptDefaultMoveProfile, TrajOptDefaultCompositeProfile,
+    TrajOptMoveProfile, TrajOptCompositeProfile,
 )
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 ```
 
 !!! note "`TrajOptCollisionConfig` lives in `trajopt_ifopt`"
-    It's defined in `tesseract_robotics.trajopt_ifopt` (trajopt_common) and
-    re-exported from `tesseract_motion_planners_trajopt` for convenience. Import
-    from either location.
+    It's defined in `tesseract_robotics.trajopt_ifopt` (trajopt_common); import it from there.
 
 ## TrajOptMotionPlanner
 
@@ -44,14 +40,14 @@ response = planner.solve(request)
 
 ## Profiles
 
-### TrajOptDefaultPlanProfile
+### TrajOptDefaultMoveProfile
 
 Per-waypoint configuration.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultPlanProfile
+from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultMoveProfile
 
-profile = TrajOptDefaultPlanProfile()
+profile = TrajOptDefaultMoveProfile()
 
 # Cartesian waypoint config
 profile.cartesian_constraint_config.enabled = True
@@ -118,7 +114,7 @@ on); `OSQPSettings()` on its own holds OSQP's defaults.
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    ProfileDictionary_addTrajOptSolverProfile, TrajOptOSQPSolverProfile,
+    TrajOptOSQPSolverProfile,
 )
 
 solver = TrajOptOSQPSolverProfile()
@@ -128,7 +124,7 @@ settings.eps_abs = 1e-5
 settings.time_limit = 0.5
 solver.settings = settings
 
-ProfileDictionary_addTrajOptSolverProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", solver)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", solver)
 ```
 
 `createOptimizationParameters()` returns the SQP parameters the planner uses
@@ -143,7 +139,7 @@ Replaces the 0.33 `CollisionCostConfig` / `CollisionConstraintConfig`.
 See [changes](../changes.md) for the full migration notes.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptCollisionConfig
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Constructor: TrajOptCollisionConfig(margin, coeff) or default
@@ -162,9 +158,7 @@ only at contact and TrajOpt settles paths on the obstacle's surface.
 ### CollisionEvaluatorType
 
 !!! note "Module Location"
-    `CollisionEvaluatorType` lives in
-    `tesseract_robotics.tesseract_collision` (re-exported from the TrajOpt
-    module for convenience).
+    `CollisionEvaluatorType` lives in `tesseract_robotics.tesseract_collision`.
 
 | Type | Description | Speed |
 |------|-------------|-------|
@@ -210,14 +204,12 @@ The waypoint configs, the default move/composite profiles,
 ```python
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptCompositeProfile,
+    TrajOptDefaultMoveProfile, TrajOptDefaultCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile (per waypoint)
-plan_profile = TrajOptDefaultPlanProfile()
+plan_profile = TrajOptDefaultMoveProfile()
 plan_profile.cartesian_constraint_config.enabled = True
 plan_profile.cartesian_constraint_config.coeff = np.array([10.0, 10.0, 10.0, 5.0, 5.0, 5.0])
 
@@ -231,8 +223,8 @@ composite_profile.smooth_velocities = True
 
 # Add to dictionary
 profiles = ProfileDictionary()
-ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
-ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
 ```
 
 `ProfileDictionary.hasProfile` / `getProfile` take a profile key. Each profile
@@ -250,8 +242,7 @@ composite = profiles.getProfile(
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptMotionPlanner, TrajOptDefaultPlanProfile, TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile, ProfileDictionary_addTrajOptCompositeProfile,
+    TrajOptMotionPlanner, TrajOptDefaultMoveProfile, TrajOptDefaultCompositeProfile,
 )
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
@@ -259,7 +250,7 @@ from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 import numpy as np
 
 # Configure profiles
-plan_profile = TrajOptDefaultPlanProfile()
+plan_profile = TrajOptDefaultMoveProfile()
 plan_profile.cartesian_constraint_config.enabled = True
 plan_profile.cartesian_constraint_config.coeff = np.array([10, 10, 10, 5, 5, 5])
 
@@ -272,8 +263,8 @@ composite_profile.smooth_velocities = True
 composite_profile.velocity_coeff = np.ones(6)
 
 profiles = ProfileDictionary()
-ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
-ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
 
 # Create request
 request = PlannerRequest()

@@ -6,14 +6,16 @@
 
 The cross-module inheritance for Profile types now works. We use `nb::class_<DerivedProfile, BaseProfile>` in nanobind to register the base class relationship, and nanobind's module import mechanism loads the base type from `tesseract_command_language`.
 
-**Solution:** Use helper functions like `ProfileDictionary_addOMPLProfile()` from the OMPL module:
+**Solution:** `ProfileDictionary.addProfile` takes a profile from any planner module. The
+per-module `ProfileDictionary_add*Profile` helpers are removed (#334):
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import ProfileDictionary_addOMPLProfile
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
 
-plan_profile = OMPLRealVectorPlanProfile()
+plan_profile = OMPLRealVectorMoveProfile()
 profiles = ProfileDictionary()
-ProfileDictionary_addOMPLProfile(profiles, "OMPLMotionPlannerTask", "DEFAULT", plan_profile)
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", plan_profile)
 ```
 
 ## InstructionsTrajectory and Time Parameterization
@@ -33,7 +35,7 @@ RuntimeError: TypeErasureBase, tried to cast 'tesseract_planning::JointWaypointP
 
 The tesseract_command_language uses type-erased "Poly" types (WaypointPoly, InstructionPoly, etc.) for runtime polymorphism. These require careful handling:
 
-- Use helper functions like `WaypointPoly_as_StateWaypointPoly()` to cast between types
+- Cast with the Poly methods: `instr.asMoveInstruction()`, `wp.asStateWaypoint()`, …
 - Check waypoint type with `isStateWaypoint()`, `isJointWaypoint()`, etc. before casting
 - Type casts will throw RuntimeError if the underlying type doesn't match
 
@@ -51,23 +53,16 @@ This is an RTTI issue where `typeid()` in Python bindings generates different `t
 - `as<T>()` template instantiated in Python binding module creates different `typeid(T)` than the one stored in the type erasure
 - BUT: `isMoveInstruction()` works because both `getType()` and `typeid(MoveInstructionPoly)` are generated within the C++ library
 
-**Solution:** Use `getInterface().recover()` to get the underlying `void*` pointer, then cast:
-
-```cpp
-m.def("InstructionPoly_as_MoveInstructionPoly", [](tp::InstructionPoly& ip) -> tp::MoveInstructionPoly {
-    if (!ip.isMoveInstruction())
-        throw std::runtime_error("InstructionPoly is not a MoveInstruction");
-    auto* ptr = static_cast<tp::MoveInstructionPoly*>(ip.getInterface().recover());
-    return *ptr;  // Copy
-}, "instruction"_a);
-```
+**Solution:** The RTTI visibility fix (`CXX_VISIBILITY_PRESET=default`) makes `as<T>()` work
+across the boundary, so the bindings call it directly.
 
 **Working Methods:**
-- `InstructionPoly_as_MoveInstructionPoly(instr)` - helper function
-- `instr.asMoveInstruction()` - method on InstructionPoly
-- `WaypointPoly_as_JointWaypointPoly(wp)` - for JointWaypoint extraction
-- `WaypointPoly_as_StateWaypointPoly(wp)` - for StateWaypoint extraction
-- `WaypointPoly_as_CartesianWaypointPoly(wp)` - for CartesianWaypoint extraction
+- `instr.asMoveInstruction()` (also `asCompositeInstruction`, `asWaitInstruction`, …) - a copy of
+  the stored instruction
+- `wp.asJointWaypoint()`, `wp.asStateWaypoint()`, `wp.asCartesianWaypoint()` - a reference into
+  the waypoint: edits reach it. `copy.copy(wp.asJointWaypoint())` when a copy is meant
+
+The SWIG-era helpers `InstructionPoly_as_*` and `WaypointPoly_as_*` are removed (#328).
 
 ## CompositeInstruction.flatten() - Not Needed
 
@@ -138,15 +133,13 @@ TrajOpt bindings are always built; CMake stops if the component is missing.
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptMotionPlanner,
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Create profiles
-plan_profile = TrajOptDefaultPlanProfile()
+plan_profile = TrajOptDefaultMoveProfile()
 composite_profile = TrajOptDefaultCompositeProfile()
 composite_profile.smooth_velocities = True
 
@@ -159,8 +152,8 @@ composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollision
 
 # Register profiles
 profiles = ProfileDictionary()
-ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
-ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", plan_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", composite_profile)
 
 # Solve
 planner = TrajOptMotionPlanner("TrajOptMotionPlannerTask")
@@ -211,21 +204,19 @@ input_key = task.getInputPortMappings().single("program")
 
 ## TrajOpt Profile Configuration (0.33 API)
 
-### TrajOptDefaultPlanProfile
+### TrajOptDefaultMoveProfile
 
 Configure waypoint-level TrajOpt behavior via config objects:
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultPlanProfile,
+    TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
-    ProfileDictionary_addTrajOptPlanProfile,
-    ProfileDictionary_addTrajOptCompositeProfile,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 
 # Plan profile - waypoint constraints
-trajopt_plan_profile = TrajOptDefaultPlanProfile()
+trajopt_plan_profile = TrajOptDefaultMoveProfile()
 trajopt_plan_profile.joint_cost_config.enabled = False
 trajopt_plan_profile.cartesian_cost_config.enabled = False
 trajopt_plan_profile.cartesian_constraint_config.enabled = True
@@ -244,8 +235,8 @@ trajopt_composite_profile.collision_cost_config.collision_check_config.type = Co
 trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
 
 # Register profiles
-ProfileDictionary_addTrajOptPlanProfile(profiles, "TrajOptMotionPlannerTask", "CARTESIAN", trajopt_plan_profile)
-ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "CARTESIAN", trajopt_plan_profile)
+profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_profile)
 ```
 
 ### 0.33 API Changes Summary
@@ -280,13 +271,13 @@ ProfileDictionary_addTrajOptCompositeProfile(profiles, "TrajOptMotionPlannerTask
 ```python
 from tesseract_robotics.tesseract_time_parameterization import (
     TimeOptimalTrajectoryGeneration,
-    TOTGCompositeProfile,
+    TimeOptimalTrajectoryGenerationCompositeProfile,
 )
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
 
 # Create TOTG with profile-based configuration
 totg = TimeOptimalTrajectoryGeneration()
-totg_profile = TOTGCompositeProfile()
+totg_profile = TimeOptimalTrajectoryGenerationCompositeProfile()
 totg_profile.max_velocity_scaling_factor = 1.0
 totg_profile.max_acceleration_scaling_factor = 1.0
 

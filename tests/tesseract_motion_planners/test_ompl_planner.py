@@ -13,11 +13,11 @@ from tesseract_robotics.planning.profiles import (
 )
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
 )
 from tesseract_robotics.tesseract_common import (
@@ -35,7 +35,6 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLPlannerType,
     OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
-    ProfileDictionary_addOMPLMoveProfile,
     RRTConnectConfigurator,
     RRTstarConfigurator,
     SBLConfigurator,
@@ -137,15 +136,15 @@ def abb_irb2400_request():
             * Quaterniond.from_xyzw(0, 0.70710678, 0, 0.70710678)
         )
         return MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
     program = CompositeInstruction("DEFAULT")
     program.setManipulatorInfo(manip_info)
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(cartesian(-0.3)))
-    program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(cartesian(0.3)))
+    program.push_back(MoveInstructionPoly(cartesian(-0.3)))
+    program.push_back(MoveInstructionPoly(cartesian(0.3)))
 
     request = PlannerRequest()
     request.instructions = program
@@ -155,7 +154,7 @@ def abb_irb2400_request():
 
 def _with_profile(request: PlannerRequest, profile: OMPLRealVectorMoveProfile) -> PlannerRequest:
     profiles = ProfileDictionary()
-    ProfileDictionary_addOMPLMoveProfile(profiles, OMPL_DEFAULT_NAMESPACE, "DEFAULT", profile)
+    profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", profile)
     request.profiles = profiles
     return request
 

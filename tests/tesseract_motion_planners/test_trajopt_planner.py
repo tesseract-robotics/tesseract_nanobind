@@ -8,16 +8,14 @@ import pytest
 import tesseract_robotics.tesseract_motion_planners_trajopt as trajopt
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
-    InstructionPoly_as_MoveInstructionPoly,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
     ProfileDictionary,
-    WaypointPoly_as_StateWaypointPoly,
 )
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -35,14 +33,11 @@ try:
     from tesseract_robotics import tesseract_motion_planners_trajopt as trajopt_planners
     from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
     from tesseract_robotics.tesseract_motion_planners_trajopt import (
-        ProfileDictionary_addTrajOptCompositeProfile,
-        ProfileDictionary_addTrajOptPlanProfile,
-        ProfileDictionary_addTrajOptSolverProfile,
-        TrajOptCollisionConfig,
         TrajOptDefaultCompositeProfile,
-        TrajOptDefaultPlanProfile,
+        TrajOptDefaultMoveProfile,
         TrajOptMotionPlanner,
     )
+    from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
     TRAJOPT_AVAILABLE = True
 except ImportError:
@@ -84,7 +79,7 @@ class TestTrajOptProfiles:
     """Test TrajOpt profile types."""
 
     def test_default_plan_profile(self):
-        profile = TrajOptDefaultPlanProfile()
+        profile = TrajOptDefaultMoveProfile()
         assert profile is not None
         # Test base class methods
         assert profile.getKey() is not None
@@ -214,39 +209,34 @@ class TestTrajOptPlanning:
         )
 
         start_instruction = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            JointWaypointPoly(wp1),
+            MoveInstructionType.FREESPACE,
             "TEST_PROFILE",
         )
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp2),
+            MoveInstructionType.FREESPACE,
             "TEST_PROFILE",
         )
 
         program = CompositeInstruction("TEST_PROFILE")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         # Interpolate the program first (TrajOpt requires a seed trajectory)
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
         # Setup TrajOpt profiles
-        plan_profile = TrajOptDefaultPlanProfile()
+        plan_profile = TrajOptDefaultMoveProfile()
         composite_profile = TrajOptDefaultCompositeProfile()
 
         profiles = ProfileDictionary()
         # Use helper functions for cross-module profile registration
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", plan_profile
-        )
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", composite_profile
-        )
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", plan_profile)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "TEST_PROFILE", composite_profile)
         if solver_profile_name is not None:
-            ProfileDictionary_addTrajOptSolverProfile(
-                profiles,
+            profiles.addProfile(
                 TRAJOPT_DEFAULT_NAMESPACE,
                 "TEST_PROFILE",
                 getattr(trajopt_planners, solver_profile_name)(),
@@ -269,10 +259,10 @@ class TestTrajOptPlanning:
         count = 0
         for instr in results:
             if instr.isMoveInstruction():
-                move_instr = InstructionPoly_as_MoveInstructionPoly(instr)
+                move_instr = instr.asMoveInstruction()
                 wp = move_instr.getWaypoint()
                 if wp.isStateWaypoint():
-                    state_wp = WaypointPoly_as_StateWaypointPoly(wp)
+                    state_wp = wp.asStateWaypoint()
                     assert len(state_wp.getJointIds()) == 7  # 7 joints for IIWA
                     assert isinstance(state_wp.getPosition(), np.ndarray)
                     assert len(state_wp.getPosition()) == 7
@@ -288,25 +278,25 @@ class TestTrajOptPlanning:
         wp2 = JointWaypoint(joint_names, np.array([0.5, 0, 0, -1.0, 0, 0, 0], dtype=np.float64))
 
         start_instruction = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            JointWaypointPoly(wp1),
+            MoveInstructionType.FREESPACE,
             "COLLISION_TEST",
         )
         plan_f1 = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            JointWaypointPoly(wp2),
+            MoveInstructionType.FREESPACE,
             "COLLISION_TEST",
         )
 
         program = CompositeInstruction("COLLISION_TEST")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         interpolated_program = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
 
         # Setup profiles with collision config
-        plan_profile = TrajOptDefaultPlanProfile()
+        plan_profile = TrajOptDefaultMoveProfile()
         composite_profile = TrajOptDefaultCompositeProfile()
 
         # Configure collision cost (0.33 API)
@@ -321,12 +311,8 @@ class TestTrajOptPlanning:
         composite_profile.smooth_jerks = False
 
         profiles = ProfileDictionary()
-        ProfileDictionary_addTrajOptPlanProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", plan_profile
-        )
-        ProfileDictionary_addTrajOptCompositeProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", composite_profile
-        )
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", plan_profile)
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, "COLLISION_TEST", composite_profile)
 
         test_planner = TrajOptMotionPlanner(TRAJOPT_DEFAULT_NAMESPACE)
 
@@ -347,10 +333,8 @@ def _joint_request(env, manip_info, joint_names, profile_name):
     program.setManipulatorInfo(manip_info)
     for q in ([0, 0, 0, -1.0, 0, 0, 0], [0.5, 0, 0, -1.0, 0, 0, 0]):
         wp = JointWaypoint(joint_names, np.array(q, dtype=np.float64))
-        instr = MoveInstruction(
-            JointWaypointPoly_wrap_JointWaypoint(wp), MoveInstructionType_FREESPACE, profile_name
-        )
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(instr))
+        instr = MoveInstruction(JointWaypointPoly(wp), MoveInstructionType.FREESPACE, profile_name)
+        program.push_back(MoveInstructionPoly(instr))
     request = PlannerRequest()
     request.instructions = generateInterpolatedProgram(program, env, 3.14, 1.0, 3.14, 10)
     request.env = env
@@ -359,16 +343,14 @@ def _joint_request(env, manip_info, joint_names, profile_name):
 
 def _trajopt_profiles(profile_name, solver_profile=None):
     profiles = ProfileDictionary()
-    trajopt.ProfileDictionary_addTrajOptMoveProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultMoveProfile()
+    profiles.addProfile(
+        TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultMoveProfile()
     )
-    trajopt.ProfileDictionary_addTrajOptCompositeProfile(
-        profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultCompositeProfile()
+    profiles.addProfile(
+        TRAJOPT_DEFAULT_NAMESPACE, profile_name, trajopt.TrajOptDefaultCompositeProfile()
     )
     if solver_profile is not None:
-        trajopt.ProfileDictionary_addTrajOptSolverProfile(
-            profiles, TRAJOPT_DEFAULT_NAMESPACE, profile_name, solver_profile
-        )
+        profiles.addProfile(TRAJOPT_DEFAULT_NAMESPACE, profile_name, solver_profile)
     return profiles
 
 

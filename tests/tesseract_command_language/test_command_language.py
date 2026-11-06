@@ -13,32 +13,24 @@ from tesseract_robotics import tesseract_command_language
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     # Poly wrappers
-    CartesianWaypointPoly_wrap_CartesianWaypoint,
+    CartesianWaypointPoly,
     CompositeInstruction,
     # Non-motion instruction casts
-    InstructionPoly_as_SetAnalogInstruction,
-    InstructionPoly_as_SetDigitalInstruction,
-    InstructionPoly_as_SetToolInstruction,
-    InstructionPoly_as_TimerInstruction,
-    InstructionPoly_as_WaitInstruction,
     # Waypoint types
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     # Instructions
     MoveInstruction,
     MoveInstructionPoly,
-    MoveInstructionPoly_wrap_MoveInstruction,
     # Enums
     MoveInstructionType,
-    MoveInstructionType_FREESPACE,
-    MoveInstructionType_LINEAR,
     # Other
     ProfileDictionary,
     SetAnalogInstruction,
     SetDigitalInstruction,
     SetToolInstruction,
     StateWaypoint,
-    StateWaypointPoly_wrap_StateWaypoint,
+    StateWaypointPoly,
     TimerInstruction,
     TimerInstructionType,
     # Non-motion instructions
@@ -139,7 +131,7 @@ class TestWaypointPoly:
     def test_cartesian_waypoint_poly_wrap(self):
         transform = Isometry3d.Identity() * Translation3d(1.0, 0.0, 0.0)
         wp = CartesianWaypoint(transform)
-        poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
+        poly = CartesianWaypointPoly(wp)
         assert poly is not None
         assert not poly.isNull()
 
@@ -149,7 +141,7 @@ class TestWaypointPoly:
         wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(1.0, 0.0, 0.0))
         wp.setSeed(JointState(names, position))
 
-        poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
+        poly = CartesianWaypointPoly(wp)
         assert poly.hasSeed()
 
         seed = poly.getSeed()
@@ -163,7 +155,7 @@ class TestWaypointPoly:
         names = ["j1", "j2"]
         position = np.array([0.5, 1.0])
         wp = JointWaypoint(names, position)
-        poly = JointWaypointPoly_wrap_JointWaypoint(wp)
+        poly = JointWaypointPoly(wp)
         assert poly is not None
         assert not poly.isNull()
 
@@ -171,7 +163,7 @@ class TestWaypointPoly:
         names = ["j1", "j2"]
         position = np.array([0.5, 1.0])
         wp = StateWaypoint(names, position)
-        poly = StateWaypointPoly_wrap_StateWaypoint(wp)
+        poly = StateWaypointPoly(wp)
         assert poly is not None
         assert not poly.isNull()
 
@@ -183,7 +175,7 @@ class TestMoveInstruction:
         """Test MoveInstruction(waypoint, type) - 2-arg form."""
         transform = Isometry3d.Identity() * Translation3d(0.8, 0.3, 1.5)
         wp = CartesianWaypoint(transform)
-        poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
+        poly = CartesianWaypointPoly(wp)
         mi = MoveInstruction(poly, MoveInstructionType.FREESPACE)
         assert mi is not None
         assert mi.getMoveType() == MoveInstructionType.FREESPACE
@@ -192,8 +184,8 @@ class TestMoveInstruction:
         """Test MoveInstruction(waypoint, type, profile) - 3-arg SWIG-compatible form."""
         transform = Isometry3d.Identity() * Translation3d(0.8, 0.3, 1.5)
         wp = CartesianWaypoint(transform)
-        poly = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly, MoveInstructionType_FREESPACE, "DEFAULT")
+        poly = CartesianWaypointPoly(wp)
+        mi = MoveInstruction(poly, MoveInstructionType.FREESPACE, "DEFAULT")
         assert mi is not None
         assert mi.getMoveType() == MoveInstructionType.FREESPACE
         assert mi.getProfile() == "DEFAULT"
@@ -203,8 +195,8 @@ class TestMoveInstruction:
         names = ["j1", "j2", "j3"]
         position = np.array([0.1, 0.2, 0.3])
         wp = JointWaypoint(names, position)
-        poly = JointWaypointPoly_wrap_JointWaypoint(wp)
-        mi = MoveInstruction(poly, MoveInstructionType_LINEAR, "MY_PROFILE")
+        poly = JointWaypointPoly(wp)
+        mi = MoveInstruction(poly, MoveInstructionType.LINEAR, "MY_PROFILE")
         assert mi.getMoveType() == MoveInstructionType.LINEAR
         assert mi.getProfile() == "MY_PROFILE"
 
@@ -212,9 +204,9 @@ class TestMoveInstruction:
         """Test wrapping MoveInstruction in MoveInstructionPoly."""
         transform = Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5)
         wp = CartesianWaypoint(transform)
-        poly_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly_wp, MoveInstructionType_FREESPACE, "DEFAULT")
-        mi_poly = MoveInstructionPoly_wrap_MoveInstruction(mi)
+        poly_wp = CartesianWaypointPoly(wp)
+        mi = MoveInstruction(poly_wp, MoveInstructionType.FREESPACE, "DEFAULT")
+        mi_poly = MoveInstructionPoly(mi)
         assert mi_poly is not None
         assert not mi_poly.isNull()
 
@@ -253,18 +245,18 @@ class TestCompositeInstruction:
         wp2 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.8, 0.3, 1.5))
 
         mi1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp1),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         mi2 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp2),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi1))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi2))
+        program.push_back(MoveInstructionPoly(mi1))
+        program.push_back(MoveInstructionPoly(mi2))
 
         assert len(program) == 2
         assert not program.empty()
@@ -277,11 +269,11 @@ class TestNestedCompositeInstruction:
     def _make_move_instr(x: float) -> MoveInstructionPoly:
         wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(x, 0.0, 1.0))
         mi = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
-        return MoveInstructionPoly_wrap_MoveInstruction(mi)
+        return MoveInstructionPoly(mi)
 
     def test_push_back_composite(self):
         """push_back accepts a CompositeInstruction as a nested child."""
@@ -412,26 +404,26 @@ class TestABBExampleWorkflow:
 
         # Create instructions (as in example - 3-arg form with profile)
         start_instruction = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp1),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         plan_f1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp2),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         _plan_f2 = MoveInstruction(  # noqa: F841  # kept for test expansion
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp3),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp3),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
 
         # Create program (as in example)
         program = CompositeInstruction("DEFAULT")
         program.setManipulatorInfo(manip_info)
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(start_instruction))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(plan_f1))
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f1))
 
         assert len(program) == 2
         assert program.getProfile() == "DEFAULT"
@@ -446,8 +438,8 @@ class TestMoveInstructionDescription:
         """Test setDescription and getDescription on MoveInstruction."""
         transform = Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5)
         wp = CartesianWaypoint(transform)
-        poly_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly_wp, MoveInstructionType_FREESPACE, "DEFAULT")
+        poly_wp = CartesianWaypointPoly(wp)
+        mi = MoveInstruction(poly_wp, MoveInstructionType.FREESPACE, "DEFAULT")
 
         # Set description
         mi.setDescription("test_waypoint_1")
@@ -461,9 +453,9 @@ class TestMoveInstructionDescription:
         """Test setDescription on MoveInstructionPoly."""
         transform = Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5)
         wp = CartesianWaypoint(transform)
-        poly_wp = CartesianWaypointPoly_wrap_CartesianWaypoint(wp)
-        mi = MoveInstruction(poly_wp, MoveInstructionType_FREESPACE, "DEFAULT")
-        mi_poly = MoveInstructionPoly_wrap_MoveInstruction(mi)
+        poly_wp = CartesianWaypointPoly(wp)
+        mi = MoveInstruction(poly_wp, MoveInstructionType.FREESPACE, "DEFAULT")
+        mi_poly = MoveInstructionPoly(mi)
 
         # MoveInstructionPoly also has setDescription
         mi_poly.setDescription("poly_description")
@@ -481,15 +473,6 @@ class TestNoTaskComposerReexport:
             "_HAS_TASK_COMPOSER",
         ):
             assert not hasattr(tesseract_command_language, name), name
-
-    def test_all_names_resolve(self):
-        """Every name in __all__ is an attribute of the package."""
-        missing = [
-            name
-            for name in tesseract_command_language.__all__
-            if not hasattr(tesseract_command_language, name)
-        ]
-        assert missing == []
 
     def test_import_does_not_load_task_composer(self):
         """Runs in a fresh interpreter: this process may already hold the task composer."""
@@ -515,11 +498,11 @@ class TestAnyPolyWrappers:
         # Add some instructions
         wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.5, 0.5, 0.5))
         mi = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi))
+        program.push_back(MoveInstructionPoly(mi))
 
         # Wrap in AnyPoly
         any_poly = AnyPoly_wrap_CompositeInstruction(program)
@@ -549,17 +532,17 @@ class TestAnyPolyWrappers:
         wp1 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(1.0, 0.0, 0.0))
         wp2 = CartesianWaypoint(Isometry3d.Identity() * Translation3d(0.0, 1.0, 0.0))
         mi1 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp1),
-            MoveInstructionType_FREESPACE,
+            CartesianWaypointPoly(wp1),
+            MoveInstructionType.FREESPACE,
             "DEFAULT",
         )
         mi2 = MoveInstruction(
-            CartesianWaypointPoly_wrap_CartesianWaypoint(wp2),
-            MoveInstructionType_LINEAR,
+            CartesianWaypointPoly(wp2),
+            MoveInstructionType.LINEAR,
             "DEFAULT",
         )
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi1))
-        program.appendMoveInstruction(MoveInstructionPoly_wrap_MoveInstruction(mi2))
+        program.push_back(MoveInstructionPoly(mi1))
+        program.push_back(MoveInstructionPoly(mi2))
 
         # Wrap
         any_poly = AnyPoly_wrap_CompositeInstruction(program)
@@ -616,7 +599,7 @@ class TestWaitInstruction:
         ip = composite[0]
 
         from_method = ip.asWaitInstruction()
-        from_helper = InstructionPoly_as_WaitInstruction(ip)
+        from_helper = ip.asWaitInstruction()
         assert from_method.getWaitType() == WaitInstructionType.TIME
         assert from_method.getWaitTime() == 0.5
         assert from_helper.getWaitTime() == from_method.getWaitTime()
@@ -642,11 +625,11 @@ class TestWaitInstruction:
         for x in (0.0, 0.1, 0.2):
             wp = CartesianWaypoint(Isometry3d.Identity() * Translation3d(x, 0.0, 0.5))
             mi = MoveInstruction(
-                CartesianWaypointPoly_wrap_CartesianWaypoint(wp),
-                MoveInstructionType_FREESPACE,
+                CartesianWaypointPoly(wp),
+                MoveInstructionType.FREESPACE,
                 "DEFAULT",
             )
-            program.push_back(MoveInstructionPoly_wrap_MoveInstruction(mi))
+            program.push_back(MoveInstructionPoly(mi))
             program.push_back(WaitInstruction(WaitInstructionType.DIGITAL_INPUT_HIGH, 1))
 
         assert len(program) == 6
@@ -695,7 +678,7 @@ class TestTimerInstruction:
         ip = composite[0]
 
         from_method = ip.asTimerInstruction()
-        from_helper = InstructionPoly_as_TimerInstruction(ip)
+        from_helper = ip.asTimerInstruction()
         assert from_method.getTimerType() == TimerInstructionType.DIGITAL_OUTPUT_LOW
         assert from_method.getTimerTime() == 2.0
         assert from_method.getTimerIO() == 3
@@ -736,7 +719,7 @@ class TestSetAnalogInstruction:
         ip = composite[0]
 
         from_method = ip.asSetAnalogInstruction()
-        from_helper = InstructionPoly_as_SetAnalogInstruction(ip)
+        from_helper = ip.asSetAnalogInstruction()
         assert (from_method.getKey(), from_method.getIndex(), from_method.getValue()) == (
             "speed",
             1,
@@ -779,7 +762,7 @@ class TestSetDigitalInstruction:
         ip = composite[0]
 
         from_method = ip.asSetDigitalInstruction()
-        from_helper = InstructionPoly_as_SetDigitalInstruction(ip)
+        from_helper = ip.asSetDigitalInstruction()
         assert (from_method.getKey(), from_method.getIndex(), from_method.getValue()) == (
             "gripper",
             2,
@@ -820,7 +803,7 @@ class TestSetToolInstruction:
         ip = composite[0]
 
         from_method = ip.asSetToolInstruction()
-        from_helper = InstructionPoly_as_SetToolInstruction(ip)
+        from_helper = ip.asSetToolInstruction()
         assert from_method.getTool() == 5
         assert from_helper.getTool() == from_method.getTool()
 

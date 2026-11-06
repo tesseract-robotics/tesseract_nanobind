@@ -264,7 +264,6 @@ Uses pyright configured via `pyrightconfig.json`. Key design decisions:
 
 - **Python code is type-checked** — the `planning/` module and other pure Python code
 - **Auto-generated stubs are excluded** — nanobind generates `.pyi` stubs with C++ type artifacts
-- **Hand-written stub exception** — `ompl_base/_ompl_base.pyi` is manually maintained
 
 When adding new bindings, declare inheritance in nanobind to get correct stubs:
 

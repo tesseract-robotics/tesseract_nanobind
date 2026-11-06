@@ -1037,7 +1037,12 @@ NB_MODULE(_trajopt_ifopt, m) {
     bind_value_equality(trajopt_collision_config);
     trajopt_collision_config
         .def(nb::init<>())
-        .def(nb::init<double, double>(), "margin"_a, "coeff"_a)
+        .def(nb::init<double, double, tesseract::collision::ContactRequest,
+                      tesseract::collision::CollisionEvaluatorType, double,
+                      tesseract::collision::CollisionCheckProgramType>(),
+             "margin"_a, "coeff"_a, "request"_a = tesseract::collision::ContactRequest(),
+             "type"_a = tesseract::collision::CollisionEvaluatorType::DISCRETE, "longest_valid_segment_length"_a = 0.005,
+             "check_program_mode"_a = tesseract::collision::CollisionCheckProgramType::ALL)
         .def_rw("enabled", &tc::TrajOptCollisionConfig::enabled)
         .def_rw("contact_manager_config", &tc::TrajOptCollisionConfig::contact_manager_config)
         .def_rw("collision_check_config", &tc::TrajOptCollisionConfig::collision_check_config)

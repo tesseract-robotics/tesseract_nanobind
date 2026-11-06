@@ -29,10 +29,10 @@ from tesseract_robotics.emitters.rapid import (
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     JointWaypoint,
-    JointWaypointPoly_wrap_JointWaypoint,
+    JointWaypointPoly,
     MoveInstruction,
-    MoveInstructionPoly_wrap_MoveInstruction,
-    MoveInstructionType_FREESPACE,
+    MoveInstructionPoly,
+    MoveInstructionType,
 )
 
 _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")
@@ -55,9 +55,9 @@ def _joint_move(names, positions_rad):
     jw = JointWaypoint()
     jw.setJointIds(list(names))
     jw.setPosition(np.asarray(positions_rad, dtype=np.float64))
-    poly = JointWaypointPoly_wrap_JointWaypoint(jw)
-    move = MoveInstruction(poly, MoveInstructionType_FREESPACE, "P")
-    return MoveInstructionPoly_wrap_MoveInstruction(move)
+    poly = JointWaypointPoly(jw)
+    move = MoveInstruction(poly, MoveInstructionType.FREESPACE, "P")
+    return MoveInstructionPoly(move)
 
 
 def _composite(*instructions) -> CompositeInstruction:

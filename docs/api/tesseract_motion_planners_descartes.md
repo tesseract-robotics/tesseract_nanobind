@@ -11,7 +11,7 @@ and finding the optimal path through it. Best for industrial toolpaths
 ```python
 from tesseract_robotics.tesseract_motion_planners_descartes import (
     DescartesMotionPlannerD,
-    DescartesDefaultPlanProfileD,
+    DescartesDefaultMoveProfileD,
     DescartesLadderGraphSolverProfileD,
 )
 ```
@@ -37,14 +37,14 @@ response = planner.solve(request)
 
 ## Profiles
 
-### DescartesDefaultPlanProfileD
+### DescartesDefaultMoveProfileD
 
 Per-waypoint configuration.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultPlanProfileD
+from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultMoveProfileD
 
-profile = DescartesDefaultPlanProfileD()
+profile = DescartesDefaultMoveProfileD()
 
 # Target pose sampler settings
 # Configure how many IK solutions to sample per waypoint

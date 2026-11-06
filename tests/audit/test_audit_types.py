@@ -171,6 +171,8 @@ def test_same_arity_unbound_overload_is_a_gap(typed_report):
 
 def test_typed_gaps_exact(typed_report):
     assert {(g.symbol, g.kind, g.arity) for g in typed_report.gaps} == {
+        ("shortReach", audit.Kind.FUNCTION, "1-2"),
+        ("outReach", audit.Kind.FUNCTION, "2-3"),
         ("pick", audit.Kind.FUNCTION, "1"),
         ("roll", audit.Kind.FUNCTION, "1"),  # the stub's Sequence[Shape] is no Sequence[Ball]
     }
@@ -257,3 +259,30 @@ def test_a_vector_iterator_has_one_key_under_either_standard_library():
     }
     keys = {name: types.cpp_key(next(f.get_arguments()).type) for name, f in funcs.items()}
     assert keys == {"libcxx": None, "libstdcxx": None}
+
+
+def test_trailing_default_python_cannot_pass_is_a_gap(typed_report):
+    """#251: `shortReach(a, b = 0)` bound as `shortReach(a)` cannot pass `b`."""
+    [gap] = [g for g in typed_report.gaps if g.symbol == "shortReach"]
+    assert gap.unreachable == ("b",)
+
+
+def test_trailing_default_python_can_pass_is_covered(typed_report):
+    assert "fullReach" not in {g.symbol for g in typed_report.gaps}
+
+
+def test_out_param_does_not_count_as_a_python_parameter(typed_report):
+    """#251: `outReach(a, out, b = 0)`'s Python form is `(a, b)`: only `b` is unreachable."""
+    [gap] = [g for g in typed_report.gaps if g.symbol == "outReach"]
+    assert gap.unreachable == ("b",)
+
+
+def test_gap_row_names_the_unreachable_parameters(typed_report):
+    prov = {"tesseract-robotics": "==0.0.0", "libclang": "clang version 0", "stubs": "abc1234"}
+    page = audit.render_markdown([typed_report], prov, COVERAGE, NO_LEDGER)
+    assert "`b` unreachable" in page
+
+
+def test_header_rel_keeps_a_path_outside_conda_and_the_repo():
+    """An SDK header in a parse error: reported as it is, not a `ValueError` hiding the error."""
+    assert audit.header_rel(Path("/usr/include/stdio.h")).endswith("usr/include/stdio.h")

@@ -204,18 +204,6 @@ differs, which is what makes the result fair to eyeball.
     penetrations deeper than 10 m would register and the colliding plan is
     allowed to finish and return a real `CompositeInstruction`.
 
-## Reeds-Shepp Example
-
-Reeds-Shepp path for a differential-drive vehicle — a 2D motion planning
-demonstration using OMPL:
-
-```bash
-tesseract_reeds_shepp_example
-```
-
-See the source at
-[`reeds_shepp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/reeds_shepp_example.py).
-
 ## Next Steps
 
 - [Planning Examples](planning.md) - Motion planning

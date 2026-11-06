@@ -53,83 +53,8 @@
     }
   },
   "tesseract_command_language": {
-    "CartesianWaypointPoly_wrap_CartesianWaypoint": {
-      "issue": "#328"
-    },
-    "CompositeInstruction.appendMoveInstruction": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_CompositeInstruction": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_MoveInstructionPoly": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_SetAnalogInstruction": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_SetDigitalInstruction": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_SetToolInstruction": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_TimerInstruction": {
-      "issue": "#328"
-    },
-    "InstructionPoly_as_WaitInstruction": {
-      "issue": "#328"
-    },
-    "JointWaypointPoly_wrap_JointWaypoint": {
-      "issue": "#328"
-    },
-    "MoveInstruction.assignCartesianWaypoint": {
-      "issue": "#276"
-    },
-    "MoveInstruction.assignJointWaypoint": {
-      "issue": "#276"
-    },
-    "MoveInstruction.assignStateWaypoint": {
-      "issue": "#276"
-    },
-    "MoveInstructionPoly.assignCartesianWaypoint": {
-      "issue": "#276"
-    },
-    "MoveInstructionPoly.assignJointWaypoint": {
-      "issue": "#276"
-    },
-    "MoveInstructionPoly.assignStateWaypoint": {
-      "issue": "#276"
-    },
-    "MoveInstructionPoly_wrap_MoveInstruction": {
-      "issue": "#328"
-    },
-    "MoveInstructionType_CIRCULAR": {
-      "issue": "#275"
-    },
-    "MoveInstructionType_FREESPACE": {
-      "issue": "#275"
-    },
-    "MoveInstructionType_LINEAR": {
-      "issue": "#275"
-    },
     "Profile.createKey": {
-      "issue": "#273"
-    },
-    "ProfileDictionary_addProfile": {
-      "issue": "#276"
-    },
-    "StateWaypointPoly_wrap_StateWaypoint": {
-      "issue": "#328"
-    },
-    "WaypointPoly_as_CartesianWaypointPoly": {
-      "issue": "#328"
-    },
-    "WaypointPoly_as_JointWaypointPoly": {
-      "issue": "#328"
-    },
-    "WaypointPoly_as_StateWaypointPoly": {
-      "issue": "#328"
+      "wont_fix": "Template over the key-owning profile base; each bound key-owning base class has its own static `createKey()` (#344, #346)."
     }
   },
   "tesseract_common": {
@@ -153,12 +78,6 @@
     },
     "JointTag": {
       "wont_fix": "Empty tag type of `NameId<Tag>`; Python has `LinkId` and `JointId`."
-    },
-    "JointTrajectory.erase": {
-      "issue": "#269"
-    },
-    "JointTrajectory.insert": {
-      "issue": "#269"
     },
     "LinkId.__getstate__": {
       "wont_fix": "Pickle support: an id's state is its name."
@@ -384,6 +303,9 @@
     },
     "trim": {
       "wont_fix": "Python `str` covers it."
+    },
+    "JointTrajectory.insert": {
+      "wont_fix": "The range form takes iterators; Python calls `insert(index, state)` per state."
     }
   },
   "tesseract_environment": {
@@ -508,10 +430,10 @@
   },
   "tesseract_motion_planners": {
     "PlannerResponse.failed_instructions": {
-      "issue": "#304"
+      "wont_fix": "Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty."
     },
     "PlannerResponse.succeeded_instructions": {
-      "issue": "#304"
+      "wont_fix": "Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty."
     },
     "isValidState": {
       "issue": "#333"
@@ -520,65 +442,7 @@
       "issue": "#373"
     }
   },
-  "tesseract_motion_planners_descartes": {
-    "DescartesDefaultPlanProfileD": {
-      "issue": "#335"
-    },
-    "DescartesPlanProfileD": {
-      "issue": "#335"
-    },
-    "cast_DescartesMoveProfileD": {
-      "issue": "#334"
-    },
-    "cast_DescartesPlanProfileD": {
-      "issue": "#334"
-    },
-    "cast_DescartesSolverProfileD": {
-      "issue": "#334"
-    }
-  },
-  "tesseract_motion_planners_ompl": {
-    "OMPLMoveProfile.createStateExtractor": {
-      "issue": "#258"
-    },
-    "OMPLMoveProfile_as_ProfileConstPtr": {
-      "issue": "#334"
-    },
-    "OMPLPlanProfile": {
-      "issue": "#335"
-    },
-    "OMPLPlanProfile_as_ProfileConstPtr": {
-      "issue": "#334"
-    },
-    "OMPLRealVectorMoveProfile.createStateExtractor": {
-      "issue": "#258"
-    },
-    "OMPLRealVectorPlanProfile": {
-      "issue": "#335"
-    },
-    "ProfileDictionary_addOMPLMoveProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addOMPLProfile": {
-      "issue": "#334"
-    }
-  },
   "tesseract_motion_planners_trajopt": {
-    "ProfileDictionary_addTrajOptCompositeProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addTrajOptMoveProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addTrajOptPlanProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addTrajOptSolverProfile": {
-      "issue": "#334"
-    },
-    "TrajOptDefaultPlanProfile": {
-      "issue": "#335"
-    },
     "TrajOptPIQPSolverProfile.__eq__": {
       "issue": "#373"
     },
@@ -587,27 +451,9 @@
     },
     "TrajOptPIQPSolverProfile.__ne__": {
       "issue": "#373"
-    },
-    "TrajOptPlanProfile": {
-      "issue": "#335"
     }
   },
   "tesseract_motion_planners_trajopt_ifopt": {
-    "ProfileDictionary_addTrajOptIfoptCompositeProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addTrajOptIfoptMoveProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addTrajOptIfoptPlanProfile": {
-      "issue": "#334"
-    },
-    "ProfileDictionary_addTrajOptIfoptSolverProfile": {
-      "issue": "#334"
-    },
-    "TrajOptIfoptDefaultPlanProfile": {
-      "issue": "#335"
-    },
     "TrajOptIfoptPIQPSolverProfile.__eq__": {
       "issue": "#373"
     },
@@ -616,9 +462,6 @@
     },
     "TrajOptIfoptPIQPSolverProfile.__ne__": {
       "issue": "#373"
-    },
-    "TrajOptIfoptPlanProfile": {
-      "issue": "#335"
     }
   },
   "tesseract_scene_graph": {
@@ -634,7 +477,7 @@
   },
   "tesseract_serialization": {
     "Serialization": {
-      "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` … functions."
+      "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` \u2026 functions."
     }
   },
   "tesseract_srdf": {
@@ -689,20 +532,12 @@
     },
     "TaskflowTaskComposerExecutor.schema": {
       "issue": "#373"
-    }
-  },
-  "tesseract_time_parameterization": {
-    "ConstantTCPSpeedCompositeProfile": {
-      "issue": "#329"
     },
-    "ISPCompositeProfile": {
-      "issue": "#329"
+    "TaskComposerGraph.__init__": {
+      "wont_fix": "`parent_uuid` stays unbound: `TaskComposerGraph::addNode` sets a node's parent when the graph takes it."
     },
-    "ISPMoveProfile": {
-      "issue": "#329"
-    },
-    "TOTGCompositeProfile": {
-      "issue": "#329"
+    "TaskComposerPipeline.__init__": {
+      "wont_fix": "`parent_uuid` stays unbound: `TaskComposerGraph::addNode` sets a node's parent when the graph takes it."
     }
   },
   "tesseract_urdf": {
@@ -748,7 +583,7 @@
       "issue": "#290"
     },
     "Var.__init__": {
-      "wont_fix": "`Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297)."
+      "wont_fix": "`Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297). Their `parent` stays unbound: a raw `Node*` that dangles after solve."
     },
     "appendGradientResultsSets": {
       "wont_fix": "Helper behind the collision constraints; the binding includes `collision_utils.h` only for `getGradient`."
@@ -781,42 +616,6 @@
     },
     "PIQPSolver.solver": {
       "issue": "#373"
-    },
-    "QPSolverStatus.QP_ERROR": {
-      "issue": "#330"
-    },
-    "QPSolverStatus.UNITIALIZED": {
-      "issue": "#330"
-    },
-    "QPSolverStatus.kFailed": {
-      "issue": "#330"
-    },
-    "QPSolverStatus.kUninitialized": {
-      "issue": "#330"
-    },
-    "SQPStatus.CALLBACK_STOPPED": {
-      "issue": "#330"
-    },
-    "SQPStatus.NLP_CONVERGED": {
-      "issue": "#330"
-    },
-    "SQPStatus.OPT_TIME_LIMIT": {
-      "issue": "#330"
-    },
-    "SQPStatus.QP_SOLVER_ERROR": {
-      "issue": "#330"
-    },
-    "SQPStatus.kConverged": {
-      "issue": "#330"
-    },
-    "SQPStatus.kQPSolveFailed": {
-      "issue": "#330"
-    },
-    "SQPStatus.kStoppedByCallback": {
-      "issue": "#330"
-    },
-    "SQPStatus.kTimeLimit": {
-      "issue": "#330"
     }
   }
 }
