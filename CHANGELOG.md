@@ -111,6 +111,8 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
   | `create_time_optimal_parameterization(path_tolerance=0.05, min_angle_change=0.01)` | `create_time_optimal_parameterization()`, and `TimeOptimalTrajectoryGenerationCompositeProfile().path_tolerance = 0.05` (`.min_angle_change`) |
   | `create_iterative_spline_parameterization(add_points=False)` | `create_iterative_spline_parameterization()`, and `IterativeSplineParameterizationCompositeProfile().add_points = False` |
 
+- **`tesseract_robotics.ompl_base` removed** — the module, its hand-written stub and `reeds_shepp_example.py` / `tesseract_reeds_shepp_example`. It wrapped five OMPL headers directly, and nothing in the package used it; OMPL stays a dependency of the OMPL planner, which loads it in C++. Use OMPL's own Python bindings for `State`, `RealVectorBounds`, `SE2StateSpace`, `ReedsSheppStateSpace` or `DubinsStateSpace` ([#258]).
+
 ### Changes
 
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
@@ -666,6 +668,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
+[#258]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/258
 [#282]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/282
 [#283]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/283
 [#284]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/284

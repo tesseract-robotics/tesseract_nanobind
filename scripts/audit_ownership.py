@@ -76,9 +76,7 @@ AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
 # Binding modules the audit does not cover yet: module → (reason, owned prefixes). The prefixes
 # decide header ownership already, so a module moves to AUDITED_HEADER_PREFIX unchanged. Every
 # binding module is in exactly one of the two tables (`check_coverage`).
-UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
-    "ompl_base": ("To be removed (#258); binds OMPL, not tesseract.", ()),
-}
+UNAUDITED_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {}
 # Patterns that apply below every owning prefix.
 ANY_PREFIX = "*"
 # Built-in task-composer node plugins (C19, not API).
@@ -208,7 +206,7 @@ UNAUDITED_HEADERS: dict[str, dict[str, str]] = {
     "tesseract/motion_planners/ompl/": {
         "*_validator.h": "OMPL `StateValidityChecker`/`MotionValidator` subclasses that "
         "`OMPLRealVectorMoveProfile::createSimpleSetup` installs into the `SimpleSetup`; Python "
-        "reaches them only through OMPL types (`ompl_base` is to be removed, #258).",
+        "reaches them only through OMPL types, which the package does not bind (#258).",
         "collision_cost_objective.h": "OMPL `StateCostIntegralObjective` subclass the OMPL "
         "profile installs; it has no Python form without OMPL types.",
         "weighted_real_vector_state_sampler.h": "OMPL `StateSampler` subclass the OMPL profile "

@@ -36,6 +36,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `SQPStatus.NLP_CONVERGED`, `OPT_TIME_LIMIT`, `QP_SOLVER_ERROR`, `CALLBACK_STOPPED`, `QPSolverStatus.UNITIALIZED`, `QP_ERROR` renamed | [The C++ names](#six-trajopt_sqp-enumerators-renamed-to-their-c-names) |
 | Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `tesseract_motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
 | Unreleased | `create_time_optimal_parameterization(path_tolerance, min_angle_change)`, `create_iterative_spline_parameterization(add_points)`: the ignored arguments are removed | [Set the composite profile's fields](#time-parameterization-factories-take-no-arguments) |
+| Unreleased | `tesseract_robotics.ompl_base` and `tesseract_reeds_shepp_example` removed | [`ompl_base` removed](#ompl_base-removed) |
 | 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
 | 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
 | 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
@@ -438,6 +439,12 @@ import.
 `from … import *` now exports every public name of the extension. The OMPL list had named only
 the legacy aliases, so a star import gave `OMPLRealVectorPlanProfile` but not
 `OMPLRealVectorMoveProfile`.
+
+### `ompl_base` removed
+
+`tesseract_robotics.ompl_base` wrapped five OMPL headers directly and nothing in the package used it. The module, its stub, `reeds_shepp_example.py` and the `tesseract_reeds_shepp_example` script are gone. OMPL itself stays: the OMPL planner loads it in C++.
+
+For `State`, `RealVectorBounds`, `SE2StateSpace`, `ReedsSheppStateSpace` or `DubinsStateSpace`, use OMPL's own Python bindings.
 
 ### Time-parameterization factories take no arguments
 
