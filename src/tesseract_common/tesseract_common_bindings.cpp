@@ -58,10 +58,10 @@ static TransformStackOut new_transform_stack(std::size_t m) {
 #include <nanobind/stl/chrono.h>
 #include <nanobind/stl/string_view.h>
 #include <spdlog/spdlog.h>
+#include <spdlog/details/null_mutex.h>
 #include <spdlog/sinks/base_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <algorithm>
-#include <mutex>
 
 // boost::uuids::uuid <-> str, the spelling TaskComposerNodeInfo.uuid uses
 #include <boost/uuid/uuid_io.hpp>
@@ -194,6 +194,11 @@ private:
 // and reports a raising handler through sys.unraisablehook. It holds no Python object: after
 // interpreter finalization a record is dropped.
 //
+// The GIL is this sink's only lock. A mutex here would be taken before the GIL on a logging
+// thread and after it on a thread already holding the GIL (Logger.flush, any binding that
+// logs), which deadlocks, and a Python handler that logs would re-lock it on its own thread.
+// The formatter runs under the GIL, and Python only sets the pattern while holding it.
+//
 // Ownership: every sink Python can hold is created by C++ (std::make_shared, see nb::new_ below)
 // and can hand out its own shared_ptr (SharedSink). A logger given one from Python then shares
 // that C++ ownership; it never holds a reference to a Python object, so tesseract's default
@@ -202,7 +207,7 @@ struct SharedSink : std::enable_shared_from_this<SharedSink> {
     virtual ~SharedSink() = default;
 };
 
-class PythonLoggingSink final : public spdlog::sinks::base_sink<std::mutex>, public SharedSink {
+class PythonLoggingSink final : public spdlog::sinks::base_sink<spdlog::details::null_mutex>, public SharedSink {
 public:
     explicit PythonLoggingSink(std::string name) : name_(std::move(name)) {
         set_pattern_("%v");
@@ -214,12 +219,12 @@ protected:
     void sink_it_(const spdlog::details::log_msg& msg) override {
         if (!Py_IsInitialized())
             return;
+        nb::gil_scoped_acquire gil;
         spdlog::memory_buf_t text;
         formatter_->format(msg, text);
         std::size_t size = text.size();
         while (size > 0 && (text[size - 1] == '\n' || text[size - 1] == '\r'))
             --size;
-        nb::gil_scoped_acquire gil;
         try {
             const int level = pythonLevel(msg.level);
             nb::object logger = nb::module_::import_("logging").attr("getLogger")(name_);

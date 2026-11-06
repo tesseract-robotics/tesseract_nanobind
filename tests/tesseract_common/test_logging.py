@@ -18,6 +18,9 @@ from tesseract_robotics.tesseract_common import LogLevel
 # relative path and returns None.
 UNHANDLED = "relative/not/handled.stl"
 
+# seconds a script that must not deadlock gets; generous for a loaded CI runner's imports
+DEADLOCK_TIMEOUT_S = 60
+
 
 def _warn_once():
     assert tesseract_common.GeneralResourceLocator().locateResource(UNHANDLED) is None
@@ -186,6 +189,54 @@ def test_a_python_sink_left_installed_is_released_before_interpreter_exit():
     # routed once, through Python logging, not also by spdlog's stderr sink
     assert result.stderr.count("Resource not handled") == 1
     assert "WARNING:tesseract.cpp:" in result.stderr
+
+
+def test_a_python_sink_does_not_deadlock_a_thread_holding_the_gil():
+    """A record in flight lets the GIL go in Python; another thread then calls into the sink."""
+    script = (
+        "import logging, threading, time\n"
+        "from tesseract_robotics import tesseract_common as tc\n"
+        "entered = threading.Event()\n"
+        "class Slow(logging.Handler):\n"
+        "    def emit(self, record):\n"
+        "        entered.set()\n"
+        "        time.sleep(0.2)\n"
+        "python_logger = logging.getLogger('tesseract.cpp')\n"
+        "python_logger.addHandler(Slow())\n"
+        "logger = tc.getLogger()\n"
+        "logger.sinks = [tc.PythonLoggingSink('tesseract.cpp')]\n"
+        f"t = threading.Thread(target=tc.GeneralResourceLocator().locateResource, args=({UNHANDLED!r},))\n"
+        "t.start()\n"
+        "assert entered.wait(30)\n"
+        "logger.flush()\n"
+        "t.join()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=DEADLOCK_TIMEOUT_S
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_a_python_logging_handler_can_call_code_that_logs():
+    """A handler that reaches tesseract logs again on the thread already inside the sink."""
+    script = (
+        "import logging\n"
+        "from tesseract_robotics import tesseract_common as tc\n"
+        "seen = []\n"
+        "class Reenter(logging.Handler):\n"
+        "    def emit(self, record):\n"
+        "        seen.append(record.getMessage())\n"
+        "        if len(seen) == 1:\n"
+        f"            tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
+        "logging.getLogger('tesseract.cpp').addHandler(Reenter())\n"
+        "tc.getLogger().sinks = [tc.PythonLoggingSink('tesseract.cpp')]\n"
+        f"tc.GeneralResourceLocator().locateResource({UNHANDLED!r})\n"
+        "assert len(seen) == 2, seen\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=DEADLOCK_TIMEOUT_S
+    )
+    assert result.returncode == 0, result.stderr
 
 
 REMOVED_NAMES = [

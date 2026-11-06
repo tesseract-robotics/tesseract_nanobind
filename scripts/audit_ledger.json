@@ -190,6 +190,9 @@
     "LogRecord.thread_id": {
       "wont_fix": "`std::thread::id` has no Python form."
     },
+    "LogSink": {
+      "wont_fix": "Binds `spdlog::sinks::sink`, the type of `Logger.sinks`; no tesseract header declares it."
+    },
     "Logger": {
       "wont_fix": "Binds `spdlog::logger`, the type `getLogger` returns; no tesseract header declares it."
     },
@@ -240,6 +243,9 @@
     },
     "ResourceLocator.__ne__": {
       "wont_fix": "upstream ResourceLocator::operator== ignores rhs and returns true (resource_locator.cpp:46); binding it would make every locator equal; GeneralResourceLocator binds its own value equality"
+    },
+    "StderrSink": {
+      "wont_fix": "Binds `spdlog::sinks::stderr_color_sink_mt`, the sink tesseract's default logger starts with; no tesseract header declares it."
     },
     "StringAttribute": {
       "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
