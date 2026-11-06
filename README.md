@@ -1,7 +1,7 @@
 # Tesseract Python (nanobind)
 
 [![PyPI](https://img.shields.io/pypi/v/tesseract-robotics-nanobind.svg)](https://pypi.org/project/tesseract-robotics-nanobind/)
-[![Python](https://img.shields.io/badge/python-3.12%20|%203.13%20|%203.14-blue.svg)](https://github.com/tesseract-robotics/tesseract_nanobind)
+[![Python](https://img.shields.io/badge/python-3.12%20|%203.13%20|%203.14%20|%203.15-blue.svg)](https://github.com/tesseract-robotics/tesseract_nanobind)
 [![Linux](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-linux.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-linux.yml)
 [![macOS](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-macos.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-macos.yml)
 [![Windows](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-windows.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-windows.yml)
@@ -41,12 +41,12 @@ pip install tesseract-robotics-nanobind
 **Platform support:** 
 
 - linux
-   - x86_64 - 3.12-3.14
-   - aarch64 - 3.12-3.14
+   - x86_64 - 3.12-3.15
+   - aarch64 - 3.12-3.15
 - windows
-    - x86_64 - 3.12-3.14
+    - x86_64 - 3.12-3.15
 - macOS
-    - arm64 - 3.12-3.14
+    - arm64 - 3.12-3.15
 
 ## Quick Start
 

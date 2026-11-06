@@ -24,11 +24,13 @@ env against the dev-label packages. The user-facing changes are in
   ==0.36.0.dev20260929` and `trajopt ==0.36.0.dev20260930` from
   `tesseract-robotics/label/dev`, which the workspace channel list puts at priority
   10, so the `default` env and the `py3xx` CI envs build the 0.36 bindings with no
-  source build. The label carries only the stack packages; everything else comes from
-  conda-forge as before.
+  source build. The label carries the stack packages and forks of three conda-forge
+  packages: `pcl` without VTK, Qt or OpenGL, and `bullet-cpp` and `ompl` without a Python
+  pin. Everything else comes from conda-forge as before.
 - **Feedstock CI publishes the dev stack.** The `dev` branches of the
-  boost-plugin-loader, tesseract-robotics, trajopt and tesseract-robotics-planning
-  feedstocks build boost-plugin-loader 0.5.0, then tesseract, trajopt and planning, on
+  boost-plugin-loader, pcl, bullet, ompl, tesseract-robotics, trajopt and
+  tesseract-robotics-planning feedstocks build boost-plugin-loader 0.5.0 and the three
+  forks, then tesseract, trajopt and planning, on
   linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, and upload each package to
   `tesseract-robotics/label/dev`. Each feedstock reads that label as a
   `channel_source`, so a stage links the packages the stage before it uploaded; a

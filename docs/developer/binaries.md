@@ -31,7 +31,7 @@ flowchart LR
         CF[(conda-forge)]
     end
     subgraph repo["this repository"]
-        P[pixi env<br/>py310 / py311 / py312 / py39]
+        P[pixi env<br/>py312]
         B[scikit-build-core<br/>nanobind modules]
         R[repair step<br/>bundle libs + plugins]
     end
@@ -50,7 +50,8 @@ flowchart LR
 |---|---|---|---|
 | Upstream C++ | source at a release tag | `tesseract-robotics/{tesseract,trajopt,tesseract_planning,boost_plugin_loader}` | nothing here; the feedstocks fetch the tag archive |
 | C++ packages | `tesseract-robotics`, `trajopt`, `tesseract-robotics-planning`, `boost-plugin-loader`, `descartes-light`, `opw-kinematics`, `libruckig`, … | `tesseract-robotics` channel, label `main` | feedstock CI in `tesseract-robotics-packaging` |
-| Third-party C++ | boost, eigen, ompl, pcl/vtk, bullet, fcl, osqp, taskflow, … | `conda-forge` | conda-forge |
+| Third-party C++ | boost, eigen, fcl, osqp, taskflow, … | `conda-forge` | conda-forge |
+| Forked third-party C++ | `pcl` without VTK, Qt or OpenGL; `bullet-cpp` and `ompl` without a Python pin | `tesseract-robotics` channel, label `dev` | CI on the `dev` branches of the `jf---` forks of the conda-forge feedstocks |
 | Bindings | `_tesseract_*` nanobind extension modules | this repository | scikit-build-core + CMake, inside a pixi env |
 | Wheels | self-contained wheels with the C++ closure bundled | PyPI, `tesseract-robotics-nanobind` | `.github/workflows/wheels-{linux,macos,windows}.yml` |
 
@@ -73,6 +74,9 @@ Each upstream library has a conda-forge-style feedstock in the
 | `descartes-light-feedstock` | `descartes-light` | 0.4.10 | |
 | `opw-kinematics-feedstock`, `ruckig-feedstock`, `ros-industrial-cmake-boilerplate-feedstock` | supporting packages | | |
 | `tesseract-robotics-python-feedstock` | `tesseract-robotics-python` (SWIG) | 0.35.0 | not used by this repository |
+| `pcl-feedstock` (`jf---` fork) | `pcl` | | `dev` label: 1.15.1 build 16. No VTK, Qt or OpenGL; `pcl_io` kept |
+| `bullet-feedstock` (`jf---` fork) | `bullet-cpp` | | `dev` label: 3.25 build 7. C++ only: no `python`, `python_abi` or `numpy` |
+| `ompl-feedstock` (`jf---` fork) | `ompl` | | `dev` label: 1.7.0 build 7. No `python` or `numpy` |
 
 How a feedstock builds:
 
@@ -95,7 +99,14 @@ How a feedstock builds:
 
 The `packaging/*-feedstock` directories in this repository are submodules
 pointing at forks of these feedstocks. They exist for the 0.36 outer loop
-below; the released wheels never touch them.
+below.
+
+The `pcl`, `bullet-cpp` and `ompl` forks build the same package names as
+conda-forge, and the `dev` label's channel priority makes them win. conda-forge's
+builds pin a Python version (`bullet-cpp`, `ompl`) or pull in `vtk-base`, which
+does (`pcl`), and none of them had a Python 3.15 build in the version ranges the
+stack needs (#223). Dropping VTK also removes most of the wheel's bundled
+payload (#106).
 
 ## pixi environments: where each one gets its C++
 
@@ -108,8 +119,7 @@ flowchart TB
         SM[upstream/ submodules<br/>tesseract, trajopt,<br/>tesseract_planning, bpl]
         OUT[(packaging/output<br/>local .conda files)]
     end
-    D[default, py310, py311, py312] -->|tesseract-robotics ==0.36.0.dev20260929<br/>tesseract-robotics-planning ==0.36.0.dev20260929<br/>trajopt ==0.36.0.dev20260930| CH
-    P39[py39] -->|TESSERACT_CPP_PREFIX| D
+    D[default, py312, py315] -->|tesseract-robotics ==0.36.0.dev20260929<br/>tesseract-robotics-planning ==0.36.0.dev20260929<br/>trajopt ==0.36.0.dev20260930| CH
     U[upstream] -->|scripts/build_upstream.sh<br/>installs into the env prefix| SM
     FS[build-feedstock tasks] -->|build-locally.py| OUT
     PK[packaged] -->|label/dev, or<br/>./packaging/output| CH
@@ -117,10 +127,10 @@ flowchart TB
 
 | Environment | Python | C++ stack comes from | Used for |
 |---|---|---|---|
-| `default` | 3.14 (unpinned, `>=3.10`) | `tesseract-robotics/label/dev`: `tesseract-robotics` / `tesseract-robotics-planning ==0.36.0.dev20260929`, `trajopt ==0.36.0.dev20260930`; descartes-light, opw-kinematics and every third-party library arrive transitively | local development |
-| `py310`, `py311`, `py312` | pinned | same as `default` | CI wheel builds |
-| `py39` | 3.9 | none of its own: the pcl → vtk closure has no cp39 builds, so the build reads the `py312` env through `TESSERACT_CPP_PREFIX` | CI wheels for Python 3.9 (macOS, Windows) |
-| `upstream` | 3.12 | the `upstream/` submodules, compiled by `pixi run -e upstream build-upstream-cpp` and installed into the env prefix; third-party libraries from conda-forge | 0.36 inner loop |
+| `default` | 3.14 (unpinned, `>=3.12`) | `tesseract-robotics/label/dev`: `tesseract-robotics` / `tesseract-robotics-planning ==0.36.0.dev20260929`, `trajopt ==0.36.0.dev20260930`; descartes-light, opw-kinematics and every third-party library arrive transitively | local development |
+| `py312` | 3.12 | same as `default` | CI wheel builds (abi3) |
+| `py315` | 3.15 | same as `default`; `viser` from PyPI, because its `websockets <17` cap has no conda-forge py315 build | builds the bindings and runs the suite on the newest Python |
+| `upstream` | 3.12 | the `upstream/` submodules, compiled by `pixi run -e upstream build-upstream-cpp` and installed into the env prefix; other third-party libraries as in `default` | 0.36 inner loop |
 | `packaged` (osx-arm64) | 3.12 | the `0.36.0.dev` packages in `packaging/output`, read as a local channel ahead of `conda-forge` / `tesseract-robotics`; `taskflow` pinned to the 3.11 that planning was built with | publish gate for the dev packages (#162) |
 
 `upstream` and `packaged` share the `bindings-dev` feature (Python 3.12,
@@ -170,7 +180,7 @@ flowchart LR
 |---|---|---|---|
 | Workflow | `wheels-linux.yml` | `wheels-macos.yml` | `wheels-windows.yml` |
 | Runner | `ubuntu-22.04` (x86_64), `ubuntu-22.04-arm` (aarch64) | `macos-14` (arm64) | `windows-2022` (x64) |
-| Python builds | 3.10, 3.11, 3.12 (x86_64); 3.12 (aarch64) | 3.9, 3.10, 3.11, 3.12 | 3.9, 3.10, 3.11, 3.12 |
+| Python builds | 3.12 (x86_64, aarch64) | 3.12 | 3.12 |
 | Entry point | `pixi run build-wheel` → `scripts/build_linux_wheel.sh` | `pixi run build-wheel` → `scripts/build_macos_wheel.sh` | inline workflow steps with MSVC v143 |
 | Repair | `ldd` closure copied next to the package, `patchelf --set-rpath '$ORIGIN'` | `delocate-wheel`, then a walk over the plugins rewriting `@rpath/` to `@loader_path/` | `delvewheel repair --analyze-existing` |
 | Bundled libraries | `tesseract_robotics/` | `tesseract_robotics/.dylibs/` | `tesseract_robotics/` (plugins), `tesseract_robotics_nanobind.libs/` (dependencies) |
@@ -180,8 +190,7 @@ flowchart LR
 ### Wheel tags
 
 `wheel.py-api = "cp312"` makes the Python 3.12 build an abi3 wheel
-(`cp312-abi3-<platform>`), which installs on 3.12 and every later CPython. The
-3.9, 3.10 and 3.11 builds produce version-specific wheels. The Linux script
+(`cp312-abi3-<platform>`), which installs on 3.12 and every later CPython. The Linux script
 renames the wheel from `linux_*` to `manylinux_2_35_*`. libstdc++ is
 deliberately left to the host, so the real floor is the host's gcc runtime;
 [Linux wheels](linux-wheels.md) explains why.
@@ -189,10 +198,10 @@ deliberately left to the host, so the real floor is the host's gcc runtime;
 ### Tests before publishing
 
 - **ABI canary.** Each build job installs the wheel it just built into the
-  pixi env and runs `tests/tesseract_kinematics` (skipped for 3.9).
+  pixi env and runs `tests/tesseract_kinematics`.
 - **`test-wheel` job.** A plain virtualenv on a fresh runner, outside pixi,
   installs the wheel and runs the full test suite. The abi3 wheel is tested on
-  3.12, 3.13 and 3.14 (3.14 is non-blocking), and the 3.9 wheel on 3.9. Linux
+  3.12, 3.13, 3.14 and 3.15. Linux
   also checks that no library is "not found" and that only one libstdc++ is
   mapped.
 

@@ -18,7 +18,7 @@ print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 
 **Supported platforms:** macOS (ARM), Linux (x86_64/aarch64), Windows (x64).
 
-**Python versions:** 3.12–3.14, from one `cp312-abi3` stable-ABI wheel per platform.
+**Python versions:** 3.12–3.15, from one `cp312-abi3` stable-ABI wheel per platform.
 That includes Rhino 9, which embeds CPython 3.13. Rhino 8 (CPython 3.9) and Python
 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them.
 
