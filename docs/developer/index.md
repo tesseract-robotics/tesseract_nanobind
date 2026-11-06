@@ -118,7 +118,7 @@ pixi install
 pixi list
 ```
 
-Critical pins: `tesseract-robotics ==0.36.0.dev20260929`, `tesseract-robotics-planning ==0.36.0.dev20260929` and `trajopt ==0.36.0.dev20260930`, from the `tesseract-robotics/label/dev` channel, plus `taskflow 3.11.*` (header-only, matched to the planning build). Everything else (eigen, boost, …) follows from those packages' `run_exports`; pinning more deadlocks the solve.
+Critical pins: `tesseract-robotics ==0.36.0.dev20261103`, `tesseract-robotics-planning ==0.36.0.dev20261014` and `trajopt ==0.36.0.dev20261013`, from the `tesseract-robotics/label/dev` channel, plus `taskflow 3.11.*` (header-only, matched to the planning build). Everything else (eigen, boost, …) follows from those packages' `run_exports`; pinning more deadlocks the solve.
 
 ### CONDA_PREFIX and Worktrees
 

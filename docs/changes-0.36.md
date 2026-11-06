@@ -3,11 +3,10 @@
 !!! warning "Unreleased"
     This page tracks the `upstream-main` branch (issue #141, PR #161), which builds
     against the 0.36 dev packages on the `tesseract-robotics/label/dev` channel:
-    `tesseract-robotics` and `tesseract-robotics-planning` `0.36.0.dev20260929`,
-    `trajopt` `0.36.0.dev20260930`, built from tesseract `f4cc080`, trajopt `de9e941`
-    and tesseract_planning `4efed5f` ahead of the 0.36 release. The `upstream/`
-    submodules are ahead of those packages, at tesseract `2b79e91`, trajopt `a504b22`,
-    tesseract_planning `a648382`. Released wheels (0.35.0.x) still expose the 0.35 API.
+    `tesseract-robotics` `0.36.0.dev20261103`, `trajopt` `0.36.0.dev20261013` and
+    `tesseract-robotics-planning` `0.36.0.dev20261014`, built from tesseract `2b79e91`,
+    trajopt `a504b22` and tesseract_planning `a648382` ahead of the 0.36 release.
+    Released wheels (0.35.0.x) still expose the 0.35 API.
 
 Each section below names what was removed or renamed and shows the 0.35 call next to
 its 0.36 replacement.
