@@ -42,6 +42,10 @@ LOAD_POLL_S = 0.25
 CHROME_START_TIMEOUT_S = 15.0
 # Settling time for the player after a pause click [s].
 PAUSE_SETTLE_S = 0.3
+# A static scene has no timeline to say it has loaded: it counts as drawn once two frames this
+# far apart [s] are identical, within the budget [s]. Meshes decode after the progress bar goes.
+STILL_SETTLE_S = 1.0
+STILL_TIMEOUT_S = 30.0
 
 _PLAYER_STATE = """(() => {
   const handle = document.querySelector('[role=slider]');
@@ -56,7 +60,14 @@ _PLAYER_STATE = """(() => {
     track: [track.x, track.y, track.width, track.height],
     pause: [button.x + button.width / 2, button.y + button.height / 2],
     bar_top_px: panel.y,
+    loading: document.querySelector('.mantine-Progress-root') !== null,
   };
+})()"""
+# With no control bar the scene-tree button floats over the scene, on a tile of its own. Both
+# stay off the poster. The first such button is the floating one; the second sits in the tree.
+_HIDE_FLOATING_BUTTON = """(() => {
+  document.querySelector('button[aria-label="Show scene tree"]').parentElement.style.visibility =
+    'hidden';
 })()"""
 _NEXT_PAINT = "new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
 
@@ -80,6 +91,23 @@ def require_timeline(state: dict, module: str) -> None:
     """
     if not state["duration_s"] > 0.0:
         raise PosterCaptureError(f"{module}: nothing to seek along")
+
+
+def require_still(state: dict, module: str) -> None:
+    """Check a static entry's recording really has no timeline.
+
+    Raises:
+        PosterCaptureError: the recording moves.
+    """
+    if state["duration_s"] > 0.0:
+        raise PosterCaptureError(f"{module}: marked static, yet it plays {state['duration_s']} s")
+
+
+def player_ready(state: dict | None, *, static: bool) -> bool:
+    """Whether the player has its recording: a timeline, or for a static entry no progress bar."""
+    if state is None:
+        return False
+    return not state["loading"] if static else state["duration_s"] > 0.0
 
 
 class _Page:
@@ -185,7 +213,10 @@ class _Browser:
                 mobile=False,
             )
             page.call("Page.navigate", url=url)
-            state = _wait_for_player(page, entry.module)
+            state = _wait_for_player(page, entry)
+            if entry.static:
+                require_still(state, entry.module)
+                return encode_png(_settled_frame(page, entry.module))
             require_timeline(state, entry.module)
             page.click(*state["pause"])
             time.sleep(PAUSE_SETTLE_S)
@@ -210,14 +241,26 @@ class _Browser:
                 time.sleep(LOAD_POLL_S)
 
 
-def _wait_for_player(page: _Page, module: str) -> dict:
+def _wait_for_player(page: _Page, entry: Entry) -> dict:
     deadline = time.monotonic() + LOAD_TIMEOUT_S
     while time.monotonic() < deadline:
         state = page.evaluate(_PLAYER_STATE)
-        if isinstance(state, dict) and state["duration_s"] > 0.0:
+        if player_ready(state, static=entry.static):
             return state
         time.sleep(LOAD_POLL_S)
-    raise PosterCaptureError(f"{module}: no timeline after {LOAD_TIMEOUT_S} s")
+    raise PosterCaptureError(f"{entry.module}: no recording after {LOAD_TIMEOUT_S} s")
+
+
+def _settled_frame(page: _Page, module: str) -> Image.Image:
+    page.evaluate(_HIDE_FLOATING_BUTTON)
+    deadline = time.monotonic() + STILL_TIMEOUT_S
+    frame = page.screenshot()
+    while time.monotonic() < deadline:
+        time.sleep(STILL_SETTLE_S)
+        previous, frame = frame, page.screenshot()
+        if frame.tobytes() == previous.tobytes():
+            return frame
+    raise PosterCaptureError(f"{module}: still changing after {STILL_TIMEOUT_S} s")
 
 
 def _free_port() -> int:
@@ -226,19 +269,32 @@ def _free_port() -> int:
         return probe.getsockname()[1]
 
 
+def to_capture(
+    modules: list[str], recorded: set[str], posed: set[str], *, only: list[str]
+) -> list[str]:
+    """The entries to capture: the named ones, or else every recording without a poster.
+
+    A person may have reviewed an existing poster, and a re-record already drops its entry.
+    """
+    return [m for m in modules if m in recorded and (m in only if only else m not in posed)]
+
+
 def main(argv: list[str] | None = None) -> int:
     """Capture posters for recorded entries, and add their hashes to the lock."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--only", nargs="*", default=[], help="entries to capture; default all")
+    parser.add_argument(
+        "--only", nargs="*", default=[], help="entries to capture; default those without a poster"
+    )
     args = parser.parse_args(argv)
     lock = read_lock()
     posters = dict(lock.posters)
     posters_dir = DEMOS_DIR / "posters"
     posters_dir.mkdir(parents=True, exist_ok=True)
+    entries = {entry.module: entry for entry in load_manifest()}
+    wanted = to_capture(list(entries), set(lock.recordings), set(posters), only=args.only)
     with _Browser(DEMOS_DIR) as browser:
-        for entry in load_manifest():
-            if entry.module not in lock.recordings or (args.only and entry.module not in args.only):
-                continue
+        for module in wanted:
+            entry = entries[module]
             data = browser.capture(entry)
             (posters_dir / f"{entry.module}.png").write_bytes(data)
             posters[entry.module] = sha256_bytes(data)

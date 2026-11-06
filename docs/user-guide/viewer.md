@@ -127,6 +127,8 @@ All materials are double-sided: sheet-metal meshes often mix face windings, whic
 
 ## Industrial Workcells
 
+--8<-- "docs/demos/players/twc_workcell_positioner_viewer.html"
+
 The Tesseract Robotics Workcell Collection (TWC) ships rail and positioner cells. Trajectories over any subset of joints, in any order, pose by their own joint names:
 
 ```python
