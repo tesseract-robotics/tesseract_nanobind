@@ -8,8 +8,7 @@ module = "car_seat_example"
 page = "examples/planning.md"
 title = "Car seat"
 blurb = "Picks a seat off a conveyor and places it through a car's door opening, on a rail-mounted robot."
-status = "excluded"
-reason = "Awaiting review of the recording joining pick and place."
+status = "published"
 floor_size_m = 20.0
 [example.camera]
 position = [-3.16, 6.85, 4.77]
