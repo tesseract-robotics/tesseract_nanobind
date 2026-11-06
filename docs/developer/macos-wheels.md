@@ -59,21 +59,6 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     install compatibility without touching the runner or the architecture. Use
     that, not the runner label.
 
-## The build cache key over-invalidates on unrelated pyproject edits
-
-!!! warning "The bindings build cache hashes all of `pyproject.toml`, so a one-line edit forces a cold bindings build"
-    CI no longer compiles tesseract: the C++ stack comes prebuilt from the
-    `tesseract-robotics` conda channel (see [How the binaries are built](binaries.md)).
-    What is cached is the scikit-build directory of the nanobind modules, keyed
-    `nanobind-wheel-build-macos-py${python}-${hashFiles(CMakeLists.txt, pyproject.toml, pixi.lock, src/**/*.{cpp,h,hpp})}`.
-    Because it hashes the **entire** `pyproject.toml`, any edit (a
-    `setuptools_scm` setting, a ruff rule, a trove classifier) misses the cache
-    and recompiles every binding module. There is no `restore-keys` fallback.
-
-    This costs time, never correctness: a cold build is still a correct build.
-    It is **not** a cause of any wheel-fragmentation failure; those are the
-    upload and publish issues above.
-
 ## STABLE_ABI: the wheel under test is not the Python under test
 
 !!! note "3.13/3.14 are verified by installing the `cp312-abi3` wheel, not by building a 3.13/3.14 wheel"

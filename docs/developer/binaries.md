@@ -216,8 +216,10 @@ deliberately left to the host, so the real floor is the host's gcc runtime;
   pixi env and runs `tests/tesseract_kinematics`.
 - **`test-wheel` job.** A lean pixi env on a fresh runner (Python and `uv` from
   conda, no C++ stack) installs the wheel with `uv pip install` and runs the full
-  test suite. The abi3 wheel is tested on 3.12, 3.13, 3.14 and 3.15. macOS also
-  checks that one `libomp` loads, with and without the env providing it. Linux
+  test suite. Pull requests test the abi3 wheel on 3.12; pushes to `main`, tags and
+  manual runs test it on 3.12, 3.13, 3.14 and 3.15. macOS also checks that one
+  `libomp` loads, and the full matrix adds `wheel-openmp`, where the env provides
+  it. Linux
   also checks that no library is "not found" and that only one libstdc++ is
   mapped.
 
