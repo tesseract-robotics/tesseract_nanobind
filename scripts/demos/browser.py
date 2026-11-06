@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import base64
+import functools
+import http.server
 import io
 import json
 import socket
 import subprocess
-import sys
 import tempfile
+import threading
 import time
 import urllib.request
 from collections.abc import Iterator
@@ -25,11 +27,39 @@ CHROME_START_TIMEOUT_S = 15.0
 START_POLL_S = 0.25
 # How long one wait for a browser event blocks before looking at the clock again [s].
 PUMP_POLL_S = 0.1
+# Pending connections the file server holds [-]. A docs page asks for its posters at once; 5,
+# the http.server default, dropped 12 requests in 30 loads of planning.md, and this dropped 0.
+LISTEN_BACKLOG = 128
 _NEXT_PAINT = "new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
 
 
 class BrowserError(RuntimeError):
     """Chrome is missing, did not start, or refused a command."""
+
+
+class StaticServer(http.server.ThreadingHTTPServer):
+    """A local file server that keeps up with a whole page's requests."""
+
+    request_queue_size = LISTEN_BACKLOG
+
+
+class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002 (the base's name)
+        pass
+
+
+@contextmanager
+def serve(root: Path) -> Iterator[int]:
+    """Serve `root` for the context; yields the port."""
+    handler = functools.partial(_QuietHandler, directory=str(root))
+    with StaticServer(("127.0.0.1", 0), handler) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield server.server_address[1]
+        finally:
+            server.shutdown()
+            thread.join()
 
 
 class Page:
@@ -88,14 +118,10 @@ class Browser:
         self._root = root
 
     def __enter__(self) -> Browser:
-        self.port, self._cdp_port = _free_port(), _free_port()
+        self._serving = serve(self._root)
+        self.port = self._serving.__enter__()
+        self._cdp_port = _free_port()
         self._profile = tempfile.TemporaryDirectory(dir=REPO / ".scratch", prefix="chrome-")
-        self._server = subprocess.Popen(
-            [sys.executable, "-m", "http.server", str(self.port), "--bind", "127.0.0.1"],
-            cwd=self._root,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
         self._chrome = subprocess.Popen(
             [
                 str(CHROME),
@@ -120,9 +146,8 @@ class Browser:
         tb: TracebackType | None,
     ) -> None:
         self._chrome.terminate()
-        self._server.terminate()
         self._chrome.wait()
-        self._server.wait()
+        self._serving.__exit__(exc_type, exc, tb)
         self._profile.cleanup()
 
     @contextmanager
