@@ -6,6 +6,20 @@ This project uses [pixi](https://pixi.sh) exclusively for package management. Pi
 
 The tesseract C++ libraries are not built here: they are prebuilt conda packages from the `tesseract-robotics` channel. [How the binaries are built](binaries.md) traces every binary from the upstream source to the PyPI wheel.
 
+### First-Time Setup
+
+Install pixi ([docs](https://pixi.sh/latest/#installation)), then clone and build:
+
+```bash
+curl -fsSL https://pixi.sh/install.sh | bash
+
+git clone --recurse-submodules https://github.com/tesseract-robotics/tesseract_nanobind.git
+cd tesseract_nanobind
+pixi run build
+```
+
+`pixi run build` resolves the environment, which pulls the prebuilt C++ libraries, and compiles only the nanobind extensions.
+
 ### Available Tasks
 
 ```bash
@@ -16,17 +30,28 @@ pixi task list
 |------|-------------|--------------|
 | `build` | Build bindings | alias for `install` |
 | `install` | Install bindings | editable `pip install -e . --no-build-isolation` against the conda tesseract libs |
-| `test` | Run tests | pytest with xdist parallel (depends on `install`) |
+| `test` | Run tests | pytest with xdist parallel, excluding benchmarks (depends on `install`) |
+| `test-benchmark` | Run benchmarks | benchmark tests, serial |
 | `build-wheel` | Portable wheel | `scripts/build_linux_wheel.sh` / `build_macos_wheel.sh` (see [binaries](binaries.md)) |
 | `typecheck` | Type check | pyright on `src/tesseract_robotics/` |
 | `lint` | Lint | ruff check |
 | `fmt` | Format | ruff format |
+| `stubs` | Regenerate stubs | the committed `.pyi` stubs; see [Stub Generation](#stub-generation) |
+| `stubs-check` | Check stubs | fails if committed stubs differ from the built modules |
 | `docs` | Live docs | mkdocs serve with auto-reload |
 | `docs-build` | Build docs | Static site to `site/` |
+| `docs-dotgraphs` | Pipeline graphs | regenerates the pipeline DOT graph SVGs (requires graphviz) |
 | `check-changelog` | Check changelog | `CHANGELOG.md` release structure (the Docs workflow runs it too) |
 | `audit-gil` (`-e audit`) | GIL audit | Every GIL release in the bindings against `scripts/nogil_entry_points.yaml`; see [Threading and the GIL](threading.md) |
 | `audit-test` (`-e audit`) | Audit contract tests | `tests/audit`, which needs libclang |
 | `gil-hotspots` | GIL hotspots | Records benchmarks and tests with `py-spy --gil`, ranks the bindings that hold the GIL ([Finding candidates](threading.md#finding-candidates)) |
+
+### Running Tests
+
+```bash
+pixi run test                              # full suite, parallel
+pixi shell && pytest tests -x --testmon    # incremental (only changed)
+```
 
 ### Daily Workflow
 
@@ -129,6 +154,15 @@ CONDA_PREFIX=$(pwd)/.pixi/envs/default pip install -e . --no-build-isolation
 ```
 
 Using `pixi run` handles this automatically.
+
+### Building Portable Wheels
+
+Editable installs bake absolute paths, so they aren't portable. For distributable wheels:
+
+```bash
+pixi run build-wheel                  # bundles native deps (Linux: patchelf, macOS: scripts/repair_macos_wheel.py)
+pip install wheelhouse/tesseract*.whl
+```
 
 ---
 
