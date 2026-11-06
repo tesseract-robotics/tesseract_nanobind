@@ -341,9 +341,6 @@ At the defaults this gives 64 hulls in about a second. Each is written as
 ```
 
 Read back, each file holds its hull's vertices to the PLY's 7 written decimals.
-The round trip works because the binding repairs the hulls' face lists, which
-upstream's `createConvexHull` corrupts ([#233]; `ConvexHullFaceRepairError` in
-the [API reference](../api/tesseract_collision.md)).
 
 Each hull is checked for convexity against its own faces: every face is planar
 and every vertex lies on the inner side of every face plane, within the
@@ -385,4 +382,3 @@ Each gives its own decomposition. The default-constructed
 The decomposition shipped with tesseract support, `car_seat/collision/seat_*.stl`,
 was made with other, unrecorded parameters. It is reported, not compared.
 
-[#233]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/233
