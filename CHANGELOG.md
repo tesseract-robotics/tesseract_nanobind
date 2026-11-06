@@ -115,6 +115,9 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Changes
 
+- **`JointTrajectory.insert(index, state)` and `del traj[i]` / `del traj[a:b]`**, in Python's list forms, as `CompositeInstruction` has ([#269]).
+- **`TrajOptCollisionConfig(margin, coeff, request, type, longest_valid_segment_length, check_program_mode)`** — the full upstream constructor; the two-argument form still works ([#251]).
+- **The binding audit reports trailing defaulted parameters Python cannot pass** — a C++ overload with defaulted parameters counts as covered only if a covering Python overload accepts all of them; otherwise the gap names the unreachable ones. `OFKTStateSolver(scene_graph, prefix)` is accepted under `upstream-broken-default` ([#251], [tesseract#1384]).
 - **The puzzle aux-axes example runs on `TrajOptIfoptPipeline`** — `run(pipeline="TrajOptIfoptPipeline")` uses the new `create_ifopt_profiles()`, the `if (ifopt_)` branch of the C++ example (OSQP `adaptive_rho` left at its default, as upstream). The legacy ports set `adaptive_rho = 0` as the C++ legacy branch does, and the low-level port's profiles come from `create_profiles()`. `docs/developer/trajopt-collision-memory.md` records why both TrajOpt planners peak at 3.2 GiB on this example (one contact-manager clone per waypoint) and the upstream fix for ifopt ([tesseract_planning#787](https://github.com/tesseract-robotics/tesseract_planning/issues/787)): 437 → 1 clone, 28× lower peak, bitwise-identical trajectory.
 - **car_seat runs on `TrajOptIfoptPipeline`, and freespace_hybrid's ifopt run uses the C++ profiles** — `car_seat_example.run(pipeline="TrajOptIfoptPipeline")` uses the new `create_car_seat_ifopt_profiles()`, the C++ `if (ifopt_)` branch (LVS_CONTINUOUS cost and constraint). `freespace_hybrid_example.run(use_ifopt=True)` registered no ifopt composite profile and planned with the planner defaults. The new `add_ifopt_profiles()` adds the C++ composite: cost and constraint `TrajOptCollisionConfig(0.025, 20)`, smoothing coeffs of 1. With the #787 fix, car_seat clones 40 → 4 contact managers and its trajectories stay bitwise identical.
 - **Sources target Python 3.12** — ruff `target-version = "py312"` without `FA102`, PEP 695 aliases and generics, `StrEnum` for `RapidType`, `zip(strict=True)` in tests. The GIL-hotspot tooling tests move back to `tests/test_gil_hotspots.py`, in the wheel suite; the `devtools-test` task is gone ([#369]).
@@ -666,6 +669,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#241]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/241
 [#232]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/232
 [#247]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/247
+[tesseract#1384]: https://github.com/tesseract-robotics/tesseract/issues/1384
+[#251]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/251
 [#252]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/252
 [#256]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/256
 [#258]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/258

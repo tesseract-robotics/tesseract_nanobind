@@ -38,7 +38,9 @@ LIMITATION = (
     "only where the keys agree. A type the mapping does not know (a template parameter, "
     "`object`, a quoted C++ name) leaves that position to arity alone; the `type fallbacks` "
     "column counts the C++ overloads covered that way. Overloads that differ only in `const` "
-    "of `this` or `&`/`&&` of a parameter count as one. An overload taking a raw buffer (a "
+    "of `this` or `&`/`&&` of a parameter count as one. A C++ overload with trailing defaulted "
+    "parameters is covered only if a covering Python overload accepts all of them; otherwise "
+    "the gap names the unreachable ones. An overload taking a raw buffer (a "
     "pointer to a non-`char` scalar) has no Python form and is reported whatever the arity, "
     "unless it is a `(const uint8_t*, size_t)` pair bound as one `bytes` parameter. "
     "A header the binding never includes that does not compile on its own is listed as "
@@ -178,6 +180,13 @@ def _unaudited_patterns() -> list[tuple[str, str]]:
     )
 
 
+def _gap_arity(g: Gap) -> str:
+    """The arity cell; a gap of trailing defaults names what Python cannot pass (#251)."""
+    if not g.unreachable:
+        return g.arity
+    return f"{g.arity}: {', '.join(f'`{n}`' for n in g.unreachable)} unreachable"
+
+
 def render_markdown(
     reports: list[ModuleReport],
     prov: dict[str, str],
@@ -197,9 +206,11 @@ def render_markdown(
         "",
         f"{len(cov.audited)} of {cov.total} binding modules audited.",
         "",
-        "Not audited:",
-        "",
-        *_table(("module", "reason"), list(cov.unaudited.items())),
+        *(
+            ("Not audited:", "", *_table(("module", "reason"), list(cov.unaudited.items())))
+            if cov.unaudited
+            else ()
+        ),
         "| module | covered | gaps | deviations | accepted | quoted types | type fallbacks |",
         "|---|---|---|---|---|---|---|",
         *(
@@ -249,7 +260,7 @@ def render_markdown(
                     f"`{g.symbol}`",
                     g.kind.value,
                     _where(g.location),
-                    g.arity,
+                    _gap_arity(g),
                     _issue_cell(outcomes.get(g.symbol)),
                 )
                 for g in r.gaps
