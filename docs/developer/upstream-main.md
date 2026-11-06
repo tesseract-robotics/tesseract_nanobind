@@ -15,13 +15,15 @@ Two loops share the same pinned upstream SHAs:
 
 The main catch-up is done. The branch is rebased onto `origin/main` at `4e3982f0`,
 every change main made since the previous rebase is ported to the 0.36 API, and main's
-tests run against it: on osx-arm64 the full suite passes, 3087 tests, in the `default`
-env against the dev-label packages. The user-facing changes are in
+tests run against it: on osx-arm64 the full suite passed, 3087 tests, in the `default`
+env against the `20260929` / `20260930` dev-label packages. At the current pins, the
+tests #363 changes pass in the `default` env on osx-arm64; the full suite is left to
+CI. The user-facing changes are in
 [API Changes: 0.35 → 0.36](../changes-0.36.md).
 
 - **The root env is on the 0.36 dev label.** `[tool.pixi.dependencies]` pins
-  `tesseract-robotics ==0.36.0.dev20260929`, `tesseract-robotics-planning
-  ==0.36.0.dev20260929` and `trajopt ==0.36.0.dev20260930` from
+  `tesseract-robotics ==0.36.0.dev20261103`, `tesseract-robotics-planning
+  ==0.36.0.dev20261014` and `trajopt ==0.36.0.dev20261013` from
   `tesseract-robotics/label/dev`, which the workspace channel list puts at priority
   10, so the `default` env and the `py3xx` CI envs build the 0.36 bindings with no
   source build. The label carries the stack packages and forks of three conda-forge
@@ -31,12 +33,17 @@ env against the dev-label packages. The user-facing changes are in
   boost-plugin-loader, pcl, bullet, ompl, tesseract-robotics, trajopt and
   tesseract-robotics-planning feedstocks build boost-plugin-loader 0.5.0 and the three
   forks, then tesseract, trajopt and planning, on
-  linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, and upload each package to
+  linux-64, linux-aarch64, osx-arm64 and win-64, and upload each package to
   `tesseract-robotics/label/dev`. Each feedstock reads that label as a
   `channel_source`, so a stage links the packages the stage before it uploaded; a
   per-repo CI cache could not feed the next feedstock. The `upstream` (source) and
   `packaged` envs stay as the inner loop and as a cross-check of the published
   packages.
+- **The stack includes PIQP through the trajopt feedstock.** The trajopt recipe builds
+  PIQP 0.6.4 from a hash-pinned tarball, static on Windows, instead of depending on
+  conda-forge's `piqp`: its win-64 build ships a `.lib` and no DLL, and its builds pin a
+  Python version, which the stack packages must not. So `piqp` is a pixi dependency only
+  in the `upstream` env, which compiles trajopt itself.
 
 ### Merging `pixi.lock` on a rebase
 
@@ -154,9 +161,9 @@ so each stage links the packages built before it rather than the 0.35 packages
 on the published channel:
 
 ```text
-boost-plugin-loader  0.4.5               output
-tesseract-robotics   0.36.0.dev20260929  output
-trajopt              0.36.0.dev20260930  output
+boost-plugin-loader  0.5.0               output
+tesseract-robotics   0.36.0.dev20261103  output
+trajopt              0.36.0.dev20261013  output
 ```
 
 Each package runs its recipe tests. Every run provisions a fresh build env and

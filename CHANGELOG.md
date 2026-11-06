@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its release: the `tesseract-robotics/label/dev` packages `tesseract-robotics` / `tesseract-robotics-planning` `0.36.0.dev20260929` and `trajopt` `0.36.0.dev20260930`, built from `master` (tesseract `f4cc080`, trajopt `de9e941`, tesseract_planning `4efed5f`) by the feedstocks' CI on linux-64, linux-aarch64, osx-64, osx-arm64 and win-64. The `upstream/` submodules that the `upstream` env builds from are ahead of those packages, at tesseract `2b79e91`, trajopt `a504b22`, tesseract_planning `a648382`. The `default` env pins them. `docs/changes-0.36.md` has the 0.35 → 0.36 migration, with a before/after example per change ([#141], [#161]).
+Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its release: the `tesseract-robotics/label/dev` packages `tesseract-robotics` `0.36.0.dev20261103`, `trajopt` `0.36.0.dev20261013` and `tesseract-robotics-planning` `0.36.0.dev20261014`, built from `master` (tesseract `2b79e91`, trajopt `a504b22`, tesseract_planning `a648382`) by the feedstocks' CI on linux-64, linux-aarch64, osx-arm64 and win-64. The `default` env pins them. `docs/changes-0.36.md` has the 0.35 → 0.36 migration, with a before/after example per change ([#141], [#161]).
 
 ### Breaking changes
 
