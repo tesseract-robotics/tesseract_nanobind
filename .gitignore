@@ -53,3 +53,6 @@ packaging/linux-aarch64-out/
 packaging/SDKs/
 packaging/logs/
 upstream/build/
+
+# Gallery recordings: built by `pixi run gallery-record`, pinned by scripts/gallery/gallery.lock.json
+docs/demos/

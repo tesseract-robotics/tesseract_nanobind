@@ -397,7 +397,7 @@ def plan_motion(
     return result
 
 
-def run(pipeline="TrajOptPipeline", num_planners=None):
+def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
     """Execute the car seat pick-and-place workflow.
 
     Workflow phases (from C++ CarSeatExample::run()):
@@ -439,7 +439,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None):
 
     robot.set_joints(POSITIONS["Home"])
 
-    composer = TaskComposer.from_config()
+    composer = composer or TaskComposer.from_config()
 
     # Create profiles based on pipeline type
     if "Freespace" in pipeline or "OMPL" in pipeline:
