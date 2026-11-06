@@ -1,4 +1,5 @@
 #include "tesseract_nb.h"
+#include <algorithm>
 #include <iterator>
 
 // tesseract_common headers (need eigen_types.h before opaque declarations)
@@ -115,6 +116,13 @@ static Eigen::Matrix3d nearest_rotation(const Eigen::Matrix3d& m) {
     const Eigen::JacobiSVD<Eigen::Matrix3d, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(m);
     const double d = svd.matrixU().determinant() * svd.matrixV().determinant() < 0.0 ? -1.0 : 1.0;
     return svd.matrixU() * Eigen::Vector3d(1.0, 1.0, d).asDiagonal() * svd.matrixV().transpose();
+}
+
+// list.insert index: negative counts from the end; out of range clamps to either end.
+static std::size_t insert_index(Py_ssize_t i, std::size_t size) {
+    const auto n = static_cast<Py_ssize_t>(size);
+    const Py_ssize_t j = i < 0 ? i + n : i;
+    return static_cast<std::size_t>(std::clamp<Py_ssize_t>(j, 0, n));
 }
 
 // Python index (negative counts from the end) -> container index; std::out_of_range -> IndexError.
@@ -1106,8 +1114,9 @@ NB_MODULE(_tesseract_common, m) {
 
     // ========== JointTrajectory ==========
     // Element access returns a copy: a reference into `states` would dangle once push_back
-    // reallocates. Edit an element with a write-back, `traj[i] = js`. The iterator-taking
-    // vector members (insert/emplace/erase, the range ctor, reverse iterators, data, swap)
+    // reallocates. Edit an element with a write-back, `traj[i] = js`. `insert` and `erase` take
+    // Python's list forms, `insert(index, state)` and `del traj[i]` / `del traj[a:b]`. The other
+    // iterator-taking vector members (emplace, the range ctor, reverse iterators, data, swap)
     // have no natural Python signature and stay unbound.
     using tesseract::common::JointState;
     using tesseract::common::JointTrajectory;
@@ -1159,7 +1168,27 @@ NB_MODULE(_tesseract_common, m) {
         .def("pop_back", [](JointTrajectory& self) {
             if (self.empty()) throw std::out_of_range("JointTrajectory.pop_back: empty trajectory");
             self.pop_back();
-        });
+        })
+        .def("insert", [](JointTrajectory& self, Py_ssize_t index, const JointState& state) {
+            self.insert(self.begin() + static_cast<std::ptrdiff_t>(insert_index(index, self.size())), state);
+        }, "index"_a, "state"_a)
+        .def("__delitem__", [](JointTrajectory& self, Py_ssize_t i) {
+            self.erase(self.begin() + static_cast<std::ptrdiff_t>(normalize_index(i, self.size())));
+        }, "index"_a)
+        .def("__delitem__", [](JointTrajectory& self, const nb::slice& slice) {
+            const auto [start, stop, step, length] = slice.compute(self.size());
+            if (step == 1) {
+                self.erase(self.begin() + start, self.begin() + start + static_cast<Py_ssize_t>(length));
+                return;
+            }
+            // Erase from the back, so the indices still to erase stay valid.
+            std::vector<Py_ssize_t> indices;
+            for (std::size_t k = 0; k < length; ++k)
+                indices.push_back(start + static_cast<Py_ssize_t>(k) * step);
+            std::sort(indices.rbegin(), indices.rend());
+            for (const Py_ssize_t j : indices)
+                self.erase(self.begin() + j);
+        }, "slice"_a);
     bind_value_equality(joint_trajectory);
 
     // ========== AllowedCollisionMatrix ==========
