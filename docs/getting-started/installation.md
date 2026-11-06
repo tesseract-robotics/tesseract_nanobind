@@ -22,6 +22,8 @@ print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 That includes Rhino 9, which embeds CPython 3.13. Rhino 8 (CPython 3.9) and Python
 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them.
 
+On 3.15, `zstandard`, which `viser` requires, compiles from source until it ships 3.15 wheels, so a plain `uv pip install` needs a C compiler there.
+
 ---
 
 ## Developers: Build from Source
