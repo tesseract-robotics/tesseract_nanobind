@@ -109,9 +109,9 @@ status = "excluded"
 reason = "Awaiting review."
 floor_size_m = 20.0
 [example.camera]
-position = [-6, -3, 2.6]
-look_at = [3, 3, 1.2]
-fov_rad = 0.6109
+position = [-4, 3, 2.0]
+look_at = [3.5, 3, 1.0]
+fov_rad = 0.75
 
 [[example]]
 module = "online_planning_sqp_example"
@@ -122,9 +122,9 @@ status = "excluded"
 reason = "Awaiting review."
 floor_size_m = 20.0
 [example.camera]
-position = [-6, -3, 2.6]
-look_at = [3, 3, 1.2]
-fov_rad = 0.6109
+position = [-4, 3, 2.0]
+look_at = [3.5, 3, 1.0]
+fov_rad = 0.75
 
 [[example]]
 module = "pick_and_place_example"
