@@ -109,8 +109,7 @@ def test_two_cubes_decompose_into_at_least_two_hulls():
 
 
 def test_hull_faces_are_box_faces():
-    """gh-233: compute builds each hull with upstream createConvexHull, whose faces carry the
-    4th+ vertices of every earlier face (sizes 4, 5, 6, 7, 8, 9 on these boxes). V-HACD of two
+    """gh-233: tesseract before 13a2310f gave these boxes faces of sizes 4, 5, 6, 7, 8, 9. V-HACD of two
     axis-aligned cubes gives axis-aligned boxes, so every face is checked exactly: four
     vertices of its own, on one of the box's planes, every hull vertex on or behind it."""
     vertices, faces = _two_cubes()
