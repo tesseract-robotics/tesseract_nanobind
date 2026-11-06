@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
-from browser import Browser, Page
+from browser import Browser, Page, scratch_dir
 from manifest import Entry, Status, load_manifest
 from numpy.typing import NDArray
 from PIL import Image
@@ -254,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.only or t[0] in args.only
     ]
     reports = []
-    with tempfile.TemporaryDirectory(dir=REPO / ".scratch", prefix="serve-") as root:
+    with tempfile.TemporaryDirectory(dir=scratch_dir(), prefix="serve-") as root:
         (Path(root) / SUBPATH).symlink_to(SITE_DIR)
         with Browser(Path(root)) as browser, browser.page() as page:
             base = args.url or f"http://127.0.0.1:{browser.port}/{SUBPATH}/"

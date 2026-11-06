@@ -5,7 +5,8 @@ under that hash, so a re-record adds an asset and an older commit still builds. 
 only: `docs.yml` runs this without installing the package.
 
 `--stage DIR` is the other direction: it names the local files by hash, ready for
-`gh release upload demo-assets DIR/*`.
+`gh release upload demo-assets DIR/* --clobber`. The names are hashes, so `--clobber` only
+rewrites identical bytes.
 """
 
 from __future__ import annotations

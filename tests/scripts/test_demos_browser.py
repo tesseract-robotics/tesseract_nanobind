@@ -21,3 +21,8 @@ def test_the_server_serves_its_root(tmp_path):
     with browser.serve(tmp_path) as port:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/a.txt") as reply:
             assert reply.read() == b"hello"
+
+
+def test_the_scratch_dir_exists_on_a_fresh_clone(tmp_path, monkeypatch):
+    monkeypatch.setattr(browser, "REPO", tmp_path)
+    assert browser.scratch_dir().is_dir()

@@ -35,6 +35,13 @@ LISTEN_BACKLOG = 128
 _NEXT_PAINT = "new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
 
 
+def scratch_dir() -> Path:
+    """The gitignored working directory, which a fresh clone lacks."""
+    path = REPO / ".scratch"
+    path.mkdir(exist_ok=True)
+    return path
+
+
 class BrowserError(RuntimeError):
     """Chrome is missing, did not start, or refused a command."""
 
@@ -123,7 +130,7 @@ class Browser:
         self._serving = serve(self._root)
         self.port = self._serving.__enter__()
         self._cdp_port = _free_port()
-        self._profile = tempfile.TemporaryDirectory(dir=REPO / ".scratch", prefix="chrome-")
+        self._profile = tempfile.TemporaryDirectory(dir=scratch_dir(), prefix="chrome-")
         self._chrome = subprocess.Popen(
             [
                 str(CHROME),
