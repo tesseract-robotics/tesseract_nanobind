@@ -29,8 +29,11 @@ CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 # Player size in the docs [CSS px]: the content column at 16:9, as the page's CSS lays it out.
 PLAYER_WIDTH_PX = 688
 PLAYER_HEIGHT_PX = 387
-# Render density [-]: sharp on most screens, without the size of a full 2x retina capture.
-DEVICE_SCALE = 1.5
+# The player's width on a 3840x2160 screen at 2x [px], measured: the box is 757 CSS px there.
+LARGEST_BOX_PHYSICAL_PX = 1514
+# Render density [-]: enough for that box, so a poster is never stretched next to the sharp
+# live player, which renders at the screen's own density.
+DEVICE_SCALE = 3.0
 # Where on the timeline the poster is taken [-]: late enough that the motion has happened.
 POSTER_FRACTION = 0.7
 # How long the client gets to download and decode a recording [s].

@@ -29,3 +29,7 @@ def test_a_frame_encodes_to_a_still_png():
 def test_the_player_state_without_a_timeline_raises():
     with pytest.raises(poster.PosterCaptureError):
         poster.require_timeline({"duration_s": 0.0}, "m")
+
+
+def test_the_poster_is_not_stretched_on_a_4k_screen():
+    assert poster.PLAYER_WIDTH_PX * poster.DEVICE_SCALE >= poster.LARGEST_BOX_PHYSICAL_PX
