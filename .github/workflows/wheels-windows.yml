@@ -250,7 +250,12 @@ jobs:
         path: wheelhouse
 
     - name: install wheel in lean env
-      run: uv pip install wheelhouse/tesseract*.whl pytest pytest-xdist scipy pyyaml
+      # zstandard and pyyaml have no cp315 wheels, so they compile from source on 3.15, and
+      # conda-forge's Windows Python 3.15 keeps Python.h in include/python, where setuptools
+      # doesn't look. cl.exe reads extra options from CL. Dash form: MSYS rewrites a leading /I.
+      run: |
+        export CL="-I$(cygpath -w "$CONDA_PREFIX/include/python")"
+        uv pip install wheelhouse/tesseract*.whl pytest pytest-xdist scipy pyyaml
 
     - name: smoke test
       run: |

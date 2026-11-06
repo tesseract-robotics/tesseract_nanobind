@@ -320,12 +320,8 @@ python = "3.13.*"
 [tool.pixi.feature.wheel-py314.dependencies]
 python = "3.14.*"
 
-# PyPI has no cp315 wheels of these two, so they'd compile from source, and conda-forge's
-# Windows Python 3.15 keeps Python.h in include/python, where setuptools doesn't look.
 [tool.pixi.feature.wheel-py315.dependencies]
 python = "3.15.*"
-zstandard = "*"
-pyyaml = "*"
 
 [tool.pixi.feature.wheel-openmp]
 platforms = ["osx-arm64"]
