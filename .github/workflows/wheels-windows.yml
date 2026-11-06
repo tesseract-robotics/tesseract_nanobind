@@ -34,6 +34,8 @@ concurrency:
 jobs:
   build:
     runs-on: windows-2022
+    # Longest successful run 38 min; a hung job otherwise holds a runner for 6 h.
+    timeout-minutes: 75
     env:
       # Tag builds must yield EXACTLY the tag version. A dirty CI tree otherwise makes
       # setuptools_scm guess-next-dev (e.g. 0.35.0.4.dev0) which — local segment stripped —
@@ -230,6 +232,8 @@ jobs:
   test-wheel:
     needs: build
     runs-on: windows-2022
+    # Longest successful run 6 min; a hung job otherwise holds a runner for 6 h.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

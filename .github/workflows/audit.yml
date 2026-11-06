@@ -21,6 +21,8 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    # Longest successful run 64 min; a hung job otherwise holds a runner for 6 h.
+    timeout-minutes: 120
     steps:
     - uses: actions/checkout@v4
 

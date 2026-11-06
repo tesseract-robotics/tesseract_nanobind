@@ -23,6 +23,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Longest successful run 1 min; a hung job otherwise holds a runner for 6 h.
+    timeout-minutes: 15
     steps:
     - uses: actions/checkout@v4
 
@@ -52,6 +54,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    # Longest successful run 1 min; a hung job otherwise holds a runner for 6 h.
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
