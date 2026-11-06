@@ -60,8 +60,7 @@ def _player(entry: Entry, lock: DemoLock, url_root: str, source_root: str) -> st
         f'<button class="demo-player" type="button" data-src="{html.escape(src)}">'
         f'<img src="{poster}" alt="" loading="lazy">'
         f'<span class="demo-play">{label}</span></button>\n\n'
-        f"`{entry.module}`, tesseract_robotics {identity.package_version}, "
-        f"viser {identity.viser_version}\n"
+        f"`{entry.module}`, tesseract_robotics {identity.package_version}\n"
     )
 
 
