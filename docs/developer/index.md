@@ -348,7 +348,7 @@ pixi run demo-check --preview         # drive every player in Chrome
 
 To add a demo: give it a camera in the manifest and a builder in `scripts/demos/scenes.py`, record it, capture its poster, and add `--8<-- "docs/demos/players/MODULE.html"` under its heading on its page. After review, set `status = "published"` and delete `reason`.
 
-**Hosting.** Recordings stay out of git, since each re-record would add its full size to history. The `demo-assets` release holds each file named by its SHA-256, and `scripts/demos/demos.lock.json` pins the hashes, so a re-record adds assets and older commits still build. To publish: `pixi run demo-fetch --stage DIR`, `gh release upload demo-assets DIR/*`. The tag has no digits on purpose: the wheel workflows and `setuptools_scm` act only on numeric tags. Upload before pushing, or the Docs workflow fails at its fetch step. Pages serves its own copies, which the build places in the site; nothing links to the release.
+**Hosting.** Recordings stay out of git, since each re-record would add its full size to history. The `demo-assets` release holds each file named by its SHA-256, and `scripts/demos/demos.lock.json` pins the hashes, so a re-record adds assets and older commits still build. To publish: `pixi run demo-fetch --stage DIR`, `gh release upload demo-assets DIR/* --clobber`, which is safe because the names are hashes. The tag has no digits on purpose: the wheel workflows and `setuptools_scm` act only on numeric tags. Upload before pushing, or the Docs workflow fails at its fetch step. Pages serves its own copies, which the build places in the site; nothing links to the release.
 
 Things that are not obvious:
 

@@ -1,6 +1,8 @@
 """`pick_env`: what the part does during a pick, which the post-attach environment can't show."""
 
 import importlib
+import os
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -8,6 +10,7 @@ import pytest
 from tesseract_robotics.viewer import Trajectory
 from tesseract_robotics.viewer.poses import link_poses
 
+TWC_SUPPORT = Path(__file__).resolve().parents[2] / "ws/src/tesseract_ros_workcell/twc_support"
 # Part position between start and end of the pick [m]; float64 round-off over the FK chain.
 FIXED_PART_ATOL_M = 1e-9
 # A carried part moves far more than this between the pick's two ends [m].
@@ -40,6 +43,10 @@ def test_the_part_stays_put_in_pick_env_and_travels_in_the_attached_env(example,
     assert travel_m > CARRIED_PART_MIN_TRAVEL_M
 
 
+@pytest.mark.skipif(
+    "TWC_SUPPORT_PATH" not in os.environ and not TWC_SUPPORT.exists(),
+    reason="needs the TWC workcell: git submodule update --init ws/src/tesseract_ros_workcell",
+)
 def test_twc_support_is_found_in_the_repo_submodule(monkeypatch, tmp_path):
     twc = _module("twc_workcell_positioner_viewer")
     support = tmp_path / "ws/src/tesseract_ros_workcell/twc_support"
