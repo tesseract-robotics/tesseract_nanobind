@@ -234,6 +234,8 @@ build = { depends-on = [
     "install",
 ], description = "Install bindings against the conda tesseract C++ libs" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
+gallery-record = { cmd = "python scripts/gallery/record.py", description = "Regenerate the gallery recordings into docs/demos/ and update the lock; --only NAME... for some" }
+gallery-page = { cmd = "python scripts/gallery/page.py", description = "Regenerate docs/examples/gallery.md from the manifest and the lock" }
 docs-dotgraphs = { cmd = "python scripts/generate_pipeline_dotgraphs.py", depends-on = [
     "install",
 ], description = "Regenerate pipeline DOT graph SVGs embedded in the docs (requires graphviz)" }

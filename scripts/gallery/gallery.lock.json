@@ -1,0 +1,16 @@
+{
+  "client_sha256": "8c05b8bfea1ed54773a7616d1d868ebf0b45055ff8da8fc1603ccb2a7858f079",
+  "lock_version": 1,
+  "recordings": {
+    "car_seat_example": {
+      "identity": {
+        "inputs_sha256": "d29301f7c93efcc8a90c285c8c2e64b922a7a1fdd5f4f350beb94d9c762a5439",
+        "package_version": "0.35.0.9.dev534",
+        "viser_version": "1.1.1"
+      },
+      "recording_sha256": "335b3e93134e020c8066597167478316ad21f282b494206c980e3783dd3328a7",
+      "size_bytes": 15067972
+    }
+  },
+  "viser_version": "1.1.1"
+}
