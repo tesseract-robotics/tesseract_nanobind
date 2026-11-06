@@ -115,15 +115,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { python: '3.12', wheel: '3.12', env: wheel-312, arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.12', wheel: '3.12', env: wheel-312, arch: aarch64, runner: ubuntu-24.04-arm }
-          - { python: '3.13', wheel: '3.12', env: wheel-313, arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.13', wheel: '3.12', env: wheel-313, arch: aarch64, runner: ubuntu-24.04-arm }
-          - { python: '3.14', wheel: '3.12', env: wheel-314, arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.14', wheel: '3.12', env: wheel-314, arch: aarch64, runner: ubuntu-24.04-arm }
-          - { python: '3.15', wheel: '3.12', env: wheel-315, arch: x64,   runner: ubuntu-24.04 }
-          - { python: '3.15', wheel: '3.12', env: wheel-315, arch: aarch64, runner: ubuntu-24.04-arm }
+        # One cp312-abi3 binary per platform. PRs test it on 3.12; pushes to main, tags and manual
+        # runs test every supported Python before anything can publish.
+        include: ${{ github.event_name == 'pull_request' && fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"aarch64","runner":"ubuntu-24.04-arm"}]') || fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.12","wheel":"3.12","env":"wheel-312","arch":"aarch64","runner":"ubuntu-24.04-arm"},{"python":"3.13","wheel":"3.12","env":"wheel-313","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.13","wheel":"3.12","env":"wheel-313","arch":"aarch64","runner":"ubuntu-24.04-arm"},{"python":"3.14","wheel":"3.12","env":"wheel-314","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.14","wheel":"3.12","env":"wheel-314","arch":"aarch64","runner":"ubuntu-24.04-arm"},{"python":"3.15","wheel":"3.12","env":"wheel-315","arch":"x64","runner":"ubuntu-24.04"},{"python":"3.15","wheel":"3.12","env":"wheel-315","arch":"aarch64","runner":"ubuntu-24.04-arm"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:

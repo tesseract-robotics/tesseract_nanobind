@@ -127,7 +127,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Fixed
 
-- **macOS wheels load one OpenMP runtime, and repair without delocate** — in a conda or pixi environment the wheel loaded a second `libomp`, so Descartes aborted with `OMP: Error #15` or segfaulted above one thread. Images now look in the environment's `lib` first, then at the bundled copy, so uv and pip environments keep working. `scripts/repair_macos_wheel.py` replaces `delocate-wheel`, which took about 15 minutes of each macOS CI build, and rewrites `RECORD`, which missed 14 files and had 4 stale hashes. `test-wheel` runs in lean pixi envs and installs with uv, with no venv ([#136]).
+- **macOS wheels load one OpenMP runtime, and repair without delocate** — in a conda or pixi environment the wheel loaded a second `libomp`, so Descartes aborted with `OMP: Error #15` or segfaulted above one thread. Images now look in the environment's `lib` first, then at the bundled copy, so uv and pip environments keep working. `scripts/repair_macos_wheel.py` replaces `delocate-wheel`, which took about 15 minutes of each macOS CI build, and rewrites `RECORD`, which missed 14 files and had 4 stale hashes. `test-wheel` runs in lean pixi envs and installs with uv, with no venv; pull requests test 3.12 and pushes to main and tags test every Python ([#136], [#377]).
 - **A server call no longer waits through back-to-back reloads** — a call that waited for `loadConfig`, `addTask` or `addExecutor` woke up needing the GIL, which a thread reloading in a loop kept into its next reload, so the call could wait for as many reloads as the thread started. A reload now lets the calls already waiting go first, which bounds a call to the one reload it found running.
 - **A `Var` or `Node` read out of a variable set keeps the set alive** — `Node.getVar` / `addVar`, `NodesVariables.getNode` / `getNodes` and `Var.getParent` tie the result to its source, and a `Node` handed to `NodesVariables` keeps the set alive; `var.getParent()` after the set was dropped read freed memory ([#297]).
 - **`NodesVariables.getNode` / `getNodes` return usable `Node`s while the caller still holds the handed-over ones** — they returned the caller's relinquished object, on which every method raised `TypeError`. A `Node` given twice, or one already in a set, raises `NodeOwnershipError` (a `ValueError`) and leaves every `Node` with the caller ([#297]).
@@ -629,6 +629,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#298]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/298
 [#369]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/369
 [#136]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/136
+[#377]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/377
 [#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273

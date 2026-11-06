@@ -85,13 +85,6 @@ jobs:
     - name: pip build tools
       run: python -m pip install --upgrade pip delvewheel
 
-    - name: restore nanobind wheel build cache
-      id: nanobind-build-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: tesseract_nanobind/build
-        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
-
     - name: build nanobind wheel
       working-directory: tesseract_nanobind
       env:
@@ -105,6 +98,8 @@ jobs:
         # must match that ABI rather than override it), leaving the bare slash
         # exposed. cl.exe accepts - and / interchangeably.
         CXXFLAGS: "-bigobj"
+        # The default generator took 9 to 19 minutes; Ninja compiles the modules in parallel.
+        CMAKE_GENERATOR: Ninja
       run: |
         CONDA_LIB="$CONDA_PREFIX/Library"
         export CMAKE_PREFIX_PATH="$CONDA_LIB"
@@ -121,13 +116,6 @@ jobs:
         echo "LIB=$LIB"
         export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         pip wheel . -w dist/ --no-build-isolation
-
-    - name: save nanobind wheel build cache
-      if: steps.nanobind-build-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: tesseract_nanobind/build
-        key: nanobind-wheel-build-win-pixi-py${{ matrix.python }}-${{ hashFiles('tesseract_nanobind/CMakeLists.txt', 'tesseract_nanobind/pyproject.toml', 'tesseract_nanobind/pixi.lock', 'tesseract_nanobind/src/**/*.cpp', 'tesseract_nanobind/src/**/*.h', 'tesseract_nanobind/src/**/*.hpp') }}
 
     - name: bundle plugins then delvewheel repair
       working-directory: tesseract_nanobind
@@ -237,13 +225,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13/3.14/3.15 install the cp312-abi3 wheel (STABLE_ABI) to verify the
-        # published support matrix on Windows, not just Linux. wheel != python.
-        include:
-          - { python: '3.12', wheel: '3.12', env: wheel-312 }
-          - { python: '3.13', wheel: '3.12', env: wheel-313 }
-          - { python: '3.14', wheel: '3.12', env: wheel-314 }
-          - { python: '3.15', wheel: '3.12', env: wheel-315 }
+        # One cp312-abi3 binary per platform. PRs test it on 3.12; pushes to main, tags and manual
+        # runs test every supported Python before anything can publish.
+        include: ${{ github.event_name == 'pull_request' && fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312"}]') || fromJSON('[{"python":"3.12","wheel":"3.12","env":"wheel-312"},{"python":"3.13","wheel":"3.12","env":"wheel-313"},{"python":"3.14","wheel":"3.12","env":"wheel-314"},{"python":"3.15","wheel":"3.12","env":"wheel-315"}]') }}
     defaults:
       run:
         shell: bash -el {0}
