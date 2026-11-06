@@ -942,8 +942,6 @@ class PIQPSolver(QPSolver):
         Whether the last solve reused the previous setup (only the vectors changed)
         """
 
-HAS_PIQP: bool
-
 class TrustRegionSQPSolver:
     """
     Trust region SQP solver for trajectory optimization.

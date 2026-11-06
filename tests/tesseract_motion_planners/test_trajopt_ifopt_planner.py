@@ -308,12 +308,7 @@ class TestTrajOptIfoptPlanner:
         "solver_profile_name",
         [
             "TrajOptIfoptOSQPSolverProfile",
-            pytest.param(
-                "TrajOptIfoptPIQPSolverProfile",
-                marks=pytest.mark.skipif(
-                    not trajopt_ifopt_planners.HAS_PIQP, reason="trajopt was built without PIQP"
-                ),
-            ),
+            "TrajOptIfoptPIQPSolverProfile",
         ],
     )
     def test_joint_to_joint_planning(self, kuka_iiwa_environment, solver_profile_name):
@@ -579,9 +574,9 @@ class TestTrajOptIfoptSolverCallbacks:
                 )
                 return False
 
-        max_iterations = 5
+        max_iter = 5
         solver_profile = TrajOptIfoptOSQPSolverProfile()
-        solver_profile.opt_params.max_iterations = max_iterations
+        solver_profile.opt_params.max_iter = max_iter
         solver_profile.callbacks = [Recorder()]
 
         TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(
@@ -590,9 +585,9 @@ class TestTrajOptIfoptSolverCallbacks:
 
         iterations = [iteration for iteration, _, _ in seen]
         assert iterations, "the planner never called the Python callback"
-        # one call per SQP iteration the solver reached, never past max_iterations
+        # one call per SQP iteration the solver reached, never past max_iter
         assert iterations == sorted(set(iterations))
-        assert 1 <= iterations[0] and iterations[-1] <= max_iterations
+        assert 1 <= iterations[0] and iterations[-1] <= max_iter
         assert all(is_problem and is_results for _, is_problem, is_results in seen)
 
 
@@ -826,10 +821,10 @@ class TestTrajOptIfoptProfileHooks:
 
     def test_solver_profile_create(self):
         profile = TrajOptIfoptOSQPSolverProfile()
-        profile.opt_params.max_iterations = 7
+        profile.opt_params.max_iter = 7
         solver = profile.create()
         assert isinstance(solver, tsqp.TrustRegionSQPSolver)
-        assert solver.params.max_iterations == 7
+        assert solver.params.max_iter == 7
 
     def test_hooks_on_base_classes(self):
         assert "create" in TrajOptIfoptMoveProfile.__dict__
@@ -853,7 +848,7 @@ class TestTrajOptIfoptValueEquality:
                 TrajOptIfoptDefaultCompositeProfile,
                 lambda x: setattr(x, "smooth_jerks", not x.smooth_jerks),
             ),
-            (TrajOptIfoptOSQPSolverProfile, lambda x: setattr(x.opt_params, "max_iterations", 7)),
+            (TrajOptIfoptOSQPSolverProfile, lambda x: setattr(x.opt_params, "max_iter", 7)),
             (TrajOptIfoptOSQPSolverProfile, lambda x: x.setPolish(False)),
         ],
     )
@@ -906,8 +901,8 @@ class TestTrajOptIfoptProfileFromYaml:
 
     def test_osqp_solver_profile(self):
         expected = TrajOptIfoptOSQPSolverProfile()
-        expected.opt_params.max_iterations = 7
-        text = "opt_params:\n  max_iterations: 7\n"
+        expected.opt_params.max_iter = 7
+        text = "opt_params:\n  max_iter: 7\n"
         assert TrajOptIfoptOSQPSolverProfile.from_yaml(text) == expected
 
     def test_malformed_yaml_raises_value_error(self):

@@ -25,9 +25,7 @@
 #include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_move_profile.h>
 #include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_composite_profile.h>
 #include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h>
-#ifdef TRAJOPT_SQP_HAS_PIQP
 #include <tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_piqp_solver_profile.h>
-#endif
 #include <tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_waypoint_config.h>
 #include <tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_utils.h>
 
@@ -424,16 +422,11 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
     bind_value_equality(osqp_solver_profile);
     bind_from_yaml(osqp_solver_profile);
 
-#ifdef TRAJOPT_SQP_HAS_PIQP
-    // ========== TrajOptIfoptPIQPSolverProfile (optional: trajopt_sqp exports TRAJOPT_SQP_HAS_PIQP) ==========
+    // ========== TrajOptIfoptPIQPSolverProfile ==========
     // PIQPSettings comes from the trajopt_sqp module imported above.
     nb::class_<tp::TrajOptIfoptPIQPSolverProfile, tp::TrajOptIfoptSolverProfile>(m, "TrajOptIfoptPIQPSolverProfile")
         .def(nb::init<>())
         .def_rw("qp_settings", &tp::TrajOptIfoptPIQPSolverProfile::qp_settings, "PIQP settings for each QP");
-    m.attr("HAS_PIQP") = true;
-#else
-    m.attr("HAS_PIQP") = false;
-#endif
 
     // Helper to add TrajOptIfopt move profile to ProfileDictionary directly
     m.def("ProfileDictionary_addTrajOptIfoptMoveProfile", [](tc::ProfileDictionary& dict,

@@ -1481,9 +1481,8 @@ class TestConvexEvaluatorArguments:
             assert outcome.startswith("RAISED") and "convexify()" in outcome, outcome
 
 
-@pytest.mark.skipif(not tsqp.HAS_PIQP, reason="trajopt was built without PIQP")
 class TestPIQPSolver:
-    """PIQP, trajopt's optional interior-point QP backend (trajopt 3b3eab1, d6d3891)."""
+    """PIQP, trajopt's interior-point QP backend (trajopt 3b3eab1, d6d3891)."""
 
     def test_settings_are_trajopts_defaults_and_writable(self):
         solver = tsqp.PIQPSolver()
