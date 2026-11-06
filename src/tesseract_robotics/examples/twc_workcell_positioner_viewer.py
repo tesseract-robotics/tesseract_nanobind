@@ -30,10 +30,11 @@ def _find_twc_support() -> Path:
     if env_path := os.environ.get("TWC_SUPPORT_PATH"):
         return Path(env_path)
 
-    # Default: submodule location relative to this file
-    submodule_path = Path(__file__).parent.parent / "ws/src/tesseract_ros_workcell/twc_support"
-    if submodule_path.exists():
-        return submodule_path
+    # Default: the submodule, in the repo above this file (src/tesseract_robotics/examples/)
+    for parent in Path(__file__).parents:
+        submodule_path = parent / "ws/src/tesseract_ros_workcell/twc_support"
+        if submodule_path.exists():
+            return submodule_path
 
     # Fallback: common development location
     dev_path = Path.home() / "Code/CADCAM/tesseract_ros_workcell/twc_support"
