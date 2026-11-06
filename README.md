@@ -186,7 +186,7 @@ This runs ruff + auto-staging on commit, and `pixi run typecheck` on push (confi
 Editable installs bake absolute paths — not portable. For distributable wheels:
 
 ```bash
-pixi run build-wheel                  # bundles native deps (Linux: patchelf, macOS: delocate)
+pixi run build-wheel                  # bundles native deps (Linux: patchelf, macOS: scripts/repair_macos_wheel.py)
 pip install wheelhouse/tesseract*.whl
 ```
 

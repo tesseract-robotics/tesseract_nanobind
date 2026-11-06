@@ -263,6 +263,8 @@ def patch_plugin_path(source: str) -> str:
 
 def strip_search_paths(source: str) -> str:
     """Drop `search_paths:` and absolute-path list items, so the env vars from `__init__.py` apply."""
+    if "search_paths:" not in source:
+        return source
     kept = [
         line
         for line in source.splitlines(keepends=True)

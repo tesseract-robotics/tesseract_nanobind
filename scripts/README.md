@@ -99,7 +99,7 @@ Tests how examples scale with parallel OMPL planners.
 Builds Python wheels for distribution. The pixi `build-wheel` task delegates to
 the right platform script: `build_linux_wheel.sh` (patchelf + `$ORIGIN` rpaths +
 manylinux retag) is the base task, and the `osx-arm64` target overrides it to
-`build_macos_wheel.sh` (delocate + `@loader_path`). Both accept the same modes.
+`build_macos_wheel.sh` (`repair_macos_wheel.py` + `@loader_path`). Both accept the same modes.
 
 #### Dev mode (fast, for local testing)
 ```bash
@@ -121,7 +121,7 @@ pixi run build-wheel
 #### What portable mode does:
 1. Builds wheel with `pip wheel`
 2. Bundles linked native deps and fixes rpaths
-   (macOS: `delocate-wheel`; Linux: `ldd` + `patchelf --set-rpath`)
+   (macOS: `repair_macos_wheel.py`; Linux: `ldd` + `patchelf --set-rpath`)
 3. Manually adds plugin factory libs (not caught by the linker since they're dlopen'd at runtime):
    - `libtesseract_collision_bullet_factories`
    - `libtesseract_collision_fcl_factories`
@@ -137,7 +137,7 @@ Editable installs (`pip install -e .`) and dev wheels bake absolute env paths in
 -> .pixi/envs/default/lib/libtesseract_environment.dylib
 ```
 
-Delocate converts these to `@loader_path` and bundles the dylibs:
+The macOS repair converts these to `@loader_path` and bundles the dylibs:
 ```
 @loader_path/.dylibs/libtesseract_environment.dylib
 ```

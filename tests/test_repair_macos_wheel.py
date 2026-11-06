@@ -143,6 +143,11 @@ def test_hardcoded_search_paths_are_removed():
     assert repair.strip_search_paths(source) == "plugins:\n  search_libraries:\n    - libfoo\n"
 
 
+def test_a_yaml_without_search_paths_keeps_its_absolute_list_items():
+    source = "points:\n  - /keep/this\n"
+    assert repair.strip_search_paths(source) == source
+
+
 def test_verify_reports_every_stray_reference(tmp_path):
     bundle = tmp_path / "pkg" / ".dylibs"
     bundle.mkdir(parents=True)
