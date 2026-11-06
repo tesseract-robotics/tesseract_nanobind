@@ -364,16 +364,15 @@ def test_g1_rules_accept_exactly_the_ledger_rows(g1_reports, module):
     assert rows == G1_ACCEPTED[module]
 
 
-# Task 8, C1 (rename; the binding side is #329): the binding's `nb::class_` maps each
-# abbreviation to its C++ class (0b T3), so the classes are covered and their members audited;
-# the abbreviations stay deviations until #329 renames them.
+# Task 8, C1: #329 bound each profile under its C++ name, so the class is covered and the old
+# abbreviation is neither bound nor a deviation.
 
 
 @pytest.mark.parametrize(("cpp", "python"), TP_PROFILES.items())
-def test_tp_profile_is_covered_and_its_abbreviation_stays_open(g1_reports, cpp, python):
+def test_tp_profile_is_covered_and_its_abbreviation_is_gone(g1_reports, cpp, python):
     report = g1_reports[TP]
     assert cpp not in {g.symbol for g in report.gaps}
-    assert (python, audit.Kind.CLASS) in {(d.name, d.kind) for d in report.deviations}
+    assert python not in {d.name for d in report.deviations}
 
 
 @pytest.mark.parametrize("cpp", TP_PROFILES)

@@ -616,24 +616,6 @@
     },
     "PIQPSolver.solver": {
       "issue": "#373"
-    },
-    "QPSolverStatus.kFailed": {
-      "issue": "#330"
-    },
-    "QPSolverStatus.kUninitialized": {
-      "issue": "#330"
-    },
-    "SQPStatus.kConverged": {
-      "issue": "#330"
-    },
-    "SQPStatus.kQPSolveFailed": {
-      "issue": "#330"
-    },
-    "SQPStatus.kStoppedByCallback": {
-      "issue": "#330"
-    },
-    "SQPStatus.kTimeLimit": {
-      "issue": "#330"
     }
   }
 }

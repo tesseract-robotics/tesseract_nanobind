@@ -94,6 +94,19 @@ K_PREFIX_ACCEPTED = {
         *(f"SQPStatus.{e}" for e in ("ITERATION_LIMIT", "PENALTY_ITERATION_LIMIT", "RUNNING")),
         "QPSolverStatus.kInitialized",
         "QPSolverStatus.INITIALIZED",
+        # #330: the six renamed to the UPPER_SNAKE form of their C++ names.
+        "SQPStatus.kConverged",
+        "SQPStatus.CONVERGED",
+        "SQPStatus.kTimeLimit",
+        "SQPStatus.TIME_LIMIT",
+        "SQPStatus.kQPSolveFailed",
+        "SQPStatus.QP_SOLVE_FAILED",
+        "SQPStatus.kStoppedByCallback",
+        "SQPStatus.STOPPED_BY_CALLBACK",
+        "QPSolverStatus.kUninitialized",
+        "QPSolverStatus.UNINITIALIZED",
+        "QPSolverStatus.kFailed",
+        "QPSolverStatus.FAILED",
     },
     # trajopt_ifopt ledger rows 3-7, 60, 61, 94-98, 102, 103.
     "trajopt_ifopt": {
@@ -131,11 +144,11 @@ def test_real_k_prefix_rows_exact(g2_reports, module):
         ("QPSolverStatus.kFailed", "QPSolverStatus.QP_ERROR"),
     ],
 )
-def test_real_non_mechanical_enumerators_stay_reported(g2_reports, cpp, python):
-    """Binding-fix #330 (rename to the native names) closes these; the rule must not."""
+def test_old_enumerator_names_are_gone(g2_reports, cpp, python):
+    """#330 renamed these to the UPPER_SNAKE form of their C++ names, so the rule accepts them."""
     report = g2_reports["trajopt_sqp"]
-    assert cpp in {g.symbol for g in report.gaps}
-    assert python in {d.name for d in report.deviations}
+    assert cpp not in {g.symbol for g in report.gaps}
+    assert python not in {d.name for d in report.deviations}
 
 
 # Task 4 (R13): `unbound-dependency-type`, third-party half.

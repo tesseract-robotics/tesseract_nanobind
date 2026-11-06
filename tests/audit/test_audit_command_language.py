@@ -458,7 +458,8 @@ def test_vector_forwarding_core_diff_is_the_8_joint_trajectory_rows(common_repor
         for m in ("crbegin", "crend", "data", "emplace", "emplace_back", "rbegin", "rend", "swap")
     }
     gaps = {g.symbol for g in common_report.gaps}
-    assert {"JointTrajectory.insert", "JointTrajectory.erase"} <= gaps  # binding-fix, not R11
+    assert "JointTrajectory.erase" not in gaps  # #269 binds `__delitem__`
+    assert "JointTrajectory.insert" in gaps  # the iterator-range form stays open, not R11
 
 
 # T9 + R8 poly-alternative-overloads.
