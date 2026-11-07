@@ -396,6 +396,11 @@ class CollisionCoeffData:
     def getCollisionCoeffPairData(self) -> dict[tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair, float]:
         """Every pair with a coefficient: {LinkIdPair: coeff}"""
 
+    def hasZeroCoeff(self, pair: tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair | tuple[str, str]) -> bool:
+        """
+        Whether the pair's coefficient is 0 (collision checking switched off for it)
+        """
+
     def getPairsWithZeroCoeff(self) -> set[tesseract_robotics.tesseract_common._tesseract_common.LinkIdPair]:
         """The pairs whose coefficient is 0 (collision checking switched off)"""
 
@@ -833,6 +838,44 @@ class CartLineConstraint(ConstraintSet):
     @use_numeric_differentiation.setter
     def use_numeric_differentiation(self, arg: bool, /) -> None: ...
 
+class CartAxisKinematics:
+    """
+    A source link axis expressed in a target link's coordinates, v(q) = R_target(q)^T R_source(q) a,
+    and its 3 x n Jacobian.
+    """
+
+    def __init__(self, manip: tesseract_robotics.tesseract_kinematics._tesseract_kinematics.JointGroup, source_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, source_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], target_frame: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str) -> None:
+        """
+        source_axis is in source link coordinates and normalized. Raises on a link that is not in
+        manip or an invalid axis.
+        """
+
+    def calcAxis(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """v at joint_vals"""
+
+    def calcAxisAndJacobian(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> tuple[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], Annotated[NDArray[numpy.float64], dict(shape=(3, None), order='F')]]:
+        """(v, dv/dq) at joint_vals; dv/dq is 3 x numJoints()"""
+
+    def numJoints(self) -> int: ...
+
+    def getSourceAxis(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """The unit source axis, in source link coordinates"""
+
+    @staticmethod
+    def mostReachableDirection(tangent_jacobian: Annotated[NDArray[numpy.float64], dict(shape=(2, None), order='F')] | Sequence[Sequence[float]]) -> Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')]:
+        """
+        The unit 2D direction the 2 x n tangent Jacobian moves along most per unit joint step
+        """
+
+    @staticmethod
+    def toUnitAxis(axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], what: str) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]:
+        """
+        axis normalized; raises RuntimeError naming `what` if it is zero or not finite
+        """
+
+    SIN_ANGLE_FLOOR: float = ...
+    """(arg: object, /) -> float"""
+
 class CartAxisConeConstraint(ConstraintSet):
     """
     Keeps the angle between a source link axis and a target link axis at most half_angle: one
@@ -848,6 +891,11 @@ class CartAxisConeConstraint(ConstraintSet):
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The angle phi between the axes for the given joint values"""
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
+        """
 
     def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> None:
         """Set the cone axis, in target link coordinates"""
@@ -873,6 +921,11 @@ class CartAxisAlignConstraint(ConstraintSet):
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """The two tilt rows for the given joint values"""
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
+        """
 
     def setTargetAxis(self, target_axis: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]) -> None:
         """Set the axis to align with, in target link coordinates"""
