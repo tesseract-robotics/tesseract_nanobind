@@ -26,7 +26,6 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -262,14 +261,14 @@ class Robot:
 
     def set_joints(
         self,
-        joint_values: dict[str, float] | Sequence[float],
+        joint_values: dict[str, float] | ArrayLike,
         joint_names: list[str] | None = None,
     ) -> None:
         """
         Set robot joint positions.
 
         Args:
-            joint_values: Joint positions as dict or sequence
+            joint_values: Joint positions as dict or array-like
             joint_names: Joint names (required if joint_values is sequence)
         """
         if isinstance(joint_values, dict):

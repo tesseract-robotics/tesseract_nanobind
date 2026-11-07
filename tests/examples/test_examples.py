@@ -966,6 +966,18 @@ def test_freespace_hybrid_ifopt_example():
 
 
 @pytest.mark.planning
+def test_freespace_clearance_objective_example():
+    from tesseract_robotics.examples.freespace_clearance_objective_example import PLANNING_TIME_S
+
+    cases = tesseract_robotics.examples.freespace_clearance_objective_example()
+    assert cases["default"]["success"]
+    assert cases["threshold"]["success"]
+    assert cases["objective_calls"] == 1
+    # The cost threshold, not the time cap, ends case 2's optimize loop.
+    assert cases["threshold"]["wall_time_s"] < PLANNING_TIME_S
+
+
+@pytest.mark.planning
 def test_chain_example():
     tesseract_robotics.examples.chain_example()
 

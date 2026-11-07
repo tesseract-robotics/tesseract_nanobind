@@ -8,6 +8,69 @@ import tesseract_robotics.tesseract_command_language._tesseract_command_language
 import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 
 
+class OMPLObjectiveReturnTypeError(TypeError):
+    pass
+
+class SpaceInformation:
+    """
+    The planning problem's OMPL space information (opaque). The objectives are built on it.
+    """
+
+class Cost:
+    """An OMPL cost value"""
+
+    def __init__(self, value: float = 0.0) -> None: ...
+
+    def value(self) -> float: ...
+
+    def __float__(self) -> float: ...
+
+    def __repr__(self) -> str: ...
+
+class OptimizationObjective:
+    """
+    Base of the OMPL optimization objectives. The planner's optimize loop ends when isSatisfied(cost of the best path) is true, or at planning_time.
+    """
+
+    def isSatisfied(self, cost: Cost) -> bool:
+        """True if cost is better than the cost threshold"""
+
+    def getCostThreshold(self) -> Cost: ...
+
+    def setCostThreshold(self, cost: Cost) -> None: ...
+
+    def getDescription(self) -> str: ...
+
+class PathLengthOptimizationObjective(OptimizationObjective):
+    """Joint-space path length (the planner's default objective)"""
+
+    def __init__(self, si: SpaceInformation) -> None: ...
+
+class MaximizeMinClearanceObjective(OptimizationObjective):
+    """
+    Maximise the smallest clearance the state validity checker reports along the path. tesseract's OMPL state validators do not report clearance (OMPL's default, 0, for every state), so on this stack the term is constant.
+    """
+
+    def __init__(self, si: SpaceInformation) -> None: ...
+
+class MechanicalWorkOptimizationObjective(OptimizationObjective):
+    """Mechanical work along the path, plus a small path-length term"""
+
+    def __init__(self, si: SpaceInformation, path_length_weight: float = 1e-05) -> None: ...
+
+class MultiOptimizationObjective(OptimizationObjective):
+    """Weighted sum of objectives"""
+
+    def __init__(self, si: SpaceInformation) -> None: ...
+
+    def addObjective(self, objective: OptimizationObjective, weight: float) -> None: ...
+
+    def getObjectiveCount(self) -> int: ...
+
+    def getObjectiveWeight(self, index: int) -> float: ...
+
+    def setObjectiveWeight(self, index: int, weight: float) -> None: ...
+
 class OMPLSolverConfig:
     def __init__(self) -> None: ...
 
