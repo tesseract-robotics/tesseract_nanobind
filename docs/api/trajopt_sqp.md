@@ -20,7 +20,7 @@ problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)  # any penalty type
 problem.setup()                                             # must call before solving
 ```
 
-Every row of a cost or constraint set must be an equality or bounded on one side, with any penalty type; `addCostSet` and `addConstraintSet` raise on a two-sided range row. (trajopt 0.35.0 required equality rows for squared and absolute costs and one-sided rows for hinge costs.) Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each squared cost row by `getCoefficients()`, as the convex model does, and counts every cost term once, so for squared costs the trust-region ratio compares like with like. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles (`TrajOptQPProblem` first ships in 0.35.0.9; earlier releases bind only `IfoptQPProblem`), there are two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt, none yet): constraint coefficients weight a set's slack in the QP but not its violation in the merit, and `ABSOLUTE` and `HINGE` costs are mis-modelled (below). The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
+Every row of a cost or constraint set must be an equality or bounded on one side, with any penalty type; `addCostSet` and `addConstraintSet` raise on a two-sided range row. (trajopt 0.35.0 required equality rows for squared and absolute costs and one-sided rows for hinge costs.) Each set is linked to the variables when it is added, and dynamic sets (`isDynamic()`) are accepted. The exact merit weights each cost row by `getCoefficients()`, as the convex model does, and counts every cost term once; it charges each constraint set its violation weighted the same way (`ConstraintViolations.weighted`). So the trust-region ratio compares like with like for every penalty type. The problem keeps one merit coefficient, one violation and one name per constraint set, not per row, and counts cost sets the same way.
 
 After `convexify()` the problem exposes the QP it built: minimise x'Hx + g'x over
 `getNumQPVars()` variables (the NLP variables, then the slacks) subject to
@@ -32,17 +32,12 @@ lower ≤ A x ≤ upper over `getNumQPConstraints()` rows. `getHessian()` and
 dynamic set recounts its rows; `NodesVariables.setVariables` only writes the values. It raises
 `VariablesSizeError` (a `ValueError`) unless `len(x) == getNumNLPVars()`.
 
-!!! warning "`ABSOLUTE` and `HINGE` costs on trajopt 0.35.0"
-    The convex model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution: it
-    evaluates the cost with its slack variables, which absorb the violation. The predicted
-    improvement then counts the whole cost, so a step is accepted only if it removes at least
-    `improve_ratio_threshold` (0.25) of that cost inside the trust box. When it cannot, every
-    trial is rejected, the box collapses, and the solve reports `CONVERGED` at its seed:
-    measured on #149's development builds for a joint 0.5 from its target or bound
-    under the default box of 0.1, while at 0.375 or less the cost reaches 0. The exact cost of
-    such a set also ignores its coefficient, at which the QP prices the slack.
-    tesseract-robotics/trajopt#592 (merged 2026-09-30, unreleased) fixes both; it reaches a
-    wheel only once one is built on a newer trajopt.
+An `ABSOLUTE` or `HINGE` cost is modelled on its linearized rows, without the slacks: the
+model charges each row its coefficient times the row's linearized violation, and the exact cost
+charges the same coefficient times the exact violation. A violation larger than the trust box is
+then reduced step by step, as a squared one is. #149's development builds on trajopt 0.35.0 read
+such a cost as 0 at every QP solution and dropped its coefficient from the exact cost (#151);
+tesseract-robotics/trajopt#592 fixed both before any wheel shipped `TrajOptQPProblem`.
 
 !!! warning "`IfoptQPProblem` and `IfoptProblem` are no longer bound"
     `IfoptQPProblem(IfoptProblem(nodes_variables))`, the two-layer form of 0.34, is gone; trajopt
