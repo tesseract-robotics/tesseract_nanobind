@@ -1047,10 +1047,9 @@ def test_lowlevel_puzzle_piece_auxillary_axes_example():
     tesseract_robotics.examples.puzzle_piece_auxillary_axes_c_api_example()
 
 
-@pytest.mark.lowlevel
 @pytest.mark.planning
-def test_lowlevel_pythonic_example():
-    assert tesseract_robotics.examples.pythonic_c_api_example() == 0
+def test_pythonic_api_example():
+    assert tesseract_robotics.examples.pythonic_api_example() == 0
 
 
 @pytest.mark.lowlevel

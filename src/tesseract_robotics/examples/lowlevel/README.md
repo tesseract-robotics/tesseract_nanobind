@@ -2,7 +2,7 @@
 
 Direct C++ binding examples for tesseract_robotics.
 
-These examples demonstrate the raw nanobind API - a 1:1 mapping of the C++ Tesseract libraries. Use these as reference for understanding the underlying mechanics or when you need fine-grained control not exposed by the high-level API.
+These examples demonstrate the raw nanobind API - a 1:1 mapping of the C++ Tesseract libraries. They use the bindings only, never `tesseract_robotics.planning` (`tests/examples/test_lowlevel_bindings_only.py` enforces it), and the ports of the C++ `tesseract_planning/examples` keep their exact parameters. `example_support.py` holds the plumbing the C++ examples share (`example.cpp`): loading a `tesseract_support` robot, adding a fixed obstacle link, running a task composer pipeline. Use these as reference for understanding the underlying mechanics or when you need fine-grained control not exposed by the high-level API.
 
 **For most use cases, prefer the [high-level examples](../) instead.**
 

@@ -4,113 +4,152 @@ Glass Upright Example - Orientation-Constrained Motion Planning
 Demonstrates TrajOpt planning with orientation constraints: the robot moves while
 keeping the tool "upright" (like carrying a glass of water without spilling).
 
-C++ Source: tesseract_planning/tesseract_examples/src/glass_upright_example.cpp
+C++ Source: tesseract_planning/examples/src/glass_upright_example.cpp
 
 Concept: "Upright" Constraint
 -----------------------------
-The UPRIGHT profile applies Cartesian constraints with coeff=[0,0,0,5,5,5]:
-  - Position (x,y,z): coeff=0 -> unconstrained, robot can move freely in space
-  - Orientation (rx,ry,rz): coeff=5 -> strongly constrained, must stay upright
-
-This is the inverse of typical constraints that fix position but allow rotation.
-The high orientation weights (5) penalize any deviation from the initial tool
-orientation during trajectory optimization.
+The UPRIGHT move profile makes the Cartesian waypoint a constraint with
+coeff = [0, 0, 0, 1, 1, 1]: position free, orientation held. The composite profile
+adds an LVS-discrete collision cost and constraint (margin 0.01 m, buffer 0.01 m)
+and velocity smoothing.
 
 Pipeline Overview
 -----------------
 1. Load KUKA IIWA 7-DOF robot
-2. Add sphere obstacle to force non-trivial path (robot must go around it)
-3. Define start/end via joint states (only joint_a1 changes: -0.4 -> 0.4 rad)
-4. Plan with TrajOpt using UPRIGHT profile for orientation constraints
-5. TrajOpt optimizes trajectory while respecting orientation + collision constraints
+2. Add the 0.15 m sphere at (0.5, 0, 0.55)
+3. LINEAR moves between two joint states (only joint_a1 changes: -0.4 -> 0.4 rad)
+4. Run TrajOptPipeline (or TrajOptIfoptPipeline with ifopt=True)
+
+Bindings only, line for line with the C++ (#42).
 """
 
 import sys
 
 import numpy as np
 
-from tesseract_robotics.planning import (
-    MotionProgram,
-    Pose,
-    Robot,
-    StateTarget,
-    TaskComposer,
-    create_obstacle,
-    sphere,
+from tesseract_robotics.examples.lowlevel.example_support import (
+    add_fixed_link,
+    load_support_environment,
+    run_pipeline,
 )
-from tesseract_robotics.planning.profiles import create_trajopt_upright_profiles
+from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.tesseract_command_language import (
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly,
+    MoveInstructionType,
+    ProfileDictionary,
+    StateWaypoint,
+    StateWaypointPoly,
+)
+from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo, Translation3d
+from tesseract_robotics.tesseract_geometry import Sphere
+from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultMoveProfile,
+)
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    TrajOptIfoptDefaultCompositeProfile,
+    TrajOptIfoptDefaultMoveProfile,
+)
+from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
+
+TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
+TRAJOPT_IFOPT_DEFAULT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
+
+JOINT_NAMES = [f"joint_a{i}" for i in range(1, 8)]
+JOINT_START = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+JOINT_END = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+
+# Collision margin and margin buffer of both the cost and the constraint (m).
+COLLISION_MARGIN_M = 0.01
+COLLISION_MARGIN_BUFFER_M = 0.01
+# Cartesian constraint coefficients [x, y, z, rx, ry, rz]: position free, orientation held.
+UPRIGHT_COEFF = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
 
 
-def run():
-    """Run glass upright example with orientation-constrained planning.
+def _collision_config() -> TrajOptCollisionConfig:
+    config = TrajOptCollisionConfig(COLLISION_MARGIN_M, 1)
+    config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
+    config.collision_margin_buffer = COLLISION_MARGIN_BUFFER_M
+    return config
+
+
+def _profiles(ifopt: bool) -> ProfileDictionary:
+    """The C++ example's UPRIGHT profiles, TrajOpt or TrajOptIfopt."""
+    if ifopt:
+        namespace = TRAJOPT_IFOPT_DEFAULT_NAMESPACE
+        composite_profile = TrajOptIfoptDefaultCompositeProfile()
+        move_profile = TrajOptIfoptDefaultMoveProfile()
+    else:
+        namespace = TRAJOPT_DEFAULT_NAMESPACE
+        composite_profile = TrajOptDefaultCompositeProfile()
+        move_profile = TrajOptDefaultMoveProfile()
+
+    composite_profile.collision_cost_config = _collision_config()
+    composite_profile.collision_constraint_config = _collision_config()
+    composite_profile.smooth_velocities = True
+    composite_profile.smooth_accelerations = False
+    composite_profile.smooth_jerks = False
+    composite_profile.velocity_coeff = np.ones(1)
+    composite_profile.acceleration_coeff = np.ones(1)
+
+    move_profile.joint_cost_config.enabled = False
+    move_profile.cartesian_cost_config.enabled = False
+    move_profile.cartesian_constraint_config.enabled = True
+    move_profile.cartesian_constraint_config.coeff = UPRIGHT_COEFF
+
+    profiles = ProfileDictionary()
+    profiles.addProfile(namespace, "UPRIGHT", composite_profile)
+    profiles.addProfile(namespace, "UPRIGHT", move_profile)
+    return profiles
+
+
+def run(ifopt: bool = False):
+    """Run the glass upright example (C++ GlassUprightExample::run).
+
+    Args:
+        ifopt: Plan with TrajOptIfoptPipeline instead of TrajOptPipeline.
 
     Returns:
-        dict with result, robot, joint_names for testing/visualization
+        dict with result, env, joint_names
     """
-    # KUKA IIWA 14 R820: 7-DOF redundant arm (joints: joint_a1 through joint_a7)
-    # 7-DOF allows maintaining orientation while repositioning - essential for upright constraint
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
-    print(f"Loaded robot with {len(robot.get_link_names())} links")
-
-    # Sphere obstacle near path to influence trajectory, not block it
-    # Forces TrajOpt to find trajectory that avoids sphere while keeping tool upright
-    # Without obstacle, robot could just rotate joint_a1 directly (trivial solution)
-    # C++ params: sphere(0.15) at (0.5, 0, 0.55)
-    create_obstacle(
-        robot,
-        name="sphere_attached",
-        geometry=sphere(0.15),  # 15cm radius (C++ default)
-        transform=Pose.from_xyz(0.5, 0, 0.55),  # C++ position
+    env = load_support_environment("lbr_iiwa_14_r820")
+    # addSphere(): a 0.15 m sphere at (0.5, 0, 0.55), fixed to base_link.
+    add_fixed_link(
+        env,
+        "sphere_attached",
+        "joint_sphere_attached",
+        Sphere(0.15),
+        Isometry3d.Identity() * Translation3d(0.5, 0, 0.55),
     )
-    print("Added sphere obstacle r=0.15 at (0.5, 0, 0.55)")
+    env.setState(JOINT_NAMES, JOINT_START)
 
-    # joint_a1 through joint_a7 for IIWA manipulator group
-    joint_names = robot.get_joint_names("manipulator")
-
-    # Start/end positions from C++ example - only joint_a1 changes (-0.4 -> 0.4 rad)
-    # This represents ~46 degrees rotation of the base joint while all other joints
-    # maintain the same configuration. The arm effectively "sweeps" horizontally
-    # while the tool orientation must remain constant (upright constraint)
-    joint_start_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-    joint_end_pos = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-
-    # Set robot to start configuration for planning
-    robot.set_joints(joint_start_pos, joint_names=joint_names)
-
-    # MotionProgram with "UPRIGHT" profile - this profile name maps to TrajOpt config that sets:
-    #   coeff = [0, 0, 0, 5, 5, 5]  (position free, orientation constrained)
-    #   lower_tolerance / upper_tolerance for orientation bounds
-    #
-    # LINEAR motion type (vs FREESPACE) tells TrajOpt to interpolate in Cartesian space,
-    # essential for maintaining orientation at intermediate waypoints
-    program = (
-        MotionProgram(
-            "manipulator", tcp_frame="tool0", working_frame="base_link", profile="UPRIGHT"
-        )
-        .set_joint_names(joint_names)
-        # StateTarget specifies full joint configuration (not just Cartesian pose)
-        # TrajOpt will optimize intermediate states while enforcing UPRIGHT constraints
-        .linear_to(StateTarget(joint_start_pos, names=joint_names, profile="UPRIGHT"))
-        .linear_to(StateTarget(joint_end_pos, names=joint_names, profile="UPRIGHT"))
+    program = CompositeInstruction("UPRIGHT", ManipulatorInfo("manipulator", "base_link", "tool0"))
+    start_instruction = MoveInstruction(
+        StateWaypointPoly(StateWaypoint(JOINT_NAMES, JOINT_START)),
+        MoveInstructionType.LINEAR,
+        "UPRIGHT",
     )
+    start_instruction.setDescription("Start Instruction")
+    plan_f0 = MoveInstruction(
+        StateWaypointPoly(StateWaypoint(JOINT_NAMES, JOINT_END)),
+        MoveInstructionType.LINEAR,
+        "UPRIGHT",
+    )
+    plan_f0.setDescription("freespace_plan")
+    program.push_back(MoveInstructionPoly(start_instruction))
+    program.push_back(MoveInstructionPoly(plan_f0))
 
-    print("\nProgram: LINEAR motion with UPRIGHT profile (orientation locked, position free)")
-    print("TrajOpt will optimize trajectory to avoid sphere while maintaining tool orientation")
-
-    # TrajOptPipeline: trajectory optimization with collision avoidance
-    # UPRIGHT profile: C++ collision (margin=0.01, buffer=0.01, coeff=1) + cartesian constraint
-    print("\nRunning TrajOpt planner with upright constraint...")
-    composer = TaskComposer.from_config()
-    profiles = create_trajopt_upright_profiles()
-    result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=profiles)
-
+    pipeline = "TrajOptIfoptPipeline" if ifopt else "TrajOptPipeline"
+    print(f"Running {pipeline} with the upright constraint...")
+    result = run_pipeline(env, program, _profiles(ifopt), pipeline)
     assert result.successful, f"Planning failed: {result.message}"
-    print("Planning successful!")
-    print(f"\nTrajectory has {len(result)} waypoints:")
-    for i, point in enumerate(result.trajectory):
-        print(f"  [{i}] {point.positions}")
+    print(f"Planning successful! {len(result)} waypoints:")
+    for i, state in enumerate(result.trajectory):
+        print(f"  [{i}] {state.positions}")
 
-    return {"result": result, "robot": robot, "joint_names": joint_names}
+    return {"result": result, "env": env, "joint_names": JOINT_NAMES}
 
 
 def main() -> int:
@@ -118,7 +157,7 @@ def main() -> int:
     from tesseract_robotics.viewer import TesseractViewer
 
     with TesseractViewer() as viewer:
-        viewer.update_environment(results["robot"].env)
+        viewer.update_environment(results["env"])
         if results["result"].raw_results is not None:
             viewer.update_trajectory(results["result"].raw_results)
         print(f"Viewer at {viewer.url}")

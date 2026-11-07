@@ -51,9 +51,8 @@ AnyPoly Wrapping: Required at plugin boundaries because C++ RTTI doesn't work
   - AnyPoly_wrap_ProfileDictionary(profiles)
   - AnyPoly_wrap_EnvironmentConst(environment)
 
-The Pythonic TaskComposer class hides all this complexity:
-  composer = TaskComposer.from_config()
-  result = composer.plan(robot, program, pipeline="FreespacePipeline")
+This example does each step with the bindings; `tesseract_robotics.planning.TaskComposer`
+wraps the same steps for the high-level examples.
 
 Configuration Files
 -------------------
@@ -89,7 +88,6 @@ See: tesseract_planning_lowlevel_c_api_example.py
 
 Related Examples
 ----------------
-- pythonic_c_api_example.py: Robot, MotionProgram, plan_freespace() wrappers
 - tesseract_planning_lowlevel_c_api_example.py: Direct planner access
 - freespace_ompl_c_api_example.py: OMPL planning via TaskComposer
 - basic_cartesian_c_api_example.py: TrajOpt Cartesian planning
@@ -97,83 +95,122 @@ Related Examples
 
 import sys
 
-from tesseract_robotics.planning import (
-    CartesianTarget,
-    MotionProgram,
-    Pose,
-    Robot,
-    TaskComposer,
+import numpy as np
+
+from tesseract_robotics import get_task_composer_config_path
+from tesseract_robotics.examples.lowlevel.example_support import locate_file
+from tesseract_robotics.tesseract_command_language import (
+    CartesianWaypoint,
+    CartesianWaypointPoly,
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly,
+    MoveInstructionType,
+    ProfileDictionary,
 )
+from tesseract_robotics.tesseract_common import (
+    GeneralResourceLocator,
+    Isometry3d,
+    ManipulatorInfo,
+    Quaterniond,
+    Translation3d,
+)
+from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    OMPLRealVectorMoveProfile,
+    RRTConnectConfigurator,
+)
+from tesseract_robotics.tesseract_task_composer import (
+    AnyPoly_as_CompositeInstruction,
+    AnyPoly_wrap_CompositeInstruction,
+    AnyPoly_wrap_EnvironmentConst,
+    AnyPoly_wrap_ProfileDictionary,
+    TaskComposerDataStorage,
+    TaskComposerPluginFactory,
+)
+
+OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
+PIPELINE = "FreespacePipeline"
+NUM_OMPL_PLANNERS = 2
+OMPL_PLANNING_TIME_S = 10.0
+
+# Target orientation, scalar-last (x, y, z, w): 180 deg about the (1, 0, 1) axis.
+TOOL_XYZW = (0.707, 0.0, 0.707, 0.0)
 
 
 def run():
-    # Load ABB IRB2400 robot from tesseract_support package
-    # WHY: ABB IRB2400 is a standard 6-DOF industrial robot with well-tested
-    # kinematic model. SRDF defines "manipulator" group with tool0 TCP frame.
-    robot = Robot.from_tesseract_support("abb_irb2400")
-    print(f"Loaded robot with {len(robot.get_link_names())} links")
+    locator = GeneralResourceLocator()
+    urdf = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.urdf")
+    srdf = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.srdf")
+    env = Environment()
+    if not env.init(urdf, srdf, locator):
+        raise RuntimeError("failed to initialize abb_irb2400")
+    print(f"Loaded {env.getName()}")
 
-    # WHY set initial state: Planners need a seed configuration for IK solving.
-    # Cartesian waypoints are converted to joint space using current state as seed.
-    # Setting all joints to 0.1 rad avoids singularities at zeros.
-    joint_names = robot.get_joint_names("manipulator")
-    robot.set_joints(dict(zip(joint_names, [0.1] * 6)))
+    # A seed away from the all-zero singularity.
+    joint_names = [jid.name() for jid in env.getJointGroup("manipulator").getJointIds()]
+    env.setState(joint_names, np.full(len(joint_names), 0.1))
 
-    # WHY Cartesian waypoints: Specifying poses in Cartesian space is natural
-    # for end-effector tasks. The planner handles IK internally.
-    # Quaternion (0.707, 0, 0.707, 0) = 90 deg rotation around Y axis,
-    # pointing tool downward (common for pick/place operations).
-    wp1 = Pose.from_xyz_quat([0.8, -0.3, 1.455], [0.707, 0, 0.707, 0])
-    wp2 = Pose.from_xyz_quat([0.8, 0.3, 1.455], [0.707, 0, 0.707, 0])
+    # Two Cartesian FREESPACE targets: the pipeline solves IK for them.
+    program = CompositeInstruction("DEFAULT", ManipulatorInfo("manipulator", "base_link", "tool0"))
+    for y in (-0.3, 0.3):
+        pose = (
+            Isometry3d.Identity() * Translation3d(0.8, y, 1.455) * Quaterniond.from_xyzw(*TOOL_XYZW)
+        )
+        program.push_back(
+            MoveInstructionPoly(
+                MoveInstruction(
+                    CartesianWaypointPoly(CartesianWaypoint(pose)),
+                    MoveInstructionType.FREESPACE,
+                    "DEFAULT",
+                )
+            )
+        )
+    print(f"\nProgram has {program.size()} instructions")
 
-    # WHY MotionProgram builder: Abstracts the low-level CompositeInstruction
-    # construction. Internally creates CartesianWaypoint, wraps in poly types,
-    # and adds to CompositeInstruction with proper ManipulatorInfo.
-    program = (
-        MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
-        .set_joint_names(joint_names)  # WHY: Required for JointTarget, optional for CartesianTarget
-        .move_to(
-            CartesianTarget(wp1)
-        )  # WHY move_to: Sets FREESPACE motion type (collision avoidance)
-        .move_to(CartesianTarget(wp2))
-    )
+    # OMPL needs at least one planner configurator; TrajOpt and the post-processing
+    # tasks run their default profiles.
+    ompl_profile = OMPLRealVectorMoveProfile()
+    ompl_profile.solver_config.planning_time = OMPL_PLANNING_TIME_S
+    ompl_profile.solver_config.planners = [
+        RRTConnectConfigurator() for _ in range(NUM_OMPL_PLANNERS)
+    ]
+    profiles = ProfileDictionary()
+    profiles.addProfile(OMPL_DEFAULT_NAMESPACE, "DEFAULT", ompl_profile)
 
-    print(f"\nProgram has {len(program)} waypoints")
+    # The factory reads the pipeline graphs and plugin libraries from the YAML config.
+    factory = TaskComposerPluginFactory(get_task_composer_config_path(), locator)
+    task = factory.createTaskComposerNode(PIPELINE)
+    input_key = task.getInputPortMappings().single("planning_input")
+    output_key = task.getOutputPortMappings().single("program")
+    executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 
-    # WHY TaskComposer: Orchestrates multi-stage planning pipeline without
-    # manual planner setup. from_config() loads YAML defining pipeline graphs.
-    # Internally handles: AnyPoly wrapping, ProfileDictionary creation,
-    # TaskComposerDataStorage setup, executor management, result extraction.
-    print("Running FreespacePipeline (OMPL + TrajOpt)...")
-    composer = TaskComposer.from_config()
+    # Task data crosses the plugin boundary type-erased, as AnyPoly.
+    data = TaskComposerDataStorage()
+    data.setData(input_key, AnyPoly_wrap_CompositeInstruction(program))
+    data.setData("environment", AnyPoly_wrap_EnvironmentConst(env))
+    data.setData("profiles", AnyPoly_wrap_ProfileDictionary(profiles))
 
-    # WHY FreespacePipeline: Combines OMPL (global search) + TrajOpt (local optimization)
-    # OMPL finds feasible path through complex configuration space,
-    # TrajOpt smooths it while enforcing collision/joint limit constraints.
-    # Alternative: "TrajOptPipeline" for optimization-only (faster but may fail).
-    result = composer.plan(robot, program, pipeline="FreespacePipeline")
-
-    if not result.successful:
-        print(f"Planning failed: {result.message}")
+    print(f"Running {PIPELINE} (OMPL + TrajOpt)...")
+    future = executor.run(task, data)
+    future.wait()
+    if not future.context.isSuccessful():
+        print("Planning failed")
         return False
-
     print("Planning successful!")
 
-    # WHY iterate result: PlanningResult wraps the raw CompositeInstruction
-    # and provides TrajectoryPoint objects with numpy arrays for positions,
-    # velocities, accelerations, and timestamps. Much easier than manual
-    # instr.asMoveInstruction().getWaypoint().asStateWaypoint() per instruction.
-    print(f"\nTrajectory has {len(result)} waypoints:")
-    for i, point in enumerate(result.trajectory):
-        # WHY point.time: FreespacePipeline includes time parameterization,
-        # so timestamps are computed from joint velocity/acceleration limits.
-        time_str = f" t={point.time:.3f}" if point.time else ""
-        print(f"  [{i:2d}] {point.positions}{time_str}")
+    results = AnyPoly_as_CompositeInstruction(future.context.data_storage.getData(output_key))
+    states = [
+        instruction.asMoveInstruction().getWaypoint().asStateWaypoint()
+        for instruction in results
+        if instruction.isMoveInstruction()
+        and instruction.asMoveInstruction().getWaypoint().isStateWaypoint()
+    ]
+    print(f"\nTrajectory has {len(states)} waypoints:")
+    for i, state in enumerate(states):
+        print(f"  [{i:2d}] {np.asarray(state.getPosition())} t={state.getTime():.3f}")
 
-    # WHY raw_results: PlanningResult stores both extracted TrajectoryPoints
-    # (for easy iteration) and the raw CompositeInstruction (for visualization
-    # and low-level access). The viewer requires the raw CompositeInstruction format.
-    return {"env": robot.env, "success": True, "trajectory": result.raw_results}
+    return {"env": env, "success": True, "trajectory": results}
 
 
 def main() -> int:
