@@ -1,14 +1,13 @@
 # Breaking API changes
 
-Changes that break existing Python code, newest first, each with what replaces it. 0.35.0.9
-removes `IfoptQPProblem` and `IfoptProblem`: build a `TrajOptQPProblem` instead, and
+Changes that break existing Python code, newest first, each with what replaces it. The next
+release removes `IfoptQPProblem` and `IfoptProblem`: build a `TrajOptQPProblem` instead, and
 expect different results wherever a cost went in without a penalty type. Its convex evaluators
 take only the QP solution vector. The [changelog](CHANGELOG.md) lists every change; the
 [upgrade guide](changes.md) covers the tesseract upgrades in full.
 
 | Release | What breaks | Use instead |
 |---|---|---|
-| Unreleased | `trajopt_ifopt.CartLineIndicesUnsupportedError` removed: `CartLineConstraint` with fewer than 6 indices returns its Jacobian | [Drop the exception](#cartlineindicesunsupportederror-removed) |
 | Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
 | Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
 | Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/tesseract_common.md#logging) |
@@ -38,37 +37,23 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | Unreleased | `ProfileDictionary_add*`, `*_as_ProfileConstPtr`, `cast_Descartes*`, the `…PlanProfile` aliases and `tesseract_motion_planners_trajopt.TrajOptCollisionConfig` / `CollisionEvaluatorType` removed | [`addProfile` and the `…MoveProfile` names](#planner-module-compatibility-names-removed) |
 | Unreleased | `create_time_optimal_parameterization(path_tolerance, min_angle_change)`, `create_iterative_spline_parameterization(add_points)`: the ignored arguments are removed | [Set the composite profile's fields](#time-parameterization-factories-take-no-arguments) |
 | Unreleased | `tesseract_robotics.ompl_base` and `tesseract_reeds_shepp_example` removed | [`ompl_base` removed](#ompl_base-removed) |
-| 0.35.0.9 | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
-| 0.35.0.9 | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
-| 0.35.0.9 | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
-| 0.35.0.9 | `tesseract_scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
-| 0.35.0.9 | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
-| 0.35.0.9 | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
-| 0.35.0.9 | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
-| 0.35.0.9 | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
-| 0.35.0.9 | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
-| 0.35.0.9 | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
-| 0.35.0.9 | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `ValueError` on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
-| 0.35.0.9 | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
+| Unreleased | `ChangeCollisionMarginsCommand(pair_margin_data)` merges the pair margins (`MODIFY`) instead of replacing them | [Pass `REPLACE`](#changecollisionmarginscommandpair_margin_data-defaults-to-modify) |
+| Unreleased | `MotionProgram` / `get_manipulator_info` require `tcp_frame` and `working_frame`; `fk` / `ik` require `tip_link`; `to_composite_instruction` has no `tcp_frame` | [Name the frames](#the-planning-api-no-longer-picks-a-tcp-or-working-frame) |
+| Unreleased | `tesseract_geometry.PointCloudPoint` renamed | [`PointCloud.Point`](#pointcloudpoint-renamed-to-pointcloudpoint) |
+| Unreleased | `tesseract_scene_graph.JointType_*` constants removed | [The `JointType` members](#swig-era-jointtype_-constants-removed) |
+| Unreleased | 37 collision, common and environment value types compare by value and are unhashable: `hash()`, `set` members and `dict` keys raise `TypeError` | [A stable key, or `id()`](#value-types-compare-by-value-and-are-unhashable) |
+| Unreleased | `TaskComposerPluginFactory.createTaskComposerNode` / `createTaskComposerExecutor` no longer return `None` | [`except TaskComposerPluginError`](#createtaskcomposernode-and-createtaskcomposerexecutor-raise) |
+| Unreleased | `margin_data_override_type`, `set{Default,Pair}CollisionMarginData`, `CollisionMarginOverrideType`, `get/setPairCollisionMargin` removed | [The tesseract names](#pre-033-collision-margin-aliases-removed) |
+| Unreleased | `ContactTestType_*`, `Events_*`, `ModifyAllowedCollisionsType_*` and module-level `CONSOLE_BRIDGE_LOG_*` constants removed | [The enum members](#swig-era-enum-constants-removed) |
+| Unreleased | `tesseract_environment.AnyPoly_wrap_EnvironmentConst`, `tesseract_command_language.AnyPoly_*` and `_HAS_TASK_COMPOSER` removed | [`tesseract_task_composer.AnyPoly_*`](#anypoly-helpers-only-in-tesseract_task_composer) |
+| Unreleased | `FilesystemPath`, `_FilesystemPath`, `TransformMap`, `Environment.initFromUrdf` / `initFromUrdfSrdf` removed; `Environment.init(str, …)` is content | [`pathlib.Path`](#a-str-is-content-pathlibpath-is-a-file) |
+| Unreleased | `evaluateConvexCosts`, `evaluateTotalConvexCost`, `evaluateConvexConstraintViolations` raise `QPSolutionSizeError` (a `ValueError`) on a `var_vals` that is not `getNumQPVars()` long | [The QP solution vector](#the-convex-evaluators-take-the-qp-solution-vector) |
+| Unreleased | `trajopt_sqp.IfoptQPProblem` and `trajopt_sqp.IfoptProblem` removed | [`TrajOptQPProblem`](#ifoptqpproblem-and-ifoptproblem-removed) |
 | 0.35.0.1 | `planning.Transform` removed; `Pose` is an `Isometry3d` | [`Pose`](#transform-removed-pose-is-an-isometry3d) |
 | 0.35.0.1 | tesseract 0.35: `package://tesseract_support/` resource URIs | [`package://tesseract/support/`](#resource-uris-moved) |
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
-
-### `CartLineIndicesUnsupportedError` removed
-
-trajopt 0.35.0 filled 6 Jacobian rows whatever the number of `CartLineInfo.indices`, so the binding
-raised `CartLineIndicesUnsupportedError` (a `ValueError`) from `CartLineConstraint.getJacobian()`
-and `calcJacobianBlock()` with fewer than 6 (#237). The pinned trajopt fills one row per index
-(trajopt#612): both return the rows the indices name, and a solve calls the same C++ method.
-Code that names the exception raises `AttributeError`; in an `except` clause only once something
-raises there. Drop the clause:
-
-| before | after |
-| --- | --- |
-| `except ti.CartLineIndicesUnsupportedError:` | nothing to catch |
-| `info.indices = np.arange(6)`, the only safe set | the rows you want, e.g. `info.indices = np.array([0, 1, 2])` |
 
 ### Python 3.12 is the minimum
 
@@ -105,7 +90,7 @@ not have (#298). Call the C++ names:
 
 `trajopt_ifopt.CollisionCoeffData`, `trajopt_ifopt.TrajOptCollisionConfig` and
 `trajopt_sqp.SQPParameters` bind `__eq__`/`__ne__` from their C++ `operator==` and set
-`__hash__ = None` (#261), as the 0.35.0.9 collision, common and environment types did.
+`__hash__ = None` (#261), as the collision, common and environment types do.
 `CollisionCoeffData() == CollisionCoeffData()` was `False`. `hash(obj)`, `{obj}` and `d[obj] = …`
 now raise `TypeError: unhashable type`:
 
@@ -151,8 +136,8 @@ vector. Call `init(num_vars, num_cnts)` with the QP's size before the updates.
 
 The command-language waypoints, instructions and Polys compared by identity: two
 `JointWaypoint(["a"], [1.0])` were unequal. They now bind `__eq__`/`__ne__` from the C++
-operators and set `__hash__ = None`, as the collision, common and environment types did in
-0.35.0.9 (#261): `CartesianWaypoint`, `JointWaypoint`, `StateWaypoint`, `WaypointPoly`,
+operators and set `__hash__ = None`, as the collision, common and environment types do
+(#261): `CartesianWaypoint`, `JointWaypoint`, `StateWaypoint`, `WaypointPoly`,
 `CartesianWaypointPoly`, `JointWaypointPoly`, `StateWaypointPoly`, `InstructionPoly`,
 `MoveInstructionPoly`, `MoveInstruction`, `CompositeInstruction`, `WaitInstruction`,
 `TimerInstruction`, `SetAnalogInstruction`, `SetDigitalInstruction`, `SetToolInstruction`.
@@ -172,7 +157,7 @@ built separately are unequal until the UUIDs match:
 The four time-parameterization profiles were bound without their C++ `operator==`, so `==`
 compared identity: `TOTGCompositeProfile() == TOTGCompositeProfile()` was `False`. They now bind
 `__eq__`/`__ne__` and set `__hash__ = None` (#261), as the collision, common and environment value
-types did in 0.35.0.9. The new `RuckigTrajectorySmoothingCompositeProfile` behaves the same way.
+types do. The new `RuckigTrajectorySmoothingCompositeProfile` behaves the same way.
 
 | before | after |
 | --- | --- |
@@ -184,7 +169,7 @@ types did in 0.35.0.9. The new `RuckigTrajectorySmoothingCompositeProfile` behav
 `SimplePlannerFixedSize{,Assign,AssignNoIK}MoveProfile` and
 `SimplePlannerLVS{,NoIK,Assign,AssignNoIK}MoveProfile` bind the C++ `operator==` (#261): two
 profiles with the same fields are `==`, and `hash()`, `set` members and `dict` keys raise
-`TypeError`, as for the [value types in 0.35.0.9](#value-types-compare-by-value-and-are-unhashable).
+`TypeError`, as for the [collision, common and environment value types](#value-types-compare-by-value-and-are-unhashable).
 
 | before | after |
 | --- | --- |
@@ -204,7 +189,7 @@ use `addPlanner` / `clearPlanners`, which change it in place.
 
 ### Planner value types compare by value and are unhashable
 
-As for collision, common and environment in 0.35.0.9, these classes bind the C++ `operator==`
+As for collision, common and environment, these classes bind the C++ `operator==`
 and set `__hash__ = None` (#261). `hash()`, `set` members and `dict` keys raise `TypeError`:
 
 | module | classes |
@@ -214,7 +199,7 @@ and set `__hash__ = None` (#261). `hash()`, `set` members and `dict` keys raise 
 | `tesseract_task_composer_planning` | `ContactCheckProfile`, `FixStateBoundsProfile`, `FixStateCollisionProfile`, `KinematicLimitsCheckProfile`, `MinLengthProfile`, `ProfileSwitchProfile`, `UpsampleTrajectoryProfile` |
 
 Key on a field, or on `id(obj)` where identity is meant, as in
-[the 0.35.0.9 entry](#value-types-compare-by-value-and-are-unhashable).
+[the value-types entry](#value-types-compare-by-value-and-are-unhashable).
 `OMPLSolverConfig` compares `planners` by count only (upstream `ompl_solver_config.cpp`), so two
 configs holding different configurator types of the same number are equal.
 
@@ -232,7 +217,7 @@ still accepted (`goal_bias` with `["RRTConnect", "RRTstar"]` sets it on the RRTs
 ### TrajOpt-Ifopt and Descartes profiles compare by value and are unhashable
 
 These classes bind `__eq__`/`__ne__` from their C++ `operator==` and set `__hash__ = None`, as the
-[0.35.0.9 value types](#value-types-compare-by-value-and-are-unhashable) do (#261):
+[collision, common and environment value types](#value-types-compare-by-value-and-are-unhashable) do (#261):
 
 | `tesseract_motion_planners_trajopt_ifopt` | `TrajOptIfoptCartesianWaypointConfig`, `TrajOptIfoptJointWaypointConfig`, `TrajOptIfoptDefaultMoveProfile`, `TrajOptIfoptDefaultCompositeProfile`, `TrajOptIfoptOSQPSolverProfile` |
 | `tesseract_motion_planners_descartes` | `DescartesDefaultMoveProfileD`, `DescartesLadderGraphSolverProfileD` |
@@ -304,7 +289,7 @@ or an `os.PathLike` (#316).
 
 ### Task-composer value types compare by value and are unhashable
 
-As for the collision, common and environment types in 0.35.0.9: `AnyPoly`, `TaskComposerKeys`,
+As for the collision, common and environment types: `AnyPoly`, `TaskComposerKeys`,
 `TaskComposerDataStorage`, `TaskComposerNodeInfo`, `TaskComposerNodeInfoContainer`,
 `TaskComposerContext`, `TaskComposerNodePorts` and `TaskComposerLog` bind C++ `operator==`, so
 `==` compares content, and `hash()`, `set` members and `dict` keys raise `TypeError` (#261).
@@ -476,8 +461,6 @@ gone, so a call that passes one raises `TypeError` instead of silently doing not
 | `create_iterative_spline_parameterization(add_points=False)` | `profile = IterativeSplineParameterizationCompositeProfile()`, `profile.add_points = False` |
 
 Add the profile with `profiles.addProfile(algorithm.getName(), "DEFAULT", profile)`.
-
-## 0.35.0.9
 
 ### `ChangeCollisionMarginsCommand(pair_margin_data)` defaults to `MODIFY`
 
@@ -746,8 +729,8 @@ NotConvexifiedError: evaluateConvexCosts: the problem has no convex model yet; c
 
 What used to work and now raises: an NLP-sized `var_vals` on a problem with constraint sets
 and no hinge or absolute cost. Each constraint row adds one or two slack variables, and trajopt
-0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel bundles, reads only the NLP block
-there, so the call returned the right values. Append zeros for the slack variables:
+0.35.0, which 0.35.0.8 and earlier bundle, reads only the NLP block there, so the call returned
+the right values. Append zeros for the slack variables:
 
 ```python
 problem.convexify()
@@ -804,17 +787,17 @@ problem.addCostSet(vel_cost, tsqp.CostPenaltyType.SQUARED)
 problem.setup()
 ```
 
-It is not a rename. In trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x wheel
-bundles (`TrajOptQPProblem` first ships in 0.35.0.9; earlier releases bind `IfoptQPProblem`),
-the two problems differ in five ways, and the third and fourth change results:
+It is not a rename. `IfoptQPProblem` as 0.35.0.8 and earlier bind it, on trajopt 0.35.0, and
+`TrajOptQPProblem` on the pinned trajopt `a504b22` differ in five ways, and the third and fourth
+change results:
 
 | | `IfoptQPProblem` (removed) | `TrajOptQPProblem` |
 |---|---|---|
-| **1. Per set, not per row** | One merit coefficient, name and violation per constraint row; names are `<set>_<row>` ([L93][i93], [L100][i100]). | One per constraint set ([L668][t668], [L675][t675], [L1021–L1043][t1021]). Code that indexes names, violations or merit coefficients by row breaks, and the solver inflates a whole set's merit coefficient at once. |
+| **1. Per set, not per row** | One merit coefficient, name and violation per constraint row; names are `<set>_<row>` ([L93][i93], [L100][i100]). | One per constraint set ([L738–L760][p738], [L833–L835][p833], [L1163–L1186][p1163]). Code that indexes names, violations or merit coefficients by row breaks, and the solver inflates a whole set's merit coefficient at once. |
 | **2. `addCostSet` checks bounds** | Checks nothing; rejects `HINGE` ([L50–L78][i50]). | Every row must be an equality or one-sided, with any penalty type; a range row raises, from `addConstraintSet` too ([L115–L127][t115]). |
-| **3. No raw-cost path** | A cost added with `IfoptProblem.addCostSet` bypasses `IfoptQPProblem::addCostSet` ([L59][i59]): it gets no gradient and no Hessian in the QP ([L190][i190], [L263][i263]), while the merit still reads its raw, signed rows ([L525–L531][i525]). | Every cost goes in with `addCostSet(set, penalty_type)`. A squared cost that was inert now shapes the steps; for `ABSOLUTE` and `HINGE` costs on trajopt 0.35.0, see the fourth difference. |
-| **4. The merit matches the model for squared costs** | Weights the model but not the merit, and counts the model once per cost term, so the solver can reject every step and stop at the seed (tesseract-robotics/trajopt#595). | The merit weights and counts squared costs as the model does, so steps the old ratio rejected can be accepted. trajopt 0.35.0 has two exceptions, both fixed by tesseract-robotics/trajopt#592 (merged 2026-09-30; the fix arrives only with a wheel built on a newer trajopt, none yet). Constraint coefficients weight a set's slack in the QP ([L798][t798]) but not its violation in the merit ([L1021–L1043][t1021]). The model reads an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution ([L166–L196][t166]) while its exact cost ignores its coefficient ([L1015][t1015]), so the model predicts the whole cost away and the solver rejects a step that removes less than `improve_ratio_threshold` of it; a violation the trust box cannot cut by that much stops at its seed ([the QP problem](api/trajopt_sqp.md#the-qp-problem)). |
-| **5. Dynamic sets** | Throws on `isDynamic()` sets ([L42–L48][i42]). | Accepts them ([L404–L414][t404]). |
+| **3. No raw-cost path** | A cost added with `IfoptProblem.addCostSet` bypasses `IfoptQPProblem::addCostSet` ([L59][i59]): it gets no gradient and no Hessian in the QP ([L190][i190], [L263][i263]), while the merit still reads its raw, signed rows ([L525–L531][i525]). | Every cost goes in with `addCostSet(set, penalty_type)`. A cost that was inert now shapes the steps. |
+| **4. The merit matches the model** | Weights the model but not the merit, and counts the model once per cost term, so the solver can reject every step and stop at the seed (tesseract-robotics/trajopt#595). | The merit weights and counts every cost as the model does ([L1118–L1162][p1118]), and weighs each constraint set's violation by its coefficients, as the QP prices its slack ([L887–L903][p887]), so steps the old ratio rejected can be accepted. An `ABSOLUTE` or `HINGE` cost is modelled on its linearized rows, without the slacks ([L233–L295][p233]; tesseract-robotics/trajopt#592), so a violation larger than the trust box is reduced step by step ([the QP problem](api/trajopt_sqp.md#the-qp-problem)). |
+| **5. Dynamic sets** | Throws on `isDynamic()` sets ([L42–L48][i42]). | Accepts them ([L488–L540][p488]). |
 
 How much the third difference moves a result: this package's online SQP example added its velocity
 cost with `IfoptProblem.addCostSet`, so its QP had no cost term and OSQP solved with an empty
@@ -823,12 +806,13 @@ fell from 23.2 to 3.9, against 3.6 for the straight-line seed, and `getTotalExac
 that sum instead of the first velocity row (0.5).
 
 !!! note "Evidence"
-    The five differences are read from the trajopt 0.35.0 sources linked above. The example's
+    The five differences are read from the sources linked above: trajopt 0.35.0 for
+    `IfoptQPProblem`, the pinned trajopt `a504b22` for `TrajOptQPProblem`. The example's
     numbers are measured on this repository's `online_planning_sqp_example.py`, and
     `tests/examples/test_online_planning_sqp_example.py` pins its problem class, its cost as the
     squared joint steps, and a global solve that reaches the target from the pinned start. How
     much results move in other code depends on its costs; nothing here measures that. The
-    `ABSOLUTE`/`HINGE` exception is also measured: `TestTrajOptQPProblemPenaltyCosts` in
+    `ABSOLUTE`/`HINGE` model is also measured: `TestTrajOptQPProblemPenaltyCosts` in
     `tests/trajopt_sqp/test_trajopt_sqp_bindings.py` pins it.
 
 [i42]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/ifopt_qp_problem.cpp#L42-L48
@@ -839,14 +823,14 @@ that sum instead of the first velocity row (0.5).
 [i190]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/ifopt_qp_problem.cpp#L190
 [i263]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/ifopt_qp_problem.cpp#L263
 [i525]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/ifopt_qp_problem.cpp#L525-L531
-[t166]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L166-L196
-[t404]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L404-L414
 [t115]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L115-L127
-[t668]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L668
-[t675]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L675
-[t798]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L798
-[t1015]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L1015
-[t1021]: https://github.com/tesseract-robotics/trajopt/blob/0.35.0/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L1021-L1043
+[p233]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L233-L295
+[p488]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L488-L540
+[p738]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L738-L760
+[p833]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L833-L835
+[p887]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L887-L903
+[p1118]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L1118-L1162
+[p1163]: https://github.com/tesseract-robotics/trajopt/blob/a504b2208d/trajopt_optimizers/trajopt_sqp/src/trajopt_qp_problem.cpp#L1163-L1186
 
 ## 0.35.0.1
 
