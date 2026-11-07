@@ -1,6 +1,6 @@
 # Tesseract Python (nanobind)
 
-[![A rail-mounted robot places a car seat through a car's door opening. Click to play the demo in your browser.](https://tesseract-robotics.github.io/tesseract_nanobind/demos/posters/car_seat_example.png)](https://tesseract-robotics.github.io/tesseract_nanobind/demos/client/index.html?playbackPath=../recordings/car_seat_example.viser&darkMode&hideViserLogo&initialCameraPosition=-3.16,6.85,4.77&initialCameraLookAt=0.81,-0.04,0.55&initialCameraUp=0,0,1&initialCameraFov=0.6109)
+[![A rail-mounted robot places a car seat through a car's door opening. Click to play the demo in your browser.](https://tesseract-robotics.github.io/tesseract_nanobind/demos/posters/car_seat_example.png)](https://tesseract-robotics.github.io/tesseract_nanobind/#play)
 
 [![PyPI](https://img.shields.io/pypi/v/tesseract-robotics-nanobind.svg)](https://pypi.org/project/tesseract-robotics-nanobind/)
 [![Python](https://img.shields.io/badge/python-3.12%20|%203.13%20|%203.14%20|%203.15-blue.svg)](https://github.com/tesseract-robotics/tesseract_nanobind)
