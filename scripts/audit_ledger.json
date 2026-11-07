@@ -559,18 +559,6 @@
     }
   },
   "trajopt_ifopt": {
-    "InverseKinematicsConstraint.calcJacobianBlock": {
-      "issue": "#289"
-    },
-    "JointAccelConstraint.__init__": {
-      "issue": "#290"
-    },
-    "JointJerkConstraint.__init__": {
-      "issue": "#290"
-    },
-    "JointVelConstraint.__init__": {
-      "issue": "#290"
-    },
     "Var.__init__": {
       "wont_fix": "`Var() = default` leaves index -1 and no values, and nothing public sets them (var.h:55); the scalar and vector constructors are bound (#297). Their `parent` stays unbound: a raw `Node*` that dangles after solve."
     },

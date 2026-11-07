@@ -2,8 +2,8 @@
 
 The C++ out-param becomes the return value: a sparse matrix sized like getJacobian(), which
 needs the linked variables for its column count. At the linked variable's own values it equals
-getJacobian(). InverseKinematicsConstraint declares the method but trajopt 0.35.0 never defines
-it, so it is not bound.
+getJacobian(). InverseKinematicsConstraint's is defined since trajopt#626 (carried as a patch on
+the pinned trajopt), with the argument order of the other three.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_common import Isometry3d, LinkId
 
 from .scenes import Iiwa, TwoBoxes
 
@@ -20,6 +20,8 @@ from .scenes import Iiwa, TwoBoxes
 TWIST_SIZE = 6
 # m: CartLineConstraint's segment along x
 LINE_LENGTH = 0.1
+# the iiwa's flange link, whose pose the Cartesian and IK constraints target
+TCP = LinkId("tool0")
 # rad: a joint configuration with every joint off zero, so no Jacobian column vanishes
 CONFIG = np.array([0.1, 0.4, -0.2, -1.2, 0.3, 0.6, -0.1])
 # m / rad: half width of the CartPos band, a true range on every axis so each row splits in two
@@ -49,7 +51,8 @@ def _cart_line_info(iiwa: Iiwa, indices) -> ti.CartLineInfo:
 def _assert_block_matches(
     constraint: ti.CartPosConstraint
     | ti.CartLineConstraint
-    | ti.DiscreteCollisionNumericalConstraint,
+    | ti.DiscreteCollisionNumericalConstraint
+    | ti.InverseKinematicsConstraint,
     var: ti.Var,
 ):
     block = constraint.calcJacobianBlock(var.value())
@@ -67,7 +70,7 @@ def test_cart_pos(iiwa: Iiwa, linked):
         "tool0",
         "base_link",
         Isometry3d.Identity(),
-        iiwa.manip.calcFwdKin(np.zeros(len(iiwa.joint_names)))["tool0"],
+        iiwa.manip.calcFwdKin(np.zeros(len(iiwa.joint_names)))[TCP],
     )
     constraint.linkWithVariables(nodes)
     _assert_block_matches(constraint, var)
@@ -130,7 +133,7 @@ def test_wrong_joint_count_raises(iiwa: Iiwa, linked):
 
 def _cart_pos_band(iiwa: Iiwa, var: ti.Var, coeffs: np.ndarray) -> ti.CartPosConstraint:
     """A CartPosConstraint whose range rows are split in two: more rows than an equality."""
-    target = iiwa.manip.calcFwdKin(np.zeros(len(iiwa.joint_names)))["tool0"]
+    target = iiwa.manip.calcFwdKin(np.zeros(len(iiwa.joint_names)))[TCP]
     band = ti.toBounds(-np.full(TWIST_SIZE, BAND_HALF_WIDTH), np.full(TWIST_SIZE, BAND_HALF_WIDTH))
     return ti.CartPosConstraint(
         var,
@@ -163,5 +166,29 @@ def test_cart_pos_without_rows_still_checks_the_joint_count(iiwa: Iiwa, linked):
     constraint.linkWithVariables(nodes)
     assert constraint.getRows() == 0
     assert constraint.calcJacobianBlock(var.value()).shape == (0, nodes.getRows())
+    with pytest.raises(ti.JointValuesSizeError, match=f"{n_dof} joints"):
+        constraint.calcJacobianBlock(np.zeros(n_dof + 1))
+
+
+def _ik_constraint(iiwa: Iiwa, nodes: ti.NodesVariables) -> ti.InverseKinematicsConstraint:
+    """IK on node 1 seeded from node 0, its target the pose of node 1's own configuration."""
+    seed_var, constraint_var = (node.getVar("joints") for node in nodes.getNodes())
+    info = ti.InverseKinematicsInfo(iiwa.manip, "base_link", "tool0")
+    target = iiwa.manip.calcFwdKin(CONFIG)[TCP]
+    return ti.InverseKinematicsConstraint(target, info, constraint_var, seed_var)
+
+
+def test_ik_calc_jacobian_block_matches_get_jacobian(iiwa: Iiwa, linked):
+    nodes, var = linked
+    constraint = _ik_constraint(iiwa, nodes)
+    constraint.linkWithVariables(nodes)
+    _assert_block_matches(constraint, var)
+
+
+def test_ik_wrong_joint_count_raises(iiwa: Iiwa, linked):
+    nodes, _ = linked
+    n_dof = iiwa.manip.numJoints()
+    constraint = _ik_constraint(iiwa, nodes)
+    constraint.linkWithVariables(nodes)
     with pytest.raises(ti.JointValuesSizeError, match=f"{n_dof} joints"):
         constraint.calcJacobianBlock(np.zeros(n_dof + 1))

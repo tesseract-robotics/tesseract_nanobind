@@ -355,15 +355,29 @@ class JointPosConstraint(ConstraintSet):
         """Get current constraint values"""
 
 class JointVelConstraint(ConstraintSet):
+    @overload
     def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointVel') -> None:
         """Create joint velocity constraint with target values"""
+
+    @overload
+    def __init__(self, bounds: Sequence[Bounds], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointVel', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+        """
+        Create the constraint with one bound per joint, the same for every step: an equality, a one-sided limit or a range. The rows are undivided finite differences, so the bounds are per step. coeffs has length n_dof, 1 (one weight for every joint) or 0 (weight 1 for every joint). A range becomes a lower-bound row followed by an upper-bound row unless range_bound_handling is KEEP_AS_IS, which TrajOptQPProblem refuses.
+        """
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
 
 class JointAccelConstraint(ConstraintSet):
+    @overload
     def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointAccel') -> None:
         """Create joint acceleration constraint with target values"""
+
+    @overload
+    def __init__(self, bounds: Sequence[Bounds], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointAccel', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+        """
+        Create the constraint with one bound per joint, the same for every step: an equality, a one-sided limit or a range. The rows are undivided finite differences, so the bounds are per step. coeffs has length n_dof, 1 (one weight for every joint) or 0 (weight 1 for every joint). A range becomes a lower-bound row followed by an upper-bound row unless range_bound_handling is KEEP_AS_IS, which TrajOptQPProblem refuses.
+        """
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
@@ -725,8 +739,15 @@ class ContinuousCollisionNumericalConstraint(ConstraintSet):
     def getCollisionEvaluator(self) -> ContinuousCollisionEvaluator: ...
 
 class JointJerkConstraint(ConstraintSet):
+    @overload
     def __init__(self, targets: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointJerk') -> None:
         """Create joint jerk constraint (requires 4+ consecutive waypoints)"""
+
+    @overload
+    def __init__(self, bounds: Sequence[Bounds], position_vars: Sequence[Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float], name: str = 'JointJerk', range_bound_handling: RangeBoundHandling = RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES) -> None:
+        """
+        Create the constraint with one bound per joint, the same for every step: an equality, a one-sided limit or a range. The rows are undivided finite differences, so the bounds are per step. coeffs has length n_dof, 1 (one weight for every joint) or 0 (weight 1 for every joint). A range becomes a lower-bound row followed by an upper-bound row unless range_bound_handling is KEEP_AS_IS, which TrajOptQPProblem refuses.
+        """
 
     def getValues(self) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
         """Get current constraint values"""
@@ -1004,6 +1025,11 @@ class InverseKinematicsConstraint(ConstraintSet):
 
     def setBounds(self, bounds: Sequence[Bounds]) -> None:
         """Set the bounds, one per row; raises BoundsSizeError otherwise"""
+
+    def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
+        """
+        The constraint Jacobian at joint_vals, the constraint var's values (sparse matrix, sized like getJacobian()); needs linked variables
+        """
 
     def setTargetPose(self, target_pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> None:
         """Set the target pose the IK solution is computed for"""

@@ -184,7 +184,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/pcl-1.15.1-ha4d38b5_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-0.36.0.dev20261103-h75b1daf_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-planning-0.36.0.dev20261014-h44ecfe1_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/descartes-light-0.4.10-h3b39e5f_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/libruckig-0.17.3-h638ef06_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/opw-kinematics-0.5.3-h5d87bd1_0.conda
@@ -379,7 +379,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/pcl-1.15.1-hd3a4f88_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-0.36.0.dev20261103-h6fb47e0_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-planning-0.36.0.dev20261014-h908ce78_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/descartes-light-0.4.10-hcc5a8d6_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/libruckig-0.17.3-hf1331f3_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/opw-kinematics-0.5.3-hcc23be9_0.conda
@@ -565,7 +565,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/pcl-1.15.1-h8ae2c8c_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-0.36.0.dev20261103-h2baf082_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-planning-0.36.0.dev20261014-h2f70197_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/descartes-light-0.4.10-h2a1f7cf_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/libruckig-0.17.3-h1a7fffe_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/opw-kinematics-0.5.3-h45ba359_0.conda
@@ -739,7 +739,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/pcl-1.15.1-hf28f9af_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-0.36.0.dev20261103-h4c8f656_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-planning-0.36.0.dev20261014-h5a7d819_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/descartes-light-0.4.10-h8901be4_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/libruckig-0.17.3-h4d964a7_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/opw-kinematics-0.5.3-hc53c223_0.conda
@@ -969,7 +969,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/pcl-1.15.1-ha4d38b5_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-0.36.0.dev20261103-h75b1daf_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-planning-0.36.0.dev20261014-h44ecfe1_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/descartes-light-0.4.10-h3b39e5f_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/libruckig-0.17.3-h638ef06_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/opw-kinematics-0.5.3-h5d87bd1_0.conda
@@ -1171,7 +1171,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/pcl-1.15.1-hd3a4f88_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-0.36.0.dev20261103-h6fb47e0_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-planning-0.36.0.dev20261014-h908ce78_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/descartes-light-0.4.10-hcc5a8d6_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/libruckig-0.17.3-hf1331f3_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/opw-kinematics-0.5.3-hcc23be9_0.conda
@@ -1364,7 +1364,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/pcl-1.15.1-h8ae2c8c_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-0.36.0.dev20261103-h2baf082_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-planning-0.36.0.dev20261014-h2f70197_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/descartes-light-0.4.10-h2a1f7cf_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/libruckig-0.17.3-h1a7fffe_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/opw-kinematics-0.5.3-h45ba359_0.conda
@@ -1552,7 +1552,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/pcl-1.15.1-hf28f9af_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-0.36.0.dev20261103-h4c8f656_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-planning-0.36.0.dev20261014-h5a7d819_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/descartes-light-0.4.10-h8901be4_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/libruckig-0.17.3-h4d964a7_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/opw-kinematics-0.5.3-hc53c223_0.conda
@@ -1956,7 +1956,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/pcl-1.15.1-h8ae2c8c_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-0.36.0.dev20261103-h2baf082_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-planning-0.36.0.dev20261014-h2f70197_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/descartes-light-0.4.10-h2a1f7cf_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/libruckig-0.17.3-h1a7fffe_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/opw-kinematics-0.5.3-h45ba359_0.conda
@@ -2166,7 +2166,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/pcl-1.15.1-ha4d38b5_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-0.36.0.dev20261103-h75b1daf_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-planning-0.36.0.dev20261014-h44ecfe1_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/descartes-light-0.4.10-h3b39e5f_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/libruckig-0.17.3-h638ef06_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/opw-kinematics-0.5.3-h5d87bd1_0.conda
@@ -2367,7 +2367,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/pcl-1.15.1-hd3a4f88_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-0.36.0.dev20261103-h6fb47e0_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-planning-0.36.0.dev20261014-h908ce78_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/descartes-light-0.4.10-hcc5a8d6_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/libruckig-0.17.3-hf1331f3_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/opw-kinematics-0.5.3-hcc23be9_0.conda
@@ -2558,7 +2558,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/pcl-1.15.1-h8ae2c8c_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-0.36.0.dev20261103-h2baf082_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-planning-0.36.0.dev20261014-h2f70197_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/descartes-light-0.4.10-h2a1f7cf_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/libruckig-0.17.3-h1a7fffe_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/opw-kinematics-0.5.3-h45ba359_0.conda
@@ -2744,7 +2744,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/pcl-1.15.1-hf28f9af_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-0.36.0.dev20261103-h4c8f656_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-planning-0.36.0.dev20261014-h5a7d819_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/descartes-light-0.4.10-h8901be4_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/libruckig-0.17.3-h4d964a7_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/opw-kinematics-0.5.3-hc53c223_0.conda
@@ -2941,7 +2941,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/pcl-1.15.1-ha4d38b5_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-0.36.0.dev20261103-h75b1daf_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/tesseract-robotics-planning-0.36.0.dev20261014-h44ecfe1_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/descartes-light-0.4.10-h3b39e5f_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/libruckig-0.17.3-h638ef06_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/opw-kinematics-0.5.3-h5d87bd1_0.conda
@@ -3143,7 +3143,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/pcl-1.15.1-hd3a4f88_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-0.36.0.dev20261103-h6fb47e0_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/tesseract-robotics-planning-0.36.0.dev20261014-h908ce78_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/descartes-light-0.4.10-hcc5a8d6_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/libruckig-0.17.3-hf1331f3_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/linux-aarch64/opw-kinematics-0.5.3-hcc23be9_0.conda
@@ -3336,7 +3336,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/pcl-1.15.1-h8ae2c8c_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-0.36.0.dev20261103-h2baf082_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/tesseract-robotics-planning-0.36.0.dev20261014-h2f70197_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/descartes-light-0.4.10-h2a1f7cf_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/libruckig-0.17.3-h1a7fffe_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/osx-arm64/opw-kinematics-0.5.3-h45ba359_0.conda
@@ -3520,7 +3520,7 @@ environments:
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/pcl-1.15.1-hf28f9af_16.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-0.36.0.dev20261103-h4c8f656_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/tesseract-robotics-planning-0.36.0.dev20261014-h5a7d819_0.conda
-      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_0.conda
+      - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/descartes-light-0.4.10-h8901be4_1.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/libruckig-0.17.3-h4d964a7_0.conda
       - conda: https://conda.anaconda.org/tesseract-robotics/win-64/opw-kinematics-0.5.3-hc53c223_0.conda
@@ -19018,9 +19018,9 @@ packages:
   license: Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause
   size: 3127834
   timestamp: 1793925862336
-- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_0.conda
-  sha256: bc9b3f68e9985ff713d8e53f830a53b3c1c1bb1674378881ebf78660ef8000a3
-  md5: 09c6256636f11d4af9a9233f610381dd
+- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-64/trajopt-0.36.0.dev20261013-h44ecfe1_1.conda
+  sha256: 2508a369ad3321704930bed990645f29bf2732694e4ca50782f0b9466da8e68d
+  md5: d6989ed37dc5b996d80331432dc7a5b8
   depends:
   - libboost-devel
   - cereal
@@ -19046,34 +19046,34 @@ packages:
   - qpoases
   - xorg-libx11
   - xorg-libxext
+  - libstdcxx >=15
   - libgcc >=15
   - __glibc >=2.17,<3.0.a0
-  - libstdcxx >=15
-  - fcl >=0.7.0,<0.8.0a0
-  - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
-  - flann >=1.9.2,<1.9.3.0a0
-  - orocos-kdl >=1.5.4,<1.6.0a0
-  - libboost >=1.88.0,<1.89.0a0
-  - xorg-libxext >=1.3.7,<2.0a0
-  - octomap >=1.10.1,<1.11.0a0
-  - osqp-eigen >=0.11.2,<0.12.0a0
-  - liblzma >=5.8.3,<6.0a0
-  - spdlog >=1.17.0,<1.18.0a0
-  - jsoncpp >=1.9.6,<1.9.7.0a0
-  - eigen-abi >=5.0.1.80,<5.0.1.81.0a0
+  - tinyxml2 >=11.0.0,<11.1.0a0
   - urdfdom_headers >=2.1.2,<3.0a0
   - urdfdom >=5.1.2,<5.2.0a0
-  - xorg-libx11 >=1.8.14,<2.0a0
-  - tinyxml2 >=11.0.0,<11.1.0a0
-  - pcl >=1.15.1,<1.15.2.0a0
-  - bullet-cpp >=3.25,<3.26.0a0
-  - qpoases >=3.2.2,<3.2.3.0a0
-  - assimp >=6.0.5,<7.0a0
-  - gtest >=1.18.0,<1.18.1.0a0
+  - spdlog >=1.17.0,<1.18.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - flann >=1.9.2,<1.9.3.0a0
   - yaml-cpp >=0.8.0,<0.9.0a0
+  - assimp >=6.0.5,<7.0a0
+  - xorg-libx11 >=1.8.14,<2.0a0
+  - xorg-libxext >=1.3.7,<2.0a0
+  - pcl >=1.15.1,<1.15.2.0a0
+  - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - qpoases >=3.2.2,<3.2.3.0a0
+  - liblzma >=5.8.3,<6.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
+  - octomap >=1.10.1,<1.11.0a0
+  - osqp-eigen >=0.11.2,<0.12.0a0
+  - bullet-cpp >=3.25,<3.26.0a0
+  - libboost >=1.88.0,<1.89.0a0
+  - eigen-abi >=5.0.1.80,<5.0.1.81.0a0
+  - orocos-kdl >=1.5.4,<1.6.0a0
   license: BSD-2-Clause
-  size: 27108142
-  timestamp: 1793925141327
+  size: 27116605
+  timestamp: 1794061826002
 - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/boost-plugin-loader-0.5.0-h00a162d_0.conda
   sha256: adbaf692aa3dc539ec5b5a06b5b4a8d6c20e7262008c7811d4ce7b83d88f770f
   md5: 081b8375bd764405513bbab81eab3c8f
@@ -19237,9 +19237,9 @@ packages:
   license: Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause
   size: 3134164
   timestamp: 1793925865977
-- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_0.conda
-  sha256: 60b6ec2dcb004fd3cfbf9f6f21fbb420ed132c6363443d3147d71c943dee442d
-  md5: 629635695611a02cc4fc1b01bae13807
+- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/linux-aarch64/trajopt-0.36.0.dev20261013-h908ce78_1.conda
+  sha256: 70eb42067cf141c96ef18f043326c9f962002d83991724cfe495a61e226676da
+  md5: 78751913bd43258a373b193b15335234
   depends:
   - libboost-devel
   - cereal
@@ -19265,33 +19265,33 @@ packages:
   - qpoases
   - xorg-libx11
   - xorg-libxext
-  - libgcc >=15
   - libstdcxx >=15
-  - jsoncpp >=1.9.6,<1.9.7.0a0
-  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
-  - gtest >=1.18.0,<1.18.1.0a0
+  - libgcc >=15
+  - qpoases >=3.2.2,<3.2.3.0a0
+  - assimp >=6.0.5,<7.0a0
   - osqp-eigen >=0.11.2,<0.12.0a0
+  - liblzma >=5.8.3,<6.0a0
+  - bullet-cpp >=3.25,<3.26.0a0
+  - yaml-cpp >=0.8.0,<0.9.0a0
+  - xorg-libx11 >=1.8.14,<2.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - libboost >=1.88.0,<1.89.0a0
+  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
+  - orocos-kdl >=1.5.4,<1.6.0a0
   - urdfdom_headers >=2.1.2,<3.0a0
   - urdfdom >=5.1.2,<5.2.0a0
-  - orocos-kdl >=1.5.4,<1.6.0a0
-  - fcl >=0.7.0,<0.8.0a0
-  - flann >=1.9.2,<1.9.3.0a0
-  - spdlog >=1.17.0,<1.18.0a0
-  - qpoases >=3.2.2,<3.2.3.0a0
-  - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
-  - xorg-libx11 >=1.8.14,<2.0a0
   - xorg-libxext >=1.3.7,<2.0a0
-  - assimp >=6.0.5,<7.0a0
-  - liblzma >=5.8.3,<6.0a0
-  - octomap >=1.10.1,<1.11.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - spdlog >=1.17.0,<1.18.0a0
   - pcl >=1.15.1,<1.15.2.0a0
-  - yaml-cpp >=0.8.0,<0.9.0a0
-  - bullet-cpp >=3.25,<3.26.0a0
+  - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
   - tinyxml2 >=11.0.0,<11.1.0a0
-  - libboost >=1.88.0,<1.89.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
+  - flann >=1.9.2,<1.9.3.0a0
+  - octomap >=1.10.1,<1.11.0a0
   license: BSD-2-Clause
-  size: 27061047
-  timestamp: 1793925141498
+  size: 27091460
+  timestamp: 1794061837675
 - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/boost-plugin-loader-0.5.0-h249bf7a_0.conda
   sha256: a5dfe9903ec2ad9a92acd8f2cc649774008d7b45cbdc348e3d74c108c64008b2
   md5: 50b284f85aa5a79cfcbe7833b3db6269
@@ -19454,9 +19454,9 @@ packages:
   license: Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause
   size: 1205434
   timestamp: 1793925862743
-- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_0.conda
-  sha256: 999fe83e84a2877b495d988a069635e2289066a64dc5fae528e0c28da277bc0c
-  md5: 3d5992bd789de5659bb063547ca0b7c4
+- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/osx-arm64/trajopt-0.36.0.dev20261013-h2f70197_1.conda
+  sha256: 8c07f7264030686c5ee90ede4a5c35b7cb6de762ae974da1d47a6a444cc1e60d
+  md5: 08a2f7223b5b6f205cf11c3a5d29f288
   depends:
   - libboost-devel
   - cereal
@@ -19482,33 +19482,33 @@ packages:
   - qpoases
   - xorg-libx11
   - xorg-libxext
-  - libcxx >=21
   - __osx >=11.0
-  - pcl >=1.15.1,<1.15.2.0a0
-  - octomap >=1.10.1,<1.11.0a0
-  - qpoases >=3.2.2,<3.2.3.0a0
-  - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
-  - xorg-libxext >=1.3.7,<2.0a0
-  - libboost >=1.88.0,<1.89.0a0
-  - orocos-kdl >=1.5.4,<1.6.0a0
-  - osqp-eigen >=0.11.2,<0.12.0a0
-  - xorg-libx11 >=1.8.14,<2.0a0
-  - yaml-cpp >=0.8.0,<0.9.0a0
-  - bullet-cpp >=3.25,<3.26.0a0
-  - spdlog >=1.17.0,<1.18.0a0
+  - libcxx >=21
   - liblzma >=5.8.3,<6.0a0
+  - qpoases >=3.2.2,<3.2.3.0a0
+  - xorg-libx11 >=1.8.14,<2.0a0
+  - tinyxml2 >=11.0.0,<11.1.0a0
+  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - osqp-eigen >=0.11.2,<0.12.0a0
+  - orocos-kdl >=1.5.4,<1.6.0a0
+  - pcl >=1.15.1,<1.15.2.0a0
+  - spdlog >=1.17.0,<1.18.0a0
+  - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - bullet-cpp >=3.25,<3.26.0a0
   - urdfdom_headers >=2.1.2,<3.0a0
   - urdfdom >=5.1.2,<5.2.0a0
-  - assimp >=6.0.5,<7.0a0
-  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
-  - tinyxml2 >=11.0.0,<11.1.0a0
-  - gtest >=1.18.0,<1.18.1.0a0
+  - libboost >=1.88.0,<1.89.0a0
+  - octomap >=1.10.1,<1.11.0a0
   - flann >=1.9.2,<1.9.3.0a0
-  - fcl >=0.7.0,<0.8.0a0
-  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - assimp >=6.0.5,<7.0a0
+  - yaml-cpp >=0.8.0,<0.9.0a0
+  - xorg-libxext >=1.3.7,<2.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
   license: BSD-2-Clause
-  size: 26777041
-  timestamp: 1793925158429
+  size: 26796972
+  timestamp: 1794061843747
 - conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/boost-plugin-loader-0.5.0-h3f98480_0.conda
   sha256: a4a712c26e20402729e8432c35fb3724bc9d2dcb372621cf7c14945292a9bc54
   md5: 633c741332f24034add861e1a4e8290e
@@ -19665,9 +19665,9 @@ packages:
   license: Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause
   size: 5443638
   timestamp: 1793925874814
-- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_0.conda
-  sha256: 2aa91cb26dea3d3dc00d4302cb4fb93e32f7ca80e908139743917e73243ebe6e
-  md5: 565c077d3c9aaea94ed25168e8abf794
+- conda: https://conda.anaconda.org/tesseract-robotics/label/dev/win-64/trajopt-0.36.0.dev20261013-h5a7d819_1.conda
+  sha256: d6900225f52b1d08f879f56c5a0f8bc88aae88bf1c22218ffe9b98f58d9fe18b
+  md5: 9bd61cf05f23d3cb1ca1380b7f4d926f
   depends:
   - libboost-devel
   - cereal
@@ -19694,29 +19694,29 @@ packages:
   - vc >=14.3,<15
   - vc14_runtime >=14.44.35208
   - ucrt >=10.0.20348.0
-  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
-  - gtest >=1.18.0,<1.18.1.0a0
-  - qpoases >=3.2.2,<3.2.3.0a0
+  - jsoncpp >=1.9.6,<1.9.7.0a0
+  - octomap >=1.10.1,<1.11.0a0
   - orocos-kdl >=1.5.4,<1.6.0a0
-  - bullet-cpp >=3.25,<3.26.0a0
+  - flann >=1.9.2,<1.9.3.0a0
+  - eigen-abi >=5.0.1.100,<5.0.1.101.0a0
+  - pcl >=1.15.1,<1.15.2.0a0
+  - fcl >=0.7.0,<0.8.0a0
+  - liblzma >=5.8.3,<6.0a0
   - urdfdom_headers >=2.1.2,<3.0a0
   - urdfdom >=5.1.2,<5.2.0a0
-  - spdlog >=1.17.0,<1.18.0a0
-  - osqp-eigen >=0.11.2,<0.12.0a0
-  - tinyxml2 >=11.0.0,<11.1.0a0
-  - liblzma >=5.8.3,<6.0a0
   - tesseract-robotics >=0.36.0.dev20261103,<0.37.0a0
-  - jsoncpp >=1.9.6,<1.9.7.0a0
-  - flann >=1.9.2,<1.9.3.0a0
-  - octomap >=1.10.1,<1.11.0a0
-  - yaml-cpp >=0.8.0,<0.9.0a0
   - libboost >=1.88.0,<1.89.0a0
+  - tinyxml2 >=11.0.0,<11.1.0a0
+  - spdlog >=1.17.0,<1.18.0a0
+  - yaml-cpp >=0.8.0,<0.9.0a0
+  - osqp-eigen >=0.11.2,<0.12.0a0
+  - gtest >=1.18.0,<1.18.1.0a0
+  - bullet-cpp >=3.25,<3.26.0a0
+  - qpoases >=3.2.2,<3.2.3.0a0
   - assimp >=6.0.5,<7.0a0
-  - fcl >=0.7.0,<0.8.0a0
-  - pcl >=1.15.1,<1.15.2.0a0
   license: BSD-2-Clause
-  size: 31501469
-  timestamp: 1793925129295
+  size: 31536722
+  timestamp: 1794061850687
 - conda: https://conda.anaconda.org/tesseract-robotics/linux-64/descartes-light-0.4.10-h3b39e5f_1.conda
   sha256: e0c6018aa5ec234c16d51f51788632444cb42d8330f9a95480af6512a7c855ae
   md5: 7fe4ee45f22530b7bd33e79c399eaf11

@@ -78,9 +78,12 @@ weighted by its coefficients (see [the QP problem](trajopt_sqp.md#the-qp-problem
 |---|---|---|
 | `JointPosConstraint` (target) | Joint values at a waypoint | equality |
 | `JointPosConstraint` (bounds) | Per-joint bounds at a waypoint | a range splits into two one-sided rows (the default) |
-| `JointVelConstraint` | Joint velocity toward a target (zero for smoothing) | equality |
-| `JointAccelConstraint` | Joint acceleration toward a target | equality |
-| `JointJerkConstraint` | Joint jerk toward a target | equality |
+| `JointVelConstraint` (target) | Joint velocity toward a target (zero for smoothing) | equality |
+| `JointVelConstraint` (bounds) | Per-joint velocity band, the same every step | a range splits into two one-sided rows (the default) |
+| `JointAccelConstraint` (target) | Joint acceleration toward a target | equality |
+| `JointAccelConstraint` (bounds) | Per-joint acceleration band | a range splits into two one-sided rows (the default) |
+| `JointJerkConstraint` (target) | Joint jerk toward a target | equality |
+| `JointJerkConstraint` (bounds) | Per-joint jerk band | a range splits into two one-sided rows (the default) |
 | `CartPosConstraint` (pose) | TCP pose at a waypoint | equality |
 | `CartPosConstraint` (per-axis) | TCP pose with free axes and bands | per axis |
 | `CartLineConstraint` | TCP on a line segment between two poses | equality |
@@ -109,7 +112,10 @@ A constraint has a Jacobian only once it is linked to the optimization variables
 `addConstraintSet` / `addCostSet` link it, or call `linkWithVariables(nodes)` yourself.
 `getJacobian()` on an unlinked set raises `ConstraintNotLinkedError` (a `RuntimeError`); upstream
 would dereference a null pointer. The collision constraints also need `update()` before
-`getValues()` or `getJacobian()`, which `TrajOptQPProblem.setup()` calls for every set.
+`getValues()` or `getJacobian()` (and `calcValues()` / `calcJacobianBlock()` on
+`DiscreteCollisionNumericalConstraint`), which `TrajOptQPProblem.setup()` calls for every set.
+Before the first `update()` they raise `RuntimeError("<name>: collision data not computed, call
+update() first")` (trajopt#617; trajopt 0.35.0 dereferenced a null pointer).
 
 An exception raised in a Python `ConstraintSet` subclass reaches the caller with its own type,
 also when trajopt calls the set from `TrajOptQPProblem` or `TrustRegionSQPSolver.solve()`: an
@@ -127,12 +133,24 @@ had the fix (trajopt#612,
 `setBounds(bounds)` replaces a set's row bounds; it raises `BoundsSizeError` (a `ValueError`)
 unless there is one bound per row (trajopt checks with `assert` only).
 
-`calcJacobianBlock(joint_vals)` on `CartPosConstraint`, `CartLineConstraint` and
-`DiscreteCollisionNumericalConstraint` evaluates the Jacobian at given joint values, sized like
-`getJacobian()`, so it also needs linked variables; a wrong `joint_vals` length raises
-`JointValuesSizeError`. `InverseKinematicsConstraint` declares the method, but trajopt 0.35.0
-never defines it, so it is not bound. Nor are the `list[Bounds]` constructors of
-`JointVelConstraint`, `JointAccelConstraint` and `JointJerkConstraint`, for the same reason.
+`calcJacobianBlock(joint_vals)` on `CartPosConstraint`, `CartLineConstraint`,
+`DiscreteCollisionNumericalConstraint` and `InverseKinematicsConstraint` evaluates the Jacobian
+at given joint values, sized like `getJacobian()`, so it also needs linked variables; a wrong
+`joint_vals` length raises `JointValuesSizeError`. trajopt 0.35.0 declared the IK one without
+defining it; trajopt#626 defines it.
+
+The `list[Bounds]` constructors of `JointVelConstraint`, `JointAccelConstraint` and
+`JointJerkConstraint` take one bound per joint, repeated for every step. The rows are undivided
+finite differences of the positions, so a velocity limit `v` (rad/s) over a step `dt` is the band
+`Bounds(-v * dt, v * dt)`. As with `JointPosConstraint`, a range splits into a lower-bound row and
+an upper-bound row by default; `RangeBoundHandling.KEEP_AS_IS` keeps it as one row, which
+`TrajOptQPProblem` refuses. trajopt 0.35.0 declared these constructors without defining them
+(trajopt#606).
+
+```python
+band = [ti.Bounds(-0.1, 0.1)] * n_dof          # rad per step
+problem.addConstraintSet(ti.JointVelConstraint(band, vars_list, np.ones(n_dof), "VelocityLimit"))
+```
 
 A constraint writes its Jacobian columns at its `Var`s' indices, so linking it to a variable set
 (`linkWithVariables`, or `TrajOptQPProblem.addConstraintSet` / `addCostSet`) raises
