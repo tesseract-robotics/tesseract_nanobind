@@ -376,16 +376,15 @@ ACCEPTED_SYMBOLS = {
             "TrajOptWaypointInfo",
         )
     },
-    # Task 10: descartes_light's generic class names, bound with the library prefix.
+    # Task 10: descartes_light's generic class names, bound with the library prefix; the
+    # `double` and `float` instances (#350).
     **{
-        ("tesseract_motion_planners_descartes", name): "template-instance-name"
-        for name in (
-            "DescartesStateD",
-            "DescartesStateSampleD",
-            "DescartesEdgeEvaluatorD",
-            "DescartesWaypointSamplerD",
-            "DescartesStateEvaluatorD",
-        )
+        (
+            "tesseract_motion_planners_descartes",
+            f"Descartes{name}{scalar}",
+        ): "template-instance-name"
+        for name in ("State", "StateSample", "EdgeEvaluator", "WaypointSampler", "StateEvaluator")
+        for scalar in ("D", "F")
     },
     # waypoint_sampler.h:63, the hook of the friend `operator<<` (#310).
     ("tesseract_motion_planners_descartes", "WaypointSampler.print"): "stream-insertion",
