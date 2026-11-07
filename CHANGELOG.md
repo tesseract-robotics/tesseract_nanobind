@@ -207,6 +207,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Changes
 
+- **`pixi run build-feedstock-nanobind` and a recipe for the conda package `tesseract-robotics-nanobind`** — the bindings get a feedstock laid out like `tesseract-robotics-python-feedstock` (rattler-build, five platforms, Python 3.12–3.14, the `dev` label of the C++ stack), declaring `run_constraints: tesseract-robotics-python <0.0a0` because both install `tesseract_robotics`. The task builds this checkout through it into `packaging/output`. The feedstock repository and its submodule follow; `docs/developer/binaries.md` has the recipe ([#162]).
 - **spdlog sinks bound** — `Logger.sinks` reads and replaces a logger's spdlog sinks, `StderrSink` is tesseract's default console sink, and `PythonLoggingSink(name)` writes each record to Python `logging` (level, source file, line and function on the `LogRecord`; text from the sink's spdlog pattern). Replacing the default logger's `StderrSink` with a `PythonLoggingSink` sends tesseract's output to Python once; a record handler alone sees each record while stderr still prints it. Sinks are C++-owned and Python holds a share, so a logger keeping one keeps no Python object alive. `Logger.set_pattern()` and `Logger.flush()` are bound too.
 - **Logging test no longer leaks at exit** — `test_handler_exception_reaches_unraisablehook` kept the hook's arguments, whose traceback frames held the test's own locals: a cycle that kept a `LogRecord` and the `Logger` alive past interpreter exit, which nanobind reported as leaked. It now keeps the exception's type and text.
 - **`JointTrajectory.insert(index, state)` and `del traj[i]` / `del traj[a:b]`**, in Python's list forms, as `CompositeInstruction` has ([#269]).
@@ -854,3 +855,4 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#334]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/334
 [#335]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/335
 [#368]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/368
+[#162]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/162
