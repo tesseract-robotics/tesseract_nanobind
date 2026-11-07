@@ -94,6 +94,8 @@ def record_scene(entry: Entry, scene: Scene, *, fps: float = RECORD_FPS_HZ) -> b
                 axes_length=PATH_AXES_LENGTH_M,
                 color=PLOT_COLOR_RGB,
             )
+        for decorate in scene.decorations:
+            decorate(viewer)
         return viewer.record(scene.phases, fps=fps)
 
 

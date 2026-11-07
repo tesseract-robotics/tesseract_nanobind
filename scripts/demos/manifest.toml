@@ -50,7 +50,7 @@ fov_rad = 0.6109
 
 [[example]]
 module = "freespace_hybrid_example"
-page = "examples/planning.md"
+page = "examples/ompl.md"
 title = "Freespace hybrid"
 blurb = "OMPL finds a path around an obstacle; TrajOpt smooths it."
 status = "published"
@@ -60,8 +60,20 @@ look_at = [0.3, 0, 0.6]
 fov_rad = 0.6109
 
 [[example]]
+module = "freespace_clearance_objective_example"
+page = "examples/ompl.md"
+title = "Clearance objective"
+blurb = "A Python OMPL objective with a cost threshold ends the optimize loop early; red lines mark each cube's closest approach."
+status = "excluded"
+reason = "awaiting review of its first recording"
+[example.camera]
+position = [1.55, -1.35, 1.25]
+look_at = [0.4, 0, 0.6]
+fov_rad = 0.6109
+
+[[example]]
 module = "freespace_ompl_example"
-page = "examples/planning.md"
+page = "examples/ompl.md"
 title = "Freespace OMPL"
 blurb = "Freespace motion around an obstacle, planned with OMPL."
 status = "published"

@@ -6,6 +6,7 @@
     "basic_cartesian_example": "f1e735b6b0d2dd69fafb025d9a1da3fdd90d26ba820532ea777f223bef009de2",
     "car_seat_example": "00feead9debcbc5fa2b935cab5721566293ebce33784a2a9f209911c399ce41e",
     "chain_example": "4ad560021b64bb43397e160f44264a4fbf0ff6622ac313260ec082d2d0851c99",
+    "freespace_clearance_objective_example": "9bdde9347d940dc3e599df9ce060212ddcc1cbe631c698fbae37dc3a509647b5",
     "freespace_hybrid_example": "16f6a9e86c804026809d8961bf89e83d1f5a81e679d0e6b05d66a231c502e876",
     "freespace_ompl_example": "f5246c50f1c0b31fc7f25faf2ca1f4636f3adc1277f32e66a3455db582e9faa8",
     "geometry_showcase_example": "e6b3e7f28897851b33bd3357d7f1f360560affe1b852a844be9aa13f704f56a8",
@@ -58,6 +59,15 @@
       },
       "recording_sha256": "2e298b99ce9242c2e10f01611bf744ac9a206f5c2fee176da286e52d34726a72",
       "size_bytes": 270894
+    },
+    "freespace_clearance_objective_example": {
+      "identity": {
+        "inputs_sha256": "2977eec3c51ab0a6281212d64e69f6747a2d12808de375567a7e299540eed81a",
+        "package_version": "0.35.0.9.dev638",
+        "viser_version": "1.1.1"
+      },
+      "recording_sha256": "8cb5a0510c8aaa16168a6608989574c7d78e02e34e55578d3c54d6033364c08a",
+      "size_bytes": 1299665
     },
     "freespace_hybrid_example": {
       "identity": {
