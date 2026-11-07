@@ -451,6 +451,27 @@ ti::Jacobian jacobian_block_checked(const Constraint& self,
     return jacobian;
 }
 
+// JointVel/Accel/JerkConstraint(bounds, position_vars, coeffs, name, range_bound_handling)
+// (trajopt#606): one bound per joint, repeated for every finite-difference row block.
+template <class Binding>
+auto joint_diff_bounds_init(const char* caller) {
+    return [caller](Binding* self, const std::vector<ti::Bounds>& bounds,
+                    const std::vector<std::shared_ptr<const ti::Var>>& position_vars,
+                    const Eigen::VectorXd& coeffs, std::string name,
+                    ti::RangeBoundHandling range_bound_handling) {
+        new (self) Binding(position_vars, bounds,
+                           require_non_null(position_vars, caller, "position_vars", "a Var"), coeffs,
+                           std::move(name), range_bound_handling);
+    };
+}
+
+constexpr const char* JOINT_DIFF_BOUNDS_DOC =
+    "Create the constraint with one bound per joint, the same for every step: an equality, a "
+    "one-sided limit or a range. The rows are undivided finite differences, so the bounds are "
+    "per step. coeffs has length n_dof, 1 (one weight for every joint) or 0 (weight 1 for "
+    "every joint). A range becomes a lower-bound row followed by an upper-bound row unless "
+    "range_bound_handling is KEEP_AS_IS, which TrajOptQPProblem refuses.";
+
 ti::Jacobian jacobian_checked(const ti::Differentiable& self) {
     // Bound on Differentiable too (#287); every Differentiable in trajopt 0.35.0 is a ConstraintSet
     if (const auto* constraint_set = dynamic_cast<const ti::ConstraintSet*>(&self))
@@ -976,6 +997,10 @@ NB_MODULE(_trajopt_ifopt, m) {
              },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointVel",
              "Create joint velocity constraint with target values")
+        .def("__init__", joint_diff_bounds_init<JointVelConstraintBinding>("JointVelConstraint"),
+             "bounds"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointVel",
+             "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
+             JOINT_DIFF_BOUNDS_DOC)
         .def("getValues", &ti::JointVelConstraint::getValues,
              "Get current constraint values");
 
@@ -991,6 +1016,10 @@ NB_MODULE(_trajopt_ifopt, m) {
              },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointAccel",
              "Create joint acceleration constraint with target values")
+        .def("__init__", joint_diff_bounds_init<JointAccelConstraintBinding>("JointAccelConstraint"),
+             "bounds"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointAccel",
+             "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
+             JOINT_DIFF_BOUNDS_DOC)
         .def("getValues", &ti::JointAccelConstraint::getValues,
              "Get current constraint values");
 
@@ -1295,6 +1324,10 @@ NB_MODULE(_trajopt_ifopt, m) {
              },
              "targets"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointJerk",
              "Create joint jerk constraint (requires 4+ consecutive waypoints)")
+        .def("__init__", joint_diff_bounds_init<JointJerkConstraintBinding>("JointJerkConstraint"),
+             "bounds"_a, "position_vars"_a, "coeffs"_a, "name"_a = "JointJerk",
+             "range_bound_handling"_a = ti::RangeBoundHandling::kSplitToTwoInequalities,
+             JOINT_DIFF_BOUNDS_DOC)
         .def("getValues", &ti::JointJerkConstraint::getValues,
              "Get current constraint values");
 
@@ -1534,6 +1567,16 @@ NB_MODULE(_trajopt_ifopt, m) {
              "Get current constraint values")
         .def("setBounds", &set_bounds_checked<InverseKinematicsConstraintBinding>, "bounds"_a,
              "Set the bounds, one per row; raises BoundsSizeError otherwise")
+        .def("calcJacobianBlock",
+             // getKinematicInfo() is non-const upstream, so self is taken by non-const reference
+             [](InverseKinematicsConstraintBinding& self,
+                const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
+                 return jacobian_block_checked(self, joint_vals,
+                                               self.getKinematicInfo()->manip->numJoints());
+             },
+             "joint_vals"_a,
+             "The constraint Jacobian at joint_vals, the constraint var's values (sparse matrix, "
+             "sized like getJacobian()); needs linked variables")
         .def("setTargetPose", &ti::InverseKinematicsConstraint::setTargetPose, "target_pose"_a,
              "Set the target pose the IK solution is computed for")
         .def("getKinematicInfo", &ti::InverseKinematicsConstraint::getKinematicInfo,
