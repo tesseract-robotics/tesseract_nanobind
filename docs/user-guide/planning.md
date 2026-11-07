@@ -608,6 +608,39 @@ Arc motion (specialized planners). Use `circular_to(...)`:
 program.circular_to(CartesianTarget(pose))
 ```
 
+## Standard toolpaths
+
+`tesseract_robotics.planning.toolpaths` has fixed, parametric toolpaths, so a new
+solver, constraint or emitter is judged on the same path every time, the way
+image processing uses one test image (#84). Each factory returns a `list[Pose]`
+in the working frame; profiles and move types stay with the caller.
+
+| Factory | Shape | Poses | Used by |
+|---|---|---|---|
+| `zigzag_square()` | 1 m × 1 m square outline at z = 0.5 m, then 11 zigzag lines at 0.1 m spacing | `OUTLINE_POSE_COUNT + 2 * ZIGZAG_LINE_COUNT` = 27 | the RAPID golden test (`tests/emitters/rapid/test_zigzag_square.py`) |
+| `circle(radius_m, n_waypoints, center=, z_m=)` | horizontal circle, tool down, evenly spaced, counter-clockwise from `+X`, start not repeated | `n_waypoints` (≥ 3) | the Descartes pool measurements of #140 (84 to 419 waypoints on the IRB 2400) |
+
+```python
+from tesseract_robotics.planning import CartesianTarget, MotionProgram
+from tesseract_robotics.planning.toolpaths import OUTLINE_POSE_COUNT, circle, zigzag_square
+
+program = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+for i, pose in enumerate(zigzag_square()):
+    program.linear_to(CartesianTarget(pose, profile="OUTLINE" if i < OUTLINE_POSE_COUNT else "RASTER"))
+
+contour = circle(0.25, 210, center=(0.8, 0.0), z_m=0.6)
+```
+
+`tests/conftest.py` serves the zigzag square as the `zigzag_square_poses` fixture.
+
+!!! warning "The zigzag square is not tool down"
+    Its orientation, `ZIGZAG_QUAT_XYZW = (0, 0, 1, 0)`, is 180° about world Z,
+    so the TCP z-axis stays on world +Z. It reads like Eigen's scalar-first
+    `Quaterniond(0, 0, 1, 0)` (180° about Y, tool down) taken as scalar-last.
+    The RAPID golden locks it, so it stays until that golden is regenerated on
+    purpose. `circle` uses the real tool-down orientation, `TOOL_DOWN_QUAT_XYZW
+    = (1, 0, 0, 0)`.
+
 ## Program Structure
 
 Use the `MotionProgram` builder — it handles all the poly-type wrapping
