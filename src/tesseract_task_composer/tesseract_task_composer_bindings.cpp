@@ -1156,6 +1156,15 @@ NB_MODULE(_tesseract_task_composer, m) {
     // server alive: their code lives in those libraries and the tasks in the server. A run holds the
     // server (and a passed node) until it ends (run_held).
     using Server = tp::TaskComposerServer;
+    // Test probe (#370), not API: the calls blocked on this server's running reload (ServerGate
+    // `waiters`), read under the gate mutex. A test waits until it reads >= 1 instead of sleeping
+    // to widen the window.
+    m.def("_reload_gate_waiters", [](const Server& server) {
+        ServerGate& gate = server_gate(server);
+        std::lock_guard<std::mutex> lock(gate.mutex);
+        return gate.waiters;
+    }, "server"_a, "Test probe: the calls waiting for this server's running reload.");
+
     nb::class_<Server>(m, "TaskComposerServer")
         .def(nb::init<>())
         .def("loadConfig", [](Server& self, const tesseract_nb::StrictPath& config_path, const tc::ResourceLocator& locator) {

@@ -13,6 +13,25 @@ import sys
 
 # A load is a few seconds; a deadlock never ends. Generous for a loaded machine.
 TIMEOUT_S = 60
+# s: how long a script waits for callers to reach the reload gate (`_reload_gate_waiters`)
+# before it fails; well inside TIMEOUT_S, generous for a loaded machine.
+GATE_DEADLINE_S = 30
+
+# Polls `_reload_gate_waiters(server)` until it reads at least `count`; exits the script with a
+# message on the deadline, so a missed overlap fails instead of passing untested (#370).
+_WAIT_AT_GATE = f"""
+import sys
+import time
+from tesseract_robotics.tesseract_task_composer._tesseract_task_composer import _reload_gate_waiters
+
+def wait_at_gate(server, count):
+    deadline = time.monotonic() + {GATE_DEADLINE_S}
+    while _reload_gate_waiters(server) < count:
+        if time.monotonic() > deadline:
+            sys.exit(f"{{_reload_gate_waiters(server)}} of {{count}} callers reached the reload "
+                     "gate in {GATE_DEADLINE_S} s")
+        time.sleep(0.001)
+"""
 
 # The TrajOpt freespace problem of conftest.make_storage, for a fresh interpreter.
 _PREAMBLE = """
@@ -142,7 +161,9 @@ def _including_config(tmp_path) -> str:
 # A handler that calls the server at the record "TOUCH", logged mid-load by another thread (a
 # handler runs on the thread that logs, and the reloading thread's own server calls raise), and
 # records what the call returned or raised.
-_TOUCH_SERVER = """
+_TOUCH_SERVER = (
+    _WAIT_AT_GATE
+    + """
 import threading
 import time
 from tesseract_robotics import tesseract_common
@@ -171,17 +192,17 @@ toucher = threading.Thread(
 def touch_mid_load():
     toucher.start()
     print("TOUCHED", touched.wait(30), flush=True)
-    time.sleep(0.5)  # the handler is in the server call while the reload still runs
+    wait_at_gate(server, 1)  # the handler is in the server call while the reload still runs
 """
+)
 
 
 # Several rounds of several callers: the GIL's handover at the end of a reload is a race, which a
 # caller on an unfair gate wins now and then, but not every caller of every round.
 ROUNDS = 5
 CALLERS = 8
-# How long a started caller gets to reach the gate, and a caller that was waiting there to finish
-# its call. Generous for a loaded machine; the second only costs time on a failure.
-SETTLE_S = 0.5
+# How long a caller that was waiting at the gate gets to finish its call. Generous for a loaded
+# machine; it only costs time on a failure.
 THROUGH_DEADLINE_S = 5
 
 
@@ -201,7 +222,9 @@ def _waiting_calls_script(tmp_path) -> str:
     )
     # A plain absolute path: see _including_config.
     text = f"task_composer_plugins: !include {included}"
-    return f"""
+    return (
+        _WAIT_AT_GATE
+        + f"""
 import threading
 import time
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, ResourceLocator
@@ -234,7 +257,7 @@ def call_server():
 def start_callers_and_let_them_reach_the_gate(callers):
     for caller in callers:
         caller.start()
-    time.sleep({SETTLE_S})
+    wait_at_gate(server, len(callers))
 
 def record_calls_through():
     # This reload is running, so a call that has not got through waits for it, whatever the wait.
@@ -243,6 +266,7 @@ def record_calls_through():
         time.sleep(0.01)
     through.append(len(done))
 """
+    )
 
 
 class TestServerReloadAgainstLogHandlers:
@@ -312,6 +336,31 @@ print("RESULTS", results)
         )
         assert "TOUCHED True" in out, out
         assert "RESULTS [True]" in out, out
+
+    def test_reload_gate_probe_counts_waiters(self, tmp_path):
+        """`_reload_gate_waiters` counts the calls blocked on a running reload: one caller
+        blocked mid-load reads 1, and 0 once the reload ended and the caller got through."""
+        out = _run(
+            _waiting_calls_script(tmp_path)
+            + """
+print("IDLE", _reload_gate_waiters(server), flush=True)
+caller = threading.Thread(target=call_server)
+seen = []
+
+def block_one_caller():
+    caller.start()
+    wait_at_gate(server, 1)
+    seen.append(_reload_gate_waiters(server))
+
+locator.mid_load = block_one_caller
+server.loadConfig(config, locator)
+caller.join()
+print("WAITERS", seen, _reload_gate_waiters(server), done)
+""",
+            planning=False,
+        )
+        assert "IDLE 0" in out, out
+        assert "WAITERS [1] 0 [True]" in out, out
 
     def test_waiting_calls_get_through_between_back_to_back_reloads(self, tmp_path):
         """A call waiting for a reload woke up when it ended and then needed the GIL, which the
