@@ -18,7 +18,6 @@ import difflib
 from pathlib import Path
 from typing import Final
 
-import numpy as np
 import pytest
 
 from tesseract_robotics.emitters.rapid import RapidProfile, emit_rapid
@@ -28,27 +27,7 @@ from tesseract_robotics.planning import (
     Pose,
     Robot,
 )
-
-# ---------------------------------------------------------------------------
-# Geometry — the determined shape of the test program. All coordinates in
-# metres; all angles are encoded in the quaternion below.
-# ---------------------------------------------------------------------------
-
-#: Workpiece-plane height above the robot base. Chosen so the entire 1 m × 1 m
-#: square sits within the IRB 2400's ~1.55 m reach envelope.
-Z_HEIGHT_M: Final[float] = 0.5
-
-#: X-axis extent of the square outline (metres).
-X_RANGE_M: Final[tuple[float, float]] = (0.3, 1.3)
-
-#: Y-axis extent of the square outline (metres).
-Y_RANGE_M: Final[tuple[float, float]] = (-0.5, 0.5)
-
-#: Spacing between consecutive zigzag scan lines (metres).
-ZIGZAG_SPACING_M: Final[float] = 0.1
-
-#: Number of zigzag scan lines: ((Y_RANGE width) / SPACING) + 1.
-ZIGZAG_LINE_COUNT: Final[int] = 11
+from tesseract_robotics.planning.toolpaths import OUTLINE_POSE_COUNT, ZIGZAG_LINE_COUNT
 
 #: TCP frame name — the robot link the planner / emitter treats as the tool tip.
 TCP_FRAME: Final[str] = "tool0"
@@ -56,21 +35,10 @@ TCP_FRAME: Final[str] = "tool0"
 #: Manipulator joint group name in the URDF / SRDF.
 MANIPULATOR: Final[str] = "manipulator"
 
-#: Tool-pointing-down orientation: 180° rotation about world Z. Encoded as
-#: scalar-last [qx, qy, qz, qw] per project CLAUDE.md convention. After this
-#: rotation, the TCP Z-axis points along world -Z (into the workpiece).
-TOOL_DOWN_QUAT_XYZW: Final[tuple[float, float, float, float]] = (0.0, 0.0, 1.0, 0.0)
-
-#: Expected leaf-instruction count: 5 outline moves (4 corners + 1 closure)
-#: plus 2 × ZIGZAG_LINE_COUNT zigzag endpoints.
-EXPECTED_INSTRUCTION_COUNT: Final[int] = 5 + 2 * ZIGZAG_LINE_COUNT  # = 27
+#: Expected leaf-instruction count: the outline moves plus 2 per zigzag line.
+EXPECTED_INSTRUCTION_COUNT: Final[int] = OUTLINE_POSE_COUNT + 2 * ZIGZAG_LINE_COUNT  # = 27
 
 GOLDEN: Final[Path] = Path(__file__).parent / "golden" / "abb_irb2400_zigzag_square.mod"
-
-
-def _pose_at(x: float, y: float) -> Pose:
-    """Pose at ``(x, y, Z_HEIGHT_M)`` with the tool pointing down."""
-    return Pose.from_xyz_quat([x, y, Z_HEIGHT_M], TOOL_DOWN_QUAT_XYZW)
 
 
 # ---------------------------------------------------------------------------
@@ -89,37 +57,17 @@ def abb_irb2400() -> Robot:
 
 
 @pytest.fixture
-def zigzag_square_program() -> MotionProgram:
-    """1 m × 1 m square outline + zigzag fill at ``ZIGZAG_SPACING_M`` spacing.
+def zigzag_square_program(zigzag_square_poses: list[Pose]) -> MotionProgram:
+    """The standard zigzag square (`planning.toolpaths.zigzag_square`) as `MoveL`s.
 
-    Coordinate frame: tool pointing down (``TOOL_DOWN_QUAT_XYZW``); plane at
-    ``Z_HEIGHT_M`` above the robot base. X spans ``X_RANGE_M``; Y spans
-    ``Y_RANGE_M``. Square corners + closure produce 5 ``MoveL`` instructions;
-    zigzag produces 2 endpoints per line × ``ZIGZAG_LINE_COUNT`` lines.
+    The outline poses get the ``OUTLINE`` profile, the zigzag endpoints ``RASTER``.
     """
     program = MotionProgram(
         MANIPULATOR, tcp_frame=TCP_FRAME, working_frame="base_link", profile="cartesian_program"
     )
-
-    x_lo, x_hi = X_RANGE_M
-    y_lo, y_hi = Y_RANGE_M
-
-    # Square outline: 4 corners + explicit closure back to the first corner.
-    open_corners: list[tuple[float, float]] = [
-        (x_lo, y_lo),
-        (x_hi, y_lo),
-        (x_hi, y_hi),
-        (x_lo, y_hi),
-    ]
-    for x, y in open_corners + [open_corners[0]]:
-        program.linear_to(CartesianTarget(_pose_at(x, y), profile="OUTLINE"))
-
-    # Zigzag fill: alternate sweep direction on each line for shortest transit.
-    y_values = np.linspace(y_lo, y_hi, ZIGZAG_LINE_COUNT)
-    for i, y in enumerate(y_values):
-        x_start, x_end = (x_lo, x_hi) if i % 2 == 0 else (x_hi, x_lo)
-        program.linear_to(CartesianTarget(_pose_at(x_start, float(y)), profile="RASTER"))
-        program.linear_to(CartesianTarget(_pose_at(x_end, float(y)), profile="RASTER"))
+    for i, pose in enumerate(zigzag_square_poses):
+        profile = "OUTLINE" if i < OUTLINE_POSE_COUNT else "RASTER"
+        program.linear_to(CartesianTarget(pose, profile=profile))
     return program
 
 

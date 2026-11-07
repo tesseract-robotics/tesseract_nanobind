@@ -14,6 +14,8 @@ and the seeds that exposed them replay in tests/examples/test_examples.py.
 
 import pytest
 
+from tesseract_robotics.planning import Pose
+from tesseract_robotics.planning.toolpaths import zigzag_square
 from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
 
 # Arbitrary nonzero value; any fixed seed works (zero is rejected by OMPL once
@@ -33,3 +35,9 @@ def _seed_ompl_rng():
     fails.
     """
     RNG_setSeed(OMPL_RNG_SEED)
+
+
+@pytest.fixture
+def zigzag_square_poses() -> list[Pose]:
+    """The standard zigzag square toolpath (`planning.toolpaths.zigzag_square`, #84)."""
+    return zigzag_square()
