@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import LinkIdPair
+from tesseract_robotics.tesseract_common import LinkId, LinkIdPair
 
 
 def _unordered(pairs):
@@ -35,3 +35,14 @@ def test_pairs_with_zero_coeff_is_a_set_of_link_id_pairs():
     data.setCollisionCoeff("b", "a", 0.0)
     data.setCollisionCoeff("a", "c", 2.0)
     assert data.getPairsWithZeroCoeff() == {LinkIdPair("a", "b")}
+
+
+def test_has_zero_coeff():
+    """`hasZeroCoeff` (#373): False by default, True once a pair's coefficient is set to 0."""
+    data = ti.CollisionCoeffData()
+    pair = LinkIdPair(LinkId("a"), LinkId("b"))
+    assert data.hasZeroCoeff(pair) is False
+    data.setCollisionCoeff("b", "a", 0.0)
+    assert data.hasZeroCoeff(pair) is True
+    data.setCollisionCoeff(pair, 1.0)
+    assert data.hasZeroCoeff(pair) is False

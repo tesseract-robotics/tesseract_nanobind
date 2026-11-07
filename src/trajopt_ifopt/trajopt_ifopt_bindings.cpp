@@ -9,6 +9,7 @@
 
 #include "tesseract_nb.h"
 
+#include <nanobind/stl/tuple.h>
 #include <mutex>
 #include <type_traits>
 #include <unordered_set>
@@ -307,6 +308,8 @@ using JointVelConstraintBinding = VarCheckedConstraint<ti::JointVelConstraint>;
 using JointAccelConstraintBinding = VarCheckedConstraint<ti::JointAccelConstraint>;
 using JointJerkConstraintBinding = VarCheckedConstraint<ti::JointJerkConstraint>;
 using CartLineConstraintBinding = VarCheckedConstraint<ti::CartLineConstraint>;
+using CartAxisConeConstraintBinding = VarCheckedConstraint<ti::CartAxisConeConstraint>;
+using CartAxisAlignConstraintBinding = VarCheckedConstraint<ti::CartAxisAlignConstraint>;
 using InverseKinematicsConstraintBinding = VarCheckedConstraint<ti::InverseKinematicsConstraint>;
 using DiscreteCollisionConstraintBinding = VarCheckedConstraint<ti::DiscreteCollisionConstraint>;
 using DiscreteCollisionConstraintDBinding = VarCheckedConstraint<ti::DiscreteCollisionConstraintD>;
@@ -1009,6 +1012,8 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def("getCollisionCoeff", &tc::CollisionCoeffData::getCollisionCoeff, "pair"_a)
         .def("getCollisionCoeffPairData", &tc::CollisionCoeffData::getCollisionCoeffPairData,
              "Every pair with a coefficient: {LinkIdPair: coeff}")
+        .def("hasZeroCoeff", &tc::CollisionCoeffData::hasZeroCoeff, "pair"_a,
+             "Whether the pair's coefficient is 0 (collision checking switched off for it)")
         .def("getPairsWithZeroCoeff", &tc::CollisionCoeffData::getPairsWithZeroCoeff,
              "The pairs whose coefficient is 0 (collision checking switched off)");
 
@@ -1370,39 +1375,94 @@ NB_MODULE(_trajopt_ifopt, m) {
         .def_rw("use_numeric_differentiation", &ti::CartLineConstraint::use_numeric_differentiation,
                 "If true, use numeric differentiation (default: true)");
 
+    // ========== CartAxisKinematics ==========
+    // The axis map both CartAxis constraints share: v = R_target^T R_source a.
+    nb::class_<ti::CartAxisKinematics>(m, "CartAxisKinematics",
+        "A source link axis expressed in a target link's coordinates, v(q) = R_target(q)^T R_source(q) a,\n"
+        "and its 3 x n Jacobian.")
+        .def(nb::init<std::shared_ptr<const tesseract::kinematics::JointGroup>, tesseract::common::LinkId,
+                      const Eigen::Vector3d&, tesseract::common::LinkId>(),
+             "manip"_a, "source_frame"_a, "source_axis"_a, "target_frame"_a,
+             "source_axis is in source link coordinates and normalized. Raises on a link that is not in\n"
+             "manip or an invalid axis.")
+        .def("calcAxis", &ti::CartAxisKinematics::calcAxis, "joint_vals"_a, "v at joint_vals")
+        .def("calcAxisAndJacobian",
+             [](const ti::CartAxisKinematics& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
+                 Eigen::Vector3d axis;
+                 Eigen::Matrix3Xd axis_jacobian;
+                 self.calcAxisAndJacobian(joint_vals, axis, axis_jacobian);
+                 return std::make_tuple(axis, axis_jacobian);
+             },
+             "joint_vals"_a, "(v, dv/dq) at joint_vals; dv/dq is 3 x numJoints()")
+        .def("numJoints", &ti::CartAxisKinematics::numJoints)
+        .def("getSourceAxis", &ti::CartAxisKinematics::getSourceAxis, "The unit source axis, in source link coordinates")
+        .def_static("mostReachableDirection", &ti::CartAxisKinematics::mostReachableDirection, "tangent_jacobian"_a,
+                    "The unit 2D direction the 2 x n tangent Jacobian moves along most per unit joint step")
+        .def_static("toUnitAxis", &ti::CartAxisKinematics::toUnitAxis, "axis"_a, "what"_a,
+                    "axis normalized; raises RuntimeError naming `what` if it is zero or not finite")
+        .def_ro_static("SIN_ANGLE_FLOOR", &ti::CartAxisKinematics::SIN_ANGLE_FLOOR);
+
     // ========== CartAxisConeConstraint (trajopt#602) ==========
-    nb::class_<ti::CartAxisConeConstraint, ti::ConstraintSet>(m, "CartAxisConeConstraint",
+    nb::class_<CartAxisConeConstraintBinding, ti::ConstraintSet>(m, "CartAxisConeConstraint",
         "Keeps the angle between a source link axis and a target link axis at most half_angle: one\n"
         "one-sided row, phi(q) = atan2(|a_tgt x v|, a_tgt . v) <= half_angle, in radians. Rotation about\n"
         "the source axis stays free. For half_angle near 0 use CartAxisAlignConstraint.")
-        .def(nb::init<std::shared_ptr<const ti::Var>, std::shared_ptr<const tesseract::kinematics::JointGroup>,
-                      tesseract::common::LinkId, const Eigen::Vector3d&, tesseract::common::LinkId,
-                      const Eigen::Vector3d&, double, double, std::string>(),
+        .def("__init__",
+             [](CartAxisConeConstraintBinding* self, std::shared_ptr<const ti::Var> position_var,
+                std::shared_ptr<const tesseract::kinematics::JointGroup> manip, tesseract::common::LinkId source_frame,
+                const Eigen::Vector3d& source_axis, tesseract::common::LinkId target_frame,
+                const Eigen::Vector3d& target_axis, double half_angle, double coeff, std::string name) {
+                 new (self) CartAxisConeConstraintBinding({position_var}, position_var, std::move(manip),
+                                                          std::move(source_frame), source_axis,
+                                                          std::move(target_frame), target_axis, half_angle, coeff,
+                                                          std::move(name));
+             },
              "position_var"_a, "manip"_a, "source_frame"_a, "source_axis"_a, "target_frame"_a, "target_axis"_a,
              "half_angle"_a, "coeff"_a = 1.0, "name"_a = "CartAxisCone",
              "Axes are in their links' coordinates and normalized; 0 < half_angle < pi. Raises on an invalid\n"
              "link, axis, half angle or coefficient.")
         .def("calcValues", &ti::CartAxisConeConstraint::calcValues, "joint_vals"_a,
              "The angle phi between the axes for the given joint values")
+        .def("calcJacobianBlock",
+             [](const CartAxisConeConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
+                 return jacobian_block_checked(self, joint_vals, self.vars().front()->size());
+             },
+             "joint_vals"_a,
+             "The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); "
+             "needs linked variables")
         .def("setTargetAxis", &ti::CartAxisConeConstraint::setTargetAxis, "target_axis"_a,
              "Set the cone axis, in target link coordinates")
         .def("getTargetAxis", &ti::CartAxisConeConstraint::getTargetAxis, "The cone axis, normalized")
         .def("getHalfAngle", &ti::CartAxisConeConstraint::getHalfAngle, "The cone half angle, in radians");
 
     // ========== CartAxisAlignConstraint (trajopt#602) ==========
-    nb::class_<ti::CartAxisAlignConstraint, ti::ConstraintSet>(m, "CartAxisAlignConstraint",
+    nb::class_<CartAxisAlignConstraintBinding, ti::ConstraintSet>(m, "CartAxisAlignConstraint",
         "Points a source link axis along a target link axis; rotation about the axis is free. Two\n"
         "equality rows, in radians: the tilt angle times the unit tilt direction, zero only when the\n"
         "axes coincide.")
-        .def(nb::init<std::shared_ptr<const ti::Var>, std::shared_ptr<const tesseract::kinematics::JointGroup>,
-                      tesseract::common::LinkId, const Eigen::Vector3d&, tesseract::common::LinkId,
-                      const Eigen::Vector3d&, double, std::string>(),
+        .def("__init__",
+             [](CartAxisAlignConstraintBinding* self, std::shared_ptr<const ti::Var> position_var,
+                std::shared_ptr<const tesseract::kinematics::JointGroup> manip, tesseract::common::LinkId source_frame,
+                const Eigen::Vector3d& source_axis, tesseract::common::LinkId target_frame,
+                const Eigen::Vector3d& target_axis, double coeff, std::string name) {
+                 new (self) CartAxisAlignConstraintBinding({position_var}, position_var, std::move(manip),
+                                                           std::move(source_frame), source_axis,
+                                                           std::move(target_frame), target_axis, coeff,
+                                                           std::move(name));
+             },
              "position_var"_a, "manip"_a, "source_frame"_a, "source_axis"_a, "target_frame"_a, "target_axis"_a,
              "coeff"_a = 1.0, "name"_a = "CartAxisAlign",
              "Axes are in their links' coordinates and normalized. Raises on an invalid link, axis or\n"
              "coefficient.")
         .def("calcValues", &ti::CartAxisAlignConstraint::calcValues, "joint_vals"_a,
              "The two tilt rows for the given joint values")
+        .def("calcJacobianBlock",
+             [](const CartAxisAlignConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
+                 return jacobian_block_checked(self, joint_vals, self.vars().front()->size());
+             },
+             "joint_vals"_a,
+             "The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); "
+             "needs linked variables")
         .def("setTargetAxis", &ti::CartAxisAlignConstraint::setTargetAxis, "target_axis"_a,
              "Set the axis to align with, in target link coordinates")
         .def("getTargetAxis", &ti::CartAxisAlignConstraint::getTargetAxis, "The axis to align with, normalized");
