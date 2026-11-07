@@ -585,7 +585,11 @@ def create_descartes_default_profiles(
     at each waypoint and finds the minimum-cost path through the graph.
 
     Creates both plan profiles (waypoint sampling) and solver profiles
-    (ladder graph solver configuration).
+    (ladder graph solver configuration), each for both scalar types from the same
+    settings: every shipped Cartesian and raster task reads the `float` profiles
+    (`DescartesMoveProfileF`, `DescartesSolverProfileF`), `DescartesDPipeline` and
+    `DescartesDNPCPipeline` read the `double` ones (`...D`). A profile of the other
+    type is never found by a node (#350).
 
     Profile Configuration:
         Plan Profile (library defaults unless overridden):
@@ -618,16 +622,21 @@ def create_descartes_default_profiles(
             (e.g. "OPWInvKin" — analytic solvers make the ladder graph fast)
         use_redundant_joint_solutions: Also sample joint-redundant IK solutions
             (e.g. wrist flips), enlarging the ladder graph
-        move_profile: Full custom `DescartesMoveProfileD` override — e.g. a Python
-            subclass with custom `createWaypointSampler` / `createEdgeEvaluator` /
-            `createStateEvaluator`. Mutually exclusive with the move-profile
-            arguments above; configure those on the custom profile instead.
+        move_profile: Full move-profile override, a `DescartesDefaultMoveProfileD` or
+            `DescartesDefaultMoveProfileF`. It is registered as given, together with a
+            profile of the other scalar type holding the same field values (the `float`
+            one rounds each double). Mutually exclusive with the move-profile arguments
+            above; configure those on the override instead. A Python subclass of
+            `DescartesMoveProfileD` / `DescartesMoveProfileF` is refused: its hooks have
+            no twin of the other type. Add it to a `ProfileDictionary` yourself, under
+            the type the pipeline's Descartes node reads.
 
     Returns:
         ProfileDictionary with configured Descartes profiles
 
     Raises:
         ValueError: `move_profile` combined with move-profile arguments.
+        ProfileOverrideNotDispatchedError: `move_profile` is not a default move profile.
 
     Usage:
         from tesseract_robotics.planning.profiles import (
@@ -644,12 +653,15 @@ def create_descartes_default_profiles(
             sample_resolution=math.radians(30),
         )
 
-        # Custom Python move profile (see gh-83 subclassing surface)
-        profiles = create_descartes_default_profiles(move_profile=my_profile)
+        # A configured default move profile; its float twin is made for you
+        custom = DescartesDefaultMoveProfileD()
+        custom.use_redundant_joint_solutions = True
+        profiles = create_descartes_default_profiles(move_profile=custom)
     """
     from tesseract_robotics.tesseract_motion_planners_descartes import (
         DescartesDefaultMoveProfileD,
         DescartesLadderGraphSolverProfileD,
+        DescartesLadderGraphSolverProfileF,
     )
 
     if profile_names is None:
@@ -699,19 +711,71 @@ def create_descartes_default_profiles(
         if use_redundant_joint_solutions is not None:
             plan_profile.use_redundant_joint_solutions = use_redundant_joint_solutions
 
-    base_plan = plan_profile
-
-    solver_profile = DescartesLadderGraphSolverProfileD()
-    solver_profile.num_threads = num_threads
-    base_solver = solver_profile
+    registered = [plan_profile, _descartes_move_twin(plan_profile)]
+    for solver_type in (DescartesLadderGraphSolverProfileD, DescartesLadderGraphSolverProfileF):
+        solver_profile = solver_type()
+        solver_profile.num_threads = num_threads
+        registered.append(solver_profile)
 
     # Register under all requested names
     profiles = ProfileDictionary()
     for name in profile_names:
-        profiles.addProfile(DESCARTES_DEFAULT_NAMESPACE, name, base_plan)
-        profiles.addProfile(DESCARTES_DEFAULT_NAMESPACE, name, base_solver)
+        for profile in registered:
+            profiles.addProfile(DESCARTES_DEFAULT_NAMESPACE, name, profile)
 
     return profiles
+
+
+def _descartes_move_twin(profile: Any) -> Any:
+    """The other scalar type's default move profile, with `profile`'s field values.
+
+    Args:
+        profile: A `DescartesDefaultMoveProfileD` or `DescartesDefaultMoveProfileF`.
+
+    Returns:
+        A new `DescartesDefaultMoveProfileF` for a `D` profile, or `...D` for an `F` one.
+
+    Raises:
+        ProfileOverrideNotDispatchedError: `profile` is not a default move profile; a Python
+            subclass of `DescartesMoveProfileD` / `DescartesMoveProfileF` has hooks no
+            profile of the other scalar type can call.
+    """
+    from tesseract_robotics.tesseract_motion_planners import ProfileOverrideNotDispatchedError
+    from tesseract_robotics.tesseract_motion_planners_descartes import (
+        DescartesDefaultMoveProfileD,
+        DescartesDefaultMoveProfileF,
+        DescartesMoveProfileD,
+        DescartesMoveProfileF,
+    )
+
+    twins = {
+        DescartesDefaultMoveProfileD: DescartesDefaultMoveProfileF,
+        DescartesDefaultMoveProfileF: DescartesDefaultMoveProfileD,
+    }
+    for concrete, twin_type in twins.items():
+        if isinstance(profile, concrete):
+            twin = twin_type()
+            for field, value in vars(concrete).items():
+                if isinstance(value, property):
+                    setattr(twin, field, getattr(profile, field))
+            return twin
+
+    accepted = "pass a DescartesDefaultMoveProfileD or DescartesDefaultMoveProfileF"
+    for base, other in (
+        (DescartesMoveProfileD, DescartesMoveProfileF),
+        (DescartesMoveProfileF, DescartesMoveProfileD),
+    ):
+        if isinstance(profile, base):
+            raise ProfileOverrideNotDispatchedError(
+                f"move_profile {type(profile).__qualname__} is a Python subclass of "
+                f"{base.__name__}: its hooks have no {other.__name__} twin, so a pipeline whose "
+                f"Descartes node reads {other.__name__} would plan with the defaults. Add it to "
+                f"a ProfileDictionary yourself, for a pipeline that reads {base.__name__}, or "
+                f"{accepted}."
+            )
+    raise ProfileOverrideNotDispatchedError(
+        f"move_profile is a {type(profile).__qualname__}, not a Descartes move profile: {accepted}."
+    )
 
 
 # =============================================================================
@@ -987,7 +1051,8 @@ def create_descartes_pipeline_profiles(
         sample_max: Rotation sampling range end in radians
         ik_solver: Override the kinematic group's IK solver for sampling
         use_redundant_joint_solutions: Also sample joint-redundant IK solutions
-        move_profile: Full custom `DescartesMoveProfileD` override (mutually
+        move_profile: Full move-profile override, a `DescartesDefaultMoveProfileD` or
+            `...F`; registered with its twin of the other scalar type (mutually
             exclusive with the move-profile arguments above)
 
     Returns:

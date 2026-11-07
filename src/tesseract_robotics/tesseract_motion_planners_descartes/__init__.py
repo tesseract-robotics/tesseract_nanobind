@@ -18,3 +18,13 @@ refuse_hook_overrides(
     ("create",),
     "Solver profiles cannot be authored in Python: configure the solver through its fields.",
 )
+refuse_hook_overrides(
+    DescartesDefaultMoveProfileF,
+    ("createWaypointSampler", "createEdgeEvaluator", "createStateEvaluator"),
+    "Subclass DescartesMoveProfileF and hold this profile to delegate to it.",
+)
+refuse_hook_overrides(
+    DescartesLadderGraphSolverProfileF,
+    ("create",),
+    "Solver profiles cannot be authored in Python: configure the solver through its fields.",
+)

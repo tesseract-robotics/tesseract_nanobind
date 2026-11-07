@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `TaskComposer.plan` raises `ProfileTypeMismatchError` when a Descartes node's namespace holds a profile only as the other scalar type (`D` for a Cartesian or raster pipeline); `create_descartes_default_profiles(move_profile=…)` refuses a Python subclass of `DescartesMoveProfileD` / `F` | [Register the type the node reads](#descartes-profiles-match-the-nodes-scalar-type) |
 | Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
 | Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
 | Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/tesseract_common.md#logging) |
@@ -54,6 +55,31 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### Descartes profiles match the node's scalar type
+
+A Descartes node reads only the profiles of its own scalar type, and runs the library defaults
+when it finds none (#350):
+
+| Pipeline | Descartes node | Reads |
+|---|---|---|
+| `CartesianPipeline`, `DescartesFPipeline`, `DescartesFNPCPipeline`, every `Raster*` pipeline | `DescartesFMotionPlannerTaskFactory` | `DescartesMoveProfileF`, `DescartesSolverProfileF` |
+| `DescartesDPipeline`, `DescartesDNPCPipeline` (the `plan_cartesian` default) | `DescartesDMotionPlannerTaskFactory` | `DescartesMoveProfileD`, `DescartesSolverProfileD` |
+
+Only the `D` types were bound, so a profile never reached a Cartesian or raster task: the
+pipeline planned with the defaults (target pose fixed, no vertex margin) and reported success.
+`TaskComposer.plan` now raises `ProfileTypeMismatchError` (a `TypeError`) before it runs when a
+profile name in a Descartes node's namespace holds the other type's move or solver profile but
+not the node's own. The profile helpers register both types, and a namespace may hold both.
+
+`create_descartes_default_profiles(move_profile=…)` registers the profile with its twin of the
+other type, copied field by field. A Python subclass of `DescartesMoveProfileD` or `...F` has
+hooks no twin can call, so the helper refuses it with `ProfileOverrideNotDispatchedError`:
+
+| before | after |
+| --- | --- |
+| `profiles.addProfile(ns, name, DescartesDefaultMoveProfileD())`, planned with `CartesianPipeline` | `create_descartes_default_profiles(move_profile=profile)`, or add a `DescartesDefaultMoveProfileF` too |
+| `create_descartes_default_profiles(move_profile=MyMoveProfile())`, `MyMoveProfile(DescartesMoveProfileD)` | `profiles.addProfile("DescartesMotionPlannerTask", name, MyMoveProfile())` for a `D` pipeline; subclass `DescartesMoveProfileF` for a Cartesian or raster one |
 
 ### Python 3.12 is the minimum
 

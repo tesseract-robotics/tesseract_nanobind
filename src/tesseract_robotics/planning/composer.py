@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
     from tesseract_robotics.planning.program import MotionProgram
 
+from tesseract_robotics.planning.profile_types import check_descartes_profile_types
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     ProfileDictionary,
@@ -419,7 +420,7 @@ class TaskComposer:
         return loaded
 
     @property
-    def executor(self) -> TaskflowTaskComposerExecutor:
+    def executor(self) -> TaskComposerExecutor:
         """Get or create task executor (lazy initialization)."""
         if self._executor is None:
             if self._num_threads is not None:
@@ -453,13 +454,17 @@ class TaskComposer:
 
         Returns:
             PlanningResult with trajectory if successful
+
+        Raises:
+            ProfileTypeMismatchError: a Descartes node of `pipeline` reads a scalar type that
+                `profiles` holds only as the other type under some profile name.
         """
         # Convert MotionProgram to CompositeInstruction if needed
-        if hasattr(program, "to_composite_instruction"):
+        if isinstance(program, CompositeInstruction):
+            composite = program
+        else:
             joint_names = robot.get_joint_names(program.group_name)
             composite = program.to_composite_instruction(joint_names)
-        else:
-            composite = program
 
         if auto_seed:
             assignCurrentStateAsSeed(composite, robot.env)
@@ -505,6 +510,9 @@ class TaskComposer:
             task = self.factory.createTaskComposerNode(pipeline)
         except TaskComposerPluginError as e:
             return PlanningResult(successful=False, message=str(e))
+
+        # A Descartes node never finds a profile of the other scalar type: refuse before planning.
+        check_descartes_profile_types(self.factory, pipeline, task, profiles)
 
         output_ports = task.getOutputPortMappings()
         if not output_ports.contains("program"):

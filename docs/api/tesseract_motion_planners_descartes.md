@@ -16,6 +16,40 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
 )
 ```
 
+## Scalar types: `D` and `F`
+
+Every type here is bound twice from one template: `...D` on `double` states and `...F` on `float`
+states (`DescartesStateF.values` is a `float32` array). A Descartes node looks its profiles up by
+the `createKey()` of its own type, and plans with the library defaults when it finds none:
+
+| Pipeline | Planner | Profiles it reads |
+|---|---|---|
+| `CartesianPipeline`, `DescartesFPipeline`, `DescartesFNPCPipeline`, every `Raster*` pipeline | `DescartesMotionPlannerF` | `DescartesMoveProfileF`, `DescartesSolverProfileF` |
+| `DescartesDPipeline`, `DescartesDNPCPipeline` (the `plan_cartesian` default) | `DescartesMotionPlannerD` | `DescartesMoveProfileD`, `DescartesSolverProfileD` |
+
+The `planning` profile helpers (`create_descartes_default_profiles` and the pipeline helpers built
+on it) register both types from the same settings; a `move_profile=` override is registered with a
+twin of the other type. `TaskComposer.plan` raises `ProfileTypeMismatchError` when a profile name
+in a Descartes node's namespace holds only the other type, instead of letting the node plan with
+the defaults:
+
+```python
+from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultMoveProfileD
+
+profiles = ProfileDictionary()
+profiles.addProfile("DescartesMotionPlannerTask", "DEFAULT", DescartesDefaultMoveProfileD())
+composer.plan(robot, program, pipeline="CartesianPipeline", profiles=profiles)
+# ProfileTypeMismatchError: Pipeline 'CartesianPipeline' would never find these profiles ...
+#   node 'CartesianPipeline/MotionPlanningTask/DescartesMotionPlannerTask' reads
+#   'DescartesMoveProfileF' in namespace 'DescartesMotionPlannerTask', but profile 'DEFAULT'
+#   there is registered only as 'DescartesMoveProfileD'
+```
+
+`tesseract_robotics.planning.profile_types.descartes_nodes(factory, pipeline, node)` lists the
+Descartes nodes a pipeline runs, with the namespace and task factory of each, including the ones a
+raster task builds when it runs.
+
 ## DescartesMotionPlannerD
 
 ```python
@@ -34,6 +68,7 @@ response = planner.solve(request)
 
 `DescartesMotionPlannerD` is a `tesseract_motion_planners.MotionPlanner`: `getName`, `solve`,
 `terminate`, `clear` and `clone` are the base class's, and `solve` releases the GIL.
+`DescartesMotionPlannerF` is the same planner on `float` states; it reads the `F` profiles.
 
 ## Profiles
 
