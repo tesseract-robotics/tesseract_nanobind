@@ -66,9 +66,12 @@ class PyConstraintSet : public ti::ConstraintSet {
 public:
     NB_TRAMPOLINE(ti::ConstraintSet, 5);
 
-    // getNonZeros() is a Jacobian reservation hint; trajopt's default -1 means unset, and a
-    // Python set cannot set the protected non_zeros_. TrajOptQPProblem reserves the sum of its
-    // cost hints, so a Python cost set on its own asked for SIZE_MAX. 0 is a valid hint:
+    // getNonZeros() is a Jacobian reservation hint, and a Python set cannot set the protected
+    // non_zeros_. trajopt leaves it at -1 (component.h:292) and asserts that a subclass set it
+    // (assert(non_zeros_ >= 0), component.cpp:91, trajopt a504b22): a non-negative hint is the
+    // subclass's job. Release builds skip the assert, and TrajOptQPProblem reserves the raw sum
+    // of its cost hints (trajopt_qp_problem.cpp:944), so -1 asked for SIZE_MAX ("ValueError:
+    // vector"). trajopt#599 (clamp negative hints) is open with no PR. 0 is a valid hint:
     // storage grows as needed.
     PyConstraintSet(std::string name, int n_constraints)
         : ti::ConstraintSet(std::move(name), n_constraints) {
