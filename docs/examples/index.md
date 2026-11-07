@@ -94,6 +94,33 @@ handles optional viewer launch, `run()` returns results for testing / reuse.
 | `abb_irb2400_viewer.py` | `tesseract_abb_irb2400_viewer` | Robot visualization |
 | `twc_workcell_positioner_viewer.py` | `tesseract_twc_workcell_positioner_viewer` | Industrial workcell (positioner, requires submodule) |
 
+### Low-level (bindings only)
+
+`tesseract_robotics.examples.lowlevel` ports the C++ `tesseract_planning/examples` with
+the binding types alone, never `tesseract_robotics.planning`, and with the C++ parameters
+(`tests/examples/test_lowlevel_bindings_only.py` enforces the first). They are the
+reference for what the high-level examples above wrap. Run them as modules:
+
+```bash
+python -m tesseract_robotics.examples.lowlevel.freespace_ompl_c_api_example
+```
+
+| Example | C++ original | Description |
+|---------|--------------|-------------|
+| `freespace_ompl_c_api_example.py` | `freespace_ompl_example.cpp` | `OMPLPipeline` around a sphere |
+| `basic_cartesian_c_api_example.py` | `basic_cartesian_example.cpp` | TrajOpt Cartesian path past an octomap (`ifopt=True` for TrajOptIfopt) |
+| `glass_upright_c_api_example.py` | `glass_upright_example.cpp` | Orientation-held linear move |
+| `puzzle_piece_c_api_example.py` | `puzzle_piece_example.cpp` | Toolpath from CSV |
+| `puzzle_piece_auxillary_axes_c_api_example.py` | `puzzle_piece_auxillary_axes_example.cpp` | 9-DOF toolpath with a positioner |
+| `pick_and_place_c_api_example.py` | `pick_and_place_example.cpp` | Pick, attach, place |
+| `car_seat_c_api_example.py` | `car_seat_example.cpp` | Seat meshes, attach, multi-phase planning |
+| `descartes_raster_c_api_example.py` | `motion_planners/examples/raster_example.cpp` | Descartes then TrajOpt, no task composer |
+| `tesseract_planning_composer_c_api_example.py` | — | The task composer steps, one by one |
+| `tesseract_planning_lowlevel_c_api_example.py` | — | Planners without the task composer |
+
+`pythonic_api_example.py` (console module `tesseract_robotics.examples.pythonic_api_example`)
+shows the same steps through `tesseract_robotics.planning`.
+
 ## Prerequisites
 
 Most examples require:

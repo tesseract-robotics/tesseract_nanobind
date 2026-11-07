@@ -25,24 +25,34 @@ Mesh decomposition rationale:
 - Visual: single seat.dae for rendering
 - Collision: 10 convex hulls (seat_1.stl through seat_10.stl) for efficient GJK/EPA
 
-Based on: tesseract_examples/src/car_seat_example.cpp
+Based on: tesseract_planning/examples/src/car_seat_example.cpp
+
+Bindings only, line for line with the C++ (#42).
 """
 
 import sys
 
 import numpy as np
 
-from tesseract_robotics.planning import (
-    MotionProgram,
-    Robot,
-    StateTarget,
-    TaskComposer,
+from tesseract_robotics.examples.lowlevel.example_support import (
+    load_support_environment,
+    run_pipeline,
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_command_language import (
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly,
+    MoveInstructionType,
+    ProfileDictionary,
+    StateWaypoint,
+    StateWaypointPoly,
+)
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
+    GeneralResourceLocator,
     Isometry3d,
+    ManipulatorInfo,
 )
 from tesseract_robotics.tesseract_environment import (
     AddLinkCommand,
@@ -214,7 +224,7 @@ def get_position_vector(joint_names, pos_dict):
     return np.array([pos_dict[name] for name in joint_names])
 
 
-def add_seats(robot):
+def add_seats(env, locator):
     """Create and add 3 seat links to the environment with visual and collision meshes.
 
     From C++ addSeats():
@@ -229,9 +239,9 @@ def add_seats(robot):
     - makeConvexMesh() creates ConvexMesh type from regular Mesh
 
     Args:
-        robot: Robot instance with environment and resource locator
+        env: The environment to add the seats to.
+        locator: Resource locator for the seat meshes.
     """
-    locator = robot.locator
 
     # Resolve package:// URI to filesystem path for visual mesh
     # seat.dae contains full visual detail (curves, materials)
@@ -288,13 +298,13 @@ def add_seats(robot):
 
         # AddLinkCommand: adds link+joint to scene graph at runtime
         cmd = AddLinkCommand(link_seat, joint_seat)
-        if not robot.env.applyCommand(cmd):
+        if not env.applyCommand(cmd):
             raise RuntimeError(f"Failed to add {seat_name}")
 
     print("Added 3 seats to environment")
 
 
-def attach_seat_to_effector(robot, seat_name="seat_1"):
+def attach_seat_to_effector(env, seat_name="seat_1"):
     """Attach a seat to the end effector using MoveLinkCommand.
 
     This demonstrates dynamic scene graph modification during planning:
@@ -309,10 +319,10 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
     - Collision checking accounts for attached geometry
 
     Args:
-        robot: Robot instance with environment
+        env: The environment.
         seat_name: Name of seat link to attach (default: "seat_1")
     """
-    state = robot.env.getState()
+    state = env.getState()
 
     # Get current world-frame transforms from environment state
     end_effector_tf = state.link_transforms["end_effector"]
@@ -333,7 +343,7 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
     # MoveLinkCommand: changes parent of existing link in scene graph
     # Seat is removed from world and becomes child of end_effector
     move_cmd = MoveLinkCommand(joint_seat_robot)
-    if not robot.env.applyCommand(move_cmd):
+    if not env.applyCommand(move_cmd):
         raise RuntimeError(f"Failed to attach {seat_name}")
 
     # === UPDATE ALLOWED COLLISION MATRIX ===
@@ -349,7 +359,7 @@ def attach_seat_to_effector(robot, seat_name="seat_1"):
 
     # ModifyAllowedCollisionsType.ADD merges with existing ACM
     acm_cmd = ModifyAllowedCollisionsCommand(acm, ModifyAllowedCollisionsType.ADD)
-    if not robot.env.applyCommand(acm_cmd):
+    if not env.applyCommand(acm_cmd):
         raise RuntimeError("Failed to modify allowed collisions")
 
     print(f"Attached {seat_name} to end effector")
@@ -371,103 +381,81 @@ def run():
     - Solver: BPMPD, max_iter=200, min_approx_improve=1e-3
 
     Returns:
-        dict: {pick_result, place_result, robot, joint_names} for testing/visualization
+        dict: {pick_result, place_result, env, joint_names} for testing/visualization
     """
-    # === PHASE 0: LOAD ROBOT ===
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
-    # URDF defines kinematic chain, SRDF defines planning groups and ACM
-    robot = Robot.from_urdf(
-        "package://tesseract/support/urdf/car_seat_demo.urdf",
-        "package://tesseract/support/urdf/car_seat_demo.srdf",
-    )
-    print(f"Loaded robot: {robot.env.getName()}")
+    locator = GeneralResourceLocator()
+    env = load_support_environment("car_seat_demo", locator)
+    print(f"Loaded environment: {env.getName()}")
 
-    # Get predefined joint configurations (from C++ source)
     positions = get_predefined_positions()
-
-    # Get joint ordering from SRDF-defined "manipulator" group
-    joint_group = robot.env.getJointGroup("manipulator")
+    joint_group = env.getJointGroup("manipulator")
     joint_names = [jid.name() for jid in joint_group.getJointIds()]
     print(f"Joint names: {joint_names}")
 
-    # === PHASE 1: ADD SEATS TO ENVIRONMENT ===
-    # Low-level mesh loading: visual (DAE) + collision (10 convex STLs per seat)
     print("\nAdding seats to environment...")
-    add_seats(robot)
+    add_seats(env, locator)
+    env.setState(list(positions["Home"]), np.array(list(positions["Home"].values())))
 
-    # Initialize robot at home position (all zeros)
-    robot.set_joints(positions["Home"])
-
-    # Create task composer for TrajOpt planning
-    composer = TaskComposer.from_config()
-
-    # Create TrajOpt profiles matching C++ settings
     profiles = create_car_seat_profiles()
+    manip_info = ManipulatorInfo("manipulator", "world", "end_effector")
 
-    # ==================== PHASE 2: PICK MOTION ====================
-    # Plan freespace motion from Home to Pick1 (above seat_1)
+    def freespace_program(description: str, start: str, end: str) -> CompositeInstruction:
+        """Two-state FREESPACE program, as each C++ phase builds it."""
+        program = CompositeInstruction("FREESPACE", manip_info)
+        program.setDescription(description)
+        start_instruction = MoveInstruction(
+            StateWaypointPoly(
+                StateWaypoint(joint_names, get_position_vector(joint_names, positions[start]))
+            ),
+            MoveInstructionType.FREESPACE,
+            "FREESPACE",
+        )
+        start_instruction.setDescription("Start Instruction")
+        plan_f0 = MoveInstruction(
+            StateWaypointPoly(
+                StateWaypoint(joint_names, get_position_vector(joint_names, positions[end]))
+            ),
+            MoveInstructionType.FREESPACE,
+            "FREESPACE",
+        )
+        plan_f0.setDescription(f"Freespace {description.lower()}")
+        program.push_back(MoveInstructionPoly(start_instruction))
+        program.push_back(MoveInstructionPoly(plan_f0))
+        return program
+
+    # ==================== PICK ====================
     print("\n=== PICK SEAT 1 ===")
-
-    start_pos = get_position_vector(joint_names, positions["Home"])
-    pick_pos = get_position_vector(joint_names, positions["Pick1"])
-
-    # MotionProgram: high-level motion specification
-    # - "manipulator": SRDF-defined joint group
-    # - tcp_frame: end_effector link for Cartesian operations
-    # - StateTarget: joint-space waypoints with planning profile
-    pick_program = (
-        MotionProgram("manipulator", tcp_frame="end_effector", working_frame="base_link")
-        .set_joint_names(joint_names)
-        .move_to(StateTarget(start_pos, names=joint_names, profile="FREESPACE"))
-        .move_to(StateTarget(pick_pos, names=joint_names, profile="FREESPACE"))
+    pick_result = run_pipeline(
+        env,
+        freespace_program("Pick up the first seat!", "Home", "Pick1"),
+        profiles,
+        "TrajOptPipeline",
     )
-
-    print(f"Pick program: {len(pick_program)} instructions")
-    print("Running TrajOpt planner for PICK...")
-
-    # TrajOptPipeline: sequential convex optimization for collision-free motion
-    pick_result = composer.plan(robot, pick_program, pipeline="TrajOptPipeline", profiles=profiles)
-
     assert pick_result.successful, f"PICK planning failed: {pick_result.message}"
     print(f"PICK successful! {len(pick_result)} waypoints")
 
-    # ==================== PHASE 3: ATTACH SEAT ====================
-    # Update environment state to Pick1, then reparent seat_1 to end_effector
-    # This simulates gripper activation after reaching pick position
+    # ==================== ATTACH ====================
+    # Reparent seat_1 to end_effector at the Pick1 state.
     print("\n=== ATTACHING SEAT ===")
-    robot.set_joints(positions["Pick1"])
-    attach_seat_to_effector(robot, "seat_1")
+    env.setState(list(positions["Pick1"]), np.array(list(positions["Pick1"].values())))
+    attach_seat_to_effector(env, "seat_1")
 
-    # ==================== PHASE 4: PLACE MOTION ====================
-    # Plan transport motion Pick1 -> Place1 with attached seat
-    # TrajOpt now includes seat_1 geometry in collision checking
+    # ==================== PLACE ====================
     print("\n=== PLACE SEAT 1 ===")
-
-    place_start_pos = get_position_vector(joint_names, positions["Pick1"])
-    place_end_pos = get_position_vector(joint_names, positions["Place1"])
-
-    place_program = (
-        MotionProgram("manipulator", tcp_frame="end_effector", working_frame="base_link")
-        .set_joint_names(joint_names)
-        .move_to(StateTarget(place_start_pos, names=joint_names, profile="FREESPACE"))
-        .move_to(StateTarget(place_end_pos, names=joint_names, profile="FREESPACE"))
+    place_result = run_pipeline(
+        env,
+        freespace_program("Place the first seat!", "Pick1", "Place1"),
+        profiles,
+        "TrajOptPipeline",
     )
-
-    print(f"Place program: {len(place_program)} instructions")
-    print("Running TrajOpt planner for PLACE...")
-
-    # Planning now accounts for attached seat_1 collision geometry
-    place_result = composer.plan(
-        robot, place_program, pipeline="TrajOptPipeline", profiles=profiles
-    )
-
     assert place_result.successful, f"PLACE planning failed: {place_result.message}"
     print(f"PLACE successful! {len(place_result)} waypoints")
 
     return {
         "pick_result": pick_result,
         "place_result": place_result,
-        "robot": robot,
+        "env": env,
         "joint_names": joint_names,
     }
 
@@ -478,7 +466,7 @@ def main() -> int:
     from tesseract_robotics.viewer import TesseractViewer
 
     with TesseractViewer() as viewer:
-        viewer.update_environment(results["robot"].env)
+        viewer.update_environment(results["env"])
         viewer.update_trajectory(results["place_result"].raw_results)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")

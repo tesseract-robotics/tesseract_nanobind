@@ -67,10 +67,10 @@ When to Use Low-Level API Instead
 
 Related Examples
 ----------------
-- tesseract_planning_composer_c_api_example.py: TaskComposer with high-level API
-- tesseract_planning_lowlevel_c_api_example.py: Raw planner access without TaskComposer
-- freespace_ompl_c_api_example.py: OMPL planning with pythonic wrappers
-- basic_cartesian_c_api_example.py: TrajOpt Cartesian planning
+- lowlevel/tesseract_planning_composer_c_api_example.py: the same TaskComposer steps in bindings
+- lowlevel/tesseract_planning_lowlevel_c_api_example.py: Raw planner access without TaskComposer
+- lowlevel/freespace_ompl_c_api_example.py: OMPL planning in bindings
+- lowlevel/basic_cartesian_c_api_example.py: TrajOpt Cartesian planning in bindings
 """
 
 import sys
