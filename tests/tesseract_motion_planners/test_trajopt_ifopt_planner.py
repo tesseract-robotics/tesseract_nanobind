@@ -519,12 +519,31 @@ class TestTrajOptIfoptSolverCallbacks:
         # every SQP iteration the solver reached called the callback at least once
         assert set(range(1, max(callback.iterations) + 1)) <= set(callback.iterations)
 
+    def test_callback_returning_false_stops_the_solve(self, kuka_iiwa_environment):
+        """A callback's False ends the solve after that call and the planner reports failure.
+
+        Upstream behaviour the low-level SQP guide documents: the pinned trajopt ends solve() on
+        kStoppedByCallback, and the planner fails every status but kConverged. trajopt 0.35.0
+        dropped the False and kept stepping to max_iter (#151).
+        """
+        t_env, manip_info, joint_names = kuka_iiwa_environment
+        callback = _RecordingCallback(keep_going=False)
+        solver_profile = TrajOptIfoptOSQPSolverProfile()
+        solver_profile.callbacks = [callback]
+
+        response = TrajOptIfoptMotionPlanner(TRAJOPT_IFOPT_NAMESPACE).solve(
+            _request(t_env, manip_info, joint_names, solver_profile)
+        )
+
+        assert callback.iterations == [1]
+        assert not response.successful
+
     def test_callback_returning_false_called_once_per_iteration_up_to_max(
         self, kuka_iiwa_environment
     ):
         # Whether False stops the solve is upstream's (the pinned trajopt stops after the first
-        # call, trajopt 0.35.0 kept iterating; see docs/user-guide/low-level-sqp.md); the binding
-        # guarantees the calls and their arguments.
+        # call, test_callback_returning_false_stops_the_solve; trajopt 0.35.0 kept iterating);
+        # the binding guarantees the calls and their arguments.
         t_env, manip_info, joint_names = kuka_iiwa_environment
         seen = []
 
