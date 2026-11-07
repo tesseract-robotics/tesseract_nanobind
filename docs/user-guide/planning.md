@@ -173,12 +173,14 @@ The override may return `None` for no objective; anything else that is not an
 `OptimizationObjective` raises `OMPLObjectiveReturnTypeError` from `solve`. Objectives
 cannot be subclassed in Python.
 
-Measured on the KUKA IIWA sphere sweep (`freespace_clearance_objective_example.py`,
-`FreespaceIfoptPipeline`, two RRTConnect planners, no solution-count exit, osx-arm64): at
-`planning_time = 5` the default objective took 8.3 s end to end, the 6.0 rad threshold
-3.0 s; the example uses `planning_time = 10`, the profile helpers' default, so the
-threshold case's TrajOptIfopt stage fits inside it under load (5.7 s with two test workers). With an infinite threshold the OMPL solve alone returns in 0.2 s against 3.0 s for
-the default objective at `planning_time = 3` (`tests/tesseract_motion_planners/test_ompl_objective.py`).
+Measured on `freespace_clearance_objective_example.py` (the KUKA IIWA sweeps joint_a1
+from -1.2 to 1.2 rad through six rotated cubes; `FreespaceIfoptPipeline`, two RRTConnect
+planners, no solution-count exit, `planning_time = 10`, the profile helpers' default;
+osx-arm64, three runs): the default objective took 13.2 to 13.9 s end to end, the 4.0 rad
+threshold 1.7 to 2.1 s. The first paths RRTConnect finds there are 3.3 to 3.7 rad long.
+On the sphere sweep of `freespace_hybrid_example.py`, with an infinite threshold the OMPL
+solve alone returns in 0.2 s against 3.0 s for the default objective at
+`planning_time = 3` (`tests/tesseract_motion_planners/test_ompl_objective.py`).
 
 !!! warning "Clearance is not reported on this stack"
     tesseract's OMPL state validators do not implement `clearance()`, so OMPL's default,
