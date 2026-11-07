@@ -120,3 +120,96 @@ def test_sqp_aligns_the_tool_axis(axes: AxisFixture):
 
     assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
     assert np.linalg.norm(align.calcValues(axes.nodes.getValues())) < 1e-3
+
+
+# rad: float64 round-off through the seven-joint forward-kinematics chain and one atan2
+ANGLE_ROUND_OFF = 1e-9
+#: rad, a cone narrower than the seed's tilt from BASE_X (above 0.5 rad), so the solve must move
+NARROW_HALF_ANGLE = 0.2
+
+
+def _world_axis(axes: AxisFixture, link: str, axis: np.ndarray) -> np.ndarray:
+    """`axis`, given in `link`'s frame, in the manipulator's base frame at SEED."""
+    return axes.manip.calcFwdKin(SEED)[link].matrix[:3, :3] @ axis
+
+
+@pytest.mark.parametrize(
+    "target", [BASE_X, np.array([0.0, -1.0, 1.0]), -TOOL_Z], ids=["x", "-y+z", "-z"]
+)
+def test_cone_row_is_the_angle_between_the_axes(axes: AxisFixture, target):
+    """The cone row is atan2(|a x b|, a . b) of the two axes in one frame, from forward
+    kinematics: the closed-form angle, independent of the constraint's own kinematics."""
+    tool = _world_axis(axes, "tool0", TOOL_Z)
+    base = _world_axis(axes, "base_link", target / np.linalg.norm(target))
+    expected = np.arctan2(np.linalg.norm(np.cross(tool, base)), tool @ base)
+
+    assert axes.cone(target, 1.0).calcValues(SEED)[0] == pytest.approx(
+        expected, abs=ANGLE_ROUND_OFF
+    )
+
+
+_ZERO = np.zeros(3)
+_NAN = np.array([np.nan, 0.0, 1.0])
+
+
+@pytest.mark.parametrize(
+    ("kind", "kwargs", "message"),
+    [
+        ("cone", {"source_axis": _ZERO}, "source axis must be finite and non-zero"),
+        ("align", {"source_axis": _NAN}, "source axis must be finite and non-zero"),
+        ("cone", {"target_axis": _ZERO}, "finite and non-zero"),
+        ("align", {"target_axis": _NAN}, "finite and non-zero"),
+        ("cone", {"coeff": -1.0}, "coeff must be finite and non-negative"),
+        ("align", {"coeff": np.inf}, "coeff must be finite and non-negative"),
+        ("cone", {"source_frame": "no_such_link"}, "source link 'no_such_link' does not exist"),
+        ("align", {"target_frame": "no_such_link"}, "target link 'no_such_link' does not exist"),
+        ("cone", {"source_frame": "base_link"}, "are both static"),
+        ("align", {"source_frame": "base_link"}, "are both static"),
+    ],
+)
+def test_invalid_arguments_raise(axes: AxisFixture, kind, kwargs, message):
+    args = {
+        "source_frame": "tool0",
+        "source_axis": TOOL_Z,
+        "target_frame": "base_link",
+        "target_axis": BASE_X,
+        "coeff": 1.0,
+    } | kwargs
+    with pytest.raises(RuntimeError, match=message):
+        if kind == "cone":
+            ti.CartAxisConeConstraint(
+                axes.var,
+                axes.manip,
+                args["source_frame"],
+                args["source_axis"],
+                args["target_frame"],
+                args["target_axis"],
+                NARROW_HALF_ANGLE,
+                args["coeff"],
+            )
+        else:
+            ti.CartAxisAlignConstraint(
+                axes.var,
+                axes.manip,
+                args["source_frame"],
+                args["source_axis"],
+                args["target_frame"],
+                args["target_axis"],
+                args["coeff"],
+            )
+
+
+def test_sqp_brings_the_tool_axis_into_the_cone(axes: AxisFixture):
+    cone = axes.cone(BASE_X, NARROW_HALF_ANGLE)
+    assert cone.calcValues(SEED)[0] > NARROW_HALF_ANGLE
+    problem = tsqp.TrajOptQPProblem(axes.nodes)
+    problem.addConstraintSet(cone)
+    problem.setup()
+    solver = tsqp.TrustRegionSQPSolver(tsqp.OSQPEigenSolver())
+
+    solver.solve(problem)
+
+    assert solver.getStatus() == tsqp.SQPStatus.CONVERGED
+    assert cone.calcValues(axes.nodes.getValues())[0] <= (
+        NARROW_HALF_ANGLE + solver.params.cnt_tolerance
+    )
