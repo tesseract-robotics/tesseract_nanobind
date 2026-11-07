@@ -24,23 +24,22 @@ from scenes import SCENES, Scene
 import tesseract_robotics.examples
 from tesseract_robotics.planning import TaskComposer
 from tesseract_robotics.viewer import TesseractViewer
-from tesseract_robotics.viewer.viewer import RECORD_FPS_HZ
+from tesseract_robotics.viewer.floor import (
+    FLOOR_CELL_M,
+    FLOOR_SECTION_M,
+    FLOOR_SHADOW_OPACITY,
+    MIN_FLOOR_SIZE_M,
+)
+from tesseract_robotics.viewer.viewer import PLOT_COLOR_RGB, RECORD_FPS_HZ
 
 REPO = Path(__file__).resolve().parents[2]
 DEMOS_DIR = REPO / "docs/demos"
 PACKAGE = "tesseract-robotics-nanobind"
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
-# The floor when an entry names no size [m]: a few reaches of an industrial arm.
-DEFAULT_FLOOR_SIZE_M = 6.0
-# Floor grid pitch [m]: fine cells for scale, heavier lines every metre.
-FLOOR_CELL_M = 0.25
-FLOOR_SECTION_M = 1.0
-# Soft contact shadow under the robot [-]; 0.3 lifts it off the grid without hiding the lines.
-FLOOR_SHADOW_OPACITY = 0.3
+# The floor when an entry names no size [m]: the viewer's smallest.
+DEFAULT_FLOOR_SIZE_M = MIN_FLOOR_SIZE_M
 # Waypoint triad axis length [m]: small, so a dense toolpath's triads don't merge.
 PATH_AXES_LENGTH_M = 0.03
-# TCP path colour, 8-bit RGB: orange, visible on the dark background.
-PATH_COLOR_RGB = (255, 170, 0)
 
 
 class UnknownSceneError(KeyError):
@@ -77,6 +76,7 @@ def record_scene(entry: Entry, scene: Scene, *, fps: float = RECORD_FPS_HZ) -> b
     floor_size_m = entry.floor_size_m or DEFAULT_FLOOR_SIZE_M
     with TesseractViewer(port=0) as viewer:
         viewer.update_environment(scene.env)
+        # Replaces the viewer's own floor: the entry's size, centred where its camera looks.
         viewer.server.scene.add_grid(
             "/floor",
             width=floor_size_m,
@@ -92,7 +92,7 @@ def record_scene(entry: Entry, scene: Scene, *, fps: float = RECORD_FPS_HZ) -> b
                 program,
                 program.getManipulatorInfo(),
                 axes_length=PATH_AXES_LENGTH_M,
-                color=PATH_COLOR_RGB,
+                color=PLOT_COLOR_RGB,
             )
         return viewer.record(scene.phases, fps=fps)
 

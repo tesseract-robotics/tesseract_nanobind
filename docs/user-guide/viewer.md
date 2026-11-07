@@ -113,6 +113,10 @@ viewer.server.gui.add_button("Replan")
 
 Keep markers out of `/links/`, which `update_environment` replaces.
 
+## Look
+
+The live viewer looks like the docs' demo players: dark theme, no viser logo, an orange TCP path, and a floor grid (`/floor`) with a soft contact shadow. `update_environment` lays the floor under the scene's footprint at its current state: square, 1 m sections over 0.25 m cells, at least 6 m across, with 1 m to spare on every side and its lines on whole metres. Adding your own `/floor` through `viewer.server.scene` replaces it, which is what the demo recorder does to give each entry its reviewed size.
+
 ## Shading
 
 | Geometry | Shading |
@@ -156,7 +160,7 @@ with TesseractViewer(port=0) as viewer:
 Path("plan.viser").write_bytes(data)
 ```
 
-Each `RecordingPhase` pairs a trajectory with the environment it runs in, so a recording can join a pick, with the part on the table, to a place, with the part on the tool. Add a floor and `plot_trajectory` paths first: `record` keeps what is already in the scene. With no phases it records the scene as it stands, and the client shows no timeline.
+Each `RecordingPhase` pairs a trajectory with the environment it runs in, so a recording can join a pick, with the part on the table, to a place, with the part on the tool. Add `plot_trajectory` paths first: `record` keeps what is already in the scene. With no phases it records the scene as it stands, and the client shows no timeline.
 
 ## API Quick Reference
 
@@ -165,11 +169,11 @@ Each `RecordingPhase` pairs a trajectory with the environment it runs in, so a r
 | `TesseractViewer(host="127.0.0.1", port=8000)` | Start serving; also a context manager that calls `close()` |
 | `url` | Address to open in a browser |
 | `server` | The `viser.ViserServer`, for markers and GUI |
-| `update_environment(env)` | Replace the scene with `env` at its current state |
+| `update_environment(env)` | Replace the scene with `env` at its current state, and lay the floor under it |
 | `update_joint_positions(joint_names, q)` | Show a stationary pose; stops playback |
 | `update_trajectory(trajectory)` | Animate a `CompositeInstruction` or `Trajectory` from its start |
 | `show_time(t_s)` | Pose the scene at one trajectory time |
-| `plot_trajectory(trajectory, manip_info, axes_length=0.1, color=(255, 255, 255))` | Draw the commanded [TCP path](#tcp-path) with an axes triad per waypoint |
+| `plot_trajectory(trajectory, manip_info, axes_length=0.1, color=(255, 170, 0))` | Draw the commanded [TCP path](#tcp-path) with an axes triad per waypoint |
 | `record(phases, *, fps=30.0)` | The `.viser` bytes of the scene playing `phases`; see [Recording](#recording) |
 | `close()` | Stop playback and serving, release the port; idempotent |
 | `serve_forever()` | Block until Ctrl-C, then `close()` |

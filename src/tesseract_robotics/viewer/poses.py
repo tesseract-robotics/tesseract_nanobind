@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import numpy as np
+import trimesh
 from numpy.typing import ArrayLike, NDArray
 
 from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
@@ -50,3 +51,18 @@ def link_poses(env: Environment, joint_names: Sequence[str], q: ArrayLike) -> di
         raise UnknownJointError(f"not joints of the environment: {sorted(unknown)}")
     state = env.getState(list(joint_names), np.asarray(q, dtype=np.float64))
     return {link.name(): isometry_to_pose(iso) for link, iso in state.link_transforms.items()}
+
+
+def pose_matrix(pose: Pose3) -> NDArray[np.float64]:
+    """The 4x4 homogeneous transform of `(xyz, wxyz)`.
+
+    Args:
+        pose: Position [m] and scalar-first unit quaternion.
+
+    Returns:
+        The transform.
+    """
+    position, wxyz = pose
+    out = trimesh.transformations.quaternion_matrix(wxyz)
+    out[:3, 3] = position
+    return out
