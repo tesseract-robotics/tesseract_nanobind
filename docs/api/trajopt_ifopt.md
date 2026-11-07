@@ -70,12 +70,9 @@ Every class below is a `ConstraintSet`. It goes into a `TrajOptQPProblem` either
 constraint, with `addConstraintSet`, or as a cost, with `addCostSet(set, penalty_type)`. Every
 class is accepted as a constraint and as a cost with any penalty type: every row must be an
 equality or bounded on one side, and a set may mix the two. A two-sided range row is refused by
-`addConstraintSet` and `addCostSet` alike. There is no cost without a penalty type. On trajopt 0.35.0, which every tesseract-robotics-nanobind 0.35.0.x
-wheel bundles (`TrajOptQPProblem` first ships in 0.35.0.9; earlier releases bind only
-`IfoptQPProblem`), the SQP models only `SQUARED` costs as it charges them: it reads an `ABSOLUTE`
-or `HINGE` cost as 0 at every QP solution, and that cost's exact value ignores its coefficient
-(see [the QP problem](trajopt_sqp.md#the-qp-problem)). tesseract-robotics/trajopt#592 fixes both;
-the fix arrives only with a wheel built on a newer trajopt (none yet).
+`addConstraintSet` and `addCostSet` alike. There is no cost without a penalty type. The SQP
+models every penalty type as it charges it: an `ABSOLUTE` or `HINGE` cost on its linearized rows,
+weighted by its coefficients (see [the QP problem](trajopt_sqp.md#the-qp-problem)).
 
 | Class | Purpose | Row bounds |
 |---|---|---|

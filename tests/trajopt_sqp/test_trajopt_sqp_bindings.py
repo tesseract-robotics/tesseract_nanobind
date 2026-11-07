@@ -1081,11 +1081,10 @@ class TestTrajOptQPProblem:
 # ABSOLUTE and HINGE cost sets on TrajOptQPProblem (tesseract_nanobind#149 review)
 # ---------------------------------------------------------------------------
 
-# "trajopt 0.35.0" in this section is trajopt as every tesseract-robotics-nanobind 0.35.0.x wheel
-# bundles it. TrajOptQPProblem first ships in 0.35.0.9 (earlier releases bind only
-# IfoptQPProblem); the behaviour pinned here was measured on #149's development builds
-# 0.35.0.9.dev13–dev16, before the merge. trajopt#592's fix reaches a wheel only once one is built
-# on a newer trajopt.
+# "trajopt 0.35.0" in this section is the trajopt #149's development builds 0.35.0.9.dev13–dev16
+# linked, where the two penalty defects of tesseract_nanobind#151 were measured. No wheel shipped
+# TrajOptQPProblem on it (0.35.0.8 and earlier bind only IfoptQPProblem); the pinned trajopt
+# includes trajopt#592, which fixes both, and the tests below assert the fixed behaviour.
 # Every joint value below is dyadic, so each residual, violation and sum is exact in float64
 # and exact costs compare with ==.
 PENALTY_JOINT_LIMIT = 10.0  # rad, symmetric; no variable bound is active below
@@ -1166,11 +1165,10 @@ _COEFFS = pytest.mark.parametrize("coeff", [1.0, LARGE_COEFF], ids=["c1", "c10"]
 class TestTrajOptQPProblemPenaltyCosts:
     """ABSOLUTE and HINGE cost sets on TrajOptQPProblem.
 
-    QP layout (trajopt 0.35.0, trajopt_qp_problem.cpp:28, :798-822): each ABSOLUTE row adds two
-    slack variables, each HINGE row one, after the NLP variables; the QP prices a slack at its
-    row's coefficient (:798). This branch links a trajopt that includes
-    tesseract-robotics/trajopt#592, which fixes the two trajopt 0.35.0 penalty defects of
-    tesseract_nanobind#151; `main` (trajopt 0.35.0) still pins the defective behaviour.
+    QP layout (pinned trajopt a504b22, trajopt_qp_problem.cpp:887-903): each equality row adds
+    two slack variables and each one-sided row one, after the NLP variables; the QP prices a
+    slack at its row's coefficient. The pinned trajopt includes tesseract-robotics/trajopt#592,
+    which fixes the two trajopt 0.35.0 penalty defects of tesseract_nanobind#151.
     """
 
     def test_absolute_cost_takes_one_sided_rows(self):
