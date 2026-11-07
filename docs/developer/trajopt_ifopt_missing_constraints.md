@@ -38,11 +38,10 @@ which a Python subclass could not change. `TrajOptQPProblem` reserves storage fr
 cost sets' hints, so a Python cost set on its own raised `ValueError: vector`. 0 is a valid hint:
 storage grows as needed (#146).
 
-**`TrajOptQPProblem` is bound as a non-movable subclass.** This one lives in
-`src/trajopt_sqp/trajopt_sqp_bindings.cpp`. trajopt 0.35.0 defaults the move constructor in the
-header, where the PIMPL type is incomplete, and nanobind instantiates the move constructor of
-every move-constructible type it binds. `TrajOptQPProblemBinding` adds no state and deletes copy
-and move; bind `TrajOptQPProblem` directly once trajopt defines the move out of line (#146).
+**`TrajOptQPProblem` is bound directly.** trajopt 0.35.0 defaulted the move constructor in the
+header, where the PIMPL type is incomplete, so `src/trajopt_sqp/trajopt_sqp_bindings.cpp` bound a
+non-movable subclass instead. trajopt#615 defines the move operations out of line, and the
+subclass is gone (#146).
 
 ## Binding patterns
 
