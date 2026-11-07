@@ -136,7 +136,11 @@ GitHub Actions on linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, Python
       does the `packaging/tesseract-robotics-nanobind-feedstock` submodule the
       `build-feedstock-nanobind` task runs in. Its CI and the upload to
       `label/dev` (by the holder of the channel's `BINSTAR_TOKEN`) follow.
-    - **Under verification:** the osx-arm64 build of the recipe, Python 3.12.
+    - **Confirmed:** the recipe builds on osx-arm64 for Python 3.12 against the
+      `label/dev` stack (32 min locally) and its tests pass: imports, `pip check`,
+      and 238 collision and kinematics tests. The first build's import test found
+      `pyyaml` missing from `[project] dependencies`; it is declared now.
+    - **Under verification:** the other four platforms and Python 3.13 and 3.14.
 
 The recipe (`recipe/recipe.yaml`):
 
