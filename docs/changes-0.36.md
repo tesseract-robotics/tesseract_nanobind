@@ -337,6 +337,10 @@ See [tesseract_common logging](api/tesseract_common.md#logging).
 (unweighted, compared against `cnt_tolerance`) and `weighted` (charged by the merit)
 arrays instead of one array.
 
+## trajopt_sqp: `ABSOLUTE` and `HINGE` costs are modelled as charged
+
+The 0.35.0.x wheels (trajopt 0.35.0) still read an `ABSOLUTE` or `HINGE` cost as 0 at every QP solution, leave its coefficient out of the exact cost, and ignore a callback's `False`; the pinned trajopt `a504b22` fixes all three, the first two by trajopt#592 (#151).
+
 ## trajopt_ifopt: contact gradients are a free function
 
 The collision evaluators lost `getGradient` (`DiscreteCollisionEvaluator`) and
