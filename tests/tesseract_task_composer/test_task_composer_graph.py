@@ -25,6 +25,11 @@ from tesseract_robotics.tesseract_task_composer import (
 )
 
 PIPELINE = "TrajOptPipeline"
+# s: how long a run of PIPELINE may take before a test waiting on it fails; generous for a
+# loaded machine
+RUN_DEADLINE_S = 60
+# s: poll period of a test that polls future.ready()
+POLL_S = 0.05
 
 
 def _copy_of(infos: TaskComposerNodeInfoContainer) -> TaskComposerNodeInfoContainer:
@@ -153,10 +158,12 @@ class TestFuture:
         if finish == "wait":
             future.wait()
         elif finish == "waitFor":
-            assert future.waitFor(datetime.timedelta(seconds=60)) == FutureStatus.ready
+            assert future.waitFor(datetime.timedelta(seconds=RUN_DEADLINE_S)) == FutureStatus.ready
         else:
+            deadline = time.monotonic() + RUN_DEADLINE_S
             while not future.ready():
-                time.sleep(0.05)
+                assert time.monotonic() < deadline, f"run not ready after {RUN_DEADLINE_S} s"
+                time.sleep(POLL_S)
         assert (sys.getrefcount(node), sys.getrefcount(executor)) == (node_refs, executor_refs)
 
     def test_clear_invalidates(self, factory, executor, make_storage):
