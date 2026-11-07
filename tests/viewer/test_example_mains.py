@@ -83,17 +83,30 @@ def _canned_results() -> dict[str, object]:
         composite.push_back(MoveInstructionPoly(move))
 
     planned = SimpleNamespace(successful=True, raw_results=composite)
+    manip_info = ManipulatorInfo("manipulator", "base_link", "tool0")
+    robot = SimpleNamespace(env=env, get_manipulator_info=lambda *_args, **_kwargs: manip_info)
     return {
         "env": env,
-        "robot": SimpleNamespace(env=env),
+        "robot": robot,
         "success": True,
         "trajectory": composite,
-        "manip_info": ManipulatorInfo("manipulator", "base_link", "tool0"),
+        "manip_info": manip_info,
         "result": planned,
         "colliding_result": planned,
         "pick_result": planned,
         "place_result": planned,
         "trajectories": [planned],
+        # freespace_clearance_objective_example: case 2 and one cube's closest approach.
+        "threshold": {"robot": robot, "result": planned, "success": True},
+        "clearances": [
+            SimpleNamespace(
+                cube="cube_0",
+                link="link_6",
+                distance_m=0.05,
+                robot_point_m=np.array([0.9, 0.0, 1.2]),
+                cube_point_m=np.array([0.9, 0.0, 1.15]),
+            )
+        ],
     }
 
 
