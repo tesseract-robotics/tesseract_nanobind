@@ -660,9 +660,9 @@ def test_late_client_after_a_swap_sees_only_the_new_scene(viewer, env, other_env
 
 def test_player_tick_does_not_overwrite_a_drag_waiting_on_the_lock(viewer, env):
     viewer.update_environment(env)
-    viewer.update_trajectory(_two_waypoints())
     drag_to_s = 1.5
-    with viewer._pose_lock:  # keeps the player thread out; the ticks are ours
+    with viewer._pose_lock:  # held before Play is on, so the player never ticks: the ticks are ours
+        viewer.update_trajectory(_two_waypoints())
         viewer._tick()
         # What viser does on its event loop before the drag callback can take the lock.
         viewer._gui_time._impl.value = drag_to_s
@@ -721,11 +721,11 @@ async def _thread_id():
 def test_drag_landing_mid_tick_is_not_overwritten(viewer, env):
     """Windows CI on f6006c83: the tick checked the slider, viser wrote a drag, the tick wrote."""
     viewer.update_environment(env)
-    viewer.update_trajectory(_two_waypoints())
     drag_to_s = 1.5
     slider = viewer._gui_time
     drag = _DragLandsOnRead(slider, viewer.server.get_event_loop(), drag_to_s)
-    with viewer._pose_lock:  # keeps the player thread out; the tick is ours
+    with viewer._pose_lock:  # held before Play is on, so the player never ticks: the tick is ours
+        viewer.update_trajectory(_two_waypoints())
         viewer._gui_time = drag
         try:
             viewer._tick()
@@ -743,7 +743,6 @@ def test_tick_on_a_wedged_viser_loop_writes_nothing(viewer, env, monkeypatch):
     """A tick gives up on a loop that does not run its slider write, which then never lands."""
     monkeypatch.setattr("tesseract_robotics.viewer.viewer.VISER_LOOP_TIMEOUT_S", 2 * PLAYBACK_DT_S)
     viewer.update_environment(env)
-    viewer.update_trajectory(_two_waypoints())
     loop = viewer.server.get_event_loop()
     wedged = threading.Event()
     release = threading.Event()
@@ -752,7 +751,8 @@ def test_tick_on_a_wedged_viser_loop_writes_nothing(viewer, env, monkeypatch):
         wedged.set()
         release.wait()
 
-    with viewer._pose_lock:  # keeps the player thread out; the tick is ours
+    with viewer._pose_lock:  # held before Play is on, so the player never ticks: the tick is ours
+        viewer.update_trajectory(_two_waypoints())
         loop.call_soon_threadsafe(wedge)
         try:
             assert wedged.wait(PLAYER_ADVANCE_TIMEOUT_S)
