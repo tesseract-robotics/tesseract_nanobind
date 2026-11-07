@@ -15,6 +15,7 @@
 #include <tesseract/collision/continuous_contact_manager.h>
 #include <tesseract/collision/contact_managers_plugin_factory.h>
 #include <tesseract/collision/contact_result_validator.h>
+#include <tesseract/collision/implicit_sdf_collision_solver.h>
 
 // tesseract_common for types
 #include <tesseract/common/allowed_collision_matrix.h>
@@ -60,6 +61,56 @@ NB_MAKE_OPAQUE(tc::ContactResultVector);
 namespace {
 
 using CRM = tc::ContactResultMap;
+
+// The batch collision-object calls, identical on DiscreteContactManager and
+// ContinuousContactManager. Each is upstream's "observably equivalent to the single calls in
+// order": an id the manager does not hold is skipped and reported by a False return
+// (remove / enable), or raises IndexError (std::out_of_range: get transform, transform from a
+// map that lacks an id). The GIL is held, as for the single-object siblings.
+template <class Class>
+void bind_batch_collision_objects(Class& cls) {
+    using M = typename Class::Type;
+    cls.def("addCollisionObjects",
+            [](M& self, const std::vector<tc::CollisionObjectSpec>& objects) {
+                for (const auto& object : objects)
+                    require_non_null(object.shapes, "addCollisionObjects", "objects[].shapes", "a Geometry");
+                return self.addCollisionObjects(objects);
+            },
+            "objects"_a,
+            "Add the objects in order, as repeated addCollisionObject calls; a repeated id: the last "
+            "entry decides. False if any failed; the rest are still added.")
+        .def("removeCollisionObjects",
+             [](M& self, const std::vector<tcommon::LinkId>& ids) { return self.removeCollisionObjects(ids); },
+             "ids"_a, "Remove the objects; False if any id was absent (the present ones are still removed).")
+        .def("setCollisionObjectsEnabled",
+             [](M& self, const std::unordered_map<tcommon::LinkId, bool>& enabled) {
+                 return self.setCollisionObjectsEnabled(enabled);
+             },
+             "enabled"_a, "Enable (True) or disable (False) each id; False if any id was absent.")
+        .def("setCollisionObjectsEnabled",
+             [](M& self, const std::vector<tcommon::LinkId>& ids, bool enabled) {
+                 return self.setCollisionObjectsEnabled(ids, enabled);
+             },
+             "ids"_a, "enabled"_a, "Enable or disable every id; False if any id was absent.")
+        .def("getCollisionObjectsTransform",
+             [](const M& self, const tcommon::LinkId& id) { return self.getCollisionObjectsTransform(id); },
+             "id"_a, "The object's world transform; raises IndexError for an id the manager does not hold.")
+        .def("setCollisionObjectsTransform",
+             [](M& self, const std::vector<tcommon::LinkId>& ids, const tcommon::LinkIdTransformMap& state) {
+                 self.setCollisionObjectsTransform(ids, state);
+             },
+             "ids"_a, "state"_a,
+             "Set each id's transform from `state`; raises IndexError if `state` lacks an id.")
+        .def("setCollisionObjectsTransform",
+             [](M& self, const std::unordered_set<tcommon::LinkId>& ids, const tcommon::LinkIdTransformMap& state) {
+                 self.setCollisionObjectsTransform(ids, state);
+             },
+             "ids"_a, "state"_a,
+             "Set each id's transform from `state`; raises IndexError if `state` lacks an id.");
+}
+
+// Eigen::AlignedBox3d has no Python form: ImplicitSDFShape.aabb is a (min, max) tuple.
+using AabbCorners = std::tuple<Eigen::Vector3d, Eigen::Vector3d>;
 
 // ContactResultMap mutator precondition that upstream only assert()s (types.cpp), so a release
 // build would call back() on an empty vector. The key needs no check: LinkIdPair is canonical.
@@ -415,8 +466,30 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("exit_condition", &tc::CollisionCheckConfig::exit_condition);
     bind_value_equality(collision_check_config);
 
+    // ========== CollisionObjectSpec ==========
+    // One object of a batch add (types.h). `shapes` holds Geometry, never None (as addCollisionObject).
+    nb::class_<tc::CollisionObjectSpec>(m, "CollisionObjectSpec",
+        "A single collision object's definition, for addCollisionObjects.")
+        .def(nb::init<>())
+        .def("__init__",
+             [](tc::CollisionObjectSpec* self, tcommon::LinkId id, int mask_id,
+                const std::vector<std::shared_ptr<const tg::Geometry>>& shapes,
+                tcommon::VectorIsometry3d shape_poses, bool enabled) {
+                 new (self) tc::CollisionObjectSpec{
+                     std::move(id), mask_id,
+                     require_non_null(shapes, "CollisionObjectSpec", "shapes", "a Geometry"),
+                     std::move(shape_poses), enabled};
+             },
+             "id"_a, "mask_id"_a, "shapes"_a, "shape_poses"_a, "enabled"_a = true)
+        .def_rw("id", &tc::CollisionObjectSpec::id)
+        .def_rw("mask_id", &tc::CollisionObjectSpec::mask_id)
+        .def_rw("shapes", &tc::CollisionObjectSpec::shapes)
+        .def_rw("shape_poses", &tc::CollisionObjectSpec::shape_poses)
+        .def_rw("enabled", &tc::CollisionObjectSpec::enabled);
+
     // ========== DiscreteContactManager (abstract, expose key methods) ==========
-    nb::class_<tc::DiscreteContactManager>(m, "DiscreteContactManager")
+    nb::class_<tc::DiscreteContactManager> discrete_contact_manager(m, "DiscreteContactManager");
+    discrete_contact_manager
         .def("getName", &tc::DiscreteContactManager::getName)
         .def("hasCollisionObject", &tc::DiscreteContactManager::hasCollisionObject, "name"_a)
         .def("removeCollisionObject", &tc::DiscreteContactManager::removeCollisionObject, "name"_a)
@@ -472,6 +545,9 @@ NB_MODULE(_tesseract_collision, m) {
         // the Python UI thread — mirrors the motion planners' solve() guards.
         .def("contactTest", &tc::DiscreteContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())
         .def("clone", [](const tc::DiscreteContactManager& self) { return self.clone(); });
+    // After the single-object overloads: nanobind tries overloads in order, and a dict converts to
+    // the batch (ids, state) overload's id set.
+    bind_batch_collision_objects(discrete_contact_manager);
 
     // ========== ContinuousContactManager (abstract, expose key methods) ==========
     // The three cast (start+end pose) overloads, each registered under two names below.
@@ -487,7 +563,8 @@ NB_MODULE(_tesseract_collision, m) {
                         const tcommon::LinkIdTransformMap& pose2) {
         self.setCollisionObjectsTransform(pose1, pose2);
     };
-    nb::class_<tc::ContinuousContactManager>(m, "ContinuousContactManager")
+    nb::class_<tc::ContinuousContactManager> continuous_contact_manager(m, "ContinuousContactManager");
+    continuous_contact_manager
         .def("getName", &tc::ContinuousContactManager::getName)
         .def("hasCollisionObject", &tc::ContinuousContactManager::hasCollisionObject, "name"_a)
         .def("removeCollisionObject", &tc::ContinuousContactManager::removeCollisionObject, "name"_a)
@@ -550,6 +627,50 @@ NB_MODULE(_tesseract_collision, m) {
         .def("applyContactManagerConfig", &tc::ContinuousContactManager::applyContactManagerConfig, "config"_a)
         .def("contactTest", &tc::ContinuousContactManager::contactTest, "collisions"_a, "request"_a, nb::call_guard<nb::gil_scoped_release>())  // GIL released (see discrete contactTest above)
         .def("clone", [](const tc::ContinuousContactManager& self) { return self.clone(); });
+    // After the cast (pose1, pose2) overloads: a (dict, dict) call is the cast map overload.
+    bind_batch_collision_objects(continuous_contact_manager);
+
+    // ========== Implicit SDF collision solver (implicit_sdf_collision_solver.h) ==========
+    // `distance` / `gradient` may be Python callables; nanobind takes the GIL to call them, so
+    // collideImplicitSDF releases it like contactTest.
+    nb::class_<tc::ImplicitSDFShape>(m, "ImplicitSDFShape",
+        "Callback representation of a signed-distance shape in world coordinates.")
+        .def(nb::init<>())
+        .def_rw("distance", &tc::ImplicitSDFShape::distance,
+                "Signed distance at a world point (negative inside)")
+        .def_rw("gradient", &tc::ImplicitSDFShape::gradient, "Gradient of `distance` at a world point")
+        .def_prop_rw(
+            "aabb",
+            [](const tc::ImplicitSDFShape& self) { return AabbCorners(self.aabb.min(), self.aabb.max()); },
+            [](tc::ImplicitSDFShape& self, const AabbCorners& corners) {
+                self.aabb = Eigen::AlignedBox3d(std::get<0>(corners), std::get<1>(corners));
+            },
+            "World axis-aligned bounds of the region searched for contacts, as (min, max)")
+        .def("isValid", &tc::ImplicitSDFShape::isValid, "Whether the shape has all data the solver needs");
+
+    nb::class_<tc::ImplicitSDFCollisionConfig>(m, "ImplicitSDFCollisionConfig",
+        "Settings of the multi-start implicit SDF collision solver.")
+        .def(nb::init<>())
+        .def_rw("initial_sample_count", &tc::ImplicitSDFCollisionConfig::initial_sample_count)
+        .def_rw("max_iterations", &tc::ImplicitSDFCollisionConfig::max_iterations)
+        .def_rw("max_contacts", &tc::ImplicitSDFCollisionConfig::max_contacts)
+        .def_rw("contact_margin", &tc::ImplicitSDFCollisionConfig::contact_margin)
+        .def_rw("minimum_step", &tc::ImplicitSDFCollisionConfig::minimum_step)
+        .def_rw("duplicate_tolerance", &tc::ImplicitSDFCollisionConfig::duplicate_tolerance);
+
+    nb::class_<tc::ImplicitSDFContact>(m, "ImplicitSDFContact", "A contact between two implicit shapes.")
+        .def(nb::init<>())
+        .def_rw("distance", &tc::ImplicitSDFContact::distance)
+        .def_rw("point", &tc::ImplicitSDFContact::point)
+        .def_rw("normal", &tc::ImplicitSDFContact::normal)
+        .def_rw("nearest_points", &tc::ImplicitSDFContact::nearest_points);
+
+    m.def("collideImplicitSDF", &tc::collideImplicitSDF, "shape0"_a, "shape1"_a,
+          "config"_a = tc::ImplicitSDFCollisionConfig{}, nb::call_guard<nb::gil_scoped_release>(),
+          "Contacts between two implicit shapes, within config.contact_margin.");
+    m.def("makeImplicitSDFShape", &tc::makeImplicitSDFShape, "geometry"_a, "pose"_a,
+          "World-coordinate implicit shape of a box, sphere, cylinder, cone, capsule or SDF geometry; "
+          "an invalid shape (isValid() False) for other geometry.");
 
     // ========== ContactManagersPluginFactory ==========
     // Note: PluginLoader copy/move ctors aren't exported from library - cannot use nb::class_.

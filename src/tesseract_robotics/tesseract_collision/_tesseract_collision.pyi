@@ -541,6 +541,45 @@ class CollisionCheckConfig:
 
     __hash__: None = None
 
+class CollisionObjectSpec:
+    """A single collision object's definition, for addCollisionObjects."""
+
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, id: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, mask_id: int, shapes: Sequence[tesseract_robotics.tesseract_geometry._tesseract_geometry.Geometry], shape_poses: Sequence[tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], enabled: bool = True) -> None: ...
+
+    @property
+    def id(self) -> tesseract_robotics.tesseract_common._tesseract_common.LinkId: ...
+
+    @id.setter
+    def id(self, arg: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, /) -> None: ...
+
+    @property
+    def mask_id(self) -> int: ...
+
+    @mask_id.setter
+    def mask_id(self, arg: int, /) -> None: ...
+
+    @property
+    def shapes(self) -> list[tesseract_robotics.tesseract_geometry._tesseract_geometry.Geometry]: ...
+
+    @shapes.setter
+    def shapes(self, arg: Sequence[tesseract_robotics.tesseract_geometry._tesseract_geometry.Geometry], /) -> None: ...
+
+    @property
+    def shape_poses(self) -> list[tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]: ...
+
+    @shape_poses.setter
+    def shape_poses(self, arg: Sequence[tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], /) -> None: ...
+
+    @property
+    def enabled(self) -> bool: ...
+
+    @enabled.setter
+    def enabled(self, arg: bool, /) -> None: ...
+
 class DiscreteContactManager:
     def getName(self) -> str: ...
 
@@ -562,6 +601,18 @@ class DiscreteContactManager:
 
     @overload
     def setCollisionObjectsTransform(self, transforms: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None: ...
+
+    @overload
+    def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Set each id's transform from `state`; raises IndexError if `state` lacks an id.
+        """
+
+    @overload
+    def setCollisionObjectsTransform(self, ids: Set[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Set each id's transform from `state`; raises IndexError if `state` lacks an id.
+        """
 
     def getCollisionObjects(self) -> list[tesseract_robotics.tesseract_common._tesseract_common.LinkId]: ...
 
@@ -596,6 +647,29 @@ class DiscreteContactManager:
     def contactTest(self, collisions: ContactResultMap, request: ContactRequest) -> None: ...
 
     def clone(self) -> DiscreteContactManager: ...
+
+    def addCollisionObjects(self, objects: Sequence[CollisionObjectSpec]) -> bool:
+        """
+        Add the objects in order, as repeated addCollisionObject calls; a repeated id: the last entry decides. False if any failed; the rest are still added.
+        """
+
+    def removeCollisionObjects(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str]) -> bool:
+        """
+        Remove the objects; False if any id was absent (the present ones are still removed).
+        """
+
+    @overload
+    def setCollisionObjectsEnabled(self, enabled: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, bool] | Mapping[str, bool]) -> bool:
+        """Enable (True) or disable (False) each id; False if any id was absent."""
+
+    @overload
+    def setCollisionObjectsEnabled(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], enabled: bool) -> bool:
+        """Enable or disable every id; False if any id was absent."""
+
+    def getCollisionObjectsTransform(self, id: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+        """
+        The object's world transform; raises IndexError for an id the manager does not hold.
+        """
 
 class ContinuousContactManager:
     def getName(self) -> str: ...
@@ -635,6 +709,18 @@ class ContinuousContactManager:
     def setCollisionObjectsTransform(self, pose1: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], pose2: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None: ...
 
     @overload
+    def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Set each id's transform from `state`; raises IndexError if `state` lacks an id.
+        """
+
+    @overload
+    def setCollisionObjectsTransform(self, ids: Set[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Set each id's transform from `state`; raises IndexError if `state` lacks an id.
+        """
+
+    @overload
     def setCollisionObjectsTransformCast(self, id: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, pose1: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d, pose2: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> None: ...
 
     @overload
@@ -670,6 +756,140 @@ class ContinuousContactManager:
     def contactTest(self, collisions: ContactResultMap, request: ContactRequest) -> None: ...
 
     def clone(self) -> ContinuousContactManager: ...
+
+    def addCollisionObjects(self, objects: Sequence[CollisionObjectSpec]) -> bool:
+        """
+        Add the objects in order, as repeated addCollisionObject calls; a repeated id: the last entry decides. False if any failed; the rest are still added.
+        """
+
+    def removeCollisionObjects(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str]) -> bool:
+        """
+        Remove the objects; False if any id was absent (the present ones are still removed).
+        """
+
+    @overload
+    def setCollisionObjectsEnabled(self, enabled: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, bool] | Mapping[str, bool]) -> bool:
+        """Enable (True) or disable (False) each id; False if any id was absent."""
+
+    @overload
+    def setCollisionObjectsEnabled(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], enabled: bool) -> bool:
+        """Enable or disable every id; False if any id was absent."""
+
+    def getCollisionObjectsTransform(self, id: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str) -> tesseract_robotics.tesseract_common._tesseract_common.Isometry3d:
+        """
+        The object's world transform; raises IndexError for an id the manager does not hold.
+        """
+
+class ImplicitSDFShape:
+    """
+    Callback representation of a signed-distance shape in world coordinates.
+    """
+
+    def __init__(self) -> None: ...
+
+    @property
+    def distance(self) -> Callable[[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], float]:
+        """Signed distance at a world point (negative inside)"""
+
+    @distance.setter
+    def distance(self, arg: Callable[[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], float], /) -> None: ...
+
+    @property
+    def gradient(self) -> Callable[[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]], Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+        """Gradient of `distance` at a world point"""
+
+    @gradient.setter
+    def gradient(self, arg: Callable[[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], /) -> None: ...
+
+    @property
+    def aabb(self) -> tuple[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')], Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]:
+        """
+        World axis-aligned bounds of the region searched for contacts, as (min, max)
+        """
+
+    @aabb.setter
+    def aabb(self, arg: tuple[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], /) -> None: ...
+
+    def isValid(self) -> bool:
+        """Whether the shape has all data the solver needs"""
+
+class ImplicitSDFCollisionConfig:
+    """Settings of the multi-start implicit SDF collision solver."""
+
+    def __init__(self) -> None: ...
+
+    @property
+    def initial_sample_count(self) -> int: ...
+
+    @initial_sample_count.setter
+    def initial_sample_count(self, arg: int, /) -> None: ...
+
+    @property
+    def max_iterations(self) -> int: ...
+
+    @max_iterations.setter
+    def max_iterations(self, arg: int, /) -> None: ...
+
+    @property
+    def max_contacts(self) -> int: ...
+
+    @max_contacts.setter
+    def max_contacts(self, arg: int, /) -> None: ...
+
+    @property
+    def contact_margin(self) -> float: ...
+
+    @contact_margin.setter
+    def contact_margin(self, arg: float, /) -> None: ...
+
+    @property
+    def minimum_step(self) -> float: ...
+
+    @minimum_step.setter
+    def minimum_step(self, arg: float, /) -> None: ...
+
+    @property
+    def duplicate_tolerance(self) -> float: ...
+
+    @duplicate_tolerance.setter
+    def duplicate_tolerance(self, arg: float, /) -> None: ...
+
+class ImplicitSDFContact:
+    """A contact between two implicit shapes."""
+
+    def __init__(self) -> None: ...
+
+    @property
+    def distance(self) -> float: ...
+
+    @distance.setter
+    def distance(self, arg: float, /) -> None: ...
+
+    @property
+    def point(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
+
+    @point.setter
+    def point(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> None: ...
+
+    @property
+    def normal(self) -> Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]: ...
+
+    @normal.setter
+    def normal(self, arg: Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float], /) -> None: ...
+
+    @property
+    def nearest_points(self) -> list[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')]]: ...
+
+    @nearest_points.setter
+    def nearest_points(self, arg: Sequence[Annotated[NDArray[numpy.float64], dict(shape=(3), order='C')] | Sequence[float]], /) -> None: ...
+
+def collideImplicitSDF(shape0: ImplicitSDFShape, shape1: ImplicitSDFShape, config: ImplicitSDFCollisionConfig = ...) -> list[ImplicitSDFContact]:
+    """Contacts between two implicit shapes, within config.contact_margin."""
+
+def makeImplicitSDFShape(geometry: tesseract_robotics.tesseract_geometry._tesseract_geometry.Geometry, pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> ImplicitSDFShape:
+    """
+    World-coordinate implicit shape of a box, sphere, cylinder, cone, capsule or SDF geometry; an invalid shape (isValid() False) for other geometry.
+    """
 
 class ContactManagersPluginFactory:
     @overload
