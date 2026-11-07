@@ -454,6 +454,40 @@ profiles.addProfile(
     of a checker — and then collisions must be checked elsewhere, for
     instance by the pipeline's own `DiscreteContactCheckTask`.
 
+    **Workaround: smaller Bullet pools.** A clone's cost is Bullet's pool
+    allocators, sized by default for a physics world (4096 persistent
+    manifolds, 4096 collision algorithms; ~7 MiB per clone). The Bullet
+    plugins read both sizes from their config, so set them in the
+    contact-manager plugin YAML your SRDF points to:
+
+    ```yaml
+    contact_manager_plugins:
+      discrete_plugins:
+        default: BulletDiscreteBVHManager
+        plugins:
+          BulletDiscreteBVHManager:
+            class: BulletDiscreteBVHManagerFactory
+            config:
+              max_persistent_manifold_pool_size: 16
+              max_collision_algorithm_pool_size: 16
+    ```
+
+    Pool size is capacity, not semantics: the contacts are the same
+    (`tests/tesseract_collision/test_bullet_pool_config.py`). Measured in
+    [#140](https://github.com/tesseract-robotics/tesseract_nanobind/issues/140)
+    (0.35.0.7, macOS arm64):
+
+    | Scene | Planner | Default pools (4096/4096) | 16/16 pools | Output |
+    |---|---|---|---|---|
+    | free space, 419 wp | Descartes | 413 ms, +2922 MiB peak RSS | 17.8 ms, +30 MiB | identical joints |
+    | `docs/assets/sample.ply` octree (333 boxes), tool 5 cm above, 210 wp | Descartes | 247 ms | 43 ms | identical joints |
+    | same scan at 1 cm (4021 boxes), edge collision on | Descartes | 6.6 s | 5.6 s | identical joints |
+    | BasicCartesianExample, C++ example's octomap | TrajOpt | 60 ms, +404 MiB | 38 ms, +8 MiB | both plan |
+
+    The per-waypoint clones themselves are upstream's: TrajOpt's are
+    tesseract-robotics/trajopt#625 (fix in tesseract_planning#789);
+    Descartes's have no upstream issue yet.
+
 !!! tip "Use for joint-continuity across rasters"
     A custom edge evaluator is the cleanest way to globally enforce
     IK-branch consistency across an entire raster program — the raster
