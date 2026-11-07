@@ -112,14 +112,6 @@ struct ConstraintNotLinkedError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-// CartLineConstraint sizes its Jacobian by indices.size() rows but fills six whatever that size,
-// in the numeric and the analytic branch (cartesian_line_constraint.cpp:179-188, :238-247,
-// trajopt 0.35.0), so fewer than six indices write past the matrix (#237, trajopt#618).
-// Remove with the check when the pinned trajopt has the fix (#238).
-struct CartLineIndicesUnsupportedError : std::invalid_argument {
-    using std::invalid_argument::invalid_argument;
-};
-
 // toTrajArray sizes its matrix by the first Var and assigns every Var as a row unchecked
 struct VarSizeMismatchError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
@@ -394,9 +386,6 @@ const std::shared_ptr<const ti::Var>& require_in_variable_set(const std::shared_
 // forward-difference step of calcNumericalConstraintGradient, its C++ default (ifopt_utils.h:108)
 constexpr double NUMERICAL_GRADIENT_EPSILON = 1e-8;
 
-// rows of a twist error: 3 linear + 3 angular
-constexpr std::size_t TWIST_SIZE = 6;
-
 // trajopt 0.35.0 checks a bounds vector's length against the rows it describes with assert()
 // (compiled out) or a log line, then indexes by row: a wrong length reads or writes out of range.
 struct BoundsSizeError : std::invalid_argument {
@@ -431,16 +420,6 @@ ti::Variables::Ptr require_linked(const ti::ConstraintSet& self, const char* met
                                        "' is not linked to variables; call "
                                        "linkWithVariables first, or add it to a problem");
     return variables;
-}
-
-void require_six_indices(const ti::CartLineConstraint& self, const char* method) {
-    const auto n_indices = static_cast<std::size_t>(self.getInfo().indices.size());
-    if (n_indices != TWIST_SIZE)
-        throw CartLineIndicesUnsupportedError(
-            std::string(method) + ": constraint set '" + self.getName() + "' has " +
-            std::to_string(n_indices) + " indices; trajopt 0.35.0 writes " +
-            std::to_string(TWIST_SIZE) + " Jacobian rows whatever their number and "
-            "corrupts memory with fewer (tesseract_nanobind#237)");
 }
 
 // calcJacobianBlock(jac_block, joint_vals) fills a caller-sized Jacobian: getJacobian() sizes it
@@ -492,8 +471,6 @@ NB_MODULE(_trajopt_ifopt, m) {
 
     nb::exception<ConstraintNotLinkedError>(m, "ConstraintNotLinkedError", PyExc_RuntimeError)
         .attr("__doc__") = "getJacobian() on a constraint set that is not linked to variables yet.";
-    nb::exception<CartLineIndicesUnsupportedError>(m, "CartLineIndicesUnsupportedError", PyExc_ValueError)
-        .attr("__doc__") = "CartLineConstraint.getJacobian() with fewer than 6 indices (#237).";
     nb::exception<BoundsSizeError>(m, "BoundsSizeError", PyExc_ValueError)
         .attr("__doc__") = "A bounds list whose length is not the number of rows or values it bounds.";
     nb::exception<JointValuesSizeError>(m, "JointValuesSizeError", PyExc_ValueError)
@@ -1372,19 +1349,16 @@ NB_MODULE(_trajopt_ifopt, m) {
              "The constraint's CartLineInfo")
         .def("getJacobian", [](const CartLineConstraintBinding& self) {
                  require_linked(self);
-                 require_six_indices(self, "getJacobian");
                  return jacobian_checked(self);
              },
-             "Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError "
-             "unless all 6 indices are set (#237)")
+             "Get the constraint Jacobian (sparse matrix), one row per index")
         .def("calcJacobianBlock",
              [](const CartLineConstraintBinding& self, const Eigen::Ref<const Eigen::VectorXd>& joint_vals) {
-                 require_six_indices(self, "calcJacobianBlock");
                  return jacobian_block_checked(self, joint_vals, self.getInfo().manip->numJoints());
              },
              "joint_vals"_a,
              "The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); "
-             "needs linked variables and all 6 indices (#237)")
+             "needs linked variables")
         .def("calcValues", &ti::CartLineConstraint::calcValues, "joint_vals"_a,
              "Calculate error values for given joint values")
         .def_static("getLinePoint", &ti::CartLineConstraint::getLinePoint,

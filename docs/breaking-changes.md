@@ -8,6 +8,7 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 
 | Release | What breaks | Use instead |
 |---|---|---|
+| Unreleased | `trajopt_ifopt.CartLineIndicesUnsupportedError` removed: `CartLineConstraint` with fewer than 6 indices returns its Jacobian | [Drop the exception](#cartlineindicesunsupportederror-removed) |
 | Unreleased | Python 3.9, 3.10 and 3.11 are no longer supported; Rhino 8 loses wheels | [Python 3.12 or later, or 0.35.0.8](#python-312-is-the-minimum) |
 | Unreleased | `planning.program.Target` and `emitters.core.events.Event` are `type` aliases, which `isinstance` rejects | [Their `__value__`, or the member classes](#target-and-event-are-type-aliases) |
 | Unreleased | console_bridge logging API removed (`setLogLevel`, `useOutputHandler`, `OutputHandler`, `CONSOLE_BRIDGE_LOG_*`, …): upstream logs through spdlog | [`getLogger()`, `addLogRecordHandler()`](api/tesseract_common.md#logging) |
@@ -54,6 +55,20 @@ take only the QP solution vector. The [changelog](CHANGELOG.md) lists every chan
 | 0.34.1.0 | tesseract 0.34: `ifopt` module, `JointPosition`, `CartPosInfo`, `CollisionCache`, … | [0.33 → 0.34 guide](changes.md#breaking-changes) |
 
 ## Unreleased
+
+### `CartLineIndicesUnsupportedError` removed
+
+trajopt 0.35.0 filled 6 Jacobian rows whatever the number of `CartLineInfo.indices`, so the binding
+raised `CartLineIndicesUnsupportedError` (a `ValueError`) from `CartLineConstraint.getJacobian()`
+and `calcJacobianBlock()` with fewer than 6 (#237). The pinned trajopt fills one row per index
+(trajopt#612): both return the rows the indices name, and a solve calls the same C++ method.
+Code that names the exception raises `AttributeError`; in an `except` clause only once something
+raises there. Drop the clause:
+
+| before | after |
+| --- | --- |
+| `except ti.CartLineIndicesUnsupportedError:` | nothing to catch |
+| `info.indices = np.arange(6)`, the only safe set | the rows you want, e.g. `info.indices = np.array([0, 1, 2])` |
 
 ### Python 3.12 is the minimum
 

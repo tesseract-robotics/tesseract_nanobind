@@ -19,9 +19,6 @@ import tesseract_robotics.tesseract_kinematics._tesseract_kinematics
 class ConstraintNotLinkedError(RuntimeError):
     """getJacobian() on a constraint set that is not linked to variables yet."""
 
-class CartLineIndicesUnsupportedError(ValueError):
-    """CartLineConstraint.getJacobian() with fewer than 6 indices (#237)."""
-
 class BoundsSizeError(ValueError):
     """
     A bounds list whose length is not the number of rows or values it bounds.
@@ -815,13 +812,11 @@ class CartLineConstraint(ConstraintSet):
         """The constraint's CartLineInfo"""
 
     def getJacobian(self) -> scipy.sparse.csr_matrix[float]:
-        """
-        Get the constraint Jacobian (sparse matrix); raises CartLineIndicesUnsupportedError unless all 6 indices are set (#237)
-        """
+        """Get the constraint Jacobian (sparse matrix), one row per index"""
 
     def calcJacobianBlock(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> scipy.sparse.csr_matrix[float]:
         """
-        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables and all 6 indices (#237)
+        The constraint Jacobian at joint_vals (sparse matrix, sized like getJacobian()); needs linked variables
         """
 
     def calcValues(self, joint_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:

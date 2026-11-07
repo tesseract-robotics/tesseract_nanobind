@@ -120,14 +120,12 @@ also when trajopt calls the set from `TrajOptQPProblem` or `TrustRegionSQPSolver
 used to arrive as `RuntimeError` with the Python traceback as its message
 ([#156](https://github.com/tesseract-robotics/tesseract_nanobind/issues/156)).
 
-`CartLineConstraint.getJacobian()` raises `CartLineIndicesUnsupportedError` (a `ValueError`)
-unless `CartLineInfo.indices` holds all 6 twist rows. Upstream sizes the Jacobian by the number
-of indices but fills 6 rows, numeric and analytic alike, so fewer corrupt memory
-([#237](https://github.com/tesseract-robotics/tesseract_nanobind/issues/237)). Construction,
-`getValues()` and `calcValues()` work with 1 to 6 indices. The check covers direct Python calls
-only: `TrajOptQPProblem` calls the C++ Jacobian, so a solve with fewer than 6 indices can still
-crash. Use all 6 indices for a constraint you solve. The check goes once the pinned trajopt
-includes the upstream fix (trajopt#618).
+`CartLineConstraint` takes 1 to 6 `CartLineInfo.indices`, in any order: `getValues()`,
+`getJacobian()` and `calcJacobianBlock()` return one row per index, the rows of the 6-index result
+that the indices name. trajopt 0.35.0 filled 6 Jacobian rows whatever their number, so fewer
+corrupted memory, and the binding raised `CartLineIndicesUnsupportedError` until the pinned trajopt
+had the fix (trajopt#612,
+[#237](https://github.com/tesseract-robotics/tesseract_nanobind/issues/237)).
 
 `setBounds(bounds)` replaces a set's row bounds; it raises `BoundsSizeError` (a `ValueError`)
 unless there is one bound per row (trajopt checks with `assert` only).

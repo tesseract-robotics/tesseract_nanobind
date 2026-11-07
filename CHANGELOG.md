@@ -111,6 +111,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
   | `create_time_optimal_parameterization(path_tolerance=0.05, min_angle_change=0.01)` | `create_time_optimal_parameterization()`, and `TimeOptimalTrajectoryGenerationCompositeProfile().path_tolerance = 0.05` (`.min_angle_change`) |
   | `create_iterative_spline_parameterization(add_points=False)` | `create_iterative_spline_parameterization()`, and `IterativeSplineParameterizationCompositeProfile().add_points = False` |
 
+- **`CartLineIndicesUnsupportedError` removed: `CartLineConstraint` takes 1 to 6 indices** — the pinned trajopt fills one Jacobian row per index (trajopt#612), so `getJacobian()` and `calcJacobianBlock()` with fewer than 6 `CartLineInfo.indices` return those rows of the 6-index Jacobian instead of raising; a solve calls the same `calcJacobianBlock`. Code that names the exception gets `AttributeError`; in an `except` clause, only once something raises. Drop it ([#237]).
 - **`tesseract_robotics.ompl_base` removed** — the module, its hand-written stub and `reeds_shepp_example.py` / `tesseract_reeds_shepp_example`. It wrapped five OMPL headers directly, and nothing in the package used it; OMPL stays a dependency of the OMPL planner, which loads it in C++. Use OMPL's own Python bindings for `State`, `RealVectorBounds`, `SE2StateSpace`, `ReedsSheppStateSpace` or `DubinsStateSpace` ([#258]).
 
 ### Changes
