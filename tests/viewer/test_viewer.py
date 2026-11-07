@@ -50,6 +50,7 @@ from tesseract_robotics.viewer.errors import (
     ViewerPortInUseError,
     ViserLoopTimeoutError,
 )
+from tesseract_robotics.viewer.floor import MIN_FLOOR_SIZE_M
 from tesseract_robotics.viewer.poses import link_poses
 from tesseract_robotics.viewer.tcp_path import tcp_path
 from tesseract_robotics.viewer.viewer import PLAYBACK_DT_S
@@ -646,6 +647,28 @@ def test_late_client_gets_the_scene_and_playback_controls(viewer, env):
     assert len(_names(messages, "GlbMessage")) == len(viewer._visual_handles) > 0
     assert [m for m in messages if m["type"] == "GuiSliderMessage"]
     assert [m for m in messages if m["type"] == "GuiCheckboxMessage"]
+
+
+def test_late_client_sees_the_docs_theme(viewer):
+    """Dark, without viser's logo: what the docs' demo players show."""
+    (theme,) = [m for m in _late_client_replay(viewer) if m["type"] == "ThemeConfigurationMessage"]
+    assert theme["dark_mode"] is True
+    assert theme["show_logo"] is False
+
+
+def test_late_client_sees_a_floor_under_the_robot(viewer, env):
+    viewer.update_environment(env)
+    (floor,) = [m for m in _late_client_replay(viewer) if m["type"] == "GridMessage"]
+    assert floor["name"] == "/floor"
+    assert floor["props"]["plane"] == "xy"
+    assert floor["props"]["width"] == floor["props"]["height"] == MIN_FLOOR_SIZE_M
+
+
+def test_floor_follows_the_environment(viewer, env, other_env):
+    viewer.update_environment(env)
+    viewer.update_environment(other_env)
+    floors = [m for m in _late_client_replay(viewer) if m["type"] == "GridMessage"]
+    assert [m["name"] for m in floors] == ["/floor"]
 
 
 def test_late_client_after_a_swap_sees_only_the_new_scene(viewer, env, other_env):

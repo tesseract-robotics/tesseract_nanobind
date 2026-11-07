@@ -29,8 +29,9 @@ from .errors import (
     ViewerPortInUseError,
     ViserLoopTimeoutError,
 )
+from .floor import FLOOR_CELL_M, FLOOR_SECTION_M, FLOOR_SHADOW_OPACITY, Floor
 from .geometry import visual_to_trimesh
-from .poses import isometry_to_pose, link_poses
+from .poses import isometry_to_pose, link_poses, pose_matrix
 from .tcp_path import tcp_path
 from .trajectory import Trajectory
 
@@ -56,8 +57,8 @@ PLAYER_JOIN_TIMEOUT_S = 5.0
 VISER_LOOP_TIMEOUT_S = 1.0
 # Default TCP axes length for plot_trajectory [m]; the old viewer's default.
 PLOT_AXES_LENGTH_M = 0.1
-# Default TCP path colour for plot_trajectory, 8-bit RGB: white, the old viewer's default.
-PLOT_COLOR_RGB = (255, 255, 255)
+# Default TCP path colour for plot_trajectory, 8-bit RGB: orange, visible on the dark theme.
+PLOT_COLOR_RGB = (255, 170, 0)
 # TCP triad axis radius per unit axis length [-]: slim enough that triads don't merge.
 PLOT_AXES_RADIUS_RATIO = 0.05
 # TCP path line thickness [m]: 2 mm, visible at robot scale.
@@ -123,6 +124,8 @@ class TesseractViewer:
         self._pose_lock = threading.RLock()
 
         gui = self._server.gui
+        # The docs' demo players' look: dark, without viser's logo.
+        gui.configure_theme(dark_mode=True, show_logo=False)
         with gui.add_folder("Playback"):
             self._gui_play = gui.add_checkbox("Play", True)
             self._gui_time = gui.add_slider(
@@ -151,6 +154,8 @@ class TesseractViewer:
     def update_environment(self, env: Environment) -> None:
         """Replace the scene with `env`'s links and visuals at its current state.
 
+        A floor grid (`/floor`) is laid under the scene's footprint at its current state.
+
         The current trajectory stays when `env` has all its joints, so a re-pushed
         environment keeps playing; otherwise it is dropped with a warning.
 
@@ -169,6 +174,16 @@ class TesseractViewer:
             ]
             for link_name in (lid.name() for lid in env.getLinkIds())
         }
+        world = {
+            name: pose_matrix(pose)
+            for name, pose in link_poses(env, [], np.empty(0, dtype=np.float64)).items()
+        }
+        floor = Floor.under(
+            (world[link_name] @ pose_matrix(pose), mesh)
+            for link_name, visuals in link_visuals.items()
+            for pose, meshes in visuals
+            for mesh in meshes
+        )
         with self._pose_lock:
             self._clear_scene()
             self._env = env
@@ -184,6 +199,16 @@ class TesseractViewer:
                                 f"{frame_name}/visual_{i}_{j}", mesh, position=position, wxyz=wxyz
                             )
                         )
+            self._server.scene.add_grid(
+                "/floor",
+                width=floor.size_m,
+                height=floor.size_m,
+                plane="xy",
+                cell_size=FLOOR_CELL_M,
+                section_size=FLOOR_SECTION_M,
+                position=(*floor.center_m, 0.0),
+                shadow_opacity=FLOOR_SHADOW_OPACITY,
+            )
             traj = self._trajectory
             if traj is not None and not set(traj.joint_names) <= {
                 jid.name() for jid in env.getJointIds()
