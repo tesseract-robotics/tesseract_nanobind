@@ -24,6 +24,12 @@ class QPSizeError(ValueError):
     QPSolver input whose size is not the (num_vars, num_cnts) of its init().
     """
 
+class QPSolutionSizeError(ValueError):
+    """A convex evaluator's var_vals that is not getNumQPVars() long."""
+
+class NotConvexifiedError(ValueError):
+    """A convex evaluator called before the problem's first convexify()."""
+
 class CostPenaltyType(enum.Enum):
     """Penalty type for cost terms"""
 
@@ -555,8 +561,8 @@ class QPProblem:
             The sum of evaluateConvexCosts(var_vals).
 
         Raises:
-            ValueError: if var_vals does not have getNumQPVars() entries, or before the
-                first convexify().
+            QPSolutionSizeError: if var_vals does not have getNumQPVars() entries.
+            NotConvexifiedError: before the first convexify().
         """
 
     def evaluateConvexCosts(self, var_vals: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float]) -> Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]:
@@ -572,8 +578,8 @@ class QPProblem:
             One convexified cost per cost term, in getNLPCostNames() order.
 
         Raises:
-            ValueError: if var_vals does not have getNumQPVars() entries, or before the
-                first convexify().
+            QPSolutionSizeError: if var_vals does not have getNumQPVars() entries.
+            NotConvexifiedError: before the first convexify().
         """
 
     def getTotalExactCost(self) -> float:
@@ -596,8 +602,8 @@ class QPProblem:
             satisfied.
 
         Raises:
-            ValueError: if var_vals does not have getNumQPVars() entries, or before the
-                first convexify().
+            QPSolutionSizeError: if var_vals does not have getNumQPVars() entries.
+            NotConvexifiedError: before the first convexify().
         """
 
     def getExactConstraintViolations(self) -> ConstraintViolations:

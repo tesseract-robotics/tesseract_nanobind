@@ -735,12 +735,13 @@ its path/content pair the same way (#337).
 `evaluateConvexConstraintViolations` read `var_vals` in the layout of the QP that the last
 `convexify()` built: `getNumQPVars()` entries, the NLP variables followed by the slack variables
 ([L28][t28]). trajopt documents that size ([L59][h59], [L67][h67]) but does not check it. The
-binding now raises `ValueError` for any other size, and before the first `convexify()`, while
-`getNumQPVars()` is still 0 ([L99][t99], [L831][t831]):
+binding now raises `QPSolutionSizeError` for any other size, and `NotConvexifiedError` before
+the first `convexify()`, while `getNumQPVars()` is still 0 ([L99][t99], [L831][t831]). Both are
+`ValueError`s:
 
 ```text
-ValueError: evaluateConvexCosts: var_vals has 3 entries; it must be the QP solution vector of getNumQPVars() = 5 entries, the NLP variables followed by the slack variables
-ValueError: evaluateConvexCosts: the problem has no convex model yet; call convexify() first
+QPSolutionSizeError: evaluateConvexCosts: var_vals has 3 entries; it must be the QP solution vector of getNumQPVars() = 5 entries, the NLP variables followed by the slack variables
+NotConvexifiedError: evaluateConvexCosts: the problem has no convex model yet; call convexify() first
 ```
 
 What used to work and now raises: an NLP-sized `var_vals` on a problem with constraint sets

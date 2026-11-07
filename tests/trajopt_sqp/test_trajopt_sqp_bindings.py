@@ -1387,7 +1387,7 @@ for name in {CONVEX_EVALUATORS!r}:
         try:
             getattr(problem, name)(var_vals)
         except ValueError as exc:
-            print(f"RAISED {{name}} {{len(var_vals)}}: {{exc}}", flush=True)
+            print(f"RAISED {{name}} {{len(var_vals)}} {{type(exc).__name__}}: {{exc}}", flush=True)
         else:
             print(f"RETURNED {{name}} {{len(var_vals)}}", flush=True)
 """
@@ -1402,9 +1402,10 @@ class TestConvexEvaluatorArguments:
     getNumNLPVars() is read past its end: with the binding's check off, a one-entry view into a
     buffer of 7s read a squared cost of 4.5 as 49.0. Before the first convexify() there is no
     model and getNumQPVars() is 0: an empty or NLP-sized var_vals segfaults on a squared cost,
-    and a penalty cost or a constraint reads 0. The binding raises ValueError unless var_vals has
-    getNumQPVars() entries, and before the first convexify(), for all three evaluators: trajopt's
-    documented contract, not the NLP-sized read it does today. trajopt 0.35.0 also read an
+    and a penalty cost or a constraint reads 0. For all three evaluators the binding raises
+    QPSolutionSizeError unless var_vals has getNumQPVars() entries, and NotConvexifiedError
+    before the first convexify(), both ValueErrors: trajopt's documented contract, not the
+    NLP-sized read it does today. trajopt 0.35.0 also read an
     NLP-sized var_vals past its end (#149: an absolute cost of 0.5 read 3.5).
     """
 
@@ -1418,7 +1419,7 @@ class TestConvexEvaluatorArguments:
         nlp_point = np.array([0.0, SEED_NODE_1, 0.0])
         assert problem.getNumNLPVars() == len(nlp_point) < problem.getNumQPVars()
 
-        with pytest.raises(ValueError, match=r"getNumQPVars\(\)"):
+        with pytest.raises(tsqp.QPSolutionSizeError, match=r"getNumQPVars\(\)"):
             getattr(problem, evaluator)(nlp_point)
 
     @pytest.mark.parametrize("evaluator", CONVEX_EVALUATORS)
@@ -1432,7 +1433,7 @@ class TestConvexEvaluatorArguments:
         problem.convexify()
         over_long = np.zeros(problem.getNumQPVars() + 1)
 
-        with pytest.raises(ValueError, match=r"getNumQPVars\(\)"):
+        with pytest.raises(tsqp.QPSolutionSizeError, match=r"getNumQPVars\(\)"):
             getattr(problem, evaluator)(over_long)
 
     @_PENALTY_TYPES
@@ -1477,6 +1478,12 @@ class TestConvexEvaluatorArguments:
         assert len(outcomes) == 2 * len(CONVEX_EVALUATORS), proc.stdout[-500:]
         for outcome in outcomes:
             assert outcome.startswith("RAISED") and "convexify()" in outcome, outcome
+            assert " NotConvexifiedError: " in outcome, outcome
+
+    @pytest.mark.parametrize("error", ["QPSolutionSizeError", "NotConvexifiedError"])
+    def test_evaluator_errors_are_value_errors(self, error):
+        """Both used to be plain ValueErrors; code that catches ValueError still does."""
+        assert issubclass(getattr(tsqp, error), ValueError)
 
 
 class TestPIQPSolver:
