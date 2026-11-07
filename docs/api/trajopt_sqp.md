@@ -32,6 +32,12 @@ lower ≤ A x ≤ upper over `getNumQPConstraints()` rows. `getHessian()` and
 dynamic set recounts its rows; `NodesVariables.setVariables` only writes the values. It raises
 `VariablesSizeError` (a `ValueError`) unless `len(x) == getNumNLPVars()`.
 
+`evaluateConvexCosts`, `evaluateTotalConvexCost` and `evaluateConvexConstraintViolations` take a
+point of the QP the last `convexify()` built: `getNumQPVars()` entries, the NLP variables followed
+by the slacks. They raise `QPSolutionSizeError` for any other size and `NotConvexifiedError`
+before the first `convexify()`, both `ValueError`s. trajopt reads only the NLP block, so a shorter
+vector would be read past its end, and before `convexify()` there is no model to read.
+
 An `ABSOLUTE` or `HINGE` cost is modelled on its linearized rows, without the slacks: the
 model charges each row its coefficient times the row's linearized violation, and the exact cost
 charges the same coefficient times the exact violation. A violation larger than the trust box is

@@ -28,6 +28,16 @@
 namespace tsqp = trajopt_sqp;
 
 namespace {
+// A convex evaluator called with a var_vals that is not getNumQPVars() long
+struct QPSolutionSizeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// A convex evaluator called before the first convexify(): there is no convex model to evaluate
+struct NotConvexifiedError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
 // The convex evaluators take a point of the QP the last convexify() built: the NLP variables
 // followed by the slack variables, getNumQPVars() entries, as trajopt documents
 // (qp_problem.h:61, :69, :92) but does not check. trajopt reads only the NLP block
@@ -35,23 +45,22 @@ namespace {
 // shorter than getNumNLPVars() is read past its end. Before the first convexify() there is no
 // model: a squared cost segfaults, and a penalty cost or a constraint reads 0 whatever its
 // violation. Measured on trajopt a504b22 with this check off, in child interpreters. The binding
-// owns the Python boundary, so it validates here and fails loud (std::invalid_argument ->
-// ValueError): one contract for all three evaluators, trajopt's documented size and not the
-// NLP-sized read it does today.
+// owns the Python boundary, so it validates here and fails loud (NotConvexifiedError,
+// QPSolutionSizeError, both ValueError): one contract for all three evaluators, trajopt's
+// documented size and not the NLP-sized read it does today.
 void validate_qp_solution(const tsqp::QPProblem& problem,
                           const Eigen::Ref<const Eigen::VectorXd>& var_vals,
                           const char* method)
 {
     const Eigen::Index n_qp = problem.getNumQPVars();
     if (n_qp < problem.getNumNLPVars())
-        throw std::invalid_argument(std::string(method) +
-                                    ": the problem has no convex model yet; call convexify() first");
+        throw NotConvexifiedError(std::string(method) +
+                                  ": the problem has no convex model yet; call convexify() first");
     if (var_vals.size() != n_qp)
-        throw std::invalid_argument(std::string(method) + ": var_vals has " +
-                                    std::to_string(var_vals.size()) +
-                                    " entries; it must be the QP solution vector of getNumQPVars() = " +
-                                    std::to_string(n_qp) +
-                                    " entries, the NLP variables followed by the slack variables");
+        throw QPSolutionSizeError(std::string(method) + ": var_vals has " + std::to_string(var_vals.size()) +
+                                  " entries; it must be the QP solution vector of getNumQPVars() = " +
+                                  std::to_string(n_qp) +
+                                  " entries, the NLP variables followed by the slack variables");
 }
 
 // QPProblem::setVariables(const double* x) reads getNumNLPVars() doubles through an Eigen::Map
@@ -216,6 +225,10 @@ NB_MODULE(_trajopt_sqp, m) {
         .attr("__doc__") = "QPProblem.setVariables with a vector that is not getNumNLPVars() long.";
     nb::exception<QPSizeError>(m, "QPSizeError", PyExc_ValueError)
         .attr("__doc__") = "QPSolver input whose size is not the (num_vars, num_cnts) of its init().";
+    nb::exception<QPSolutionSizeError>(m, "QPSolutionSizeError", PyExc_ValueError)
+        .attr("__doc__") = "A convex evaluator's var_vals that is not getNumQPVars() long.";
+    nb::exception<NotConvexifiedError>(m, "NotConvexifiedError", PyExc_ValueError)
+        .attr("__doc__") = "A convex evaluator called before the problem's first convexify().";
 
     // Import trajopt_ifopt module for cross-module type resolution
     nb::module_::import_("tesseract_robotics.trajopt_ifopt._trajopt_ifopt");
@@ -489,8 +502,8 @@ NB_MODULE(_trajopt_sqp, m) {
              "Returns:\n"
              "    The sum of evaluateConvexCosts(var_vals).\n\n"
              "Raises:\n"
-             "    ValueError: if var_vals does not have getNumQPVars() entries, or before the\n"
-             "        first convexify().")
+             "    QPSolutionSizeError: if var_vals does not have getNumQPVars() entries.\n"
+             "    NotConvexifiedError: before the first convexify().")
         .def("evaluateConvexCosts",
              [](const tsqp::QPProblem& self, const Eigen::Ref<const Eigen::VectorXd>& var_vals) {
                  validate_qp_solution(self, var_vals, "evaluateConvexCosts");
@@ -505,8 +518,8 @@ NB_MODULE(_trajopt_sqp, m) {
              "Returns:\n"
              "    One convexified cost per cost term, in getNLPCostNames() order.\n\n"
              "Raises:\n"
-             "    ValueError: if var_vals does not have getNumQPVars() entries, or before the\n"
-             "        first convexify().")
+             "    QPSolutionSizeError: if var_vals does not have getNumQPVars() entries.\n"
+             "    NotConvexifiedError: before the first convexify().")
         .def("getTotalExactCost", &tsqp::QPProblem::getTotalExactCost,
              "Get exact (non-convexified) total cost")
         .def("getExactCosts", &tsqp::QPProblem::getExactCosts,
@@ -526,8 +539,8 @@ NB_MODULE(_trajopt_sqp, m) {
              "    One violation per constraint set, in getNLPConstraintNames() order; 0 where\n"
              "    satisfied.\n\n"
              "Raises:\n"
-             "    ValueError: if var_vals does not have getNumQPVars() entries, or before the\n"
-             "        first convexify().")
+             "    QPSolutionSizeError: if var_vals does not have getNumQPVars() entries.\n"
+             "    NotConvexifiedError: before the first convexify().")
         .def("getExactConstraintViolations", &tsqp::QPProblem::getExactConstraintViolations,
              "Get current exact constraint violations")
         .def("setSumConstraintSetViolations", &tsqp::QPProblem::setSumConstraintSetViolations, "sum"_a,
@@ -578,7 +591,7 @@ NB_MODULE(_trajopt_sqp, m) {
     // ========== TrajOptQPProblem ==========
     // The QP problem tesseract_planning's TrajOpt-Ifopt planner builds
     // (trajopt_ifopt_motion_planner.cpp): costs and constraints go straight in. Its exact merit
-    // weights each squared cost row by its coefficient, as its convex model does, and counts
+    // weights each cost row by its coefficient, as its convex model does, and counts
     // every cost term once; it keeps one merit coefficient per constraint set.
     nb::class_<tsqp::TrajOptQPProblem, tsqp::QPProblem>(
         m, "TrajOptQPProblem",
