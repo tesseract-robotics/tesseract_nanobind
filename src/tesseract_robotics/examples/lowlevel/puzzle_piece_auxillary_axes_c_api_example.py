@@ -72,7 +72,7 @@ JOINT_POS = np.array([-0.785398, 0.4, 0.0, -1.9, 0.0, 1.0, 0.0, 0.0, 0.0])
 CARTESIAN_COEFF = np.array([5.0, 5.0, 5.0, 2.0, 2.0, 0.0])
 
 
-def _profiles(ifopt: bool) -> ProfileDictionary:
+def create_profiles(ifopt: bool = False) -> ProfileDictionary:
     """The C++ example's profiles, TrajOpt or TrajOptIfopt."""
     if ifopt:
         move_profile = TrajOptIfoptDefaultMoveProfile()
@@ -138,7 +138,7 @@ def run(ifopt: bool = False):
 
     pipeline = "TrajOptIfoptPipeline" if ifopt else "TrajOptPipeline"
     print(f"Running {pipeline} (9 DOF)...")
-    result = run_pipeline(env, program, _profiles(ifopt), pipeline)
+    result = run_pipeline(env, program, create_profiles(ifopt), pipeline)
     if not result.successful:
         print(f"Planning failed: {result.message}")
         return False
