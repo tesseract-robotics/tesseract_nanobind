@@ -222,4 +222,4 @@ extra_javascript:
   - javascripts/demos.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
-copyright: Copyright &copy; 2024-2026 Tesseract Robotics
+copyright: Copyright &copy; 2024-2026 Jelle Feringa and the tesseract_nanobind contributors
