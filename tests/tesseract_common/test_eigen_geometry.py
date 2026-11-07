@@ -457,24 +457,38 @@ def test_quaterniond_from_valid_rotation_matrix_accepted():
 # orthonormality_residual(R) <= EIGEN_DEFAULT_PREC, the same rule a consumer
 # applies at build time. Eigen's isUnitary() disagreed with it within a few ulp
 # of the bound (min(x, 1)·prec on column norms, different rounding on the dot
-# products). The two matrices below are such seam samples, as exact hex floats.
-_SEAM_INSIDE_REFUSED_BY_ISUNITARY = (
-    ("0x1.dacd2989b2d55p-2", "-0x1.f7150ca83cfa8p-2", "0x1.7981f0c2e8aedp-1"),
-    ("-0x1.ab8ae39f90b57p-2", "0x1.39c4e0f2c8967p-1", "0x1.5780f58210fd1p-1"),
-    ("-0x1.901bc185cc2b8p-1", "-0x1.3ce427378df06p-1", "0x1.43b2ef5f46dbbp-4"),
-)
-_SEAM_OUTSIDE_ACCEPTED_BY_ISUNITARY = (
-    ("0x1.9daf202cc4697p-2", "0x1.cc1bcd8ed4b01p-1", "-0x1.5e1884dce2d86p-3"),
-    ("-0x1.a8a01c583af2dp-2", "0x1.62cac922c2439p-2", "0x1.aecf90a975eafp-1"),
-    ("0x1.a1791482db675p-1", "-0x1.137f56f0bef90p-2", "0x1.0675efa827e91p-1"),
-)
+# products). The residual of fixed bits moves by a few ulp between platforms
+# (FMA contraction, vector width), so seam samples are drawn where the test runs.
 # Sweep half-width around the bound: residuals within it are the seam samples.
 SEAM_BAND = 3e-15
 SEAM_SAMPLES = 60_000
 
 
-def _hex_matrix(rows: tuple[tuple[str, str, str], ...]) -> np.ndarray:
-    return np.array([[float.fromhex(v) for v in row] for row in rows])
+def _near_bound(rng: np.random.Generator) -> np.ndarray:
+    """A rotation perturbed by a symmetric matrix to a residual within a few dozen ulp of the bound."""
+    q = rng.normal(size=4)
+    q /= np.linalg.norm(q)
+    Q = np.array(Quaterniond.from_xyzw(*q).toRotationMatrix())
+    offset = 1e-16 * rng.uniform(-60, 60)  # a few dozen ulp of the bound either side
+    S = rng.normal(size=(3, 3))
+    S = (S + S.T) / 2
+    S /= np.abs(S).max()
+    return Q @ (np.eye(3) + 0.5 * (DEFAULT_PREC + offset) * S)
+
+
+def _seam_sample(inside: bool) -> np.ndarray:
+    """A matrix whose residual on this platform is within SEAM_BAND of the bound, on one side."""
+    rng = np.random.default_rng(7)
+    for _ in range(SEAM_SAMPLES):
+        M = _near_bound(rng)
+        r = orthonormality_residual(M)
+        if inside and DEFAULT_PREC - SEAM_BAND < r <= DEFAULT_PREC:
+            return M
+        if not inside and DEFAULT_PREC < r < DEFAULT_PREC + SEAM_BAND:
+            return M
+    raise AssertionError(
+        f"no seam sample {'inside' if inside else 'outside'} the bound in {SEAM_SAMPLES} draws"
+    )
 
 
 def _refused(R: np.ndarray) -> bool:
@@ -486,13 +500,13 @@ def _refused(R: np.ndarray) -> bool:
 
 
 def test_quaterniond_accepts_residual_just_inside_prec():
-    R = _hex_matrix(_SEAM_INSIDE_REFUSED_BY_ISUNITARY)
+    R = _seam_sample(inside=True)
     assert DEFAULT_PREC - SEAM_BAND < orthonormality_residual(R) <= DEFAULT_PREC
     Quaterniond(R)
 
 
 def test_quaterniond_refuses_residual_just_outside_prec():
-    R = _hex_matrix(_SEAM_OUTSIDE_ACCEPTED_BY_ISUNITARY)
+    R = _seam_sample(inside=False)
     assert DEFAULT_PREC < orthonormality_residual(R) < DEFAULT_PREC + SEAM_BAND
     with pytest.raises(ValueError, match="not orthonormal"):
         Quaterniond(R)
@@ -511,14 +525,7 @@ def test_quaterniond_acceptance_matches_residual_rule_across_seam():
     rng = np.random.default_rng(5)
     inside_refused = outside_accepted = seam = 0
     for _ in range(SEAM_SAMPLES):
-        q = rng.normal(size=4)
-        q /= np.linalg.norm(q)
-        Q = np.array(Quaterniond.from_xyzw(*q).toRotationMatrix())
-        offset = 1e-16 * rng.uniform(-60, 60)  # a few dozen ulp of the bound either side
-        S = rng.normal(size=(3, 3))
-        S = (S + S.T) / 2
-        S /= np.abs(S).max()
-        M = Q @ (np.eye(3) + 0.5 * (DEFAULT_PREC + offset) * S)
+        M = _near_bound(rng)
         r = orthonormality_residual(M)
         if abs(r - DEFAULT_PREC) > SEAM_BAND:
             continue
