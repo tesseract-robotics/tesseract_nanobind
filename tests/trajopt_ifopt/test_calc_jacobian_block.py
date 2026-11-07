@@ -82,14 +82,22 @@ def test_cart_line(iiwa: Iiwa, linked):
     _assert_block_matches(constraint, var)
 
 
-def test_cart_line_rejects_fewer_than_six_indices(iiwa: Iiwa, linked):
+def test_cart_line_fewer_than_six_indices(iiwa: Iiwa, linked):
+    """One row per index, those of the six-index Jacobian (#237); in a child first, see
+    test_cartline_indices.py, since a trajopt without the fix corrupts the heap."""
     nodes, var = linked
-    constraint = ti.CartLineConstraint(_cart_line_info(iiwa, [0, 1, 2]), var, np.ones(3))
-    constraint.linkWithVariables(nodes)
-    with pytest.raises(ti.CartLineIndicesUnsupportedError):
-        constraint.getJacobian()
-    with pytest.raises(ti.CartLineIndicesUnsupportedError):
-        constraint.calcJacobianBlock(var.value())
+    indices = [0, 1, 2]
+    full = ti.CartLineConstraint(
+        _cart_line_info(iiwa, np.arange(TWIST_SIZE)), var, np.ones(TWIST_SIZE)
+    )
+    full.linkWithVariables(nodes)
+    partial = ti.CartLineConstraint(_cart_line_info(iiwa, indices), var, np.ones(len(indices)))
+    partial.linkWithVariables(nodes)
+    _assert_block_matches(partial, var)
+    np.testing.assert_array_equal(
+        partial.calcJacobianBlock(var.value()).toarray(),
+        full.calcJacobianBlock(var.value()).toarray()[indices],
+    )
 
 
 def test_discrete_collision_numerical(two_boxes: TwoBoxes):
