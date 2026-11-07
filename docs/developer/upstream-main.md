@@ -306,14 +306,17 @@ converts ids with `.name()` at its boundary
 
 ## trajopt workarounds (#146, #151)
 
-Checked against trajopt `de9e941`:
+Checked against the pinned trajopt `a504b22` (`0.36.0.dev20261013`); trajopt#592 merged as
+`de9e941`:
 
-| Item | Upstream fix | In `de9e941`? | Status |
+| Item | Upstream fix | In `a504b22`? | Status |
 |---|---|---|---|
-| #151 ABSOLUTE / HINGE penalty costs mis-modelled | trajopt#592 (`4634678`…`de9e941`) | yes | the two 0.35.0 characterization tests failed exactly as their docstrings predicted; replaced by `test_penalty_only_cost_beyond_the_trust_box_is_reduced` and `test_penalty_exact_cost_is_weighted_by_the_coefficient` (the assertions those docstrings named). The 0.35.0 caveats in `docs/api/trajopt_sqp.md`, `trajopt_ifopt.md` and `user-guide/low-level-sqp.md` stay: they describe the released wheels |
+| #151 ABSOLUTE / HINGE penalty costs mis-modelled | trajopt#592 | yes | `test_penalty_only_cost_beyond_the_trust_box_is_reduced` and `test_penalty_exact_cost_is_weighted_by_the_coefficient` assert the fixed behaviour. The docs state the fixed model: no published wheel shipped `TrajOptQPProblem` on trajopt 0.35.0 (0.35.0.8 binds only `IfoptQPProblem`) |
 | #146.1 `JointPosConstraint` bounds ctor broadcasts `coeffs` | trajopt#592 | yes | upstream's split now indexes `coeffs_` and the ctor broadcasts length 0 / 1 itself; binding broadcast removed, `test_joint_pos_constraint_bounds.py` passes against trajopt's own ctor |
-| #146.2 `TrajOptQPProblemBinding` subclass | trajopt#598 | no (move ctor still `= default` in the header) | keep |
-| #146.3 trampoline `non_zeros_ = 0` | trajopt#599 | no (raw `getNonZeros()` sum still reserves) | keep |
+| #146.2 `TrajOptQPProblemBinding` subclass | trajopt#598 (PR #615: move operations defined out of line) | yes | removed; `TrajOptQPProblem` is bound directly. No bound API returns a C++-built problem, so Python sees no difference |
+| #146.3 trampoline `non_zeros_ = 0` | trajopt#599 (open, no PR) | no | kept: `component.cpp:91` asserts `non_zeros_ >= 0`, so a non-negative hint is the subclass's job; release builds skip the assert and `trajopt_qp_problem.cpp:944` reserves the raw sum |
+| #146.5 `validate_qp_solution` | trajopt#592 reads only the NLP block | partly | kept. Re-measured with the check off, each case in a child interpreter: before `convexify()` a squared cost segfaults and a penalty cost or a constraint reads 0; after it, a vector shorter than `getNumNLPVars()` is read past its end. The QP size stays the rule: trajopt documents it (`qp_problem.h:61, :69, :92`) |
+| #146.6 `ConstraintViolations` | trajopt#592 | yes | bound (`bd2650a9`) |
 
 ## Logging
 
