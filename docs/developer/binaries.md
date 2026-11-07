@@ -145,9 +145,9 @@ The recipe (`recipe/recipe.yaml`):
 | `source` | `archive/<sha>.tar.gz` of this repository on the `dev` branch; the release tag on `master` | the dev track pins the merge SHA of the license PR (#368) or later: earlier commits have no `LICENSE` / `NOTICE` |
 | `build` | `pip install . --no-deps --no-build-isolation`, `SETUPTOOLS_SCM_PRETEND_VERSION` = the recipe version, `CONDA_PREFIX` = the host prefix | the archive has no `.git` for setuptools-scm; `CMakeLists.txt` finds the C++ stack and its data through `$CONDA_PREFIX` |
 | `host` | `python`, `pip`, `scikit-build-core >=0.11`, `setuptools-scm`, `nanobind ==2.12.0`, `tesseract-robotics`, `tesseract-robotics-planning`, `trajopt`, `descartes-light`, `libboost-devel`, `eigen-abi-devel`, `taskflow 3.11.*` | every `find_package` in `CMakeLists.txt` resolves from these and their run deps |
-| `run` | `numpy >=2.0`, `scipy >=1.17.1`, `loguru`, `viser >=1.1.1`, `trimesh >=4`, `pillow`, `taskflow 3.11.*`, plus the C++ packages' `run_exports` | the `[project] dependencies`, so `pip check` passes |
+| `run` | `numpy >=2.0`, `scipy >=1.17.1`, `loguru`, `pyyaml >=6.0`, `viser >=1.1.1`, `trimesh >=4`, `pillow`, `taskflow 3.11.*`, plus the C++ packages' `run_exports` | the `[project] dependencies`, so `pip check` passes |
 | `run_constraints` | `tesseract-robotics-python <0.0a0` | both packages install `tesseract_robotics` |
-| `tests` | imports + `pip check`; `python -m tesseract_robotics.selftest`; `pytest tests/tesseract_collision tests/tesseract_kinematics` | the selftest loads every plugin family; the two suites need no planner |
+| `tests` | imports + `pip check`; `pytest tests/tesseract_collision tests/tesseract_kinematics` from the source tree | the two suites load the contact-manager and kinematics plugins and need no planner. `tesseract_nanobind_selftest` is not used: it runs tests bundled under `tesseract_robotics/tests`, which no build installs |
 | `about` | `license: Apache-2.0`, `license_file: [LICENSE, NOTICE]` | #368 |
 
 `recipe/conda_build_config.yaml` uses the dev-track channels of the C++
