@@ -485,17 +485,20 @@ def _refused(R: np.ndarray) -> bool:
     return False
 
 
-def test_quaterniond_accepts_residual_just_inside_prec():
-    R = _hex_matrix(_SEAM_INSIDE_REFUSED_BY_ISUNITARY)
-    assert DEFAULT_PREC - SEAM_BAND < orthonormality_residual(R) <= DEFAULT_PREC
-    Quaterniond(R)
+@pytest.mark.parametrize(
+    "rows", [_SEAM_INSIDE_REFUSED_BY_ISUNITARY, _SEAM_OUTSIDE_ACCEPTED_BY_ISUNITARY]
+)
+def test_quaterniond_follows_residual_rule_at_seam_samples(rows):
+    """Refused iff the residual is over the bound, as this platform rounds it.
 
-
-def test_quaterniond_refuses_residual_just_outside_prec():
-    R = _hex_matrix(_SEAM_OUTSIDE_ACCEPTED_BY_ISUNITARY)
-    assert DEFAULT_PREC < orthonormality_residual(R) < DEFAULT_PREC + SEAM_BAND
-    with pytest.raises(ValueError, match="not orthonormal"):
-        Quaterniond(R)
+    Which side a sample lands on is platform-dependent: Eigen's residual is
+    computed with FMA on aarch64 and rounds a few 1e-18 away from x86_64's,
+    which flips both samples. The rule holds either way.
+    """
+    R = _hex_matrix(rows)
+    r = orthonormality_residual(R)
+    assert abs(r - DEFAULT_PREC) < SEAM_BAND
+    assert _refused(R) == (r > DEFAULT_PREC)
 
 
 @pytest.mark.parametrize("bad", [math.nan, math.inf])
