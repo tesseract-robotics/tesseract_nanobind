@@ -225,6 +225,26 @@ def is_within_limits(joints: np.ndarray, manip) -> bool:
     return bool(np.all(joints >= lower) and np.all(joints <= upper))
 ```
 
+### Sample Grids and Reach
+
+The utilities the positioner solvers sample with are callable directly:
+
+```python
+from tesseract_robotics import tesseract_kinematics as tk
+
+graph = env.getSceneGraph()
+limits = tk.gatherJointLimits(graph, manip.getJointIds())  # (N, 2) [lower, upper]
+grid = tk.buildSampleGrid(limits, np.full(len(limits), 0.1))
+# grid[i]: ceil((hi - lo) / 0.1) + 1 evenly spaced values of joint i (not their product)
+
+reach = tk.computeChainReachUpperBound(graph, "base_link", "tool0")  # metres
+```
+
+`computeChainReachUpperBound` sums the joint offsets along the chain (plus each prismatic
+joint's largest |limit|), so it bounds the base-to-tip distance over every configuration.
+`PositionerSampleResolution(name, value, min=None, max=None)` is the per-joint resolution record
+of the REP / ROP solver configs; `None` bounds default to the joint's limits.
+
 ## Jacobian
 
 The Jacobian relates joint velocities to end-effector velocities:

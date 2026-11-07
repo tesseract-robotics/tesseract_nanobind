@@ -302,6 +302,36 @@ This run was aborted by `DiscreteContactCheckTask` — the planners upstream suc
 | `FixStateBoundsTask` | Clamp to joint limits |
 | `FixStateCollisionTask` | Push out of collision |
 
+## Config Schemas
+
+Each node and executor type describes the YAML config it accepts as a schema, a
+`tesseract_common.PropertyTree`. Its YAML crosses as text:
+
+```python
+from tesseract_robotics.tesseract_task_composer import (
+    TaskComposerGraph, TaskComposerNodePorts, TaskComposerTask,
+)
+
+TaskComposerGraph.schema().keys()  # [..., 'inputs', 'outputs', 'nodes', 'edges', 'terminals']
+
+ports = TaskComposerNodePorts()
+ports.addRequiredInput("program").addRequiredOutput("program")
+ports.inputSchema().keys()         # ['program']
+
+schema = TaskComposerTask.schema(ports)
+schema.applyConfig("inputs: {program: in}\noutputs: {program: out}\nbogus_key: 1\n")
+# ['bogus_key: property does not exist in schema']
+```
+
+`applyConfig` merges the config into the schema and returns every error (empty when valid);
+`allow_extra_properties=True` accepts undeclared keys. A port mapping that breaks the contract
+gives a `ValidationError` instead, whose `toString()` (also `str()`) is `inputs.<port>: <message>`:
+
+```python
+(error,) = ports.validate(inputs, outputs)  # inputs maps an undeclared port "bogus_port"
+error.toString()                            # 'inputs.bogus_port: undeclared port'
+```
+
 ## Profiles
 
 Profiles configure each task's behaviour. `TaskComposer.plan(...)` auto-selects a pipeline-appropriate default set from `planning/profiles.py`. You can also build profiles yourself and pass them via the `profiles` keyword:

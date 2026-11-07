@@ -264,6 +264,57 @@ robot.env.applyCommand(
 
 Adjacent links already defined in the SRDF are added automatically when the environment is loaded.
 
+## Batch Updates
+
+Adding, removing, enabling or moving many objects one call at a time pays a broadphase update
+per call. The batch calls apply one update per batch where the backend supports it, and behave
+as the single calls in order:
+
+```python
+from tesseract_robotics.tesseract_collision import CollisionObjectSpec
+
+specs = [CollisionObjectSpec(name, 0, shapes, shape_poses) for name in ("a", "b", "c")]
+assert manager.addCollisionObjects(specs)  # a repeated id: the last entry decides
+
+manager.setCollisionObjectsEnabled(["b"], False)     # or a dict: {"b": False, "c": True}
+manager.setCollisionObjectsTransform(["a", "c"], state.link_transforms)  # ids, then a map
+pose = manager.getCollisionObjectsTransform("a")
+manager.removeCollisionObjects(["a", "c"])
+```
+
+An id the manager does not hold is reported, never silently dropped: `removeCollisionObjects`
+and `setCollisionObjectsEnabled` return `False` (the ids that are present are still applied),
+and `getCollisionObjectsTransform` or a transform map that lacks an id raises `IndexError`.
+
+## Implicit Signed-Distance Shapes
+
+`collideImplicitSDF` finds the contacts between two shapes given as signed-distance callbacks:
+a multi-start search inside each shape's bounding box. `makeImplicitSDFShape` builds one from a
+box, sphere, cylinder, cone, capsule or `SignedDistanceField` at a world pose; other geometry
+gives a shape whose `isValid()` is `False`. A shape's `distance` and `gradient` may also be
+Python callables:
+
+```python
+import numpy as np
+from tesseract_robotics.tesseract_collision import (
+    ImplicitSDFCollisionConfig, ImplicitSDFShape, collideImplicitSDF, makeImplicitSDFShape,
+)
+from tesseract_robotics.tesseract_geometry import Sphere
+
+ball = ImplicitSDFShape()
+ball.distance = lambda p: float(np.linalg.norm(p) - 0.5)   # negative inside
+ball.gradient = lambda p: p / np.linalg.norm(p)
+ball.aabb = (np.full(3, -0.5), np.full(3, 0.5))             # (min, max), world frame
+
+config = ImplicitSDFCollisionConfig()
+config.contact_margin = 0.5
+other = makeImplicitSDFShape(Sphere(0.3), pose)            # pose: Isometry3d
+contacts = collideImplicitSDF(ball, other, config)          # list[ImplicitSDFContact]
+```
+
+`collideImplicitSDF` releases the GIL; a Python callback takes it back for each evaluation, so
+Python shapes are correct but slow.
+
 ## Performance Optimization
 
 !!! tip "Reduce Active Objects"

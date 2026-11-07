@@ -1,52 +1,16 @@
 {
   "tesseract_collision": {
-    "CollisionObjectSpec": {
-      "issue": "#373"
-    },
     "ContactResultMap.find": {
       "wont_fix": "Returns a C++ iterator; `at` and iteration read a result by key."
     },
     "ContactTestData": {
       "wont_fix": "Internal to the collision checkers (types.h:322)."
     },
-    "ContinuousContactManager.addCollisionObjects": {
-      "issue": "#373"
-    },
-    "ContinuousContactManager.getCollisionObjectsTransform": {
-      "issue": "#373"
-    },
-    "ContinuousContactManager.removeCollisionObjects": {
-      "issue": "#373"
-    },
-    "ContinuousContactManager.setCollisionObjectsEnabled": {
-      "issue": "#373"
-    },
-    "ContinuousContactManager.setCollisionObjectsTransform": {
-      "issue": "#373"
-    },
     "ContinuousContactManager.setCollisionObjectsTransformCast": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174)"
     },
-    "DiscreteContactManager.addCollisionObjects": {
-      "issue": "#373"
-    },
-    "DiscreteContactManager.getCollisionObjectsTransform": {
-      "issue": "#373"
-    },
-    "DiscreteContactManager.removeCollisionObjects": {
-      "issue": "#373"
-    },
-    "DiscreteContactManager.setCollisionObjectsEnabled": {
-      "issue": "#373"
-    },
-    "DiscreteContactManager.setCollisionObjectsTransform": {
-      "issue": "#373"
-    },
     "tesseract/collision/common.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
-    },
-    "tesseract/collision/implicit_sdf_collision_solver.h": {
-      "issue": "#373"
     },
     "tesseract/collision/utils.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
@@ -130,8 +94,14 @@
     "OrderedIdPair.hash": {
       "wont_fix": "`LinkIdPair.__hash__` is the Python form."
     },
-    "PluginDiscoveryInfo": {
-      "issue": "#373"
+    "PropertyTree.addValidator": {
+      "wont_fix": "Takes a C++ validator that appends to an out-param error list; a schema's validators come from the C++ type that builds it."
+    },
+    "PropertyTreeBuilder": {
+      "wont_fix": "Fluent C++ schema builder; Python reads schemas that C++ types build (`schema()`), it does not author them."
+    },
+    "PropertyTreeValidationError": {
+      "wont_fix": "Not thrown by any bound call: `applyConfig` and `validate` return their errors as a list."
     },
     "QueryDoubleAttributeRequired": {
       "wont_fix": "tinyxml2 helper; tinyxml2 is never exposed to Python."
@@ -278,7 +248,7 @@
       "wont_fix": "No concrete `ProfileFactory` plugin ships in 0.35.0; revisit when upstream ships one."
     },
     "tesseract/common/property_tree.h": {
-      "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
+      "wont_fix": "`PropertyTree` is bound with YAML as text (#373); `PropertyTreeBuilder`, `PropertyTree.addValidator` and the `YAML::Node` overloads stay C++: a schema is built and validated by the C++ type that owns it (`TaskComposerTask.schema`, …)."
     },
     "tesseract/common/schema_registration.h": {
       "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
@@ -403,20 +373,8 @@
     "KinematicGroup.calcInvKinMultiple": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212)"
     },
-    "PositionerSampleResolution": {
-      "issue": "#373"
-    },
-    "buildSampleGrid": {
-      "issue": "#373"
-    },
-    "computeChainReachUpperBound": {
-      "issue": "#373"
-    },
     "dampedPInv": {
       "wont_fix": "numpy covers it."
-    },
-    "gatherJointLimits": {
-      "issue": "#373"
     },
     "getRedundantSolutionsHelper": {
       "wont_fix": "Recursion helper behind `getRedundantSolutions`."
@@ -425,13 +383,13 @@
       "wont_fix": "numpy covers it."
     },
     "tesseract/kinematics/factory_utils.h": {
-      "issue": "#373"
+      "wont_fix": "plugin-internal: `parseSampleResolutionMap` reads the `sample_resolution` block of a REP / ROP / RTP solver plugin's `YAML::Node` config, and `JointSampleSpec`, `SampleGridConfig` and `toSampleGridConfig` carry its result into the plugin's constructor; Python builds a grid with `gatherJointLimits` and `buildSampleGrid`."
     },
     "tesseract/kinematics/rtp_factory.h": {
-      "issue": "#373"
+      "wont_fix": "plugin-internal: robot-with-tool-positioner solver plugin factory, loaded by `KinematicsPluginFactory` (as the `rep_*` / `rop_*` headers)."
     },
     "tesseract/kinematics/rtp_inv_kin.h": {
-      "issue": "#373"
+      "wont_fix": "plugin-internal: robot-with-tool-positioner solver, created by `KinematicsPluginFactory` from the `RTPInvKinFactory` plugin config and reached as an `InverseKinematics` (as the `rep_*` / `rop_*` headers)."
     }
   },
   "tesseract_motion_planners": {
@@ -443,31 +401,6 @@
     },
     "isValidState": {
       "issue": "#333"
-    },
-    "tesseract/motion_planners/piqp/settings_utils.h": {
-      "issue": "#373"
-    }
-  },
-  "tesseract_motion_planners_trajopt": {
-    "TrajOptPIQPSolverProfile.__eq__": {
-      "issue": "#373"
-    },
-    "TrajOptPIQPSolverProfile.__init__": {
-      "issue": "#373"
-    },
-    "TrajOptPIQPSolverProfile.__ne__": {
-      "issue": "#373"
-    }
-  },
-  "tesseract_motion_planners_trajopt_ifopt": {
-    "TrajOptIfoptPIQPSolverProfile.__eq__": {
-      "issue": "#373"
-    },
-    "TrajOptIfoptPIQPSolverProfile.__init__": {
-      "issue": "#373"
-    },
-    "TrajOptIfoptPIQPSolverProfile.__ne__": {
-      "issue": "#373"
     }
   },
   "tesseract_scene_graph": {
@@ -483,7 +416,7 @@
   },
   "tesseract_serialization": {
     "Serialization": {
-      "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` \u2026 functions."
+      "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` … functions."
     }
   },
   "tesseract_srdf": {
@@ -509,9 +442,6 @@
     }
   },
   "tesseract_task_composer": {
-    "TaskComposerGraph.schema": {
-      "issue": "#373"
-    },
     "TaskComposerNode.DynamicPortsTag": {
       "wont_fix": "Constructor tag for C++ nodes with configuration-defined ports."
     },
@@ -520,24 +450,6 @@
     },
     "TaskComposerNodePorts.ValidationError.__init__": {
       "wont_fix": "`validate` produces them; Python only reads them."
-    },
-    "TaskComposerNodePorts.ValidationError.toString": {
-      "issue": "#373"
-    },
-    "TaskComposerNodePorts.inputSchema": {
-      "issue": "#373"
-    },
-    "TaskComposerNodePorts.outputSchema": {
-      "issue": "#373"
-    },
-    "TaskComposerPipeline.schema": {
-      "issue": "#373"
-    },
-    "TaskComposerTask.schema": {
-      "issue": "#373"
-    },
-    "TaskflowTaskComposerExecutor.schema": {
-      "issue": "#373"
     },
     "TaskComposerGraph.__init__": {
       "wont_fix": "`parent_uuid` stays unbound: `TaskComposerGraph::addNode` sets a node's parent when the graph takes it."
@@ -564,18 +476,6 @@
     }
   },
   "trajopt_ifopt": {
-    "CartAxisAlignConstraint.calcJacobianBlock": {
-      "issue": "#373"
-    },
-    "CartAxisConeConstraint.calcJacobianBlock": {
-      "issue": "#373"
-    },
-    "CartAxisKinematics": {
-      "issue": "#373"
-    },
-    "CollisionCoeffData.hasZeroCoeff": {
-      "issue": "#373"
-    },
     "InverseKinematicsConstraint.calcJacobianBlock": {
       "issue": "#289"
     },
@@ -621,7 +521,7 @@
       "wont_fix": "Fills an out-param; `PIQPSolver.defaultSettings()` returns the same settings."
     },
     "PIQPSolver.solver": {
-      "issue": "#373"
+      "wont_fix": "unbound-dependency-type: returns `piqp::SparseSolver<double>`, which no module binds (piqp has no binding module; `PIQPSettings` is the only piqp type bound)."
     }
   }
 }
