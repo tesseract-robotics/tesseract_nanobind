@@ -50,6 +50,7 @@ static TransformStackOut new_transform_stack(std::size_t m) {
 #include <tesseract/common/contact_allowed_validator.h>
 #include <tesseract/common/kinematic_limits.h>
 #include <tesseract/common/plugin_info.h>
+#include <tesseract/common/property_tree.h>
 #include <tesseract/common/utils.h>
 #include <yaml-cpp/yaml.h>  // YAML::Load / YAML::Node for PluginInfo.config <-> str
 #include <cmath>
@@ -317,6 +318,102 @@ void bindNameId(nb::module_& m, const char* py_name) {
         .def("__setstate__", [](Id& self, const std::string& name) { new (&self) Id(name); });
     nb::implicitly_convertible<std::string, Id>();
 }
+
+namespace {
+
+YAML::Node load_yaml_text(const std::string& text) {
+    try {
+        return YAML::Load(text);
+    } catch (const YAML::Exception& e) {
+        throw nb::value_error(e.what());
+    }
+}
+
+std::string dump_yaml(const YAML::Node& node) {
+    YAML::Emitter out;
+    out << node;
+    return out.c_str();
+}
+
+void bind_property_tree(nb::module_& m) {
+    using tesseract::common::PropertyTree;
+    nb::class_<PropertyTree>(m, "PropertyTree",
+        "A node of a configuration schema: a YAML value, metadata attributes and ordered children.")
+        .def(nb::init<>())
+        .def("applyConfig",
+             [](PropertyTree& self, const std::string& config, bool allow_extra_properties) {
+                 return self.applyConfig(load_yaml_text(config), allow_extra_properties);
+             },
+             "config"_a, "allow_extra_properties"_a = false,
+             "Merge the YAML config text into the schema and validate it; returns every error, empty "
+             "when valid. A key the schema does not declare is an error unless allow_extra_properties. "
+             "Malformed YAML raises ValueError.")
+        .def("validate", &PropertyTree::validate, "allow_extra_properties"_a = false,
+             "Every validation error of the tree, empty when valid.")
+        .def("at", nb::overload_cast<std::string_view>(&PropertyTree::at, nb::const_), "key"_a,
+             nb::rv_policy::reference_internal, "The child at key; raises IndexError when absent.")
+        .def("__getitem__",
+             [](const PropertyTree& self, std::string_view key) -> const PropertyTree& {
+                 const PropertyTree* child = self.find(key);
+                 if (child == nullptr)
+                     throw nb::key_error(std::string(key).c_str());
+                 return *child;
+             },
+             "key"_a, nb::rv_policy::reference_internal, "The child at key; raises KeyError when absent.")
+        .def("find", nb::overload_cast<std::string_view>(&PropertyTree::find, nb::const_), "key"_a,
+             nb::rv_policy::reference_internal, "The child at key, or None.")
+        .def("__contains__", [](const PropertyTree& self, std::string_view key) { return self.find(key) != nullptr; },
+             "key"_a)
+        .def("setValue", [](PropertyTree& self, const std::string& value) { self.setValue(load_yaml_text(value)); },
+             "value"_a, "Set the value from YAML text.")
+        .def("getValue", [](const PropertyTree& self) { return dump_yaml(self.getValue()); },
+             "The value as YAML text.")
+        .def("isNull", &PropertyTree::isNull)
+        .def("isContainer", &PropertyTree::isContainer)
+        .def("keys", &PropertyTree::keys, "The child keys, in insertion order.")
+        .def("setAttribute",
+             [](PropertyTree& self, std::string_view name, const std::string& attr) {
+                 self.setAttribute(name, std::string_view(attr));
+             },
+             "name"_a, "attr"_a)
+        .def("setAttribute", nb::overload_cast<std::string_view, bool>(&PropertyTree::setAttribute), "name"_a,
+             "attr"_a)
+        .def("setAttribute", nb::overload_cast<std::string_view, int>(&PropertyTree::setAttribute), "name"_a,
+             "attr"_a)
+        .def("setAttribute", nb::overload_cast<std::string_view, double>(&PropertyTree::setAttribute), "name"_a,
+             "attr"_a)
+        .def("setAttribute",
+             nb::overload_cast<std::string_view, const std::vector<std::string>&>(&PropertyTree::setAttribute),
+             "name"_a, "attr"_a)
+        .def("hasAttribute", &PropertyTree::hasAttribute, "name"_a)
+        .def("getAttribute",
+             [](const PropertyTree& self, std::string_view name) -> std::optional<std::string> {
+                 const auto attr = self.getAttribute(name);
+                 if (!attr)
+                     return std::nullopt;
+                 return dump_yaml(*attr);
+             },
+             "name"_a, "The attribute as YAML text, or None.")
+        .def("getAttributeKeys", &PropertyTree::getAttributeKeys)
+        .def("isRequired", &PropertyTree::isRequired)
+        .def_static("fromYAML", [](const std::string& text) { return PropertyTree::fromYAML(load_yaml_text(text)); },
+                    "text"_a, "A tree from the YAML that toYAML(exclude_attributes=False) writes.")
+        .def("toYAML", [](const PropertyTree& self, bool exclude_attributes) {
+                 return dump_yaml(self.toYAML(exclude_attributes));
+             },
+             "exclude_attributes"_a = true, "The tree as YAML text.")
+        .def("size", &PropertyTree::size)
+        .def("__len__", &PropertyTree::size)
+        .def("empty", &PropertyTree::empty)
+        .def("__bool__", [](const PropertyTree& self) { return static_cast<bool>(self); })
+        .def("__str__", [](const PropertyTree& self) {
+            std::ostringstream os;
+            os << self;
+            return os.str();
+        });
+}
+
+}  // namespace
 
 NB_MODULE(_tesseract_common, m) {
     m.doc() = "tesseract_common Python bindings (nanobind)";
@@ -1633,11 +1730,29 @@ NB_MODULE(_tesseract_common, m) {
         .def("clear", &tesseract::common::PluginInfoContainer::clear);
     bind_value_equality(plugin_info_container);
 
+    // ========== PluginDiscoveryInfo ==========
+    // The base of every *PluginInfo: where to find plugin libraries, before any plugin is loaded.
+    auto plugin_discovery_info = nb::class_<tesseract::common::PluginDiscoveryInfo>(m, "PluginDiscoveryInfo",
+        "Plugin library discovery: search paths and library names (without prefix or suffix).")
+        .def(nb::init<>())
+        .def_rw("search_paths", &tesseract::common::PluginDiscoveryInfo::search_paths)
+        .def_rw("search_libraries", &tesseract::common::PluginDiscoveryInfo::search_libraries)
+        .def("insert", &tesseract::common::PluginDiscoveryInfo::insert, "other"_a)
+        .def("clear", &tesseract::common::PluginDiscoveryInfo::clear)
+        .def("empty", &tesseract::common::PluginDiscoveryInfo::empty);
+    bind_value_equality(plugin_discovery_info);
+
+    // ========== PropertyTree ==========
+    // A config schema (property_tree.h): YAML crosses as text, as PluginInfo.config does. Read
+    // access, applyConfig and validate; the validator and builder API stays C++ (a schema is
+    // built by the C++ type that owns it, e.g. TaskComposerTask.schema).
+    bind_property_tree(m);
+
     // ========== KinematicsPluginInfo ==========
     // fwd/inv_plugin_infos are std::map<std::string, PluginInfoContainer> keyed on group
     // name -> dict[str, PluginInfoContainer]. search_paths / search_libraries are
     // std::vector<std::string> -> list[str].
-    auto kinematics_plugin_info = nb::class_<tesseract::common::KinematicsPluginInfo>(m, "KinematicsPluginInfo")
+    auto kinematics_plugin_info = nb::class_<tesseract::common::KinematicsPluginInfo, tesseract::common::PluginDiscoveryInfo>(m, "KinematicsPluginInfo")
         .def(nb::init<>())
         .def_rw("search_paths", &tesseract::common::KinematicsPluginInfo::search_paths)
         .def_rw("search_libraries", &tesseract::common::KinematicsPluginInfo::search_libraries)
@@ -1652,7 +1767,7 @@ NB_MODULE(_tesseract_common, m) {
     // ========== ContactManagersPluginInfo ==========
     // discrete/continuous_plugin_infos are bound PluginInfoContainers: def_rw returns a
     // reference, so in-place edits persist.
-    auto contact_managers_plugin_info = nb::class_<tesseract::common::ContactManagersPluginInfo>(m, "ContactManagersPluginInfo")
+    auto contact_managers_plugin_info = nb::class_<tesseract::common::ContactManagersPluginInfo, tesseract::common::PluginDiscoveryInfo>(m, "ContactManagersPluginInfo")
         .def(nb::init<>())
         .def_rw("search_paths", &tesseract::common::ContactManagersPluginInfo::search_paths)
         .def_rw("search_libraries", &tesseract::common::ContactManagersPluginInfo::search_libraries)
@@ -1681,7 +1796,7 @@ NB_MODULE(_tesseract_common, m) {
     bind_value_equality(calibration_info);
 
     // ========== TaskComposerPluginInfo ==========
-    auto task_composer_plugin_info = nb::class_<tesseract::common::TaskComposerPluginInfo>(m, "TaskComposerPluginInfo")
+    auto task_composer_plugin_info = nb::class_<tesseract::common::TaskComposerPluginInfo, tesseract::common::PluginDiscoveryInfo>(m, "TaskComposerPluginInfo")
         .def(nb::init<>())
         .def_rw("search_paths", &tesseract::common::TaskComposerPluginInfo::search_paths)
         .def_rw("search_libraries", &tesseract::common::TaskComposerPluginInfo::search_libraries)
@@ -1697,7 +1812,7 @@ NB_MODULE(_tesseract_common, m) {
     // plugin_infos is std::map<std::string, PluginInfoMap> -> dict[str, dict[str, PluginInfo]],
     // converted on every access (like KinematicsPluginInfo.fwd_plugin_infos): assign the
     // whole field; an in-place edit of the returned dict changes a copy.
-    auto profiles_plugin_info = nb::class_<tesseract::common::ProfilesPluginInfo>(m, "ProfilesPluginInfo")
+    auto profiles_plugin_info = nb::class_<tesseract::common::ProfilesPluginInfo, tesseract::common::PluginDiscoveryInfo>(m, "ProfilesPluginInfo")
         .def(nb::init<>())
         .def_rw("search_paths", &tesseract::common::ProfilesPluginInfo::search_paths)
         .def_rw("search_libraries", &tesseract::common::ProfilesPluginInfo::search_libraries)

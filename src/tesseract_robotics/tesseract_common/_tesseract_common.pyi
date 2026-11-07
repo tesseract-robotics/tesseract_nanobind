@@ -973,7 +973,118 @@ class PluginInfoContainer:
 
     __hash__: None = None
 
-class KinematicsPluginInfo:
+class PluginDiscoveryInfo:
+    """
+    Plugin library discovery: search paths and library names (without prefix or suffix).
+    """
+
+    def __init__(self) -> None: ...
+
+    @property
+    def search_paths(self) -> list[str]: ...
+
+    @search_paths.setter
+    def search_paths(self, arg: Sequence[str], /) -> None: ...
+
+    @property
+    def search_libraries(self) -> list[str]: ...
+
+    @search_libraries.setter
+    def search_libraries(self, arg: Sequence[str], /) -> None: ...
+
+    def insert(self, other: PluginDiscoveryInfo) -> None: ...
+
+    def clear(self) -> None: ...
+
+    def empty(self) -> bool: ...
+
+    def __eq__(self, arg: PluginDiscoveryInfo, /) -> bool: ...
+
+    def __ne__(self, arg: PluginDiscoveryInfo, /) -> bool: ...
+
+    __hash__: None = None
+
+class PropertyTree:
+    """
+    A node of a configuration schema: a YAML value, metadata attributes and ordered children.
+    """
+
+    def __init__(self) -> None: ...
+
+    def applyConfig(self, config: str, allow_extra_properties: bool = False) -> list[str]:
+        """
+        Merge the YAML config text into the schema and validate it; returns every error, empty when valid. A key the schema does not declare is an error unless allow_extra_properties. Malformed YAML raises ValueError.
+        """
+
+    def validate(self, allow_extra_properties: bool = False) -> list[str]:
+        """Every validation error of the tree, empty when valid."""
+
+    def at(self, key: str) -> PropertyTree:
+        """The child at key; raises IndexError when absent."""
+
+    def __getitem__(self, key: str) -> PropertyTree:
+        """The child at key; raises KeyError when absent."""
+
+    def find(self, key: str) -> PropertyTree:
+        """The child at key, or None."""
+
+    def __contains__(self, key: str) -> bool: ...
+
+    def setValue(self, value: str) -> None:
+        """Set the value from YAML text."""
+
+    def getValue(self) -> str:
+        """The value as YAML text."""
+
+    def isNull(self) -> bool: ...
+
+    def isContainer(self) -> bool: ...
+
+    def keys(self) -> list[str]:
+        """The child keys, in insertion order."""
+
+    @overload
+    def setAttribute(self, name: str, attr: str) -> None: ...
+
+    @overload
+    def setAttribute(self, name: str, attr: bool) -> None: ...
+
+    @overload
+    def setAttribute(self, name: str, attr: int) -> None: ...
+
+    @overload
+    def setAttribute(self, name: str, attr: float) -> None: ...
+
+    @overload
+    def setAttribute(self, name: str, attr: Sequence[str]) -> None: ...
+
+    def hasAttribute(self, name: str) -> bool: ...
+
+    def getAttribute(self, name: str) -> str | None:
+        """The attribute as YAML text, or None."""
+
+    def getAttributeKeys(self) -> list[str]: ...
+
+    def isRequired(self) -> bool: ...
+
+    @staticmethod
+    def fromYAML(text: str) -> PropertyTree:
+        """A tree from the YAML that toYAML(exclude_attributes=False) writes."""
+
+    def toYAML(self, exclude_attributes: bool = True) -> str:
+        """The tree as YAML text."""
+
+    def size(self) -> int: ...
+
+    def __len__(self) -> int: ...
+
+    def empty(self) -> bool: ...
+
+    def __bool__(self) -> bool: ...
+
+    def __str__(self) -> str: ...
+
+class KinematicsPluginInfo(PluginDiscoveryInfo):
     def __init__(self) -> None: ...
 
     @property
@@ -1015,7 +1126,7 @@ class KinematicsPluginInfo:
 
     __hash__: None = None
 
-class ContactManagersPluginInfo:
+class ContactManagersPluginInfo(PluginDiscoveryInfo):
     def __init__(self) -> None: ...
 
     @property
@@ -1084,7 +1195,7 @@ class CalibrationInfo:
 
     __hash__: None = None
 
-class TaskComposerPluginInfo:
+class TaskComposerPluginInfo(PluginDiscoveryInfo):
     def __init__(self) -> None: ...
 
     @property
@@ -1126,7 +1237,7 @@ class TaskComposerPluginInfo:
 
     __hash__: None = None
 
-class ProfilesPluginInfo:
+class ProfilesPluginInfo(PluginDiscoveryInfo):
     def __init__(self) -> None: ...
 
     @property
