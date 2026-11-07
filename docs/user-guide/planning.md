@@ -331,6 +331,13 @@ profiles = create_descartes_default_profiles(
 result = plan_cartesian(robot, program, profiles=profiles)
 ```
 
+!!! note "Two scalar types"
+    `plan_cartesian`'s `DescartesDPipeline` runs Descartes on `double` states and reads the `D`
+    profiles; `CartesianPipeline`, `DescartesFPipeline` and every raster pipeline run it on
+    `float` states and read the `F` ones. The helpers register both, and `TaskComposer.plan`
+    raises `ProfileTypeMismatchError` if a pipeline would find only the other type (see the
+    [Descartes API page](../api/tesseract_motion_planners_descartes.md#scalar-types-d-and-f)).
+
 ### Custom Edge / State Evaluators in Python
 
 When the default cost function (joint-space distance) does not fully satisfy your
@@ -345,6 +352,11 @@ The three extension points are:
 | `DescartesWaypointSamplerD` | `sample() -> list[DescartesStateSampleD]` | Generating IK candidates for a waypoint |
 | `DescartesEdgeEvaluatorD` | `evaluate(start, end) -> (valid, cost)` | Edge between two graph states |
 | `DescartesStateEvaluatorD` | `evaluate(state) -> (valid, cost)` | Per-state cost |
+
+Each has an `F` twin (`DescartesEdgeEvaluatorF`, …) on `float32` states. Use the type of the
+pipeline you plan with: `D` for `DescartesDPipeline` (the `plan_cartesian` default), `F` for
+`CartesianPipeline`, `DescartesFPipeline` and the raster pipelines. The example below is `D`;
+replace every `D` suffix with `F` for the others.
 
 To inject them into the planner, subclass `DescartesMoveProfileD` and
 return your custom objects from the three factory methods. Delegate the
@@ -392,7 +404,9 @@ objects with a `.values` attribute that is a 1-D numpy array of joint
 positions in the manipulator's joint order.
 
 Then, register the profile in the `ProfileDictionary` the same way you would a
-C++ profile; `addProfile` takes the Python subclass directly:
+C++ profile; `addProfile` takes the Python subclass directly. Register it yourself:
+`create_descartes_default_profiles(move_profile=...)` refuses a subclass, because its hooks
+have no twin of the other scalar type.
 
 ```python
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
