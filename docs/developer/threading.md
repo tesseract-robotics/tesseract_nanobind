@@ -247,6 +247,27 @@ during a reload can cost up to one reload.
 Tests: `tests/tesseract_task_composer/test_output_handler_deadlocks.py`
 (`TestServerReloadAgainstLogHandlers`).
 
+## The viewer's player and viser's event loop
+
+viser applies a browser's GUI update on its asyncio event loop: it sets the handle's value, then
+submits each plain `on_update` callback to its thread pool. `GuiEvent` carries no value, so the
+callback reads the handle back, and sees whatever another thread wrote in between. The viewer's
+player advances the time slider 30 times a second from its own thread. It used to check the slider
+and then write the next frame there, so a drag viser applied between the check and the write was
+overwritten, and playback paused at the player's time (Windows CI on `f6006c83`).
+
+The player now checks and writes the slider in one call on viser's loop
+(`ViserServer.get_event_loop()`, public), ordered with viser's own writes: a drag that lands first
+fails the check, and its callback reads the drag back. The player waits at most
+`VISER_LOOP_TIMEOUT_S` for the loop. A call that has not started by then is cancelled before it can
+run (`concurrent.futures.Future.set_running_or_notify_cancel`), so a timeout leaves no late write.
+
+Rule: a write from another thread to a viser GUI value that a browser also changes goes through
+viser's loop.
+
+Tests: `tests/viewer/test_viewer.py` (`test_drag_landing_mid_tick_is_not_overwritten`,
+`test_tick_on_a_wedged_viser_loop_writes_nothing`).
+
 ## Upstream: plugin factory caches
 
 `TaskComposerPluginFactory`, `KinematicsPluginFactory` and `ContactManagersPluginFactory` each

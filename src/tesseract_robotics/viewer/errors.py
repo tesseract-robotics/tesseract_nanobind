@@ -25,6 +25,10 @@ class ViewerCloseTimeoutError(RuntimeError):
     """The playback thread did not exit within `PLAYER_JOIN_TIMEOUT_S`."""
 
 
+class ViserLoopTimeoutError(RuntimeError):
+    """viser's event loop did not start a player's slider write within `VISER_LOOP_TIMEOUT_S`."""
+
+
 class NoEnvironmentError(RuntimeError):
     """A viewer call needs an environment; `update_environment` has not been called."""
 

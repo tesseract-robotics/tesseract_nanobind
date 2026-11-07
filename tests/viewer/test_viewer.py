@@ -48,6 +48,7 @@ from tesseract_robotics.viewer.errors import (
     UnsupportedMoveTypeError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
+    ViserLoopTimeoutError,
 )
 from tesseract_robotics.viewer.poses import link_poses
 from tesseract_robotics.viewer.tcp_path import tcp_path
@@ -670,6 +671,99 @@ def test_player_tick_does_not_overwrite_a_drag_waiting_on_the_lock(viewer, env):
         viewer._on_time_dragged(SimpleNamespace(client=object()))
     assert viewer._t_s == drag_to_s
     assert viewer._gui_play.value is False
+
+
+class _DragLandsOnRead:
+    """The time slider as a tick sees it: a browser drag lands the moment the tick reads it.
+
+    viser applies a drag on its event loop. Read on another thread, the drag lands right
+    after the read returns; read on the loop itself, once the loop's current callback ends.
+    """
+
+    def __init__(self, slider, loop, drag_to_s):
+        self._slider = slider
+        self._loop = loop
+        self._drag_to_s = drag_to_s
+        self._loop_thread_id = asyncio.run_coroutine_threadsafe(_thread_id(), loop).result(
+            PLAYER_ADVANCE_TIMEOUT_S
+        )
+        self._scheduled = False
+        self.landed = threading.Event()
+
+    def _land(self):
+        self._slider._impl.value = self._drag_to_s  # what viser's GUI update handler does
+        self.landed.set()
+
+    @property
+    def value(self):
+        value = self._slider.value
+        if not self._scheduled:
+            self._scheduled = True
+            if threading.get_ident() == self._loop_thread_id:
+                self._loop.call_soon(self._land)
+            else:
+                self._loop.call_soon_threadsafe(self._land)
+                assert self.landed.wait(PLAYER_ADVANCE_TIMEOUT_S)
+        return value
+
+    @value.setter
+    def value(self, value):
+        self._slider.value = value
+
+    def __getattr__(self, name):
+        return getattr(self._slider, name)
+
+
+async def _thread_id():
+    return threading.get_ident()
+
+
+def test_drag_landing_mid_tick_is_not_overwritten(viewer, env):
+    """Windows CI on f6006c83: the tick checked the slider, viser wrote a drag, the tick wrote."""
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    drag_to_s = 1.5
+    slider = viewer._gui_time
+    drag = _DragLandsOnRead(slider, viewer.server.get_event_loop(), drag_to_s)
+    with viewer._pose_lock:  # keeps the player thread out; the tick is ours
+        viewer._gui_time = drag
+        try:
+            viewer._tick()
+        finally:
+            viewer._gui_time = slider
+    assert drag.landed.wait(PLAYER_ADVANCE_TIMEOUT_S)
+    assert slider.value == drag_to_s
+    # What viser's thread pool runs for the drag, once the tick has released the pose lock.
+    viewer._on_time_dragged(SimpleNamespace(client=object()))
+    assert viewer._t_s == drag_to_s
+    assert viewer._gui_play.value is False
+
+
+def test_tick_on_a_wedged_viser_loop_writes_nothing(viewer, env, monkeypatch):
+    """A tick gives up on a loop that does not run its slider write, which then never lands."""
+    monkeypatch.setattr("tesseract_robotics.viewer.viewer.VISER_LOOP_TIMEOUT_S", 2 * PLAYBACK_DT_S)
+    viewer.update_environment(env)
+    viewer.update_trajectory(_two_waypoints())
+    loop = viewer.server.get_event_loop()
+    wedged = threading.Event()
+    release = threading.Event()
+
+    def wedge():
+        wedged.set()
+        release.wait()
+
+    with viewer._pose_lock:  # keeps the player thread out; the tick is ours
+        loop.call_soon_threadsafe(wedge)
+        try:
+            assert wedged.wait(PLAYER_ADVANCE_TIMEOUT_S)
+            with pytest.raises(ViserLoopTimeoutError):
+                viewer._tick()
+        finally:
+            release.set()
+        # Runs after the write the tick gave up on: the loop runs callbacks in order.
+        asyncio.run_coroutine_threadsafe(_thread_id(), loop).result(PLAYER_ADVANCE_TIMEOUT_S)
+        assert viewer._gui_time.value == 0.0
+        assert viewer._t_s == 0.0
 
 
 def test_browser_drag_pauses_and_scrubs(viewer, env):

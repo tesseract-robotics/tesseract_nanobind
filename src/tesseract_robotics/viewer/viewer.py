@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from types import TracebackType
 
 import numpy as np
@@ -24,6 +27,7 @@ from .errors import (
     StaleSceneError,
     ViewerCloseTimeoutError,
     ViewerPortInUseError,
+    ViserLoopTimeoutError,
 )
 from .geometry import visual_to_trimesh
 from .poses import isometry_to_pose, link_poses
@@ -47,6 +51,9 @@ SPEED_STEP = 0.1
 EMPTY_TIME_MAX_S = 1.0
 # How long close() waits for the player [s]: many ticks, so only a wedged pose update trips it.
 PLAYER_JOIN_TIMEOUT_S = 5.0
+# How long a tick waits for viser's event loop to start its slider write [s]: 30 ticks, so only a
+# wedged loop trips it, and well inside PLAYER_JOIN_TIMEOUT_S.
+VISER_LOOP_TIMEOUT_S = 1.0
 # Default TCP axes length for plot_trajectory [m]; the old viewer's default.
 PLOT_AXES_LENGTH_M = 0.1
 # Default TCP path colour for plot_trajectory, 8-bit RGB: white, the old viewer's default.
@@ -449,20 +456,30 @@ class TesseractViewer:
         traj = self._trajectory
         if traj is None or not self._gui_play.value:
             return
-        # viser wrote a browser drag to the slider; its callback is waiting on the pose lock
-        # and reads the slider, so writing it here would lose the drag.
-        if self._gui_time.value != self._t_s:
-            return
         t_s = self._t_s + PLAYBACK_DT_S * self._gui_speed.value
+        at_end = False
         if t_s > traj.duration_s:
             if self._gui_loop.value:
                 t_s = 0.0
             else:
                 t_s = traj.duration_s
-                self._gui_play.value = False
+                at_end = True
+        loop = self._server.get_event_loop()
+        if not _call_on_loop(loop, partial(self._advance_slider, self._t_s, t_s)):
+            return
+        if at_end:
+            self._gui_play.value = False
         self._t_s = t_s
-        self._gui_time.value = t_s
         self.show_time(t_s)
+
+    def _advance_slider(self, from_s: float, to_s: float) -> bool:
+        # On viser's event loop, which writes a browser drag to the slider and then hands its
+        # callback to a thread that waits on the pose lock and reads the slider back. A slider
+        # off `from_s` holds such a drag: writing it here would lose the drag.
+        if self._gui_time.value != from_s:
+            return False
+        self._gui_time.value = to_s
+        return True
 
     def _clear_trajectory(self) -> None:
         self._trajectory = None
@@ -478,3 +495,40 @@ class TesseractViewer:
             frame.remove()
         self._visual_handles.clear()
         self._link_frames.clear()
+
+
+def _call_on_loop[T](loop: asyncio.AbstractEventLoop, call: Callable[[], T]) -> T:
+    """Run `call` on `loop` from another thread and return its result.
+
+    Args:
+        loop: A running event loop on another thread.
+        call: What to run there; short, as it holds up the loop.
+
+    Returns:
+        What `call` returned; what it raised is raised here.
+
+    Raises:
+        ViserLoopTimeoutError: `loop` did not start `call` within `VISER_LOOP_TIMEOUT_S`;
+            `call` then never runs.
+    """
+    future: concurrent.futures.Future[T] = concurrent.futures.Future()
+
+    def run() -> None:
+        # False once the caller gave up: the call must not run late.
+        if not future.set_running_or_notify_cancel():
+            return
+        try:
+            future.set_result(call())
+        except Exception as error:
+            future.set_exception(error)
+
+    loop.call_soon_threadsafe(run)
+    try:
+        return future.result(VISER_LOOP_TIMEOUT_S)
+    except TimeoutError:
+        # cancel() fails once run() has started: then it finishes, short, and its result stands.
+        if future.cancel():
+            raise ViserLoopTimeoutError(
+                f"viser's event loop did not start a slider write within {VISER_LOOP_TIMEOUT_S} s"
+            ) from None
+        return future.result()
