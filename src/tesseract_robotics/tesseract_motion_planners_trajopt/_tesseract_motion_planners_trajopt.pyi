@@ -621,5 +621,19 @@ class TrajOptPIQPSolverProfile(TrajOptSolverProfile):
     @settings.setter
     def settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
 
+    def __eq__(self, arg: TrajOptPIQPSolverProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptPIQPSolverProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptPIQPSolverProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        `settings:` (PIQP) and `opt_params:` are merged into the profile's values; settings PIQP's sparse backend rejects raise RuntimeError.
+        """
+
 class TrajOptMotionPlanner(tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners.MotionPlanner):
     def __init__(self, name: str) -> None: ...

@@ -13,6 +13,7 @@
 NB_MAKE_OPAQUE(tesseract::common::VectorIsometry3d)
 
 // tesseract_motion_planners core
+#include <tesseract/motion_planners/piqp/settings_utils.h>
 #include <tesseract/motion_planners/planner.h>
 #include <tesseract/motion_planners/planner_utils.h>
 #include <tesseract/motion_planners/robot_config.h>
@@ -78,6 +79,8 @@ NB_MODULE(_tesseract_motion_planners, m) {
     nb::module_::import_("tesseract_robotics.tesseract_kinematics._tesseract_kinematics");
     nb::module_::import_("tesseract_robotics.tesseract_environment._tesseract_environment");
     nb::module_::import_("tesseract_robotics.tesseract_command_language._tesseract_command_language");
+    // PIQPSettings (checkPIQPSettings) is owned by the trajopt_sqp module.
+    nb::module_::import_("tesseract_robotics.trajopt_sqp._trajopt_sqp");
 
     // ========== PlannerRequest ==========
     nb::class_<tp::PlannerRequest>(m, "PlannerRequest")
@@ -185,6 +188,12 @@ NB_MODULE(_tesseract_motion_planners, m) {
           "joint_values"_a, "limits"_a, "coupling_limits"_a,
           "True if `joint_values` are within `limits` and joint 4 + joint 6 (third and first from "
           "the end) are within `coupling_limits`.");
+
+    // piqp/settings_utils.h. Its operator== is PIQPSettings' equality, used by the PIQP solver
+    // profiles' __eq__; Python compares the profiles.
+    m.def("checkPIQPSettings", &tp::checkPIQPSettings, "settings"_a, "profile_name"_a,
+          "Raise RuntimeError, naming `profile_name`, unless `settings` has a KKT solver of PIQP's sparse "
+          "backend and passes piqp::Settings::verify_settings().");
 
     // isValidState<double> is not bound: upstream planner_utils.h:85 calls isWithinLimits without
     // its template argument, and the call does not deduce for an Eigen::Matrix limits argument,

@@ -418,9 +418,16 @@ NB_MODULE(_tesseract_motion_planners_trajopt_ifopt, m) {
 
     // ========== TrajOptIfoptPIQPSolverProfile ==========
     // PIQPSettings comes from the trajopt_sqp module imported above.
-    nb::class_<tp::TrajOptIfoptPIQPSolverProfile, tp::TrajOptIfoptSolverProfile>(m, "TrajOptIfoptPIQPSolverProfile")
+    nb::class_<tp::TrajOptIfoptPIQPSolverProfile, tp::TrajOptIfoptSolverProfile> ifopt_piqp_solver_profile(
+        m, "TrajOptIfoptPIQPSolverProfile");
+    ifopt_piqp_solver_profile
         .def(nb::init<>())
         .def_rw("qp_settings", &tp::TrajOptIfoptPIQPSolverProfile::qp_settings, "PIQP settings for each QP");
+    // operator== compares qp_settings with checkPIQPSettings' relative tolerance (settings_utils.h)
+    bind_value_equality(ifopt_piqp_solver_profile);
+    bind_from_yaml(ifopt_piqp_solver_profile,
+        "`settings:` (PIQP, read into qp_settings) and `opt_params:` are merged into the profile's "
+        "values; settings PIQP's sparse backend rejects raise RuntimeError.");
 
     // ========== Term factories (trajopt_ifopt_utils.h) ==========
     // The planner's own term set-up; a hand-built TrajOptQPProblem gets the same sets.
