@@ -57,7 +57,8 @@ flowchart LR
 The SWIG bindings follow the same pattern one level up:
 [tesseract-robotics-python-feedstock](https://github.com/tesseract-robotics-packaging/tesseract-robotics-python-feedstock)
 builds `tesseract_python` as a conda package against the same channel. This
-repository ships wheels to PyPI instead and has no feedstock of its own yet.
+repository ships wheels to PyPI, and its own feedstock is being set up (see
+[Conda package](#conda-package-tesseract-robotics-nanobind)).
 
 ## C++ packages: the feedstocks
 
@@ -121,6 +122,45 @@ What each fork changes on its `dev` branch:
 `keep-portable-shebang.patch` exists because, with `python` out of host, OMPL's
 `install_python` macro writes the build tool's Python into its script shebangs. The
 patch keeps `#!/usr/bin/env python3`.
+
+## Conda package: tesseract-robotics-nanobind
+
+The bindings get a feedstock of their own, `tesseract-robotics-nanobind-feedstock`,
+laid out like `tesseract-robotics-python-feedstock`: rattler-build, conda-smithy,
+GitHub Actions on linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, Python
+3.12 to 3.14 (#162 step 2). It turns this repository into the conda package
+`tesseract-robotics-nanobind`, built the same way as the C++ stack under it.
+
+!!! warning "Status"
+    - **Incomplete:** the feedstock repository does not exist yet, so neither
+      does the `packaging/tesseract-robotics-nanobind-feedstock` submodule the
+      `build-feedstock-nanobind` task runs in. Its CI and the upload to
+      `label/dev` (by the holder of the channel's `BINSTAR_TOKEN`) follow.
+    - **Under verification:** the osx-arm64 build of the recipe, Python 3.12.
+
+The recipe (`recipe/recipe.yaml`):
+
+| Section | Contents | Why |
+|---|---|---|
+| `source` | `archive/<sha>.tar.gz` of this repository on the `dev` branch; the release tag on `master` | the dev track pins the merge SHA of the license PR (#368) or later: earlier commits have no `LICENSE` / `NOTICE` |
+| `build` | `pip install . --no-deps --no-build-isolation`, `SETUPTOOLS_SCM_PRETEND_VERSION` = the recipe version, `CONDA_PREFIX` = the host prefix | the archive has no `.git` for setuptools-scm; `CMakeLists.txt` finds the C++ stack and its data through `$CONDA_PREFIX` |
+| `host` | `python`, `pip`, `scikit-build-core >=0.11`, `setuptools-scm`, `nanobind ==2.12.0`, `tesseract-robotics`, `tesseract-robotics-planning`, `trajopt`, `descartes-light`, `libboost-devel`, `eigen-abi-devel`, `taskflow 3.11.*` | every `find_package` in `CMakeLists.txt` resolves from these and their run deps |
+| `run` | `numpy >=2.0`, `scipy >=1.17.1`, `loguru`, `viser >=1.1.1`, `trimesh >=4`, `pillow`, `taskflow 3.11.*`, plus the C++ packages' `run_exports` | the `[project] dependencies`, so `pip check` passes |
+| `run_constraints` | `tesseract-robotics-python <0.0a0` | both packages install `tesseract_robotics` |
+| `tests` | imports + `pip check`; `python -m tesseract_robotics.selftest`; `pytest tests/tesseract_collision tests/tesseract_kinematics` | the selftest loads every plugin family; the two suites need no planner |
+| `about` | `license: Apache-2.0`, `license_file: [LICENSE, NOTICE]` | #368 |
+
+`recipe/conda_build_config.yaml` uses the dev-track channels of the C++
+feedstocks: `channel_sources: tesseract-robotics/label/dev,tesseract-robotics,conda-forge`,
+`channel_targets: tesseract-robotics dev`, and the same `libboost_devel`,
+`eigen_abi_devel` and `jsoncpp` pins. The extension modules are `cp312-abi3`, but
+like any conda Python package they are built once per interpreter; the recipe
+skips Python below 3.12.
+
+Locally, `pixi run build-feedstock-nanobind` builds the stack feedstocks first,
+then this checkout (`TESSERACT_NANOBIND_SRC_DIR` points the recipe at it instead
+of the pinned archive) into `packaging/output`, for Python 3.12 on the host
+platform.
 
 ## pixi environments: where each one gets its C++
 

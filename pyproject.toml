@@ -294,6 +294,12 @@ index-feedstock-channel = { cmd = "pixi exec --spec 'rattler-index==0.30.11' rat
 build-feedstock = { cmd = "pixi run index-feedstock-channel", depends-on = [
     "build-feedstock-planning",
 ], description = "Build the upstream-main C++ stack from the packaging/ feedstocks, then index them as a local channel" }
+# The bindings themselves, as the conda package tesseract-robotics-nanobind (#162 step 2).
+# TESSERACT_NANOBIND_SRC_DIR makes the recipe build this checkout instead of its pinned
+# GitHub archive. One Python (3.12) locally; the feedstock's CI builds 3.12-3.14.
+build-feedstock-nanobind = { cmd = "git checkout -- .ci_support && python build-locally.py ${FEEDSTOCK_CONFIG}python3.12.____cpython", cwd = "packaging/tesseract-robotics-nanobind-feedstock", env = { CI = "", EXTRA_CB_OPTIONS = "--output-dir $PIXI_PROJECT_ROOT/packaging/output", OSX_SDK_DIR = "$PIXI_PROJECT_ROOT/packaging/SDKs", TESSERACT_NANOBIND_SRC_DIR = "$PIXI_PROJECT_ROOT" }, depends-on = [
+    "build-feedstock-planning",
+], description = "Build the nanobind feedstock (dev branch) from this checkout against the local C++ stack" }
 
 [tool.pixi.target.osx-arm64.activation.env]
 FEEDSTOCK_CONFIG = "osx_arm64_"
