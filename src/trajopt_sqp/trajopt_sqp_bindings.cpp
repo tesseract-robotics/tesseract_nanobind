@@ -28,14 +28,16 @@
 namespace tsqp = trajopt_sqp;
 
 namespace {
-// The convex evaluators read var_vals in the layout of the last convexify(): the NLP variables
-// followed by the slack variables, getNumQPVars() entries, as trajopt documents ("Should be size
-// num_qp_vars", qp_problem.h:59, :67) but does not check. trajopt 0.35.0 (every 0.35.0.x wheel)
-// multiplies a penalty cost's full QP rows into var_vals (trajopt_qp_problem.cpp:187-188), so a
-// shorter vector is read past its end; before the first convexify() getNumQPVars() is 0 and an
-// empty or NLP-sized vector segfaults on a squared cost and reads garbage otherwise. The binding
-// owns the Python boundary, so validate here and fail loud (std::invalid_argument -> ValueError).
-// One contract for all three evaluators, although trajopt 0.35.0 reads only the NLP block in two.
+// The convex evaluators take a point of the QP the last convexify() built: the NLP variables
+// followed by the slack variables, getNumQPVars() entries, as trajopt documents
+// (qp_problem.h:61, :69, :92) but does not check. trajopt reads only the NLP block
+// (var_vals.head(n_nlp_vars), trajopt_qp_problem.cpp:246, :309, since trajopt#592), so a vector
+// shorter than getNumNLPVars() is read past its end. Before the first convexify() there is no
+// model: a squared cost segfaults, and a penalty cost or a constraint reads 0 whatever its
+// violation. Measured on trajopt a504b22 with this check off, in child interpreters. The binding
+// owns the Python boundary, so it validates here and fails loud (std::invalid_argument ->
+// ValueError): one contract for all three evaluators, trajopt's documented size and not the
+// NLP-sized read it does today.
 void validate_qp_solution(const tsqp::QPProblem& problem,
                           const Eigen::Ref<const Eigen::VectorXd>& var_vals,
                           const char* method)
