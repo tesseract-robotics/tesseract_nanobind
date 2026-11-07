@@ -174,9 +174,10 @@ The override may return `None` for no objective; anything else that is not an
 cannot be subclassed in Python.
 
 Measured on the KUKA IIWA sphere sweep (`freespace_clearance_objective_example.py`,
-`FreespaceIfoptPipeline`, two RRTConnect planners, `planning_time = 5`, no solution-count
-exit, osx-arm64): the default objective took 8.3 s end to end, the 6.0 rad threshold
-3.0 s. With an infinite threshold the OMPL solve alone returns in 0.2 s against 3.0 s for
+`FreespaceIfoptPipeline`, two RRTConnect planners, no solution-count exit, osx-arm64): at
+`planning_time = 5` the default objective took 8.3 s end to end, the 6.0 rad threshold
+3.0 s; the example uses `planning_time = 10`, the profile helpers' default, so the
+threshold case's TrajOptIfopt stage fits inside it under load (5.7 s with two test workers). With an infinite threshold the OMPL solve alone returns in 0.2 s against 3.0 s for
 the default objective at `planning_time = 3` (`tests/tesseract_motion_planners/test_ompl_objective.py`).
 
 !!! warning "Clearance is not reported on this stack"
