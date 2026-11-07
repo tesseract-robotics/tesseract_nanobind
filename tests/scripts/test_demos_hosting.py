@@ -175,3 +175,16 @@ def test_a_root_relative_link_is_named_though_a_local_server_would_find_it(tmp_p
     page = site / "examples/p/index.html"
     page.write_text(page.read_text().replace("../../demos/posters/", "/demos/posters/"))
     assert any("leaves the site" in p for p in check_site.missing_files(site, [SHOWN]))
+
+
+def test_readme_poster_opens_the_docs_player():
+    """The README's poster lands on the docs home, whose player `#play` starts: not the bare client."""
+    readme = (REPO / "README.md").read_text("utf-8")
+    site_url = next(
+        line.split(":", 1)[1].strip()
+        for line in (REPO / "mkdocs.yml").read_text("utf-8").splitlines()
+        if line.startswith("site_url:")
+    )
+    poster = f"{site_url}demos/posters/{check_site.HERO_MODULE}.png"
+    (line,) = [line for line in readme.splitlines() if poster in line]
+    assert line.endswith(f"]({site_url}#play)")
