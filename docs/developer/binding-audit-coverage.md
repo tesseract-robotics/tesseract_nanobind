@@ -1,6 +1,6 @@
 # Binding audit coverage and ownership
 
-All 22 binding modules are audited: the 10 core modules and the 12 planning and trajopt modules (#256). Every open row of the [Binding API Audit](binding-api-audit.md) (a gap, a deviation or a quoted C++ name) has a recorded outcome in `scripts/audit_ledger.json`: an open issue or a won't-fix reason. `tests/audit/test_audit_ledger.py` checks this in both directions on every PR. Every other difference between a header and its stub is accepted under one of the 54 named rules below, and each rule's text is printed in the report.
+All 22 binding modules are audited: the 10 core modules and the 12 planning and trajopt modules (#256). Every open row of the [Binding API Audit](binding-api-audit.md) (a gap, a deviation or a quoted C++ name) has a recorded outcome in `scripts/audit_ledger.json`: an open issue or a won't-fix reason. `tests/audit/test_audit_ledger.py` checks this in both directions on every merge into main. Every other difference between a header and its stub is accepted under one of the 54 named rules below, and each rule's text is printed in the report.
 
 A binding module that is in neither module table fails the run before anything is parsed. A rule-table entry whose rule has no text fails at import. A ledger entry whose row is gone fails the ledger test. Nothing is accepted silently.
 
@@ -30,7 +30,7 @@ flowchart LR
 5. **Report** (`audit_report.render_markdown`, `to_json`): writes `docs/developer/binding-api-audit.md` with provenance, coverage and per-module tables. Each open row gets an `issue` column read from the ledger.
 6. **Ledger verify** (`test_audit_ledger`): one fresh audit of every audited module. It finds no open row without an outcome and no ledger entry without a row.
 
-Regenerate with `pixi run -e audit audit-bindings` and test with `pixi run -e audit audit-test`. CI runs both on every PR and fails if the regenerated report differs from the committed one (provenance line excepted).
+Regenerate with `pixi run -e audit audit-bindings` and test with `pixi run -e audit audit-test`. CI runs both on every merge into main and fails if the regenerated report differs from the committed one (provenance line excepted).
 
 A stub row names its file, not its line, and a header row keeps its line. Line numbers in the header rows move only when the headers change, which is only on a tesseract bump through `pixi.lock`. The report therefore changes only when a row is added, removed or reclassified, and needs regenerating only after one of these changes:
 

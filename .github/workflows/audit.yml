@@ -1,19 +1,9 @@
 name: Binding audit
 
-# On pull requests, only when its inputs change: the binding TUs and stubs (src/), the headers
-# they include (pixi.lock), and the audit's own scripts, tests, report and config. Headers come
-# through pixi.lock, so a new input outside this list would stop being audited on PRs without any
-# failure; pushes to main and tags always run, and catch that before a release.
+# Runs on a merge into main and on tags only, never on pull requests: a run takes up to an hour,
+# and nearly every binding PR touches its inputs. A stale report or a failing contract test shows
+# up on main, before a release. workflow_dispatch runs it on a branch by hand.
 on:
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'pixi.lock'
-      - 'pyproject.toml'
-      - 'scripts/audit*'
-      - 'tests/audit/**'
-      - 'docs/developer/binding-api-audit.md'
-      - '.github/workflows/audit.yml'
   push:
     branches: [main]
     tags:
@@ -60,8 +50,9 @@ jobs:
       run: pixi run -e audit audit-gil
 
     # The committed report must be what the audit generates from this tree. The provenance
-    # line carries the stubs' last-commit SHA, which on a PR merge ref is the synthetic merge
-    # commit, so that one line is ignored (git diff -I, git >= 2.30); every row is compared.
+    # line carries the stubs' last-commit SHA, which the committed report cannot know (a merge
+    # or rebase rewrites it), so that one line is ignored (git diff -I, git >= 2.30); every row
+    # is compared.
     - name: Report is current
       run: |
         pixi run -e audit audit-bindings
