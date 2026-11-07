@@ -186,7 +186,8 @@ NB_MODULE(_tesseract_motion_planners, m) {
           "True if `joint_values` are within `limits` and joint 4 + joint 6 (third and first from "
           "the end) are within `coupling_limits`.");
 
-    // isValidState<double> is not bound: upstream planner_utils.h:84 calls isWithinLimits without
+    // isValidState<double> is not bound: upstream planner_utils.h:85 calls isWithinLimits without
     // its template argument, and the call does not deduce for an Eigen::Matrix limits argument,
-    // so the double instance does not compile (0.35.0).
+    // so the double instance does not compile (tesseract_planning a6483823;
+    // tesseract-robotics/tesseract_planning#791).
 }
