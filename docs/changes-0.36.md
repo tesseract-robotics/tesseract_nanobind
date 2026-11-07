@@ -386,3 +386,35 @@ task_composer_log_to_file(log, "failing_plan.tclx")
 
 Building the bindings now requires the Descartes, TrajOpt and TrajOptIfopt components; CMake stops
 if one is missing instead of skipping its modules.
+
+## New in 0.36: batch collision updates, sample grids, config schemas
+
+Additions, not changes: 0.35 code keeps working. Each was a 0.36 API with no binding (#373).
+
+| Module | New |
+|---|---|
+| `tesseract_collision` | `CollisionObjectSpec`; `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled`, `getCollisionObjectsTransform`, `setCollisionObjectsTransform(ids, state)` on both managers; `collideImplicitSDF`, `makeImplicitSDFShape` and their types |
+| `tesseract_kinematics` | `PositionerSampleResolution`, `gatherJointLimits`, `buildSampleGrid`, `computeChainReachUpperBound` |
+| `tesseract_task_composer` | `schema()` on graphs, pipelines, tasks and the Taskflow executor; `TaskComposerNodePorts.inputSchema` / `outputSchema`; `ValidationError.toString` |
+| `tesseract_common` | `PropertyTree` (YAML as text), `PluginDiscoveryInfo` |
+| `trajopt_ifopt` | `CartAxisKinematics`; `calcJacobianBlock` on the CartAxis constraints; `CollisionCoeffData.hasZeroCoeff` |
+| planners | `==`, `!=` and `from_yaml` on the PIQP solver profiles; `checkPIQPSettings` |
+
+```python
+# 0.35: one call, one broadphase update, per object
+for name, shapes, poses in objects:
+    manager.addCollisionObject(name, 0, shapes, poses)
+
+# 0.36: one batch
+manager.addCollisionObjects([CollisionObjectSpec(n, 0, s, p) for n, s, p in objects])
+```
+
+The CartAxis constraints now check that their `Var` is in the set they are linked to, as the
+other `Var`-based constraints do: linking one to a set that does not hold its `Var` raises
+`VarNotInVariableSetError`.
+
+Left unbound, with the reason in `scripts/audit_ledger.json`: the REP / ROP / RTP solver plugin
+internals (`factory_utils.h`, `rtp_factory.h`, `rtp_inv_kin.h`), reached through
+`KinematicsPluginFactory`; `PIQPSolver.solver()`, which returns a `piqp::SparseSolver` no module
+binds; and `PropertyTreeBuilder` / `PropertyTree.addValidator`, since schemas are built by the C++
+type that owns them.
