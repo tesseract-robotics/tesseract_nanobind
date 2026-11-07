@@ -522,8 +522,9 @@ class TestTrajOptIfoptSolverCallbacks:
     def test_callback_returning_false_called_once_per_iteration_up_to_max(
         self, kuka_iiwa_environment
     ):
-        # Whether False stops the solve is upstream's (trajopt 0.35.0 keeps iterating, see
-        # docs/user-guide/low-level-sqp.md); the binding guarantees the calls and their arguments.
+        # Whether False stops the solve is upstream's (the pinned trajopt stops after the first
+        # call, trajopt 0.35.0 kept iterating; see docs/user-guide/low-level-sqp.md); the binding
+        # guarantees the calls and their arguments.
         t_env, manip_info, joint_names = kuka_iiwa_environment
         seen = []
 

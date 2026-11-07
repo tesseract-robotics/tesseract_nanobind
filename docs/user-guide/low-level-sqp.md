@@ -330,14 +330,12 @@ solver_profile.callbacks = [Progress()]  # assign the whole list; it is copied
     Read what you need from `problem` inside the callback; do not store it, or anything
     taken from it, for use after `execute` returns.
 
-!!! warning "Returning `False` does not stop the solve on trajopt 0.35.0"
-    The callback's `False` reaches the solver, which drops it. In trajopt 0.35.0's
-    `trust_region_sqp_solver.cpp`, `runTrustRegionLoop` returns on `kStoppedByCallback`, but
-    `stepSQPSolver` does not check that status, so `solve` keeps stepping until
-    `opt_params.max_iterations`, and `verifySQPSolverConvergence` can then set `kConverged`.
-    Through `TrajOptIfoptMotionPlanner`, a callback that always returns `False` is called once
-    per iteration up to `max_iterations` and the response can still be successful. To bound a
-    solve, set `opt_params.max_iterations` or `opt_params.max_time`.
+!!! note "Returning `False` stops the solve"
+    The solver ends the solve after that call with `SQPStatus.STOPPED_BY_CALLBACK`. Through
+    `TrajOptIfoptMotionPlanner` the response is unsuccessful, its message ending in
+    `SQP_STOPPED_BY_CALLBACK`. The 0.35.0.x wheels up to 0.35.0.8 bundle trajopt 0.35.0, whose
+    solver dropped the `False` and kept stepping: there, bound a solve with
+    `opt_params.max_iterations` or `opt_params.max_time`.
 
 ## Python Subclassing
 
