@@ -61,8 +61,9 @@ SPHERE_POSITION_M = (0.5, 0.0, 0.55)
 NUM_PLANNERS = 2  # the C++ example's parallel RRTConnect planners
 PLANNER_RANGE_RAD = 0.01  # the C++ example's RRTConnect range
 
-# Long enough that the time cap, not the planner, ends case 1.
-PLANNING_TIME_S = 5.0
+# The freespace profile helpers' default planning_time. Case 2's whole pipeline (OMPL and
+# TrajOptIfopt) must finish inside it, so it has to leave TrajOptIfopt room under load.
+PLANNING_TIME_S = 10.0
 # No solution-count exit: only the objective or the time cap ends the optimize loop.
 UNREACHABLE_MAX_SOLUTIONS = 1_000_000
 # Joint-space path length the first RRTConnect paths on this scene reach (5.2 to 5.7 rad

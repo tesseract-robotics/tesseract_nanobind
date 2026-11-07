@@ -973,8 +973,10 @@ def test_freespace_clearance_objective_example():
     assert cases["default"]["success"]
     assert cases["threshold"]["success"]
     assert cases["objective_calls"] == 1
-    # The cost threshold, not the time cap, ends case 2's optimize loop.
+    # The cost threshold, not the time cap, ends case 2's optimize loop: its whole pipeline
+    # finishes inside the planning_time that case 1's OMPL stage alone uses up.
     assert cases["threshold"]["wall_time_s"] < PLANNING_TIME_S
+    assert cases["default"]["wall_time_s"] > PLANNING_TIME_S
 
 
 @pytest.mark.planning
