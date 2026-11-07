@@ -144,6 +144,10 @@ ignore = ["E501"]                       # line too long (handled by formatter)
 
 [tool.ruff.format]
 quote-style = "double"
+# ruff 0.17 formats Markdown code blocks too. The docs' python blocks hold pymdownx snippet
+# includes (`--8<-- "file:section"`), which it rewrites to `--8 < --"file:section"` and breaks,
+# and hand-aligned arrays; the pre-commit hook formats only Python, stubs and notebooks.
+exclude = ["*.md"]
 
 # ============================================================================
 # Pixi configuration - replaces conda environment.yml
