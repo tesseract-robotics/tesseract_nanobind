@@ -134,7 +134,7 @@ public:
         if (!nb::isinstance<ob::OptimizationObjective>(result))
             throw ObjectiveReturnTypeError(
                 "OMPLRealVectorMoveProfile.createOptimizationObjective must return an OptimizationObjective "
-                "or None, not " + nb::cast<std::string>(nb::str(result.type().attr("__name__"))));
+                "or None, not " + std::string(nb::type_name(result.type()).c_str()));
         return std::make_unique<SharedOptimizationObjective>(nb::cast<std::shared_ptr<ob::OptimizationObjective>>(result));
     }
 };
