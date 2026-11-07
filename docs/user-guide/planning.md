@@ -128,6 +128,64 @@ For freespace-pipeline use (OMPL + TrajOpt together), use
 `create_freespace_pipeline_profiles` — same arguments plus the TrajOpt smoothing
 profile in the same dictionary.
 
+### OMPL optimization objectives
+
+With `optimize = True`, the OMPL planner re-solves until `planning_time` runs out,
+`max_solutions` solutions exist, or the objective calls the best path good enough
+(`objective.isSatisfied(cost)`). The default objective is joint-space path length with no
+reachable threshold, so in practice the loop ends on time or count. A Python subclass of
+`OMPLRealVectorMoveProfile` can supply its own objective by overriding
+`createOptimizationObjective(si, env, manip)`; the planner calls it once per solve, and a
+cost threshold on the returned objective ends the loop as soon as a path meets it (#362).
+
+```python
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    Cost,
+    MaximizeMinClearanceObjective,
+    MultiOptimizationObjective,
+    OMPLRealVectorMoveProfile,
+    PathLengthOptimizationObjective,
+)
+
+
+class LengthAndClearance(OMPLRealVectorMoveProfile):
+    def createOptimizationObjective(self, si, env, manip):
+        objective = MultiOptimizationObjective(si)
+        objective.addObjective(PathLengthOptimizationObjective(si), 1.0)
+        objective.addObjective(MaximizeMinClearanceObjective(si), 0.5)
+        objective.setCostThreshold(Cost(6.0))  # rad of joint-space path length
+        return objective
+```
+
+Register the instance under `OMPL_DEFAULT_NAMESPACE` like any OMPL profile.
+
+| Type | Role |
+|---|---|
+| `SpaceInformation` | the problem's OMPL space information; opaque, the objectives are built on it |
+| `Cost` | a cost value: `Cost(2.0)`, `.value()` |
+| `OptimizationObjective` | base: `isSatisfied`, `setCostThreshold`, `getCostThreshold`, `getDescription` |
+| `PathLengthOptimizationObjective` | joint-space path length, the default |
+| `MaximizeMinClearanceObjective` | maximise the smallest clearance along the path |
+| `MechanicalWorkOptimizationObjective` | mechanical work, plus a small path-length term |
+| `MultiOptimizationObjective` | weighted sum: `addObjective(objective, weight)` |
+
+The override may return `None` for no objective; anything else that is not an
+`OptimizationObjective` raises `OMPLObjectiveReturnTypeError` from `solve`. Objectives
+cannot be subclassed in Python.
+
+Measured on the KUKA IIWA sphere sweep (`freespace_clearance_objective_example.py`,
+`FreespaceIfoptPipeline`, two RRTConnect planners, `planning_time = 5`, no solution-count
+exit, osx-arm64): the default objective took 8.3 s end to end, the 6.0 rad threshold
+3.0 s. With an infinite threshold the OMPL solve alone returns in 0.2 s against 3.0 s for
+the default objective at `planning_time = 3` (`tests/tesseract_motion_planners/test_ompl_objective.py`).
+
+!!! warning "Clearance is not reported on this stack"
+    tesseract's OMPL state validators do not implement `clearance()`, so OMPL's default,
+    0, applies to every state and `MaximizeMinClearanceObjective` adds a constant. A
+    clearance-weighted objective therefore optimizes path length alone until upstream
+    reports clearance. Ending the loop on cost convergence (no improvement over the last
+    `k` solutions) needs an upstream `OMPLSolverConfig` option, also tracked in #362.
+
 ### Available OMPL Planners
 
 | Planner | Description |

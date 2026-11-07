@@ -75,6 +75,7 @@ handles optional viewer launch, `run()` returns results for testing / reuse.
 | `raster_example.py` | `tesseract_raster_example` | Industrial raster patterns |
 | `puzzle_piece_auxillary_axes_example.py` | `tesseract_puzzle_piece_auxillary_axes_example` | 9-DOF with external axis |
 | `freespace_hybrid_example.py` | `tesseract_freespace_hybrid_example` | OMPL + TrajOpt hybrid |
+| `freespace_clearance_objective_example.py` | `tesseract_freespace_clearance_objective_example` | OMPL objective from Python; a cost threshold ends the optimize loop |
 | `chain_example.py` | `tesseract_chain_example` | Descartes + TrajOpt chaining |
 
 ### Real-Time
