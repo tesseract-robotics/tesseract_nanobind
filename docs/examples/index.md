@@ -67,15 +67,15 @@ handles optional viewer launch, `run()` returns results for testing / reuse.
 
 | Example | Console script | Description |
 |---------|----------------|-------------|
-| `freespace_ompl_example.py` | `tesseract_freespace_ompl_example` | OMPL freespace motion |
+| [`freespace_ompl_example.py`](ompl.md) | `tesseract_freespace_ompl_example` | OMPL freespace motion |
 | `basic_cartesian_example.py` | `tesseract_basic_cartesian_example` | Cartesian path with TrajOpt |
 | `glass_upright_example.py` | `tesseract_glass_upright_example` | Orientation constraints |
 | `pick_and_place_example.py` | `tesseract_pick_and_place_example` | Pick, attach, place workflow |
 | `car_seat_example.py` | `tesseract_car_seat_example` | Complex multi-step planning |
 | `raster_example.py` | `tesseract_raster_example` | Industrial raster patterns |
 | `puzzle_piece_auxillary_axes_example.py` | `tesseract_puzzle_piece_auxillary_axes_example` | 9-DOF with external axis |
-| `freespace_hybrid_example.py` | `tesseract_freespace_hybrid_example` | OMPL + TrajOpt hybrid |
-| `freespace_clearance_objective_example.py` | `tesseract_freespace_clearance_objective_example` | OMPL objective from Python; a cost threshold ends the optimize loop |
+| [`freespace_hybrid_example.py`](ompl.md) | `tesseract_freespace_hybrid_example` | OMPL + TrajOpt hybrid |
+| [`freespace_clearance_objective_example.py`](ompl.md) | `tesseract_freespace_clearance_objective_example` | OMPL objective from Python; a cost threshold ends the optimize loop |
 | `chain_example.py` | `tesseract_chain_example` | Descartes + TrajOpt chaining |
 
 ### Real-Time

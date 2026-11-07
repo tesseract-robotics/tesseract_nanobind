@@ -2,28 +2,18 @@
 
 Motion planning examples from simple freespace to complex industrial tasks.
 
+The OMPL examples (freespace, hybrid OMPL + TrajOpt, objectives from Python) have their
+own page: [OMPL Examples](ompl.md).
+
 All examples install as console scripts. Run them with:
 
 ```bash
 # Installed console script (preferred)
-tesseract_freespace_ompl_example
+tesseract_basic_cartesian_example
 
 # Or via Python module invocation
-pixi run python -m tesseract_robotics.examples.freespace_ompl_example
+pixi run python -m tesseract_robotics.examples.basic_cartesian_example
 ```
-
-## Freespace OMPL
-
---8<-- "docs/demos/players/freespace_ompl_example.html"
-
-Basic OMPL planning between joint configurations using the KUKA LBR iiwa 14 R820:
-
-```bash
-tesseract_freespace_ompl_example
-```
-
-See the source at
-[`freespace_ompl_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_ompl_example.py).
 
 ## Basic Cartesian
 
@@ -106,19 +96,6 @@ tesseract_raster_example
 Full source:
 [`raster_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/raster_example.py).
 
-## Hybrid Planning (OMPL + TrajOpt)
-
---8<-- "docs/demos/players/freespace_hybrid_example.html"
-
-OMPL finds a feasible path, TrajOpt smooths and optimizes it:
-
-```bash
-tesseract_freespace_hybrid_example
-```
-
-See the source at
-[`freespace_hybrid_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_hybrid_example.py).
-
 ## Multi-Step with Task Composer (Car Seat)
 
 --8<-- "docs/demos/players/car_seat_example.html"
@@ -193,5 +170,6 @@ with TesseractViewer() as viewer:
 
 ## Next Steps
 
+- [OMPL Examples](ompl.md) - Sampling-based planning and optimization objectives
 - [Online Planning](online-planning.md) - Real-time replanning examples
 - [Low-Level SQP Guide](../user-guide/low-level-sqp.md) - Direct solver access

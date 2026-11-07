@@ -151,6 +151,7 @@ nav:
     - Collision Examples: examples/collision.md
     - Environment Examples: examples/environment.md
     - Planning Examples: examples/planning.md
+    - OMPL Examples: examples/ompl.md
     - Online Planning: examples/online-planning.md
   - API Reference:
     - api/index.md

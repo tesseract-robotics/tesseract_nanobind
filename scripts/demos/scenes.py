@@ -10,7 +10,7 @@ from types import ModuleType
 from tesseract_robotics.planning import TaskComposer
 from tesseract_robotics.tesseract_command_language import CompositeInstruction
 from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.viewer import RecordingPhase, Trajectory
+from tesseract_robotics.viewer import RecordingPhase, TesseractViewer, Trajectory
 
 # The TWC cell the demo shows.
 TWC_CELL = "rail"
@@ -24,6 +24,8 @@ class Scene:
     phases: list[RecordingPhase]
     # Programs whose commanded TCP path gets drawn.
     plots: list[CompositeInstruction] = field(default_factory=list)
+    # Drawn into the viewer after the plots (markers, labels); the recording keeps them.
+    decorations: list[Callable[[TesseractViewer], None]] = field(default_factory=list)
 
 
 def _example(module: str) -> ModuleType:
@@ -66,6 +68,19 @@ def _abb(_composer: TaskComposer) -> Scene:
     results = _example("abb_irb2400_viewer").run()
     env, program = results["env"], results["trajectory"]
     return Scene(env, [RecordingPhase(env, program)], [program])
+
+
+def _clearance_objective(composer: TaskComposer) -> Scene:
+    # Case 2, the thresholded objective, with each cube's closest approach marked.
+    example = _example("freespace_clearance_objective_example")
+    cases = example.run(composer=composer)
+    scene = _result_scene(cases["threshold"])
+    return Scene(
+        scene.env,
+        scene.phases,
+        scene.plots,
+        [lambda viewer: example.draw_clearances(viewer, cases["clearances"])],
+    )
 
 
 def _online(composer: TaskComposer) -> Scene:
@@ -113,6 +128,7 @@ SCENES: dict[str, Callable[[TaskComposer], Scene]] = {
     "glass_upright_example": lambda c: _planned("glass_upright_example", c),
     "freespace_ompl_example": lambda c: _planned("freespace_ompl_example", c),
     "freespace_hybrid_example": lambda c: _planned("freespace_hybrid_example", c),
+    "freespace_clearance_objective_example": _clearance_objective,
     "chain_example": lambda c: _planned("chain_example", c),
     # No plot: its MoveL working frame moves with the group (MovingWorkingFrameError).
     "puzzle_piece_auxillary_axes_example": lambda c: _planned(
