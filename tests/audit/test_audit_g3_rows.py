@@ -470,26 +470,29 @@ def test_simple_author_helpers_are_bound(g3_reports, symbol):
     assert symbol not in open_names(g3_reports[SIMPLE])
 
 
-# Task 10.1: Descartes; `bound_classes` maps the `…D` instances to their templates.
+# Task 10.1: Descartes; `bound_classes` maps the `…D` and `…F` instances to their templates
+# (#350 binds the `float` instances).
 
 DESCARTES_RENAMES = [
-    ("DescartesMoveProfile", "DescartesMoveProfileD"),
-    ("DescartesSolverProfile", "DescartesSolverProfileD"),
-    ("DescartesDefaultMoveProfile", "DescartesDefaultMoveProfileD"),
-    ("DescartesLadderGraphSolverProfile", "DescartesLadderGraphSolverProfileD"),
-    ("DescartesMotionPlanner", "DescartesMotionPlannerD"),
-    ("State", "DescartesStateD"),
-    ("StateSample", "DescartesStateSampleD"),
-    ("EdgeEvaluator", "DescartesEdgeEvaluatorD"),
-    ("WaypointSampler", "DescartesWaypointSamplerD"),
-    ("StateEvaluator", "DescartesStateEvaluatorD"),
+    (cpp, python + scalar)
+    for cpp, python in (
+        ("DescartesMoveProfile", "DescartesMoveProfile"),
+        ("DescartesSolverProfile", "DescartesSolverProfile"),
+        ("DescartesDefaultMoveProfile", "DescartesDefaultMoveProfile"),
+        ("DescartesLadderGraphSolverProfile", "DescartesLadderGraphSolverProfile"),
+        ("DescartesMotionPlanner", "DescartesMotionPlanner"),
+        ("State", "DescartesState"),
+        ("StateSample", "DescartesStateSample"),
+        ("EdgeEvaluator", "DescartesEdgeEvaluator"),
+        ("WaypointSampler", "DescartesWaypointSampler"),
+        ("StateEvaluator", "DescartesStateEvaluator"),
+    )
+    for scalar in ("D", "F")
 ]
 DESCARTES_PREFIXED = [
-    "DescartesStateD",
-    "DescartesStateSampleD",
-    "DescartesEdgeEvaluatorD",
-    "DescartesWaypointSamplerD",
-    "DescartesStateEvaluatorD",
+    f"Descartes{name}{scalar}"
+    for name in ("State", "StateSample", "EdgeEvaluator", "WaypointSampler", "StateEvaluator")
+    for scalar in ("D", "F")
 ]
 
 
@@ -668,8 +671,11 @@ GUARDED_PROFILES = [
         (IFOPT, f"TrajOptIfopt{p}")
         for p in ("DefaultMoveProfile", "DefaultCompositeProfile", "OSQPSolverProfile")
     ],
-    (DESCARTES, "DescartesDefaultMoveProfileD"),
-    (DESCARTES, "DescartesLadderGraphSolverProfileD"),
+    *[
+        (DESCARTES, f"Descartes{p}{scalar}")
+        for p in ("DefaultMoveProfile", "LadderGraphSolverProfile")
+        for scalar in ("D", "F")
+    ],
 ]  # fmt: skip
 
 
