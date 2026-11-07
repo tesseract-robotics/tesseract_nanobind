@@ -404,6 +404,69 @@ def harmonizeTowardMedian(qs: Annotated[NDArray[numpy.float64], dict(shape=(None
 def isValid(qs: Sequence[float]) -> bool:
     """True when all six values are finite."""
 
+class PositionerSampleResolution:
+    """
+    A positioner joint's sample resolution, optionally with its own sampled range (by default the joint's limits).
+    """
+
+    @overload
+    def __init__(self) -> None: ...
+
+    @overload
+    def __init__(self, name: str, value: float, min: float | None = None, max: float | None = None) -> None: ...
+
+    @property
+    def name(self) -> str:
+        """Joint name"""
+
+    @name.setter
+    def name(self, arg: str, /) -> None: ...
+
+    @property
+    def value(self) -> float:
+        """Sample resolution"""
+
+    @value.setter
+    def value(self, arg: float, /) -> None: ...
+
+    @property
+    def min(self) -> float | None:
+        """Lower bound; None: the joint's lower limit"""
+
+    @min.setter
+    def min(self, arg: float | None) -> None: ...
+
+    @property
+    def max(self) -> float | None:
+        """Upper bound; None: the joint's upper limit"""
+
+    @max.setter
+    def max(self, arg: float | None) -> None: ...
+
+def gatherJointLimits(scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, joint_ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.JointId | str]) -> Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')]:
+    """
+    The joints' position limits as an (N, 2) array [lower, upper]; a continuous joint reports [-pi, pi].
+
+    Raises:
+        RuntimeError: a joint is not in scene_graph, or a non-continuous joint has no limits.
+    """
+
+def buildSampleGrid(range: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')] | Sequence[Sequence[float]], resolution: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> list[Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')]]:
+    """
+    Per joint i, ceil((range[i, 1] - range[i, 0]) / resolution[i]) + 1 evenly spaced samples over range[i] (one array per joint, not their product).
+
+    Raises:
+        RuntimeError: sizes disagree, a bound is non-finite or inverted, a resolution is not finite and > 0, or a joint would need more than 10 million samples.
+    """
+
+def computeChainReachUpperBound(scene_graph: tesseract_robotics.tesseract_scene_graph._tesseract_scene_graph.SceneGraph, base_link_id: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str, tip_link_id: tesseract_robotics.tesseract_common._tesseract_common.LinkId | str) -> float:
+    """
+    An upper bound, in metres, on the base-to-tip distance over every joint configuration: the sum of the joint origin offsets along the path plus each prismatic joint's largest |limit|.
+
+    Raises:
+        RuntimeError: a link is missing, no path joins them, or a joint on it has unbounded translation.
+    """
+
 def checkKinematics(manip: KinematicGroup, tol: float = 0.001) -> bool:
     """
     Round-trip self-check: FK then IK for every working frame and tip link of manip.

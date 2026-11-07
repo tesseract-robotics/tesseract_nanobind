@@ -562,6 +562,44 @@ NB_MODULE(_tesseract_kinematics, m) {
     m.def("isValid", [](const std::array<double, 6>& qs) { return tk::isValid<double>(qs); }, "qs"_a,
           "True when all six values are finite.");
 
+    // ========== Sample grids (types.h, utils.h) ==========
+    // The building blocks the REP / ROP / RTP solver plugins use to sample a positioner or tool
+    // chain; callable without a plugin.
+    nb::class_<tk::PositionerSampleResolution>(m, "PositionerSampleResolution",
+        "A positioner joint's sample resolution, optionally with its own sampled range "
+        "(by default the joint's limits).")
+        .def(nb::init<>())
+        .def("__init__",
+             [](tk::PositionerSampleResolution* self, std::string name, double value, std::optional<double> min,
+                std::optional<double> max) {
+                 new (self) tk::PositionerSampleResolution{std::move(name), value, min, max};
+             },
+             "name"_a, "value"_a, "min"_a = nb::none(), "max"_a = nb::none())
+        .def_rw("name", &tk::PositionerSampleResolution::name, "Joint name")
+        .def_rw("value", &tk::PositionerSampleResolution::value, "Sample resolution")
+        .def_rw("min", &tk::PositionerSampleResolution::min, "Lower bound; None: the joint's lower limit")
+        .def_rw("max", &tk::PositionerSampleResolution::max, "Upper bound; None: the joint's upper limit");
+
+    m.def("gatherJointLimits", &tk::gatherJointLimits, "scene_graph"_a, "joint_ids"_a,
+          "The joints' position limits as an (N, 2) array [lower, upper]; a continuous joint reports "
+          "[-pi, pi].\n\n"
+          "Raises:\n"
+          "    RuntimeError: a joint is not in scene_graph, or a non-continuous joint has no limits.");
+    m.def("buildSampleGrid", &tk::buildSampleGrid, "range"_a, "resolution"_a,
+          "Per joint i, ceil((range[i, 1] - range[i, 0]) / resolution[i]) + 1 evenly spaced samples "
+          "over range[i] (one array per joint, not their product).\n\n"
+          "Raises:\n"
+          "    RuntimeError: sizes disagree, a bound is non-finite or inverted, a resolution is not "
+          "finite and > 0, or a joint would need more than 10 million samples.");
+    m.def("computeChainReachUpperBound", &tk::computeChainReachUpperBound, "scene_graph"_a, "base_link_id"_a,
+          "tip_link_id"_a,
+          "An upper bound, in metres, on the base-to-tip distance over every joint configuration: the "
+          "sum of the joint origin offsets along the path plus each prismatic joint's largest "
+          "|limit|.\n\n"
+          "Raises:\n"
+          "    RuntimeError: a link is missing, no path joins them, or a joint on it has unbounded "
+          "translation.");
+
     m.def("checkKinematics", &tk::checkKinematics, "manip"_a, "tol"_a = CHECK_KINEMATICS_TOL_DEFAULT,
           nb::call_guard<nb::gil_scoped_release>(),
           "Round-trip self-check: FK then IK for every working frame and tip link of manip.\n\n"
