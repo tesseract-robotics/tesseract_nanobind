@@ -1398,16 +1398,16 @@ for name in {CONVEX_EVALUATORS!r}:
 class TestConvexEvaluatorArguments:
     """evaluateConvexCosts, evaluateTotalConvexCost and evaluateConvexConstraintViolations take
     the QP solution vector of the last convexify(): getNumQPVars() entries, the NLP variables
-    followed by the slack variables (trajopt_qp_problem.cpp:28).
+    followed by the slack variables, as trajopt documents (qp_problem.h:61, :69, :92).
 
-    trajopt 0.35.0 multiplies a penalty cost's full QP rows, slack columns included, into
-    var_vals unchecked (trajopt_qp_problem.cpp:187-188), so an NLP-sized var_vals was read past
-    its end: on a #149 development build from before this guard, through a view of the first
-    three entries of a longer buffer, an absolute cost of 0.5 read 3.5, a hinge one 0.0,
-    depending on the entries after the view. Before the first convexify() there is no model and getNumQPVars() is 0; an
-    empty or NLP-sized var_vals then segfaulted on a squared cost. The binding raises ValueError
-    in both cases, for all three evaluators, although trajopt 0.35.0 reads only the NLP block in
-    two of them: one contract.
+    The pinned trajopt reads only the NLP block (trajopt#592), so a vector shorter than
+    getNumNLPVars() is read past its end: with the binding's check off, a one-entry view into a
+    buffer of 7s read a squared cost of 4.5 as 49.0. Before the first convexify() there is no
+    model and getNumQPVars() is 0: an empty or NLP-sized var_vals segfaults on a squared cost,
+    and a penalty cost or a constraint reads 0. The binding raises ValueError unless var_vals has
+    getNumQPVars() entries, and before the first convexify(), for all three evaluators: trajopt's
+    documented contract, not the NLP-sized read it does today. trajopt 0.35.0 also read an
+    NLP-sized var_vals past its end (#149: an absolute cost of 0.5 read 3.5).
     """
 
     @pytest.mark.parametrize("evaluator", CONVEX_EVALUATORS)
@@ -1427,7 +1427,7 @@ class TestConvexEvaluatorArguments:
     @_PENALTY_TYPES
     def test_over_long_var_vals_raises(self, evaluator, penalty_type):
         """The rule is exactly getNumQPVars() entries: one more raises too, although trajopt
-        0.35.0 would read only the leading ones and return a value."""
+        would read only the leading ones and return a value."""
         _, problem = _penalty_problem(
             (SEED_NODE_1,), [_seed_cost(penalty_type, 1.0)], constraint_sets=[_start_pin]
         )
