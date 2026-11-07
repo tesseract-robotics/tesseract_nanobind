@@ -607,7 +607,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .value("GRAPH", tp::TaskComposerNodeType::GRAPH);
 
     // A task's fixed port contract (task_composer_node_ports.h). The add* builders return the
-    // contract itself for chaining. inputSchema/outputSchema are not bound: PropertyTree has no binding.
+    // contract itself for chaining. inputSchema/outputSchema return a tesseract_common.PropertyTree.
     using Ports = tp::TaskComposerNodePorts;
     auto node_ports = nb::class_<Ports>(m, "TaskComposerNodePorts");
     nb::enum_<Ports::Cardinality>(node_ports, "Cardinality")
@@ -632,6 +632,7 @@ NB_MODULE(_tesseract_task_composer, m) {
         .def_ro("port", &Ports::ValidationError::port)
         .def_ro("message", &Ports::ValidationError::message)
         .def("path", &Ports::ValidationError::path)
+        .def("toString", &Ports::ValidationError::toString, "'<path>: <message>'")
         .def("__str__", &Ports::ValidationError::toString);
     node_ports.def(nb::init<>())
         .def("addRequiredInput", &Ports::addRequiredInput, "name"_a, "cardinality"_a = Ports::Cardinality::SINGLE,
@@ -644,6 +645,8 @@ NB_MODULE(_tesseract_task_composer, m) {
              nb::rv_policy::reference_internal)
         .def("inputs", &Ports::inputs, nb::rv_policy::copy, "Input port name -> PortDefinition.")
         .def("outputs", &Ports::outputs, nb::rv_policy::copy, "Output port name -> PortDefinition.")
+        .def("inputSchema", &Ports::inputSchema, "The schema of an `inputs:` port-mapping config.")
+        .def("outputSchema", &Ports::outputSchema, "The schema of an `outputs:` port-mapping config.")
         .def("validate", &Ports::validate, "inputs"_a, "outputs"_a,
              "Every way `inputs` / `outputs` break the contract; empty when they satisfy it.")
         .def("validateOrThrow", &Ports::validateOrThrow, "inputs"_a, "outputs"_a, "node_name"_a = std::string(),
@@ -933,8 +936,11 @@ NB_MODULE(_tesseract_task_composer, m) {
     // Factory nodes come back as their most-derived bound class: YAML pipelines are
     // TaskComposerPipeline, the concrete task classes are unbound plugins and stay
     // TaskComposerNode. TaskComposerTask has no Python constructor (runImpl is pure virtual).
+    // schema(): the config schema of a node / executor type, a tesseract_common.PropertyTree.
     nb::class_<tp::TaskComposerTask, tp::TaskComposerNode>(m, "TaskComposerTask")
-        .def("setTriggerAbort", &tp::TaskComposerTask::setTriggerAbort, "enable"_a);
+        .def("setTriggerAbort", &tp::TaskComposerTask::setTriggerAbort, "enable"_a)
+        .def_static("schema", &tp::TaskComposerTask::schema, "ports"_a,
+                    "The config schema of a task with the port contract `ports`.");
 
     // getNodes / getNodeByName return nodes the graph shares (shared_ptr), so no keep_alive. A
     // node added with addNode is shared with the graph, which keeps the Python object alive.
@@ -964,13 +970,15 @@ NB_MODULE(_tesseract_task_composer, m) {
              nb::rv_policy::reference_internal)
         .def("getOverrideOutputPortMappings", &tp::TaskComposerGraph::getOverrideOutputPortMappings,
              nb::rv_policy::reference_internal)
-        .def("isValid", &tp::TaskComposerGraph::isValid, "(True, message) if valid, else (False, the reason).");
+        .def("isValid", &tp::TaskComposerGraph::isValid, "(True, message) if valid, else (False, the reason).")
+        .def_static("schema", &tp::TaskComposerGraph::schema, "The config schema of a TaskComposerGraph.");
 
     nb::class_<tp::TaskComposerPipeline, tp::TaskComposerGraph>(m, "TaskComposerPipeline")
         .def("__init__", [](tp::TaskComposerPipeline* self, std::string name) {
             new (self) tp::TaskComposerPipeline(std::move(name));
         }, "name"_a = "TaskComposerPipeline")
-        .def(nb::init<std::string, bool>(), "name"_a, "conditional"_a);
+        .def(nb::init<std::string, bool>(), "name"_a, "conditional"_a)
+        .def_static("schema", &tp::TaskComposerPipeline::schema, "The config schema of a TaskComposerPipeline.");
 
     // ========== TaskflowTaskComposerExecutor ==========
     nb::class_<tp::TaskflowTaskComposerExecutor, tp::TaskComposerExecutor>(m, "TaskflowTaskComposerExecutor")
@@ -995,7 +1003,9 @@ NB_MODULE(_tesseract_task_composer, m) {
                             [&] { return static_cast<tp::TaskComposerExecutor&>(self).run(node, context); });
         }, "node"_a, "data_storage"_a, "dotgraph"_a = false, "name"_a = "run")
         .def("getWorkerCount", &tp::TaskflowTaskComposerExecutor::getWorkerCount)
-        .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount);
+        .def("getTaskCount", &tp::TaskflowTaskComposerExecutor::getTaskCount)
+        .def_static("schema", &tp::TaskflowTaskComposerExecutor::schema,
+                    "The config schema of a TaskflowTaskComposerExecutor.");
 
     // ========== TaskComposerPluginFactory ==========
     // Move-only class (deleted copy, has move). Use unique_ptr internally to handle moves.

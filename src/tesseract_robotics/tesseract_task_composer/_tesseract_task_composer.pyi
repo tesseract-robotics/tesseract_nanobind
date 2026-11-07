@@ -152,6 +152,9 @@ class TaskComposerNodePorts:
 
         def path(self) -> str: ...
 
+        def toString(self) -> str:
+            """'<path>: <message>'"""
+
         def __str__(self) -> str: ...
 
     def addRequiredInput(self, name: str, cardinality: TaskComposerNodePorts.Cardinality = TaskComposerNodePorts.Cardinality.SINGLE) -> TaskComposerNodePorts: ...
@@ -167,6 +170,12 @@ class TaskComposerNodePorts:
 
     def outputs(self) -> dict[str, TaskComposerNodePorts.PortDefinition]:
         """Output port name -> PortDefinition."""
+
+    def inputSchema(self) -> tesseract_robotics.tesseract_common._tesseract_common.PropertyTree:
+        """The schema of an `inputs:` port-mapping config."""
+
+    def outputSchema(self) -> tesseract_robotics.tesseract_common._tesseract_common.PropertyTree:
+        """The schema of an `outputs:` port-mapping config."""
 
     def validate(self, inputs: TaskComposerPortMap, outputs: TaskComposerPortMap) -> list[TaskComposerNodePorts.ValidationError]:
         """
@@ -527,6 +536,10 @@ class TaskComposerNode:
 class TaskComposerTask(TaskComposerNode):
     def setTriggerAbort(self, enable: bool) -> None: ...
 
+    @staticmethod
+    def schema(ports: TaskComposerNodePorts) -> tesseract_robotics.tesseract_common._tesseract_common.PropertyTree:
+        """The config schema of a task with the port contract `ports`."""
+
 class TaskComposerGraph(TaskComposerNode):
     def __init__(self, name: str = 'TaskComposerGraph') -> None: ...
 
@@ -565,12 +578,20 @@ class TaskComposerGraph(TaskComposerNode):
     def isValid(self) -> tuple[bool, str]:
         """(True, message) if valid, else (False, the reason)."""
 
+    @staticmethod
+    def schema() -> tesseract_robotics.tesseract_common._tesseract_common.PropertyTree:
+        """The config schema of a TaskComposerGraph."""
+
 class TaskComposerPipeline(TaskComposerGraph):
     @overload
     def __init__(self, name: str = 'TaskComposerPipeline') -> None: ...
 
     @overload
     def __init__(self, name: str, conditional: bool) -> None: ...
+
+    @staticmethod
+    def schema() -> tesseract_robotics.tesseract_common._tesseract_common.PropertyTree:
+        """The config schema of a TaskComposerPipeline."""
 
 class TaskflowTaskComposerExecutor(TaskComposerExecutor):
     @overload
@@ -590,6 +611,10 @@ class TaskflowTaskComposerExecutor(TaskComposerExecutor):
     def getWorkerCount(self) -> int: ...
 
     def getTaskCount(self) -> int: ...
+
+    @staticmethod
+    def schema() -> tesseract_robotics.tesseract_common._tesseract_common.PropertyTree:
+        """The config schema of a TaskflowTaskComposerExecutor."""
 
 class TaskComposerPluginError(RuntimeError):
     """
