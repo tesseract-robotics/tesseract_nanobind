@@ -12,6 +12,9 @@ using VectorIsometry3d = tesseract::common::VectorIsometry3d;  // std::vector<Ei
 
 // [joint units: rad or m] satisfiesLimits' scalar max_diff default, copied from kinematic_limits.h
 constexpr double SATISFIES_LIMITS_DEFAULT_MAX_DIFF = 1e-6;
+// [dimensionless] Eigen's float64 dummy_precision (1e-12): exported as EIGEN_DEFAULT_PREC, and the
+// rigidity bound — a 3x3 is a rotation iff orthonormality_residual <= this.
+constexpr double EIGEN_DEFAULT_PREC = Eigen::NumTraits<double>::dummy_precision();
 NB_MAKE_OPAQUE(VectorVector3d)
 NB_MAKE_OPAQUE(VectorIsometry3d)
 
@@ -132,8 +135,13 @@ static std::size_t insert_index(Py_ssize_t i, std::size_t size) {
 
 // max|RᵀR − I| of a 3x3, dimensionless: how far it is from orthonormal. A consumer bounds it to
 // accept a matrix as a rotation; computed here so that check is Eigen's, as the rotation is.
+// A NaN entry gives NaN: Eigen's default maxCoeff may skip a NaN coefficient, which read a NaN
+// matrix as rigid. The trace carries it: diagonal j is |column j|² − 1, NaN iff column j has a NaN
+// (an inf column makes it inf, never NaN). maxCoeff<PropagateNaN> instead costs ~1.7x at 200k.
 static double orthonormality_residual(const Eigen::Matrix3d& r) {
-    return (r.transpose() * r - Eigen::Matrix3d::Identity()).cwiseAbs().maxCoeff();
+    const Eigen::Matrix3d deviation = (r.transpose() * r - Eigen::Matrix3d::Identity()).cwiseAbs();
+    const double trace = deviation.trace();
+    return std::isnan(trace) ? trace : deviation.maxCoeff();
 }
 
 // The 3x3 rotation block of transform i of a stack, as a fixed-size matrix: the scalar readouts
@@ -355,7 +363,7 @@ NB_MODULE(_tesseract_common, m) {
     // tests/tesseract/common/test_eigen_geometry.py (DEFAULT_PREC),
     // tests/tesseract_planning/test_planning_api.py (EIGEN_DEFAULT_PREC),
     // and the C++ `kDegenerateGeometryEps` constexpr further down.
-    m.attr("EIGEN_DEFAULT_PREC") = Eigen::NumTraits<double>::dummy_precision();
+    m.attr("EIGEN_DEFAULT_PREC") = EIGEN_DEFAULT_PREC;
 
     // ========== Eigen Type Aliases ==========
     // Note: Vector3d, VectorXd, MatrixXd are handled automatically by nanobind/eigen/dense.h
@@ -603,11 +611,12 @@ NB_MODULE(_tesseract_common, m) {
     nb::class_<Eigen::Quaterniond>(m, "Quaterniond")
         .def(nb::init<double, double, double, double>())  // w, x, y, z
         // Constructor from rotation matrix — validates orthonormality so
-        // callers cannot smuggle scaling or shear into a "rotation."
+        // callers cannot smuggle scaling or shear into a "rotation." The rule
+        // is orthonormality_residual <= EIGEN_DEFAULT_PREC, the one a consumer
+        // builds with; written as !(dev <= ...) so a NaN residual refuses.
         .def("__init__", [](Eigen::Quaterniond* self, const Eigen::Matrix3d& rot) {
-            if (!rot.isUnitary()) {
-                const double dev = (rot.transpose() * rot
-                                    - Eigen::Matrix3d::Identity()).cwiseAbs().maxCoeff();
+            const double dev = orthonormality_residual(rot);
+            if (!(dev <= EIGEN_DEFAULT_PREC)) {
                 std::ostringstream ss;
                 ss << "Quaterniond(rotation_matrix): input is not orthonormal "
                    << "(max |Rᵀ·R − I| = " << dev << ")";

@@ -453,6 +453,83 @@ def test_quaterniond_from_valid_rotation_matrix_accepted():
     assert q_out.angularDistance(q_in) == pytest.approx(0.0, abs=DEFAULT_PREC)
 
 
+# Rotation-acceptance seam: Quaterniond(Matrix3d) accepts R iff
+# orthonormality_residual(R) <= EIGEN_DEFAULT_PREC, the same rule a consumer
+# applies at build time. Eigen's isUnitary() disagreed with it within a few ulp
+# of the bound (min(x, 1)·prec on column norms, different rounding on the dot
+# products). The two matrices below are such seam samples, as exact hex floats.
+_SEAM_INSIDE_REFUSED_BY_ISUNITARY = (
+    ("0x1.dacd2989b2d55p-2", "-0x1.f7150ca83cfa8p-2", "0x1.7981f0c2e8aedp-1"),
+    ("-0x1.ab8ae39f90b57p-2", "0x1.39c4e0f2c8967p-1", "0x1.5780f58210fd1p-1"),
+    ("-0x1.901bc185cc2b8p-1", "-0x1.3ce427378df06p-1", "0x1.43b2ef5f46dbbp-4"),
+)
+_SEAM_OUTSIDE_ACCEPTED_BY_ISUNITARY = (
+    ("0x1.9daf202cc4697p-2", "0x1.cc1bcd8ed4b01p-1", "-0x1.5e1884dce2d86p-3"),
+    ("-0x1.a8a01c583af2dp-2", "0x1.62cac922c2439p-2", "0x1.aecf90a975eafp-1"),
+    ("0x1.a1791482db675p-1", "-0x1.137f56f0bef90p-2", "0x1.0675efa827e91p-1"),
+)
+# Sweep half-width around the bound: residuals within it are the seam samples.
+SEAM_BAND = 3e-15
+SEAM_SAMPLES = 60_000
+
+
+def _hex_matrix(rows: tuple[tuple[str, str, str], ...]) -> np.ndarray:
+    return np.array([[float.fromhex(v) for v in row] for row in rows])
+
+
+def _refused(R: np.ndarray) -> bool:
+    try:
+        Quaterniond(R)
+    except ValueError:
+        return True
+    return False
+
+
+def test_quaterniond_accepts_residual_just_inside_prec():
+    R = _hex_matrix(_SEAM_INSIDE_REFUSED_BY_ISUNITARY)
+    assert DEFAULT_PREC - SEAM_BAND < orthonormality_residual(R) <= DEFAULT_PREC
+    Quaterniond(R)
+
+
+def test_quaterniond_refuses_residual_just_outside_prec():
+    R = _hex_matrix(_SEAM_OUTSIDE_ACCEPTED_BY_ISUNITARY)
+    assert DEFAULT_PREC < orthonormality_residual(R) < DEFAULT_PREC + SEAM_BAND
+    with pytest.raises(ValueError, match="not orthonormal"):
+        Quaterniond(R)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf])
+def test_quaterniond_refuses_non_finite_matrix(bad):
+    R = np.eye(3)
+    R[1, 2] = bad
+    with pytest.raises(ValueError, match="not orthonormal"):
+        Quaterniond(R)
+
+
+def test_quaterniond_acceptance_matches_residual_rule_across_seam():
+    """Dense sweep at the bound: no matrix on the wrong side of the residual rule."""
+    rng = np.random.default_rng(5)
+    inside_refused = outside_accepted = seam = 0
+    for _ in range(SEAM_SAMPLES):
+        q = rng.normal(size=4)
+        q /= np.linalg.norm(q)
+        Q = np.array(Quaterniond.from_xyzw(*q).toRotationMatrix())
+        offset = 1e-16 * rng.uniform(-60, 60)  # a few dozen ulp of the bound either side
+        S = rng.normal(size=(3, 3))
+        S = (S + S.T) / 2
+        S /= np.abs(S).max()
+        M = Q @ (np.eye(3) + 0.5 * (DEFAULT_PREC + offset) * S)
+        r = orthonormality_residual(M)
+        if abs(r - DEFAULT_PREC) > SEAM_BAND:
+            continue
+        seam += 1
+        refused = _refused(M)
+        inside_refused += r <= DEFAULT_PREC and refused
+        outside_accepted += r > DEFAULT_PREC and not refused
+    assert seam > SEAM_SAMPLES // 4  # about half land in the band
+    assert (inside_refused, outside_accepted) == (0, 0)
+
+
 # ---------- Hyperplane3d ----------
 
 
@@ -1177,6 +1254,17 @@ def test_orthonormality_residual_is_max_abs_rtr_minus_identity():
 
 def test_orthonormality_residual_of_the_identity_is_zero():
     assert orthonormality_residual(np.eye(3)) == 0.0
+
+
+@pytest.mark.parametrize("index", [(0, 0), (1, 2), (2, 2)])
+def test_orthonormality_residual_of_a_nan_entry_is_nan(index):
+    """A NaN anywhere poisons the residual, so `residual <= bound` refuses it."""
+    m = np.eye(3)
+    m[index] = math.nan
+    stack = np.eye(4)[None].copy()
+    stack[0, :3, :3] = m
+    assert math.isnan(orthonormality_residual(m))
+    assert math.isnan(orthonormality_residual_each(stack)[0])
 
 
 @pytest.mark.parametrize("m", [0, 1, 500])
