@@ -131,4 +131,4 @@ Special thanks to:
 
 ## License
 
-Apache 2.0
+[Apache 2.0](LICENSE). Attribution notices are in [NOTICE](NOTICE).
