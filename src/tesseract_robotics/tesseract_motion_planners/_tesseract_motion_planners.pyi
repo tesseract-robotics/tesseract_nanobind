@@ -13,6 +13,7 @@ import tesseract_robotics.tesseract_common._tesseract_common
 import tesseract_robotics.tesseract_environment._tesseract_environment
 import tesseract_robotics.tesseract_kinematics._tesseract_kinematics
 import tesseract_robotics.tesseract_state_solver._tesseract_state_solver
+import tesseract_robotics.trajopt_sqp._trajopt_sqp
 
 
 class PlannerRequest:
@@ -171,4 +172,9 @@ def getJointTurns(joint_values: Annotated[NDArray[numpy.float64], dict(shape=(No
 def isWithinJointLimits(joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], limits: Annotated[NDArray[numpy.float64], dict(shape=(None, 2), order='F')] | Sequence[Sequence[float]], coupling_limits: Annotated[NDArray[numpy.float64], dict(shape=(2), order='C')] | Sequence[float]) -> bool:
     """
     True if `joint_values` are within `limits` and joint 4 + joint 6 (third and first from the end) are within `coupling_limits`.
+    """
+
+def checkPIQPSettings(settings: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, profile_name: str) -> None:
+    """
+    Raise RuntimeError, naming `profile_name`, unless `settings` has a KKT solver of PIQP's sparse backend and passes piqp::Settings::verify_settings().
     """

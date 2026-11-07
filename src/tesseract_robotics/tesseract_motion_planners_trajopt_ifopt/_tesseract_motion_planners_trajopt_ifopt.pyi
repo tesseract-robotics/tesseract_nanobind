@@ -385,6 +385,20 @@ class TrajOptIfoptPIQPSolverProfile(TrajOptIfoptSolverProfile):
     @qp_settings.setter
     def qp_settings(self, arg: tesseract_robotics.trajopt_sqp._trajopt_sqp.PIQPSettings, /) -> None: ...
 
+    def __eq__(self, arg: TrajOptIfoptPIQPSolverProfile, /) -> bool: ...
+
+    def __ne__(self, arg: TrajOptIfoptPIQPSolverProfile, /) -> bool: ...
+
+    __hash__: None = None
+
+    @staticmethod
+    def from_yaml(config: str) -> TrajOptIfoptPIQPSolverProfile:
+        """
+        Construct the profile from its YAML config text; malformed YAML raises ValueError.
+
+        `settings:` (PIQP, read into qp_settings) and `opt_params:` are merged into the profile's values; settings PIQP's sparse backend rejects raise RuntimeError.
+        """
+
 def createJointPositionConstraint(joint_waypoint: tesseract_robotics.tesseract_command_language._tesseract_command_language.JointWaypointPoly, var: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
     """
     Joint position constraint at a waypoint: equality to its position, or its tolerance band

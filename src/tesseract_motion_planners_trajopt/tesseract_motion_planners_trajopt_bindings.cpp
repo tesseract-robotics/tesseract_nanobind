@@ -259,9 +259,16 @@ NB_MODULE(_tesseract_motion_planners_trajopt, m) {
     // ========== TrajOptPIQPSolverProfile ==========
     // PIQPSettings is owned by the trajopt_sqp module.
     nb::module_::import_("tesseract_robotics.trajopt_sqp._trajopt_sqp");
-    nb::class_<tp::TrajOptPIQPSolverProfile, tp::TrajOptSolverProfile>(m, "TrajOptPIQPSolverProfile")
+    nb::class_<tp::TrajOptPIQPSolverProfile, tp::TrajOptSolverProfile> piqp_solver_profile(
+        m, "TrajOptPIQPSolverProfile");
+    piqp_solver_profile
         .def(nb::init<>())
         .def_rw("settings", &tp::TrajOptPIQPSolverProfile::settings, "PIQP settings for each QP");
+    // operator== compares the settings with checkPIQPSettings' relative tolerance (settings_utils.h)
+    bind_value_equality(piqp_solver_profile);
+    bind_from_yaml(piqp_solver_profile,
+        "`settings:` (PIQP) and `opt_params:` are merged into the profile's values; settings PIQP's "
+        "sparse backend rejects raise RuntimeError.");
 
     // ========== TrajOptMotionPlanner ==========
     // getName / solve (GIL released) / terminate / clear / clone come from MotionPlanner
