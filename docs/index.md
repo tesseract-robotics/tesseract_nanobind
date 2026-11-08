@@ -53,12 +53,15 @@ graph TB
 
 ```python
 import numpy as np
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import (
     Robot, MotionProgram, JointTarget, CartesianTarget, Pose, plan_freespace,
 )
 
-# Load a bundled robot
-robot = Robot.from_tesseract_support("abb_irb2400")
+# Load a robot from tesseract's support data (the [support] extra)
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # Forward kinematics (note: group_name is first positional arg)
 joints = np.zeros(6)

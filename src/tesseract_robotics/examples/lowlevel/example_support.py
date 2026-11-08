@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics import get_task_composer_config_path
+from tesseract_robotics import get_task_composer_config_path, get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import CompositeInstruction, ProfileDictionary
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
 from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
@@ -100,7 +100,7 @@ def load_support_environment(
     Raises:
         EnvironmentInitError: the URDF/SRDF pair did not load.
     """
-    locator = locator or GeneralResourceLocator()
+    locator = locator or GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locate_file(locator, f"package://tesseract/support/urdf/{robot}.urdf")
     srdf = locate_file(locator, f"package://tesseract/support/urdf/{robot}.srdf")
     env = Environment()
@@ -161,7 +161,10 @@ def task_composer_factory() -> TaskComposerPluginFactory:
 
     Building it loads the plugin libraries (seconds), so the examples share one.
     """
-    return TaskComposerPluginFactory(get_task_composer_config_path(), GeneralResourceLocator())
+    return TaskComposerPluginFactory(
+        get_task_composer_config_path(),
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
+    )
 
 
 def run_pipeline(

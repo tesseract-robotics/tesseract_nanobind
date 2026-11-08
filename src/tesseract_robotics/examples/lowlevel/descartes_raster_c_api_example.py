@@ -32,6 +32,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
@@ -163,7 +164,7 @@ def _iter_move_instructions(composite):
 def run():
     # ABB IRB2400 with the OPW closed-form IK solver — Descartes samples IK at
     # every waypoint, so an analytic solver is what makes the ladder graph fast.
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = Environment()
     urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()

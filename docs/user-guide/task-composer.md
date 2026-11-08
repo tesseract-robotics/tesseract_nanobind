@@ -27,7 +27,8 @@ graph TD
         CartesianTarget, JointTarget, MotionProgram, Pose, Robot, TaskComposer,
     )
 
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+    robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
     program = (
         MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")

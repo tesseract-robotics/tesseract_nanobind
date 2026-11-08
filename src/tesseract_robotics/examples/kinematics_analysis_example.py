@@ -49,6 +49,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     AngleAxisd,
     GeneralResourceLocator,
@@ -203,7 +204,7 @@ def manipulability_fields(manip: Manipulability) -> dict[str, dict[str, Any]]:
 
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     factory = KinematicsPluginFactory(locate(locator, PLUGINS_URL), locator)
     scene_graph = parseURDFFile(str(locate(locator, URDF_URL)), locator)
     scene_state = KDLStateSolver(scene_graph).getState()

@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_collision import (
     CollisionCheckConfig,
     CollisionEvaluatorType,
@@ -64,7 +65,7 @@ OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 @pytest.fixture
 def abb_irb2400_environment():
     """Load ABB IRB2400 robot environment for testing."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )

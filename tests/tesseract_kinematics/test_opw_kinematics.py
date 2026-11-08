@@ -5,6 +5,7 @@ import numpy as np
 import numpy.testing as nptest
 
 from tesseract_robotics import (
+    get_tesseract_support_path,
     tesseract_common,
     tesseract_kinematics,
     tesseract_state_solver,
@@ -15,14 +16,14 @@ from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
 
 def get_scene_graph():
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    tesseract_support = str(get_tesseract_support_path())
     path = os.path.join(tesseract_support, "urdf/abb_irb2400.urdf")
     locator = TesseractSupportResourceLocator()
     return tesseract_urdf.parseURDFFile(path, locator)
 
 
 def get_plugin_factory():
-    support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
+    support_dir = str(get_tesseract_support_path())
     kin_config = Path(support_dir) / "urdf" / "abb_irb2400_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_kinematics.KinematicsPluginFactory(kin_config, locator), locator

@@ -6,12 +6,12 @@ Tests XML/binary serialization roundtrip for root types:
 - SceneState (joint/link state snapshots)
 """
 
-import os
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     JointWaypoint,
@@ -127,24 +127,13 @@ class TestCompositeInstructionSerialization:
 
 
 def make_test_environment():
-    """Build an Environment from the bundled lbr_iiwa support model.
-
-    Located via TESSERACT_RESOURCE_PATH (set by tesseract_robotics for bundled
-    data) so the test does not depend on a TESSERACT_SUPPORT_DIR override.
-    """
-    base = None
-    for entry in os.environ.get("TESSERACT_RESOURCE_PATH", "").split(os.pathsep):
-        cand = Path(entry) / "tesseract" / "support" / "urdf"
-        if (cand / "lbr_iiwa_14_r820.urdf").exists():
-            base = cand
-            break
-    assert base is not None, "lbr_iiwa_14_r820 support model not on TESSERACT_RESOURCE_PATH"
-
+    """Build an Environment from the lbr_iiwa support model (tesseract's support data)."""
+    base = get_tesseract_support_path() / "urdf"
     env = Environment()
     assert env.init(
         (base / "lbr_iiwa_14_r820.urdf").read_text(),
         (base / "lbr_iiwa_14_r820.srdf").read_text(),
-        GeneralResourceLocator(),
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
     return env
 

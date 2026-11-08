@@ -1,13 +1,17 @@
 import gc
 import os
 import uuid
-from pathlib import Path
 
 import numpy as np
 import numpy.testing as nptest
 import pytest
 
-from tesseract_robotics import tesseract_common, tesseract_geometry, tesseract_urdf
+from tesseract_robotics import (
+    get_tesseract_support_path,
+    tesseract_common,
+    tesseract_geometry,
+    tesseract_urdf,
+)
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -94,7 +98,7 @@ def test_geometry_plane():
 
 
 def test_geometry_load_mesh():
-    TESSERACT_SUPPORT_DIR = os.environ["TESSERACT_SUPPORT_DIR"]
+    TESSERACT_SUPPORT_DIR = str(get_tesseract_support_path())
 
     mesh_file = os.path.join(TESSERACT_SUPPORT_DIR, "meshes/sphere_p25m.stl")
     meshes = tesseract_geometry.createMeshFromPath(mesh_file)
@@ -665,7 +669,7 @@ def test_mesh_equality_is_the_class_operator(cls):
     assert (a != c) is COMPARES_SCALE[cls]
 
 
-SPHERE_STL = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/sphere_p25m.stl"
+SPHERE_STL = get_tesseract_support_path() / "meshes/sphere_p25m.stl"
 
 
 @pytest.mark.parametrize("triangulate", [True, False])
@@ -711,7 +715,7 @@ def test_create_mesh_from_bytes_outlives_the_buffer():
     nptest.assert_array_equal(np.array(meshes[0].getVertices()), expected)
 
 
-MATERIAL_DAE = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/tesseract_material_mesh.dae"
+MATERIAL_DAE = get_tesseract_support_path() / "meshes/tesseract_material_mesh.dae"
 # The flags the URDF parser passes for a visual mesh (urdf/src/mesh.cpp:84-85 @ 0.35.0).
 URDF_VISUAL_FLAGS = dict(flatten=True, normals=True, vertex_colors=True, material_and_texture=True)
 

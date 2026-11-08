@@ -14,6 +14,7 @@ import sys
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
@@ -24,7 +25,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import ManipulatorInfo
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.tesseract_time_parameterization import (
     ConstantTCPSpeedParameterization,
     ConstantTCPSpeedParameterizationCompositeProfile,
@@ -270,7 +271,9 @@ def _abb_program(num=10, span=1.0):
 
 @pytest.fixture(scope="module")
 def abb_env():
-    return Robot.from_tesseract_support("abb_irb2400").env
+    return Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    ).env
 
 
 def _times(program):
@@ -366,6 +369,8 @@ def test_instructions_trajectory_stale_read_does_not_crash(appends):
     # Subprocess so a crash fails this test instead of killing the worker.
     code = f"""
 import numpy as np
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction, MoveInstruction, MoveInstructionPoly,
     MoveInstructionType, StateWaypoint, StateWaypointPoly,

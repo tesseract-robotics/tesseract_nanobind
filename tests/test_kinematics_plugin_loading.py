@@ -14,13 +14,14 @@ environment and kinematic group.
 import gc
 from pathlib import Path
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
 
 def test_kdl_kinematics_plugin_loads():
     """Test KDL kinematics plugin loads for KUKA robot."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = Environment()
     urdf = locator.locateResource(
         "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
@@ -41,7 +42,7 @@ def test_kdl_kinematics_plugin_loads():
 
 def test_opw_kinematics_plugin_loads():
     """Test OPW kinematics plugin loads for ABB robot."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = Environment()
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()

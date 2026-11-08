@@ -10,6 +10,7 @@ str via getConfigString / YAML::Load).
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     KinematicsPluginInfo,
@@ -56,7 +57,9 @@ SIX_DOF_URDF = (
 @pytest.fixture
 def env():
     environment = Environment()
-    assert environment.init(SIX_DOF_URDF, GeneralResourceLocator())
+    assert environment.init(
+        SIX_DOF_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     return environment
 
 

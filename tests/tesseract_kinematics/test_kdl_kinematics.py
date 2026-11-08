@@ -8,6 +8,7 @@ import numpy.testing as nptest
 import pytest
 
 from tesseract_robotics import (
+    get_tesseract_support_path,
     tesseract_common,
     tesseract_environment,
     tesseract_kinematics,
@@ -19,14 +20,14 @@ from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
 
 def get_scene_graph():
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    tesseract_support = str(get_tesseract_support_path())
     path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
     locator = TesseractSupportResourceLocator()
     return tesseract_urdf.parseURDFFile(path, locator)
 
 
 def get_plugin_factory():
-    support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
+    support_dir = str(get_tesseract_support_path())
     kin_config = Path(support_dir) / "urdf" / "lbr_iiwa_14_r820_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return tesseract_kinematics.KinematicsPluginFactory(kin_config, locator), locator
@@ -135,7 +136,7 @@ def test_jacobian_change_ref_point_matches_calc_jacobian_with_point():
     """
     env = tesseract_environment.Environment()
     locator = TesseractSupportResourceLocator()
-    support = Path(os.environ["TESSERACT_SUPPORT_DIR"])
+    support = get_tesseract_support_path()
     assert env.init(
         support / "urdf" / "abb_irb2400.urdf", support / "urdf" / "abb_irb2400.srdf", locator
     )
@@ -155,7 +156,7 @@ def test_jacobian_change_ref_point_matches_calc_jacobian_with_point():
 @pytest.mark.parametrize("form", ["path", "content"])
 def test_kinematics_factory_from_path_or_content(form):
     """gh-165: a `pathlib.Path` is the config file; a `str` is YAML content, never a path."""
-    config = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf" / "lbr_iiwa_14_r820_plugins.yaml"
+    config = get_tesseract_support_path() / "urdf" / "lbr_iiwa_14_r820_plugins.yaml"
     arg = config if form == "path" else config.read_text()
     factory = tesseract_kinematics.KinematicsPluginFactory(arg, TesseractSupportResourceLocator())
     assert factory.getDefaultFwdKinPlugin("manipulator") == "KDLFwdKinChain"
@@ -255,7 +256,7 @@ def test_calc_jacobian_unknown_link_raises_key_error(call):
 
 
 def _iiwa_env():
-    support = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
+    support = get_tesseract_support_path() / "urdf"
     env = tesseract_environment.Environment()
     assert env.init(
         support / "lbr_iiwa_14_r820.urdf",
@@ -323,7 +324,8 @@ from pathlib import Path
 
 import numpy as np
 
-import tesseract_robotics  # noqa: F401 - sets TESSERACT_SUPPORT_DIR
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_kinematics import (
     KinematicGroup, KinematicsPluginFactory, KinGroupIKInput,
@@ -331,8 +333,8 @@ from tesseract_robotics.tesseract_kinematics import (
 from tesseract_robotics.tesseract_state_solver import KDLStateSolver
 from tesseract_robotics.tesseract_urdf import parseURDFFile
 
-support = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
-locator = GeneralResourceLocator()
+support = get_tesseract_support_path() / "urdf"
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 scene_graph = parseURDFFile(str(support / "lbr_iiwa_14_r820.urdf"), locator)
 scene_state = KDLStateSolver(scene_graph).getState(np.zeros(7))
 factory = KinematicsPluginFactory(support / "lbr_iiwa_14_r820_plugins.yaml", locator)

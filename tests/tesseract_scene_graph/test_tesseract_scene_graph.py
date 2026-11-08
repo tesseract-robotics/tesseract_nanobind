@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.tesseract_scene_graph as sg
-from tesseract_robotics import tesseract_common, tesseract_srdf
+from tesseract_robotics import get_tesseract_support_path, tesseract_common, tesseract_srdf
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -140,7 +140,7 @@ def test_tesseract_scene_graph():
 
 
 def test_load_srdf_unit():
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    tesseract_support = str(get_tesseract_support_path())
     srdf_file = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
 
     locator = TesseractSupportResourceLocator()

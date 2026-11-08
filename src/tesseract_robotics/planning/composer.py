@@ -250,9 +250,6 @@ class TaskComposer:
             Use TaskComposer.from_config() for simpler initialization.
             Do not pass a Robot or Environment - use the factory pattern.
         """
-        from tesseract_robotics import ensure_configured
-
-        ensure_configured()
         if not isinstance(factory, TaskComposerPluginFactory):
             type_name = type(factory).__name__
             raise TypeError(
@@ -280,8 +277,8 @@ class TaskComposer:
         """
         Create TaskComposer from config file.
 
-        If no config_path is provided, uses TESSERACT_TASK_COMPOSER_CONFIG_FILE
-        environment variable or falls back to the default config.
+        If no config_path is provided, uses get_task_composer_config_path():
+        TESSERACT_TASK_COMPOSER_CONFIG_FILE when set, else the bundled config.
 
         Args:
             config_path: Path to task composer config YAML
@@ -309,51 +306,12 @@ class TaskComposer:
             executor = TaskflowTaskComposerExecutor("MyExecutor", 8)
             composer = TaskComposer.from_config(executor=executor)
         """
+        from tesseract_robotics import get_task_composer_config_path
+
         locator = locator or GeneralResourceLocator()
-        tried_paths: list[str] = []
-
         if config_path is None:
-            # Try environment variable first
-            env_path = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
-            if env_path:
-                tried_paths.append(f"TESSERACT_TASK_COMPOSER_CONFIG_FILE={env_path}")
-                if Path(env_path).is_file():
-                    config_path = env_path
-
-            if config_path is None:
-                # Fall back to TESSERACT_TASK_COMPOSER_DIR
-                composer_dir = os.environ.get("TESSERACT_TASK_COMPOSER_DIR")
-                if composer_dir:
-                    composer_path = Path(composer_dir)
-                    # Try direct (env var points to config dir itself)
-                    direct = composer_path / "task_composer_plugins.yaml"
-                    # Try nested (env var points to root composer dir)
-                    nested = composer_path / "config" / "task_composer_plugins.yaml"
-                    tried_paths.append(f"TESSERACT_TASK_COMPOSER_DIR: {direct}, {nested}")
-                    if direct.is_file():
-                        config_path = str(direct)
-                    elif nested.is_file():
-                        config_path = str(nested)
-
-        if config_path is None:
-            # Last resort: package helper (env var → bundled data → conda share)
-            from tesseract_robotics import (
-                TaskComposerConfigNotFoundError,
-                get_task_composer_config_path,
-            )
-
-            try:
-                config_path = str(get_task_composer_config_path())
-            except TaskComposerConfigNotFoundError as e:
-                tried_paths.append(str(e))
-
-        if config_path is None:
-            paths_tried = "\n  - ".join(tried_paths) if tried_paths else "(none)"
-            raise ValueError(
-                f"No valid task composer config found.\n"
-                f"Tried:\n  - {paths_tried}\n"
-                f"Set TESSERACT_TASK_COMPOSER_CONFIG_FILE or install with bundled data."
-            )
+            # TaskComposerConfigNotFoundError (a FileNotFoundError) names what it checked
+            config_path = get_task_composer_config_path()
 
         # A Path: the factory reads a `str` as YAML text (#337).
         factory = TaskComposerPluginFactory(Path(config_path), locator)

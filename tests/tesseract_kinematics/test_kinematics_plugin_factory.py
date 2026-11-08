@@ -167,14 +167,15 @@ from pathlib import Path
 
 import numpy as np
 
-import tesseract_robotics  # noqa: F401 - sets TESSERACT_SUPPORT_DIR
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
 from tesseract_robotics.tesseract_state_solver import KDLStateSolver
 from tesseract_robotics.tesseract_urdf import parseURDFFile
 
-support = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
-locator = GeneralResourceLocator()
+support = get_tesseract_support_path() / "urdf"
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 scene_graph = parseURDFFile(str(support / "lbr_iiwa_14_r820.urdf"), locator)
 scene_state = KDLStateSolver(scene_graph).getState(np.zeros(7))
 factory = KinematicsPluginFactory(support / "lbr_iiwa_14_r820_plugins.yaml", locator)

@@ -181,9 +181,12 @@ flowchart LR
    `ws/install`. trajopt_ext builds OSQP, qpOASES and PIQP.
 4. `pip wheel . --no-build-isolation` runs scikit-build-core against `ws/install` and
    the vcpkg prefix (`CMAKE_PREFIX_PATH`), compiling each `_tesseract_*` module as
-   `STABLE_ABI NB_STATIC`. The CMake install step copies the robot models and the
-   task composer configuration into `tesseract_robotics/data/`.
+   `STABLE_ABI NB_STATIC`. The CMake install step copies the task composer
+   configuration into `tesseract_robotics/data/`.
 5. The platform's repair tool bundles the dependency closure.
+6. The Linux x86_64 job also builds `tesseract-robotics-nanobind-support`, a `py3-none-any`
+   wheel of tesseract's robot models and meshes (`packaging/tesseract-robotics-nanobind-support`),
+   copied from `ws/install/share/tesseract`. The bindings install it with the `[support]` extra.
 
 ### Plugin anchors
 
@@ -235,17 +238,21 @@ name.
 
 ## At import time
 
-`src/tesseract_robotics/__init__.py` points tesseract at the data the wheel carries:
+Importing `tesseract_robotics` changes nothing in the process environment and adds no resource
+search paths. Data is found through functions the caller uses explicitly:
 
-- **Data.** `TESSERACT_SUPPORT_DIR`, `TESSERACT_RESOURCE_PATH`,
-  `TESSERACT_TASK_COMPOSER_DIR` and `TESSERACT_TASK_COMPOSER_CONFIG_FILE` point at
-  `tesseract_robotics/data/` in a wheel, or the pixi env's `share/` in an editable
-  install. Variables that are already set are left alone.
-- **Plugins.** Nothing to configure: importing the collision, kinematics or task
-  composer module registers its factories through the anchors.
-- **Windows.** `boost::dll` loads libraries with plain `LoadLibrary`, which ignores
-  `os.add_dll_directory`, so the package directory and the delvewheel `.libs`
-  directory are also prepended to `PATH`.
+- **Task composer config.** `get_task_composer_config_path()`:
+  `TESSERACT_TASK_COMPOSER_CONFIG_FILE` when set, else the config the wheel bundles in
+  `tesseract_robotics/data/`, else the pixi env's `share/` for an editable install.
+- **Support data.** tesseract's robot models and meshes are a separate wheel,
+  `tesseract-robotics-nanobind-support` (the `[support]` extra), built from the same prefix by
+  `packaging/tesseract-robotics-nanobind-support`. `get_tesseract_resource_path()` returns its
+  directory (or the pixi env's `share/`), to pass to
+  `GeneralResourceLocator(paths=[...])` or `addPath()`; `get_tesseract_support_path()` is its
+  `tesseract/support/`. Without either it raises `SupportDataNotFoundError`.
+- **Plugins.** Nothing to configure: importing the collision, kinematics or task composer
+  module registers its factories through the anchors. These are the one environment change, made
+  by boost_plugin_loader in C++ (`TESSERACT_*_PLUGINS`), which its loaders read.
 
 An editable install (`pixi run install`) bakes the env's `lib/` into the
 modules' RPATH. It runs only inside the pixi env it was built in; use a wheel

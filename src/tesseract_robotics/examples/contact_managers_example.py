@@ -66,6 +66,7 @@ from typing import Any, override
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_collision import (
     ContactManagersPluginFactory,
     ContactRequest,
@@ -537,7 +538,7 @@ def environment(locator: GeneralResourceLocator) -> dict[str, Any]:
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
     # --8<-- [start:factory]
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     factory = ContactManagersPluginFactory(locate(locator, PLUGINS_URL), locator)
 
     discrete_plugins = list(factory.getDiscreteContactManagerPlugins())

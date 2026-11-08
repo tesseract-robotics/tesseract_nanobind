@@ -59,6 +59,7 @@ Related Examples
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import Pose, Robot, create_fixed_joint, sphere
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
@@ -66,7 +67,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactResultVector,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import CollisionMarginData
+from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
 from tesseract_robotics.tesseract_scene_graph import Collision, Link, Visual
 
 
@@ -75,7 +76,9 @@ def main():
     # STEP 1: Environment Setup
     # =========================================================================
     # Load ABB IRB2400 robot - a common 6-axis industrial manipulator
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    robot = Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # Create an obstacle sphere in the robot's workspace
     # This sphere will be positioned where the robot may collide during motion

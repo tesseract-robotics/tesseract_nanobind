@@ -23,6 +23,8 @@ _WAIT_AT_GATE = f"""
 import sys
 import time
 from tesseract_robotics.tesseract_task_composer._tesseract_task_composer import _reload_gate_waiters
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 def wait_at_gate(server, count):
     deadline = time.monotonic() + {GATE_DEADLINE_S}
@@ -38,6 +40,8 @@ _PREAMBLE = """
 import gc
 import numpy as np
 import tesseract_robotics
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import JointTarget, MotionProgram, Robot
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
@@ -53,8 +57,8 @@ from tesseract_robotics.tesseract_task_composer import (
 J_START = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 J_END = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 config_path = tesseract_robotics.get_task_composer_config_path()
-factory = TaskComposerPluginFactory(config_path, GeneralResourceLocator())
-robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+factory = TaskComposerPluginFactory(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
+robot = Robot.from_tesseract_support("lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 joint_names = robot.get_joint_names("manipulator")
 robot.set_joints(J_START, joint_names=joint_names)
 program = (
@@ -98,6 +102,8 @@ _WORKER_HANDLER = """
 import threading
 import time
 from tesseract_robotics import tesseract_common
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_common import LogLevel
 MAIN = threading.get_ident()
 tesseract_common.getLogger().set_level(LogLevel.debug)
@@ -123,6 +129,8 @@ class TestWorkersLoggingIntoPython:
             _WORKER_HANDLER
             + """
 from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 handler = WorkerHook(lambda: None)
 handler_id = tesseract_common.addLogRecordHandler(handler)
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
@@ -167,10 +175,12 @@ _TOUCH_SERVER = (
 import threading
 import time
 from tesseract_robotics import tesseract_common
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_common import LogLevel, ResourceLocator
 from tesseract_robotics.tesseract_task_composer import TaskComposerServer
 server = TaskComposerServer()
-server.loadConfig(config_path, GeneralResourceLocator())
+server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 touched = threading.Event()
 results = []
 
@@ -186,7 +196,7 @@ handler_id = tesseract_common.addLogRecordHandler(touch_server)
 tesseract_common.getLogger().set_level(LogLevel.debug)
 # GeneralResourceLocator logs "Resource not handled: <url>" (a warning) for a relative path.
 toucher = threading.Thread(
-    target=lambda: GeneralResourceLocator().locateResource("TOUCH/relative/not/handled.stl")
+    target=lambda: GeneralResourceLocator(paths=[get_tesseract_resource_path()]).locateResource("TOUCH/relative/not/handled.stl")
 )
 
 def touch_mid_load():
@@ -228,6 +238,8 @@ def _waiting_calls_script(tmp_path) -> str:
 import threading
 import time
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, ResourceLocator
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import TaskComposerServer
 ROUNDS = {ROUNDS}
 CALLERS = {CALLERS}
@@ -239,7 +251,7 @@ through = []
 class MidLoad(ResourceLocator):
     def __init__(self):
         super().__init__()
-        self.inner = GeneralResourceLocator()
+        self.inner = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         self.mid_load = None
 
     def locateResource(self, url):
@@ -283,8 +295,10 @@ class TestServerReloadAgainstLogHandlers:
             _WORKER_HANDLER
             + """
 from tesseract_robotics.tesseract_task_composer import TaskComposerServer
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 server = TaskComposerServer()
-server.loadConfig(config_path, GeneralResourceLocator())
+server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 errors = []
 
 def touch_server(record):
@@ -301,7 +315,7 @@ node = factory.createTaskComposerNode("TrajOptPipeline")
 future = executor.run(node, make_storage(node))
 reloads = 0
 while not future.ready():
-    server.loadConfig(config_path, GeneralResourceLocator())
+    server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
     reloads += 1
 future.wait()
 tesseract_common.removeLogRecordHandler(handler_id)
@@ -319,7 +333,7 @@ print("RELOADS", reloads > 0, future.context.isSuccessful(), sorted(set(errors))
 class LogMidLoad(ResourceLocator):
     def __init__(self):
         super().__init__()
-        self.inner = GeneralResourceLocator()
+        self.inner = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         self.done = False
 
     def locateResource(self, url):

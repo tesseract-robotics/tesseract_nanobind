@@ -10,6 +10,19 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
   - Linux wheels are `manylinux_2_39` (Ubuntu 24.04+, Debian 13+), up from `manylinux_2_35`; the old floor was nominal, since the bundled libraries already needed a gcc-13 era libstdc++.
   - macOS wheels ship for x86_64 as well as arm64, tagged with the minimum macOS of the bundled Homebrew `libomp`.
   - A macOS wheel installed into a conda or pixi environment with `llvm-openmp` loads two OpenMP runtimes again (#136); use a venv.
+- **Importing `tesseract_robotics` no longer sets environment variables; the robot models are a separate wheel** — the import used to write `TESSERACT_SUPPORT_DIR`, `TESSERACT_RESOURCE_PATH`, `TESSERACT_TASK_COMPOSER_CONFIG_FILE` and `TESSERACT_TASK_COMPOSER_DIR` into `os.environ` (and on Windows prepend to `PATH`), so every bare `GeneralResourceLocator()` resolved `package://tesseract/support/...`. It now changes nothing, and no API adds resource search paths on its own. tesseract's robot models and meshes moved out of the bindings wheel into `tesseract-robotics-nanobind-support`, installed by the `[support]` extra; the bindings wheel keeps the task composer config. Migrating:
+
+  | before | after |
+  | --- | --- |
+  | `pip install tesseract-robotics-nanobind` (models included) | `pip install "tesseract-robotics-nanobind[support]"` |
+  | `GeneralResourceLocator()` resolving `package://tesseract/support/...` | `GeneralResourceLocator(paths=[tesseract_robotics.get_tesseract_resource_path()])`, or set `TESSERACT_RESOURCE_PATH` yourself |
+  | `Robot.from_tesseract_support("abb_irb2400")` | `Robot.from_tesseract_support("abb_irb2400", locator)` with that locator |
+  | `os.environ["TESSERACT_SUPPORT_DIR"]` | `tesseract_robotics.get_tesseract_support_path()` |
+  | `os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"]` | `tesseract_robotics.get_task_composer_config_path()` (still honours the variable when you set it) |
+  | `tesseract_robotics.ensure_configured()` | removed; nothing to configure |
+  | `TaskComposer.from_config()` reading `TESSERACT_TASK_COMPOSER_DIR` | reads `get_task_composer_config_path()` only |
+
+  `get_tesseract_resource_path()` and `get_tesseract_support_path()` raise `SupportDataNotFoundError` when neither the support wheel nor (editable install) the conda env's `share/` has the data. `planning.mesh_from_file` and `convex_mesh_from_file` take a `locator` for `package://` URLs. `pyyaml`, which `tesseract_robotics.planning` imports, is now a declared dependency.
 - **Python 3.12 is the minimum; Rhino 8 loses wheels** — `requires-python` rises from `>=3.9` to `>=3.12`. One `cp312-abi3` wheel per platform now covers 3.12, 3.13 and 3.14, including Rhino 9 (CPython 3.13). Rhino 8 (CPython 3.9) and Python 3.10–3.11 stay on 0.35.0.8, the last release with wheels for them ([#369]; `docs/breaking-changes.md`).
 - **numpy 2.0 and scipy 1.17.1 are the minimum** — `numpy>=1.21.0` and `scipy>=1.7.0` were never tested. The scipy floor is the oldest scipy CI runs; numpy 1.x users stay on 0.35.0.8. `importlib-resources` is no longer a dependency: the viewer uses stdlib `importlib.resources` ([#369]).
 - **`planning.program.Target` and `emitters.core.events.Event` are `type` aliases** — `isinstance(x, Target)` and `typing.get_args(Target)` raise or return nothing; use `Target.__value__` or test the member classes ([#369]; `docs/breaking-changes.md`).

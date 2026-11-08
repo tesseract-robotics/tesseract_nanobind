@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.tesseract_motion_planners_trajopt as trajopt
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -50,7 +51,7 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 @pytest.fixture
 def lbr_iiwa_environment():
     """Load LBR IIWA robot environment for testing."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"

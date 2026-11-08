@@ -47,6 +47,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
 from tesseract_robotics.tesseract_geometry import Box
 from tesseract_robotics.tesseract_scene_graph import (
@@ -149,7 +150,7 @@ def check_step(solver: StateSolver, scene_graph: SceneGraph, origin: Isometry3d)
 
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     scene_graph = parseURDFFile(str(locate(locator, URDF_URL)), locator)
     solver = OFKTStateSolver(scene_graph)
 

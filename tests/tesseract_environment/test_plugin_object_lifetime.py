@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics import tesseract_kinematics
+from tesseract_robotics import get_tesseract_resource_path, tesseract_kinematics
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
@@ -29,8 +29,10 @@ _TEARDOWN_SCRIPT = """\
 from pathlib import Path
 import numpy as np
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
-locator = GeneralResourceLocator()
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
 env = Environment()
@@ -42,7 +44,7 @@ print("OK:", J.shape)
 
 
 def _make_env():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
     env = Environment()
@@ -139,9 +141,11 @@ _ROP_EXPECTED_JOINTS = [
 _ROP_TEARDOWN_SCRIPT = """\
 from pathlib import Path
 from tesseract_robotics import tesseract_kinematics as tk
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
-locator = GeneralResourceLocator()
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.srdf").getFilePath()
 env = Environment()
@@ -154,7 +158,7 @@ print("OK:", solver.numJoints())
 
 
 def _make_rop_solver():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource(
         "package://tesseract/support/urdf/abb_irb2400_on_positioner.urdf"
     ).getFilePath()
@@ -199,8 +203,10 @@ def test_rop_solver_usable_after_factory_and_env_release():
 _NAMED_MANAGER_TEARDOWN_SCRIPT = """\
 from pathlib import Path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
-locator = GeneralResourceLocator()
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
 env = Environment()

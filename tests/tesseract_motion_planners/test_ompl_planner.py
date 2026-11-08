@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.tesseract_motion_planners_ompl as ompl
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning.profiles import (
     UnknownConfiguratorFieldError,
     UnknownPlannerTypeError,
@@ -113,7 +114,7 @@ CONFIGURATORS = [
 @pytest.fixture
 def abb_irb2400_request():
     """Freespace Cartesian request on the ABB IRB2400 (same scene as test_motion_planners)."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )

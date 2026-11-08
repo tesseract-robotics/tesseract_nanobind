@@ -62,6 +62,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -78,6 +79,7 @@ from tesseract_robotics.planning.profiles import (
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_geometry import Octree, OctreeSubType, PointCloud, createOctree
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
@@ -184,7 +186,9 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
             - joint_names: List of 7 KUKA IIWA joint names
     """
     # Load KUKA IIWA 7-DOF robot
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # The obstacle is the C++ example's octomap, built from point-cloud data
     octree = add_point_cloud_octree(robot)

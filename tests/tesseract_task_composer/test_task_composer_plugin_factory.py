@@ -5,6 +5,7 @@ import gc
 import pytest
 import yaml
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import TaskComposer
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -25,8 +26,12 @@ class TestPathAndYamlConstructors:
     """`os.PathLike` is a config path, `str` is YAML text (#337)."""
 
     def test_path_and_text_configure_the_same_plugins(self, config_path):
-        from_path = TaskComposerPluginFactory(config_path, GeneralResourceLocator())
-        from_text = TaskComposerPluginFactory(config_path.read_text(), GeneralResourceLocator())
+        from_path = TaskComposerPluginFactory(
+            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
+        from_text = TaskComposerPluginFactory(
+            config_path.read_text(), GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         assert set(from_path.getTaskComposerNodePlugins()) == set(
             from_text.getTaskComposerNodePlugins()
         )
@@ -35,18 +40,24 @@ class TestPathAndYamlConstructors:
     def test_str_path_is_parsed_as_yaml(self, config_path):
         """A path given as `str` is YAML text: it parses as a scalar, not the config mapping."""
         with pytest.raises(TaskComposerConfigError, match="is YAML text"):
-            TaskComposerPluginFactory(str(config_path), GeneralResourceLocator())
+            TaskComposerPluginFactory(
+                str(config_path), GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+            )
 
     @pytest.mark.parametrize("text", ["", "~", "[1, 2]", "foo: bar"])
     @pytest.mark.parametrize("caller", ["init", "loadConfig", "server"])
     def test_text_without_plugins_key_raises(self, caller, text):
         """Empty, null, list and unrelated YAML loaded silently as an empty config (#337)."""
         load = {
-            "init": lambda: TaskComposerPluginFactory(text, GeneralResourceLocator()),
-            "loadConfig": lambda: TaskComposerPluginFactory().loadConfig(
-                text, GeneralResourceLocator()
+            "init": lambda: TaskComposerPluginFactory(
+                text, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
             ),
-            "server": lambda: TaskComposerServer().loadConfig(text, GeneralResourceLocator()),
+            "loadConfig": lambda: TaskComposerPluginFactory().loadConfig(
+                text, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+            ),
+            "server": lambda: TaskComposerServer().loadConfig(
+                text, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+            ),
         }[caller]
         with pytest.raises(TaskComposerConfigError, match="task_composer_plugins"):
             load()
@@ -56,24 +67,34 @@ class TestPathAndYamlConstructors:
 
     def test_load_config_str_path_raises_config_error(self, config_path):
         with pytest.raises(TaskComposerConfigError, match="loadConfig"):
-            TaskComposerPluginFactory().loadConfig(str(config_path), GeneralResourceLocator())
+            TaskComposerPluginFactory().loadConfig(
+                str(config_path), GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+            )
 
     def test_server_load_config_str_path_raises_config_error(self, config_path):
         with pytest.raises(TaskComposerConfigError, match="TaskComposerServer.loadConfig"):
-            TaskComposerServer().loadConfig(str(config_path), GeneralResourceLocator())
+            TaskComposerServer().loadConfig(
+                str(config_path), GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+            )
 
     def test_default_then_load_config_path(self, config_path):
         factory = TaskComposerPluginFactory()
         assert not factory.hasTaskComposerNodePlugins()
-        factory.loadConfig(config_path, GeneralResourceLocator())
-        expected = TaskComposerPluginFactory(config_path, GeneralResourceLocator())
+        factory.loadConfig(
+            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
+        expected = TaskComposerPluginFactory(
+            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         assert set(factory.getTaskComposerNodePlugins()) == set(
             expected.getTaskComposerNodePlugins()
         )
 
     def test_default_then_load_config_text(self, config_path):
         factory = TaskComposerPluginFactory()
-        factory.loadConfig(config_path.read_text(), GeneralResourceLocator())
+        factory.loadConfig(
+            config_path.read_text(), GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         assert PIPELINE in factory.getTaskComposerNodePlugins()
 
     def test_plugin_info_constructor_and_load_config(self):
@@ -143,7 +164,9 @@ class TestPluginRegistry:
             getattr(factory, method)("NoSuchPlugin")
 
     def test_create_node_from_plugin_info_outlives_factory(self, config_path):
-        factory = TaskComposerPluginFactory(config_path, GeneralResourceLocator())
+        factory = TaskComposerPluginFactory(
+            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         info = factory.getTaskComposerNodePlugins()["TrajOptTask"]
         node = factory.createTaskComposerNode("Unconfigured", info)
         del factory
@@ -175,7 +198,9 @@ class TestConfig:
     def test_get_config_round_trips_through_text_constructor(self, factory):
         text = factory.getConfig()
         assert "task_composer_plugins" in yaml.safe_load(text)
-        rebuilt = TaskComposerPluginFactory(text, GeneralResourceLocator())
+        rebuilt = TaskComposerPluginFactory(
+            text, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         assert set(rebuilt.getTaskComposerNodePlugins()) == set(
             factory.getTaskComposerNodePlugins()
         )
@@ -196,7 +221,9 @@ class TestServer:
     @pytest.fixture(scope="class")
     def server(self, config_path):
         server = TaskComposerServer()
-        server.loadConfig(config_path, GeneralResourceLocator())
+        server.loadConfig(
+            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         return server
 
     def test_loads_tasks_and_executors(self, server):
@@ -210,7 +237,9 @@ class TestServer:
 
     def test_load_config_text(self, config_path):
         server = TaskComposerServer()
-        server.loadConfig(config_path.read_text(), GeneralResourceLocator())
+        server.loadConfig(
+            config_path.read_text(), GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         assert PIPELINE in server.getAvailableTasks()
 
     @pytest.mark.parametrize("by", ["task_name", "node"])
@@ -266,7 +295,9 @@ class TestServer:
 
     def test_task_outlives_server(self, config_path):
         server = TaskComposerServer()
-        server.loadConfig(config_path, GeneralResourceLocator())
+        server.loadConfig(
+            config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         task = server.getTask(PIPELINE)
         del server
         gc.collect()

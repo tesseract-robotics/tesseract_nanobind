@@ -24,6 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     AngleAxisd,
     GeneralResourceLocator,
@@ -46,7 +47,7 @@ def run():
     3. Scene graph queries - traverse kinematic tree
     """
     # Resource locator resolves package:// URIs to filesystem paths
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
     # Load KUKA IIWA 7-DOF robot
     urdf_url = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"

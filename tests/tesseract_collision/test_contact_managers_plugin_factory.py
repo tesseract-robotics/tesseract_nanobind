@@ -131,7 +131,8 @@ from pathlib import Path
 
 import numpy as np
 
-import tesseract_robotics  # noqa: F401 - sets TESSERACT_SUPPORT_DIR
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_collision import (
     ContactManagersPluginFactory, ContactRequest, ContactResultMap, ContactTestType,
 )
@@ -140,8 +141,8 @@ from tesseract_robotics.tesseract_common import (
 )
 from tesseract_robotics.tesseract_geometry import Box, GeometriesConst
 
-cfg = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf" / "contact_manager_plugins.yaml"
-factory = ContactManagersPluginFactory(cfg, GeneralResourceLocator())
+cfg = get_tesseract_support_path() / "urdf" / "contact_manager_plugins.yaml"
+factory = ContactManagersPluginFactory(cfg, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 checker = {create}
 del factory
 gc.collect()

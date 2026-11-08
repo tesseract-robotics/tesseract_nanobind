@@ -35,6 +35,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 from tesseract_robotics.planning.transforms import Pose
 from tesseract_robotics.tesseract_common import Isometry3d
@@ -116,6 +117,7 @@ def cone(radius: float, length: float) -> Cone:
 def mesh_from_file(
     filepath: str | Path,
     scale: np.ndarray | None = None,
+    locator: GeneralResourceLocator | None = None,
 ) -> Mesh:
     """
     Load mesh geometry from file.
@@ -125,6 +127,7 @@ def mesh_from_file(
     Args:
         filepath: Path to mesh file
         scale: Optional scale factors [sx, sy, sz]
+        locator: Resolves package:// URLs (uses GeneralResourceLocator if not provided)
 
     Returns:
         Mesh geometry
@@ -132,7 +135,7 @@ def mesh_from_file(
     from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from tesseract_robotics.tesseract_geometry import createMeshFromResource
 
-    locator = GeneralResourceLocator()
+    locator = locator or GeneralResourceLocator()
     filepath = str(filepath)
 
     if scale is None:
@@ -163,6 +166,7 @@ def mesh_from_file(
 def convex_mesh_from_file(
     filepath: str | Path,
     scale: np.ndarray | None = None,
+    locator: GeneralResourceLocator | None = None,
 ) -> ConvexMesh:
     """
     Load convex mesh geometry from file.
@@ -173,6 +177,7 @@ def convex_mesh_from_file(
     Args:
         filepath: Path to mesh file or package:// URL
         scale: Optional scale factors [sx, sy, sz]
+        locator: Resolves package:// URLs (uses GeneralResourceLocator if not provided)
 
     Returns:
         ConvexMesh geometry
@@ -180,7 +185,7 @@ def convex_mesh_from_file(
     from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from tesseract_robotics.tesseract_geometry import createConvexMeshFromPath
 
-    locator = GeneralResourceLocator()
+    locator = locator or GeneralResourceLocator()
     filepath = str(filepath)
 
     if scale is None:

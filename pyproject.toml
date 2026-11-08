@@ -19,6 +19,7 @@ dependencies = [
     "viser>=1.1.1",          # Required for tesseract_robotics.viewer
     "trimesh>=4",            # Required for tesseract_robotics.viewer
     "pillow",                # Required for tesseract_robotics.viewer
+    "pyyaml",                # Required for tesseract_robotics.planning (profile_types)
 ]
 
 authors = [
@@ -43,6 +44,11 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+# tesseract's robot models and meshes, for the examples and the package://tesseract/support URLs
+# (packaging/tesseract-robotics-nanobind-support); pass get_tesseract_resource_path() to a locator
+support = ["tesseract-robotics-nanobind-support"]
 
 [project.urls]
 Homepage = "https://github.com/tesseract-robotics/tesseract_nanobind"

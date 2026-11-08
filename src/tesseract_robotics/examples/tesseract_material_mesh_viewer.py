@@ -2,6 +2,7 @@
 
 import sys
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
@@ -48,8 +49,8 @@ shapes_urdf = """
 def run():
     t_env = Environment()
 
-    # GeneralResourceLocator uses TESSERACT_RESOURCE_PATH env var
-    locator = GeneralResourceLocator()
+    # GeneralResourceLocator searches the support data given as `paths`
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     assert t_env.init(shapes_urdf, locator)
     return {"env": t_env, "locator": locator}
 

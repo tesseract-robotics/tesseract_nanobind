@@ -11,6 +11,7 @@ import pytest
 import viser
 import zstandard
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer import RecordingPhase, TesseractViewer, Trajectory
@@ -47,7 +48,7 @@ OTHER_ROBOT_URDF = """
 
 
 def _irb2400() -> Environment:
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()
@@ -195,7 +196,9 @@ def test_recording_before_an_environment_raises(viewer):
 
 def test_a_phase_with_other_links_raises_and_leaves_the_live_scene(viewer, env):
     other = Environment()
-    assert other.init(OTHER_ROBOT_URDF, GeneralResourceLocator())
+    assert other.init(
+        OTHER_ROBOT_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     viewer.update_environment(env)
     traj = Trajectory.build(["other_joint"], np.array([[0.0], [0.5]]), np.array([0.0, 1.0]))
 

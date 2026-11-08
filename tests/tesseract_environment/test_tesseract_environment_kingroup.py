@@ -1,8 +1,8 @@
-import os
 from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics.tesseract_common import ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_kinematics import (
@@ -16,7 +16,7 @@ from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 def get_environment():
     env = Environment()
     locator = TesseractSupportResourceLocator()
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    tesseract_support = str(get_tesseract_support_path())
     urdf_path = Path(tesseract_support) / "urdf" / "abb_irb2400.urdf"
     srdf_path = Path(tesseract_support) / "urdf" / "abb_irb2400.srdf"
     assert env.init(urdf_path, srdf_path, locator)

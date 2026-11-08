@@ -81,6 +81,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -90,6 +91,7 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
@@ -116,6 +118,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     robot = Robot.from_urdf(
         "package://tesseract/support/urdf/abb_irb2400.urdf",
         "package://tesseract/support/urdf/abb_irb2400.srdf",
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
