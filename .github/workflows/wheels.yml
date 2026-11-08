@@ -123,6 +123,7 @@ jobs:
           -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
           -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - name: build wheel
+      id: wheel
       shell: bash
       working-directory: tesseract_nanobind
       run: |
@@ -137,14 +138,16 @@ jobs:
         auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
     - name: build support data wheel
       # tesseract's robot models and meshes, one py3-none-any wheel for every platform, copied
-      # from the same colcon prefix (packaging/tesseract-robotics-nanobind-support)
-      if: matrix.config.arch == 'x64'
+      # from the same colcon prefix (packaging/tesseract-robotics-nanobind-support); test-wheels/
+      # holds it with the bindings wheel for the tests below
+      id: test_wheels
       shell: bash
       working-directory: tesseract_nanobind
       run: |
         source $GITHUB_WORKSPACE/venv/bin/activate
         TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install \
           python -m pip wheel packaging/tesseract-robotics-nanobind-support -w wheelhouse-support --no-deps
+        mkdir -p test-wheels && cp wheelhouse/*.whl wheelhouse-support/*.whl test-wheels/
     - name: archive support data wheel
       if: matrix.config.arch == 'x64'
       uses: actions/upload-artifact@v7
@@ -152,6 +155,7 @@ jobs:
         name: 'python-wheels-support-any'
         path: tesseract_nanobind/wheelhouse-support/*.whl
     - name: archive wheels
+      if: ${{ !cancelled() && steps.wheel.outcome == 'success' }}
       uses: actions/upload-artifact@v7
       with:
         name: 'python-wheels-linux-${{ matrix.config.arch }}'
@@ -174,6 +178,40 @@ jobs:
       run: |
         source $GITHUB_WORKSPACE/check-venv/bin/activate
         pyright src/tesseract_robotics
+    - name: fetch the TWC workcell the rail tests load
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      shell: bash
+      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+    # One cp312-abi3 wheel covers every supported Python: test it on each, in this job (pull
+    # requests on 3.12 only). Runs even if a gate above failed.
+    - name: test Python 3.12
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.12"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.13
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.13"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.14
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.14"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.15
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.15"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -242,6 +280,7 @@ jobs:
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         if %ERRORLEVEL% GEQ 1 exit 1
     - name: build wheel
+      id: wheel
       working-directory: tesseract_nanobind
       shell: cmd
       run: |
@@ -253,7 +292,16 @@ jobs:
         for %%I in ("dist\*.whl") do set WHEEL_FILE=%%~I
         python -m delvewheel repair --add-path "%GITHUB_WORKSPACE%\ws\install\bin;%GITHUB_WORKSPACE%\ws\install\lib;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin" --no-dll "msvcp140.dll;vcomp140.dll" -w wheelhouse "%WHEEL_FILE%"
         if %ERRORLEVEL% GEQ 1 exit 1
+    - name: support data wheel for the tests
+      id: test_wheels
+      shell: bash
+      working-directory: tesseract_nanobind
+      run: |
+        TESSERACT_CPP_PREFIX="$GITHUB_WORKSPACE/ws/install" \
+          python -m pip wheel packaging/tesseract-robotics-nanobind-support -w wheelhouse-support --no-deps
+        mkdir -p test-wheels && cp wheelhouse/*.whl wheelhouse-support/*.whl test-wheels/
     - name: archive wheels
+      if: ${{ !cancelled() && steps.wheel.outcome == 'success' }}
       uses: actions/upload-artifact@v7
       with:
         name: 'python-wheels-win-${{ matrix.config.arch }}'
@@ -267,6 +315,40 @@ jobs:
         python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
+    - name: fetch the TWC workcell the rail tests load
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      shell: bash
+      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+    # One cp312-abi3 wheel covers every supported Python: test it on each, in this job (pull
+    # requests on 3.12 only). Runs even if a gate above failed.
+    - name: test Python 3.12
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.12"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.13
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.13"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.14
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.14"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.15
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.15"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -343,6 +425,7 @@ jobs:
             -Dtcmalloc_minimal_LIBRARY=${{ github.workspace }}/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib/libtcmalloc_minimal.dylib \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - name: build wheel
+      id: wheel
       working-directory: tesseract_nanobind
       run: |
         VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
@@ -363,10 +446,19 @@ jobs:
         # the wheel tag to the minimum macOS of the bundled libraries (Homebrew's libomp is built
         # for the runner's macOS) instead of failing on the mismatch
         DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
+    - name: support data wheel for the tests
+      id: test_wheels
+      shell: bash
+      working-directory: tesseract_nanobind
+      run: |
+        TESSERACT_CPP_PREFIX="$GITHUB_WORKSPACE/ws/install" \
+          python3 -m pip wheel packaging/tesseract-robotics-nanobind-support -w wheelhouse-support --no-deps
+        mkdir -p test-wheels && cp wheelhouse/*.whl wheelhouse-support/*.whl test-wheels/
     # upload-artifact intermittently fails on macOS runners with "CreateArtifact: Request
     # timeout" (actions/upload-artifact#569, #527); a fresh re-invocation usually succeeds.
     # The last attempt has no continue-on-error, so a real outage still fails the job.
     - name: archive wheels
+      if: ${{ !cancelled() && steps.wheel.outcome == 'success' }}
       id: up1
       continue-on-error: true
       uses: actions/upload-artifact@v7
@@ -398,6 +490,40 @@ jobs:
         python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
+    - name: fetch the TWC workcell the rail tests load
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      shell: bash
+      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+    # One cp312-abi3 wheel covers every supported Python: test it on each, in this job (pull
+    # requests on 3.12 only). Runs even if a gate above failed.
+    - name: test Python 3.12
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.12"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.13
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.13"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.14
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.14"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    - name: test Python 3.15
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
+      timeout-minutes: 45
+      uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.15"
+        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -406,79 +532,8 @@ jobs:
         path: "**/*.log"
         retention-days: 2
 
-  test-wheel:
-    # One cp312-abi3 wheel per platform. Pull requests test it on 3.12; other events test every
-    # supported Python before anything can publish.
-    needs:
-      - build-ubuntu
-      - build-win
-      - build-macos
-    # Runs even if a build job's gates failed after its wheel was archived; a platform with no
-    # wheel fails at its download step
-    if: ${{ !cancelled() }}
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - { name: linux-x64, runner: ubuntu-24.04 }
-          - { name: linux-arm64, runner: ubuntu-24.04-arm }
-          - { name: win-x64, runner: windows-2022 }
-          - { name: macos-x64, runner: macos-15-intel }
-          - { name: macos-arm64, runner: macos-15 }
-        python: ${{ github.event_name == 'pull_request' && fromJSON('["3.12"]') || fromJSON('["3.12", "3.13", "3.14", "3.15"]') }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-    - uses: actions/checkout@v6
-      with:
-        path: tesseract_nanobind
-    - name: fetch the TWC workcell the rail tests load
-      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
-    - uses: actions/setup-python@v6
-      id: setup-python
-      with:
-        python-version: ${{ matrix.python }}
-        allow-prereleases: true
-    - uses: actions/download-artifact@v8
-      with:
-        name: python-wheels-${{ matrix.platform.name }}
-        path: wheelhouse
-    - uses: actions/download-artifact@v8
-      with:
-        name: python-wheels-support-any
-        path: wheelhouse
-    - name: install wheel
-      run: |
-        python -m venv test-venv
-        if [ -d test-venv/Scripts ]; then source test-venv/Scripts/activate; else source test-venv/bin/activate; fi
-        python -m pip install --upgrade pip
-        python -m pip install wheelhouse/*.whl pytest pytest-xdist pyyaml
-    - name: wheel bundles no libstdc++
-      # gh-119: two libstdc++ copies in one process corrupt the heap; auditwheel never bundles it
-      if: runner.os == 'Linux'
-      run: |
-        source test-venv/bin/activate
-        if python -m pip show -f tesseract-robotics-nanobind | grep -q 'libstdc++'; then
-          echo "::error::wheel bundles libstdc++ (gh-119)"; exit 1
-        fi
-    - name: smoke test
-      run: |
-        if [ -d test-venv/Scripts ]; then source test-venv/Scripts/activate; else source test-venv/bin/activate; fi
-        python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
-        python -c "from tesseract_robotics import tesseract_collision, tesseract_kinematics, tesseract_task_composer"
-    - name: run tests
-      env:
-        TWC_SUPPORT_PATH: ${{ github.workspace }}/tesseract_nanobind/ws/src/tesseract_ros_workcell/twc_support
-      run: |
-        if [ -d test-venv/Scripts ]; then source test-venv/Scripts/activate; else source test-venv/bin/activate; fi
-        cd tesseract_nanobind
-        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
-
   collect-wheels:
-    needs: test-wheel
+    needs: [build-ubuntu, build-win, build-macos]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     steps:
@@ -497,7 +552,8 @@ jobs:
   publish:
     # PyPI trusted publishing: the PyPI project must list this workflow (wheels.yml) and the
     # `pypi` environment as a trusted publisher
-    needs: [build-ubuntu, build-win, build-macos, test-wheel]
+    # every build job, its gates and its per-Python tests must pass
+    needs: [build-ubuntu, build-win, build-macos]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     environment: pypi
