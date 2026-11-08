@@ -968,8 +968,12 @@ def test_freespace_hybrid_ifopt_example():
 
 @pytest.mark.planning
 def test_freespace_clearance_objective_example():
-    """The example checks its own claims (timing, objective use, clearances) and raises if one fails."""
-    tesseract_robotics.examples.freespace_clearance_objective_example()
+    """The example checks its own claims (timing, objective use, clearances) and raises if one fails.
+
+    Twice the example's planning_time: the threshold case's whole pipeline must finish inside it,
+    and on the macOS x86_64 runner, under the suite's parallel load, it took 11.5-12 s of 10 s.
+    """
+    tesseract_robotics.examples.freespace_clearance_objective_example(planning_time_s=20.0)
 
 
 # Canned node times (s) for the clearance example's loop checks; nothing here is measured.
