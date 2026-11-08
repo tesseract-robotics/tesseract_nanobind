@@ -4,7 +4,8 @@ Notes captured during the 0.35.0.x release-pipeline hardening
 ([PR #98](https://github.com/tesseract-robotics/tesseract_nanobind/pull/98)),
 recorded so future maintainers don't re-diagnose them.
 
-The macOS build runs on `macos-14` (Apple Silicon, arm64) and has sharp edges
+The macOS builds run on `macos-15` (arm64) and `macos-15-intel` (x86_64), and
+have sharp edges
 the Linux build doesn't. The dangerous part: each one fragments a *release*
 rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
 **after** the tag is cut — not as CI red you'd catch in review.
@@ -29,7 +30,7 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     builds, P(all 4 upload) = (2/3)⁴ ≈ **20%**, so ~80% of macOS releases would
     otherwise need a manual job re-run.
 
-    Fix (`wheels-macos.yml`): retry the `archive wheel` step up to 3× with
+    Fix (`wheels.yml`): retry the `archive wheels` step up to 3× with
     `overwrite: true` on the retries (clears any half-created artifact). The
     final attempt has **no** `continue-on-error`, so a genuine outage still
     fails loud — never a silently-missing wheel.
@@ -80,27 +81,18 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     Windows tested 3.9 + 3.12 only, leaving the cross-platform abi3 claim
     *asserted* but not *verified*. Now all three platforms verify it.
 
-## The wheel loads one `libomp`, the env's when it has one
+## The wheel bundles `libomp`, which conflicts with a conda env's
 
-!!! success "Images look in the env's `lib` first, then at the bundled copy"
-    `scripts/repair_macos_wheel.py` bundles `libomp.dylib` like any other library,
-    but every OpenMP user loads it as `@rpath/libomp.dylib`, with two rpaths:
-    `<env>/lib` relative to where the image sits once installed, then
-    `tesseract_robotics/.dylibs/`. `dyld` takes the first that exists.
+!!! warning "A wheel installed into a conda or pixi env with `llvm-openmp` loads two OpenMP runtimes"
+    `wheels.yml` repairs the macOS wheel with `delocate-wheel`, which bundles Homebrew's
+    `libomp.dylib` and points every OpenMP user at that copy. In a plain venv that is the
+    only `libomp`. In a conda or pixi environment whose `numpy` brings conda-forge's
+    `llvm-openmp`, the process gets two, the #136 failure below. The pixi-built wheels up
+    to the switch to `wheels.yml` avoided it by loading `libomp` through `@rpath`, the
+    environment's `lib/` first and the bundled copy second; the delocated wheel does not.
 
-    MEASURED, macOS arm64, Python 3.15, wheel installed with `uv pip install`, `libomp`
-    images after `import numpy, tesseract_robotics`, Descartes tests run:
-
-    | Environment | `libomp` loaded | Descartes tests |
-    |---|---|---|
-    | conda Python + `uv`, no `llvm-openmp` | one, the wheel's copy | 31 passed |
-    | conda `numpy` + `llvm-openmp` | one, `<env>/lib/libomp.dylib` | 31 passed |
-
-    `wheels-macos.yml` asserts this on every `test-wheel` row: the `wheel-3xx` envs
-    have no `libomp`, and `wheel-openmp` has conda's.
-
-!!! note "Why the bundled-only wheel failed under conda (#136)"
-    Wheels up to 0.35.0.9 were repaired by `delocate-wheel`, which bundled `libomp` and
+!!! note "Why the bundled-only wheel fails under conda (#136)"
+    Wheels up to 0.35.0.9 were also repaired by `delocate-wheel`, which bundled `libomp` and
     pointed everything at that copy.
 
     Install that wheel into a conda or pixi environment and the process gets

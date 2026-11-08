@@ -27,7 +27,6 @@ fi
 # The tesseract C++ libs + bundled data come from the tesseract-robotics conda
 # packages installed under $CONDA_PREFIX.
 SHARE_DIR="$CONDA_PREFIX/share"
-LIB_DIR="$CONDA_PREFIX/lib"
 
 # Qt6 cross-compile fix (conda Qt6 needs this on macOS)
 export QT_HOST_PATH=$CONDA_PREFIX
@@ -39,14 +38,11 @@ export TESSERACT_RESOURCE_PATH="$SHARE_DIR"
 # Task composer config (required for planning examples and tests)
 export TESSERACT_TASK_COMPOSER_DIR="$SHARE_DIR/tesseract_planning/task_composer"
 export TESSERACT_TASK_COMPOSER_CONFIG_FILE="$TESSERACT_TASK_COMPOSER_DIR/config/task_composer_plugins.yaml"
-# Plugin path for YAML patching (package auto-patches /usr/local/lib -> this path)
-export TESSERACT_PLUGIN_PATH="$LIB_DIR"
 
 echo "Environment set up (from \$CONDA_PREFIX=$CONDA_PREFIX):"
 echo "  TESSERACT_SUPPORT_DIR: $TESSERACT_SUPPORT_DIR"
 echo "  TESSERACT_RESOURCE_PATH: $TESSERACT_RESOURCE_PATH"
 echo "  TESSERACT_TASK_COMPOSER_CONFIG_FILE: $TESSERACT_TASK_COMPOSER_CONFIG_FILE"
-echo "  TESSERACT_PLUGIN_PATH: $TESSERACT_PLUGIN_PATH"
 echo ""
 echo "Run tests:    ./scripts/run_tests.sh"
 echo "Run examples: python examples/freespace_ompl_example.py"

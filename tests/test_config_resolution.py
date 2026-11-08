@@ -1,8 +1,8 @@
 """Contract tests for get_task_composer_config_path resolution (gh-110).
 
-The helper must return the same env-var-published, plugin-path-patched config
-the runtime uses — in every install flavour (wheel, editable/conda) — and fail
-loudly instead of returning a phantom path.
+The helper must return the same env-var-published config the runtime uses — in
+every install flavour (wheel, editable/conda) — and fail loudly instead of
+returning a phantom path.
 """
 
 import pytest
@@ -15,11 +15,6 @@ def test_resolves_to_existing_yaml():
     config = get_task_composer_config_path()
     assert config.is_file()
     assert config.suffix == ".yaml"
-
-
-def test_resolved_config_is_plugin_path_patched():
-    """The returned config is loadable as-is — no unresolved plugin placeholders."""
-    assert "@PLUGIN_PATH@" not in get_task_composer_config_path().read_text()
 
 
 def test_stale_env_var_raises(monkeypatch):
