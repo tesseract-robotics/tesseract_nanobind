@@ -106,6 +106,9 @@ jobs:
         VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.vcpkg_triplet }}
         export CMAKE_PREFIX_PATH=$VCPKG_PREFIX
         export LD_LIBRARY_PATH=$VCPKG_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
+        # Upstream headers (tesseract_planning's poly types) use std::runtime_error without
+        # <stdexcept>; the distro Boost pulled it in transitively, vcpkg's Boost does not
+        export CXXFLAGS="-include stdexcept"
         colcon build --merge-install \
           --cmake-force-configure \
           --packages-ignore tesseract_examples gtest \
