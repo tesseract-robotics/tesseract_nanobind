@@ -1,3 +1,6 @@
+# Upstream sources for the wheel build (.github/workflows/wheels.yml). tesseract,
+# tesseract_planning and trajopt are the commits the tesseract-robotics `dev` conda packages
+# pinned in pyproject.toml were built from (the upstream/ submodules); keep them in step.
 - git:
     local-name: ros_industrial_cmake_boilerplate
     uri: https://github.com/ros-industrial/ros_industrial_cmake_boilerplate.git
@@ -5,15 +8,15 @@
 - git:
     local-name: tesseract
     uri: https://github.com/tesseract-robotics/tesseract.git
-    version: 0.35.0
+    version: 2b79e91c8097579b01d66cca74015ad127abb339
 - git:
     local-name: tesseract_planning
     uri: https://github.com/tesseract-robotics/tesseract_planning.git
-    version: 0.35.0
+    version: a6483823830c8cf145370bc79f1ac260cac1f807
 - git:
     local-name: trajopt
     uri: https://github.com/tesseract-robotics/trajopt.git
-    version: 0.35.0
+    version: a504b2208d43ca0e4e80e39f6c1712eacb4a6772
 - git:
     local-name: descartes_light
     uri: https://github.com/swri-robotics/descartes_light.git
@@ -29,4 +32,4 @@
 - git:
     local-name: boost_plugin_loader
     uri: https://github.com/tesseract-robotics/boost_plugin_loader.git
-    version: 0.4.3
+    version: 0.5.0

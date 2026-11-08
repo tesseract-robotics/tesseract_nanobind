@@ -19,7 +19,7 @@ env:
     boost-serialization boost-filesystem
     boost-stacktrace boost-algorithm
     boost-format cereal
-    tinyxml2 console-bridge assimp
+    tinyxml2 spdlog assimp
     urdfdom octomap orocos-kdl pcl
     gtest benchmark flann jsoncpp
     yaml-cpp eigen3
@@ -249,8 +249,6 @@ jobs:
         - arch: arm64
           runner: macos-15
           brew_prefix: /opt/homebrew
-    env:
-      MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
     - uses: actions/checkout@v6
       with:
@@ -321,6 +319,9 @@ jobs:
           "-Ccmake.define.OpenMP_CXX_FLAGS=-Xpreprocessor -fopenmp" \
           "-Ccmake.define.OpenMP_C_FLAGS=-Xpreprocessor -fopenmp" \
           -Ccmake.define.OpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib
+        # No MACOSX_DEPLOYMENT_TARGET in the environment, as in tesseract_python: delocate raises
+        # the wheel tag to the minimum macOS of the bundled libraries (Homebrew's libomp is built
+        # for the runner's macOS) instead of failing on the mismatch
         DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
     - name: test
       shell: bash
