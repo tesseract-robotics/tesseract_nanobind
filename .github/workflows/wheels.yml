@@ -128,6 +128,11 @@ jobs:
           -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
         auditwheel show dist/*.whl
         auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
+    - name: archive wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-linux-${{ matrix.config.arch }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
     - name: stub drift gate
       # The committed .pyi stubs must equal the stubgen output of the wheel just built (gh-159);
       # runs per platform so platform-dependent output fails here
@@ -146,11 +151,6 @@ jobs:
       run: |
         source $GITHUB_WORKSPACE/check-venv/bin/activate
         pyright src/tesseract_robotics
-    - name: archive wheels
-      uses: actions/upload-artifact@v7
-      with:
-        name: 'python-wheels-linux-${{ matrix.config.arch }}'
-        path: tesseract_nanobind/wheelhouse/*.whl
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -230,6 +230,11 @@ jobs:
         for %%I in ("dist\*.whl") do set WHEEL_FILE=%%~I
         python -m delvewheel repair --add-path "%GITHUB_WORKSPACE%\ws\install\bin;%GITHUB_WORKSPACE%\ws\install\lib;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin" --no-dll "msvcp140.dll;vcomp140.dll" -w wheelhouse "%WHEEL_FILE%"
         if %ERRORLEVEL% GEQ 1 exit 1
+    - name: archive wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-win-${{ matrix.config.arch }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
     - name: stub drift gate
       shell: bash
       run: |
@@ -239,11 +244,6 @@ jobs:
         python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
-    - name: archive wheels
-      uses: actions/upload-artifact@v7
-      with:
-        name: 'python-wheels-win-${{ matrix.config.arch }}'
-        path: tesseract_nanobind/wheelhouse/*.whl
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -339,15 +339,6 @@ jobs:
         # the wheel tag to the minimum macOS of the bundled libraries (Homebrew's libomp is built
         # for the runner's macOS) instead of failing on the mismatch
         DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
-    - name: stub drift gate
-      shell: bash
-      run: |
-        ${{ steps.setup-python.outputs.python-path }} -m venv check-venv
-        source check-venv/bin/activate
-        python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
-        cd tesseract_nanobind
-        python scripts/generate_stubs.py --check
     # upload-artifact intermittently fails on macOS runners with "CreateArtifact: Request
     # timeout" (actions/upload-artifact#569, #527); a fresh re-invocation usually succeeds.
     # The last attempt has no continue-on-error, so a real outage still fails the job.
@@ -374,6 +365,15 @@ jobs:
         name: 'python-wheels-macos-${{ matrix.config.arch }}'
         path: tesseract_nanobind/wheelhouse/*.whl
         overwrite: true
+    - name: stub drift gate
+      shell: bash
+      run: |
+        ${{ steps.setup-python.outputs.python-path }} -m venv check-venv
+        source check-venv/bin/activate
+        python -m pip install --upgrade pip
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
+        cd tesseract_nanobind
+        python scripts/generate_stubs.py --check
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -389,6 +389,9 @@ jobs:
       - build-ubuntu
       - build-win
       - build-macos
+    # Runs even if a build job's gates failed after its wheel was archived; a platform with no
+    # wheel fails at its download step
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 45
     strategy:
@@ -448,6 +451,7 @@ jobs:
 
   collect-wheels:
     needs: test-wheel
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     steps:
     - name: Download CI artifacts
@@ -465,7 +469,7 @@ jobs:
   publish:
     # PyPI trusted publishing: the PyPI project must list this workflow (wheels.yml) and the
     # `pypi` environment as a trusted publisher
-    needs: test-wheel
+    needs: [build-ubuntu, build-win, build-macos, test-wheel]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     environment: pypi
