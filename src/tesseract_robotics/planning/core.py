@@ -139,9 +139,6 @@ class Robot:
             env: Initialized Tesseract Environment
             locator: Resource locator (created if not provided)
         """
-        from tesseract_robotics import ensure_configured
-
-        ensure_configured()
         self.env = env
         self.locator = locator or GeneralResourceLocator()
 
@@ -222,12 +219,17 @@ class Robot:
         locator: GeneralResourceLocator | None = None,
     ) -> Robot:
         """
-        Load robot from tesseract_support package.
+        Load robot from tesseract's support package.
 
-        Convenience method for loading standard test robots.
+        Convenience method for loading standard test robots. `locator` must resolve
+        `package://tesseract/support/...`, e.g. with the support data installed
+        (`pip install 'tesseract-robotics-nanobind[support]'`):
+
+            locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
         Args:
             robot_name: Name of robot (e.g., "abb_irb2400", "lbr_iiwa_14_r820")
+            locator: Resource locator (uses GeneralResourceLocator if not provided)
 
         Returns:
             Initialized Robot instance

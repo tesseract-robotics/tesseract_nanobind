@@ -1,13 +1,10 @@
 """#220: tesseract_urdf.writeMeshToFile (tesseract/urdf/utils.h:30)."""
 
-import os
-from pathlib import Path
-
 import pytest
 
-from tesseract_robotics import tesseract_geometry, tesseract_urdf
+from tesseract_robotics import get_tesseract_support_path, tesseract_geometry, tesseract_urdf
 
-SPHERE_STL = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes/sphere_p25m.stl"
+SPHERE_STL = get_tesseract_support_path() / "meshes/sphere_p25m.stl"
 
 
 def _sphere():

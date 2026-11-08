@@ -43,6 +43,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     JointTarget,
     MotionProgram,
@@ -56,6 +57,7 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
     create_trajopt_default_profiles,
 )
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 
 def run(pipeline="FreespacePipeline", num_planners=None, *, composer: TaskComposer | None = None):
@@ -84,7 +86,9 @@ def run(pipeline="FreespacePipeline", num_planners=None, *, composer: TaskCompos
     """
     # Load KUKA IIWA 7-DOF robot from tesseract_support package
     # Joints: joint_a1 through joint_a7
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     print(f"Loaded robot with {len(robot.get_link_names())} links")
 
     # Add sphere obstacle for collision avoidance

@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 import tesseract_robotics.tesseract_common as tc
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     ContactManagersPluginInfo,
     GeneralResourceLocator,
@@ -42,7 +43,7 @@ def _info(joints: dict[str, Isometry3d]) -> tc.CalibrationInfo:
 
 @pytest.fixture
 def locator() -> GeneralResourceLocator:
-    return GeneralResourceLocator()
+    return GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
 
 @pytest.fixture

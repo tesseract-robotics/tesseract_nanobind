@@ -57,6 +57,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import Pose, Robot, create_obstacle
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
@@ -226,7 +227,9 @@ def write_scene(directory: Path, contact_manager_plugins: str) -> tuple[str, str
 def build_robot(directory: Path, contact_manager_plugins: str) -> Robot:
     """Load the probe cell with the given contact-manager plugin configuration."""
     urdf_url, srdf_url = write_scene(directory, contact_manager_plugins)
-    return Robot.from_urdf(urdf_url, srdf_url, GeneralResourceLocator())
+    return Robot.from_urdf(
+        urdf_url, srdf_url, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
 
 def level_set_octree(field, resolution: float = 0.025) -> Octree:

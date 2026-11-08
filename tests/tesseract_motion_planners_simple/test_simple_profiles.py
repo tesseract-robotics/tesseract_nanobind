@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     InstructionPoly,
@@ -316,7 +317,7 @@ PLANNER_NAME = "SIMPLE"
 
 @pytest.fixture
 def irb2400_env():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )

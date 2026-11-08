@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.viewer.errors import UnknownJointError
@@ -19,7 +20,7 @@ Q = np.array([0.3, -0.2, 0.1, 0.4, -0.5, 0.6])
 
 @pytest.fixture(scope="module")
 def env():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()

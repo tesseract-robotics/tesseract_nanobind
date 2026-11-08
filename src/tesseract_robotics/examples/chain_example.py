@@ -31,6 +31,7 @@ import time
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -42,6 +43,7 @@ from tesseract_robotics.planning import (
 from tesseract_robotics.planning.profiles import (
     create_cartesian_pipeline_profiles,
 )
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 
 def run(pipeline="CartesianPipeline", num_planners=None, *, composer: TaskComposer | None = None):
@@ -60,7 +62,9 @@ def run(pipeline="CartesianPipeline", num_planners=None, *, composer: TaskCompos
     """
     # ABB IRB2400: 6-DOF industrial arm with OPW analytic IK solver
     # OPW = Ortho-Parallel Wrist kinematics (closed-form, ~100x faster than numeric)
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    robot = Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # Get joint names from "manipulator" kinematic group (defined in SRDF)
     joint_names = robot.get_joint_names("manipulator")

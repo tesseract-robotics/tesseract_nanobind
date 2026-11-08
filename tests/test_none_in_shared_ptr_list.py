@@ -15,10 +15,12 @@ _SHAPES = """
 import os
 from pathlib import Path
 from tesseract_robotics.tesseract_collision import ContactManagersPluginFactory
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
 from tesseract_robotics.tesseract_geometry import Box
-cfg = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf" / "contact_manager_plugins.yaml"
-factory = ContactManagersPluginFactory(cfg, GeneralResourceLocator())
+cfg = get_tesseract_support_path() / "urdf" / "contact_manager_plugins.yaml"
+factory = ContactManagersPluginFactory(cfg, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 manager = factory.create{kind}ContactManager("{plugin}")
 call = lambda: manager.addCollisionObject(
     "obj", 0, [Box(1, 1, 1), None], [Isometry3d.Identity(), Isometry3d.Identity()]
@@ -28,6 +30,8 @@ call = lambda: manager.addCollisionObject(
 _VARS = """
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 call = lambda: ti.{cls}(np.zeros(2), [None] * 6, np.ones(1), "c")  # jerk needs >= 6
 """
 

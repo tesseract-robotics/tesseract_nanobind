@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
 )
@@ -14,7 +15,7 @@ from tesseract_robotics.tesseract_environment import Environment
 @pytest.fixture
 def abb_environment():
     """Load ABB IRB2400 environment."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )

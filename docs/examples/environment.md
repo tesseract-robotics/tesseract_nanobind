@@ -24,10 +24,12 @@ from an SRDF with a calibration, and from another environment's history.
 ### Resource locators
 
 `GeneralResourceLocator` resolves `package://name/...` through a directory named
-`name` that holds a `package.xml`. The default constructor reads the
-`TESSERACT_RESOURCE_PATH`, `ROS_PACKAGE_PATH` and `AMENT_PREFIX_PATH` variables;
-`paths` and `environment_variables` (keyword-only) choose the sources
-explicitly. A locator built with no variables resolves nothing until
+`name` that holds a `package.xml`. It always reads the
+`TESSERACT_RESOURCE_PATH`, `ROS_PACKAGE_PATH` and `AMENT_PREFIX_PATH` variables
+unless `environment_variables` (keyword-only) names others; `paths` adds
+directories, here `get_tesseract_resource_path()`, tesseract's support data. The
+example sets a variable of its own to show `environment_variables`, and removes
+it again. A locator built with no variables resolves nothing until
 `loadEnvironmentVariable` adds one, which returns `False` for an unset variable.
 `addPath` registers the packages under a directory: here a temporary package
 holding the calibration file used below.

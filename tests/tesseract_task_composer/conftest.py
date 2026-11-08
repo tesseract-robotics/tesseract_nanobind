@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 import tesseract_robotics
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import JointTarget, MotionProgram, Robot
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
@@ -36,7 +37,9 @@ def config_path() -> Path:
 @pytest.fixture(scope="module")
 def factory(config_path: Path) -> Iterator[TaskComposerPluginFactory]:
     """One factory per module: every factory loads the plugins again (#137)."""
-    factory = TaskComposerPluginFactory(config_path, GeneralResourceLocator())
+    factory = TaskComposerPluginFactory(
+        config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     yield factory
     del factory
     gc.collect()
@@ -45,7 +48,9 @@ def factory(config_path: Path) -> Iterator[TaskComposerPluginFactory]:
 @pytest.fixture(scope="module")
 def make_storage() -> Callable[[TaskComposerNode], TaskComposerDataStorage]:
     """Build the input data storage for a planning node: program, environment, profiles."""
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     joint_names = robot.get_joint_names("manipulator")
     robot.set_joints(J_START, joint_names=joint_names)
     program = (

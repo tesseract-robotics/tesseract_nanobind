@@ -58,8 +58,14 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import Robot, TaskComposer
-from tesseract_robotics.tesseract_common import AllowedCollisionMatrix, Isometry3d, LinkIdPair
+from tesseract_robotics.tesseract_common import (
+    AllowedCollisionMatrix,
+    GeneralResourceLocator,
+    Isometry3d,
+    LinkIdPair,
+)
 from tesseract_robotics.tesseract_scene_graph import (
     Joint,
     JointCalibration,
@@ -233,7 +239,9 @@ def run(pipeline=None, num_planners=None, *, composer: TaskComposer | None = Non
     """
     # === LOAD ROBOT ===
     # Robot.from_tesseract_support() handles URDF/SRDF loading and resource location
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     print(f"Loaded robot: {robot}")
 
     # === QUERY SCENE GRAPH STRUCTURE ===

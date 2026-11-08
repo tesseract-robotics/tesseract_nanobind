@@ -4,6 +4,7 @@ The first block must run; the skip-marked block must not (it would raise);
 the third block must fail on its own assert.
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     JointTarget,
@@ -12,8 +13,10 @@ from tesseract_robotics.planning import (
     Robot,
     plan_freespace,
 )
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 ```
 
 <!-- snippet: skip -->

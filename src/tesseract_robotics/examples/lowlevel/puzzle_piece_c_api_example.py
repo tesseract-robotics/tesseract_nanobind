@@ -28,6 +28,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.examples.lowlevel.example_support import (
     load_support_environment,
     locate_file,
@@ -143,7 +144,7 @@ def run(ifopt: bool = False):
     Returns:
         dict with env, success, trajectory, result
     """
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = load_support_environment("puzzle_piece_workcell", locator)
     env.setState(JOINT_NAMES, JOINT_POS)
 

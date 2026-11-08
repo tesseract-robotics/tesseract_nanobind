@@ -58,6 +58,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_collision import (
     CollisionCheckConfig,
     CollisionCheckExitType,
@@ -358,7 +359,7 @@ def trajectory_link(locator: GeneralResourceLocator, trajectory: JointTrajectory
 
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     trajectory, trajectory_result = joint_trajectory()
     return {
         "state": boxbot_checks(locator),

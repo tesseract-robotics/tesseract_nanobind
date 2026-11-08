@@ -55,6 +55,7 @@ Key Concepts
 from pathlib import Path
 from typing import Any
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import TaskComposer
 from tesseract_robotics.tesseract_common import (
     ContactManagersPluginInfo,
@@ -319,7 +320,7 @@ def factory_introspection() -> dict[str, Any]:
 
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     return {
         "contact_managers": contact_managers(locator),
         "profiles": profiles(),

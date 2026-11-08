@@ -56,6 +56,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     AngleAxisd,
     GeneralResourceLocator,
@@ -310,7 +311,7 @@ def point_cloud(box: Mesh) -> dict[str, Any]:
 
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     box_path = Path(locate(locator, BOX_URL).getFilePath())
 
     from_bytes = load_bytes(box_path)

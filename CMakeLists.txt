@@ -428,38 +428,17 @@ message(STATUS "nanobind: ${nanobind_VERSION}")
 message(STATUS "===============================================")
 
 # ============== Install Bundled Data Files ==============
-# These are installed into the wheel so env vars can use relative paths.
-# The tesseract-robotics conda packages ship them under <cpp-prefix>/share:
-#   support meshes/urdfs  -> share/tesseract/support (+ share/tesseract/package.xml)
+# The task composer config is installed into the wheel (get_task_composer_config_path()). It comes
+# from <cpp-prefix>/share, where the tesseract install puts it:
 #   task_composer config  -> share/tesseract_planning/task_composer/config
+# tesseract's support data (robot models, meshes) is not: it is its own wheel,
+# packaging/tesseract-robotics-nanobind-support (the `[support]` extra).
 if(DEFINED TESSERACT_CPP_PREFIX)
-  set(TESSERACT_SUPPORT_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract/support")
   set(TASK_COMPOSER_CFG_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract_planning/task_composer/config")
-  if(WIN32 AND NOT EXISTS "${TESSERACT_SUPPORT_SRC}")
+  if(WIN32 AND NOT EXISTS "${TASK_COMPOSER_CFG_SRC}")
     # conda on Windows installs data under the Library/ prefix
-    set(TESSERACT_SUPPORT_SRC "${TESSERACT_CPP_PREFIX}/Library/share/tesseract/support")
     set(TASK_COMPOSER_CFG_SRC "${TESSERACT_CPP_PREFIX}/Library/share/tesseract_planning/task_composer/config")
   endif()
-endif()
-
-if(EXISTS "${TESSERACT_SUPPORT_SRC}")
-  message(STATUS "Installing tesseract_support from: ${TESSERACT_SUPPORT_SRC}")
-  install(DIRECTORY "${TESSERACT_SUPPORT_SRC}/"
-    DESTINATION tesseract_robotics/data/tesseract/support
-    FILES_MATCHING
-    PATTERN "*.urdf" PATTERN "*.srdf" PATTERN "*.yaml" PATTERN "*.xacro"
-    PATTERN "*.stl" PATTERN "*.STL" PATTERN "*.dae" PATTERN "*.glb" PATTERN "*.ply" PATTERN "*.obj" PATTERN "*.csv"
-    PATTERN "*.xml" PATTERN "*.png" PATTERN "*.jpg" PATTERN "*.jpeg"
-    PATTERN ".git" EXCLUDE PATTERN "__pycache__" EXCLUDE)
-  # Install package.xml alongside support data so GeneralResourceLocator
-  # registers `tesseract` as a package when scanning TESSERACT_RESOURCE_PATH.
-  # The locator skips directories without package.xml (ROS convention).
-  get_filename_component(TESSERACT_PKG_XML "${TESSERACT_SUPPORT_SRC}/../package.xml" ABSOLUTE)
-  if(EXISTS "${TESSERACT_PKG_XML}")
-    install(FILES "${TESSERACT_PKG_XML}" DESTINATION tesseract_robotics/data/tesseract)
-  endif()
-else()
-  message(WARNING "tesseract_support not found at ${TESSERACT_SUPPORT_SRC}")
 endif()
 
 if(EXISTS "${TASK_COMPOSER_CFG_SRC}")

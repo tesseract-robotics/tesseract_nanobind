@@ -26,6 +26,9 @@ Or use:   ./scripts/run_scaling_benchmarks.sh
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+
 pytest.importorskip("pytest_benchmark")
 
 from tesseract_robotics.planning import (
@@ -71,7 +74,9 @@ def assert_state_collision_free(robot: Robot, joint_names: list[str], joints: np
 
 def setup_robot_with_obstacles(num_obstacles: int = 1):
     """Create robot with configurable obstacle count for difficulty scaling."""
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # Add obstacles - more obstacles = harder problem
     obstacle_positions = [
@@ -185,7 +190,9 @@ class TestFirstSolutionScaling:
 
 def test_collision_check_raises_for_a_colliding_state():
     """#341: the invariant fires, naming the links, on the state the old `sphere_3` overlapped."""
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     create_obstacle(
         robot, name="probe", geometry=sphere(0.12), transform=Pose.from_xyz(0.6, 0.1, 0.65)
     )

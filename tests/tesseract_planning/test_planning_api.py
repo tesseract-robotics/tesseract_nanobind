@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import yaml
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     JointTarget,
@@ -24,7 +25,12 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
-from tesseract_robotics.tesseract_common import EIGEN_DEFAULT_PREC, Isometry3d, Quaterniond
+from tesseract_robotics.tesseract_common import (
+    EIGEN_DEFAULT_PREC,
+    GeneralResourceLocator,
+    Isometry3d,
+    Quaterniond,
+)
 
 # Tolerance constants for the equality / isApprox tests below. EIGEN_DEFAULT_PREC
 # is the project-wide anchor: Eigen's NumTraits<double>::dummy_precision()
@@ -287,7 +293,9 @@ class TestRobot:
     @pytest.fixture
     def robot(self):
         """Load test robot."""
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     def test_load_robot(self, robot):
         assert robot is not None
@@ -657,7 +665,8 @@ class TestGeometry:
 
         # Use mesh from tesseract_support package
         mesh = mesh_from_file(
-            "package://tesseract/support/meshes/car_seat/visual/end_effector_open.stl"
+            "package://tesseract/support/meshes/car_seat/visual/end_effector_open.stl",
+            locator=GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         assert mesh is not None
 
@@ -667,7 +676,8 @@ class TestGeometry:
 
         # Use mesh from tesseract_support package
         mesh = convex_mesh_from_file(
-            "package://tesseract/support/meshes/car_seat/visual/end_effector_open.stl"
+            "package://tesseract/support/meshes/car_seat/visual/end_effector_open.stl",
+            locator=GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         assert mesh is not None
 
@@ -677,7 +687,9 @@ class TestCreateObstacle:
 
     @pytest.fixture
     def robot(self):
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     def test_create_box_obstacle(self, robot):
         result = create_obstacle(
@@ -707,7 +719,9 @@ class TestRobotLinkManagement:
     @pytest.fixture
     def robot(self):
         """Load test robot."""
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     def test_add_link_with_geometry(self, robot):
         """Test adding a link with visual/collision geometry."""
@@ -905,7 +919,9 @@ class TestPlanningIntegration:
 
     @pytest.fixture
     def robot(self):
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     def test_plan_freespace(self, robot, composer):
         """Test freespace planning through TaskComposer."""
@@ -1009,7 +1025,9 @@ class TestTaskComposer:
         from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
 
         config = tesseract_robotics.get_task_composer_config_path()
-        factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+        factory = TaskComposerPluginFactory(
+            config, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
         assert TaskComposer(factory).get_available_pipelines() == (
             TaskComposer.from_config(config).get_available_pipelines()
@@ -1033,7 +1051,9 @@ class TestTaskComposer:
 
     @pytest.fixture
     def robot(self):
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     def test_get_available_pipelines(self, composer):
         """Test get_available_pipelines returns all expected pipelines from factory."""
@@ -1275,7 +1295,9 @@ class TestDescartesPipeline:
 
     @pytest.fixture
     def robot(self):
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     @staticmethod
     def _raster_program(robot):
@@ -1529,7 +1551,9 @@ class TestFailureMessage:
 
     def test_a_real_failure_names_the_planner(self, composer):
         """An out-of-reach Cartesian target: TrajOpt fails in about a second."""
-        robot = Robot.from_tesseract_support("abb_irb2400")
+        robot = Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         joint_names = robot.get_joint_names("manipulator")
         start = np.zeros(6)
         robot.set_joints(start, joint_names=joint_names)
@@ -1923,7 +1947,9 @@ class TestPluginLifetime:
 
     @pytest.fixture
     def robot(self):
-        return Robot.from_tesseract_support("abb_irb2400")
+        return Robot.from_tesseract_support(
+            "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
     def _simple_program(self, robot):
         joint_names = robot.get_joint_names("manipulator")

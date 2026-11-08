@@ -61,7 +61,7 @@ Key Concepts
 Pipeline
 --------
 1. Environment Setup:
-   - GeneralResourceLocator finds URDF/SRDF via TESSERACT_RESOURCE_PATH
+   - GeneralResourceLocator finds URDF/SRDF in the support data passed as `paths`
    - Environment.init() parses robot description and loads collision plugins
    - AddLinkCommand adds obstacle geometry to scene
 
@@ -92,6 +92,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_collision import (
     ContactRequest,
     ContactResultMap,
@@ -121,28 +122,21 @@ from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
 # to configure the plugins using Bullet for collision checking. This configuration file can be copied and
 # used for most scenes.
 
-# This example uses the GeneralResourceLocator to find resources on the file system. The GeneralResourceLocator
-# uses the TESSERACT_RESOURCE_PATH environmental variable.
-#
-# TESSERACT_RESOURCE_PATH must be set to the directory containing the `tesseract_support` package. This can be done
-# by running:
+# This example uses the GeneralResourceLocator to find resources on the file system. It is given the
+# directory of tesseract's support data (`pip install 'tesseract-robotics-nanobind[support]'`) as a
+# search path; it also searches the TESSERACT_RESOURCE_PATH, ROS_PACKAGE_PATH and AMENT_PREFIX_PATH
+# environment variables, so a tesseract checkout works too:
 #
 # git clone https://github.com/tesseract-robotics/tesseract.git
 # export TESSERACT_RESOURCE_PATH="$(pwd)/tesseract/"
-#
-# or on Windows
-#
-# git clone https://github.com/tesseract-robotics/tesseract.git
-# set TESSERACT_RESOURCE_PATH=%cd%\tesseract\
 
 
 def main():
     # =========================================================================
     # STEP 1: Environment Initialization
     # =========================================================================
-    # GeneralResourceLocator resolves "package://" URIs using TESSERACT_RESOURCE_PATH
-    # This env var should point to a directory containing tesseract_support/urdf/
-    locator = GeneralResourceLocator()
+    # GeneralResourceLocator resolves "package://" URIs in its search paths
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = Environment()
 
     # Locate URDF (robot geometry) and SRDF (semantic info: groups, ACM, plugins)

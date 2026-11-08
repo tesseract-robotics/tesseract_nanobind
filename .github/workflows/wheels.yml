@@ -38,6 +38,7 @@ env:
   # Tag builds must yield exactly the tag version (a dirty tree otherwise makes setuptools-scm
   # guess the next dev version); other builds take the version setuptools-scm derives
   SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+  SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND_SUPPORT: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
   NB_BUILD_REQS: scikit-build-core>=0.10 nanobind==2.12.0 setuptools-scm>=8 wheel
 
 jobs:
@@ -110,7 +111,9 @@ jobs:
         # Upstream headers (tesseract_planning's poly types) use std::runtime_error without
         # <stdexcept>; the distro Boost pulled it in transitively, vcpkg's Boost does not
         export CXXFLAGS="-include stdexcept"
-        colcon build --merge-install \
+        # Two packages at a time, each building with every core: four packages at once peaks
+        # past the runner's 16 GB and the runner is shut down mid-build
+        colcon build --merge-install --parallel-workers 2 \
           --cmake-force-configure \
           --packages-ignore tesseract_examples gtest \
           --event-handlers console_cohesion+ \
@@ -132,6 +135,22 @@ jobs:
           -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
         auditwheel show dist/*.whl
         auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
+    - name: build support data wheel
+      # tesseract's robot models and meshes, one py3-none-any wheel for every platform, copied
+      # from the same colcon prefix (packaging/tesseract-robotics-nanobind-support)
+      if: matrix.config.arch == 'x64'
+      shell: bash
+      working-directory: tesseract_nanobind
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        TESSERACT_CPP_PREFIX=$GITHUB_WORKSPACE/ws/install \
+          python -m pip wheel packaging/tesseract-robotics-nanobind-support -w wheelhouse-support --no-deps
+    - name: archive support data wheel
+      if: matrix.config.arch == 'x64'
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-support-any'
+        path: tesseract_nanobind/wheelhouse-support/*.whl
     - name: archive wheels
       uses: actions/upload-artifact@v7
       with:
@@ -426,6 +445,10 @@ jobs:
     - uses: actions/download-artifact@v8
       with:
         name: python-wheels-${{ matrix.platform.name }}
+        path: wheelhouse
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-support-any
         path: wheelhouse
     - name: install wheel
       run: |

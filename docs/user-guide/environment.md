@@ -34,7 +34,8 @@ The `Environment` is the central data structure in tesseract_robotics — it own
     from tesseract_robotics.planning import Robot
 
     # Available: abb_irb2400, lbr_iiwa_14_r820, ...
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+    robot = Robot.from_tesseract_support("abb_irb2400", locator)
     env = robot.env
     ```
 

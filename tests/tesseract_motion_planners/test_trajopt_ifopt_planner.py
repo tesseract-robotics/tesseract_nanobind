@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 import scipy.sparse
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import tesseract_motion_planners_trajopt_ifopt as trajopt_ifopt_planners
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
@@ -63,7 +64,7 @@ TRAJOPT_IFOPT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 @pytest.fixture
 def kuka_iiwa_environment():
     """Load KUKA IIWA robot environment for testing."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
@@ -1028,6 +1029,8 @@ _CHILD_PREAMBLE = textwrap.dedent(
 # cost's release all happen off the main thread.
 _TASK_COMPOSER_RELEASE = textwrap.dedent(
     """
+    from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from tesseract_robotics.planning import (
         JointTarget,
         MotionProgram,
@@ -1048,7 +1051,7 @@ _TASK_COMPOSER_RELEASE = textwrap.dedent(
             terms.squared_costs = [*terms.squared_costs, ZeroCost()]
             return terms
 
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    robot = Robot.from_tesseract_support("abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
     program = (
         MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
@@ -1072,6 +1075,8 @@ _TASK_COMPOSER_RELEASE = textwrap.dedent(
 # trampoline refuses such an info before the planner moves the node out.
 _KEPT_WAYPOINT_INFO = textwrap.dedent(
     """
+    from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from pathlib import Path
 
     from tesseract_robotics.tesseract_command_language import (
@@ -1108,7 +1113,7 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
                 self.kept.append(info.node)
             return info
 
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
     env = Environment()
     assert env.init(
@@ -1163,6 +1168,8 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
 # dispatch back into the override.
 _SUPER_CREATE = textwrap.dedent(
     """
+    from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from pathlib import Path
 
     from tesseract_robotics.tesseract_command_language import (
@@ -1186,7 +1193,7 @@ _SUPER_CREATE = textwrap.dedent(
         def create(self, composite_manip_info, env, nodes, fixed_indices):
             return super().create(composite_manip_info, env, nodes, fixed_indices)
 
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
     env = Environment()
     assert env.init(
@@ -1222,6 +1229,8 @@ _SUPER_CREATE = textwrap.dedent(
 # read freed memory. Shared by the two children below: plans once, keeping nodes[0] and its var.
 _KEEP_FROM_CREATE = textwrap.dedent(
     """
+    from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     from pathlib import Path
 
     from tesseract_robotics.tesseract_command_language import (
@@ -1258,7 +1267,7 @@ _KEEP_FROM_CREATE = textwrap.dedent(
                 kept["refused_during_create"] = True
             return self._inner.create(composite_manip_info, env, nodes, fixed_indices)
 
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     support = "package://tesseract/support/urdf/lbr_iiwa_14_r820"
     env = Environment()
     assert env.init(

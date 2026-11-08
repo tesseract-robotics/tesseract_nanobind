@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 import tesseract_robotics.tesseract_motion_planners_descartes as descartes
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -27,7 +28,7 @@ from tesseract_robotics.planning.profiles import (
 )
 from tesseract_robotics.tesseract_collision import ContactManagerConfig
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import PluginInfo
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, PluginInfo
 from tesseract_robotics.tesseract_motion_planners import ProfileOverrideNotDispatchedError
 
 # m, the vertex contact margin of the infeasible profile. Every link of the IRB2400 lies within
@@ -64,7 +65,9 @@ def composer():
 
 @pytest.fixture(scope="module")
 def robot():
-    return Robot.from_tesseract_support("abb_irb2400")
+    return Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
 
 def _linear_program(robot):

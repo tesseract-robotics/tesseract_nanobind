@@ -5,6 +5,7 @@ Each class binds its C++ operator==/operator!= as __eq__/__ne__ and sets __hash_
 
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
     GeneralResourceLocator,
@@ -170,7 +171,9 @@ def test_changing_joint_origin_within_tolerance_is_equal():
 @pytest.fixture
 def env():
     environment = Environment()
-    assert environment.init(SIMPLE_URDF, GeneralResourceLocator())
+    assert environment.init(
+        SIMPLE_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     return environment
 
 
@@ -191,8 +194,8 @@ def test_environment_unequal_after_state_change(env):
 def test_environments_built_separately_are_unequal():
     """operator== compares the timestamps that each init sets (environment.cpp:412-413, 0.35.0)."""
     a, b = Environment(), Environment()
-    assert a.init(SIMPLE_URDF, GeneralResourceLocator())
-    assert b.init(SIMPLE_URDF, GeneralResourceLocator())
+    assert a.init(SIMPLE_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
+    assert b.init(SIMPLE_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
     assert a.getTimestamp() != b.getTimestamp()
     assert a != b
 
@@ -215,7 +218,7 @@ NO_GEOMETRY_URDF = """
 
 def _history(urdf):
     environment = Environment()
-    assert environment.init(urdf, GeneralResourceLocator())
+    assert environment.init(urdf, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
     return environment.getCommandHistory()
 
 

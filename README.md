@@ -35,8 +35,10 @@ for an excellent overview of `Tesseract's` architecture & features see [this pre
 ## Installation
 
 ```bash
-pip install tesseract-robotics-nanobind
+pip install "tesseract-robotics-nanobind[support]"
 ```
+
+The `[support]` extra adds tesseract's example robots and meshes (`tesseract-robotics-nanobind-support`), which the examples and the Quick Start load. Leave it out if you only use your own robots.
 
 **Platform support:** 
 
@@ -61,12 +63,17 @@ The source is in [`src/tesseract_robotics/examples`](https://github.com/tesserac
 ## Quick Start
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import (
     Robot, MotionProgram, JointTarget, CartesianTarget, Pose, TaskComposer,
 )
 
-# Load a bundled robot (urdf + srdf from tesseract's support package)
-robot = Robot.from_tesseract_support("abb_irb2400")
+# Resolve package:// URLs in tesseract's support data (the [support] extra)
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+
+# Load a robot from tesseract's support package (urdf + srdf)
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # Start at all-zero joints, goal is a tool0 pose (upstream freespace_example.cpp);
 # quaternion is scalar-last [qx, qy, qz, qw]

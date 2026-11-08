@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
@@ -28,7 +29,7 @@ COEFF = 20.0
 
 
 def test_collision_constraint_with_an_active_contact():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf")
     env = Environment()

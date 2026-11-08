@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 import scipy.sparse
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.tesseract_common import (
@@ -54,7 +55,7 @@ def _make_problem(nodes_variables, constraints=None, costs=None):
 @pytest.fixture
 def kuka_setup():
     """Load KUKA IIWA robot environment."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
@@ -885,6 +886,8 @@ TEARDOWN_CHILD_TIMEOUT_S = 60.0
 _TRAJOPT_QP_TEARDOWN_SCRIPT = """\
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics import trajopt_sqp as tsqp
 nodes = ti.createNodesVariables(
     "trajectory", ["j0"], [np.array([float(k)]) for k in range(6)],
@@ -1370,6 +1373,8 @@ def _start_pin(vars_list):
 _BEFORE_CONVEXIFY_SCRIPT = f"""\
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics import trajopt_sqp as tsqp
 nodes = ti.createNodesVariables(
     "trajectory", ["j0"], [np.array([v]) for v in (0.0, {SEED_NODE_1}, 0.0)],

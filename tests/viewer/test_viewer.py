@@ -15,6 +15,7 @@ import websockets
 import zstandard
 from loguru import logger
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import tesseract_geometry as tg
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
@@ -94,7 +95,7 @@ def _assert_port_free(port: int) -> None:
 
 
 def _irb2400():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()
@@ -348,7 +349,7 @@ def _wait_for(condition):
 @pytest.fixture
 def other_env():
     env = Environment()
-    assert env.init(OTHER_ROBOT_URDF, GeneralResourceLocator())
+    assert env.init(OTHER_ROBOT_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
     return env
 
 

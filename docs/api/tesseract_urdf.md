@@ -5,10 +5,11 @@ URDF parsing and writing: `parseURDFString` / `parseURDFFile` build a `SceneGrap
 URDF references.
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_urdf import parseURDFFile, writeURDFFile
 
-locator = GeneralResourceLocator()
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 
 scene_graph = parseURDFFile(urdf, locator)

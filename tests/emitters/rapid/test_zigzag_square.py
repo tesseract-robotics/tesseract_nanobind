@@ -20,6 +20,7 @@ from typing import Final
 
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.emitters.rapid import RapidProfile, emit_rapid
 from tesseract_robotics.planning import (
     CartesianTarget,
@@ -28,6 +29,7 @@ from tesseract_robotics.planning import (
     Robot,
 )
 from tesseract_robotics.planning.toolpaths import OUTLINE_POSE_COUNT, ZIGZAG_LINE_COUNT
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 #: TCP frame name — the robot link the planner / emitter treats as the tool tip.
 TCP_FRAME: Final[str] = "tool0"
@@ -53,7 +55,9 @@ def abb_irb2400() -> Robot:
     Session-scoped: loading the URDF + meshes is expensive and the robot
     isn't mutated by any test in this module.
     """
-    return Robot.from_tesseract_support("abb_irb2400")
+    return Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
 
 @pytest.fixture

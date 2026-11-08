@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -61,7 +62,7 @@ TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 
 def run():
     # Initialize the resource locator and environment
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     abb_irb2400_urdf_package_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
     abb_irb2400_urdf_fname = Path(

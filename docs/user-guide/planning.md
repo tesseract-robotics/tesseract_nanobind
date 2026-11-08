@@ -33,7 +33,8 @@ All three entry points take the same shape: a `Robot` plus a `MotionProgram` of
         Robot, MotionProgram, JointTarget, plan_ompl,
     )
 
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+    robot = Robot.from_tesseract_support("abb_irb2400", locator)
     program = (
         MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .move_to(JointTarget(np.zeros(6)))

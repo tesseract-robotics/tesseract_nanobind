@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.examples
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
     MoveInstruction,
@@ -70,7 +71,7 @@ VIEWER_MAIN_FILES = [p for p in MAIN_FILES if "TesseractViewer" in p.read_text(e
 
 def _canned_results() -> dict[str, object]:
     # Every key a planning main reads from run(), holding real viewer inputs.
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()

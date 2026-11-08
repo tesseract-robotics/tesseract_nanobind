@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     JointTarget,
@@ -18,7 +19,7 @@ from tesseract_robotics.planning import (
     Robot,
     TaskComposer,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
 
 GROUP = "manipulator"
 TCP_FRAME = "tool0"
@@ -48,7 +49,9 @@ def _offset_matrix(info: ManipulatorInfo) -> np.ndarray:
 
 @pytest.fixture(scope="module")
 def robot() -> Robot:
-    return Robot.from_tesseract_support("abb_irb2400")
+    return Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
 
 class TestFramesAreRequired:

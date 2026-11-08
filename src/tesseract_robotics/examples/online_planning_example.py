@@ -87,6 +87,7 @@ import time
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     MotionProgram,
     Robot,
@@ -94,6 +95,7 @@ from tesseract_robotics.planning import (
     TaskComposer,
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 
 def update_human_position(robot, human_x, human_y):
@@ -150,7 +152,9 @@ def run(
     # - Gantry: gantry_axis_1, gantry_axis_2 (prismatic, large travel)
     # - ABB IRB2400: joint_1..joint_6 (revolute, standard 6-axis arm)
     # - Human: human_x_joint, human_y_joint (prismatic, for obstacle motion)
-    robot = Robot.from_tesseract_support("online_planning_example")
+    robot = Robot.from_tesseract_support(
+        "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # "manipulator" group contains only the 8 gantry+arm joints
     # Human joints are NOT part of the manipulator - they're environment state

@@ -3,16 +3,21 @@
 ## Users: Install from PyPI
 
 ```bash
-pip install tesseract-robotics-nanobind
+pip install "tesseract-robotics-nanobind[support]"
 ```
 
-The wheel bundles all C++ dependencies (~50MB). No compiler needed.
+The wheel bundles all C++ dependencies (~30 MB). No compiler needed. The `[support]` extra
+installs tesseract's example robots and meshes as a separate wheel,
+`tesseract-robotics-nanobind-support` (~40 MB); the examples and these pages load robots from it.
+Leave it out if you only load your own robots.
 
 ```python
-import tesseract_robotics
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 ```
 

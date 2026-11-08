@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -67,7 +68,7 @@ OSQP_ADAPTIVE_RHO_INTERVAL = 25
 
 def run():
     # Initialize the resource locator and environment
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     srdf_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
     urdf_path = Path(locator.locateResource(urdf_url).getFilePath())
