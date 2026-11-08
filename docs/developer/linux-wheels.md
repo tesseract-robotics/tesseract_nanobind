@@ -4,10 +4,9 @@
 
 The single most important rule for the Linux wheels: **the gcc runtime
 (`libstdc++.so.6`, `libgcc_s.so.1`) must come from the host or the active
-conda/pixi env, never from the wheel.** `scripts/build_linux_wheel.sh` skips it
-explicitly in the ldd-closure bundling loop, and the test-wheel CI has a
-regression guard asserting the wheel ships no copy and exactly one copy is
-mapped at runtime.
+conda/pixi env, never from the wheel.** auditwheel never bundles it (manylinux
+policy), and the `test-wheel` job in `wheels.yml` asserts the installed wheel
+ships no copy.
 
 ### Why (gh-119 forensics, 2026-06-10)
 
@@ -56,26 +55,17 @@ reintroduce it.
 
 ### Supported libstdc++ floor
 
-The conda-forge-built tesseract libs need a gcc-13+ era libstdc++
-(`GLIBCXX_3.4.32`-ish): ubuntu 24.04+, debian 13+, fedora 38+, or any
-conda/pixi env. On older distros the wheel imports fail loudly with a
-missing-`GLIBCXX`/`CXXABI` error — by design; that is strictly better than the
-silent corruption it replaces. The `manylinux_2_35` platform tag encodes only
-the glibc floor, not libstdc++, so pip will install on e.g. ubuntu 22.04 and
-fail at import.
-
-**Wheel inside a conda/pixi env on an old distro:** the env carries a suitable
-libstdc++ at `$CONDA_PREFIX/lib`, but env activation does not put it on the
-loader path for foreign (pip-installed) wheels — export
-`LD_LIBRARY_PATH="$CONDA_PREFIX/lib"` (the ABI canary in `wheels-linux.yml`
-does exactly this on its 22.04 build host).
+The wheels are built on Ubuntu 24.04 with its gcc 13 and tagged
+`manylinux_2_39`, so pip installs them only where glibc is 2.39 or newer
+(Ubuntu 24.04+, Debian 13+), which also carry a gcc-13 era libstdc++.
 
 ## Plugin bundling
 
 Plugin factory libraries are dlopen'd by boost_plugin_loader, so the linker
-never sees them — `build_linux_wheel.sh` copies them into the package root
-explicitly and they seed the ldd closure. Objects created by those plugins
-carry vtables that live in the plugin `.so`s; binding-level
-`nb::keep_alive<0, 1>` on every Environment getter returning plugin-backed
-objects keeps the Environment (and so the loader and the mapped plugins) alive
-as long as any such object exists.
+would never see them. The collision, kinematics and task composer modules link
+them anyway and register them through their anchors (see
+[binaries](binaries.md#plugin-anchors)), so auditwheel bundles them with the
+rest of the closure. Objects created by those plugins carry vtables that live
+in the plugin `.so`s; binding-level `nb::keep_alive<0, 1>` on every
+Environment getter returning plugin-backed objects keeps the Environment (and
+so the loader and the mapped plugins) alive as long as any such object exists.

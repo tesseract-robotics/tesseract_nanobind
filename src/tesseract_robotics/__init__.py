@@ -6,25 +6,21 @@ Environment Variables (auto-configured on first use):
     TESSERACT_RESOURCE_PATH: Resource search path for URDFs
     TESSERACT_TASK_COMPOSER_CONFIG_FILE: Task composer YAML config
     TESSERACT_TASK_COMPOSER_DIR: Task composer config directory
-    TESSERACT_PLUGIN_PATH: Override plugin search path
-    TESSERACT_CONTACT_MANAGERS_PLUGIN_DIRECTORIES: Collision plugin path
-    TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES: Kinematics plugin path
-    TESSERACT_TASK_COMPOSER_PLUGIN_DIRECTORIES: Composer plugin path
 
-Priority: Bundled data (installed) > Dev workspace (editable) > User env vars
+Priority: User env vars > Bundled data (installed) > conda share (editable)
+
+Plugins need no configuration: the plugin factory libraries are linked into the extension
+modules, and each module's init registers them with the plugin loaders by path through their
+anchors (TESSERACT_CONTACT_MANAGERS_PLUGINS, TESSERACT_KINEMATICS_PLUGINS,
+TESSERACT_TASK_COMPOSER_PLUGINS), so the copies the wheel bundles are the ones loaded.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import sys
-import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-
-from loguru import logger
 
 # Linux: libstdc++ is intentionally NOT bundled in the wheels, and never
 # preloaded. Two libstdc++ copies in one process (bundled via $ORIGIN rpath +
@@ -64,24 +60,6 @@ except PackageNotFoundError:
     __version__ = "0.0.0.dev"  # fallback for editable installs without build
 
 
-def _is_editable_install() -> bool:
-    """Check if package was installed in editable mode (pip install -e .)."""
-    try:
-        from importlib.metadata import distribution
-
-        dist = distribution("tesseract-robotics-nanobind")
-        # Check for direct_url.json which indicates editable install
-        direct_url = dist.read_text("direct_url.json")
-        if direct_url:
-            data = json.loads(direct_url)
-            return data.get("dir_info", {}).get("editable", False)
-    except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError) as e:
-        logger.debug(f"Editable install check failed: {type(e).__name__}: {e}")
-    # Fallback: check if __file__ is outside site-packages
-    pkg_path = Path(__file__).parent
-    return "site-packages" not in str(pkg_path)
-
-
 def _set_env_if_missing(var_name: str, *candidates: Path, use_parent: bool = False) -> None:
     """Set env var to first existing path if not already set."""
     if var_name in os.environ:
@@ -90,45 +68,6 @@ def _set_env_if_missing(var_name: str, *candidates: Path, use_parent: bool = Fal
         if path.is_dir():
             os.environ[var_name] = str(path.parent if use_parent else path)
             return
-
-
-def _resolve_config_paths(config_path: Path, plugin_path: str | None) -> Path:
-    """
-    Resolve plugin path placeholders in task composer YAML configs.
-
-    Handles both:
-    - @PLUGIN_PATH@ placeholder (bundled wheels)
-    - /usr/local/lib (the conda task_composer config's default search path)
-    """
-    if plugin_path is None:
-        return config_path
-
-    content = config_path.read_text()
-
-    # Check if config needs patching
-    needs_patch = "@PLUGIN_PATH@" in content or "/usr/local/lib" in content
-    if not needs_patch:
-        return config_path
-
-    # Generate resolved config in system temp dir (not inside package dir)
-    cache_dir = Path(tempfile.gettempdir()) / "tesseract_robotics"
-    cache_dir.mkdir(exist_ok=True)
-
-    # Use hash of plugin_path to allow different installs
-    path_hash = hashlib.md5(plugin_path.encode()).hexdigest()[:8]
-    resolved_path = cache_dir / f"{config_path.stem}_{path_hash}.yaml"
-
-    # YAML double-quoted strings treat backslashes as escapes, so Windows paths
-    # must be written with forward slashes.
-    yaml_plugin_path = plugin_path.replace("\\", "/")
-
-    # Only regenerate if source changed or cache missing
-    if not resolved_path.exists() or resolved_path.stat().st_mtime < config_path.stat().st_mtime:
-        resolved_content = content.replace("@PLUGIN_PATH@", yaml_plugin_path)
-        resolved_content = resolved_content.replace("/usr/local/lib", yaml_plugin_path)
-        resolved_path.write_text(resolved_content)
-
-    return resolved_path
 
 
 def _configure_environment():
@@ -169,67 +108,15 @@ def _configure_environment():
     # dev (conda): $CONDA_PREFIX/share/tesseract → use parent (= share)
     _set_env_if_missing("TESSERACT_RESOURCE_PATH", support_dir.parent, ws_resource, use_parent=True)
 
-    # Plugin search paths - env var, bundled plugins, or $CONDA_PREFIX/lib (editable)
-    # Linux:   pkg_dir (all deps bundled in package root with $ORIGIN rpath)
-    # macOS:   .dylibs (scripts/repair_macos_wheel.py)
-    # Windows: pkg_dir (plugin factory DLLs bundled there; delvewheel libs go to
-    #          sibling tesseract_robotics.libs/ but plugin dlopen targets pkg_dir)
-    plugin_path = os.environ.get("TESSERACT_PLUGIN_PATH")  # explicit override
-    editable = _is_editable_install()
-
-    if not plugin_path:
-        bundled_plugin = pkg_dir / "libtesseract_collision_bullet_factories.so"
-        dylibs_dir = pkg_dir / ".dylibs"
-        bundled_plugin_win = pkg_dir / "tesseract_collision_bullet_factories.dll"
-        # editable install: plugin factory libs live alongside the conda libs
-        # ($CONDA_PREFIX/lib, or Library/bin for the DLLs on conda Windows).
-        conda_lib = None
-        if conda_prefix:
-            for cand in (Path(conda_prefix) / "lib", Path(conda_prefix) / "Library" / "bin"):
-                if cand.is_dir():
-                    conda_lib = cand
-                    break
-
-        if bundled_plugin.exists():
-            plugin_path = str(pkg_dir)
-        elif dylibs_dir.is_dir():
-            plugin_path = str(dylibs_dir)
-        elif bundled_plugin_win.exists():
-            plugin_path = str(pkg_dir)
-        elif editable and conda_lib is not None:
-            plugin_path = str(conda_lib)
-
-    # TESSERACT_TASK_COMPOSER_CONFIG_FILE
-    # Check if patching is needed (for bundled wheels or if env.sh set a path)
-    env_cfg = os.environ.get("TESSERACT_TASK_COMPOSER_CONFIG_FILE")
-    if env_cfg and plugin_path:
-        env_cfg_path = Path(env_cfg)
-        if env_cfg_path.is_file():
-            cfg_resolved = _resolve_config_paths(env_cfg_path, plugin_path)
-            os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg_resolved)
-    elif "TESSERACT_TASK_COMPOSER_CONFIG_FILE" not in os.environ:
-        cfg = config_dir / "task_composer_plugins.yaml"
-        if cfg.is_file():
-            cfg_resolved = _resolve_config_paths(cfg, plugin_path) if plugin_path else cfg
-            os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg_resolved)
-        elif ws_config.is_file():
-            cfg_resolved = (
-                _resolve_config_paths(ws_config, plugin_path) if plugin_path else ws_config
-            )
-            os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg_resolved)
+    # TESSERACT_TASK_COMPOSER_CONFIG_FILE: bundled config (wheel) or the conda share (editable)
+    if "TESSERACT_TASK_COMPOSER_CONFIG_FILE" not in os.environ:
+        for cfg in (config_dir / "task_composer_plugins.yaml", ws_config):
+            if cfg.is_file():
+                os.environ["TESSERACT_TASK_COMPOSER_CONFIG_FILE"] = str(cfg)
+                break
 
     # TESSERACT_TASK_COMPOSER_DIR (needed by some code paths)
     _set_env_if_missing("TESSERACT_TASK_COMPOSER_DIR", config_dir, ws_composer)
-
-    # Set plugin directories for all plugin factories (if not overridden)
-    if plugin_path:
-        for env_var in [
-            "TESSERACT_CONTACT_MANAGERS_PLUGIN_DIRECTORIES",
-            "TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES",
-            "TESSERACT_TASK_COMPOSER_PLUGIN_DIRECTORIES",
-        ]:
-            if env_var not in os.environ:
-                os.environ[env_var] = plugin_path
 
 
 _configured = False
@@ -261,7 +148,7 @@ def get_task_composer_config_path() -> Path:
     """Get the resolved task composer plugin config file.
 
     Resolution is owned by `_configure_environment()` (env var → bundled data →
-    conda share, with plugin-path placeholders patched) and published via
+    conda share) and published via
     TESSERACT_TASK_COMPOSER_CONFIG_FILE; this returns that single source of
     truth as a `Path`.
 

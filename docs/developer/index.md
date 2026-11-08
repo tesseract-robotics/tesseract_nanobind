@@ -32,7 +32,6 @@ pixi task list
 | `install` | Install bindings | editable `pip install -e . --no-build-isolation` against the conda tesseract libs |
 | `test` | Run tests | pytest with xdist parallel, excluding benchmarks (depends on `install`) |
 | `test-benchmark` | Run benchmarks | benchmark tests, serial |
-| `build-wheel` | Portable wheel | `scripts/build_linux_wheel.sh` / `build_macos_wheel.sh` (see [binaries](binaries.md)) |
 | `typecheck` | Type check | pyright on `src/tesseract_robotics/` |
 | `lint` | Lint | ruff check |
 | `fmt` | Format | ruff format |
@@ -159,12 +158,10 @@ Using `pixi run` handles this automatically.
 
 ### Building Portable Wheels
 
-Editable installs bake absolute paths, so they aren't portable. For distributable wheels:
-
-```bash
-pixi run build-wheel                  # bundles native deps (Linux: patchelf, macOS: scripts/repair_macos_wheel.py)
-pip install wheelhouse/tesseract*.whl
-```
+Editable installs bake absolute paths, so they aren't portable. The PyPI wheels are
+built without conda by `.github/workflows/wheels.yml`: the tesseract C++ stack is built
+from source with colcon against vcpkg dependencies, and auditwheel, delvewheel or
+delocate bundles it. See [binaries](binaries.md#building-a-wheel).
 
 ---
 
@@ -227,8 +224,6 @@ tesseract_nanobind/
 │   ├── gil_call_counts.py     # pytest plugin: binding calls per call site
 │   ├── gil_entry_points.py    # nogil_entry_points.yaml loader
 │   ├── nogil_entry_points.yaml # Every binding that releases the GIL, and why
-│   ├── build_linux_wheel.sh   # Portable manylinux wheel (patchelf)
-│   ├── build_macos_wheel.sh   # Portable macOS wheel
 │   └── build_upstream.sh      # 0.36 inner loop: build upstream/ into the env
 ├── upstream/                  # tesseract, trajopt, tesseract_planning, bpl submodules (0.36)
 └── packaging/                 # forked feedstock submodules (0.36 outer loop)

@@ -143,7 +143,7 @@ Run within pixi: `pixi run python your_script.py` or enter `pixi shell` first.
 
 Pixi installs `llvm-openmp` from conda-forge. If you have Homebrew's libomp installed, library conflicts can cause crashes. The pixi environment isolates this, but running outside `pixi shell` may pick up the wrong library.
 
-Wheels up to 0.35.0.9 carry their own `libomp.dylib`, and inside a conda or pixi environment that makes two runtimes: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Newer wheels use the environment's `libomp` when it has one and their bundled copy otherwise, so uv and pip environments work too. The mechanism and the fix are in [macOS Wheel Gotchas](../developer/macos-wheels.md).
+The PyPI wheels carry their own `libomp.dylib`. In a plain venv (pip, uv) that is the only runtime, but inside a conda or pixi environment that has `llvm-openmp` it makes two: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Install the wheel into a venv, or use the pixi environment's editable install. The mechanism is in [macOS Wheel Gotchas](../developer/macos-wheels.md).
 
 ### Scattered Segfaults / "double free or corruption"
 

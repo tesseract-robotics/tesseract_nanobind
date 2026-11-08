@@ -1,17 +1,25 @@
 name: Python Wheels
 
-# Builds the nanobind bindings the same way the tesseract_python SWIG wheels are built: the tesseract
-# C++ stack is built from source with colcon against vcpkg dependencies on every platform, then the
-# wheel is repaired with auditwheel/delvewheel/delocate. The plugin factories are linked into the
-# extension modules and registered through their anchors, so the repair tools bundle them like any
-# other dependency.
+# Builds, tests and publishes the PyPI wheels the same way the tesseract_python SWIG wheels are
+# built: the tesseract C++ stack is built from source with colcon against vcpkg dependencies on every
+# platform (no conda packages), then the wheel is repaired with auditwheel/delvewheel/delocate. The
+# plugin factories are linked into the extension modules and registered through their anchors
+# (boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv), so the repair tools bundle them like
+# any other dependency and the plugin loaders find the bundled copies by path.
 
 on:
   push:
     branches:
+      - main
       - 'dev**'
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   VCPKG_PKGS: >-
@@ -27,8 +35,9 @@ env:
     fcl ompl taskflow
     bullet3[multithreading,double-precision,rtti]
     ccd[double-precision] gperftools
-  # setuptools-scm needs tags, which a fork branch does not carry
-  SETUPTOOLS_SCM_PRETEND_VERSION: 0.35.0.9
+  # Tag builds must yield exactly the tag version (a dirty tree otherwise makes setuptools-scm
+  # guess the next dev version); other builds take the version setuptools-scm derives
+  SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
   NB_BUILD_REQS: scikit-build-core>=0.10 nanobind==2.12.0 setuptools-scm>=8 wheel
 
 jobs:
@@ -41,9 +50,11 @@ jobs:
       matrix:
         config:
         - runs_on: ubuntu-24.04
+          arch: x64
           vcpkg_triplet: x64-linux-dynamic-release
           plat: manylinux_2_39_x86_64
         - runs_on: ubuntu-24.04-arm
+          arch: arm64
           vcpkg_triplet: arm64-linux-dynamic-release
           plat: manylinux_2_39_aarch64
     env:
@@ -54,6 +65,7 @@ jobs:
     - uses: actions/checkout@v6
       with:
         path: tesseract_nanobind
+        fetch-depth: 0  # setuptools-scm derives the version from the tag history
     - name: apt
       # Only the toolchain and the tools vcpkg ports need; all libraries come from vcpkg
       run: >
@@ -116,26 +128,34 @@ jobs:
           -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
         auditwheel show dist/*.whl
         auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
-    - name: test
+    - name: stub drift gate
+      # The committed .pyi stubs must equal the stubgen output of the wheel just built (gh-159);
+      # runs per platform so platform-dependent output fails here
       shell: bash
       run: |
-        python3 -m venv test-venv
-        source test-venv/bin/activate
+        python3 -m venv check-venv
+        source check-venv/bin/activate
         python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl pytest pytest-xdist pyyaml
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0 pyright==1.1.414
         cd tesseract_nanobind
-        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
+        python scripts/generate_stubs.py --check
+    - name: typecheck
+      if: matrix.config.vcpkg_triplet == 'x64-linux-dynamic-release'
+      shell: bash
+      working-directory: tesseract_nanobind
+      run: |
+        source $GITHUB_WORKSPACE/check-venv/bin/activate
+        pyright src/tesseract_robotics
     - name: archive wheels
-      if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: 'python-wheels-ubuntu-${{ matrix.config.runs_on }}'
+        name: 'python-wheels-linux-${{ matrix.config.arch }}'
         path: tesseract_nanobind/wheelhouse/*.whl
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
       with:
-        name: 'build-logs-ubuntu-${{ matrix.config.runs_on }}'
+        name: 'build-logs-linux-${{ matrix.config.arch }}'
         path: "**/*.log"
         retention-days: 2
 
@@ -152,6 +172,7 @@ jobs:
     - uses: actions/checkout@v6
       with:
         path: tesseract_nanobind
+        fetch-depth: 0  # setuptools-scm derives the version from the tag history
     - uses: actions/setup-python@v6
       id: setup-python
       with:
@@ -209,22 +230,16 @@ jobs:
         for %%I in ("dist\*.whl") do set WHEEL_FILE=%%~I
         python -m delvewheel repair --add-path "%GITHUB_WORKSPACE%\ws\install\bin;%GITHUB_WORKSPACE%\ws\install\lib;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin" --no-dll "msvcp140.dll;vcomp140.dll" -w wheelhouse "%WHEEL_FILE%"
         if %ERRORLEVEL% GEQ 1 exit 1
-    - name: test
-      shell: cmd
+    - name: stub drift gate
+      shell: bash
       run: |
-        python -m venv test-venv
-        if %errorlevel% neq 0 exit /b %errorlevel%
-        call test-venv\Scripts\activate
-        if %errorlevel% neq 0 exit /b %errorlevel%
+        python -m venv check-venv
+        source check-venv/Scripts/activate
         python -m pip install --upgrade pip
-        for %%I in ("%GITHUB_WORKSPACE%\tesseract_nanobind\wheelhouse\*.whl") do set WHEEL_FILE=%%~I
-        python -m pip install "%WHEEL_FILE%" pytest pytest-xdist pyyaml
-        if %errorlevel% neq 0 exit /b %errorlevel%
-        cd %GITHUB_WORKSPACE%\tesseract_nanobind
-        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
-        if %errorlevel% neq 0 exit /b %errorlevel%
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
+        cd tesseract_nanobind
+        python scripts/generate_stubs.py --check
     - name: archive wheels
-      if: always()
       uses: actions/upload-artifact@v7
       with:
         name: 'python-wheels-win-${{ matrix.config.arch }}'
@@ -253,6 +268,7 @@ jobs:
     - uses: actions/checkout@v6
       with:
         path: tesseract_nanobind
+        fetch-depth: 0  # setuptools-scm derives the version from the tag history
     - uses: actions/setup-python@v6
       id: setup-python
       with:
@@ -323,21 +339,41 @@ jobs:
         # the wheel tag to the minimum macOS of the bundled libraries (Homebrew's libomp is built
         # for the runner's macOS) instead of failing on the mismatch
         DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
-    - name: test
+    - name: stub drift gate
       shell: bash
       run: |
-        ${{ steps.setup-python.outputs.python-path }} -m venv test-venv
-        source test-venv/bin/activate
+        ${{ steps.setup-python.outputs.python-path }} -m venv check-venv
+        source check-venv/bin/activate
         python -m pip install --upgrade pip
-        python -m pip install tesseract_nanobind/wheelhouse/*.whl pytest pytest-xdist pyyaml
+        python -m pip install tesseract_nanobind/wheelhouse/*.whl nanobind==2.12.0
         cd tesseract_nanobind
-        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
+        python scripts/generate_stubs.py --check
+    # upload-artifact intermittently fails on macOS runners with "CreateArtifact: Request
+    # timeout" (actions/upload-artifact#569, #527); a fresh re-invocation usually succeeds.
+    # The last attempt has no continue-on-error, so a real outage still fails the job.
     - name: archive wheels
-      if: always()
+      id: up1
+      continue-on-error: true
       uses: actions/upload-artifact@v7
       with:
         name: 'python-wheels-macos-${{ matrix.config.arch }}'
         path: tesseract_nanobind/wheelhouse/*.whl
+    - name: archive wheels (retry 1)
+      if: steps.up1.outcome == 'failure'
+      id: up2
+      continue-on-error: true
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-macos-${{ matrix.config.arch }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
+        overwrite: true
+    - name: archive wheels (retry 2)
+      if: steps.up1.outcome == 'failure' && steps.up2.outcome == 'failure'
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'python-wheels-macos-${{ matrix.config.arch }}'
+        path: tesseract_nanobind/wheelhouse/*.whl
+        overwrite: true
     - name: archive logs
       if: failure()
       uses: actions/upload-artifact@v7
@@ -346,17 +382,78 @@ jobs:
         path: "**/*.log"
         retention-days: 2
 
-  collect-wheels:
+  test-wheel:
+    # One cp312-abi3 wheel per platform. Pull requests test it on 3.12; other events test every
+    # supported Python before anything can publish.
     needs:
-      - build-win
       - build-ubuntu
+      - build-win
       - build-macos
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { name: linux-x64, runner: ubuntu-24.04 }
+          - { name: linux-arm64, runner: ubuntu-24.04-arm }
+          - { name: win-x64, runner: windows-2022 }
+          - { name: macos-x64, runner: macos-15-intel }
+          - { name: macos-arm64, runner: macos-15 }
+        python: ${{ github.event_name == 'pull_request' && fromJSON('["3.12"]') || fromJSON('["3.12", "3.13", "3.14", "3.15"]') }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - name: fetch the TWC workcell the rail tests load
+      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+    - uses: actions/setup-python@v6
+      id: setup-python
+      with:
+        python-version: ${{ matrix.python }}
+        allow-prereleases: true
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-${{ matrix.platform.name }}
+        path: wheelhouse
+    - name: install wheel
+      run: |
+        python -m venv test-venv
+        if [ -d test-venv/Scripts ]; then source test-venv/Scripts/activate; else source test-venv/bin/activate; fi
+        python -m pip install --upgrade pip
+        python -m pip install wheelhouse/*.whl pytest pytest-xdist pyyaml
+    - name: wheel bundles no libstdc++
+      # gh-119: two libstdc++ copies in one process corrupt the heap; auditwheel never bundles it
+      if: runner.os == 'Linux'
+      run: |
+        source test-venv/bin/activate
+        if python -m pip show -f tesseract-robotics-nanobind | grep -q 'libstdc++'; then
+          echo "::error::wheel bundles libstdc++ (gh-119)"; exit 1
+        fi
+    - name: smoke test
+      run: |
+        if [ -d test-venv/Scripts ]; then source test-venv/Scripts/activate; else source test-venv/bin/activate; fi
+        python -c "import tesseract_robotics; print('Version:', tesseract_robotics.__version__)"
+        python -c "from tesseract_robotics import tesseract_collision, tesseract_kinematics, tesseract_task_composer"
+    - name: run tests
+      env:
+        TWC_SUPPORT_PATH: ${{ github.workspace }}/tesseract_nanobind/ws/src/tesseract_ros_workcell/twc_support
+      run: |
+        if [ -d test-venv/Scripts ]; then source test-venv/Scripts/activate; else source test-venv/bin/activate; fi
+        cd tesseract_nanobind
+        python -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks
+
+  collect-wheels:
+    needs: test-wheel
     runs-on: ubuntu-24.04
     steps:
     - name: Download CI artifacts
       uses: actions/download-artifact@v8
       with:
-        pattern: python-wheels-*
+        pattern: python-wheels-*-*
         path: artifacts
         merge-multiple: true
     - name: archive wheels
@@ -364,3 +461,31 @@ jobs:
       with:
         name: 'python-wheels-all'
         path: artifacts/*.whl
+
+  publish:
+    # PyPI trusted publishing: the PyPI project must list this workflow (wheels.yml) and the
+    # `pypi` environment as a trusted publisher
+    needs: test-wheel
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@v8
+      with:
+        pattern: python-wheels-*-*
+        path: dist
+        merge-multiple: true
+    - name: List wheels
+      run: ls -la dist/
+    - name: assert wheel version == tag
+      run: |
+        for whl in dist/*.whl; do
+          v=$(basename "$whl" | cut -d- -f2)
+          [ "$v" = "$GITHUB_REF_NAME" ] || { echo "::error::$whl is version $v, expected tag $GITHUB_REF_NAME"; exit 1; }
+        done
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        skip-existing: true
