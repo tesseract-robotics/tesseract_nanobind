@@ -19,9 +19,27 @@ TESSERACT_TASK_COMPOSER_PLUGINS), so the copies the wheel bundles are the ones l
 from __future__ import annotations
 
 import os
+import sys
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files
 from pathlib import Path
+
+
+def _tesseract_dll_path_() -> None:
+    """Windows: add the directories in TESSERACT_PYTHON_DLL_PATH to the DLL search path.
+
+    Opt-in, as in the tesseract_python (SWIG) bindings: for a build whose tesseract DLLs live
+    outside the package. A wheel needs nothing; delvewheel adds its bundled DLL directory.
+    """
+    if sys.platform == "win32":
+        dll_path = os.environ.get("TESSERACT_PYTHON_DLL_PATH")
+        if dll_path:
+            for p in filter(None, dll_path.split(os.pathsep)):
+                os.add_dll_directory(p)  # type: ignore[attr-defined]
+
+
+_tesseract_dll_path_()
+del _tesseract_dll_path_
 
 try:
     __version__ = version("tesseract-robotics-nanobind")

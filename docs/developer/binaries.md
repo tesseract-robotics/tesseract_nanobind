@@ -250,6 +250,9 @@ search paths. Data is found through functions the caller uses explicitly:
   directory (or the pixi env's `share/`), to pass to
   `GeneralResourceLocator(paths=[...])` or `addPath()`; `get_tesseract_support_path()` is its
   `tesseract/support/`. Without either it raises `SupportDataNotFoundError`.
+- **Windows DLLs.** A wheel needs nothing: delvewheel adds its bundled DLL directory. For a
+  build whose tesseract DLLs live elsewhere, `TESSERACT_PYTHON_DLL_PATH` (as in the
+  tesseract_python bindings) lists directories the import passes to `os.add_dll_directory`.
 - **Plugins.** Nothing to configure: importing the collision, kinematics or task composer
   module registers its factories through the anchors. These are the one environment change, made
   by boost_plugin_loader in C++ (`TESSERACT_*_PLUGINS`), which its loaders read.
