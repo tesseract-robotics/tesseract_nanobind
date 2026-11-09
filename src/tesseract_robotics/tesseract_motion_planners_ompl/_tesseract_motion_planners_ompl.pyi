@@ -11,6 +11,12 @@ import tesseract_robotics.tesseract_motion_planners._tesseract_motion_planners
 class OMPLObjectiveReturnTypeError(TypeError):
     pass
 
+class OMPLStateCostError(TypeError):
+    pass
+
+class OMPLStateSpaceTypeError(TypeError):
+    pass
+
 class SpaceInformation:
     """
     The planning problem's OMPL space information (opaque). The objectives are built on it.
@@ -57,6 +63,15 @@ class MechanicalWorkOptimizationObjective(OptimizationObjective):
     """Mechanical work along the path, plus a small path-length term"""
 
     def __init__(self, si: SpaceInformation, path_length_weight: float = 1e-05) -> None: ...
+
+class StateCostIntegralObjective(OptimizationObjective):
+    """
+    Integral of a per-state cost along the path. Subclass it and override stateCost(self, values) -> float, where values holds the state's joint positions (rad or m per joint); the planner's thread takes the GIL for every call. Without an override the cost of every state is 1, so the integral is path length.
+    """
+
+    def __init__(self, si: SpaceInformation, enable_motion_cost_interpolation: bool = False) -> None: ...
+
+    def isMotionCostInterpolationEnabled(self) -> bool: ...
 
 class MultiOptimizationObjective(OptimizationObjective):
     """Weighted sum of objectives"""
