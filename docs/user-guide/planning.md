@@ -168,10 +168,12 @@ Register the instance under `OMPL_DEFAULT_NAMESPACE` like any OMPL profile.
 | `MaximizeMinClearanceObjective` | maximise the smallest clearance along the path |
 | `MechanicalWorkOptimizationObjective` | mechanical work, plus a small path-length term |
 | `MultiOptimizationObjective` | weighted sum: `addObjective(objective, weight)` |
+| `StateCostIntegralObjective` | integral of a per-state cost; subclass it to price states in Python |
 
 The override may return `None` for no objective; anything else that is not an
-`OptimizationObjective` raises `OMPLObjectiveReturnTypeError` from `solve`. Objectives
-cannot be subclassed in Python.
+`OptimizationObjective` raises `OMPLObjectiveReturnTypeError` from `solve`, and a Python
+error raised in it propagates from `solve` as itself. Of the objectives, only
+`StateCostIntegralObjective` can be subclassed in Python (see below).
 
 Measured on `freespace_clearance_objective_example.py` (the KUKA IIWA sweeps joint_a1
 from -1.2 to 1.2 rad through six rotated cubes; `FreespaceIfoptPipeline`, two RRTConnect
@@ -188,6 +190,75 @@ solve alone returns in 0.2 s against 3.0 s for the default objective at
     clearance-weighted objective therefore optimizes path length alone until upstream
     reports clearance. Ending the loop on cost convergence (no improvement over the last
     `k` solutions) needs an upstream `OMPLSolverConfig` option, also tracked in #362.
+
+#### A per-state cost in Python
+
+`StateCostIntegralObjective` prices each state with `stateCost` and integrates the cost
+along each motion: the mean of the two end states' costs times the motion's length, or the
+sum over `validSegmentCount` sub-motions with `enable_motion_cost_interpolation=True`.
+Without an override every state costs 1, so the integral is path length. Override
+`stateCost(self, values) -> float` to price states in Python. `values` is a copy of the
+state's joint positions (rad, or m for a prismatic joint, in the group's joint order).
+Until tesseract's validators report clearance, this is the way to price clearance.
+
+```python
+from tesseract_robotics.tesseract_motion_planners_ompl import (
+    Cost,
+    OMPLRealVectorMoveProfile,
+    StateCostIntegralObjective,
+)
+
+
+class AvoidJointA1Extremes(StateCostIntegralObjective):
+    def stateCost(self, values):
+        return 1.0 + values[0] ** 2  # values[0]: joint_a1 (rad)
+
+
+class Profile(OMPLRealVectorMoveProfile):
+    def createOptimizationObjective(self, si, env, manip):
+        objective = AvoidJointA1Extremes(si)
+        objective.setCostThreshold(Cost(6.0))
+        return objective
+```
+
+| Raised | When |
+|---|---|
+| `OMPLStateCostError` (a `TypeError`), from `solve` | `stateCost` returned something other than a `float` (a numpy float qualifies) |
+| `OMPLStateSpaceTypeError` (a `TypeError`), building the subclass | the planning space is not a `RealVectorStateSpace` |
+| the override's own exception, from `solve` | `stateCost` raised on the thread that called `solve` (see the warning below) |
+
+Only the optimize loop prices paths: with `optimize = False` the planner builds no
+objective, so `stateCost` is never called.
+
+What a Python `stateCost` costs, measured with `scripts/bench_state_cost.py`: the sphere
+sweep of `freespace_hybrid_example.py`, one RRTConnect planner on seed 1 (both arms plan the
+same path), an infinite cost threshold (the loop prices the first path once), motion-cost
+interpolation on, 5 processes per arm. Apple M1 Max, Python 3.14, `895ef747` plus this
+change.
+
+| Measure | Value | Source |
+|---|---|---|
+| `stateCost` calls per solve | 517, the same in every seeded run | `bench_state_cost.py`, run 1 |
+| Solve median, C++ `stateCost` | 15.2 ms (14.6 to 16.0) | run 1 |
+| Solve median, Python `stateCost` | 15.2 ms (15.0 to 16.4) | run 1 |
+| Calls per second of solve | 34 097 | run 1 |
+| Extra time per call | not resolved: the medians differ by less than the C++ arm's spread, 1.4 ms / 517 calls = 2.7 µs per call | run 1 |
+| Repeat | medians 16.1 and 16.3 ms, 31 747 calls/s; one C++ run took 29.5 ms, which widens the bound to 26 µs | run 2 |
+
+On this scene the Python calls cost less than the solve's run-to-run noise. A scene whose
+planner prices many more states would resolve the per-call cost; this one does not.
+
+!!! note "Each call takes the GIL"
+    `solve` releases the GIL and every `stateCost` call takes it back. Parallel planners
+    that price states serialise on the GIL while they do, and a slow `stateCost` slows
+    every planner thread.
+
+!!! warning "Optimizing planners: a raising `stateCost` aborts the process"
+    RRTConnect never prices states itself. tesseract's optimize loop does, on the thread
+    that called `solve`, so a Python error reaches the caller. An optimizing planner such
+    as RRT\* prices states inside its own solve, on an OMPL `ParallelPlan` worker thread,
+    and an exception there ends the process (`std::terminate`). Until that is fixed, use a
+    Python `stateCost` with RRTConnect, or make sure it cannot raise.
 
 ### Available OMPL Planners
 

@@ -32,10 +32,12 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLObjectiveReturnTypeError,
     OMPLRealVectorMoveProfile,
+    OMPLStateCostError,
     OptimizationObjective,
     PathLengthOptimizationObjective,
     RRTConnectConfigurator,
     SpaceInformation,
+    StateCostIntegralObjective,
 )
 
 OMPL_NAMESPACE = "OMPLMotionPlannerTask"
@@ -56,6 +58,8 @@ UNREACHABLE_MAX_SOLUTIONS = 1_000_000
 # A threshold-satisfied solve on this scene takes well under 1 s; 2 s is the bound.
 THRESHOLD_SOLVE_BOUND_S = 2.0
 CLEARANCE_WEIGHT = 0.5
+# Joint count of the IIWA's manipulator group: the length of every state stateCost sees.
+IIWA_DOF = 7
 
 
 @pytest.fixture(scope="module")
@@ -185,4 +189,95 @@ def test_override_must_return_an_objective(iiwa_sphere_env):
     profile = Wrong()
     _configure(profile, LONG_PLANNING_TIME_S)
     with pytest.raises(OMPLObjectiveReturnTypeError, match="createOptimizationObjective"):
+        OMPLMotionPlanner(OMPL_NAMESPACE).solve(_request(env, joint_names, profile))
+
+
+class StateCostProfile(OMPLRealVectorMoveProfile):
+    """Returns `make_objective(si)` with a cost threshold every path meets.
+
+    The infinite threshold ends the optimize loop at the first solution, after the
+    planner has priced it with the objective (so `stateCost` runs).
+    """
+
+    def __init__(self, make_objective):
+        super().__init__()
+        self.make_objective = make_objective
+        self.objective = None
+
+    def createOptimizationObjective(self, si, env, manip):
+        self.objective = self.make_objective(si)
+        self.objective.setCostThreshold(Cost(math.inf))
+        return self.objective
+
+
+def _solve_state_cost(iiwa_sphere_env, make_objective):
+    env, joint_names = iiwa_sphere_env
+    profile = StateCostProfile(make_objective)
+    _configure(profile, LONG_PLANNING_TIME_S)
+    response = OMPLMotionPlanner(OMPL_NAMESPACE).solve(_request(env, joint_names, profile))
+    return profile, response
+
+
+def test_state_cost_integral_default_is_path_length(iiwa_sphere_env):
+    """Without an override the C++ stateCost (Cost(1)) applies: the integral is path length."""
+    profile, response = _solve_state_cost(iiwa_sphere_env, StateCostIntegralObjective)
+
+    assert response.successful, response.message
+    assert isinstance(profile.objective, OptimizationObjective)
+    assert profile.objective.isMotionCostInterpolationEnabled() is False
+
+
+class CountingStateCost(StateCostIntegralObjective):
+    """stateCost = 1 + joint_a1^2, recording every state it is handed."""
+
+    def __init__(self, si):
+        super().__init__(si)
+        self.calls = 0
+        self.lengths: set[int] = set()
+
+    def stateCost(self, values):
+        self.calls += 1
+        self.lengths.add(len(values))
+        return 1.0 + values[0] ** 2
+
+
+def test_python_state_cost_is_called(iiwa_sphere_env):
+    profile, response = _solve_state_cost(iiwa_sphere_env, CountingStateCost)
+
+    assert response.successful, response.message
+    assert profile.objective.calls > 0
+    assert profile.objective.lengths == {IIWA_DOF}
+
+
+def test_state_cost_wrong_return_raises(iiwa_sphere_env):
+    class WrongReturn(StateCostIntegralObjective):
+        def stateCost(self, values):
+            return "x"
+
+    with pytest.raises(OMPLStateCostError, match="stateCost"):
+        _solve_state_cost(iiwa_sphere_env, WrongReturn)
+
+
+def test_state_cost_exception_propagates(iiwa_sphere_env):
+    """A Python error in stateCost, raised on a planner thread, surfaces from solve (no crash)."""
+
+    class Raises(StateCostIntegralObjective):
+        def stateCost(self, values):
+            raise ZeroDivisionError("state cost")
+
+    with pytest.raises(ZeroDivisionError, match="state cost"):
+        _solve_state_cost(iiwa_sphere_env, Raises)
+
+
+def test_objective_override_exception_propagates(iiwa_sphere_env):
+    """A Python error in createOptimizationObjective surfaces as itself, not as RuntimeError."""
+    env, joint_names = iiwa_sphere_env
+
+    class Raises(OMPLRealVectorMoveProfile):
+        def createOptimizationObjective(self, si, env, manip):
+            raise ZeroDivisionError("objective")
+
+    profile = Raises()
+    _configure(profile, LONG_PLANNING_TIME_S)
+    with pytest.raises(ZeroDivisionError, match="objective"):
         OMPLMotionPlanner(OMPL_NAMESPACE).solve(_request(env, joint_names, profile))

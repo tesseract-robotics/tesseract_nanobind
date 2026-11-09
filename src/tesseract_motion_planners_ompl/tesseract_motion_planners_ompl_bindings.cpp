@@ -38,6 +38,8 @@
 #include <ompl/base/objectives/MaximizeMinClearanceObjective.h>
 #include <ompl/base/objectives/MechanicalWorkOptimizationObjective.h>
 #include <ompl/base/objectives/PathLengthOptimizationObjective.h>
+#include <ompl/base/objectives/StateCostIntegralObjective.h>
+#include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/geometric/SimpleSetup.h>
 
 #include <tesseract/environment/environment.h>
@@ -57,6 +59,53 @@ constexpr double kMechanicalWorkPathLengthWeight = 0.00001;
 // OptimizationObjective (or None).
 struct ObjectiveReturnTypeError : std::invalid_argument {
     using std::invalid_argument::invalid_argument;
+};
+
+// A Python stateCost override returned something other than a float.
+struct StateCostReturnTypeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// A Python stateCost override reads the state as joint values, which needs a
+// RealVectorStateSpace (the space OMPLRealVectorMoveProfile plans in).
+struct StateSpaceTypeError : std::invalid_argument {
+    using std::invalid_argument::invalid_argument;
+};
+
+// Python subclasses of StateCostIntegralObjective override stateCost(values) -> float, where
+// values holds the state's joint positions (an owned copy). The ticket takes the GIL: the
+// planner calls stateCost while pricing paths, with the GIL released by solve, possibly on a
+// planner thread. A Python error propagates as a C++ exception from that call. Without an
+// override the C++ stateCost (Cost(1)) applies, so the integral is path length.
+class PyStateCostIntegralObjective : public ob::StateCostIntegralObjective {
+public:
+    NB_TRAMPOLINE(ob::StateCostIntegralObjective, 1);
+
+    PyStateCostIntegralObjective(const ob::SpaceInformationPtr& si, bool enable_motion_cost_interpolation)
+        : ob::StateCostIntegralObjective(si, enable_motion_cost_interpolation) {
+        if (si->getStateSpace()->getType() != ob::STATE_SPACE_REAL_VECTOR)
+            throw StateSpaceTypeError(
+                "StateCostIntegralObjective.stateCost needs a RealVectorStateSpace; the planning space "
+                "'" + si->getStateSpace()->getName() + "' is not one");
+    }
+
+    ob::Cost stateCost(const ob::State* s) const override {
+        nb::detail::ticket t(nb_trampoline, "stateCost", false);
+        if (!t.key.is_valid())
+            return ob::StateCostIntegralObjective::stateCost(s);
+        const std::size_t dof = si_->getStateDimension();
+        const double* src = s->as<ob::RealVectorStateSpace::StateType>()->values;
+        auto* values = new double[dof];
+        std::copy(src, src + dof, values);
+        nb::capsule owner(values, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+        nb::ndarray<double, nb::numpy, nb::ndim<1>> array(values, { dof }, owner);
+        nb::object result = nb_trampoline.base().attr(t.key)(array);
+        if (!nb::isinstance<nb::float_>(result))
+            throw StateCostReturnTypeError(
+                "StateCostIntegralObjective.stateCost must return a float, not " +
+                std::string(nb::type_name(result.type()).c_str()));
+        return ob::Cost(nb::cast<double>(result));
+    }
 };
 
 // The profile hook returns a unique_ptr, but an objective built in Python is shared with
@@ -159,6 +208,9 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
     nb::module_::import_("tesseract_robotics.tesseract_kinematics._tesseract_kinematics");
 
     nb::exception<ObjectiveReturnTypeError>(m, "OMPLObjectiveReturnTypeError", PyExc_TypeError);
+    nb::exception<StateCostReturnTypeError>(m, "OMPLStateCostError", PyExc_TypeError);
+    nb::exception<StateSpaceTypeError>(m, "OMPLStateSpaceTypeError", PyExc_TypeError);
+    register_python_error_translator();  // createOptimizationObjective and stateCost trampolines
 
     // ========== ompl::base optimization objectives (#362) ==========
     // The types a createOptimizationObjective override builds an objective from. Python
@@ -194,6 +246,15 @@ NB_MODULE(_tesseract_motion_planners_ompl, m) {
     nb::class_<ob::MechanicalWorkOptimizationObjective, ob::OptimizationObjective>(
         m, "MechanicalWorkOptimizationObjective", "Mechanical work along the path, plus a small path-length term")
         .def(nb::init<const ob::SpaceInformationPtr&, double>(), "si"_a, "path_length_weight"_a = kMechanicalWorkPathLengthWeight);
+
+    nb::class_<ob::StateCostIntegralObjective, ob::OptimizationObjective, PyStateCostIntegralObjective>(
+        m, "StateCostIntegralObjective",
+        "Integral of a per-state cost along the path. Subclass it and override "
+        "stateCost(self, values) -> float, where values holds the state's joint positions "
+        "(rad or m per joint); the planner's thread takes the GIL for every call. Without "
+        "an override the cost of every state is 1, so the integral is path length.")
+        .def(nb::init<const ob::SpaceInformationPtr&, bool>(), "si"_a, "enable_motion_cost_interpolation"_a = false)
+        .def("isMotionCostInterpolationEnabled", &ob::StateCostIntegralObjective::isMotionCostInterpolationEnabled);
 
     nb::class_<ob::MultiOptimizationObjective, ob::OptimizationObjective>(m, "MultiOptimizationObjective",
         "Weighted sum of objectives")
