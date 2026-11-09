@@ -237,6 +237,7 @@ install = { cmd = "pip install -e . --no-build-isolation", description = "Instal
 build = { depends-on = [
     "install",
 ], description = "Install bindings against the conda tesseract C++ libs" }
+ompl-seed-report = { cmd = "python scripts/ompl_seed_report.py", description = "Per-seed OMPL/TrajOptIfopt report of the clearance example (#362): JSON and Markdown into build/ompl_seed_report" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
 demo-record = { cmd = "python scripts/demos/record.py", description = "Regenerate the demo recordings into docs/demos/ and update the lock; --only NAME... for some" }
 demo-check = { cmd = "python scripts/demos/check.py", description = "Drive every player in site/ in headless Chrome: play, pause, scrub, orbit, no failed demo request; --url for the deployed site, --preview for entries awaiting review" }

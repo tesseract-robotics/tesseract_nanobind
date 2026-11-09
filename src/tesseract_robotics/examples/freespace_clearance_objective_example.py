@@ -41,6 +41,7 @@ from tesseract_robotics.planning import (
 from tesseract_robotics.planning.composer import PlanningResult
 from tesseract_robotics.planning.profiles import (
     OMPL_DEFAULT_NAMESPACE,
+    TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
     create_freespace_ifopt_pipeline_profiles,
     create_ompl_planner_configurators,
 )
@@ -58,7 +59,11 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     OMPLRealVectorMoveProfile,
     PathLengthOptimizationObjective,
 )
+from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    TrajOptIfoptOSQPSolverProfile,
+)
 from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
+from tesseract_robotics.trajopt_sqp import SQPCallback
 
 PIPELINE = "FreespaceIfoptPipeline"
 PROFILE = "FREESPACE"
@@ -250,23 +255,75 @@ def _scene() -> tuple[Robot, MotionProgram]:
     return robot, program
 
 
-def _profiles(planning_time_s: float, ompl_profile: OMPLRealVectorMoveProfile | None):
+def _profiles(
+    planning_time_s: float,
+    ompl_profile: OMPLRealVectorMoveProfile | None,
+    *,
+    num_planners: int,
+    sqp_callback: SQPCallback | None,
+):
     profiles = create_freespace_ifopt_pipeline_profiles(
-        num_planners=NUM_PLANNERS,
+        num_planners=num_planners,
         planner_range=PLANNER_RANGE_RAD,
         planning_time=planning_time_s,
         max_solutions=UNREACHABLE_MAX_SOLUTIONS,
     )
     add_ifopt_profiles(profiles)
+    if sqp_callback is not None:
+        # The profile helpers' solver profile is a default TrajOptIfoptOSQPSolverProfile; this
+        # one differs from it only in the callback.
+        solver = TrajOptIfoptOSQPSolverProfile()
+        solver.callbacks = [sqp_callback]
+        profiles.addProfile(TRAJOPT_IFOPT_DEFAULT_NAMESPACE, PROFILE, solver)
     if ompl_profile is not None:
         ompl_profile.solver_config.planners = create_ompl_planner_configurators(
-            num_planners=NUM_PLANNERS, range=PLANNER_RANGE_RAD
+            num_planners=num_planners, range=PLANNER_RANGE_RAD
         )
         ompl_profile.solver_config.planning_time = planning_time_s
         ompl_profile.solver_config.max_solutions = UNREACHABLE_MAX_SOLUTIONS
         ompl_profile.solver_config.optimize = True
         profiles.addProfile(OMPL_DEFAULT_NAMESPACE, PROFILE, ompl_profile)
     return profiles
+
+
+def run_case(
+    name: str,
+    ompl_profile: OMPLRealVectorMoveProfile | None,
+    planning_time_s: float,
+    *,
+    composer: TaskComposer,
+    sqp_callback: SQPCallback | None = None,
+    pipeline: str = PIPELINE,
+    num_planners: int = NUM_PLANNERS,
+) -> dict:
+    """Plan the sweep once with `ompl_profile` (None: the default objective).
+
+    Args:
+        name: The case's name, for the printout and errors.
+        ompl_profile: The OMPL move profile, or None for the profile helpers' default.
+        planning_time_s: OMPL `planning_time` (s).
+        composer: Composer to plan with; it must provide `pipeline`.
+        sqp_callback: Registered on the TrajOptIfopt solver profile, if given.
+        pipeline: `FreespaceIfoptPipeline`, or a variant of it with the same nodes.
+        num_planners: Parallel OMPL planners (one plans reproducibly on a seed).
+
+    Returns:
+        dict with `robot`, `result`, `success` and `wall_time_s`.
+
+    Raises:
+        PlanningFailedError: the case did not plan.
+    """
+    robot, program = _scene()
+    profiles = _profiles(
+        planning_time_s, ompl_profile, num_planners=num_planners, sqp_callback=sqp_callback
+    )
+    start = time.perf_counter()
+    result = composer.plan(robot, program, pipeline=pipeline, profiles=profiles)
+    wall_time_s = time.perf_counter() - start
+    print(f"{name:>9}: success={result.successful} wall time {wall_time_s:.2f} s")
+    if not result.successful:
+        raise PlanningFailedError(f"{name} case: {result.message}")
+    return {"robot": robot, "result": result, "success": True, "wall_time_s": wall_time_s}
 
 
 def run(
@@ -300,20 +357,7 @@ def run(
     cases: dict = {}
     threshold_profile = LengthAndClearanceProfile(path_length_threshold_rad)
     for name, ompl_profile in (("default", None), ("threshold", threshold_profile)):
-        robot, program = _scene()
-        profiles = _profiles(planning_time_s, ompl_profile)
-        start = time.perf_counter()
-        result = composer.plan(robot, program, pipeline=PIPELINE, profiles=profiles)
-        wall_time_s = time.perf_counter() - start
-        cases[name] = {
-            "robot": robot,
-            "result": result,
-            "success": result.successful,
-            "wall_time_s": wall_time_s,
-        }
-        print(f"{name:>9}: success={result.successful} wall time {wall_time_s:.2f} s")
-        if not result.successful:
-            raise PlanningFailedError(f"{name} case: {result.message}")
+        cases[name] = run_case(name, ompl_profile, planning_time_s, composer=composer)
 
     cases["objective_calls"] = threshold_profile.objective_calls
     if threshold_profile.objective_calls != 1:

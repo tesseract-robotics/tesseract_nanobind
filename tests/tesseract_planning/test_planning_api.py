@@ -1146,6 +1146,41 @@ class TestTaskComposer:
         assert len(result) > 0
         assert all(type(n) is str for n in result.trajectory[0].joint_names)
 
+    def test_plan_result_keeps_node_infos_and_data_storage(self, robot, composer):
+        """A run's node infos and data storage reach the caller (#362: the per-seed report reads
+        the OMPL node's elapsed time and output program from them)."""
+        joint_names = robot.get_joint_names("manipulator")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+            .move_to(JointTarget([0.3, 0, 0, 0, 0, 0]))
+        )
+
+        result = composer.plan(robot, program, pipeline="OMPLPipeline")
+
+        assert result.successful, result.message
+        ompl = [info for info in result.task_infos if info.name == "OMPLMotionPlannerTask"]
+        assert len(ompl) == 1
+        assert ompl[0].elapsed_time > 0.0
+        assert ompl[0].status_message
+        assert result.data_storage is not None
+        assert result.data_storage.hasKey("environment")
+
+    def test_plan_result_without_a_run_has_no_infos(self, robot, composer):
+        joint_names = robot.get_joint_names("manipulator")
+        program = (
+            MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
+            .set_joint_names(joint_names)
+            .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+        )
+
+        result = composer.plan(robot, program, pipeline="NonexistentPipeline")
+
+        assert not result.successful
+        assert result.task_infos == []
+        assert result.data_storage is None
+
     def test_ompl_pipeline_with_cartesian_targets(self, robot, composer):
         """Test OMPLPipeline execution with Cartesian targets.
 
