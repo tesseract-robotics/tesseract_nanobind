@@ -131,6 +131,80 @@ recording calls too:
     The recording above awaits review and is not yet published. Under heavy machine load
     case 2's TrajOptIfopt stage has taken up to 7.0 s of the 10 s budget.
 
+### Per seed
+
+**Over 10 seeds, the threshold ends OMPL in 0.04 to 0.05 s against 10.8 to 11.2 s for the
+default objective, and TrajOptIfopt brings both cases' final paths to 27 to 51 mm from the
+cubes.** `pixi run ompl-seed-report` plans both cases once per seed, each seed in its own
+process, and writes JSON and this table to `build/ompl_seed_report/`.
+
+It plans with `FreespaceIfoptOMPLOutputPipeline` (`scripts/ompl_seed_report_task_composer.yaml`).
+That is stock `FreespaceIfoptPipeline` except for one key: OMPL hands its program to
+TrajOptIfopt under `ompl_output_data` instead of `output_data`, which TrajOptIfopt overwrote,
+so one run yields both stages' paths. On a fixed seed with one planner its final program is
+bit-identical to stock's (`test_ompl_output_variant_is_bit_identical_to_stock`).
+
+```mermaid
+flowchart LR
+    M[MinLengthTask] -->|output_data| O[OMPLMotionPlannerTask]
+    O -->|"ompl_output_data (stock: output_data)"| T[TrajOptIfoptMotionPlannerTask]
+    T -->|output_data| C[DiscreteContactCheckTask]
+    O -.->|"read after the run: OMPL wall time, OMPL path"| R[ompl_seed_report.py]
+    T -.->|"final path, SQP iterations"| R
+    classDef runtime fill:#ffaa00,stroke:#b37700,color:#000
+    class O,T runtime
+```
+
+N = 10 seeds, commit `9126549d` plus the uncommitted report change, Darwin arm64 (Apple M1
+Max), Python 3.14.10. Clearances are each path's smallest distance to any cube, from the
+example's 0.005 rad scan; the final length is joint-space (sum of the per-step L2 norms).
+
+| seed | case | OMPL (s) | OMPL min clearance (mm) | TrajOptIfopt iterations | TrajOptIfopt status | final min clearance (mm) | final length (rad) | total (s) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | default | 11.05 | 10.0 | 2 | Found valid solution | 51.0 | 2.81 | 12.34 |
+| 1 | threshold | 0.04 | 0.0 | 4 | Found valid solution | 39.9 | 2.79 | 1.43 |
+| 2 | default | 11.05 | 10.1 | 2 | Found valid solution | 39.9 | 2.88 | 12.05 |
+| 2 | threshold | 0.05 | 0.1 | 7 | Found valid solution | 27.8 | 2.77 | 1.46 |
+| 3 | default | 11.08 | 10.0 | 2 | Found valid solution | 26.7 | 2.79 | 12.60 |
+| 3 | threshold | 0.05 | 0.0 | 4 | Found valid solution | 50.3 | 2.79 | 2.37 |
+| 4 | default | 10.76 | 10.0 | 4 | Found valid solution | 29.8 | 2.76 | 12.06 |
+| 4 | threshold | 0.05 | 0.0 | 2 | Found valid solution | 49.2 | 2.89 | 1.34 |
+| 5 | default | 11.12 | 10.0 | 2 | Found valid solution | 38.3 | 2.84 | 12.19 |
+| 5 | threshold | 0.04 | 0.0 | 4 | Found valid solution | 35.5 | 2.79 | 1.54 |
+| 6 | default | 11.05 | 10.1 | 2 | Found valid solution | 44.4 | 2.86 | 12.35 |
+| 6 | threshold | 0.04 | 0.0 | 2 | Found valid solution | 47.3 | 2.90 | 1.28 |
+| 7 | default | 11.07 | 10.0 | 5 | Found valid solution | 39.6 | 2.91 | 12.30 |
+| 7 | threshold | 0.05 | 0.0 | 4 | Found valid solution | 37.1 | 2.98 | 1.49 |
+| 8 | default | 11.19 | 10.0 | 4 | Found valid solution | 43.1 | 2.79 | 12.73 |
+| 8 | threshold | 0.04 | 0.0 | 2 | Found valid solution | 51.0 | 2.96 | 1.36 |
+| 9 | default | 11.12 | 10.0 | 7 | Found valid solution | 37.1 | 2.83 | 12.34 |
+| 9 | threshold | 0.04 | 0.0 | 7 | Found valid solution | 34.7 | 2.73 | 1.59 |
+| 10 | default | 11.21 | 10.0 | 5 | Found valid solution | 32.2 | 2.75 | 12.46 |
+| 10 | threshold | 0.05 | 0.0 | 2 | Found valid solution | 51.0 | 2.91 | 1.27 |
+
+| Claim | Evidence | Source |
+|---|---|---|
+| The default objective's OMPL stage runs to the time cap | 10.8 to 11.2 s at `planning_time = 10`, all 10 seeds | table, OMPL (s) |
+| The threshold ends OMPL at its first path | 0.04 to 0.05 s, all 10 seeds | table, OMPL (s) |
+| TrajOptIfopt takes 2 to 7 SQP iterations in both cases | highest `overall_iteration` its callback saw | table |
+| Both cases end 27 to 51 mm from the cubes | final min clearance; final length 2.73 to 2.98 rad | table |
+| The OMPL paths hug the cubes at their collision margin | default 10.0 to 10.1 mm (margin 10 mm); threshold 0.0007 to 0.094 mm (no margin, see below) | `rows.json` |
+| The report's pipeline plans what stock plans | final program bit-identical to stock `FreespaceIfoptPipeline`'s on seed 1, one planner; stock reproduces itself on the seed | `tests/scripts/test_ompl_seed_report.py` |
+
+!!! warning "The two cases plan OMPL with different collision margins"
+    The profile helpers set the default case's OMPL `contact_manager_config.default_margin`
+    to 0.01 m (`create_ompl_default_profiles`). Case 2's `LengthAndClearanceProfile` is a
+    fresh `OMPLRealVectorMoveProfile`, and the example does not copy the margin to it. So its
+    OMPL paths may graze the cubes (0.0007 to 0.094 mm above), and the cases differ in margin
+    as well as in objective. That confounds the OMPL timing comparison until the example
+    gives both cases the same margin. TrajOptIfopt's own margins push both final paths off
+    the cubes.
+
+!!! note "Termination reason: pending upstream"
+    The table cannot say why OMPL's loop ended. tesseract's planner builds the reason and
+    then reports only "Found valid solution". A termination-reason column follows once the
+    reason is reported upstream (#362).
+
 ## Further reading
 
 - [Optimal planning](https://ompl.kavrakilab.org/optimalPlanning.html): OMPL's overview of

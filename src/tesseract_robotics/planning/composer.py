@@ -49,6 +49,7 @@ from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_wrap_ProfileDictionary,
     TaskComposerDataStorage,
     TaskComposerExecutor,
+    TaskComposerNodeInfo,
     TaskComposerPluginError,
     TaskComposerPluginFactory,
     TaskflowTaskComposerExecutor,
@@ -116,12 +117,18 @@ class PlanningResult:
         message: Status or error message
         trajectory: List of trajectory points (if successful)
         raw_results: Raw CompositeInstruction output
+        task_infos: The run's node infos (name, status_message, elapsed_time, ...), one per
+            node that ran, in no particular order; empty if the pipeline never ran.
+        data_storage: The run's data storage, including each nested pipeline's own storage
+            under its uuid; None if the pipeline never ran.
     """
 
     successful: bool
     message: str = ""
     trajectory: list[TrajectoryPoint] = field(default_factory=list)
     raw_results: CompositeInstruction | None = None
+    task_infos: list[TaskComposerNodeInfo] = field(default_factory=list)
+    data_storage: TaskComposerDataStorage | None = None
 
     def __bool__(self) -> bool:
         """Allow `if result:` checks."""
@@ -549,17 +556,20 @@ class TaskComposer:
             future = self.executor.run(task, task_data)
             future.wait()
 
+            task_infos = future.context.task_infos
+            node_infos = list(task_infos.getInfoMap().values()) if task_infos is not None else []
             if not future.context.isSuccessful():
-                task_infos = future.context.task_infos
                 message = (
-                    _failure_message(
-                        task_infos.getInfoMap().values(),
-                        task_infos.getInfo(task_infos.getAbortingNode()),
-                    )
+                    _failure_message(node_infos, task_infos.getInfo(task_infos.getAbortingNode()))
                     if task_infos is not None
                     else "Planning failed"
                 )
-                return PlanningResult(successful=False, message=message)
+                return PlanningResult(
+                    successful=False,
+                    message=message,
+                    task_infos=node_infos,
+                    data_storage=future.context.data_storage,
+                )
 
             # Extract results
             output_composite = AnyPoly_as_CompositeInstruction(
@@ -573,6 +583,8 @@ class TaskComposer:
                 message="Planning successful",
                 trajectory=trajectory,
                 raw_results=output_composite,
+                task_infos=node_infos,
+                data_storage=future.context.data_storage,
             )
 
         except (TypeError, RuntimeError, ValueError, AttributeError, KeyError) as e:

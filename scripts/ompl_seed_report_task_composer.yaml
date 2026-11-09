@@ -1,0 +1,147 @@
+# FreespaceIfoptPipeline with the OMPL program kept under its own key (#362).
+#
+# Copied from the stock task_composer_plugins.yaml of tesseract-robotics-planning
+# 0.36.0.dev20261014 (tesseract_planning master a648382,
+# share/tesseract_planning/task_composer/config/): its header, FreespaceIfoptTask and
+# FreespaceIfoptPipeline, unchanged except where a line says `# stock: ...`. Stock hands the
+# OMPL program to TrajOptIfopt in place under `output_data`, where TrajOptIfopt overwrites
+# it; here OMPLMotionPlannerTask writes `ompl_output_data` and TrajOptIfoptMotionPlannerTask
+# reads it, so the OMPL program stays in FreespaceIfoptOMPLOutputTask's data storage after
+# the run. tests/scripts/test_ompl_seed_report.py checks that the final program is
+# bit-identical to stock FreespaceIfoptPipeline's on a fixed seed.
+task_composer_plugins:
+  search_paths:
+    - /usr/local/lib
+  search_libraries:
+    - tesseract_task_composer_factories
+    - tesseract_task_composer_planning_factories
+    - tesseract_task_composer_taskflow_factories
+  executors:
+    default: TaskflowExecutor
+    plugins:
+      TaskflowExecutor:
+        class: TaskflowTaskComposerExecutorFactory
+        config:
+          threads: 5
+  tasks:
+    plugins:
+      FreespaceIfoptOMPLOutputTask:  # stock: FreespaceIfoptTask
+        class: PipelineTaskFactory
+        config:
+          conditional: true
+          inputs:
+            program: input_data
+            environment: environment
+            profiles: profiles
+          outputs:
+            program: output_data
+          nodes:
+            DoneTask:
+              class: DoneTaskFactory
+              config:
+                conditional: false
+            ErrorTask:
+              class: ErrorTaskFactory
+              config:
+                conditional: false
+            MinLengthTask:
+              class: MinLengthTaskFactory
+              config:
+                conditional: true
+                inputs:
+                  program: input_data
+                  environment: environment
+                  profiles: profiles
+                outputs:
+                  program: output_data
+            OMPLMotionPlannerTask:
+              class: OMPLMotionPlannerTaskFactory
+              config:
+                conditional: true
+                inputs:
+                  program: output_data
+                  environment: environment
+                  profiles: profiles
+                outputs:
+                  program: ompl_output_data  # stock: output_data
+                format_result_as_input: true
+            TrajOptIfoptMotionPlannerTask:
+              class: TrajOptIfoptMotionPlannerTaskFactory
+              config:
+                conditional: true
+                inputs:
+                  program: ompl_output_data  # stock: output_data
+                  environment: environment
+                  profiles: profiles
+                outputs:
+                  program: output_data
+                format_result_as_input: false
+            DiscreteContactCheckTask:
+              class: DiscreteContactCheckTaskFactory
+              config:
+                conditional: true
+                inputs:
+                  program: output_data
+                  environment: environment
+                  profiles: profiles
+            IterativeSplineParameterizationTask:
+              class: IterativeSplineParameterizationTaskFactory
+              config:
+                conditional: true
+                inputs:
+                  program: output_data
+                  environment: environment
+                  profiles: profiles
+                outputs:
+                  program: output_data
+          edges:
+            - source: MinLengthTask
+              destinations: [ErrorTask, OMPLMotionPlannerTask]
+            - source: OMPLMotionPlannerTask
+              destinations: [ErrorTask, TrajOptIfoptMotionPlannerTask]
+            - source: TrajOptIfoptMotionPlannerTask
+              destinations: [ErrorTask, DiscreteContactCheckTask]
+            - source: DiscreteContactCheckTask
+              destinations: [ErrorTask, IterativeSplineParameterizationTask]
+            - source: IterativeSplineParameterizationTask
+              destinations: [ErrorTask, DoneTask]
+          terminals: [ErrorTask, DoneTask]
+      FreespaceIfoptOMPLOutputPipeline:  # stock: FreespaceIfoptPipeline
+        class: PipelineTaskFactory
+        config:
+          conditional: false
+          inputs:
+            planning_input: planning_input
+            environment: environment
+            profiles: profiles
+          outputs:
+            program: output_data
+          nodes:
+            ProcessInputTask:
+              class: ProcessPlanningInputTaskFactory
+              config:
+                conditional: false
+                inputs:
+                  planning_input: planning_input
+                outputs:
+                  program: input_data
+            FormatInputTask:
+              class: FormatPlanningInputTaskFactory
+              config:
+                conditional: false
+                inputs:
+                  program: input_data
+                  environment: environment
+                outputs:
+                  program: input_data
+            MotionPlanningTask:
+              task: FreespaceIfoptOMPLOutputTask  # stock: FreespaceIfoptTask
+              config:
+                conditional: false
+                abort_terminal: 0
+          edges:
+            - source: ProcessInputTask
+              destinations: [FormatInputTask]
+            - source: FormatInputTask
+              destinations: [MotionPlanningTask]
+          terminals: [MotionPlanningTask]
