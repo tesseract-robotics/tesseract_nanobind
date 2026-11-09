@@ -12,7 +12,13 @@ from types import MappingProxyType
 from audit_ownership import SRC
 from audit_parse import CppSymbol, Kind
 from audit_stub import PyApi, PySymbol, load_stub, py_api, rel
-from audit_types import TypeKey
+from audit_types import (
+    CONVERTED_RECORDS,
+    EIGEN_NAMESPACE,
+    ID_TEMPLATES,
+    STD_NAMESPACES,
+    TypeKey,
+)
 
 
 @functools.cache
@@ -101,6 +107,45 @@ def _unaliased_key(key: TypeKey, unalias: Mapping[str, str]) -> TypeKey:
     if key[0] == "class":
         return ("class", unalias.get(key[1], key[1]))
     return (key[0], *(k if isinstance(k, str) else _unaliased_key(k, unalias) for k in key[1:]))
+
+
+def _keyed_by_leaf(qualified: str) -> bool:
+    """`audit_types.cpp_key` names a C++ parameter of this class `("class", <leaf>)`."""
+    namespace, sep, rest = qualified.partition("::")
+    return (
+        bool(sep and namespace)
+        and namespace not in (*STD_NAMESPACES, EIGEN_NAMESPACE)
+        and qualified not in CONVERTED_RECORDS
+        and rest.rpartition("::")[2] not in ID_TEMPLATES
+    )
+
+
+def _renamed_elsewhere(
+    stub_rel: str, stub_roots: Sequence[Path], bound: BoundLookup
+) -> Mapping[str, str]:
+    """Python name -> C++ leaf of each class another extension under `stub_roots` binds under
+    another name (`PIQPSettings` -> `Settings`, trajopt_sqp's `piqp::Settings<double>`), so a
+    parameter typed by it in this module compares with the C++ parameter keys.
+
+    Only a class `audit_types.cpp_key` keys as `("class", leaf)` counts: not an Eigen or std
+    class (keyed by its Python name or structurally), a converted record, an id template, or a
+    wrapper the binding declares outside any namespace (no header parameter names it). A Python
+    name two extensions bind as different C++ classes is left out: the annotation does not say
+    which one it names.
+    """
+    found: dict[str, set[str]] = {}
+    for root in stub_roots:
+        for stub in _stubs_under(root):
+            if rel(stub) == stub_rel:
+                continue
+            for p, qualified in bound(stub.stem.removeprefix("_")).items():
+                if _keyed_by_leaf(qualified):
+                    found.setdefault(p, set()).add(qualified)
+    return {
+        p: leaf
+        for p, qs in found.items()
+        if len(qs) == 1 and (leaf := next(iter(qs)).rpartition("::")[2]) != p
+    }
 
 
 def _unaliased_api(py: PyApi, unalias: Mapping[str, str]) -> PyApi:

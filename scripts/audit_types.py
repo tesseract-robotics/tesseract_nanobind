@@ -83,6 +83,7 @@ TYPE_PARAMETER_PREFIX = "type-parameter-"  # libclang's spelling of a template p
 # Namespaces of the standard library: libstdc++ declares `std::vector<T>::iterator` as
 # `__gnu_cxx::__normal_iterator`, where libc++ has `std::__1::__wrap_iter`.
 STD_NAMESPACES = frozenset({"std", "__gnu_cxx"})
+EIGEN_NAMESPACE = "Eigen"  # its classes are keyed by `_eigen_key`, not by their leaf
 # A binding may widen a `std::string` file path to `std::filesystem::path` (`str |
 # os.PathLike`): the path annotation covers the string parameter, never the reverse.
 STR_KEY = ("str",)
@@ -203,7 +204,7 @@ def cpp_key(t: ci.Type) -> TypeKey:
     namespace = _top_namespace(decl)
     if namespace in STD_NAMESPACES:
         return _std_key(decl.spelling, t)
-    if namespace == "Eigen":
+    if namespace == EIGEN_NAMESPACE:
         return _eigen_key(decl.spelling, t.get_canonical())
     return ("class", record_path(decl))
 

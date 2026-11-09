@@ -2,8 +2,10 @@
 methods of `DiscreteContactManager` and `ContinuousContactManager`.
 
 Upstream defines each batch call as observably equivalent to the single calls in order
-(discrete_contact_manager.h): an absent id is skipped and reported by a `False` return, never
-silently ignored; `getCollisionObjectsTransform` of an id the manager does not hold raises.
+(discrete_contact_manager.h). An id the manager does not hold is skipped: `removeCollisionObjects`
+and `setCollisionObjectsEnabled` report it by a `False` return; `setCollisionObjectsTransform`
+returns nothing, so there the skip is silent. An id missing from a transform map raises, and so
+does `getCollisionObjectsTransform` of an id the manager does not hold.
 """
 
 import gc
@@ -168,6 +170,85 @@ def test_batch_unknown_name(make_manager):
         manager.getCollisionObjectsTransform("missing")
     with pytest.raises(IndexError):
         manager.setCollisionObjectsTransform(["missing"], {NAMES[1]: _pose(0.0)})
+
+
+# The two id containers of the (ids, state0, state1) cast overloads
+CAST_IDS = {"list": list, "set": lambda names: {LinkId(name) for name in names}}
+
+
+@pytest.fixture
+def cast_manager():
+    """A Bullet cast manager holding the three boxes, placed; box_a and box_b can move."""
+    factory, _locator = _get_discrete_factory()
+    manager = factory.createContinuousContactManager("BulletCastBVHManager")
+    assert manager.addCollisionObjects(_specs())
+    manager.setActiveCollisionObjects(list(NAMES[:2]))
+    manager.setCollisionMarginData(CollisionMarginData(MARGIN))
+    _place(manager, NAMES[:2], X_POSITIONS[:2])
+    manager.setCollisionObjectsTransform(NAMES[2], _pose(X_POSITIONS[2]))
+    yield manager
+    del manager
+    gc.collect()
+
+
+def _cast_contact_pairs(manager) -> list[tuple[str, str]]:
+    result = ContactResultMap()
+    manager.contactTest(result, ContactRequest(ContactTestType.ALL))
+    return sorted(
+        tuple(sorted(link.name() for link in contact.link_ids))
+        for contact in result.flattenCopyResults()
+    )
+
+
+@pytest.mark.parametrize("container", CAST_IDS)
+def test_batch_cast_transform_from_two_maps(cast_manager, container):
+    """state0 is the start pose, state1 the end; an id the batch does not name stays put."""
+    far = 10.0  # m: clear of every box
+    ids = CAST_IDS[container](NAMES[:2])
+    state0 = {NAMES[0]: _pose(far), NAMES[1]: _pose(2 * far), NAMES[2]: _pose(3 * far)}
+
+    # box_a ends on box_c, so only the end pose in state1 can produce this contact
+    state1 = {NAMES[0]: _pose(X_POSITIONS[2]), NAMES[1]: _pose(2 * far), NAMES[2]: _pose(3 * far)}
+    cast_manager.setCollisionObjectsTransform(ids, state0, state1)
+    assert _cast_contact_pairs(cast_manager) == [(NAMES[0], NAMES[2])]
+    for name, x in zip(NAMES, (far, 2 * far, X_POSITIONS[2])):
+        np.testing.assert_allclose(
+            cast_manager.getCollisionObjectsTransform(name).matrix, _pose(x).matrix
+        )
+
+    # the same start with an end that stays clear: no sweep reaches box_c
+    cast_manager.setCollisionObjectsTransform(ids, state0, state0)
+    assert _cast_contact_pairs(cast_manager) == []
+
+
+@pytest.mark.parametrize("container", CAST_IDS)
+@pytest.mark.parametrize("lacking", ["state0", "state1"])
+def test_batch_cast_transform_lacking_id_raises_and_moves_nothing(cast_manager, container, lacking):
+    """Upstream gathers both maps before it moves anything: IndexError, every pose unchanged."""
+    ids = CAST_IDS[container](NAMES[:2])
+    states = {key: {name: _pose(7.0) for name in NAMES[:2]} for key in ("state0", "state1")}
+    # The second id: an implementation moving as it goes has already moved the first.
+    del states[lacking][NAMES[1]]
+    with pytest.raises(IndexError):
+        cast_manager.setCollisionObjectsTransform(ids, states["state0"], states["state1"])
+    for name, x in zip(NAMES, X_POSITIONS):
+        np.testing.assert_allclose(
+            cast_manager.getCollisionObjectsTransform(name).matrix, _pose(x).matrix
+        )
+
+
+@pytest.mark.parametrize("container", CAST_IDS)
+def test_batch_cast_transform_skips_an_id_the_manager_does_not_hold(cast_manager, container):
+    """Both maps name it, the manager does not hold it: no error, and the held id still moves."""
+    moved = 7.0  # m: clear of every box
+    absent = "missing"
+    state = {NAMES[0]: _pose(moved), absent: _pose(moved)}
+    ids = CAST_IDS[container]([NAMES[0], absent])
+    assert cast_manager.setCollisionObjectsTransform(ids, state, state) is None
+    assert not cast_manager.hasCollisionObject(absent)
+    np.testing.assert_allclose(
+        cast_manager.getCollisionObjectsTransform(NAMES[0]).matrix, _pose(moved).matrix
+    )
 
 
 def test_batch_duplicate_add_last_entry_wins(make_manager):

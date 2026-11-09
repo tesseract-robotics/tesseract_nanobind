@@ -18,6 +18,7 @@ from audit_lookup import (
     _inherited_from_bound,
     _py_member,
     _renamed,
+    _renamed_elsewhere,
     _same_class,
     _stub_base,
     _unaliased_api,
@@ -488,8 +489,13 @@ def match(
     }
     unalias = {p: c for c, p in alias.items()}
     # Parameter types name classes as C++ does; `cpp_key` already names an id instance as Python.
+    # A class another extension renames counts in parameter keys only (`alias` and `unalias`
+    # drive member lookup), unless this module binds that Python name itself.
+    own = bound(module)
+    elsewhere_renamed = _renamed_elsewhere(stub_rel, stub_roots, bound)
+    param_unalias = {p: c for p, c in elsewhere_renamed.items() if p not in own} | unalias
     py = _unaliased_api(
-        py, {p: c for p, c in unalias.items() if p not in audit_types.ID_INSTANCES.values()}
+        py, {p: c for p, c in param_unalias.items() if p not in audit_types.ID_INSTANCES.values()}
     )
     # Top-level classes this stub lacks but another extension binds: their members are
     # compared against that extension's stub (#232). An own rename wins over a leaf hit there.

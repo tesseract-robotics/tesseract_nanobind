@@ -176,10 +176,19 @@ error raised in it propagates from `solve` as itself. Of the objectives, only
 `StateCostIntegralObjective` can be subclassed in Python (see below).
 
 Measured on `freespace_clearance_objective_example.py` (the KUKA IIWA sweeps joint_a1
-from -1.2 to 1.2 rad through six rotated cubes; `FreespaceIfoptPipeline`, two RRTConnect
+from -1.2 to 1.2 rad through six rotated cubes; `FreespaceIfoptOMPLOutputPipeline`, the report's copy of
+`FreespaceIfoptPipeline` that also keeps OMPL's program; two RRTConnect
 planners, no solution-count exit, `planning_time = 10`, the profile helpers' default;
-osx-arm64, three runs): the default objective took 13.2 to 13.9 s end to end, the 4.0 rad
-threshold 1.7 to 2.1 s. The first paths RRTConnect finds there are 3.3 to 3.7 rad long.
+osx-arm64, one run of 10 seeds, both cases at the helpers' 10 mm OMPL collision margin): the default
+objective took 12.11 to 13.83 s end to end, the 4.0 rad threshold 1.27 to 2.26 s
+([per-seed table](../examples/ompl.md#per-seed); timings are load-sensitive). The first path
+RRTConnect finds there usually meets the threshold already, so the loop usually ends at the
+first solution. With one planner (reproducible on a seed, `pixi run ompl-first-path-probe`)
+that solution is the path `optimize = False` returns on 4 of 5 seeds; on the fifth the
+first path is 4.21 rad, and the planner re-solved and found a 3.95 rad path, which ended the loop.
+With the example's two planners (seeds 1 to 3, both modes) 1 of 42 runs differed from its
+seed's usual path: one `optimize = False` run on seed 3 was longer, 3.64 rad against 3.57
+rad. The planners' race is the inferred cause; 36 repeats did not reproduce it.
 On the sphere sweep of `freespace_hybrid_example.py`, with an infinite threshold the OMPL
 solve alone returns in 0.2 s against 3.0 s for the default objective at
 `planning_time = 3` (`tests/tesseract_motion_planners/test_ompl_objective.py`).
@@ -187,9 +196,7 @@ solve alone returns in 0.2 s against 3.0 s for the default objective at
 !!! warning "Clearance is not reported on this stack"
     tesseract's OMPL state validators do not implement `clearance()`, so OMPL's default,
     0, applies to every state and `MaximizeMinClearanceObjective` adds a constant. A
-    clearance-weighted objective therefore optimizes path length alone until upstream
-    reports clearance. Ending the loop on cost convergence (no improvement over the last
-    `k` solutions) needs an upstream `OMPLSolverConfig` option, also tracked in #362.
+    clearance-weighted objective therefore optimizes path length alone.
 
 #### A per-state cost in Python
 
@@ -199,7 +206,7 @@ sum over `validSegmentCount` sub-motions with `enable_motion_cost_interpolation=
 Without an override every state costs 1, so the integral is path length. Override
 `stateCost(self, values) -> float` to price states in Python. `values` is a copy of the
 state's joint positions (rad, or m for a prismatic joint, in the group's joint order).
-Until tesseract's validators report clearance, this is the way to price clearance.
+tesseract's validators report no clearance, so this is the way to price clearance.
 
 ```python
 from tesseract_robotics.tesseract_motion_planners_ompl import (
@@ -257,8 +264,8 @@ planner prices many more states would resolve the per-call cost; this one does n
     RRTConnect never prices states itself. tesseract's optimize loop does, on the thread
     that called `solve`, so a Python error reaches the caller. An optimizing planner such
     as RRT\* prices states inside its own solve, on an OMPL `ParallelPlan` worker thread,
-    and an exception there ends the process (`std::terminate`). Until that is fixed, use a
-    Python `stateCost` with RRTConnect, or make sure it cannot raise.
+    and an exception there ends the process (`std::terminate`). Use a Python `stateCost`
+    with RRTConnect, or make sure it cannot raise.
 
 ### Available OMPL Planners
 

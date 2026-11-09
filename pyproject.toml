@@ -131,7 +131,9 @@ exclude = ["tests/audit/fixtures/"]
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-extend-exclude = ["*.pyi"] # auto-generated stubs have C++ type strings
+# auto-generated stubs have C++ type strings; upstream/ and packaging/ are other projects'
+# submodules, linted by their own repos (a checked-out submodule otherwise fails `pixi run lint`)
+extend-exclude = ["*.pyi", "upstream/", "packaging/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"] # errors, pyflakes, isort, pyupgrade
@@ -237,6 +239,7 @@ install = { cmd = "pip install -e . --no-build-isolation", description = "Instal
 build = { depends-on = [
     "install",
 ], description = "Install bindings against the conda tesseract C++ libs" }
+ompl-first-path-probe = { cmd = "python scripts/ompl_first_path_probe.py", description = "OMPL path of the clearance example's threshold case against its first path (#362)" }
 ompl-seed-report = { cmd = "python scripts/ompl_seed_report.py", description = "Per-seed OMPL/TrajOptIfopt report of the clearance example (#362): JSON and Markdown into build/ompl_seed_report" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
 demo-record = { cmd = "python scripts/demos/record.py", description = "Regenerate the demo recordings into docs/demos/ and update the lock; --only NAME... for some" }

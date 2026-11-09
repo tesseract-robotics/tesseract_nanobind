@@ -192,6 +192,8 @@ LOOKUP = {
     "_inherited_from_bound",
     # G3 Task 10: renamed classes in parameter types.
     "_unaliased_key", "_unaliased_api",
+    # #373: classes another extension renames, in parameter types.
+    "_renamed_elsewhere", "_keyed_by_leaf",
 }  # fmt: skip
 
 

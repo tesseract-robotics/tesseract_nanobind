@@ -533,8 +533,9 @@ def createSignedDistanceField(sdf: Callable, domain_min: Annotated[NDArray[numpy
     2. Every evaluation takes the GIL, and the collision backends call getDistance() once per
        sample point. contactTest releases the GIL precisely so trajectory sweeps can run in
        parallel; a lazy field re-acquires it per query, serializing that work back against the
-       interpreter. Call discretize() before handing the field to a contact manager - after that
-       the sampler is never invoked again and the field behaves like pure data.
+       interpreter. discretize() does not change that: it fills the grid for serialization and
+       comparison, and getDistance() still calls sdf, taking the GIL, every time. For pure data use
+       createDiscreteSignedDistanceField.
     3. The field references sdf (and so its __globals__), so storing it in a module-level global
        forms a reference cycle the garbage collector cannot see through - drop the field
        explicitly or keep it out of module scope.

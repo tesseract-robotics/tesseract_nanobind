@@ -9,6 +9,7 @@ Markers:
 
 import importlib
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -969,6 +970,120 @@ def test_freespace_hybrid_ifopt_example():
 def test_freespace_clearance_objective_example():
     """The example checks its own claims (timing, objective use, clearances) and raises if one fails."""
     tesseract_robotics.examples.freespace_clearance_objective_example()
+
+
+# Canned node times (s) for the clearance example's loop checks; nothing here is measured.
+LOOP_CHECK_CAP_S = 10.0
+LOOP_CHECK_INSIDE_CAP_S = 0.1
+LOOP_CHECK_PAST_CAP_S = 12.0
+# Far past the cap: the time another node took, as on a loaded machine.
+LOOP_CHECK_OTHER_NODE_S = 30.0
+
+
+def _clearance_example():
+    return importlib.import_module(
+        "tesseract_robotics.examples.freespace_clearance_objective_example"
+    )
+
+
+def _canned_plan(ompl_s):
+    """A result whose infos hold the OMPL node at `ompl_s` and a slower TrajOptIfopt node."""
+    from tesseract_robotics.planning.composer import PlanningResult
+
+    return PlanningResult(
+        successful=True,
+        task_infos=[
+            SimpleNamespace(name=_clearance_example().OMPL_NODE, elapsed_time=ompl_s),
+            SimpleNamespace(
+                name="TrajOptIfoptMotionPlannerTask", elapsed_time=LOOP_CHECK_OTHER_NODE_S
+            ),
+        ],
+    )
+
+
+@pytest.mark.parametrize("default_s", [LOOP_CHECK_CAP_S, LOOP_CHECK_PAST_CAP_S])
+def test_clearance_loop_checks_pass_on_the_ompl_nodes_time(default_s):
+    """Another node's time, past the cap in both cases, changes neither verdict."""
+    _clearance_example().check_loop_exits(
+        _canned_plan(default_s), _canned_plan(LOOP_CHECK_INSIDE_CAP_S), LOOP_CHECK_CAP_S
+    )
+
+
+def test_clearance_default_check_judges_the_ompl_node():
+    ex = _clearance_example()
+    with pytest.raises(ex.DefaultEndedEarlyError):
+        ex.check_loop_exits(
+            _canned_plan(LOOP_CHECK_INSIDE_CAP_S),
+            _canned_plan(LOOP_CHECK_INSIDE_CAP_S),
+            LOOP_CHECK_CAP_S,
+        )
+
+
+@pytest.mark.parametrize("threshold_s", [LOOP_CHECK_CAP_S, LOOP_CHECK_PAST_CAP_S])
+def test_clearance_threshold_check_judges_the_ompl_node(threshold_s):
+    ex = _clearance_example()
+    with pytest.raises(ex.ThresholdDidNotEndLoopError):
+        ex.check_loop_exits(
+            _canned_plan(LOOP_CHECK_PAST_CAP_S), _canned_plan(threshold_s), LOOP_CHECK_CAP_S
+        )
+
+
+@pytest.mark.parametrize(
+    ("default_s", "threshold_s", "error"),
+    [
+        (LOOP_CHECK_INSIDE_CAP_S, LOOP_CHECK_INSIDE_CAP_S, "DefaultEndedEarlyError"),
+        (LOOP_CHECK_PAST_CAP_S, LOOP_CHECK_PAST_CAP_S, "ThresholdDidNotEndLoopError"),
+    ],
+)
+def test_clearance_run_applies_the_loop_checks(monkeypatch, default_s, threshold_s, error):
+    """`run()` judges the plans it made: canned plans, nothing planned and no clock read."""
+    ex = _clearance_example()
+    canned = {"default": default_s, "threshold": threshold_s}
+
+    def planned(name, ompl_profile, _planning_time_s, *, composer):
+        if ompl_profile is not None:
+            ompl_profile.objective_calls += 1
+        return {"result": _canned_plan(canned[name])}
+
+    monkeypatch.setattr(ex, "run_case", planned)
+    composer = SimpleNamespace(warmup=lambda _pipelines: None)
+    with pytest.raises(getattr(ex, error)):
+        ex.run(LOOP_CHECK_CAP_S, composer=composer)
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_clearance_node_lookup_needs_exactly_one_info(count):
+    from tesseract_robotics.planning.composer import PlanningResult
+
+    ex = _clearance_example()
+    info = SimpleNamespace(name=ex.OMPL_NODE, elapsed_time=LOOP_CHECK_INSIDE_CAP_S)
+    with pytest.raises(ex.NodeInfoMissingError):
+        ex.node_info(PlanningResult(successful=True, task_infos=[info] * count), ex.OMPL_NODE)
+
+
+def test_freespace_clearance_objective_cases_share_the_ompl_margin():
+    """Both cases' OMPL profiles check states at the profile helpers' collision margin.
+
+    The cases may differ only in the objective: a Python profile starts with no margin, and
+    without the helpers' margin its paths may touch the cubes.
+    """
+    ex = importlib.import_module(
+        "tesseract_robotics.examples.freespace_clearance_objective_example"
+    )
+    from tesseract_robotics.planning.profiles import OMPL_DEFAULT_NAMESPACE
+
+    def ompl_margin(ompl_profile):
+        profiles = ex._profiles(
+            ex.PLANNING_TIME_S, ompl_profile, num_planners=ex.NUM_PLANNERS, sqp_callback=None
+        )
+        (by_name,) = profiles.getAllProfileEntries()[OMPL_DEFAULT_NAMESPACE].values()
+        return by_name[ex.PROFILE].contact_manager_config.default_margin
+
+    default_margin = ompl_margin(None)
+    threshold_margin = ompl_margin(ex.LengthAndClearanceProfile(ex.PATH_LENGTH_THRESHOLD_RAD))
+
+    assert default_margin is not None
+    assert threshold_margin == default_margin
 
 
 @pytest.mark.planning

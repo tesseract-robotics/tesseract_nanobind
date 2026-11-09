@@ -8,6 +8,8 @@ Run in the `audit` env only (libclang): `pixi run -e audit audit-test`.
 """
 
 import json
+import os
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +18,8 @@ from tests.audit._load import audit
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
 # Open-row tables of a module in `to_json`, with the field that is the row's ledger key.
 OPEN_TABLES = (("gaps", "symbol"), ("deviations", "name"), ("quoted", "annotation"))
+# Path of the findings `audit-bindings --json` wrote (.github/workflows/audit.yml).
+FINDINGS_ENV = "BINDING_AUDIT_JSON"
 
 
 @pytest.fixture(scope="module")
@@ -30,19 +34,89 @@ def _open_rows(modules):
                 yield module, table, row[key], row
 
 
-def test_every_open_row_has_an_outcome_and_every_entry_a_row(ledger):
-    """Both directions on one fresh audit of every audited module (one regeneration per run)."""
-    cov = audit.coverage()
-    reports = [audit.audit_module(m) for m in cov.audited]
-    modules = json.loads(audit.to_json(reports, PROV, cov, ledger))["modules"]
+def _ledger_debt(modules, ledger):
+    """Both directions in one message, empty when there is none: open rows with no outcome,
+    and ledger entries with no open row."""
     rows = list(_open_rows(modules))
     missing = sorted(
         {(m, t, k) for m, t, k, row in rows if row["issue"] is None and row["wont_fix"] is None}
     )
     keys = {(m, k) for m, _, k, _ in rows}
     stale = sorted((m, s) for m, entries in ledger.items() for s in entries if (m, s) not in keys)
-    assert not missing, f"open rows with no issue or won't-fix entry in the ledger: {missing}"
-    assert not stale, f"ledger entries with no open row (fix landed: remove them): {stale}"
+    parts = []
+    if missing:
+        parts.append(f"open rows with no issue or won't-fix entry in the ledger: {missing}")
+    if stale:
+        parts.append(f"ledger entries with no open row (fix landed: remove them): {stale}")
+    return "\n".join(parts)
+
+
+def _audited_modules(ledger):
+    """The findings of `audit-bindings --json` when a job names them, else one fresh audit."""
+    findings = os.environ.get(FINDINGS_ENV)
+    if findings:
+        return json.loads(Path(findings).read_text(encoding="utf-8"))["modules"]
+    cov = audit.coverage()
+    reports = [audit.audit_module(m) for m in cov.audited]
+    return json.loads(audit.to_json(reports, PROV, cov, ledger))["modules"]
+
+
+def test_every_open_row_has_an_outcome_and_every_entry_a_row(ledger):
+    """Both directions on one audit of every audited module (one regeneration per run)."""
+    debt = _ledger_debt(_audited_modules(ledger), ledger)
+    assert not debt, debt
+
+
+def test_ledger_test_reads_the_findings_it_is_pointed_at(tmp_path, monkeypatch):
+    """CI names its one audit's findings: no second audit, and no file is a failure."""
+
+    def audited(_module):
+        pytest.fail("named findings must not be audited again")
+
+    monkeypatch.setattr(audit, "audit_module", audited)
+    report = audit.ModuleReport(
+        module="fixture",
+        covered=0,
+        gaps=[audit.Gap("Open", audit.Kind.CLASS, "tesseract/fixture/a.h:1")],
+        deviations=[],
+        accepted=[],
+        quoted=[],
+    )
+    cov = audit.Coverage(audited=("fixture",), unaudited={}, total=1)
+    findings = tmp_path / "findings.json"
+    findings.write_text(audit.to_json([report], PROV, cov, {}), encoding="utf-8")
+    monkeypatch.setenv(FINDINGS_ENV, str(findings))
+    assert "('fixture', 'gaps', 'Open')" in _ledger_debt(_audited_modules({}), {})
+    monkeypatch.setenv(FINDINGS_ENV, str(tmp_path / "absent.json"))
+    with pytest.raises(FileNotFoundError):
+        _audited_modules({})
+
+
+def test_ledger_debt_names_missing_and_stale_rows_together():
+    """CI shows the whole debt in one failure: open rows with no outcome and entries with no
+    row, not the stale half only after the missing half is paid (#373)."""
+    modules = {
+        "m": {
+            "gaps": [{"symbol": "Open", "issue": None, "wont_fix": None}],
+            "deviations": [{"name": "Settled", "issue": "#1", "wont_fix": None}],
+            "quoted": [],
+        }
+    }
+    ledger = {
+        "m": {
+            "Settled": audit.LedgerEntry(issue="#1", wont_fix=None),
+            "Gone": audit.LedgerEntry(issue=None, wont_fix="Fixed."),
+        }
+    }
+    message = _ledger_debt(modules, ledger)
+    assert "('m', 'gaps', 'Open')" in message
+    assert "('m', 'Gone')" in message
+    assert (
+        _ledger_debt(
+            {"m": {**modules["m"], "gaps": []}}, {"m": {"Settled": ledger["m"]["Settled"]}}
+        )
+        == ""
+    )
 
 
 MALFORMED = {

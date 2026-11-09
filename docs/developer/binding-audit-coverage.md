@@ -1,6 +1,6 @@
 # Binding audit coverage and ownership
 
-All 22 binding modules are audited: the 10 core modules and the 12 planning and trajopt modules (#256). Every open row of the [Binding API Audit](binding-api-audit.md) (a gap, a deviation or a quoted C++ name) has a recorded outcome in `scripts/audit_ledger.json`: an open issue or a won't-fix reason. `tests/audit/test_audit_ledger.py` checks this in both directions on every merge into main. Every other difference between a header and its stub is accepted under one of the 54 named rules below, and each rule's text is printed in the report.
+All 22 binding modules are audited: the 10 core modules and the 12 planning and trajopt modules (#256). Every open row of the [Binding API Audit](binding-api-audit.md) (a gap, a deviation or a quoted C++ name) has a recorded outcome in `scripts/audit_ledger.json`: an open issue or a won't-fix reason. `tests/audit/test_audit_ledger.py` checks this in both directions on every merge into main, on tags and when the workflow is run by hand. It does not run on pull requests. Every other difference between a header and its stub is accepted under one of the 54 named rules below, and each rule's text is printed in the report.
 
 A binding module that is in neither module table fails the run before anything is parsed. A rule-table entry whose rule has no text fails at import. A ledger entry whose row is gone fails the ledger test. Nothing is accepted silently.
 
@@ -28,9 +28,9 @@ flowchart LR
 3. **Stub** (`audit_stub.py_api`): reads the committed `.pyi`, including `@overload`s, `@staticmethod`s and base classes.
 4. **Match** (`audit_match.match`): compares the two APIs symbol by symbol and overload by overload. Each difference becomes a covered row, an accepted row (with its rule), a gap or a deviation.
 5. **Report** (`audit_report.render_markdown`, `to_json`): writes `docs/developer/binding-api-audit.md` with provenance, coverage and per-module tables. Each open row gets an `issue` column read from the ledger.
-6. **Ledger verify** (`test_audit_ledger`): one fresh audit of every audited module. It finds no open row without an outcome and no ledger entry without a row.
+6. **Ledger verify** (`test_audit_ledger`): one audit of every audited module, in CI the findings of `audit-bindings --json`, run on its own a fresh audit. It finds no open row without an outcome and no ledger entry without a row.
 
-Regenerate with `pixi run -e audit audit-bindings` and test with `pixi run -e audit audit-test`. CI runs both on every merge into main and fails if the regenerated report differs from the committed one (provenance line excepted).
+Regenerate with `pixi run -e audit audit-bindings` and test with `pixi run -e audit audit-test`. CI runs both on every merge into main and on tags, and fails if the regenerated report differs from the committed one (provenance line excepted). `.github/workflows/audit.yml` computes the full audit once, last: the contract tests without the ledger row test, the GIL list, then `audit-bindings --json`, whose findings the ledger test below reads (`BINDING_AUDIT_JSON`), then the report check. Nothing runs on a pull request, so nothing here is enforced before merge: a PR's unledgered rows or stale report show up on main after it lands. `workflow_dispatch` runs the audit on a branch by hand.
 
 A stub row names its file, not its line, and a header row keeps its line. Line numbers in the header rows move only when the headers change, which is only on a tesseract bump through `pixi.lock`. The report therefore changes only when a row is added, removed or reclassified, and needs regenerating only after one of these changes:
 
@@ -249,12 +249,14 @@ The report's "Accepted deviation rules" note gives the full text of every rule.
 
 | test | checks |
 |---|---|
-| `test_every_open_row_has_an_outcome_and_every_entry_a_row` | one fresh audit: no `—` row in an audited module, and no stale entry |
+| `test_every_open_row_has_an_outcome_and_every_entry_a_row` | one fresh audit, or the findings named by `BINDING_AUDIT_JSON`: no `—` row in an audited module, and no stale entry; one failure message lists both |
+| `test_ledger_test_reads_the_findings_it_is_pointed_at` | with `BINDING_AUDIT_JSON` set, the findings come from that file and nothing is audited; a missing file raises |
+| `test_ledger_debt_names_missing_and_stale_rows_together` | the message names missing and stale rows together |
 | `test_ledger_entries_are_well_formed` | each malformed shape raises `MalformedLedgerError` |
 | `test_committed_ledger_entries_are_well_formed` | the committed file loads, and each entry has exactly one outcome |
 | `test_issue_column_renders_each_outcome` | Markdown and JSON render `#NNN`, `won't fix:` and `—` |
 
-**A PR that fixes a row removes the row's ledger entry in the same PR.** Once the row is gone, the entry is stale and the first test fails. A PR that adds a row (a new header, a new binding module, an upstream bump) adds the row's outcome in the same PR: file the issue first, or record the won't-fix reason.
+**A PR that fixes a row removes the row's ledger entry in the same PR.** Once the row is gone, the entry is stale and the first test fails. A PR that adds a row (a new header, a new binding module, an upstream bump) adds the row's outcome in the same PR: file the issue first, or record the won't-fix reason. Nothing checks either rule before merge, because no audit runs on a pull request. A PR that breaks one turns main's audit red after it lands, as rows added without an outcome did (#373); run the workflow on the branch by hand to find out first.
 
 ## Adding a rule
 

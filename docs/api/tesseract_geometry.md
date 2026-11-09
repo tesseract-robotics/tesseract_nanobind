@@ -258,18 +258,19 @@ field.getDistance(p)    # exact - calls sphere(p)
 field.discretize()      # materialize the grid up front
 ```
 
-!!! warning "Discretize before using a lazy field for collision"
+!!! warning "Use a discrete field for collision"
     The collision backends call `getDistance()` **once per sample point**, and each call
     re-acquires the GIL. `contactTest` releases the GIL specifically so trajectory sweeps can run
     in parallel across threads; a lazy field hands that parallelism straight back to the
     interpreter. Bullet also transcodes the field into its own grid when the geometry is added to
     a manager, which is one Python call per lattice point.
 
-    `discretize()` up front fixes both — afterwards the sampler is never invoked again and the
-    field behaves like pure data:
+    `discretize()` does not change this: it fills the grid for serialization and comparison, and
+    `getDistance()` still calls the sampler, taking the GIL, every time. For pure data, build the
+    field with `createDiscreteSignedDistanceField`:
 
     ```python
-    field.discretize()          # pay the sampling cost once, under your control
+    field = createDiscreteSignedDistanceField(sphere, lo, hi, dims)
     create_obstacle(robot, name="field", geometry=field)
     ```
 

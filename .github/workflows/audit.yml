@@ -1,8 +1,11 @@
 name: Binding audit
 
 # Runs on a merge into main and on tags only, never on pull requests: a run takes up to an hour,
-# and nearly every binding PR touches its inputs. A stale report or a failing contract test shows
-# up on main, before a release. workflow_dispatch runs it on a branch by hand.
+# and nearly every binding PR touches its inputs. So nothing here is enforced before merge: a PR's
+# unledgered rows, stale report or failing contract test show up on main after it lands, before a
+# release. workflow_dispatch runs it on a branch by hand. The full audit is computed once, last:
+# contract tests without the ledger row test, the GIL list, then the one audit pass, whose findings
+# the ledger test reads and whose report is compared with the committed one.
 on:
   push:
     branches: [main]
@@ -40,20 +43,38 @@ jobs:
         # here instead of silently re-solving to other header versions.
         locked: true
 
-    # tests/audit (fixtures and the real binding TUs): the contract tests of the audit.
+    # tests/audit (fixtures and the real binding TUs): the contract tests of the audit. The ledger
+    # row test audits every module, so it runs below on the one audit pass instead.
     - name: Contract tests
-      run: pixi run -e audit audit-test
+      run: >-
+        pixi run -e audit audit-test
+        --deselect
+        'tests/audit/test_audit_ledger.py::test_every_open_row_has_an_outcome_and_every_entry_a_row'
 
     # Every GIL release is listed, with its reason, in scripts/nogil_entry_points.yaml, and
     # every listed entry point still releases it (#124; docs/developer/threading.md).
     - name: GIL releases match the list
       run: pixi run -e audit audit-gil
 
+    # The one audit pass: writes the report and, for the next step, the findings.
+    - name: Audit
+      id: audit
+      run: pixi run -e audit audit-bindings --json "$RUNNER_TEMP/binding-audit.json"
+
+    # Missing outcomes and stale entries in one message: the whole debt, not half of it.
+    - name: Every open row has an outcome, every entry a row
+      env:
+        BINDING_AUDIT_JSON: ${{ runner.temp }}/binding-audit.json
+      run: >-
+        pixi run -e audit python -m pytest -o addopts='-ra --strict-markers --tb=short'
+        --noconftest
+        'tests/audit/test_audit_ledger.py::test_every_open_row_has_an_outcome_and_every_entry_a_row'
+
     # The committed report must be what the audit generates from this tree. The provenance
     # line carries the stubs' last-commit SHA, which the committed report cannot know (a merge
     # or rebase rewrites it), so that one line is ignored (git diff -I, git >= 2.30); every row
-    # is compared.
+    # is compared. Runs after a ledger failure too, so one run shows both. Only after the audit:
+    # with no regenerated report the diff would compare the committed one with itself and pass.
     - name: Report is current
-      run: |
-        pixi run -e audit audit-bindings
-        git diff --exit-code -I '^tesseract-robotics `' -- docs/developer/binding-api-audit.md
+      if: ${{ !cancelled() && steps.audit.outcome == 'success' }}
+      run: git diff --exit-code -I '^tesseract-robotics `' -- docs/developer/binding-api-audit.md
