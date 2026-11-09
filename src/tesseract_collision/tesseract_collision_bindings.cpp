@@ -602,6 +602,22 @@ NB_MODULE(_tesseract_collision, m) {
         .def("setCollisionObjectsTransform", cast_name, "id"_a, "pose1"_a, "pose2"_a)
         .def("setCollisionObjectsTransform", cast_names, "ids"_a, "pose1"_a, "pose2"_a)
         .def("setCollisionObjectsTransform", cast_maps, "pose1"_a, "pose2"_a)
+        .def("setCollisionObjectsTransform",
+             [](tc::ContinuousContactManager& self, const std::vector<tcommon::LinkId>& ids,
+                const tcommon::LinkIdTransformMap& state0, const tcommon::LinkIdTransformMap& state1) {
+                 self.setCollisionObjectsTransform(ids, state0, state1);
+             },
+             "ids"_a, "state0"_a, "state1"_a,
+             "Cast each id from `state0` to `state1`; raises IndexError, moving nothing, if either map lacks an id. "
+             "An id both maps have and the manager does not hold is skipped, with no error.")
+        .def("setCollisionObjectsTransform",
+             [](tc::ContinuousContactManager& self, const std::unordered_set<tcommon::LinkId>& ids,
+                const tcommon::LinkIdTransformMap& state0, const tcommon::LinkIdTransformMap& state1) {
+                 self.setCollisionObjectsTransform(ids, state0, state1);
+             },
+             "ids"_a, "state0"_a, "state1"_a,
+             "Cast each id from `state0` to `state1`; raises IndexError, moving nothing, if either map lacks an id. "
+             "An id both maps have and the manager does not hold is skipped, with no error.")
         .def("setCollisionObjectsTransformCast", cast_name, "id"_a, "pose1"_a, "pose2"_a)
         .def("setCollisionObjectsTransformCast", cast_names, "ids"_a, "pose1"_a, "pose2"_a)
         .def("setCollisionObjectsTransformCast", cast_maps, "pose1"_a, "pose2"_a)
@@ -632,7 +648,10 @@ NB_MODULE(_tesseract_collision, m) {
 
     // ========== Implicit SDF collision solver (implicit_sdf_collision_solver.h) ==========
     // `distance` / `gradient` may be Python callables; nanobind takes the GIL to call them, so
-    // collideImplicitSDF releases it like contactTest.
+    // collideImplicitSDF releases it like contactTest. It solves on copies: Python can assign a
+    // shape's members during the call, from a callback or another thread, which would destroy the
+    // closures the solver is calling. The copies are made with the GIL held and declared before the
+    // release, so they die after it is re-acquired (copying or dropping a Python callable needs it).
     nb::class_<tc::ImplicitSDFShape>(m, "ImplicitSDFShape",
         "Callback representation of a signed-distance shape in world coordinates.")
         .def(nb::init<>())
@@ -665,12 +684,39 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("normal", &tc::ImplicitSDFContact::normal)
         .def_rw("nearest_points", &tc::ImplicitSDFContact::nearest_points);
 
-    m.def("collideImplicitSDF", &tc::collideImplicitSDF, "shape0"_a, "shape1"_a,
-          "config"_a = tc::ImplicitSDFCollisionConfig{}, nb::call_guard<nb::gil_scoped_release>(),
+    m.def("collideImplicitSDF",
+          [](const tc::ImplicitSDFShape& shape0, const tc::ImplicitSDFShape& shape1,
+             const tc::ImplicitSDFCollisionConfig& config) {
+              const tc::ImplicitSDFShape solved0 = shape0;
+              const tc::ImplicitSDFShape solved1 = shape1;
+              const tc::ImplicitSDFCollisionConfig solved_config = config;
+              nb::gil_scoped_release release;
+              return tc::collideImplicitSDF(solved0, solved1, solved_config);
+          },
+          "shape0"_a, "shape1"_a, "config"_a = tc::ImplicitSDFCollisionConfig{},
           "Contacts between two implicit shapes, within config.contact_margin.");
-    m.def("makeImplicitSDFShape", &tc::makeImplicitSDFShape, "geometry"_a, "pose"_a,
+    // Upstream's SDF closures keep a reference to the geometry, which Python owns. Wrapping both
+    // callables makes every copy hold it, also one taken out of the shape (`d = shape.distance`).
+    // The last copy may die without the GIL: nanobind's shared_ptr deleter takes it to drop the
+    // Python reference. An invalid shape's empty callables stay empty, so isValid() stays False.
+    m.def("makeImplicitSDFShape",
+          [](const std::shared_ptr<const tg::Geometry>& geometry, const Eigen::Isometry3d& pose) {
+              tc::ImplicitSDFShape shape = tc::makeImplicitSDFShape(*geometry, pose);
+              if (shape.distance) {
+                  shape.distance = [geometry, inner = std::move(shape.distance)](const Eigen::Vector3d& point) {
+                      return inner(point);
+                  };
+              }
+              if (shape.gradient) {
+                  shape.gradient = [geometry, inner = std::move(shape.gradient)](const Eigen::Vector3d& point) {
+                      return inner(point);
+                  };
+              }
+              return shape;
+          },
+          "geometry"_a.none(false), "pose"_a,
           "World-coordinate implicit shape of a box, sphere, cylinder, cone, capsule or SDF geometry; "
-          "an invalid shape (isValid() False) for other geometry.");
+          "an invalid shape (isValid() False) for other geometry. The shape's callables keep the geometry alive.");
 
     // ========== ContactManagersPluginFactory ==========
     // Note: PluginLoader copy/move ctors aren't exported from library - cannot use nb::class_.

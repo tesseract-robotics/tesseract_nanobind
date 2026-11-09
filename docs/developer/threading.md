@@ -1,6 +1,6 @@
 # Threading and the GIL
 
-47 bindings release the GIL, each one listed with its reason in
+64 bindings release the GIL, each one listed with its reason in
 [`scripts/nogil_entry_points.yaml`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/scripts/nogil_entry_points.yaml)
 (#124). Every other binding holds the GIL for the whole call. The list is checked, not trusted:
 `pixi run -e audit audit-gil` parses every binding TU and fails CI when a binding and the list
@@ -14,9 +14,9 @@ Second, the plugin factories are slow but can't release the GIL until upstream s
 caches (see [Upstream](#upstream-plugin-factory-caches)).
 
 !!! success "Confirmed"
-    `audit-gil`: 47 releases, all listed. The audit's contract tests (`pixi run -e audit
-    audit-test`), the run-time release tests and the full test suite pass (macOS arm64,
-    Python 3.14, 2026-10-24).
+    `audit-gil`: 64 releases, all listed (macOS arm64, 2026-11-08). The audit's contract tests (`pixi run -e audit
+    audit-test`), the run-time release tests and the full test suite passed at 47 releases
+    (macOS arm64, Python 3.14, 2026-10-24).
 
 !!! warning "Incomplete"
     The `Environment` deadlock fix and the plugin-factory releases are remaining work: see
@@ -39,6 +39,16 @@ Release the GIL around a call only when all three hold:
    while the call held it; after the release, two threads can race on it.
 
 Value types, getters, setters and constructors never qualify.
+
+Whatever the released region reads must stay alive without the GIL. A C++ closure holding a raw
+reference to a Python-owned object breaks this: another thread can drop the object during the
+call. The closure has to hold a `shared_ptr` to it, as `makeImplicitSDFShape`'s callables do.
+
+A released call that reads a Python-assignable member in place races a thread assigning it.
+`collideImplicitSDF` avoids this by copying its shapes and config with the GIL held, before the
+release. Other releases leave it to the caller: assigning `ContactRequest.is_valid` during
+`contactTest` is the caller's race. The other entries have not been checked one by one, so don't
+assign to an argument of a released call while it runs.
 
 ## How to release it
 
@@ -65,7 +75,7 @@ that takes `nb::object`, `nb::handle`, `nb::callable`, `nb::bytes` or `nb::args`
 
 ```mermaid
 flowchart LR
-    subgraph static["Static: every CI run"]
+    subgraph static["Static: audit.yml, on merge to main, on tags, by hand"]
         tu["binding TUs<br/>src/*/*_bindings.cpp"] --> audit["audit_gil.py<br/>(libclang, bodies parsed)"]
         yaml["nogil_entry_points.yaml"] --> audit
         audit -->|"release not listed,<br/>or listed but gone"| fail["CI fails"]

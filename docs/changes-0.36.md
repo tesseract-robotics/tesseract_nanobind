@@ -393,7 +393,7 @@ Additions, not changes: 0.35 code keeps working. Each was a 0.36 API with no bin
 
 | Module | New |
 |---|---|
-| `tesseract_collision` | `CollisionObjectSpec`; `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled`, `getCollisionObjectsTransform`, `setCollisionObjectsTransform(ids, state)` on both managers; `collideImplicitSDF`, `makeImplicitSDFShape` and their types |
+| `tesseract_collision` | `CollisionObjectSpec`; `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled`, `getCollisionObjectsTransform`, `setCollisionObjectsTransform(ids, state)` on both managers; `setCollisionObjectsTransform(ids, state0, state1)` on `ContinuousContactManager`; `collideImplicitSDF`, `makeImplicitSDFShape` and their types |
 | `tesseract_kinematics` | `PositionerSampleResolution`, `gatherJointLimits`, `buildSampleGrid`, `computeChainReachUpperBound` |
 | `tesseract_task_composer` | `schema()` on graphs, pipelines, tasks and the Taskflow executor; `TaskComposerNodePorts.inputSchema` / `outputSchema`; `ValidationError.toString` |
 | `tesseract_common` | `PropertyTree` (YAML as text), `PluginDiscoveryInfo` |

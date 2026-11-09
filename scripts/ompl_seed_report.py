@@ -31,7 +31,6 @@ from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
 from tesseract_robotics.tesseract_task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_as_TaskComposerDataStorage,
-    TaskComposerNodeInfo,
 )
 from tesseract_robotics.trajopt_sqp import SQPCallback
 
@@ -45,7 +44,6 @@ VARIANT_CONFIG = Path(__file__).with_name("ompl_seed_report_task_composer.yaml")
 VARIANT_PIPELINE = "FreespaceIfoptOMPLOutputPipeline"
 # The key the variant's OMPLMotionPlannerTask writes and its TrajOptIfopt task reads.
 OMPL_OUTPUT_KEY = "ompl_output_data"
-OMPL_NODE = "OMPLMotionPlannerTask"
 # The variant's nested pipeline holding the OMPL node; the run stores its data storage under
 # the node's uuid (task_composer_pipeline.cpp).
 MOTION_PLANNING_NODE = "MotionPlanningTask"
@@ -68,10 +66,6 @@ MM_PER_M = 1000.0
 
 class OMPLProgramMissingError(LookupError):
     """No nested data storage of the run holds the OMPL program under `OMPL_OUTPUT_KEY`."""
-
-
-class NodeInfoMissingError(LookupError):
-    """The run has not exactly one info for a node the report reads."""
 
 
 class UnplannedWaypointError(ValueError):
@@ -125,26 +119,14 @@ class SeedRow:
     total_wall_time_s: float
 
 
-def node_info(result: PlanningResult, name: str) -> TaskComposerNodeInfo:
-    """The run's one info for node `name`.
-
-    Raises:
-        NodeInfoMissingError: none, or more than one.
-    """
-    infos = [info for info in result.task_infos if info.name == name]
-    if len(infos) != 1:
-        raise NodeInfoMissingError(f"{len(infos)} infos for node {name!r}, expected 1")
-    return infos[0]
-
-
 def ompl_program(result: PlanningResult) -> CompositeInstruction:
     """The OMPL node's output program, from `MOTION_PLANNING_NODE`'s data storage.
 
     Raises:
         OMPLProgramMissingError: that storage has no `OMPL_OUTPUT_KEY` (a stock pipeline).
-        NodeInfoMissingError: the run has no single `MOTION_PLANNING_NODE`.
+        example.NodeInfoMissingError: the run has no single `MOTION_PLANNING_NODE`.
     """
-    uuid = str(node_info(result, MOTION_PLANNING_NODE).uuid)
+    uuid = str(example.node_info(result, MOTION_PLANNING_NODE).uuid)
     if result.data_storage is None or not result.data_storage.hasKey(uuid):
         raise OMPLProgramMissingError(f"the run stored no data for {MOTION_PLANNING_NODE}")
     nested = AnyPoly_as_TaskComposerDataStorage(result.data_storage.getData(uuid))
@@ -219,10 +201,10 @@ def run_seed(seed: int) -> list[SeedRow]:
             SeedRow(
                 seed=seed,
                 case=name,
-                ompl_wall_time_s=node_info(result, OMPL_NODE).elapsed_time,
+                ompl_wall_time_s=example.node_info(result, example.OMPL_NODE).elapsed_time,
                 ompl_min_clearance_m=min_clearance_m(robot, ompl_points),
                 trajopt_iterations=counter.iterations,
-                trajopt_status=node_info(result, TRAJOPT_NODE).status_message,
+                trajopt_status=example.node_info(result, TRAJOPT_NODE).status_message,
                 final_min_clearance_m=min_clearance_m(robot, result.trajectory),
                 final_length_rad=joint_length_rad([p.positions for p in result.trajectory]),
                 total_wall_time_s=case["wall_time_s"],

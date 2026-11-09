@@ -139,6 +139,12 @@ tesseract_collision:
     setCollisionObjectsTransform: See DiscreteContactManager.setCollisionObjectsTransform.
   ConvexDecomposition:
     compute: VHACD convex decomposition takes seconds per mesh.
+  module:
+    collideImplicitSDF: >-
+      Multi-start descent: many distance and gradient evaluations per call. It solves on copies
+      of the shapes and config, made with the GIL held and destroyed after it is re-acquired, so
+      assigning a shape's members during the call affects only later calls, and the copies keep a
+      shape's geometry alive. A Python distance, gradient or field sampler takes the GIL per call.
 
 tesseract_environment:
   Environment:

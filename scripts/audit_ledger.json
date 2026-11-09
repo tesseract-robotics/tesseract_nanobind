@@ -1,5 +1,8 @@
 {
   "tesseract_collision": {
+    "CollisionObjectSpec.__init__": {
+      "wont_fix": "Spells the C++ aggregate initialization `{id, mask_id, shapes, shape_poses, enabled}`; `shapes` refuses None, as `addCollisionObject` does."
+    },
     "ContactResultMap.find": {
       "wont_fix": "Returns a C++ iterator; `at` and iteration read a result by key."
     },
@@ -30,6 +33,9 @@
     },
     "Isometry3d.compose_each": {
       "wont_fix": "Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart."
+    },
+    "Isometry3d.precompose_each": {
+      "wont_fix": "Python-only batch form for numpy callers over (M, 4, 4) arrays; no C++ counterpart."
     },
     "JointId.__getstate__": {
       "wont_fix": "Pickle support: an id's state is its name."
@@ -94,8 +100,23 @@
     "OrderedIdPair.hash": {
       "wont_fix": "`LinkIdPair.__hash__` is the Python form."
     },
+    "PropertyTree.__contains__": {
+      "wont_fix": "`key in tree` is `find(key) is not None`."
+    },
     "PropertyTree.addValidator": {
       "wont_fix": "Takes a C++ validator that appends to an out-param error list; a schema's validators come from the C++ type that builds it."
+    },
+    "PropertyTree.applyConfig": {
+      "wont_fix": "Takes the config as YAML text in place of the `YAML::Node`, which no Python type converts to; malformed YAML raises `ValueError`."
+    },
+    "PropertyTree.as": {
+      "wont_fix": "Template over the value type; `getValue()` returns the value as YAML text."
+    },
+    "PropertyTree.fromYAML": {
+      "wont_fix": "Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `toYAML` returns text."
+    },
+    "PropertyTree.setValue": {
+      "wont_fix": "Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `getValue` returns text."
     },
     "PropertyTreeBuilder": {
       "wont_fix": "Fluent C++ schema builder; Python reads schemas that C++ types build (`schema()`), it does not author them."
@@ -157,6 +178,12 @@
     "concat": {
       "wont_fix": "numpy covers it."
     },
+    "createList": {
+      "wont_fix": "Builds a schema type string (`T[]`, `T[N]`) for `PropertyTreeBuilder`, which stays C++."
+    },
+    "createMap": {
+      "wont_fix": "Builds a schema type string (`{K,T}`) for `PropertyTreeBuilder`, which stays C++."
+    },
     "emitLogRecord": {
       "wont_fix": "Dispatch behind the `TESSERACT_LOG_*` macros; Python logs through its own logging."
     },
@@ -187,8 +214,14 @@
     "isIdenticalSet": {
       "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
+    "isMapType": {
+      "wont_fix": "Parses a schema `type` string (`{K,T}`); Python `str` covers it."
+    },
     "isNumeric": {
       "wont_fix": "Python `str` covers it."
+    },
+    "isSequenceType": {
+      "wont_fix": "Parses a schema `type` string (`T[N]`); Python `str` covers it."
     },
     "log": {
       "wont_fix": "fmt-format template behind the `TESSERACT_LOG_*` macros; Python logs through its own logging."
@@ -202,14 +235,23 @@
     "ltrim": {
       "wont_fix": "Python `str` covers it."
     },
+    "makePluginInfoContainerSchema": {
+      "wont_fix": "Building block of the C++ types' `schema()`; Python reads the finished schema there."
+    },
     "nameIdHash": {
       "wont_fix": "Hash primitive behind `LinkId.value()`."
+    },
+    "norm_each": {
+      "wont_fix": "Python-only batch form for numpy callers over (M, 3) arrays; no C++ counterpart."
     },
     "numeric_cast": {
       "wont_fix": "No reason recorded (phaseB PE-M3)."
     },
     "operator==": {
       "wont_fix": "Compares `AllowedCollisionEntries`, which Python receives as a dict; dict `==` compares by value."
+    },
+    "orthonormality_residual_each": {
+      "wont_fix": "Python-only batch form of `orthonormality_residual` over (M, 4, 4) arrays; no C++ counterpart."
     },
     "pointersComparison": {
       "wont_fix": "No reason recorded (phaseB PE-M3)."
@@ -229,6 +271,9 @@
     "reorder": {
       "wont_fix": "numpy covers it."
     },
+    "rotation_determinant_each": {
+      "wont_fix": "Python-only batch form of `determinant` over the rotation blocks of (M, 4, 4) arrays; no C++ counterpart."
+    },
     "rtrim": {
       "wont_fix": "Python `str` covers it."
     },
@@ -246,9 +291,6 @@
     },
     "tesseract/common/profile_plugin_factory.h": {
       "wont_fix": "No concrete `ProfileFactory` plugin ships in 0.35.0; revisit when upstream ships one."
-    },
-    "tesseract/common/property_tree.h": {
-      "wont_fix": "`PropertyTree` is bound with YAML as text (#373); `PropertyTreeBuilder`, `PropertyTree.addValidator` and the `YAML::Node` overloads stay C++: a schema is built and validated by the C++ type that owns it (`TaskComposerTask.schema`, …)."
     },
     "tesseract/common/schema_registration.h": {
       "wont_fix": "`YAML::Node` API; no Python type converts to a `YAML::Node`."
@@ -282,6 +324,36 @@
     },
     "JointTrajectory.insert": {
       "wont_fix": "The range form takes iterators; Python calls `insert(index, state)` per state."
+    },
+    "validateContainer": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateCustomType": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateEnum": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateMap": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validatePluginInfo": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateRequired": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateSequence": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateStringLength": {
+      "wont_fix": "Schema validator for `PropertyTree.addValidator`, which stays C++ (it appends to an out-param error list); `validate()` runs a schema's validators."
+    },
+    "validateTypeCast": {
+      "wont_fix": "Validator template for `PropertyTree.addValidator`, which stays C++; `validate()` runs a schema's validators."
+    },
+    "validateTypeCastWithRange": {
+      "wont_fix": "Validator template for `PropertyTree.addValidator`, which stays C++; `validate()` runs a schema's validators."
     }
   },
   "tesseract_environment": {
@@ -373,6 +445,9 @@
     "KinematicGroup.calcInvKinMultiple": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212)"
     },
+    "PositionerSampleResolution.__init__": {
+      "wont_fix": "Spells the C++ aggregate initialization `{name, value, min, max}`; `min` and `max` default to None, the joint's limits."
+    },
     "dampedPInv": {
       "wont_fix": "numpy covers it."
     },
@@ -401,6 +476,14 @@
     },
     "isValidState": {
       "issue": "#333"
+    },
+    "operator==": {
+      "issue": "#393"
+    }
+  },
+  "tesseract_motion_planners_ompl": {
+    "Cost.__float__": {
+      "wont_fix": "Python form of `value()`: `float(cost)` reads the cost."
     }
   },
   "tesseract_scene_graph": {

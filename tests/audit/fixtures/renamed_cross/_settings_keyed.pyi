@@ -1,0 +1,6 @@
+# Audit contract fixture: parameters typed by classes `_settings_owner` binds under names whose
+# C++ key is already the Python name (an Eigen class, a binding-local wrapper).
+import _settings_owner
+
+def place(pose: _settings_owner.OwnerPose) -> None: ...
+def wrap(wrapped: _settings_owner.OwnerWrapped) -> None: ...

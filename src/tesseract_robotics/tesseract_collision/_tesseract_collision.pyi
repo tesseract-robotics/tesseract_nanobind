@@ -709,6 +709,18 @@ class ContinuousContactManager:
     def setCollisionObjectsTransform(self, pose1: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], pose2: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None: ...
 
     @overload
+    def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state0: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], state1: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Cast each id from `state0` to `state1`; raises IndexError, moving nothing, if either map lacks an id. An id both maps have and the manager does not hold is skipped, with no error.
+        """
+
+    @overload
+    def setCollisionObjectsTransform(self, ids: Set[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state0: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d], state1: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
+        """
+        Cast each id from `state0` to `state1`; raises IndexError, moving nothing, if either map lacks an id. An id both maps have and the manager does not hold is skipped, with no error.
+        """
+
+    @overload
     def setCollisionObjectsTransform(self, ids: Sequence[tesseract_robotics.tesseract_common._tesseract_common.LinkId | str], state: Mapping[tesseract_robotics.tesseract_common._tesseract_common.LinkId, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d] | Mapping[str, tesseract_robotics.tesseract_common._tesseract_common.Isometry3d]) -> None:
         """
         Set each id's transform from `state`; raises IndexError if `state` lacks an id.
@@ -888,7 +900,7 @@ def collideImplicitSDF(shape0: ImplicitSDFShape, shape1: ImplicitSDFShape, confi
 
 def makeImplicitSDFShape(geometry: tesseract_robotics.tesseract_geometry._tesseract_geometry.Geometry, pose: tesseract_robotics.tesseract_common._tesseract_common.Isometry3d) -> ImplicitSDFShape:
     """
-    World-coordinate implicit shape of a box, sphere, cylinder, cone, capsule or SDF geometry; an invalid shape (isValid() False) for other geometry.
+    World-coordinate implicit shape of a box, sphere, cylinder, cone, capsule or SDF geometry; an invalid shape (isValid() False) for other geometry. The shape's callables keep the geometry alive.
     """
 
 class ContactManagersPluginFactory:

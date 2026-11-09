@@ -14,9 +14,10 @@ sys.path.insert(0, str(SCRIPTS))
 
 import ompl_seed_report as report  # noqa: E402
 
-# The remap check plans the threshold case with one planner: two parallel planners race, so
-# only a single planner reproduces on a seed (the plan's RNG note). The threshold ends the
-# optimize loop, so the time cap never decides the plan; this cap only bounds a failed run (s).
+# The remap check plans the threshold case with one planner, which reproduces on a seed. With the
+# example's two, 1 of 42 runs differed from its seed's usual path; the planners' race is the
+# inferred cause, and 36 repeats did not reproduce it. The threshold ends the optimize loop, so
+# the time cap never decides the plan; this cap only bounds a failed run (s).
 REMAP_CHECK_SEED = 1
 REMAP_CHECK_PLANNERS = 1
 REMAP_CHECK_PLANNING_TIME_S = 30.0

@@ -53,6 +53,12 @@ DESCARTES_PROFILE_NAMES = ["DEFAULT", "CARTESIAN", "RASTER"]
 TRAJOPT_DEFAULT_NAMESPACE = "TrajOptMotionPlannerTask"
 TRAJOPT_IFOPT_DEFAULT_NAMESPACE = "TrajOptIfoptMotionPlannerTask"
 
+# Collision margin of the OMPL state validity check in create_ompl_default_profiles (m): a
+# state closer than 10 mm to an obstacle is invalid. The TrajOpt margins in this file are 0, 5
+# and 10 mm, so this equals the largest. Enough for OMPL to return paths that are clearly
+# collision-free.
+OMPL_CONTACT_MARGIN_M = 0.01
+
 
 def _create_trajopt_profiles():
     """Create TrajOpt composite and plan profiles with C++ example defaults (internal helper).
@@ -465,10 +471,7 @@ def create_ompl_default_profiles(
     profile.solver_config.optimize = optimize
     profile.solver_config.simplify = simplify
 
-    # Configure collision margin for OMPL state validity check
-    # Use margin of 0.01 (10mm) - smaller than TrajOpt's margin (40mm) but enough
-    # for OMPL to find paths that are clearly collision-free
-    profile.contact_manager_config.default_margin = 0.01
+    profile.contact_manager_config.default_margin = OMPL_CONTACT_MARGIN_M
 
     # Add parallel RRTConnect planners (C++ default is 2)
     profile.solver_config.clearPlanners()

@@ -219,3 +219,80 @@ def test_renamed_enum_k_prefix_enumerators_are_accepted():
         ("Phase.WARM_START", "k-prefix-enumerator"),
         ("Phase.CONVERGED", "k-prefix-enumerator"),
     }
+
+
+# A parameter typed by a class another module binds under another name (#373:
+# `checkPIQPSettings(const piqp::Settings<double>&, ...)` in tesseract_motion_planners, with
+# `piqp::Settings<double>` bound in trajopt_sqp as `PIQPSettings`).
+
+RENAMED_CROSS = FIXTURES / "renamed_cross"
+CROSS_BOUND = {
+    "settings_owner": {
+        "RenamedSettings": "ns::Settings",
+        "Unrelated": "ns::Unrelated",
+        "OwnerPose": "Eigen::Transform",
+        "OwnerWrapped": "VarCheckedConstraint",
+    }
+}
+
+
+def _cross_report(stub_name, bound=CROSS_BOUND):
+    here = "tests/audit/fixtures/renamed_cross/check.h"
+    param = (frozenset({("class", "Settings")}),)
+    cpp = {
+        "check": audit.CppSymbol(
+            "check",
+            audit.Kind.FUNCTION,
+            f"{here}:1",
+            [audit.CppOverload(audit.Arity(1, 1), (), f"{here}:1", params=param)],
+        )
+    }
+    stub = RENAMED_CROSS / f"{stub_name}.pyi"
+    py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
+    return audit.match(
+        stub_name.removeprefix("_"), cpp, frozenset({"check"}), py, audit.rel(stub),
+        stub_roots=(RENAMED_CROSS,), bound=lambda m: bound.get(m, {}),
+    )  # fmt: skip
+
+
+def test_parameter_renamed_in_another_module_matches_its_python_name():
+    report = _cross_report("_settings_user")
+    assert not report.gaps
+    assert not report.deviations
+    assert report.covered == 1
+
+
+def test_parameter_of_another_class_from_that_module_stays_a_gap_and_a_deviation():
+    report = _cross_report("_settings_misuser")
+    assert ("check", "1") in {(g.symbol, g.arity) for g in report.gaps}
+    assert ("check", audit.Kind.OVERLOAD) in {(d.name, d.kind) for d in report.deviations}
+
+
+def test_python_name_two_modules_bind_as_different_classes_is_not_unaliased():
+    """No evidence which class the annotation names: the parameter is not matched."""
+    bound = {**CROSS_BOUND, "settings_rival": {"RenamedSettings": "other::Options"}}
+    report = _cross_report("_settings_user", bound)
+    assert ("check", "1") in {(g.symbol, g.arity) for g in report.gaps}
+
+
+def test_rename_whose_cpp_key_is_the_python_name_is_not_unaliased():
+    """An Eigen class is keyed by its Python name (`Isometry3d`, not `Transform`), and a
+    binding-local wrapper is never a header parameter: both keep the Python name."""
+    here = "tests/audit/fixtures/renamed_cross/keyed.h"
+
+    def fn(name, key):
+        ov = audit.CppOverload(audit.Arity(1, 1), (), f"{here}:1", params=(frozenset({key}),))
+        return audit.CppSymbol(name, audit.Kind.FUNCTION, f"{here}:1", [ov])
+
+    cpp = {
+        "place": fn("place", ("class", "OwnerPose")),
+        "wrap": fn("wrap", ("class", "OwnerWrapped")),
+    }
+    stub = RENAMED_CROSS / "_settings_keyed.pyi"
+    py = audit.py_api(audit.load_stub(stub), audit.rel(stub))
+    report = audit.match(
+        "settings_keyed", cpp, frozenset({"place", "wrap"}), py, audit.rel(stub),
+        stub_roots=(RENAMED_CROSS,), bound=lambda m: CROSS_BOUND.get(m, {}),
+    )  # fmt: skip
+    assert not report.gaps
+    assert not report.deviations
