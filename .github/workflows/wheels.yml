@@ -2,7 +2,7 @@ name: Python Wheels
 
 # Builds, tests and publishes the PyPI wheels the same way the tesseract_python SWIG wheels are
 # built: the tesseract C++ stack is built from source with colcon against vcpkg dependencies on every
-# platform (no conda packages), then the wheel is repaired with auditwheel/delvewheel/delocate. The
+# platform (no conda packages), then the wheel is repaired with auditwheel/delvewheel/batched Mach-O edits. The
 # plugin factories are linked into the extension modules and registered through their anchors
 # (boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv), so the repair tools bundle them like
 # any other dependency and the plugin loaders find the bundled copies by path.
@@ -610,7 +610,7 @@ jobs:
         brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja ccache
     - name: pip3
       run: |
-        python3 -m pip install colcon-common-extensions vcs2l delocate ${{ env.NB_BUILD_REQS }}
+        python3 -m pip install colcon-common-extensions vcs2l ${{ env.NB_BUILD_REQS }}
         python3 tesseract_nanobind/scripts/check_wheel_sources.py
     - name: restore native build artifacts
       id: native_cache
@@ -731,7 +731,7 @@ jobs:
         ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
         ccache --zero-stats
     - name: build wheel
-      id: wheel
+      id: compile_wheel
       working-directory: tesseract_nanobind
       run: |
         VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
@@ -748,14 +748,6 @@ jobs:
           "-Ccmake.define.OpenMP_CXX_FLAGS=-Xpreprocessor -fopenmp" \
           "-Ccmake.define.OpenMP_C_FLAGS=-Xpreprocessor -fopenmp" \
           -Ccmake.define.OpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib
-        # No MACOSX_DEPLOYMENT_TARGET in the environment, as in tesseract_python: delocate raises
-        # the wheel tag to the minimum macOS of the bundled libraries (Homebrew's libomp is built
-        # for the runner's macOS) instead of failing on the mismatch
-        DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
-        # Keep delocate's complete bundle; adjust only OpenMP lookup for pixi consumers.
-        python3 -m wheel unpack wheelhouse/*.whl -d openmp-wheel
-        python3 scripts/configure_wheel_openmp.py openmp-wheel/*
-        python3 -m wheel pack openmp-wheel/* -d wheelhouse
     - name: binding compiler statistics
       if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
       shell: bash
@@ -766,6 +758,15 @@ jobs:
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ${{ steps.compiler_cache.outputs.cache-primary-key }}
+    - name: repair wheel
+      id: wheel
+      working-directory: tesseract_nanobind
+      run: |
+        python3 scripts/repair_macos_wheel.py dist/*.whl \
+          --lib-dir "$GITHUB_WORKSPACE/ws/install/lib" \
+          --lib-dir "$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib" \
+          --lib-dir "${{ matrix.config.brew_prefix }}/opt/libomp/lib" \
+          --out wheelhouse
     - name: support data wheel for the tests
       id: test_wheels
       shell: bash

@@ -45,3 +45,9 @@ Routine PR and branch builds cover Linux x64/ARM64, Windows x64 and macOS ARM64.
 Intel macOS remains enabled on weekly refreshes and release tags; manual builds
 can enable `include-intel-macos`. Its fresh-runner wheel test follows the same
 selection, so routine runs do not wait for an artifact they did not build.
+
+The macOS compile and repair steps are measured separately. Repair uses the
+batched Mach-O implementation from #136, adapted to the vcpkg/plugin-anchor
+layout: one dependency traversal, one edit command and one signature per changed
+image. Plugin YAML stays unchanged; the bundled closure determines the macOS
+wheel tag. Compiler caches are saved before repair.
