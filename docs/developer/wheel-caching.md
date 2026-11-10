@@ -4,6 +4,8 @@ The wheel workflow keeps three reusable layers:
 
 - **vcpkg binary packages:** platform-specific artifacts seed vcpkg's own binary
   cache. vcpkg decides which packages remain compatible after dependency changes.
+  A later test failure or cancellation does not discard completed binary packages
+  from a trusted producer.
 - **Installed native stack:** artifacts contain `ws/install` and `vcpkg/installed`.
   Compatible runs bypass vcpkg and colcon entirely. The runner image, compiler,
   Homebrew runtime versions, original install prefix and native build inputs must

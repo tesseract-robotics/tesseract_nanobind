@@ -188,3 +188,21 @@ def test_successful_workflow_needs_no_extra_job_lookup(monkeypatch):
 
     monkeypatch.setattr(cache, "github_json", unexpected)
     assert cache.platform_succeeded("org/project", {"conclusion": "success"}, "linux-x64")
+
+
+def test_completed_binary_packages_survive_later_job_failure(tmp_path, monkeypatch):
+    cache, output = prepare_discovery(tmp_path, monkeypatch)
+    producer = dict(run(), id=42, conclusion="failure")
+    monkeypatch.setattr(
+        cache,
+        "github_json",
+        lambda endpoint: (
+            {"artifacts": [{"expired": False, "workflow_run": {"id": 42}}]}
+            if "/artifacts?" in endpoint
+            else producer
+        ),
+    )
+    monkeypatch.setattr(cache, "platform_succeeded", lambda *_: False)
+    cache.discover(tmp_path, "linux-x64", False)
+    assert "native-run=\n" in output.read_text()
+    assert "vcpkg-run=42\n" in output.read_text()
