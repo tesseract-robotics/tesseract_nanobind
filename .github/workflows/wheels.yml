@@ -21,7 +21,19 @@ on:
       - 'mkdocs.yml'
   pull_request:
     paths-ignore: *docs-only
+  # Refresh native installs weekly; normal runs consume compatible completed artifacts.
+  schedule:
+    - cron: '17 3 * * 1'
   workflow_dispatch:
+    inputs:
+      refresh-native:
+        description: Rebuild the native stack while reusing vcpkg binary packages
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,7 +43,9 @@ env:
   # Same release used by the successful pre-review wheel build.
   VCPKG_REVISION: "2026.10.16"
   CCACHE_DIR: ${{ github.workspace }}/.ccache
-  CCACHE_MAXSIZE: 300M
+  # Initial 1 GiB working set per platform; statistics expose eviction pressure.
+  CCACHE_MAXSIZE: 1G
+  CCACHE_BASEDIR: ${{ github.workspace }}
   VCPKG_PKGS: >-
     boost-dll boost-program-options
     boost-serialization boost-filesystem
@@ -93,16 +107,27 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install colcon-common-extensions vcs2l auditwheel patchelf $NB_BUILD_REQS
         python tesseract_nanobind/scripts/check_wheel_sources.py
+    - name: restore native build artifacts
+      id: native_cache
+      uses: ./tesseract_nanobind/.github/actions/native-cache
+      with:
+        platform: linux-${{ matrix.config.arch }}
+        refresh: ${{ github.event_name == 'schedule' || inputs.refresh-native }}
     - name: vcs import
+      if: steps.native_cache.outputs.native-run == ''
       shell: bash
       run: |
         source $GITHUB_WORKSPACE/venv/bin/activate
         mkdir -p ws/src
         vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
     - name: vcpkg build
+      id: vcpkg
+      if: steps.native_cache.outputs.native-run == ''
       uses: johnwason/vcpkg-action@v8
       with:
         revision: ${{ env.VCPKG_REVISION }}
+        # Once artifact-seeded, do not duplicate the large binaries in Actions cache.
+        disable-cache: ${{ steps.native_cache.outputs.vcpkg-run != '' }}
         pkgs: >-
           ${{ env.VCPKG_PKGS }}
         triplet: ${{ matrix.config.vcpkg_triplet }}
@@ -113,13 +138,34 @@ jobs:
           --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
         token: ${{ github.token }}
         cache-key: linux-${{ matrix.config.vcpkg_triplet }}
+    - name: archive vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-vcpkg
+        --workspace "$RUNNER_TEMP" --artifact cache-artifacts/vcpkg
+    - name: publish vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.vcpkg-name }}
+        path: cache-artifacts/vcpkg/vcpkg-binaries.tar
+        retention-days: 14
+        compression-level: 0
+        overwrite: true
+        if-no-files-found: error
     - name: restore compiler cache
-      uses: actions/cache@v5
+      id: compiler_cache
+      uses: actions/cache/restore@v5
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}
-        restore-keys: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+        key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+    - name: reset compiler counters
+      run: ccache --zero-stats
     - name: colcon build
+      id: native_build
+      if: steps.native_cache.outputs.native-run == ''
       shell: bash
       working-directory: ws
       run: |
@@ -143,6 +189,44 @@ jobs:
           -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_ENABLE_TESTING=OFF \
           -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
           -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    - name: archive installed native stack
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-native
+        --workspace "$GITHUB_WORKSPACE" --artifact cache-artifacts/native
+        --environment cache-work/current-environment.json
+    - name: record native producer checkout
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: |
+        mkdir -p cache-artifacts/native-source
+        git -C tesseract_nanobind rev-parse HEAD > cache-artifacts/native-source/revision.txt
+    - name: publish native producer checkout
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}-source
+        path: cache-artifacts/native-source/
+        retention-days: 14
+        overwrite: true
+        if-no-files-found: error
+    - name: publish installed native stack
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}
+        path: cache-artifacts/native/
+        retention-days: 14
+        compression-level: 1
+        overwrite: true
+        if-no-files-found: error
+    - name: upstream compiler statistics
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      shell: bash
+      run: |
+        ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
+        ccache --zero-stats
     - name: build wheel
       id: wheel
       shell: bash
@@ -154,9 +238,19 @@ jobs:
         export CMAKE_PREFIX_PATH=$TESSERACT_CPP_PREFIX:$VCPKG_PREFIX
         export LD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib
         python -m pip wheel . -w dist --no-build-isolation --no-deps \
-          -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
+          -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
         auditwheel show dist/*.whl
         auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
+    - name: binding compiler statistics
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      shell: bash
+      run: ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: save compiler results before tests
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ steps.compiler_cache.outputs.cache-primary-key }}
     - name: build support data wheel
       # tesseract's robot models and meshes, one py3-none-any wheel for every platform, copied
       # from the same colcon prefix (packaging/tesseract-robotics-nanobind-support); test-wheels/
@@ -268,14 +362,25 @@ jobs:
     - name: choco
       run: |
         choco install ninja ccache -r
+    - name: restore native build artifacts
+      id: native_cache
+      uses: ./tesseract_nanobind/.github/actions/native-cache
+      with:
+        platform: win-${{ matrix.config.arch }}
+        refresh: ${{ github.event_name == 'schedule' || inputs.refresh-native }}
     - name: vcs import
+      if: steps.native_cache.outputs.native-run == ''
       run: |
         mkdir ws\src
         vcs import --input tesseract_nanobind\dependencies.rosinstall ws\src
     - name: vcpkg build
+      id: vcpkg
+      if: steps.native_cache.outputs.native-run == ''
       uses: johnwason/vcpkg-action@v8
       with:
         revision: ${{ env.VCPKG_REVISION }}
+        # Once artifact-seeded, do not duplicate the large binaries in Actions cache.
+        disable-cache: ${{ steps.native_cache.outputs.vcpkg-run != '' }}
         pkgs: >-
           ${{ env.VCPKG_PKGS }}
         triplet: ${{ matrix.config.vcpkg_triplet }}
@@ -284,13 +389,34 @@ jobs:
           --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
         token: ${{ github.token }}
         cache-key: win-${{ matrix.config.arch }}-nanobind
+    - name: archive vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-vcpkg
+        --workspace "$RUNNER_TEMP" --artifact cache-artifacts/vcpkg
+    - name: publish vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.vcpkg-name }}
+        path: cache-artifacts/vcpkg/vcpkg-binaries.tar
+        retention-days: 14
+        compression-level: 0
+        overwrite: true
+        if-no-files-found: error
     - name: restore compiler cache
-      uses: actions/cache@v5
+      id: compiler_cache
+      uses: actions/cache/restore@v5
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}
-        restore-keys: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+        key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+    - name: reset compiler counters
+      run: ccache --zero-stats
     - name: colcon build
+      id: native_build
+      if: steps.native_cache.outputs.native-run == ''
       working-directory: ws
       shell: cmd
       run: |
@@ -310,6 +436,44 @@ jobs:
         -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON ^
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         if %ERRORLEVEL% GEQ 1 exit 1
+    - name: archive installed native stack
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-native
+        --workspace "$GITHUB_WORKSPACE" --artifact cache-artifacts/native
+        --environment cache-work/current-environment.json
+    - name: record native producer checkout
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: |
+        mkdir -p cache-artifacts/native-source
+        git -C tesseract_nanobind rev-parse HEAD > cache-artifacts/native-source/revision.txt
+    - name: publish native producer checkout
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}-source
+        path: cache-artifacts/native-source/
+        retention-days: 14
+        overwrite: true
+        if-no-files-found: error
+    - name: publish installed native stack
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}
+        path: cache-artifacts/native/
+        retention-days: 14
+        compression-level: 1
+        overwrite: true
+        if-no-files-found: error
+    - name: upstream compiler statistics
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      shell: bash
+      run: |
+        ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
+        ccache --zero-stats
     - name: build wheel
       id: wheel
       working-directory: tesseract_nanobind
@@ -318,11 +482,21 @@ jobs:
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
         set TESSERACT_CPP_PREFIX=%GITHUB_WORKSPACE%\ws\install
         set CMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%\ws\install;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}
-        python -m pip wheel . -w dist --no-build-isolation --no-deps -Ccmake.args=-GNinja -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
+        python -m pip wheel . -w dist --no-build-isolation --no-deps -Ccmake.args=-GNinja -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5
         if %ERRORLEVEL% GEQ 1 exit 1
         for %%I in ("dist\*.whl") do set WHEEL_FILE=%%~I
         python -m delvewheel repair --add-path "%GITHUB_WORKSPACE%\ws\install\bin;%GITHUB_WORKSPACE%\ws\install\lib;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin" --no-dll "msvcp140.dll;vcomp140.dll" -w wheelhouse "%WHEEL_FILE%"
         if %ERRORLEVEL% GEQ 1 exit 1
+    - name: binding compiler statistics
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      shell: bash
+      run: ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: save compiler results before tests
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ steps.compiler_cache.outputs.cache-primary-key }}
     - name: support data wheel for the tests
       id: test_wheels
       shell: bash
@@ -417,14 +591,25 @@ jobs:
       run: |
         python3 -m pip install colcon-common-extensions vcs2l delocate ${{ env.NB_BUILD_REQS }}
         python3 tesseract_nanobind/scripts/check_wheel_sources.py
+    - name: restore native build artifacts
+      id: native_cache
+      uses: ./tesseract_nanobind/.github/actions/native-cache
+      with:
+        platform: macos-${{ matrix.config.arch }}
+        refresh: ${{ github.event_name == 'schedule' || inputs.refresh-native }}
     - name: vcs import
+      if: steps.native_cache.outputs.native-run == ''
       run: |
         mkdir -p ws/src
         vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
     - name: vcpkg build
+      id: vcpkg
+      if: steps.native_cache.outputs.native-run == ''
       uses: johnwason/vcpkg-action@v8
       with:
         revision: ${{ env.VCPKG_REVISION }}
+        # Once artifact-seeded, do not duplicate the large binaries in Actions cache.
+        disable-cache: ${{ steps.native_cache.outputs.vcpkg-run != '' }}
         pkgs: >-
           ${{ env.VCPKG_PKGS }}
         triplet: ${{ matrix.config.arch }}-osx-dynamic-release
@@ -435,13 +620,34 @@ jobs:
           --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
         token: ${{ github.token }}
         cache-key: osx-${{ matrix.config.arch }}-vcpkg
+    - name: archive vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-vcpkg
+        --workspace "$RUNNER_TEMP" --artifact cache-artifacts/vcpkg
+    - name: publish vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.vcpkg-name }}
+        path: cache-artifacts/vcpkg/vcpkg-binaries.tar
+        retention-days: 14
+        compression-level: 0
+        overwrite: true
+        if-no-files-found: error
     - name: restore compiler cache
-      uses: actions/cache@v5
+      id: compiler_cache
+      uses: actions/cache/restore@v5
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}
-        restore-keys: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+        key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+    - name: reset compiler counters
+      run: ccache --zero-stats
     - name: colcon build
+      id: native_build
+      if: steps.native_cache.outputs.native-run == ''
       working-directory: ws
       run: |
         export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib:$GITHUB_WORKSPACE/ws/install/lib
@@ -465,6 +671,44 @@ jobs:
             -DOpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib \
             -Dtcmalloc_minimal_LIBRARY=${{ github.workspace }}/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib/libtcmalloc_minimal.dylib \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    - name: archive installed native stack
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-native
+        --workspace "$GITHUB_WORKSPACE" --artifact cache-artifacts/native
+        --environment cache-work/current-environment.json
+    - name: record native producer checkout
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: |
+        mkdir -p cache-artifacts/native-source
+        git -C tesseract_nanobind rev-parse HEAD > cache-artifacts/native-source/revision.txt
+    - name: publish native producer checkout
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}-source
+        path: cache-artifacts/native-source/
+        retention-days: 14
+        overwrite: true
+        if-no-files-found: error
+    - name: publish installed native stack
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}
+        path: cache-artifacts/native/
+        retention-days: 14
+        compression-level: 1
+        overwrite: true
+        if-no-files-found: error
+    - name: upstream compiler statistics
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      shell: bash
+      run: |
+        ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
+        ccache --zero-stats
     - name: build wheel
       id: wheel
       working-directory: tesseract_nanobind
@@ -474,7 +718,7 @@ jobs:
         export CMAKE_PREFIX_PATH="$TESSERACT_CPP_PREFIX:$VCPKG_PREFIX"
         # descartes_light's exported config needs OpenMP; point it at Homebrew's libomp as colcon does
         python3 -m pip wheel . -w dist --no-build-isolation --no-deps \
-          -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -Ccmake.define.CMAKE_C_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_CXX_COMPILER_LAUNCHER=ccache -Ccmake.define.CMAKE_POLICY_VERSION_MINIMUM=3.5 \
           -Ccmake.define.CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
           -Ccmake.define.OpenMP_CXX_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
           -Ccmake.define.OpenMP_C_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
@@ -491,6 +735,16 @@ jobs:
         python3 -m wheel unpack wheelhouse/*.whl -d openmp-wheel
         python3 scripts/configure_wheel_openmp.py openmp-wheel/*
         python3 -m wheel pack openmp-wheel/* -d wheelhouse
+    - name: binding compiler statistics
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      shell: bash
+      run: ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: save compiler results before tests
+      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ steps.compiler_cache.outputs.cache-primary-key }}
     - name: support data wheel for the tests
       id: test_wheels
       shell: bash

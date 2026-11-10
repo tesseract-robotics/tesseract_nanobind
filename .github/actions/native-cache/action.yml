@@ -1,0 +1,65 @@
+name: Restore native build artifacts
+description: Reuse a compatible native install or seed vcpkg's binary cache; download failures are fatal.
+inputs:
+  platform:
+    required: true
+    description: Wheel platform, including architecture
+  refresh:
+    default: 'false'
+    description: Rebuild native sources while retaining vcpkg binary reuse
+outputs:
+  native-run:
+    description: Producer run for the restored native install; empty means build from source
+    value: ${{ steps.find.outputs.native-run }}
+  vcpkg-run:
+    description: Producer run for the restored vcpkg binary cache
+    value: ${{ steps.find.outputs.vcpkg-run }}
+  native-name:
+    description: Native artifact name for this runner/toolchain
+    value: ${{ steps.find.outputs.native-name }}
+  vcpkg-name:
+    description: Binary-cache artifact name for this platform
+    value: ${{ steps.find.outputs.vcpkg-name }}
+runs:
+  using: composite
+  steps:
+  - name: discover compatible artifacts
+    id: find
+    shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CACHE_PLATFORM: ${{ inputs.platform }}
+      CACHE_REFRESH: ${{ inputs.refresh }}
+    run: |
+      args=()
+      if [ "$CACHE_REFRESH" = true ]; then args+=(--refresh); fi
+      python tesseract_nanobind/scripts/wheel_cache.py --platform "$CACHE_PLATFORM" "${args[@]}"
+  - name: download native install
+    if: steps.find.outputs.native-run != ''
+    uses: actions/download-artifact@v8
+    with:
+      name: ${{ steps.find.outputs.native-name }}
+      run-id: ${{ steps.find.outputs.native-run }}
+      github-token: ${{ github.token }}
+      path: cache-artifacts/native
+  - name: restore native install at its original prefix
+    if: steps.find.outputs.native-run != ''
+    shell: bash
+    run: >-
+      python tesseract_nanobind/scripts/wheel_cache_archive.py unpack-native
+      --workspace "$GITHUB_WORKSPACE" --artifact cache-artifacts/native
+      --environment cache-work/current-environment.json
+  - name: download vcpkg binaries
+    if: steps.find.outputs.vcpkg-run != ''
+    uses: actions/download-artifact@v8
+    with:
+      name: ${{ steps.find.outputs.vcpkg-name }}
+      run-id: ${{ steps.find.outputs.vcpkg-run }}
+      github-token: ${{ github.token }}
+      path: cache-artifacts/vcpkg
+  - name: restore vcpkg binary cache
+    if: steps.find.outputs.vcpkg-run != ''
+    shell: bash
+    run: >-
+      python tesseract_nanobind/scripts/wheel_cache_archive.py unpack-vcpkg
+      --workspace "$RUNNER_TEMP" --artifact cache-artifacts/vcpkg
