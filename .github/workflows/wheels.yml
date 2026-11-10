@@ -30,6 +30,10 @@ on:
         description: Rebuild the native stack while reusing vcpkg binary packages
         type: boolean
         default: false
+      include-intel-macos:
+        description: Also build and test legacy Intel macOS wheels
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -575,6 +579,8 @@ jobs:
         - arch: arm64
           runner: macos-15
           brew_prefix: /opt/homebrew
+        # Keep Intel release coverage, without putting it on every PR's critical path.
+        exclude: ${{ (github.event_name == 'schedule' || github.ref_type == 'tag' || inputs.include-intel-macos) && fromJSON('[]') || fromJSON('[{"config":{"arch":"x64","runner":"macos-15-intel","brew_prefix":"/usr/local"}}]') }}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -835,23 +841,24 @@ jobs:
     # No colcon/vcpkg install on these runners: plugins must come from the wheel.
     needs: [build-ubuntu, build-win, build-macos]
     timeout-minutes: 45
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.config.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
+        config:
           - {runner: ubuntu-24.04, artifact: linux-x64}
           - {runner: ubuntu-24.04-arm, artifact: linux-arm64}
           - {runner: windows-2022, artifact: win-x64}
           - {runner: macos-15, artifact: macos-arm64}
           - {runner: macos-15-intel, artifact: macos-x64}
+        exclude: ${{ (github.event_name == 'schedule' || github.ref_type == 'tag' || inputs.include-intel-macos) && fromJSON('[]') || fromJSON('[{"config":{"runner":"macos-15-intel","artifact":"macos-x64"}}]') }}
     steps:
     - uses: actions/checkout@v6
       with:
         path: tesseract_nanobind
     - uses: actions/download-artifact@v8
       with:
-        name: python-wheels-${{ matrix.artifact }}
+        name: python-wheels-${{ matrix.config.artifact }}
         path: test-wheels
     - uses: actions/download-artifact@v8
       with:
