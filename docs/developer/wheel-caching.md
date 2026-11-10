@@ -20,8 +20,9 @@ Native input comparison uses the producer's actual checkout revision, including
 GitHub's PR merge commit. Changes to dependencies, overlays, upstream gitlinks,
 cache scripts or the wheel workflow cause a native rebuild. Artifact metadata
 records the original environment because these CMake installs are not relocatable.
-Only successful runs from the default branch or the same source branch/PR are
-eligible. Release jobs never consume PR artifacts. API, download and extraction
+Only tested native builds from the default branch or the same source branch/PR
+are eligible. The producing `native-<platform>` job must pass; a failed sibling
+platform does not discard its results. Release jobs never consume PR artifacts. API, download and extraction
 errors fail the job; an absent compatible artifact takes the source-build path.
 
 A Monday 03:17 UTC build refreshes the native stack, retaining vcpkg binary reuse.

@@ -159,3 +159,32 @@ def test_api_failure_does_not_turn_into_a_cold_build(tmp_path, monkeypatch):
     with pytest.raises(subprocess.CalledProcessError):
         cache.discover(tmp_path, "linux-x64", False)
     assert not output.exists()
+
+
+def test_failed_sibling_does_not_discard_successful_platform(monkeypatch):
+    cache = load_cache_module()
+    monkeypatch.setattr(
+        cache,
+        "github_json",
+        lambda endpoint: {
+            "jobs": [
+                {"name": "native-linux-x64", "conclusion": "success"},
+                {"name": "native-win-x64", "conclusion": "failure"},
+                {"name": "native-macos-arm64", "conclusion": None},
+            ]
+        },
+    )
+    producer = {"id": 42, "conclusion": "failure"}
+    assert cache.platform_succeeded("org/project", producer, "linux-x64")
+    assert not cache.platform_succeeded("org/project", producer, "win-x64")
+    assert not cache.platform_succeeded("org/project", producer, "macos-arm64")
+
+
+def test_successful_workflow_needs_no_extra_job_lookup(monkeypatch):
+    cache = load_cache_module()
+
+    def unexpected(endpoint):
+        pytest.fail(f"Unexpected API request: {endpoint}")
+
+    monkeypatch.setattr(cache, "github_json", unexpected)
+    assert cache.platform_succeeded("org/project", {"conclusion": "success"}, "linux-x64")

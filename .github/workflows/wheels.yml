@@ -71,6 +71,7 @@ env:
 
 jobs:
   build-ubuntu:
+    name: native-linux-${{ matrix.config.arch }}
     timeout-minutes: 180
     # Runs on the host runner: johnwason/vcpkg-action uses the host workspace path, which does not
     # exist inside a container job. Ubuntu 24.04 gives the manylinux_2_39 glibc baseline.
@@ -340,6 +341,7 @@ jobs:
         retention-days: 2
 
   build-win:
+    name: native-win-${{ matrix.config.arch }}
     timeout-minutes: 180
     runs-on: windows-2022
     strategy:
@@ -567,6 +569,7 @@ jobs:
         retention-days: 2
 
   build-macos:
+    name: native-macos-${{ matrix.config.arch }}
     timeout-minutes: 180
     runs-on: ${{ matrix.config.runner }}
     strategy:
