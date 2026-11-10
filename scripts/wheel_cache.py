@@ -167,7 +167,9 @@ def discover(root: Path, platform: str, refresh: bool) -> None:
                 run, repository, default_branch, source_repository, source_branch, is_pr
             ):
                 continue
-            if not platform_succeeded(repository, run, platform):
+            # Binary packages were published only after vcpkg completed. Its own
+            # compatibility checks select usable packages even if later tests failed.
+            if check_sources and not platform_succeeded(repository, run, platform):
                 continue
             if check_sources:
                 revision = producer_revision(repository, run["id"], name, work)
