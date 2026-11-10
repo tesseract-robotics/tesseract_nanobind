@@ -10,7 +10,9 @@ The wheel workflow keeps three reusable layers:
   match. Binding-only changes do not invalidate this layer.
 - **Compiler results:** ccache covers both colcon and nanobind compilation. Each
   platform starts with a 1 GiB budget. Restored entries are checked by ccache;
-  changed source/header/compiler options cause recompilation. Separate upstream
+  changed source/header/compiler options cause recompilation. Binding PCH is disabled
+  when the launcher is `ccache`, because caching PCH would require relaxing macro
+  and timestamp checks. Ordinary builds retain PCH. Separate upstream
   and binding statistics appear in the job summary. Results are saved before
   wheel tests, including after compilation failures when setup succeeded.
 

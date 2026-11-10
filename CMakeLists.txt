@@ -121,6 +121,11 @@ function(add_tesseract_nanobind_extension module_name source_file)
   # Apply precompiled headers
   target_precompile_headers(_${module_name} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tesseract_nb.h)
+  # PCH makes these calls uncacheable unless ccache's macro/time checks are relaxed.
+  # Keep those checks and cache ordinary compilation; retain PCH without ccache.
+  if(CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "ccache")
+    set_property(TARGET _${module_name} PROPERTY DISABLE_PRECOMPILE_HEADERS ON)
+  endif()
 
   # Include directories
   target_include_directories(_${module_name} PRIVATE
