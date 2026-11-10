@@ -30,7 +30,7 @@ flowchart LR
     subgraph wheels["wheels.yml"]
         V[vcpkg<br/>third-party libraries]
         CB[colcon build<br/>C++ stack]
-        R[pip wheel + auditwheel /<br/>delvewheel / delocate]
+        R[pip wheel + auditwheel /<br/>delvewheel / batched Mach-O repair]
     end
     P[pixi env<br/>development]
     W[(PyPI<br/>tesseract-robotics-nanobind)]
@@ -168,7 +168,7 @@ flowchart LR
     A[vcs import<br/>dependencies.rosinstall] --> B[vcpkg<br/>third-party libraries]
     B --> C[colcon build<br/>tesseract C++ stack]
     C --> D[pip wheel .<br/>--no-build-isolation]
-    D --> E[auditwheel / delvewheel /<br/>delocate repair]
+    D --> E[auditwheel / delvewheel /<br/>batched Mach-O repair]
 ```
 
 1. `vcs import` checks out `dependencies.rosinstall`: tesseract, tesseract_planning and
@@ -205,7 +205,7 @@ copies by path. No plugin directory is configured and no YAML is patched.
 |---|---|---|---|
 | Runner | `ubuntu-24.04` (x86_64), `ubuntu-24.04-arm` (aarch64) | `macos-15-intel` (x86_64), `macos-15` (arm64) | `windows-2022` (x64) |
 | vcpkg triplet | `x64-linux-dynamic-release`, `arm64-linux-dynamic-release` | `x64-osx-dynamic-release`, `arm64-osx-dynamic-release` | `x64-windows-release` |
-| Repair | `auditwheel repair --plat manylinux_2_39_*` | `delocate-wheel --sanitize-rpaths` | `delvewheel repair` |
+| Repair | `auditwheel repair --plat manylinux_2_39_*` | `repair_macos_wheel.py --lib-dir ...` | `delvewheel repair` |
 | Never bundled | `libstdc++`, `libgcc_s`, glibc (manylinux policy) | system libraries | `msvcp140.dll`, `vcomp140.dll` |
 | Platform gotchas | [Linux wheels](linux-wheels.md) | [macOS wheels](macos-wheels.md) | [Windows wheels](windows-wheels.md) |
 
@@ -215,8 +215,8 @@ copies by path. No plugin directory is configured and no YAML is patched.
 (`cp312-abi3-<platform>`), which installs on 3.12 and every later CPython. Linux wheels
 are `manylinux_2_39`: Ubuntu 24.04's glibc, and its gcc 13 libstdc++, which auditwheel
 leaves to the host. On macOS the C++ stack is built for 12.0, but Homebrew's `libomp`
-is built for the runner's macOS; `MACOSX_DEPLOYMENT_TARGET` is left unset so delocate
-raises the wheel tag to the bundled libraries' minimum.
+is built for the runner's macOS. Repair reads the native closure's minimum OS
+versions and updates both the wheel filename and its WHEEL tags.
 
 ### Tests before publishing
 
@@ -303,10 +303,10 @@ Two local loops also exist, described in [Building against upstream main](upstre
 The `dev` track uploads to its own label, so the `main` label keeps serving the
 0.35.0 packages the released wheels are built from.
 
-## Known gaps
+## Platform runtime behavior
 
-- **libomp under conda (macOS).** delocate bundles Homebrew's `libomp`. A wheel installed
-  into a conda or pixi environment that has its own `llvm-openmp` loads two OpenMP
-  runtimes, the failure described in [macOS wheels](macos-wheels.md) (#136).
+- **libomp under conda (macOS).** The repair bundles Homebrew's `libomp` and
+  configures consumers to prefer the Python environment's runtime, then the bundled
+  copy. Fresh-wheel and pixi tests verify one runtime in both import orders (#136).
 - **macOS minimum version.** The macOS tag follows Homebrew's `libomp`, so it rises when
   the runner image does.

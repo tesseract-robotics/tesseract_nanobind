@@ -98,7 +98,11 @@ The PyPI wheels are built without conda by `.github/workflows/wheels.yml`, the
 method of [tesseract_python](https://github.com/tesseract-robotics/tesseract_python):
 the tesseract C++ stack (`dependencies.rosinstall`) is built from source with colcon
 against vcpkg dependencies, `pip wheel .` builds the bindings against it, and
-auditwheel (Linux), delvewheel (Windows) or delocate (macOS) bundles the closure.
+auditwheel (Linux), delvewheel (Windows) or `repair_macos_wheel.py` (macOS)
+bundles the closure. The macOS repair batches load-command edits and signs each
+changed image once; repeated `--lib-dir` arguments name the native, vcpkg and
+Homebrew OpenMP library directories. It preserves plugin YAML and derives the
+minimum macOS tag from the bundled libraries.
 The plugin factory libraries are linked into the extension modules and registered
 through their anchors, so the repair tools bundle them like any other dependency.
 See [docs/developer/binaries.md](../docs/developer/binaries.md#building-a-wheel).
