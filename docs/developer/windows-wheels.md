@@ -117,8 +117,9 @@ planner continues using a separate seed. A repeatable seed is not effective
 across that DLL boundary.
 
 The Windows-only overlay keeps OMPL's planner library static and moves its RNG
-and logging implementation into `ompl_runtime.dll`. Logging accompanies RNG to
-avoid a circular link dependency. Automatically exporting all of OMPL exceeds
+implementation into `ompl_runtime.dll`, together with its logging, hyperspheroid
+and geometric-equation dependencies. Keeping these together avoids a circular
+link dependency. Automatically exporting all of OMPL exceeds
 MSVC's 65,535-symbol limit; automatic exports cover only this small runtime.
 Linux/macOS retain their existing port. The wheel workflow compiles
 two small DLL consumers and checks that setting the seed through one is visible

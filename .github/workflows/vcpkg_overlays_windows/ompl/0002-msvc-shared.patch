@@ -1,7 +1,7 @@
 diff --git a/src/ompl/CMakeLists.txt b/src/ompl/CMakeLists.txt
 --- a/src/ompl/CMakeLists.txt
 +++ b/src/ompl/CMakeLists.txt
-@@ -35,7 +35,26 @@
+@@ -35,7 +35,28 @@
  
  # build the library
  if(MSVC)
@@ -10,6 +10,8 @@ diff --git a/src/ompl/CMakeLists.txt b/src/ompl/CMakeLists.txt
 +    # 65535-export limit because of its template instantiations.
 +    set(OMPL_RUNTIME_SOURCES
 +        "${CMAKE_CURRENT_SOURCE_DIR}/util/src/RandomNumbers.cpp"
++        "${CMAKE_CURRENT_SOURCE_DIR}/util/src/ProlateHyperspheroid.cpp"
++        "${CMAKE_CURRENT_SOURCE_DIR}/util/src/GeometricEquations.cpp"
 +        "${CMAKE_CURRENT_SOURCE_DIR}/util/src/Console.cpp")
 +    list(REMOVE_ITEM OMPL_SOURCE_CODE ${OMPL_RUNTIME_SOURCES})
 +    add_library(ompl_runtime SHARED ${OMPL_RUNTIME_SOURCES})
