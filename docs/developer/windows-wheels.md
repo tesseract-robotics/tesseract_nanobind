@@ -107,3 +107,18 @@ real cause.
     `src/tesseract_serialization/tesseract_serialization_bindings.cpp` for
     the canonical placement; keep `CEREAL_FORCE_DYNAMIC_INIT(LibName)` as
     belt-and-suspenders on the producer side.
+
+## Shared OMPL state
+
+vcpkg's standard OMPL 1.7 port builds a static library with MSVC. Linking that
+library into both the binding and the native planner duplicates OMPL's global
+RNG seed generator. `RNG_setSeed` then seeds the binding's copy while the native
+planner continues using a separate seed. A repeatable seed is not effective
+across that DLL boundary.
+
+The Windows-only OMPL overlay builds a shared DLL with CMake's automatic symbol
+exports. Linux/macOS retain their existing port. The wheel workflow compiles
+two small DLL consumers and checks that setting the seed through one is visible
+through the other; the ordinary planning tests still run on the repaired wheel.
+The source-download checksum in the overlay is the upstream vcpkg port's required
+download-verification field.

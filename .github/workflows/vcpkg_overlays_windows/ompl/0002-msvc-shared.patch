@@ -1,0 +1,26 @@
+diff --git a/src/ompl/CMakeLists.txt b/src/ompl/CMakeLists.txt
+--- a/src/ompl/CMakeLists.txt
++++ b/src/ompl/CMakeLists.txt
+@@ -34,7 +34,7 @@ source_group("OMPL Source" FILES "${OMPL_SOURCE_CODE}")
+ source_group("OMPL Headers" FILES "${OMPL_HEADERS}")
+ 
+ # build the library
+-if(MSVC)
++if(MSVC AND NOT BUILD_SHARED_LIBS)
+     add_library(ompl STATIC ${OMPL_SOURCE_CODE})
+ else()
+     add_library(ompl SHARED ${OMPL_SOURCE_CODE})
+@@ -56,7 +56,12 @@ target_link_libraries(ompl
+         "$<$<BOOL:${OMPL_HAVE_SPOT}>:Spot::Spot>")
+ 
+ if (MSVC)
+-    set_target_properties(ompl PROPERTIES VERSION "${PROJECT_VERSION}" STATIC_LIBRARY_FLAGS "psapi.lib ws2_32.lib")
++    set_target_properties(ompl PROPERTIES VERSION "${PROJECT_VERSION}")
++    if(BUILD_SHARED_LIBS)
++        target_link_libraries(ompl PRIVATE psapi ws2_32)
++    else()
++        set_target_properties(ompl PROPERTIES STATIC_LIBRARY_FLAGS "psapi.lib ws2_32.lib")
++    endif()
+ else (MSVC)
+     if (MINGW)
+         target_link_libraries(ompl psapi ws2_32)
