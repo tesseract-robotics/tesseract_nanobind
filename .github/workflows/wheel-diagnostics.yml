@@ -1,0 +1,40 @@
+name: Wheel planning diagnostics
+on:
+  push:
+    branches: [jf/pr394-diagnostics]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-win-x64
+        run-id: 42845423395
+        repository: tesseract-robotics/tesseract_nanobind
+        github-token: ${{ github.token }}
+        path: wheels
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-support-any
+        run-id: 42845423395
+        repository: tesseract-robotics/tesseract_nanobind
+        github-token: ${{ github.token }}
+        path: wheels
+    - name: install built wheels
+      shell: bash
+      run: python -m pip install wheels/*.whl pytest pytest-xdist
+    - name: trace repeated planning
+      run: python scripts/diagnose_wheel_planning.py
+    - uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: planning-diagnostics
+        path: planning-diagnostics/
