@@ -69,3 +69,25 @@ rest of the closure. Objects created by those plugins carry vtables that live
 in the plugin `.so`s; binding-level `nb::keep_alive<0, 1>` on every
 Environment getter returning plugin-backed objects keeps the Environment (and
 so the loader and the mapped plugins) alive as long as any such object exists.
+
+## Wheel/development dependency drift
+
+`pixi run check-wheel-sources` compares `dependencies.rosinstall` with the
+`tesseract`, `tesseract_planning`, and `trajopt` development submodule revisions.
+The wheel jobs run it before building dependencies. Update the source manifest
+when those submodules change; this check does not certify the provenance of an
+externally built conda package.
+
+The wheel dependency set uses vcpkg release `2026.10.16`, the release used by
+PR #394's successful build, instead of following the latest release. Overlays
+remain checked into this repository and the selected upstream sources. This
+pins the port set without switching the existing action to manifest mode.
+
+The conda and vcpkg dependency versions are still different: the reviewed build
+used Boost 1.92 / 1.88, yaml-cpp 0.9 / 0.8 and KDL 1.5.3 / 1.5.4 respectively
+(wheel / development). Source alignment is not third-party ABI parity; the
+fresh-runner artifact tests exercise the shipped stack independently.
+
+The Linux `-include stdexcept` workaround is tracked in
+[tesseract_planning#802](https://github.com/tesseract-robotics/tesseract_planning/issues/802).
+Remove it only after an updated upstream source passes the wheel build without it.

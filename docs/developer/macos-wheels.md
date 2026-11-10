@@ -81,15 +81,23 @@ rather than failing a *build*, so it surfaces as a gappy wheel set on PyPI
     Windows tested 3.9 + 3.12 only, leaving the cross-platform abi3 claim
     *asserted* but not *verified*. Now all three platforms verify it.
 
-## The wheel bundles `libomp`, which conflicts with a conda env's
+## Sharing OpenMP with conda and pixi consumers
 
-!!! warning "A wheel installed into a conda or pixi env with `llvm-openmp` loads two OpenMP runtimes"
-    `wheels.yml` repairs the macOS wheel with `delocate-wheel`, which bundles Homebrew's
-    `libomp.dylib` and points every OpenMP user at that copy. In a plain venv that is the
-    only `libomp`. In a conda or pixi environment whose `numpy` brings conda-forge's
-    `llvm-openmp`, the process gets two, the #136 failure below. The pixi-built wheels up
-    to the switch to `wheels.yml` avoided it by loading `libomp` through `@rpath`, the
-    environment's `lib/` first and the bundled copy second; the delocated wheel does not.
+`delocate-wheel` bundles all dependencies. After delocation,
+`scripts/configure_wheel_openmp.py` changes only OpenMP load commands to
+`@rpath/libomp.dylib`, with the installed Python environment's `lib/` first,
+then the bundled `.dylibs/` directory. Changed Mach-O images are re-signed;
+`wheel pack` regenerates the wheel's required RECORD metadata.
+
+`scripts/check_wheel_openmp.py` checks both import orders and the actual dyld
+image paths. Plain consumers must load exactly one bundled runtime; the
+`test-wheel-openmp` CI job must load exactly the environment runtime and pass
+Descartes planning tests. Both this job and fresh-runner artifact tests gate
+publishing. This does not restore the old general-purpose repair script or
+its plugin/YAML rewrites.
+
+The current Homebrew runtime raises both architectures' minimum macOS to
+15.0. A lower deployment target on the bindings cannot lower this requirement.
 
 !!! note "Why the bundled-only wheel fails under conda (#136)"
     Wheels up to 0.35.0.9 were also repaired by `delocate-wheel`, which bundled `libomp` and
