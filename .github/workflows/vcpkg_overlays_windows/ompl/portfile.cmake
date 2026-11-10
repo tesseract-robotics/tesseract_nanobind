@@ -1,6 +1,6 @@
 vcpkg_buildpath_length_warning(37)
 
-# A single OMPL DLL shares RNG state between the bindings and the planner DLL.
+# A small runtime DLL shares RNG state; the planner library remains static.
 # The source checksum below belongs to vcpkg's upstream download verification.
 vcpkg_check_linkage(ONLY_DYNAMIC_LIBRARY)
 
@@ -25,7 +25,6 @@ vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     DISABLE_PARALLEL_CONFIGURE
     OPTIONS
-        -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON
         -DOMPL_VERSIONED_INSTALL=OFF
         -DOMPL_REGISTRATION=OFF
         -DOMPL_BUILD_DEMOS=OFF

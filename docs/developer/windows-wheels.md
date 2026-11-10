@@ -116,8 +116,11 @@ RNG seed generator. `RNG_setSeed` then seeds the binding's copy while the native
 planner continues using a separate seed. A repeatable seed is not effective
 across that DLL boundary.
 
-The Windows-only OMPL overlay builds a shared DLL with CMake's automatic symbol
-exports. Linux/macOS retain their existing port. The wheel workflow compiles
+The Windows-only overlay keeps OMPL's planner library static and moves its RNG
+and logging implementation into `ompl_runtime.dll`. Logging accompanies RNG to
+avoid a circular link dependency. Automatically exporting all of OMPL exceeds
+MSVC's 65,535-symbol limit; automatic exports cover only this small runtime.
+Linux/macOS retain their existing port. The wheel workflow compiles
 two small DLL consumers and checks that setting the seed through one is visible
 through the other; the ordinary planning tests still run on the repaired wheel.
 The source-download checksum in the overlay is the upstream vcpkg port's required
