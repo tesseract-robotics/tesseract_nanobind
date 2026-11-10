@@ -95,6 +95,17 @@ def github_json(endpoint: str) -> dict:
     return json.loads(command("gh", "api", endpoint))
 
 
+def platform_succeeded(repository: str, run: dict, platform: str) -> bool:
+    """A failed sibling platform does not invalidate a tested native install."""
+    if run["conclusion"] == "success":
+        return True
+    jobs = github_json(f"repos/{repository}/actions/runs/{run['id']}/jobs?per_page=100")
+    return any(
+        job["name"] == f"native-{platform}" and job["conclusion"] == "success"
+        for job in jobs["jobs"]
+    )
+
+
 def unchanged_native_inputs(root: Path, revision: str) -> bool:
     """Compare the producer revision with current native build inputs."""
     present = subprocess.run(
@@ -152,11 +163,11 @@ def discover(root: Path, platform: str, refresh: bool) -> None:
             if artifact["expired"]:
                 continue
             run = github_json(f"repos/{repository}/actions/runs/{artifact['workflow_run']['id']}")
-            if run["conclusion"] != "success":
-                continue
             if not trusted_run(
                 run, repository, default_branch, source_repository, source_branch, is_pr
             ):
+                continue
+            if not platform_succeeded(repository, run, platform):
                 continue
             if check_sources:
                 revision = producer_revision(repository, run["id"], name, work)
