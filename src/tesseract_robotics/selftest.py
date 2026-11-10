@@ -95,7 +95,18 @@ def get_env_info() -> dict:
         "DYLD_LIBRARY_PATH",
         "LD_LIBRARY_PATH",
     ]
-    return {k: os.environ.get(k, "not set") for k in env_vars}
+    info = {k: os.environ.get(k, "not set") for k in env_vars}
+    import tesseract_robotics
+
+    for name, resolve in (
+        ("support data", tesseract_robotics.get_tesseract_resource_path),
+        ("task composer config", tesseract_robotics.get_task_composer_config_path),
+    ):
+        try:
+            info[name] = str(resolve())
+        except FileNotFoundError as e:
+            info[name] = f"not found ({e})"
+    return info
 
 
 def main():

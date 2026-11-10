@@ -60,6 +60,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_collision import (
     ConvexDecompositionVHACD,
     FillMode,
@@ -406,7 +407,7 @@ def run(argv: list[str] | None = None, output_dir: Path | None = None) -> dict[s
         argv: Command-line options; none gives upstream's defaults.
         output_dir: Where the hull files go; a temporary directory when None.
     """
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     args = parse_args(argv or [])
     seat_path = Path(args.input) if args.input else locate(locator, SEAT_URL)
 

@@ -29,6 +29,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.examples.freespace_hybrid_example import add_ifopt_profiles
 from tesseract_robotics.planning import (
     MotionProgram,
@@ -53,7 +54,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactResultVector,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import CollisionMarginData
+from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     Cost,
     MaximizeMinClearanceObjective,
@@ -302,7 +303,9 @@ class LengthAndClearanceProfile(OMPLRealVectorMoveProfile):
 
 
 def _scene() -> tuple[Robot, MotionProgram]:
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     for i, (edge_m, centre_m, rpy_rad) in enumerate(CUBES):
         create_obstacle(
             robot, f"cube_{i}", box(edge_m, edge_m, edge_m), Pose.from_xyz_rpy(centre_m, rpy_rad)

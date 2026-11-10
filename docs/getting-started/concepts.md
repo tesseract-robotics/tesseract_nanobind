@@ -12,9 +12,12 @@ The **Environment** is the central data structure containing:
 - **Allowed Collision Matrix**: Defines which link pairs to ignore
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 env = robot.env  # Access the Environment
 
 # Scene graph operations
@@ -275,17 +278,24 @@ pose_from_matrix = Isometry3d(mat)
 
 ### Resource Locators
 
-Resource locators resolve `package://` URLs to file paths. The `GeneralResourceLocator` class
-searches paths in `TESSERACT_RESOURCE_PATH` to find resources.
+Resource locators resolve `package://` URLs to file paths. A `GeneralResourceLocator` searches
+the `paths` it is given (or `addPath()` adds later), plus the directories listed in the
+`TESSERACT_RESOURCE_PATH`, `ROS_PACKAGE_PATH` and `AMENT_PREFIX_PATH` environment variables.
 
-**Auto-configuration:** When you import `tesseract_robotics`, environment variables are automatically
-set to point to bundled data (if not already set):
+Importing `tesseract_robotics` sets no environment variables and adds no search paths: what a
+locator searches is up to you. tesseract's example robots are in the `[support]` extra, and
+`get_tesseract_resource_path()` returns their directory:
 
-- `TESSERACT_RESOURCE_PATH` - Path for `package://` URL resolution
-- `TESSERACT_SUPPORT_DIR` - Path to bundled tesseract_support directory
-- `TESSERACT_TASK_COMPOSER_CONFIG_FILE` - Path to bundled task composer config
+```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
-This means `package://tesseract/support/urdf/...` URLs work out of the box.
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+assert locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf") is not None
+```
+
+`get_tesseract_support_path()` is tesseract's `support/` directory itself, and
+`get_task_composer_config_path()` the task composer config the wheel bundles.
 
 ### Type Erasure Pattern
 

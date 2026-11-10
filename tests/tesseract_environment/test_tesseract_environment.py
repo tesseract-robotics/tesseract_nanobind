@@ -7,12 +7,12 @@ import sys
 import threading
 import traceback
 import weakref
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 from tesseract_robotics import (
+    get_tesseract_support_path,
     tesseract_common,
     tesseract_environment,
     tesseract_srdf,
@@ -24,7 +24,7 @@ from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
 
 def get_scene_graph():
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    tesseract_support = str(get_tesseract_support_path())
     path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.urdf")
     locator = TesseractSupportResourceLocator()
     # nanobind automatically extracts from unique_ptr, no .release() needed
@@ -32,7 +32,7 @@ def get_scene_graph():
 
 
 def get_srdf_model(scene_graph):
-    tesseract_support = os.environ["TESSERACT_SUPPORT_DIR"]
+    tesseract_support = str(get_tesseract_support_path())
     path = os.path.join(tesseract_support, "urdf/lbr_iiwa_14_r820.srdf")
     srdf = tesseract_srdf.SRDFModel()
     locator = TesseractSupportResourceLocator()
@@ -324,7 +324,7 @@ def test_clone_releases_gil():
 
 
 def _iiwa_files():
-    urdf_dir = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
+    urdf_dir = get_tesseract_support_path() / "urdf"
     return urdf_dir / "lbr_iiwa_14_r820.urdf", urdf_dir / "lbr_iiwa_14_r820.srdf"
 
 
@@ -845,8 +845,10 @@ import json
 from pathlib import Path
 import numpy as np
 from tesseract_robotics import tesseract_environment as te
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
-locator = GeneralResourceLocator()
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
 env = te.Environment()
@@ -921,8 +923,10 @@ _PY_TCP_XYZ = (0.1, 0.2, 0.3)
 _FIND_TCP_TEARDOWN_SCRIPT = """\
 from pathlib import Path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
-locator = GeneralResourceLocator()
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
 env = Environment()

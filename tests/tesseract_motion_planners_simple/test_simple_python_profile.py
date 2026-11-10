@@ -15,6 +15,7 @@ from typing import override
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -77,7 +78,7 @@ LINEAR_STEPS = 4
 
 @pytest.fixture
 def irb2400_env():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
@@ -505,6 +506,8 @@ def test_interpolate_fixed_size(irb2400_env, manip_info, fn, start_cart, end_car
 
 _CHILD_PREAMBLE = textwrap.dedent(
     """
+    from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     import gc
     from pathlib import Path
 
@@ -533,7 +536,7 @@ _CHILD_PREAMBLE = textwrap.dedent(
     END = [0.5, 0.2, -0.3, 0.4, 0.6, -0.2]
 
     def make_env():
-        locator = GeneralResourceLocator()
+        locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         support = "package://tesseract/support/urdf/abb_irb2400"
         env = Environment()
         assert env.init(

@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 import tesseract_robotics
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     PluginInfo,
@@ -38,7 +39,7 @@ class _DelegatingResourceLocator(ResourceLocator):
 
     def __init__(self):
         super().__init__()
-        self._inner = GeneralResourceLocator()
+        self._inner = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         self.urls: list[str] = []
 
     @override
@@ -74,7 +75,7 @@ class TestTaskComposerPluginFactory:
     def test_create_factory_and_nodes(self):
         """Test factory creation and pipeline node creation."""
         config_file = _resolve_task_composer_config()
-        locator = GeneralResourceLocator()
+        locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         factory = TaskComposerPluginFactory(config_file, locator)
         assert factory is not None
 
@@ -106,7 +107,8 @@ class TestTaskComposerPluginFactory:
         )
 
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         executor = factory.createTaskComposerExecutor("TaskflowExecutor")
         task = factory.createTaskComposerNode("TrajOptPipeline")
@@ -165,7 +167,7 @@ class TestTaskComposerPluginFactory:
         ]
 
         config_file = _resolve_task_composer_config()
-        locator = GeneralResourceLocator()
+        locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         factory = TaskComposerPluginFactory(config_file, locator)
 
         # Try to load each pipeline
@@ -191,7 +193,8 @@ class TestTaskComposerPluginFactory:
     def test_get_task_composer_node_plugins_matches_config(self):
         """Keys are the configured node names (36 today); values carry the class (gh-185)."""
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         plugins = factory.getTaskComposerNodePlugins()
         expected = _shipped_task_plugins()
@@ -219,14 +222,17 @@ class TestTaskComposerPluginFactory:
             + "  tasks: !include tasks.yaml\n"
         )
 
-        factory = TaskComposerPluginFactory(main, GeneralResourceLocator())
+        factory = TaskComposerPluginFactory(
+            main, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
 
         assert set(factory.getTaskComposerNodePlugins()) == {"OMPLTask"}
 
     def test_get_task_composer_node_plugins_returns_copy(self):
         """Editing the returned map does not change the factory (gh-185)."""
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         plugins = factory.getTaskComposerNodePlugins()
         plugins.pop("TrajOptTask")
@@ -242,7 +248,8 @@ class TestTaskComposerPluginFactory:
         no configured node name (`...Pipeline` / `...Task`) is a class name.
         """
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         classes = factory.getAvailableTaskComposerNodePlugins()
         configured = factory.getTaskComposerNodePlugins()
@@ -259,17 +266,19 @@ class TestTaskComposerPluginFactory:
 _NODE_OUTLIVES_FACTORY_SCRIPT = """
 import gc
 import tesseract_robotics
+from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_task_composer import (
     TaskComposerDataStorage, TaskComposerPluginFactory,
 )
 config = tesseract_robotics.get_task_composer_config_path()
-factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+factory = TaskComposerPluginFactory(config, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 factory.getAvailableTaskComposerNodePlugins()  # maps the plugin libraries first
 node = factory.createTaskComposerNode("TrajOptPipeline")
 del factory
 gc.collect()
-other = TaskComposerPluginFactory(config, GeneralResourceLocator())
+other = TaskComposerPluginFactory(config, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 executor = other.createTaskComposerExecutor("TaskflowExecutor")
 future = executor.run(node, TaskComposerDataStorage())
 future.wait()
@@ -303,7 +312,7 @@ class TestDotgraph:
     def pipeline_node(self):
         config_file = _resolve_task_composer_config()
         assert config_file, "No task composer config found"
-        locator = GeneralResourceLocator()
+        locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
         factory = TaskComposerPluginFactory(config_file, locator)
         node = factory.createTaskComposerNode("TrajOptPipeline")
         assert node is not None
@@ -459,7 +468,8 @@ class TestCreateRaisesOnFailure:
         from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
 
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         with pytest.raises(TaskComposerPluginError, match="NoSuchTask") as exc:
             factory.createTaskComposerNode("NoSuchTask")
@@ -469,7 +479,8 @@ class TestCreateRaisesOnFailure:
         from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
 
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         with pytest.raises(TaskComposerPluginError, match="NoSuchExecutor") as exc:
             factory.createTaskComposerExecutor("NoSuchExecutor")
@@ -477,7 +488,8 @@ class TestCreateRaisesOnFailure:
 
     def test_known_names_still_return_objects(self):
         factory = TaskComposerPluginFactory(
-            _resolve_task_composer_config(), GeneralResourceLocator()
+            _resolve_task_composer_config(),
+            GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
         )
         node = factory.createTaskComposerNode("TrajOptTask")
         executor = factory.createTaskComposerExecutor("TaskflowExecutor")
@@ -491,7 +503,9 @@ class TestCreateRaisesOnFailure:
         from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
 
         config = _config_with_only(tmp_path, "TrajOptPipeline")
-        factory = TaskComposerPluginFactory(config, GeneralResourceLocator())
+        factory = TaskComposerPluginFactory(
+            config, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         with pytest.raises(TaskComposerPluginError, match="TrajOptPipeline"):
             factory.createTaskComposerNode("TrajOptPipeline")
 
@@ -509,7 +523,9 @@ class TestAnyPolyEnvironment:
         from tesseract_robotics.planning import Robot
         from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst
 
-        robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+        robot = Robot.from_tesseract_support(
+            "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         any_poly = AnyPoly_wrap_EnvironmentConst(robot.env)
         assert not any_poly.isNull()
 
@@ -629,7 +645,9 @@ class TestPipelineDataStorageExposure:
             ContactCheckProfile,
         )
 
-        robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+        robot = Robot.from_tesseract_support(
+            "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+        )
         joint_names = robot.get_joint_names("manipulator")
         j_start = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
         j_end = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])

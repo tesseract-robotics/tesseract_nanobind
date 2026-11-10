@@ -42,6 +42,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     JointTarget,
     MotionProgram,
@@ -62,7 +63,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactResultVector,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import CollisionMarginData
+from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
 from tesseract_robotics.tesseract_geometry import (
     Octree,
     OctreeSubType,
@@ -226,7 +227,9 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     )
 
     # Attach the octree as a fixed-joint obstacle on the robot's base.
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    robot = Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     create_obstacle(
         robot,
         name="pcd_octree",

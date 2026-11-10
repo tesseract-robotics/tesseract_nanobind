@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -71,7 +72,7 @@ class CartPosFixture:
 @pytest.fixture
 def cart_pos() -> CartPosFixture:
     """KUKA IIWA kinematic group plus a single-node Var to constrain."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = Path(
         locator.locateResource(
             "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"

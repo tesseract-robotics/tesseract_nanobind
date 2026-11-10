@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
@@ -75,7 +76,11 @@ class TwoBoxes:
 def two_boxes_at(*positions: float) -> TwoBoxes:
     """The two-box scene with one node per slider position."""
     env = Environment()
-    assert env.init(TWO_BOXES_URDF, TWO_BOXES_SRDF, GeneralResourceLocator())
+    assert env.init(
+        TWO_BOXES_URDF,
+        TWO_BOXES_SRDF,
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
+    )
     manip = env.getJointGroup("slider", ["slider_joint"])
     nodes = ti.createNodesVariables(
         "trajectory",
@@ -103,7 +108,7 @@ class Iiwa:
 
 def load_iiwa() -> Iiwa:
     """The KUKA IIWA environment and its "manipulator" kinematic group."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf")
     assert urdf is not None and srdf is not None

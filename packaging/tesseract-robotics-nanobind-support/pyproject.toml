@@ -1,0 +1,44 @@
+# tesseract's support data (robot models, meshes, plugin configs) as a pure-data wheel, so the
+# bindings wheel stays small. Installed with `pip install tesseract-robotics-nanobind[support]`.
+#
+# The data is copied at build time (setup.py) from an installed tesseract prefix:
+# <prefix>/share/tesseract/{package.xml,support/}, where <prefix> is TESSERACT_CPP_PREFIX, else
+# CONDA_PREFIX, the same lookup the bindings' CMakeLists.txt uses. That prefix can be a colcon
+# install (the PyPI build in .github/workflows/wheels.yml), a conda/pixi env or a system install.
+#
+#   TESSERACT_CPP_PREFIX=/path/to/install pip wheel packaging/tesseract-robotics-nanobind-support
+
+[build-system]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tesseract-robotics-nanobind-support"
+description = "Robot models and meshes from tesseract's support package, for tesseract-robotics-nanobind"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0 AND BSD-3-Clause"  # tesseract's package.xml: Apache 2.0, BSD
+dynamic = ["version"]
+authors = [
+    { name = "Jelle Feringa", email = "jelle@terrestrial.construction" },
+    { name = "John Wason", email = "wason@wasontech.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/tesseract-robotics/tesseract_nanobind"
+Repository = "https://github.com/tesseract-robotics/tesseract_nanobind"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["tesseract_robotics_support"]
+
+# Same version as the bindings wheel: both derive it from this repository's tags
+# (a tag build pins both with SETUPTOOLS_SCM_PRETEND_VERSION_FOR_<NAME>).
+[tool.setuptools_scm]
+root = "../.."
+tag_regex = "^(?P<version>\\d+\\.\\d+\\.\\d+\\.\\d+)$"
+local_scheme = "no-local-version"

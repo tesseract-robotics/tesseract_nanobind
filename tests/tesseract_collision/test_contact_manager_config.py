@@ -6,13 +6,13 @@ missing (addCollisionObject, cast transforms, etc.).
 """
 
 import gc
-import os
 import types
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics.tesseract_collision import (
     ACMOverrideType,
     CollisionCheckConfig,
@@ -134,7 +134,7 @@ def _two_overlapping_boxes(checker):
 
 
 def _get_discrete_factory():
-    support_dir = os.environ["TESSERACT_SUPPORT_DIR"]
+    support_dir = str(get_tesseract_support_path())
     cfg = Path(support_dir) / "urdf" / "contact_manager_plugins.yaml"
     locator = TesseractSupportResourceLocator()
     return ContactManagersPluginFactory(cfg, locator), locator
@@ -381,7 +381,7 @@ def test_continuous_manager_apply_config_acm():
 @pytest.mark.parametrize("form", ["path", "content"])
 def test_contact_managers_factory_from_path_or_content(form):
     """gh-165: a `pathlib.Path` is the config file; a `str` is YAML content, never a path."""
-    config = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf" / "contact_manager_plugins.yaml"
+    config = get_tesseract_support_path() / "urdf" / "contact_manager_plugins.yaml"
     arg = config if form == "path" else config.read_text()
     factory = ContactManagersPluginFactory(arg, TesseractSupportResourceLocator())
     assert factory.getDefaultDiscreteContactManagerPlugin() == "BulletDiscreteBVHManager"

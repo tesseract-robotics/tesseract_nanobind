@@ -17,9 +17,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.examples.online_planning_sqp_example import build_optimization_problem
 from tesseract_robotics.planning import Robot
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 STEPS = 12  # waypoints; run()'s default, as in the C++ reference
 TARGET_JOINTS = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # run()'s target, rad/m
@@ -30,7 +32,9 @@ COST_ROUND_OFF = 1e-12
 
 @pytest.fixture(scope="module")
 def robot():
-    robot = Robot.from_tesseract_support("online_planning_example")
+    robot = Robot.from_tesseract_support(
+        "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     robot.set_joints(np.zeros(len(TARGET_JOINTS)), joint_names=robot.get_joint_names("manipulator"))
     return robot
 

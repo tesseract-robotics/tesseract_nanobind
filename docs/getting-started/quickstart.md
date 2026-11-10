@@ -5,10 +5,14 @@ This guide walks you through your first motion planning task using the high-leve
 ## Load a Robot
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
-# Load a bundled example robot (ABB IRB2400, KUKA LBR IIWA, etc.)
-robot = Robot.from_tesseract_support("abb_irb2400")
+# Load an example robot from tesseract's support data (ABB IRB2400, KUKA LBR IIWA, etc.),
+# installed by the [support] extra
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 ```
 
 Or load your own robot:
@@ -152,7 +156,7 @@ See the [viewer guide](../user-guide/viewer.md).
 ## Installation
 
 ```bash
-pip install tesseract-robotics-nanobind
+pip install "tesseract-robotics-nanobind[support]"
 ```
 
 See [Installation](installation.md) for developer-mode setup via pixi.

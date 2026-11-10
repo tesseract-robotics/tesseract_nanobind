@@ -45,11 +45,12 @@ import time
 import numpy as np
 
 # Low-level SQP imports
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.planning import Robot
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, ContactTestType
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
 
 # --8<-- [end:setup]
 
@@ -215,7 +216,9 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
         dict with results
     """
     # Load robot model
-    robot = Robot.from_tesseract_support("online_planning_example")
+    robot = Robot.from_tesseract_support(
+        "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     joint_names = robot.get_joint_names("manipulator")
     print(f"Manipulator joints ({len(joint_names)}): {joint_names}")
 

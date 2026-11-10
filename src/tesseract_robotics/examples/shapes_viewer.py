@@ -6,6 +6,7 @@ import sys
 import traceback
 from typing import override
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
 from tesseract_robotics.tesseract_environment import Environment
 
@@ -90,10 +91,7 @@ class TesseractSupportResourceLocator(ResourceLocator):
                 print(f"url_match failed for: {url}")
                 return None
 
-            tesseract_support = os.environ.get("TESSERACT_SUPPORT_DIR")
-            if tesseract_support is None:
-                print("TESSERACT_SUPPORT_DIR not set")
-                return None
+            tesseract_support = str(get_tesseract_support_path())
 
             filename = os.path.join(tesseract_support, os.path.normpath(url_match.group(1)))
             return SimpleLocatedResource(url, filename, self)

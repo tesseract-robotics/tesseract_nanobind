@@ -9,6 +9,7 @@ from typing import override
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_collision import ACMOverrideType, ContactManagerConfig
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
@@ -57,7 +58,7 @@ DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 @pytest.fixture
 def abb_irb2400_environment():
     """Load ABB IRB2400 robot environment for testing (has OPW kinematics)."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_path = Path(
         locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
     )
@@ -522,6 +523,8 @@ CHILD_TIMEOUT_S = 60.0
 # keep the environment alive, or deleting the environment unloads the code the group calls.
 _KINEMATIC_GROUP_KEEPS_ENV_ALIVE = textwrap.dedent(
     """
+    from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
+    from tesseract_robotics.tesseract_common import GeneralResourceLocator
     import gc
     from pathlib import Path
 
@@ -532,7 +535,7 @@ _KINEMATIC_GROUP_KEEPS_ENV_ALIVE = textwrap.dedent(
     from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
     from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultMoveProfileD
 
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     support = "package://tesseract/support/urdf/abb_irb2400"
     env = Environment()
     assert env.init(

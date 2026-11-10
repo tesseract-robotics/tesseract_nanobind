@@ -61,8 +61,14 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics import (
+    SupportDataNotFoundError,
+    get_tesseract_resource_path,
+    get_tesseract_support_path,
+)
 from tesseract_robotics.planning import Pose, Robot
 from tesseract_robotics.tesseract_common import (
+    GeneralResourceLocator,
     VectorVector3d,
 )
 from tesseract_robotics.tesseract_geometry import (
@@ -290,7 +296,9 @@ def run(**kwargs):
     print("=" * 60)
 
     # Load KUKA IIWA robot as base
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     print(f"\nLoaded robot: {robot.env.getSceneGraph().getName()}")
     print(f"Links: {len(robot.get_link_names())}")
 
@@ -456,10 +464,11 @@ def run(**kwargs):
 
     z_row3 = z_base + 0.7
 
-    # TESSERACT_SUPPORT_DIR contains example meshes from tesseract_support package
-    import os
-
-    tesseract_support = os.environ.get("TESSERACT_SUPPORT_DIR")
+    # tesseract's support data (the `[support]` extra) has example meshes
+    try:
+        tesseract_support = str(get_tesseract_support_path())
+    except SupportDataNotFoundError:
+        tesseract_support = None
     if tesseract_support:
         # createMeshFromPath returns a list because some formats (DAE) contain
         # multiple meshes. For single-mesh files like STL, use meshes[0].
@@ -501,7 +510,7 @@ def run(**kwargs):
                 )
                 robot.add_link(link, joint)
     else:
-        print("TESSERACT_SUPPORT_DIR not set, skipping file-based meshes")
+        print("tesseract support data not installed, skipping file-based meshes")
 
     # =========================================================================
     # SUMMARY

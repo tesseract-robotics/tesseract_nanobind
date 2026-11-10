@@ -14,7 +14,8 @@ management, and access to the underlying `Environment`.
 from tesseract_robotics.planning import Robot
 
 # Bundled test robots
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # From URDF/SRDF (package:// or file:// URLs)
 robot = Robot.from_urdf(

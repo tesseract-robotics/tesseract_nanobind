@@ -1,19 +1,16 @@
 # How the binaries are built
 
-This repository compiles only the nanobind modules. The tesseract C++ stack
-(tesseract, trajopt, tesseract_planning and their plugins) is built as conda
-packages by the [tesseract-robotics-packaging](https://github.com/tesseract-robotics-packaging)
-feedstocks and published to the `tesseract-robotics` channel on anaconda.org.
-pixi installs those packages, scikit-build-core compiles the bindings against
-them, and a per-platform repair step copies the C++ libraries and plugin
-factories into the wheel. Each platform's workflow then publishes its wheels to
-PyPI when a version tag is pushed.
+This repository compiles only the nanobind modules, and gets the tesseract C++ stack
+(tesseract, trajopt, tesseract_planning and their plugins) two ways:
 
-Released wheels are built against tesseract 0.35.0. The 0.36 stack that
-`upstream-main` (#161) binds is published as `0.36.0.dev` packages on the
-channel's `dev` label (`tesseract-robotics/label/dev`), built by the feedstocks'
-`dev` branches on CI for all four platforms; the `default` env pins them (see
-[Building against upstream main](upstream-main.md#status)).
+- **Development** (pixi): the stack comes as conda packages, built by the
+  [tesseract-robotics-packaging](https://github.com/tesseract-robotics-packaging)
+  feedstocks and published to the `tesseract-robotics` channel on anaconda.org. The
+  `default` env pins the `0.36.0.dev` packages on the channel's `dev` label (see
+  [Building against upstream main](upstream-main.md#status)).
+- **PyPI wheels** (no conda): `.github/workflows/wheels.yml` builds the same upstream
+  commits from source with colcon against vcpkg dependencies, and the platform's repair
+  tool bundles them into the wheel. See [Building a wheel](#building-a-wheel).
 
 ```mermaid
 flowchart LR
@@ -27,21 +24,23 @@ flowchart LR
         F[rattler-build recipes<br/>GitHub Actions, 4 platforms]
     end
     subgraph chan["anaconda.org"]
-        C[(tesseract-robotics channel<br/>label: main)]
+        C[(tesseract-robotics channel)]
         CF[(conda-forge)]
     end
-    subgraph repo["this repository"]
-        P[pixi env<br/>py312]
-        B[scikit-build-core<br/>nanobind modules]
-        R[repair step<br/>bundle libs + plugins]
+    subgraph wheels["wheels.yml"]
+        V[vcpkg<br/>third-party libraries]
+        CB[colcon build<br/>C++ stack]
+        R[pip wheel + auditwheel /<br/>delvewheel / delocate]
     end
+    P[pixi env<br/>development]
     W[(PyPI<br/>tesseract-robotics-nanobind)]
 
-    upstream -->|release tag tarball| F
+    upstream -->|source tarball| F
     F -->|upload| C
     C --> P
     CF --> P
-    P --> B --> R -->|on version tag| W
+    upstream -->|dependencies.rosinstall| CB
+    V --> CB --> R -->|on version tag| W
 ```
 
 ## Layers and who owns them
@@ -53,7 +52,7 @@ flowchart LR
 | Third-party C++ | boost, eigen, fcl, osqp, taskflow, … | `conda-forge` | conda-forge |
 | Forked third-party C++ | `pcl` without VTK, Qt or OpenGL; `bullet-cpp` and `ompl` without a Python pin | `tesseract-robotics` channel, label `dev` | CI on the `dev` branches of the `jf---` forks of the conda-forge feedstocks |
 | Bindings | `_tesseract_*` nanobind extension modules | this repository | scikit-build-core + CMake, inside a pixi env |
-| Wheels | self-contained wheels with the C++ closure bundled | PyPI, `tesseract-robotics-nanobind` | `.github/workflows/wheels-{linux,macos,windows}.yml` |
+| Wheels | self-contained wheels with the C++ closure bundled | PyPI, `tesseract-robotics-nanobind` | `.github/workflows/wheels.yml` (vcpkg + colcon, no conda) |
 
 The SWIG bindings follow the same pattern one level up:
 [tesseract-robotics-python-feedstock](https://github.com/tesseract-robotics-packaging/tesseract-robotics-python-feedstock)
@@ -158,114 +157,105 @@ The pins are in `pyproject.toml` under `[tool.pixi.dependencies]`: the three
 build). Pinning eigen or the other third-party libraries as well deadlocks the
 solve; the stack packages' `run_exports` drive the rest.
 
-`TESSERACT_CPP_PREFIX` takes precedence over `CONDA_PREFIX` in `CMakeLists.txt`
-(the RPATH, `CMAKE_PREFIX_PATH`, link directories and the data that gets
-installed into the wheel), in `scripts/build_macos_wheel.sh`, and in the Windows
-workflow.
-
 ## Building a wheel
 
-Every platform follows the same five steps:
+The PyPI wheels contain no conda packages. `.github/workflows/wheels.yml` builds them
+the way [tesseract_python](https://github.com/tesseract-robotics/tesseract_python)
+builds its SWIG wheels:
 
 ```mermaid
 flowchart LR
-    A[pixi install<br/>locked: true] --> B[pip wheel .<br/>--no-build-isolation]
-    B --> C[copy plugin factories<br/>into the wheel]
-    C --> D[bundle the C++ closure<br/>fix load paths]
-    D --> E[patch task composer YAML<br/>/usr/local/lib → @PLUGIN_PATH@]
+    A[vcs import<br/>dependencies.rosinstall] --> B[vcpkg<br/>third-party libraries]
+    B --> C[colcon build<br/>tesseract C++ stack]
+    C --> D[pip wheel .<br/>--no-build-isolation]
+    D --> E[auditwheel / delvewheel /<br/>delocate repair]
 ```
 
-1. `prefix-dev/setup-pixi` installs the platform's env from `pixi.lock` with
-   `locked: true`, so CI fails if the lock drifts from `pyproject.toml`.
-2. `pip wheel . --no-build-isolation` runs scikit-build-core, which configures
-   `CMakeLists.txt` against the env and compiles each `_tesseract_*` module as
-   `STABLE_ABI NB_STATIC`. The CMake install step also copies data into the
-   wheel: `share/tesseract/support` (robot models) and the task composer
-   configuration from `share/tesseract_planning/task_composer/config`.
-3. The plugin factories are loaded with `dlopen`, so no linker-based tool finds
-   them. Each script copies the nine factory libraries explicitly (contact
-   managers, kinematics including KDL/OPW/UR, task composer).
-4. A repair step bundles the remaining dependency closure and fixes load paths
-   (table below).
-5. The task composer YAML hard-codes `/usr/local/lib` as the plugin directory.
-   The build replaces it with the placeholder `@PLUGIN_PATH@`, which the
-   package resolves at import time.
+1. `vcs import` checks out `dependencies.rosinstall`: tesseract, tesseract_planning and
+   trajopt at the commits the 0.36 dev conda packages were built from (the `upstream/`
+   submodules), boost_plugin_loader 0.5.0, descartes_light, opw_kinematics, ruckig.
+2. `johnwason/vcpkg-action` builds the third-party libraries (Boost, Eigen, OMPL,
+   Bullet, FCL, PCL, spdlog, …) as shared libraries, with the overlay triplets in
+   `.github/workflows/vcpkg_triplets` on Linux and macOS.
+3. `colcon build --merge-install` builds the tesseract stack against them into
+   `ws/install`. trajopt_ext builds OSQP, qpOASES and PIQP.
+4. `pip wheel . --no-build-isolation` runs scikit-build-core against `ws/install` and
+   the vcpkg prefix (`CMAKE_PREFIX_PATH`), compiling each `_tesseract_*` module as
+   `STABLE_ABI NB_STATIC`. The CMake install step copies the task composer
+   configuration into `tesseract_robotics/data/`.
+5. The platform's repair tool bundles the dependency closure.
+6. The Linux x86_64 job also builds `tesseract-robotics-nanobind-support`, a `py3-none-any`
+   wheel of tesseract's robot models and meshes (`packaging/tesseract-robotics-nanobind-support`),
+   copied from `ws/install/share/tesseract`. The bindings install it with the `[support]` extra.
+
+### Plugin anchors
+
+The contact manager, kinematics and task composer factories are loaded at runtime by
+boost_plugin_loader, so no linker would see them. `CMakeLists.txt` creates imported
+targets for the nine factory libraries (`tesseract_nb_find_plugin_target`), and the
+collision, kinematics and task composer modules link them. Each module's init calls
+`boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv` with the factory library's
+anchor symbol, which appends that library's resolved path to
+`TESSERACT_CONTACT_MANAGERS_PLUGINS`, `TESSERACT_KINEMATICS_PLUGINS` or
+`TESSERACT_TASK_COMPOSER_PLUGINS`. The link makes the repair tools bundle the factories
+like any other dependency, and the anchor makes the plugin loaders open the bundled
+copies by path. No plugin directory is configured and no YAML is patched.
 
 | | Linux | macOS | Windows |
 |---|---|---|---|
-| Workflow | `wheels-linux.yml` | `wheels-macos.yml` | `wheels-windows.yml` |
-| Runner | `ubuntu-22.04` (x86_64), `ubuntu-22.04-arm` (aarch64) | `macos-14` (arm64) | `windows-2022` (x64) |
-| Python builds | 3.12 (x86_64, aarch64) | 3.12 | 3.12 |
-| Entry point | `pixi run build-wheel` → `scripts/build_linux_wheel.sh` | `pixi run build-wheel` → `scripts/build_macos_wheel.sh` | inline workflow steps with MSVC v143 |
-| Repair | `ldd` closure copied next to the package, `patchelf --set-rpath '$ORIGIN'` | `scripts/repair_macos_wheel.py`: walks the closure from the extension modules and plugins, rewrites references to `@loader_path/`, re-signs, and refuses anything left outside the wheel except `libomp` | `delvewheel repair --analyze-existing` |
-| Bundled libraries | `tesseract_robotics/` | `tesseract_robotics/.dylibs/` | `tesseract_robotics/` (plugins), `tesseract_robotics_nanobind.libs/` (dependencies) |
-| Never bundled | `libstdc++`, `libgcc_s`, system libraries, `libpython` | | |
+| Runner | `ubuntu-24.04` (x86_64), `ubuntu-24.04-arm` (aarch64) | `macos-15-intel` (x86_64), `macos-15` (arm64) | `windows-2022` (x64) |
+| vcpkg triplet | `x64-linux-dynamic-release`, `arm64-linux-dynamic-release` | `x64-osx-dynamic-release`, `arm64-osx-dynamic-release` | `x64-windows-release` |
+| Repair | `auditwheel repair --plat manylinux_2_39_*` | `delocate-wheel --sanitize-rpaths` | `delvewheel repair` |
+| Never bundled | `libstdc++`, `libgcc_s`, glibc (manylinux policy) | system libraries | `msvcp140.dll`, `vcomp140.dll` |
 | Platform gotchas | [Linux wheels](linux-wheels.md) | [macOS wheels](macos-wheels.md) | [Windows wheels](windows-wheels.md) |
 
 ### Wheel tags
 
 `wheel.py-api = "cp312"` makes the Python 3.12 build an abi3 wheel
-(`cp312-abi3-<platform>`), which installs on 3.12 and every later CPython. The Linux script
-renames the wheel from `linux_*` to `manylinux_2_35_*`. libstdc++ is
-deliberately left to the host, so the real floor is the host's gcc runtime;
-[Linux wheels](linux-wheels.md) explains why.
+(`cp312-abi3-<platform>`), which installs on 3.12 and every later CPython. Linux wheels
+are `manylinux_2_39`: Ubuntu 24.04's glibc, and its gcc 13 libstdc++, which auditwheel
+leaves to the host. On macOS the C++ stack is built for 12.0, but Homebrew's `libomp`
+is built for the runner's macOS; `MACOSX_DEPLOYMENT_TARGET` is left unset so delocate
+raises the wheel tag to the bundled libraries' minimum.
 
 ### Tests before publishing
 
-- **ABI canary.** Each build job installs the wheel it just built into the
-  pixi env and runs `tests/tesseract_kinematics`.
-- **`test-wheel` job.** A lean pixi env on a fresh runner (Python and `uv` from
-  conda, no C++ stack) installs the wheel with `uv pip install` and runs the full
-  test suite. Pull requests test the abi3 wheel on 3.12; pushes to `main`, tags and
-  manual runs test it on 3.12, 3.13, 3.14 and 3.15. macOS also checks that one
-  `libomp` loads, and the full matrix adds `wheel-openmp`, where the env provides
-  it. Linux
-  also checks that no library is "not found" and that only one libstdc++ is
-  mapped.
+- **Stub drift gate.** Each build job installs the wheel it just built and runs
+  `scripts/generate_stubs.py --check`; Linux x86_64 also runs pyright.
+- **`test-wheel` job.** A fresh venv on each platform installs the wheel with pip and
+  runs the test suite (without `tests/audit` and `tests/benchmarks`). Pull requests
+  test the abi3 wheel on 3.12; pushes, tags and manual runs test it on 3.12, 3.13,
+  3.14 and 3.15. Linux also checks that the wheel bundles no libstdc++.
 
 ### Publishing
 
-The wheel workflows run on pull requests, on pushes to `main`, and on tags
-matching `X.Y.Z` or `X.Y.Z.W`. On a tag, each workflow's `publish` job (after
-`build` and `test-wheel`) checks that every wheel's version equals the tag and
-uploads with PyPI trusted publishing (`id-token: write`, no stored token). The
-three platforms publish independently, so one platform's wheels can reach PyPI
-while another's job is still failing. The version is the tag:
-`SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND` is set from the
-tag name.
+`wheels.yml` runs on pull requests, on pushes to `main` and `dev*` branches, and on
+tags matching `X.Y.Z.W`. On a tag, the `publish` job (after every `test-wheel` row)
+checks that every wheel's version equals the tag and uploads all platforms at once
+with PyPI trusted publishing from the `pypi` environment. The version is the tag:
+`SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND` is set from the tag
+name.
 
 ## At import time
 
-```mermaid
-flowchart TB
-    I[import tesseract_robotics] --> WIN{Windows?}
-    WIN -->|yes| PATH[prepend package dir and<br/>tesseract_robotics_nanobind.libs<br/>to PATH + add_dll_directory]
-    WIN -->|no| PL
-    PATH --> PL[find the plugin directory]
-    PL --> E1{TESSERACT_PLUGIN_PATH set?}
-    E1 -->|no| E2{bundled factories<br/>in the package?}
-    E2 -->|no| E3[editable install:<br/>CONDA_PREFIX/lib or Library/bin]
-    E1 -->|yes| SET
-    E2 -->|yes| SET
-    E3 --> SET[set TESSERACT_*_PLUGIN_DIRECTORIES]
-    SET --> CFG[write task composer YAML with<br/>@PLUGIN_PATH@ resolved,<br/>to the temp dir]
-```
+Importing `tesseract_robotics` changes nothing in the process environment and adds no resource
+search paths. Data is found through functions the caller uses explicitly:
 
-`src/tesseract_robotics/__init__.py` makes an installed wheel self-contained:
-
-- **Plugins.** The first match wins: `TESSERACT_PLUGIN_PATH`, then the bundled
-  factories (`tesseract_robotics/` on Linux and Windows, `.dylibs/` on macOS),
-  then `$CONDA_PREFIX/lib` (`Library/bin` on Windows) for an editable install.
-  The result is exported as `TESSERACT_CONTACT_MANAGERS_PLUGIN_DIRECTORIES`,
-  `TESSERACT_KINEMATICS_PLUGIN_DIRECTORIES` and
-  `TESSERACT_TASK_COMPOSER_PLUGIN_DIRECTORIES`. Variables that are already set
-  are left alone.
-- **Data.** A wheel reads robot models and task composer configs from
-  `tesseract_robotics/data/`; an editable install reads them from the pixi
-  env's `share/`.
-- **Windows.** `boost::dll` loads plugins with plain `LoadLibrary`, which
-  ignores `os.add_dll_directory`, so the package directory and the `.libs`
-  directory are also prepended to `PATH`.
+- **Task composer config.** `get_task_composer_config_path()`:
+  `TESSERACT_TASK_COMPOSER_CONFIG_FILE` when set, else the config the wheel bundles in
+  `tesseract_robotics/data/`, else the pixi env's `share/` for an editable install.
+- **Support data.** tesseract's robot models and meshes are a separate wheel,
+  `tesseract-robotics-nanobind-support` (the `[support]` extra), built from the same prefix by
+  `packaging/tesseract-robotics-nanobind-support`. `get_tesseract_resource_path()` returns its
+  directory (or the pixi env's `share/`), to pass to
+  `GeneralResourceLocator(paths=[...])` or `addPath()`; `get_tesseract_support_path()` is its
+  `tesseract/support/`. Without either it raises `SupportDataNotFoundError`.
+- **Windows DLLs.** A wheel needs nothing: delvewheel adds its bundled DLL directory. For a
+  build whose tesseract DLLs live elsewhere, `TESSERACT_PYTHON_DLL_PATH` (as in the
+  tesseract_python bindings) lists directories the import passes to `os.add_dll_directory`.
+- **Plugins.** Nothing to configure: importing the collision, kinematics or task composer
+  module registers its factories through the anchors. These are the one environment change, made
+  by boost_plugin_loader in C++ (`TESSERACT_*_PLUGINS`), which its loaders read.
 
 An editable install (`pixi run install`) bakes the env's `lib/` into the
 modules' RPATH. It runs only inside the pixi env it was built in; use a wheel
@@ -315,20 +305,8 @@ The `dev` track uploads to its own label, so the `main` label keeps serving the
 
 ## Known gaps
 
-!!! note "Under verification"
-    These come from reading the scripts; no wheel has been inspected to
-    confirm them.
-
-    - **`manylinux` tag.** The Linux script renames the file but does not run
-      auditwheel or rewrite `Tag:` in `.dist-info/WHEEL`.
-    - **`RECORD`.** On Linux, plugins and patched YAMLs are added after
-      `pip wheel`, and the wheel is re-zipped without regenerating `RECORD`.
-      macOS rewrites it last in `repair_macos_wheel.py`; Windows runs
-      `delvewheel` last, which rewrites it.
-    - **OPW plugin name.** `abb_irb2400_plugins.yaml` asks for
-      `tesseract_kinematics_opw_factories`, but the library is
-      `libtesseract_kinematics_opw_factory`. The Windows workflow ships aliases
-      under the plural name; Linux and macOS don't.
-    - **Silent copies.** A plugin factory missing from the env is skipped
-      (Linux, macOS) or only logged (Windows), and several `patchelf` /
-      `install_name_tool` calls end in `|| true`.
+- **libomp under conda (macOS).** delocate bundles Homebrew's `libomp`. A wheel installed
+  into a conda or pixi environment that has its own `llvm-openmp` loads two OpenMP
+  runtimes, the failure described in [macOS wheels](macos-wheels.md) (#136).
+- **macOS minimum version.** The macOS tag follows Homebrew's `libomp`, so it rises when
+  the runner image does.

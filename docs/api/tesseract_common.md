@@ -224,14 +224,19 @@ Id-keyed results (`SceneState.link_transforms`, `calcFwdKin`) are plain
 Resolves `package://` URLs to file paths.
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
-locator = GeneralResourceLocator()
+# tesseract's support data (the [support] extra) as a search path
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
 # Resolve package URL
-resource = locator.locateResource("package://tesseract_support/urdf/abb_irb2400.urdf")
+resource = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
 path = resource.getFilePath()
 ```
+
+`tesseract_robotics` never adds search paths itself: a locator searches what it is given and the
+environment variables below.
 
 A package is a directory that holds a `package.xml`; its name is the directory name. The
 locator finds packages in the directories it is given and in their subdirectories. Without

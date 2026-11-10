@@ -10,17 +10,20 @@ main thread has run, so a call too fast to observe once is caught on a later rep
 that holds the GIL fails deterministically, never passes vacuously.
 """
 
-import os
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import override
 
 import numpy as np
 import pytest
 
-from tesseract_robotics import tesseract_environment, tesseract_kinematics, tesseract_urdf
+from tesseract_robotics import (
+    get_tesseract_support_path,
+    tesseract_environment,
+    tesseract_kinematics,
+    tesseract_urdf,
+)
 from tesseract_robotics.tesseract_common import Isometry3d, ResourceLocator
 
 from .tesseract_support_resource_locator import TesseractSupportResourceLocator
@@ -74,7 +77,7 @@ def assert_releases_gil(call):
 
 
 def _support_urdf(name):
-    return Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf" / name
+    return get_tesseract_support_path() / "urdf" / name
 
 
 class _PythonLocator(ResourceLocator):
@@ -199,7 +202,7 @@ def test_environment_serialization_releases_gil(abb_env, tmp_path):  # noqa: F81
 def test_create_mesh_releases_gil(kind):
     from tesseract_robotics import tesseract_geometry as tg
 
-    path = str(Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "meshes" / "sphere_p25m.dae")
+    path = str(get_tesseract_support_path() / "meshes" / "sphere_p25m.dae")
     from_path = getattr(tg, f"create{kind}FromPath")
     from_resource = getattr(tg, f"create{kind}FromResource")
     locator = _PythonLocator()

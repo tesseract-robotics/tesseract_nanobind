@@ -1,0 +1,68 @@
+name: test_python_ver
+description: >-
+  Install the wheels a build job just built into a fresh venv of one Python version and run the
+  test suite. The bindings are one cp312-abi3 wheel per platform, so the build jobs build once and
+  call this once per supported Python version (the pattern of Robot Raconteur's build_python_ver).
+inputs:
+  python_version:
+    description: Python version to test, as actions/setup-python takes it
+    required: true
+  wheel_dir:
+    description: Directory holding the bindings wheel and the support data wheel
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/setup-python@v6
+    id: python
+    with:
+      python-version: ${{ inputs.python_version }}
+      allow-prereleases: true
+  - name: install wheels (Python ${{ inputs.python_version }})
+    shell: bash
+    run: |
+      VENV="$RUNNER_TEMP/test-venv-${{ inputs.python_version }}"
+      "${{ steps.python.outputs.python-path }}" -m venv "$VENV"
+      if [ -d "$VENV/Scripts" ]; then BIN="$VENV/Scripts"; else BIN="$VENV/bin"; fi
+      echo "TEST_PYTHON=$BIN/python" >> $GITHUB_ENV
+      "$BIN/python" -m pip install --upgrade pip
+      "$BIN/python" -m pip install "${{ inputs.wheel_dir }}"/*.whl pytest pytest-xdist
+  - name: wheel bundles no libstdc++ (Python ${{ inputs.python_version }})
+    # gh-119: two libstdc++ copies in one process corrupt the heap; auditwheel never bundles it
+    if: runner.os == 'Linux'
+    shell: bash
+    run: |
+      if "$TEST_PYTHON" -m pip show -f tesseract-robotics-nanobind | grep -q 'libstdc++'; then
+        echo "::error::wheel bundles libstdc++ (gh-119)"; exit 1
+      fi
+  - name: smoke test (Python ${{ inputs.python_version }})
+    shell: bash
+    run: |
+      "$TEST_PYTHON" - <<'EOF'
+      import importlib, os, pkgutil
+      before = dict(os.environ)
+      import tesseract_robotics
+      print("Version:", tesseract_robotics.__version__)
+      for m in pkgutil.iter_modules(tesseract_robotics.__path__):
+          if m.name.startswith(("tesseract_", "trajopt")) or m.name == "planning":
+              importlib.import_module("tesseract_robotics." + m.name)
+      # the plugin anchors setenv() in C++, which os.environ does not see; Python must set nothing
+      changed = sorted(k for k in set(before) | set(os.environ) if before.get(k) != os.environ.get(k))
+      assert not changed, f"importing tesseract_robotics changed the environment: {changed}"
+      print("support data:", tesseract_robotics.get_tesseract_resource_path())
+      EOF
+  - name: one bundled OpenMP runtime (Python ${{ inputs.python_version }})
+    if: runner.os == 'macOS'
+    shell: bash
+    working-directory: tesseract_nanobind
+    run: |
+      "$TEST_PYTHON" scripts/check_wheel_openmp.py --expected bundled --order consumer-first
+      "$TEST_PYTHON" scripts/check_wheel_openmp.py --expected bundled --order bindings-first
+  - name: run tests (Python ${{ inputs.python_version }})
+    shell: bash
+    working-directory: tesseract_nanobind
+    env:
+      TWC_SUPPORT_PATH: ${{ github.workspace }}/tesseract_nanobind/ws/src/tesseract_ros_workcell/twc_support
+    run: |
+      "$TEST_PYTHON" -m pytest -ra -p no:cacheprovider -n auto tests --ignore=tests/audit --ignore=tests/benchmarks

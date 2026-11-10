@@ -34,6 +34,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.examples.lowlevel.example_support import (
     load_support_environment,
     run_pipeline,
@@ -384,7 +385,7 @@ def run():
         dict: {pick_result, place_result, env, joint_names} for testing/visualization
     """
     # car_seat_demo: 8-DOF system with linear carriage + 7-axis arm
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = load_support_environment("car_seat_demo", locator)
     print(f"Loaded environment: {env.getName()}")
 

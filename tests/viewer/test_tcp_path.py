@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import MoveInstructionType as Move
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
@@ -44,7 +45,7 @@ PUZZLE_SRDF = "package://tesseract/support/urdf/puzzle_piece_workcell.srdf"
 
 
 def _load(name):
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource(f"package://tesseract/support/urdf/{name}.urdf")
     srdf = locator.locateResource(f"package://tesseract/support/urdf/{name}.srdf")
     env = Environment()
@@ -195,7 +196,7 @@ def test_rail_and_arm_stay_on_the_path():
 
 def test_group_without_an_ik_solver_has_a_path():
     env = Environment()
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource(PUZZLE_URDF)
     srdf = locator.locateResource(PUZZLE_SRDF)
     assert env.init(Path(urdf.getFilePath()), Path(srdf.getFilePath()), locator)

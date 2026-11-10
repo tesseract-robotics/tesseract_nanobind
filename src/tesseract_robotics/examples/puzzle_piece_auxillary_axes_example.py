@@ -100,6 +100,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -110,6 +111,7 @@ from tesseract_robotics.planning import (
 from tesseract_robotics.planning.profiles import TRAJOPT_IFOPT_DEFAULT_NAMESPACE
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
@@ -283,6 +285,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     robot = Robot.from_urdf(
         "package://tesseract/support/urdf/puzzle_piece_workcell.urdf",
         "package://tesseract/support/urdf/puzzle_piece_workcell.srdf",
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
 
     # 9 DOF: KUKA IIWA (7) + auxiliary axes (2)

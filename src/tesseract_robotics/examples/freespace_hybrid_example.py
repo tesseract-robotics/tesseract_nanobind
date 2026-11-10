@@ -33,6 +33,7 @@ import time
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     MotionProgram,
     Pose,
@@ -47,6 +48,7 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_ifopt_pipeline_profiles,
     create_freespace_pipeline_profiles,
 )
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
 )
@@ -94,7 +96,9 @@ def run(
     """
     # KUKA LBR IIWA 14 R820: 7-DOF collaborative arm
     # Uses KDL (numeric) IK solver - slower than OPW but works for 7-DOF
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # Add sphere obstacle at (0.5, 0, 0.55) with radius 0.15m
     # This blocks the direct path, forcing OMPL to find collision-free route

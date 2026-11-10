@@ -44,6 +44,12 @@
 #include <tesseract/collision/vhacd/VHACD.h>
 #include <tesseract/collision/convex_decomposition.h>
 #include <tesseract/collision/vhacd/convex_decomposition_vhacd.h>
+
+// Plugin anchors: the factory libraries are linked into this module, so the wheel repair tools
+// bundle them; the anchors register the bundled copies with the plugin loader at import
+#include <tesseract/collision/bullet/bullet_factories.h>
+#include <tesseract/collision/fcl/fcl_factories.h>
+#include <boost_plugin_loader/utils.h>
 // VHACD_GOOGOL_SIZE is defined only inside VHACD.h's implementation section: if it is set here, this
 // TU compiled a second V-HACD copy (an ODR and size hazard, not a link error). Fails the build on
 // every platform, Windows included, where the nm test cannot look.
@@ -186,6 +192,9 @@ public:
 }  // namespace
 
 NB_MODULE(_tesseract_collision, m) {
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tc::BulletFactoriesAnchor(), "TESSERACT_CONTACT_MANAGERS_PLUGINS");
+    boost_plugin_loader::addSymbolLibraryToSearchLibrariesEnv(tc::FCLFactoriesAnchor(), "TESSERACT_CONTACT_MANAGERS_PLUGINS");
+
     // Import geometry module for tesseract::geometry::{Geometry,Mesh,ConvexMesh} (else stubs quote the
     // C++ name). It imports tesseract_common in turn, which covers Isometry3d, ACM and CollisionMarginData.
     nb::module_::import_("tesseract_robotics.tesseract_geometry._tesseract_geometry");

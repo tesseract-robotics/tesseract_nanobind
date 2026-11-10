@@ -58,12 +58,14 @@ Key Concepts
     `floating_joints` is left out.
 """
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     BytesResource,
     CalibrationInfo,
@@ -87,6 +89,8 @@ URDF_URL = "package://tesseract/support/urdf/abb_irb2400.urdf"
 SRDF_URL = "package://tesseract/support/urdf/abb_irb2400.srdf"
 # A variable no installation sets: loadEnvironmentVariable returns False for it
 UNSET_VARIABLE = "TESSERACT_EXAMPLE_UNSET_VARIABLE"
+# Set by this example only, to show the environment-variable API
+EXAMPLE_VARIABLE = "TESSERACT_EXAMPLE_RESOURCE_PATH"
 
 # Upstream's unit-test calibration (tesseract_srdf_unit.cpp:672-690), verbatim. A fixture
 # for the mechanism, not a calibration of a real IRB2400.
@@ -197,17 +201,22 @@ def run() -> dict[str, Any]:
 def run_in(fixture_root: Path) -> dict[str, Any]:
     """The example, with the calibration fixture package written under `fixture_root`."""
     # --8<-- [start:locators]
-    # Default: the TESSERACT_RESOURCE_PATH, ROS_PACKAGE_PATH and AMENT_PREFIX_PATH variables
-    locator = GeneralResourceLocator()
+    # The directory that holds the `tesseract` package (the `[support]` extra's data)
+    share = get_tesseract_resource_path()
+    # `paths`, plus the TESSERACT_RESOURCE_PATH, ROS_PACKAGE_PATH and AMENT_PREFIX_PATH variables
+    locator = GeneralResourceLocator(paths=[share])
     urdf_path, srdf_path = locate(locator, URDF_URL), locate(locator, SRDF_URL)
-    # The directory that holds the `tesseract` package, found through the package itself
-    share = locate(locator, "package://tesseract/package.xml").parent.parent
 
     by_paths = GeneralResourceLocator(paths=[share], environment_variables=[])
-    by_variable = GeneralResourceLocator(environment_variables=["TESSERACT_RESOURCE_PATH"])
-    late = GeneralResourceLocator(environment_variables=[])
-    unresolved_before_load = late.locateResource(URDF_URL) is None
-    load_set_variable = late.loadEnvironmentVariable("TESSERACT_RESOURCE_PATH")
+    # Search paths can also come from a variable of your choice, as a shell would set it
+    os.environ[EXAMPLE_VARIABLE] = str(share)
+    try:
+        by_variable = GeneralResourceLocator(environment_variables=[EXAMPLE_VARIABLE])
+        late = GeneralResourceLocator(environment_variables=[])
+        unresolved_before_load = late.locateResource(URDF_URL) is None
+        load_set_variable = late.loadEnvironmentVariable(EXAMPLE_VARIABLE)
+    finally:
+        del os.environ[EXAMPLE_VARIABLE]
     load_unset_variable = late.loadEnvironmentVariable(UNSET_VARIABLE)
 
     write_fixture_package(fixture_root)

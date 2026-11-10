@@ -56,8 +56,9 @@ Related Examples
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import Pose, Robot
-from tesseract_robotics.tesseract_common import Quaterniond
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, Quaterniond
 
 
 def main():
@@ -68,7 +69,9 @@ def main():
     # KUKA LBR IIWA 14 R820 is a 7-DOF collaborative robot
     # 7 joints = redundant (more DOF than needed for 6D pose) -> multiple IK solutions
     # KDL (Kinematics and Dynamics Library) is the default solver
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     # =========================================================================
     # STEP 2: Forward Kinematics

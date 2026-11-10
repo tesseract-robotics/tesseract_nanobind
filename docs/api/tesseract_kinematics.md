@@ -269,7 +269,8 @@ from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
 import numpy as np
 
 # Load robot
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 manip = robot.env.getKinematicGroup("manipulator")
 
 # Current pose

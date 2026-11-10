@@ -53,6 +53,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import (
     ChangeLinkCollisionEnabledCommand,
@@ -134,7 +135,7 @@ def laser_callback(manip_info: ManipulatorInfo) -> Isometry3d:
 
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     env = Environment()
     env.init(locate(locator, URDF_URL), locate(locator, SRDF_URL), locator)
     revisions = {"after_init": (env.getRevision(), env.getInitRevision())}

@@ -4,9 +4,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/tesseract-robotics-nanobind.svg)](https://pypi.org/project/tesseract-robotics-nanobind/)
 [![Python](https://img.shields.io/badge/python-3.12%20|%203.13%20|%203.14%20|%203.15-blue.svg)](https://github.com/tesseract-robotics/tesseract_nanobind)
-[![Linux](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-linux.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-linux.yml)
-[![macOS](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-macos.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-macos.yml)
-[![Windows](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-windows.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels-windows.yml)
+[![Wheels](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels.yml/badge.svg)](https://github.com/tesseract-robotics/tesseract_nanobind/actions/workflows/wheels.yml)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://tesseract-robotics.github.io/tesseract_nanobind/)
 [![license - Apache 2.0](https://img.shields.io/:license-Apache%202.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -37,8 +35,10 @@ for an excellent overview of `Tesseract's` architecture & features see [this pre
 ## Installation
 
 ```bash
-pip install tesseract-robotics-nanobind
+pip install "tesseract-robotics-nanobind[support]"
 ```
+
+The `[support]` extra adds tesseract's example robots and meshes (`tesseract-robotics-nanobind-support`), which the examples and the Quick Start load. Leave it out if you only use your own robots.
 
 **Platform support:** 
 
@@ -63,12 +63,17 @@ The source is in [`src/tesseract_robotics/examples`](https://github.com/tesserac
 ## Quick Start
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import (
     Robot, MotionProgram, JointTarget, CartesianTarget, Pose, TaskComposer,
 )
 
-# Load a bundled robot (urdf + srdf from tesseract's support package)
-robot = Robot.from_tesseract_support("abb_irb2400")
+# Resolve package:// URLs in tesseract's support data (the [support] extra)
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+
+# Load a robot from tesseract's support package (urdf + srdf)
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # Start at all-zero joints, goal is a tool0 pose (upstream freespace_example.cpp);
 # quaternion is scalar-last [qx, qy, qz, qw]

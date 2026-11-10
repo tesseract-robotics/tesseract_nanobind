@@ -26,10 +26,14 @@ endif()
 find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
 
-# The tesseract C++ libs (and every dependency) are provided by the tesseract-robotics
-# conda packages installed in the active env; find_package() resolves them via the
-# CMAKE_PREFIX_PATH entry added below.
-if(NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
+# The tesseract C++ prefix: TESSERACT_CPP_PREFIX when set (the PyPI wheel builds point it at
+# the colcon install of the source-built stack, see .github/workflows/wheels.yml), otherwise
+# the active conda env, whose tesseract-robotics packages provide the libs for development.
+# find_package() resolves them via the CMAKE_PREFIX_PATH entry added below, and the data the
+# wheel carries is copied from its share/.
+if(NOT "$ENV{TESSERACT_CPP_PREFIX}" STREQUAL "")
+  set(TESSERACT_CPP_PREFIX "$ENV{TESSERACT_CPP_PREFIX}")
+elseif(NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
   set(TESSERACT_CPP_PREFIX "$ENV{CONDA_PREFIX}")
 endif()
 
@@ -71,6 +75,39 @@ find_package(tesseract REQUIRED COMPONENTS state_solver)
 find_package(tesseract REQUIRED COMPONENTS kinematics)
 find_package(tesseract REQUIRED COMPONENTS environment)
 find_package(tesseract_planning REQUIRED COMPONENTS command_language)
+
+# Plugin factory libraries are loaded at runtime by boost_plugin_loader and are mostly not exported
+# as CMake targets. Create imported targets for them so the extension modules can link them: that
+# makes them ordinary dependencies, so auditwheel/delocate/delvewheel bundle them, and the module
+# init registers each one through its anchor symbol (addSymbolLibraryToSearchLibrariesEnv).
+macro(tesseract_nb_find_plugin_target lib_name search_target)
+  get_target_property(_plugin_search_location ${search_target} LOCATION)
+  if(NOT WIN32)
+    get_filename_component(_plugin_search_dir ${_plugin_search_location} DIRECTORY)
+  else()
+    # LOCATION is the .dll in bin/; the import library is in lib/
+    get_filename_component(_plugin_search_dir1 ${_plugin_search_location} DIRECTORY)
+    get_filename_component(_plugin_search_dir2 ${_plugin_search_dir1} DIRECTORY)
+    set(_plugin_search_dir "${_plugin_search_dir2}/lib")
+  endif()
+  unset(_plugin_lib_location)
+  find_library(_plugin_lib_location ${lib_name} HINTS ${_plugin_search_dir} NO_CACHE)
+  if(NOT _plugin_lib_location)
+    message(FATAL_ERROR "Could not find plugin library ${lib_name}")
+  endif()
+  add_library(tesseract::${lib_name} SHARED IMPORTED)
+  if(WIN32)
+    set_target_properties(tesseract::${lib_name} PROPERTIES IMPORTED_IMPLIB ${_plugin_lib_location})
+  else()
+    set_target_properties(tesseract::${lib_name} PROPERTIES IMPORTED_LOCATION ${_plugin_lib_location})
+  endif()
+endmacro()
+
+tesseract_nb_find_plugin_target(tesseract_collision_bullet_factories tesseract::collision)
+tesseract_nb_find_plugin_target(tesseract_collision_fcl_factories tesseract::collision)
+tesseract_nb_find_plugin_target(tesseract_kinematics_kdl_factories tesseract::kinematics)
+tesseract_nb_find_plugin_target(tesseract_kinematics_opw_factory tesseract::kinematics)
+tesseract_nb_find_plugin_target(tesseract_kinematics_ur_factory tesseract::kinematics)
 
 # Define reusable function for nanobind extensions
 function(add_tesseract_nanobind_extension module_name source_file)
@@ -155,6 +192,8 @@ add_tesseract_nanobind_extension(
   tesseract::collision_vhacd_convex_decomposition
   tesseract::geometry
   tesseract::common
+  tesseract::tesseract_collision_bullet_factories
+  tesseract::tesseract_collision_fcl_factories
 )
 
 # Add tesseract_state_solver module
@@ -175,6 +214,10 @@ add_tesseract_nanobind_extension(
   tesseract::scene_graph
   tesseract::state_solver_kdl
   tesseract::common
+  tesseract::kinematics_factories
+  tesseract::tesseract_kinematics_kdl_factories
+  tesseract::tesseract_kinematics_opw_factory
+  tesseract::tesseract_kinematics_ur_factory
 )
 
 # Add tesseract_environment module
@@ -328,6 +371,10 @@ add_tesseract_nanobind_extension(
 # Find and add tesseract_task_composer
 find_package(tesseract_planning REQUIRED COMPONENTS task_composer task_composer_taskflow task_composer_planning)
 
+tesseract_nb_find_plugin_target(tesseract_task_composer_factories tesseract::task_composer)
+tesseract_nb_find_plugin_target(tesseract_task_composer_planning_factories tesseract::task_composer)
+tesseract_nb_find_plugin_target(tesseract_task_composer_taskflow_factories tesseract::task_composer)
+
 add_tesseract_nanobind_extension(
   tesseract_task_composer
   src/tesseract_task_composer/tesseract_task_composer_bindings.cpp
@@ -337,6 +384,9 @@ add_tesseract_nanobind_extension(
   tesseract::command_language
   tesseract::collision
   tesseract::common
+  tesseract::tesseract_task_composer_factories
+  tesseract::tesseract_task_composer_planning_factories
+  tesseract::tesseract_task_composer_taskflow_factories
 )
 # Pins the plugin libraries the task composer loads (macOS, Windows).
 target_sources(_tesseract_task_composer PRIVATE src/tesseract_task_composer/plugin_pinning.cpp)
@@ -378,38 +428,17 @@ message(STATUS "nanobind: ${nanobind_VERSION}")
 message(STATUS "===============================================")
 
 # ============== Install Bundled Data Files ==============
-# These are installed into the wheel so env vars can use relative paths.
-# The tesseract-robotics conda packages ship them under <cpp-prefix>/share:
-#   support meshes/urdfs  -> share/tesseract/support (+ share/tesseract/package.xml)
+# The task composer config is installed into the wheel (get_task_composer_config_path()). It comes
+# from <cpp-prefix>/share, where the tesseract install puts it:
 #   task_composer config  -> share/tesseract_planning/task_composer/config
+# tesseract's support data (robot models, meshes) is not: it is its own wheel,
+# packaging/tesseract-robotics-nanobind-support (the `[support]` extra).
 if(DEFINED TESSERACT_CPP_PREFIX)
-  set(TESSERACT_SUPPORT_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract/support")
   set(TASK_COMPOSER_CFG_SRC "${TESSERACT_CPP_PREFIX}/share/tesseract_planning/task_composer/config")
-  if(WIN32 AND NOT EXISTS "${TESSERACT_SUPPORT_SRC}")
+  if(WIN32 AND NOT EXISTS "${TASK_COMPOSER_CFG_SRC}")
     # conda on Windows installs data under the Library/ prefix
-    set(TESSERACT_SUPPORT_SRC "${TESSERACT_CPP_PREFIX}/Library/share/tesseract/support")
     set(TASK_COMPOSER_CFG_SRC "${TESSERACT_CPP_PREFIX}/Library/share/tesseract_planning/task_composer/config")
   endif()
-endif()
-
-if(EXISTS "${TESSERACT_SUPPORT_SRC}")
-  message(STATUS "Installing tesseract_support from: ${TESSERACT_SUPPORT_SRC}")
-  install(DIRECTORY "${TESSERACT_SUPPORT_SRC}/"
-    DESTINATION tesseract_robotics/data/tesseract/support
-    FILES_MATCHING
-    PATTERN "*.urdf" PATTERN "*.srdf" PATTERN "*.yaml" PATTERN "*.xacro"
-    PATTERN "*.stl" PATTERN "*.STL" PATTERN "*.dae" PATTERN "*.glb" PATTERN "*.ply" PATTERN "*.obj" PATTERN "*.csv"
-    PATTERN "*.xml" PATTERN "*.png" PATTERN "*.jpg" PATTERN "*.jpeg"
-    PATTERN ".git" EXCLUDE PATTERN "__pycache__" EXCLUDE)
-  # Install package.xml alongside support data so GeneralResourceLocator
-  # registers `tesseract` as a package when scanning TESSERACT_RESOURCE_PATH.
-  # The locator skips directories without package.xml (ROS convention).
-  get_filename_component(TESSERACT_PKG_XML "${TESSERACT_SUPPORT_SRC}/../package.xml" ABSOLUTE)
-  if(EXISTS "${TESSERACT_PKG_XML}")
-    install(FILES "${TESSERACT_PKG_XML}" DESTINATION tesseract_robotics/data/tesseract)
-  endif()
-else()
-  message(WARNING "tesseract_support not found at ${TESSERACT_SUPPORT_SRC}")
 endif()
 
 if(EXISTS "${TASK_COMPOSER_CFG_SRC}")

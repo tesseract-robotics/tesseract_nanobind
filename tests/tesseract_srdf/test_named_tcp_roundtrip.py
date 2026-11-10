@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
 from tesseract_robotics.tesseract_environment import Environment
 from tesseract_robotics.tesseract_srdf import SRDFModel
@@ -94,7 +95,7 @@ def _assert_tcp(
 
 @pytest.fixture(scope="module")
 def locator() -> GeneralResourceLocator:
-    return GeneralResourceLocator()
+    return GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
 
 @pytest.fixture(scope="module")

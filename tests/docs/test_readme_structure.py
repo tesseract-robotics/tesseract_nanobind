@@ -42,7 +42,9 @@ def test_examples_is_the_first_section_after_installation():
 
 
 def test_quickstart_stays_on_the_irb2400():
-    assert 'Robot.from_tesseract_support("abb_irb2400")' in "\n".join(_section("Quick Start"))
+    assert 'Robot.from_tesseract_support("abb_irb2400", locator)' in "\n".join(
+        _section("Quick Start")
+    )
 
 
 def test_development_detail_lives_in_the_docs():

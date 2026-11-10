@@ -12,6 +12,7 @@ import time
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import Pose, Robot, create_obstacle, sphere
 from tesseract_robotics.tesseract_command_language import (
     CompositeInstruction,
@@ -22,7 +23,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import ManipulatorInfo
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.tesseract_motion_planners import PlannerRequest
 from tesseract_robotics.tesseract_motion_planners_ompl import (
     Cost,
@@ -64,7 +65,9 @@ IIWA_DOF = 7
 
 @pytest.fixture(scope="module")
 def iiwa_sphere_env():
-    robot = Robot.from_tesseract_support("lbr_iiwa_14_r820")
+    robot = Robot.from_tesseract_support(
+        "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
     create_obstacle(
         robot, "sphere_attached", sphere(SPHERE_RADIUS_M), Pose.from_xyz(*SPHERE_CENTER)
     )

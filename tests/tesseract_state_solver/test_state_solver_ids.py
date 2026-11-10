@@ -4,7 +4,12 @@ import os
 
 import numpy as np
 
-from tesseract_robotics import tesseract_common, tesseract_state_solver, tesseract_urdf
+from tesseract_robotics import (
+    get_tesseract_support_path,
+    tesseract_common,
+    tesseract_state_solver,
+    tesseract_urdf,
+)
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -12,7 +17,7 @@ IIWA_JOINTS = [f"joint_a{i}" for i in range(1, 8)]
 
 
 def _solver():
-    path = os.path.join(os.environ["TESSERACT_SUPPORT_DIR"], "urdf/lbr_iiwa_14_r820.urdf")
+    path = os.path.join(str(get_tesseract_support_path()), "urdf/lbr_iiwa_14_r820.urdf")
     scene_graph = tesseract_urdf.parseURDFFile(path, TesseractSupportResourceLocator())
     return tesseract_state_solver.KDLStateSolver(scene_graph)
 

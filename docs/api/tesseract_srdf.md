@@ -6,11 +6,12 @@ plugin configs. `SRDFModel.initFile` / `initString` parse an SRDF against the `S
 its URDF; `saveToFile` writes it back.
 
 ```python
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_srdf import SRDFModel
 from tesseract_robotics.tesseract_urdf import parseURDFFile
 
-locator = GeneralResourceLocator()
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf").getFilePath()
 

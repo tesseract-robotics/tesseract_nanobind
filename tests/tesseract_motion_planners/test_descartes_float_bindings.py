@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import tesseract_robotics.tesseract_motion_planners_descartes as descartes
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -37,7 +38,7 @@ DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 @pytest.fixture
 def irb2400():
     """The ABB IRB2400 environment and its manipulator (analytic OPW kinematics)."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     support = "package://tesseract/support/urdf/abb_irb2400"
     urdf, srdf = (locator.locateResource(support + suffix) for suffix in (".urdf", ".srdf"))
     assert urdf is not None and srdf is not None

@@ -13,7 +13,7 @@ The high-level API abstracts three major pain points of the raw C++ bindings:
 
 1. Environment Setup (Robot class)
    Low-level: 10+ lines with GeneralResourceLocator, pathlib.Path, Environment.init()
-   High-level: Robot.from_tesseract_support("abb_irb2400")
+   High-level: Robot.from_tesseract_support("abb_irb2400", locator)
 
 2. Poly-Type Wrapping (MotionProgram class)
    Low-level: Manual wrapping with CartesianWaypointPoly(),
@@ -75,6 +75,7 @@ Related Examples
 
 import sys
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import (
     CartesianTarget,
     JointTarget,
@@ -88,7 +89,7 @@ from tesseract_robotics.planning import (
     sphere,
     translation,
 )
-from tesseract_robotics.tesseract_common import Quaterniond
+from tesseract_robotics.tesseract_common import GeneralResourceLocator, Quaterniond
 
 
 def main() -> int:
@@ -105,7 +106,9 @@ def main() -> int:
     # Compare with tesseract_planning_lowlevel_c_api_example.py lines 52-62.
     print("\n1. Loading robot...")
 
-    robot = Robot.from_tesseract_support("abb_irb2400")
+    robot = Robot.from_tesseract_support(
+        "abb_irb2400", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
 
     print(f"   Loaded: {robot}")
     print(f"   Links: {robot.get_link_names()[:5]}...")

@@ -64,6 +64,7 @@ import sys
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
 from tesseract_robotics.planning.profiles import (
     TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
@@ -71,7 +72,11 @@ from tesseract_robotics.planning.profiles import (
 )
 from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
 from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import AllowedCollisionMatrix, Isometry3d
+from tesseract_robotics.tesseract_common import (
+    AllowedCollisionMatrix,
+    GeneralResourceLocator,
+    Isometry3d,
+)
 from tesseract_robotics.tesseract_environment import (
     AddLinkCommand,
     ModifyAllowedCollisionsCommand,
@@ -408,6 +413,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     robot = Robot.from_urdf(
         "package://tesseract/support/urdf/car_seat_demo.urdf",
         "package://tesseract/support/urdf/car_seat_demo.srdf",
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
     print(f"Loaded robot: {robot.env.getName()}")
 

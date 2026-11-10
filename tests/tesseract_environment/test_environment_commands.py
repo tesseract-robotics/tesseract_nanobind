@@ -1,15 +1,17 @@
 """Tests for Environment Command bindings"""
 
 import gc
-import os
 import subprocess
 import sys
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-from tesseract_robotics import tesseract_environment
+from tesseract_robotics import (
+    get_tesseract_resource_path,
+    get_tesseract_support_path,
+    tesseract_environment,
+)
 from tesseract_robotics.tesseract_common import (
     AllowedCollisionMatrix,
     ContactManagersPluginInfo,
@@ -79,7 +81,7 @@ SIMPLE_URDF = """
 def env():
     """Create a test environment"""
     environment = Environment()
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     environment.init(SIMPLE_URDF, locator)
     return environment
 
@@ -582,7 +584,7 @@ _COMMAND_TYPE_VALUES = {
 @pytest.fixture
 def iiwa_env():
     """URDF + SRDF environment: the SRDF brings the contact-manager plugins SIMPLE_URDF lacks."""
-    urdf_dir = Path(os.environ["TESSERACT_SUPPORT_DIR"]) / "urdf"
+    urdf_dir = get_tesseract_support_path() / "urdf"
     environment = Environment()
     assert environment.init(
         urdf_dir / "lbr_iiwa_14_r820.urdf",

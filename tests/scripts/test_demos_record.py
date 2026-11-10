@@ -9,6 +9,8 @@ import numpy as np
 import pytest
 import viser
 
+from tesseract_robotics import get_tesseract_resource_path
+
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts/demos"))
 
@@ -30,7 +32,7 @@ ENTRY = manifest.Entry(
 
 @pytest.fixture(scope="module")
 def scene() -> Scene:
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
     srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()

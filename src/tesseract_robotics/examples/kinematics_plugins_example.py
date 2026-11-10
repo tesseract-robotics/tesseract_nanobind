@@ -47,6 +47,7 @@ from typing import Any
 
 import numpy as np
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.tesseract_common import (
     GeneralResourceLocator,
     Isometry3d,
@@ -129,7 +130,7 @@ def plugin_names(plugins) -> dict[str, list[str]]:
 def run() -> dict[str, Any]:
     """Run the example; return every result the test asserts on."""
     # --8<-- [start:factory]
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     factory = KinematicsPluginFactory(locate(locator, PLUGINS_URL), locator)
 
     fwd_kin_plugins = plugin_names(factory.getFwdKinPlugins())

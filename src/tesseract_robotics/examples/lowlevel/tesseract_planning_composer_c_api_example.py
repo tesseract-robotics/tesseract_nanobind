@@ -67,9 +67,9 @@ task_composer_plugins.yaml structure:
         edges: [[OMPL, Interpolate], [Interpolate, TrajOpt], ...]
 
 Plugin Resolution:
-  - Bundled wheels: plugins in .dylibs/ (macOS) or .libs/ (Linux)
-  - Editable install: uses $CONDA_PREFIX/lib paths
-  - __init__.py patches @PLUGIN_PATH@ placeholder at import time
+  - The task composer plugin factories are linked into the bindings; importing
+    tesseract_task_composer registers them with the plugin loader by path
+    (TESSERACT_TASK_COMPOSER_PLUGINS), in a wheel and an editable install alike
 
 Why Use TaskComposer?
 ---------------------
@@ -97,7 +97,7 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics import get_task_composer_config_path
+from tesseract_robotics import get_task_composer_config_path, get_tesseract_resource_path
 from tesseract_robotics.examples.lowlevel.example_support import locate_file
 from tesseract_robotics.tesseract_command_language import (
     CartesianWaypoint,
@@ -139,7 +139,7 @@ TOOL_XYZW = (0.707, 0.0, 0.707, 0.0)
 
 
 def run():
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.urdf")
     srdf = locate_file(locator, "package://tesseract/support/urdf/abb_irb2400.srdf")
     env = Environment()

@@ -3,16 +3,21 @@
 ## Users: Install from PyPI
 
 ```bash
-pip install tesseract-robotics-nanobind
+pip install "tesseract-robotics-nanobind[support]"
 ```
 
-The wheel bundles all C++ dependencies (~50MB). No compiler needed.
+The wheel bundles all C++ dependencies (~30 MB). No compiler needed. The `[support]` extra
+installs tesseract's example robots and meshes as a separate wheel,
+`tesseract-robotics-nanobind-support` (~40 MB); the examples and these pages load robots from it.
+Leave it out if you only load your own robots.
 
 ```python
-import tesseract_robotics
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 ```
 
@@ -143,7 +148,7 @@ Run within pixi: `pixi run python your_script.py` or enter `pixi shell` first.
 
 Pixi installs `llvm-openmp` from conda-forge. If you have Homebrew's libomp installed, library conflicts can cause crashes. The pixi environment isolates this, but running outside `pixi shell` may pick up the wrong library.
 
-Wheels up to 0.35.0.9 carry their own `libomp.dylib`, and inside a conda or pixi environment that makes two runtimes: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Newer wheels use the environment's `libomp` when it has one and their bundled copy otherwise, so uv and pip environments work too. The mechanism and the fix are in [macOS Wheel Gotchas](../developer/macos-wheels.md).
+The PyPI wheels carry their own `libomp.dylib`. In a plain venv (pip, uv) that is the only runtime, but inside a conda or pixi environment that has `llvm-openmp` it makes two: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Install the wheel into a venv, or use the pixi environment's editable install. The mechanism is in [macOS Wheel Gotchas](../developer/macos-wheels.md).
 
 ### Scattered Segfaults / "double free or corruption"
 

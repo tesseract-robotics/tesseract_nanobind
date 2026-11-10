@@ -27,7 +27,8 @@ from tesseract_robotics.planning import (
 )
 
 # Load robot from bundled tesseract_support
-robot = Robot.from_tesseract_support("abb_irb2400")
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
 # Add obstacle
 create_obstacle(robot, "box", box(0.5, 0.5, 0.5), Pose.from_xyz(0.5, 0, 0.3))

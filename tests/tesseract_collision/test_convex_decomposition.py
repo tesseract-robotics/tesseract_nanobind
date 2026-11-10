@@ -40,6 +40,9 @@ LONG_SWITCH_INTERVAL = 100.0
 STRONG_DEFINITION = re.compile(r"^[0-9a-fA-F]+ [TDBSR] ")
 # The VHACD namespace itself, not names ending in VHACD (ConvexDecompositionVHACD::).
 VHACD_NAMESPACE = re.compile(r"(?<![\w:])VHACD::")
+# RTTI the binding emits for the V-HACD types it binds (nb::enum_<VHACD::FillMode> takes its
+# typeid): not V-HACD code. macOS x86_64's nm lists it as a section symbol, `S`.
+RTTI = re.compile(r" typeinfo (name )?for ")
 
 # Header defaults, tesseract/collision/vhacd/convex_decomposition_vhacd.h:38-78.
 HEADER_DEFAULTS = {
@@ -232,6 +235,6 @@ def test_extension_has_single_vhacd_copy():
     strong = [
         line
         for line in demangled.splitlines()
-        if STRONG_DEFINITION.match(line) and VHACD_NAMESPACE.search(line)
+        if STRONG_DEFINITION.match(line) and VHACD_NAMESPACE.search(line) and not RTTI.search(line)
     ]
     assert not strong, f"{len(strong)} strong VHACD:: definitions, e.g. {strong[:5]}"

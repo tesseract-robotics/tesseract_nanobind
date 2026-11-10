@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from trimesh.visual.texture import TextureVisuals
 
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import tesseract_geometry as tg
 from tesseract_robotics.examples.pointcloud_octree_collision_example import build_octree_obstacle
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
@@ -50,7 +51,7 @@ def _visual(geometry, material=None):
 def _mesh_env(scale=(1.0, 1.0, 1.0)):
     env = Environment()
     urdf = MESH_URDF.format(scale=" ".join(str(s) for s in scale))
-    assert env.init(urdf, GeneralResourceLocator())
+    assert env.init(urdf, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
     return env
 
 
@@ -100,7 +101,7 @@ def _stl_mesh(scale):
 
 def test_mesh_keeps_tesseract_normals():
     """Authored normals, not face-averaged ones: on IRB2400 link_6 they differ by ~0.07."""
-    locator = GeneralResourceLocator()
+    locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf")
     env = Environment()
     assert env.init(Path(urdf.getFilePath()), locator)
@@ -133,7 +134,10 @@ SCALED_DAE_URDF = """
 
 def _raw_dae_normals(scale):
     env = Environment()
-    assert env.init(SCALED_DAE_URDF.format(scale=scale), GeneralResourceLocator())
+    assert env.init(
+        SCALED_DAE_URDF.format(scale=scale),
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
+    )
     (visual,) = env.getLink("dae_link").visual
     return np.vstack(
         [np.asarray(m.getNormals()).reshape(-1, 3) for m in visual.geometry.getMeshes()]

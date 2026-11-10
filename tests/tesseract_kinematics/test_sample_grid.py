@@ -7,12 +7,11 @@ upper bound on the base-to-tip distance over every joint configuration.
 
 import itertools
 import math
-import os
-from pathlib import Path
 
 import numpy as np
 import pytest
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics import tesseract_kinematics as tk
 from tesseract_robotics.tesseract_environment import Environment
 
@@ -25,7 +24,7 @@ SAMPLES_PER_RANGE = 3
 @pytest.fixture(scope="module")
 def irb2400():
     env = Environment()
-    support = Path(os.environ["TESSERACT_SUPPORT_DIR"])
+    support = get_tesseract_support_path()
     assert env.init(
         support / "urdf" / "abb_irb2400.urdf",
         support / "urdf" / "abb_irb2400.srdf",

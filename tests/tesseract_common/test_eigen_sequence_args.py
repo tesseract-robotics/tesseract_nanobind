@@ -6,14 +6,13 @@ parameter. `tesseract_nb.h` runs a sequence through `numpy.asarray` when implici
 conversion is allowed; shape and dtype checks stay nanobind's.
 """
 
-import os
-from pathlib import Path
-
 import numpy as np
 import numpy.testing as nptest
 import pytest
 
 from tesseract_robotics import (
+    get_tesseract_resource_path,
+    get_tesseract_support_path,
     tesseract_command_language,
     tesseract_common,
     tesseract_environment,
@@ -56,11 +55,11 @@ ROT_Z_90 = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
 @pytest.fixture(scope="module")
 def abb_env():
     env = tesseract_environment.Environment()
-    support = Path(os.environ["TESSERACT_SUPPORT_DIR"])
+    support = get_tesseract_support_path()
     assert env.init(
         support / "urdf" / "abb_irb2400.urdf",
         support / "urdf" / "abb_irb2400.srdf",
-        GeneralResourceLocator(),
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
     return env
 
@@ -134,11 +133,11 @@ def test_calc_fwd_kin_ref_accepts(abb_env, form):
 @VECTOR_FORMS
 def test_set_state_ref_accepts(form):
     env = tesseract_environment.Environment()
-    support = Path(os.environ["TESSERACT_SUPPORT_DIR"])
+    support = get_tesseract_support_path()
     assert env.init(
         support / "urdf" / "abb_irb2400.urdf",
         support / "urdf" / "abb_irb2400.srdf",
-        GeneralResourceLocator(),
+        GeneralResourceLocator(paths=[get_tesseract_resource_path()]),
     )
     names = list(env.getJointGroup("manipulator").getJointIds())
     env.setState(names, form(JOINTS))
