@@ -1,7 +1,7 @@
 diff --git a/src/ompl/CMakeLists.txt b/src/ompl/CMakeLists.txt
 --- a/src/ompl/CMakeLists.txt
 +++ b/src/ompl/CMakeLists.txt
-@@ -35,7 +35,24 @@
+@@ -35,7 +35,26 @@
  
  # build the library
  if(MSVC)
@@ -14,6 +14,8 @@ diff --git a/src/ompl/CMakeLists.txt b/src/ompl/CMakeLists.txt
 +    list(REMOVE_ITEM OMPL_SOURCE_CODE ${OMPL_RUNTIME_SOURCES})
 +    add_library(ompl_runtime SHARED ${OMPL_RUNTIME_SOURCES})
 +    set_target_properties(ompl_runtime PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
++    target_include_directories(ompl_runtime PRIVATE
++        "${CMAKE_CURRENT_SOURCE_DIR}/.." "${CMAKE_CURRENT_BINARY_DIR}/..")
 +    target_link_libraries(ompl_runtime PRIVATE Eigen3::Eigen Boost::boost
 +        "$<$<BOOL:${Threads_FOUND}>:Threads::Threads>")
 +    install(TARGETS ompl_runtime EXPORT omplExport
