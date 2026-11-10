@@ -7,7 +7,7 @@ permissions:
   actions: read
 jobs:
   windows:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 25
     steps:
     - uses: actions/checkout@v6
@@ -39,7 +39,7 @@ jobs:
         name: planning-diagnostics
         path: planning-diagnostics/
   shared-ompl:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 35
     steps:
     - uses: actions/checkout@v6
@@ -67,7 +67,7 @@ jobs:
     - name: verify cross-DLL RNG state
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+        for /f "usebackq tokens=*" %%i in (`"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do call "%%i\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
         cmake -S scripts/ompl_shared_probe -B probe-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%/vcpkg/installed/x64-windows-release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         if %ERRORLEVEL% GEQ 1 exit 1
         cmake --build probe-build
