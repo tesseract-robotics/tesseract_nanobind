@@ -14,7 +14,13 @@ on:
       - 'dev**'
     tags:
       - '[0-9]+.[0-9]+.[0-9]+.[0-9]+'
+    paths-ignore: &docs-only
+      - 'docs/**'
+      - '**/*.md'
+      - '!**/README.md'
+      - 'mkdocs.yml'
   pull_request:
+    paths-ignore: *docs-only
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +28,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Same release used by the successful pre-review wheel build.
+  VCPKG_REVISION: "2026.10.16"
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 300M
   VCPKG_PKGS: >-
     boost-dll boost-program-options
     boost-serialization boost-filesystem
@@ -43,6 +53,7 @@ env:
 
 jobs:
   build-ubuntu:
+    timeout-minutes: 180
     # Runs on the host runner: johnwason/vcpkg-action uses the host workspace path, which does not
     # exist inside a container job. Ubuntu 24.04 gives the manylinux_2_39 glibc baseline.
     runs-on: ${{ matrix.config.runs_on }}
@@ -73,7 +84,7 @@ jobs:
         sudo apt-get update -qq &&
         sudo apt-get install python3-pip python3-venv python3-dev git cmake ninja-build
         build-essential pkg-config curl zip unzip tar autoconf autoconf-archive automake
-        libtool bison flex perl linux-libc-dev -y -qq
+        libtool bison flex perl ccache linux-libc-dev -y -qq
     - name: pip
       shell: bash
       run: |
@@ -81,6 +92,7 @@ jobs:
         source $GITHUB_WORKSPACE/venv/bin/activate
         python -m pip install --upgrade pip
         python -m pip install colcon-common-extensions vcs2l auditwheel patchelf $NB_BUILD_REQS
+        python tesseract_nanobind/scripts/check_wheel_sources.py
     - name: vcs import
       shell: bash
       run: |
@@ -90,6 +102,7 @@ jobs:
     - name: vcpkg build
       uses: johnwason/vcpkg-action@v8
       with:
+        revision: ${{ env.VCPKG_REVISION }}
         pkgs: >-
           ${{ env.VCPKG_PKGS }}
         triplet: ${{ matrix.config.vcpkg_triplet }}
@@ -100,6 +113,12 @@ jobs:
           --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
         token: ${{ github.token }}
         cache-key: linux-${{ matrix.config.vcpkg_triplet }}
+    - name: restore compiler cache
+      uses: actions/cache@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}
+        restore-keys: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
     - name: colcon build
       shell: bash
       working-directory: ws
@@ -110,6 +129,7 @@ jobs:
         export LD_LIBRARY_PATH=$VCPKG_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
         # Upstream headers (tesseract_planning's poly types) use std::runtime_error without
         # <stdexcept>; the distro Boost pulled it in transitively, vcpkg's Boost does not
+        # Tracked upstream: tesseract-robotics/tesseract_planning#802
         export CXXFLAGS="-include stdexcept"
         # Two packages at a time, each building with every core: four packages at once peaks
         # past the runner's 16 GB and the runner is shut down mid-build
@@ -118,6 +138,7 @@ jobs:
           --packages-ignore tesseract_examples gtest \
           --event-handlers console_cohesion+ \
           --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
           -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_ENABLE_TESTING=OFF \
           -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
@@ -221,6 +242,7 @@ jobs:
         retention-days: 2
 
   build-win:
+    timeout-minutes: 180
     runs-on: windows-2022
     strategy:
       fail-fast: false
@@ -242,9 +264,10 @@ jobs:
     - name: pip3
       run: |
         python -m pip install colcon-common-extensions vcs2l delvewheel ${{ env.NB_BUILD_REQS }}
+        python tesseract_nanobind/scripts/check_wheel_sources.py
     - name: choco
       run: |
-        choco install ninja -r
+        choco install ninja ccache -r
     - name: vcs import
       run: |
         mkdir ws\src
@@ -252,6 +275,7 @@ jobs:
     - name: vcpkg build
       uses: johnwason/vcpkg-action@v8
       with:
+        revision: ${{ env.VCPKG_REVISION }}
         pkgs: >-
           ${{ env.VCPKG_PKGS }}
         triplet: ${{ matrix.config.vcpkg_triplet }}
@@ -260,6 +284,12 @@ jobs:
           --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
         token: ${{ github.token }}
         cache-key: win-${{ matrix.config.arch }}-nanobind
+    - name: restore compiler cache
+      uses: actions/cache@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}
+        restore-keys: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
     - name: colcon build
       working-directory: ws
       shell: cmd
@@ -268,12 +298,13 @@ jobs:
         set CMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}
         set PATH=%PATH%;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin
         set CC=cl
-        set CCX=cl
+        set CXX=cl
         colcon build --merge-install ^
         --cmake-force-configure ^
         --event-handlers console_cohesion+ ^
         --packages-ignore tesseract_examples gtest ^
         --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release ^
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ^
         -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON ^
         -DVCPKG_APPLOCAL_DEPS=OFF ^
         -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON ^
@@ -358,6 +389,7 @@ jobs:
         retention-days: 2
 
   build-macos:
+    timeout-minutes: 180
     runs-on: ${{ matrix.config.runner }}
     strategy:
       fail-fast: false
@@ -380,10 +412,11 @@ jobs:
         python-version: '3.12'
     - name: brew
       run: |
-        brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja
+        brew install libomp cmake automake autoconf autoconf-archive libtool gcc ninja ccache
     - name: pip3
       run: |
         python3 -m pip install colcon-common-extensions vcs2l delocate ${{ env.NB_BUILD_REQS }}
+        python3 tesseract_nanobind/scripts/check_wheel_sources.py
     - name: vcs import
       run: |
         mkdir -p ws/src
@@ -391,6 +424,7 @@ jobs:
     - name: vcpkg build
       uses: johnwason/vcpkg-action@v8
       with:
+        revision: ${{ env.VCPKG_REVISION }}
         pkgs: >-
           ${{ env.VCPKG_PKGS }}
         triplet: ${{ matrix.config.arch }}-osx-dynamic-release
@@ -401,6 +435,12 @@ jobs:
           --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
         token: ${{ github.token }}
         cache-key: osx-${{ matrix.config.arch }}-vcpkg
+    - name: restore compiler cache
+      uses: actions/cache@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}
+        restore-keys: colcon-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
     - name: colcon build
       working-directory: ws
       run: |
@@ -412,6 +452,7 @@ jobs:
             --event-handlers console_cohesion+ \
             --cmake-force-configure \
             --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
             -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
             -DVCPKG_APPLOCAL_DEPS=OFF -DTESSERACT_ENABLE_TESTING=OFF \
@@ -446,6 +487,10 @@ jobs:
         # the wheel tag to the minimum macOS of the bundled libraries (Homebrew's libomp is built
         # for the runner's macOS) instead of failing on the mismatch
         DYLD_LIBRARY_PATH=$TESSERACT_CPP_PREFIX/lib:$VCPKG_PREFIX/lib delocate-wheel --sanitize-rpaths -v -w wheelhouse dist/*.whl
+        # Keep delocate's complete bundle; adjust only OpenMP lookup for pixi consumers.
+        python3 -m wheel unpack wheelhouse/*.whl -d openmp-wheel
+        python3 scripts/configure_wheel_openmp.py openmp-wheel/*
+        python3 -m wheel pack openmp-wheel/* -d wheelhouse
     - name: support data wheel for the tests
       id: test_wheels
       shell: bash
@@ -532,7 +577,91 @@ jobs:
         path: "**/*.log"
         retention-days: 2
 
+  test-artifacts:
+    # No colcon/vcpkg install on these runners: plugins must come from the wheel.
+    needs: [build-ubuntu, build-win, build-macos]
+    timeout-minutes: 45
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, artifact: linux-x64}
+          - {runner: ubuntu-24.04-arm, artifact: linux-arm64}
+          - {runner: windows-2022, artifact: win-x64}
+          - {runner: macos-15, artifact: macos-arm64}
+          - {runner: macos-15-intel, artifact: macos-x64}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-${{ matrix.artifact }}
+        path: test-wheels
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-support-any
+        path: test-wheels
+    - name: fetch the TWC workcell the rail tests load
+      run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
+    - uses: ./tesseract_nanobind/.github/actions/test_python_ver
+      with:
+        python_version: "3.12"
+        wheel_dir: ${{ github.workspace }}/test-wheels
+    - name: verify support dependency and source alignment
+      shell: bash
+      working-directory: tesseract_nanobind
+      run: |
+        "$TEST_PYTHON" scripts/check_wheel_sources.py
+        "$TEST_PYTHON" - <<'EOF'
+        from importlib.metadata import metadata, version
+        from packaging.requirements import Requirement
+        name = "tesseract-robotics-nanobind"
+        requirements = [Requirement(r) for r in metadata(name).get_all("Requires-Dist")]
+        support = [r for r in requirements if r.name == name + "-support"]
+        assert len(support) == 1, support
+        assert str(support[0].specifier) == "==" + version(name), support
+        assert version(name + "-support") == version(name)
+        EOF
+
+  test-wheel-openmp:
+    needs: [build-macos, build-ubuntu]
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        path: tesseract_nanobind
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-macos-arm64
+        path: test-wheels
+    - uses: actions/download-artifact@v8
+      with:
+        name: python-wheels-support-any
+        path: test-wheels
+    - uses: prefix-dev/setup-pixi@v0.8.0
+      with:
+        pixi-version: v0.70.1
+        manifest-path: tesseract_nanobind/pyproject.toml
+        environments: wheel-openmp
+        locked: true
+        cache: true
+    - name: install wheel in conda OpenMP consumer
+      working-directory: tesseract_nanobind
+      run: pixi run -e wheel-openmp uv pip install ../test-wheels/*.whl pytest pytest-xdist
+    - name: one OpenMP runtime in both import orders
+      working-directory: tesseract_nanobind
+      run: |
+        pixi run -e wheel-openmp python scripts/check_wheel_openmp.py --expected environment --order consumer-first
+        pixi run -e wheel-openmp python scripts/check_wheel_openmp.py --expected environment --order bindings-first
+    - name: exercise Descartes parallel planning
+      working-directory: tesseract_nanobind
+      run: pixi run -e wheel-openmp python -m pytest -n auto tests/tesseract_motion_planners/test_descartes_planner.py tests/tesseract_motion_planners/test_descartes_openmp.py
+
   collect-wheels:
+    timeout-minutes: 10
     needs: [build-ubuntu, build-win, build-macos]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
@@ -550,10 +679,11 @@ jobs:
         path: artifacts/*.whl
 
   publish:
+    timeout-minutes: 15
     # PyPI trusted publishing: the PyPI project must list this workflow (wheels.yml) and the
     # `pypi` environment as a trusted publisher
     # every build job, its gates and its per-Python tests must pass
-    needs: [build-ubuntu, build-win, build-macos]
+    needs: [build-ubuntu, build-win, build-macos, test-artifacts, test-wheel-openmp]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     environment: pypi

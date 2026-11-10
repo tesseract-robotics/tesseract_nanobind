@@ -52,6 +52,13 @@ runs:
       assert not changed, f"importing tesseract_robotics changed the environment: {changed}"
       print("support data:", tesseract_robotics.get_tesseract_resource_path())
       EOF
+  - name: one bundled OpenMP runtime (Python ${{ inputs.python_version }})
+    if: runner.os == 'macOS'
+    shell: bash
+    working-directory: tesseract_nanobind
+    run: |
+      "$TEST_PYTHON" scripts/check_wheel_openmp.py --expected bundled --order consumer-first
+      "$TEST_PYTHON" scripts/check_wheel_openmp.py --expected bundled --order bindings-first
   - name: run tests (Python ${{ inputs.python_version }})
     shell: bash
     working-directory: tesseract_nanobind

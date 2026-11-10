@@ -43,12 +43,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "License :: OSI Approved :: Apache Software License",
 ]
-dynamic = ["version"]
-
-[project.optional-dependencies]
-# tesseract's robot models and meshes, for the examples and the package://tesseract/support URLs
-# (packaging/tesseract-robotics-nanobind-support); pass get_tesseract_resource_path() to a locator
-support = ["tesseract-robotics-nanobind-support"]
+dynamic = ["version", "optional-dependencies"]
 
 [project.urls]
 Homepage = "https://github.com/tesseract-robotics/tesseract_nanobind"
@@ -103,12 +98,18 @@ markers = [
 ]
 
 [tool.scikit-build]
+# Required by scikit-build-core for the local support-extra metadata provider.
+experimental = true
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
 wheel.py-api = "cp312"
 wheel.packages = ["src/tesseract_robotics"]
 cmake.version = ">=3.15"
 cmake.build-type = "Release"
+
+[tool.scikit-build.metadata.optional-dependencies]
+provider = "support_metadata"
+provider-path = "scripts"
 
 [tool.scikit-build.metadata.version]
 provider = "scikit_build_core.metadata.setuptools_scm"
@@ -231,6 +232,7 @@ pyright = ">=1.1"
 pytest-testmon = ">=2.0"  # PyPI version for pytest>=7 compat
 
 [tool.pixi.tasks]
+check-wheel-sources = { cmd = "python scripts/check_wheel_sources.py", description = "Check wheel sources against upstream development submodules" }
 test = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q -n auto", depends-on = [
     "install",
 ] }
