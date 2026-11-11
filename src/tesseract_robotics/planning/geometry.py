@@ -35,6 +35,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -42,7 +44,12 @@ from numpy.typing import ArrayLike
 if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
 
-from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, Resource
+from tesseract_robotics.common import (
+    GeneralResourceLocator,
+    Isometry3d,
+    Resource,
+    SimpleLocatedResource,
+)
 from tesseract_robotics.geometry import (
     Box,
     Cone,
@@ -70,8 +77,10 @@ from tesseract_robotics.scene_graph import (
     Visual,
 )
 
-# URL schemes the resource locator resolves; anything else is a local path.
-URL_SCHEMES: Final = ("package://", "file://")
+# URL schemes a mesh path may carry; anything else is a local path. A file:// URL is parsed here,
+# a package:// URL is resolved by the locator.
+FILE_SCHEME: Final = "file://"
+URL_SCHEMES: Final = ("package://", FILE_SCHEME)
 
 # Triangulate faces; right for visual and plain meshes, wrong for convex hull input.
 TRIANGULATE: Final = True
@@ -155,20 +164,25 @@ def _locate(filepath: str | Path, locator: GeneralResourceLocator) -> Resource:
             resolve the URL to one.
     """
     text = str(filepath)
-    if text.startswith(URL_SCHEMES):
-        url = text
+    if text.startswith(FILE_SCHEME):
+        # Parsed here, not by the locator: GeneralResourceLocator strips the scheme and turns an
+        # RFC 8089 Windows URI (file:///C:/...) into /C:/..., which it cannot resolve.
+        path = Path(url2pathname(urlparse(text).path))
+    elif text.startswith(URL_SCHEMES):
+        resource = locator.locateResource(text)
+        if resource is None:
+            raise ResourceNotFoundError(f"Locator could not resolve mesh resource: {text}")
+        # A package:// URL resolves to a path whether or not the file is there.
+        if not Path(resource.getFilePath()).is_file():
+            raise ResourceNotFoundError(f"Mesh resource {text} resolves to a missing file")
+        return resource
     else:
-        path = Path(filepath).resolve()
-        if not path.is_file():
-            raise ResourceNotFoundError(f"Mesh file does not exist: {path}")
-        url = path.as_uri()
-    resource = locator.locateResource(url)
-    if resource is None:
-        raise ResourceNotFoundError(f"Locator could not resolve mesh resource: {url}")
-    # A package:// URL resolves to a path whether or not the file is there.
-    if not Path(resource.getFilePath()).is_file():
-        raise ResourceNotFoundError(f"Mesh resource {url} resolves to a missing file")
-    return resource
+        path = Path(filepath)
+    path = path.resolve()
+    if not path.is_file():
+        raise ResourceNotFoundError(f"Mesh file does not exist: {path}")
+    # A local file is its own resource; the locator still resolves the URLs the mesh refers to.
+    return SimpleLocatedResource(path.as_uri(), str(path), locator)
 
 
 def _scale_vector(scale: ArrayLike | None) -> np.ndarray:
