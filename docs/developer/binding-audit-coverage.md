@@ -72,14 +72,16 @@ The report is the source of these numbers. This table is copied from it once per
 
 ## Fact cache
 
-Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the remaining cost is the uncached declarations parse (see the end of this section).
+Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the remaining cost is the uncached declarations parse (see the end of this section). Status: **under verification** for the typed key, the listing rule and the telemetry: their libclang-free contract tests pass, the libclang side has not run in CI yet.
 
-| step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) |
-|---|---|---|---|
-| contract tests | 26:12 | 12:52 | 10:40 |
-| GIL list | 11:03 | 8:26 | < 0:01 |
-| audit | 12:35 | 3:36 | 3:55 |
-| job | ~50 min | ~25 min | ~15 min |
+| step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) | warm cache, main at 16a89e46 ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43003311837)) |
+|---|---|---|---|---|
+| contract tests | 26:12 | 12:52 | 10:40 | 7:01 |
+| GIL list | 11:03 | 8:26 | < 0:01 | < 0:01 |
+| audit | 12:35 | 3:36 | 3:55 | 2:52 |
+| job | ~50 min | ~25 min | ~15 min | ~10 min |
+
+Why the second warm run is faster than the first is not known: nothing was profiled between them, and the telemetry below is what will say.
 
 The cold run gains because the per-entry lock lets one xdist worker parse each binding with bodies while the others wait for its entry, and the audit step then reads what the contract tests computed. The warm run's regenerated report differs from the committed one in exactly the 28 rows that main's uncached run reported (2026-11-11): the cached path changes no row.
 
@@ -93,26 +95,59 @@ The audit's cost is libclang: two parses of each binding (one with function bodi
 | `decl_facts` | declarations (`PARSE_OPTIONS`) | the three whole-TU walks `decl_names`, `class_ancestors`, `public_bases` |
 | `gil_releases` | the GIL audit's own bodies parse | `audit_gil.Scanner.scan` |
 
-`scripts/audit_cache.py` stores each fact as one JSON entry under `.cache/binding-audit/<fact>/<digest>.json`, together with the SHA-256 of every file the parse read (the main file plus `get_includes()`). An entry is used only when every one of those files is byte-identical. The digest covers everything else the fact depends on:
+`scripts/audit_cache.py` stores each fact as one JSON entry under `.cache/binding-audit/<fact>/<digest>.json`, together with the SHA-256 of every file the parse read (the main file plus `get_includes()`). An entry is used only when every one of those files is byte-identical. The digest covers everything else the fact depends on, as one typed value: `audit_toolchain.Toolchain`. `Toolchain.build` sorts its two mappings, and `Toolchain.canonical()` is the only serialisation, so two keys built in another order are the same key and a field added to the class is part of the digest without further code. Its fields:
 
-- the parse arguments and options;
+- the parse arguments, in order (argument order is search order), and the options;
 - the audit env's package set (`conda-meta` records and `dist-info` names): libclang, every header package, nanobind;
 - `CPATH`, `C_INCLUDE_PATH` and `CPLUS_INCLUDE_PATH`;
-- the file listing of each include dir inside the repo, because a new file there can shadow a header found later on the search path;
+- the file listing of each include dir inside the repo (`repo_dir_listing`), because a new file there can shadow a header found later on the search path;
 - the source of the scripts that run during extraction (`*_EXTRACTORS`).
+
+The listing names every file a parse could include: everything except the suffixes in `NOT_INCLUDED_SUFFIXES` (`.py`, `.pyi`, `.md`, `.typed`, `.cpp`) and `__pycache__`. The include dirs inside the repo are the package tree, so without this rule every stub or Python edit changed every key. The rule rests on one premise, that no parse includes such a file, and `require_listed` checks it on every parse whose facts are stored: a TU that includes a file of a skipped kind raises `UnlistedIncludeError` instead of being cached. The binding sources include only `.h` and `.hpp` spellings today (535 includes under `src/` and `tests/audit/fixtures/`, at d8ad6e8d).
 
 `audit_ownership.py` is not part of the digest. The parse reads only its path constants, which the arguments already cover, and its `header_rel`, which only formats errors. Binding PRs edit its tables constantly.
 
 A per-entry `flock` makes xdist workers that ask for one fact compute it once. In CI, `audit.yml` restores the newest earlier cache, stamps the run start, and after a run that reached every step drops the entries nothing used since the stamp (`audit-cache-prune`). It then saves the cache, also after a failed step.
 
+### Telemetry
+
+`scripts/audit_telemetry.py` records what a run spent its time on. Each audit step in `audit.yml` sets `BINDING_AUDIT_EVENTS` to its own JSONL file under `$RUNNER_TEMP/audit-events`; with the variable unset (local runs, tests) nothing is written. Every process of the step appends to that file, one `write` on an `O_APPEND` descriptor per event, so xdist workers leave whole lines. The log may not live in the cache directory (`EventsInCacheError`): CI saves that directory, and a log in it would be restored into later runs.
+
+| event | written by | fields |
+|---|---|---|
+| `fetch` | `FactCache.fetch`, once per answered fetch (none when `compute` raises) | `kind`, `hit`, `compute_s` (extraction only, 0 on a hit), `wait_s` (time until the entry lock was held), `pid` |
+| `phase` | `audit_tu`, through `EVENTS.timed` | `name` (`decl-parse`, `cpp-api`, `match`, `unincluded-headers`), `seconds`, `pid` |
+
+The step "Fact cache use" (`pixi run -e audit audit-telemetry DIR`) prints one pair of tables per step:
+
+```text
+3-audit: 141 events from 1 process
+kind   hits  misses  compute  wait
+bound    34       0      0.0   0.0
+decl     34       0      0.0   0.0
+phase               calls  seconds
+cpp-api                34     61.2
+decl-parse             34     88.4
+```
+
+The numbers above only show the layout; they are not a measurement. Reading it: a warm run has 0 misses for `bound` and `gil`; `wait` is time workers spent blocked on another worker's parse of the same binding; `decl-parse` and `cpp-api` seconds are the uncached cost that the last paragraph of this section is about, summed over the processes that paid it.
+
 Rejected alternatives:
 
 - **Caching whole module reports.** Contract tests patch the rule tables (`ACCEPTED`, `UNAUDITED_HEADERS`, …) and then audit, so a report keyed on files would return stale rows. Every module's report also reads every other binding through `bound_index`, so any binding edit would invalidate all of them.
 - **Caching libclang ASTs** (`TranslationUnit.save` / `from_ast_file`). This removes the parse but not the Python walks. Loading also validates every input file's mtime, and a fresh checkout changes every mtime.
+- **Listing only header suffixes (`.h`, `.hpp`).** Unsound: a parse also reads headers with no suffix (`<vector>`, `<Eigen/Core>`) and `.tcc` / `.ipp` files, and the fixture include dir is searched first. A new file named `vector` there would shadow the standard header with no listed file and no recorded file changing. Listing everything except what no parse reads, and checking that per parse, has no such hole.
+- **The toolchain as a JSON string assembled in `fact_key`** (the first version). Any caller could build a key with other fields or another order; the type now owns both.
 
 Still parsed on every audit: the declarations parse of each audited module for `cpp_api`, and the synthetic TUs of headers that a binding does not include. `cpp_api` takes a callback over every module's bound classes, so it is not yet a function of one TU's inputs. This is the remaining cost: warm, the audit step takes as long as cold (3:55 against 3:36), so caching the three whole-TU walks saved nothing measurable, and the 10:40 of warm contract tests is these parses repeated per worker. Splitting `cpp_api` into a per-TU extraction and a cross-module pass is the next step.
 
-Tests: `tests/audit/test_audit_cache.py` covers hit and miss, edits that keep size and mtime, removed files, the key parts, concurrent workers, pruning and corrupt entries, without libclang. `tests/audit/test_audit_facts.py` checks that a cached fact equals the fresh extraction and that a hit does not parse, and that an edit to an included fixture header re-parses.
+Tests: `tests/audit/test_audit_cache.py` covers hit and miss, edits that keep size and mtime, removed files, the key parts, concurrent workers, pruning and corrupt entries. `tests/audit/test_audit_toolchain.py` covers the key's serialisation (mapping order, every field, unset against empty variables) and the listing rule in both directions. `tests/audit/test_audit_telemetry.py` covers one event per fetch, none on a failed compute or without a log, whole lines under three concurrent writers, and the tables. These three need no libclang and run in the default env:
+
+```bash
+python -m pytest -o addopts='' --noconftest -p no:cacheprovider -n 2 tests/audit/test_audit_cache.py tests/audit/test_audit_telemetry.py tests/audit/test_audit_toolchain.py
+```
+
+`tests/audit/test_audit_facts.py` (libclang, CI only) checks that a cached fact equals the fresh extraction and that a hit does not parse, and that an edit to an included fixture header re-parses.
 
 ## Module layout
 
@@ -124,9 +159,12 @@ The scripts import in one direction, top to bottom. Each file has one job.
 | `scripts/audit_ownership.py` | module tables, header ownership (longest prefix), not-API and third-party header patterns, coverage errors |
 | `scripts/audit_parse.py` | libclang TUs → `CppSymbol`/`CppOverload`; structural `absent_ok` predicates; `bound_classes` from `nb::class_`/`nb::enum_` |
 | `scripts/audit_bound.py` | what a binding TU binds: `bound_classes` reads the `nb::class_`/`nb::enum_` constructions in the `NB_MODULE` body (Python name → qualified C++ class); `audit_match` builds its per-module `bound_index` from it |
+| `scripts/audit_telemetry.py` | event log of fetches and timed phases (`BINDING_AUDIT_EVENTS`), and its totals; imports no audit script |
+| `scripts/audit_toolchain.py` | `Toolchain`, the typed part of a fact's key; the include-dir listing and `require_listed` |
 | `scripts/audit_cache.py` | content-addressed fact cache: entries keyed on every file a parse read, per-entry lock, prune (`audit-cache-prune`) |
-| `scripts/audit_facts.py` | the cached facts of a binding TU (`bound_facts`, `decl_facts`, `gil_releases`) and their toolchain key |
+| `scripts/audit_facts.py` | the cached facts of a binding TU (`bound_facts`, `decl_facts`, `gil_releases`); assembles their `Toolchain` |
 | `scripts/audit_cache_prune.py` | thin CLI (`pixi run -e audit audit-cache-prune`): drop the entries a run did not use |
+| `scripts/audit_telemetry_report.py` | thin CLI (`pixi run -e audit audit-telemetry`): the per-step tables |
 | `scripts/audit_stub.py` | `.pyi` → `PySymbol`/`PyOverload`; deviations and quoted names |
 | `scripts/audit_rules.py` | `ACCEPTED` rule texts and every rule table; checks at import that each table entry names a rule |
 | `scripts/audit_anchor.py` | holds each `PLUGIN_ANCHOR_INCLUDES` header to its claim: raises when one declares more than its plugin anchor and plugin factory classes, or when its binding no longer includes it |
@@ -134,7 +172,7 @@ The scripts import in one direction, top to bottom. Each file has one job.
 | `scripts/audit_report.py` | Markdown and JSON output; the ledger loader and the `issue` column |
 | `scripts/audit_bindings.py` | thin CLI (`pixi run -e audit audit-bindings`) |
 
-Tests import the scripts through `tests/audit/_load.py` (`from tests.audit._load import audit`). To monkeypatch a function, patch the module that calls it.
+Tests import the scripts through `tests/audit/_load.py` (`from tests.audit._load import audit`); the tests of the three libclang-free scripts use `tests/audit/_free.py` instead. To monkeypatch a function, patch the module that calls it.
 
 ## What "audited" means
 
