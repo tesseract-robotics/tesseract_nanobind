@@ -10,15 +10,15 @@ tesseract `4cf644d7` · tesseract_planning `4e27d94b` · trajopt `98b85d55` · l
 | collision | 278 | 5 | 2 | 16 | 0 | 18 |
 | command_language | 380 | 1 | 1 | 129 | 0 | 48 |
 | common | 262 | 89 | 28 | 56 | 0 | 47 |
-| environment | 235 | 11 | 4 | 55 | 0 | 48 |
+| environment | 236 | 10 | 4 | 55 | 0 | 48 |
 | geometry | 158 | 21 | 4 | 22 | 0 | 27 |
 | kinematics | 105 | 6 | 1 | 16 | 0 | 5 |
 | motion_planners | 40 | 2 | 0 | 7 | 0 | 4 |
-| motion_planners_descartes | 58 | 4 | 0 | 34 | 0 | 8 |
-| motion_planners_ompl | 119 | 4 | 1 | 28 | 0 | 4 |
-| motion_planners_simple | 101 | 3 | 0 | 29 | 0 | 14 |
-| motion_planners_trajopt | 81 | 4 | 0 | 39 | 0 | 14 |
-| motion_planners_trajopt_ifopt | 78 | 4 | 8 | 20 | 0 | 12 |
+| motion_planners_descartes | 62 | 0 | 0 | 34 | 0 | 8 |
+| motion_planners_ompl | 123 | 0 | 1 | 28 | 0 | 4 |
+| motion_planners_simple | 104 | 0 | 0 | 29 | 0 | 14 |
+| motion_planners_trajopt | 85 | 0 | 0 | 39 | 0 | 14 |
+| motion_planners_trajopt_ifopt | 82 | 0 | 8 | 20 | 0 | 12 |
 | scene_graph | 196 | 3 | 0 | 22 | 0 | 26 |
 | serialization | 0 | 1 | 0 | 24 | 0 | 0 |
 | srdf | 45 | 3 | 0 | 1 | 0 | 4 |
@@ -186,7 +186,7 @@ None.
 | `ContactResultMap.find` | method | tesseract/collision/types.h:300 | — | won't fix: Returns a C++ iterator; `at` and iteration read a result by key. |
 | `ContactTestData` | class | tesseract/collision/types.h:345 | — | won't fix: Internal to the collision checkers (types.h:322). |
 | `tesseract/collision/common.h` | header | tesseract/collision/common.h:49 | — | won't fix: Helpers for C++ collision backends; a Python subclass cannot be a backend. |
-| `tesseract/collision/per_thread_contact_manager.h` | header | tesseract/collision/per_thread_contact_manager.h:57 | — | — |
+| `tesseract/collision/per_thread_contact_manager.h` | header | tesseract/collision/per_thread_contact_manager.h:57 | — | won't fix: Per-thread clones for the C++ planners' parallel collision evaluators, keyed by `std::thread::id`; a Python thread calls `clone()` for its own manager. |
 | `tesseract/collision/utils.h` | header | tesseract/collision/utils.h:42 | — | won't fix: Helpers for C++ collision backends; a Python subclass cannot be a backend. |
 
 ### Deviations
@@ -233,7 +233,7 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `CompositeInstructionIterator.__next__` | protocol | src/tesseract_robotics/command_language.pyi | — | — |
+| `CompositeInstructionIterator.__next__` | protocol | src/tesseract_robotics/command_language.pyi | — | won't fix: Python iterator protocol of the iterator `CompositeInstruction.__iter__` returns; no C++ counterpart. |
 
 ### Accepted
 
@@ -475,7 +475,7 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `ContactManagersPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | — |
+| `ContactManagersPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one. |
 | `Isometry3d.apply_directions` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Intentional Python-only batched extension (CHANGELOG.md:169). |
 | `Isometry3d.apply_points` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Intentional Python-only batched extension (CHANGELOG.md:169). |
 | `Isometry3d.compose_each` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
@@ -483,7 +483,7 @@ None.
 | `JointId.__getstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
 | `JointId.__hash__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
 | `JointId.__setstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
-| `KinematicsPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | — |
+| `KinematicsPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one. |
 | `LinkId.__getstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
 | `LinkId.__hash__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
 | `LinkId.__setstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
@@ -492,13 +492,13 @@ None.
 | `LogLevel` | enum | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::level::level_enum`, the type of `getLogger(name).set_level`; no tesseract header declares it. |
 | `LogSink` | class | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::sinks::sink`, the type of `Logger.sinks`; no tesseract header declares it. |
 | `Logger` | class | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::logger`, the type `getLogger` returns; no tesseract header declares it. |
-| `ProfilesPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | — |
+| `ProfilesPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one. |
 | `PropertyTree.__contains__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: `key in tree` is `find(key) is not None`. |
 | `PropertyTree.applyConfig` | overload | src/tesseract_robotics/common/_common.pyi | 1-2 | won't fix: Takes the config as YAML text in place of the `YAML::Node`, which no Python type converts to; malformed YAML raises `ValueError`. |
 | `PropertyTree.fromYAML` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `toYAML` returns text. |
 | `PropertyTree.setValue` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `getValue` returns text. |
 | `StderrSink` | class | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::sinks::stderr_color_sink_mt`, the sink tesseract's default logger starts with; no tesseract header declares it. |
-| `TaskComposerPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | — |
+| `TaskComposerPluginInfo.insert` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one. |
 | `apply_directions_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
 | `norm_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (M, 3) arrays; no C++ counterpart. |
 | `orthonormality_residual_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form of `orthonormality_residual` over (M, 4, 4) arrays; no C++ counterpart. |
@@ -583,11 +583,10 @@ None.
 | `Command.__init__` | constructor | tesseract/environment/command.h:78 | — | won't fix: A base `Command` claiming a derived type would be undefined behaviour under the `getType` + `static_pointer_cast` dispatch; unverified (environment.cpp not read, phaseB E3). |
 | `CommandAppliedEvent.__init__` | constructor | tesseract/environment/events.h:64 | — | won't fix: Events are fired by `Environment`; Python cannot fire one. |
 | `Environment.__init__` | constructor | tesseract/environment/environment.h:624 | 1 | won't fix: Takes the private `Environment::Implementation`, used only by `clone`. |
-| `Environment.addEventCallback` | method | tesseract/environment/environment.h:267 | 2 | — |
+| `Environment.addEventCallback` | method | tesseract/environment/environment.h:267 | 2 | won't fix: Takes the callable alone and returns its key: the binding picks a key no registered callback holds, for `removeEventCallback`. |
 | `Environment.getEventCallbacks` | method | tesseract/environment/environment.h:282 | — | won't fix: Returns opaque `std::function` objects. |
 | `Environment.getFindTCPOffsetCallbacks` | method | tesseract/environment/environment.h:256 | — | won't fix: Returns opaque `std::function` objects. |
 | `Environment.lockRead` | method | tesseract/environment/environment.h:593 | — | won't fix: A `shared_lock` held from Python while other calls release the GIL is a deadlock trap. |
-| `EnvironmentContactAllowedValidator.__call__` | operator | tesseract/environment/environment.h:80 | — | — |
 | `Event.__init__` | constructor | tesseract/environment/events.h:48 | — | won't fix: Events are fired by `Environment`; Python cannot fire one. |
 | `SceneStateChangedEvent.__init__` | constructor | tesseract/environment/events.h:77 | — | won't fix: Events are fired by `Environment`; Python cannot fire one. |
 | `getActiveLinkIdsRecursive` | function | tesseract/environment/utils.h:53 | — | won't fix: Recursion helper behind `getActiveLinkIds`. |
@@ -596,7 +595,7 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `Environment.addEventCallback` | overload | src/tesseract_robotics/environment.pyi | 1 | — |
+| `Environment.addEventCallback` | overload | src/tesseract_robotics/environment.pyi | 1 | won't fix: Takes the callable alone and returns its key: the binding picks a key no registered callback holds, for `removeEventCallback`. |
 | `Environment.link_transforms_batch` | method | src/tesseract_robotics/environment.pyi | — | won't fix: Python-only batch form of `getLinkTransforms` for numpy callers; no C++ counterpart. |
 | `cast_CommandAppliedEvent` | function | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191) |
 | `cast_SceneStateChangedEvent` | function | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191) |
@@ -674,33 +673,33 @@ None.
 | C++ symbol | kind | header:line | missing overload (arity) | issue |
 |---|---|---|---|---|
 | `Octree.update` | method | tesseract/geometry/impl/octree.h:83 | — | won't fix: Its body is `assert(false)` (octree.h:83). |
-| `SignedDistanceField.__init__` | constructor | tesseract/geometry/impl/signed_distance_field.h:116 | 3-4 | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
-| `SignedDistanceField.__init__` | constructor | tesseract/geometry/impl/signed_distance_field.h:138 | 3-4 | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
-| `SignedDistanceField.__init__` | constructor | tesseract/geometry/impl/signed_distance_field.h:174 | 2-3 | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
-| `SignedDistanceField.getBandClamp` | method | tesseract/geometry/impl/signed_distance_field.h:256 | — | — |
-| `SignedDistanceField.getDistanceAndGradient` | method | tesseract/geometry/impl/signed_distance_field.h:218 | — | — |
+| `SignedDistanceField.__init__` | constructor | tesseract/geometry/impl/signed_distance_field.h:116 | 3-4 | #429 |
+| `SignedDistanceField.__init__` | constructor | tesseract/geometry/impl/signed_distance_field.h:138 | 3-4 | #429 |
+| `SignedDistanceField.__init__` | constructor | tesseract/geometry/impl/signed_distance_field.h:174 | 2-3 | #429 |
+| `SignedDistanceField.getBandClamp` | method | tesseract/geometry/impl/signed_distance_field.h:256 | — | #429 |
+| `SignedDistanceField.getDistanceAndGradient` | method | tesseract/geometry/impl/signed_distance_field.h:218 | — | #429 |
 | `SignedDistanceField.getDomain` | method | tesseract/geometry/impl/signed_distance_field.h:182 | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
-| `SignedDistanceField.getGradient` | method | tesseract/geometry/impl/signed_distance_field.h:212 | — | — |
-| `SignedDistanceField.getGradientInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:247 | — | — |
-| `SignedDistanceField.getInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:235 | — | — |
-| `SignedDistanceField.getNVDB` | method | tesseract/geometry/impl/signed_distance_field.h:253 | — | — |
-| `SignedDistanceField.isSparse` | method | tesseract/geometry/impl/signed_distance_field.h:224 | — | — |
-| `SignedDistanceField.setGradientInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:245 | — | — |
-| `SignedDistanceField.setInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:233 | — | — |
-| `SignedDistanceFieldInterpolation` | enum | tesseract/geometry/impl/signed_distance_field.h:65 | — | — |
+| `SignedDistanceField.getGradient` | method | tesseract/geometry/impl/signed_distance_field.h:212 | — | #429 |
+| `SignedDistanceField.getGradientInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:247 | — | #429 |
+| `SignedDistanceField.getInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:235 | — | #429 |
+| `SignedDistanceField.getNVDB` | method | tesseract/geometry/impl/signed_distance_field.h:253 | — | #429 |
+| `SignedDistanceField.isSparse` | method | tesseract/geometry/impl/signed_distance_field.h:224 | — | #429 |
+| `SignedDistanceField.setGradientInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:245 | — | #429 |
+| `SignedDistanceField.setInterpolation` | method | tesseract/geometry/impl/signed_distance_field.h:233 | — | #429 |
+| `SignedDistanceFieldInterpolation` | enum | tesseract/geometry/impl/signed_distance_field.h:65 | — | #429 |
 | `createMeshFromAsset` | function | tesseract/geometry/mesh_parser.h:300 | — | won't fix: Takes an assimp `aiScene`; assimp is never exposed to Python. |
 | `extractMeshData` | function | tesseract/geometry/mesh_parser.h:73 | — | won't fix: Takes an assimp `aiScene`/`aiNode`; assimp is never exposed to Python. |
-| `getSignedDistanceFieldNVDBGridNames` | function | tesseract/geometry/impl/signed_distance_field_utils.h:163 | — | — |
+| `getSignedDistanceFieldNVDBGridNames` | function | tesseract/geometry/impl/signed_distance_field_utils.h:163 | — | #429 |
 | `readSignedDistanceFieldNVDB` | function | tesseract/geometry/impl/signed_distance_field_utils.h:154 | 1-2 | won't fix: `bytes` is the Python form of the `std::vector<std::uint8_t>` overload. |
 | `readSignedDistanceFieldVDB` | function | tesseract/geometry/impl/signed_distance_field_utils.h:123 | 1-2 | won't fix: `bytes` is the Python form of the `std::vector<std::uint8_t>` overload. |
-| `readSparseSignedDistanceFieldNVDB` | function | tesseract/geometry/impl/signed_distance_field_utils.h:179 | — | — |
+| `readSparseSignedDistanceFieldNVDB` | function | tesseract/geometry/impl/signed_distance_field_utils.h:179 | — | #429 |
 
 ### Deviations
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
 | `GeometriesConst` | class | src/tesseract_robotics/geometry.pyi | — | won't fix: The opaque container class needs a Python name; upstream's typedef is spelled `GeometrysConst` (geometry.h:104). |
-| `SignedDistanceField.__init__` | overload | src/tesseract_robotics/geometry.pyi | 4-5 | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
+| `SignedDistanceField.__init__` | overload | src/tesseract_robotics/geometry.pyi | 4-5 | #429 |
 | `SignedDistanceField.getDomainMax` | method | src/tesseract_robotics/geometry.pyi | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
 | `SignedDistanceField.getDomainMin` | method | src/tesseract_robotics/geometry.pyi | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
 
@@ -812,12 +811,7 @@ None.
 
 ### Gaps
 
-| C++ symbol | kind | header:line | missing overload (arity) | issue |
-|---|---|---|---|---|
-| `DescartesMotionPlanner.clear` | method | tesseract/motion_planners/descartes/descartes_motion_planner.h:24 | — | — |
-| `DescartesMotionPlanner.clone` | method | tesseract/motion_planners/descartes/descartes_motion_planner.h:26 | — | — |
-| `DescartesMotionPlanner.solve` | method | tesseract/motion_planners/descartes/descartes_motion_planner.h:20 | — | — |
-| `DescartesMotionPlanner.terminate` | method | tesseract/motion_planners/descartes/descartes_motion_planner.h:22 | — | — |
+None.
 
 ### Deviations
 
@@ -870,12 +864,7 @@ None.
 
 ### Gaps
 
-| C++ symbol | kind | header:line | missing overload (arity) | issue |
-|---|---|---|---|---|
-| `OMPLMotionPlanner.clear` | method | tesseract/motion_planners/ompl/ompl_motion_planner.h:74 | — | — |
-| `OMPLMotionPlanner.clone` | method | tesseract/motion_planners/ompl/ompl_motion_planner.h:76 | — | — |
-| `OMPLMotionPlanner.solve` | method | tesseract/motion_planners/ompl/ompl_motion_planner.h:70 | — | — |
-| `OMPLMotionPlanner.terminate` | method | tesseract/motion_planners/ompl/ompl_motion_planner.h:72 | — | — |
+None.
 
 ### Deviations
 
@@ -924,11 +913,7 @@ None.
 
 ### Gaps
 
-| C++ symbol | kind | header:line | missing overload (arity) | issue |
-|---|---|---|---|---|
-| `SimpleMotionPlanner.clear` | method | tesseract/motion_planners/simple/simple_motion_planner.h:63 | — | — |
-| `SimpleMotionPlanner.clone` | method | tesseract/motion_planners/simple/simple_motion_planner.h:65 | — | — |
-| `SimpleMotionPlanner.terminate` | method | tesseract/motion_planners/simple/simple_motion_planner.h:61 | — | — |
+None.
 
 ### Deviations
 
@@ -976,12 +961,7 @@ None.
 
 ### Gaps
 
-| C++ symbol | kind | header:line | missing overload (arity) | issue |
-|---|---|---|---|---|
-| `TrajOptMotionPlanner.clear` | method | tesseract/motion_planners/trajopt/trajopt_motion_planner.h:52 | — | — |
-| `TrajOptMotionPlanner.clone` | method | tesseract/motion_planners/trajopt/trajopt_motion_planner.h:54 | — | — |
-| `TrajOptMotionPlanner.solve` | method | tesseract/motion_planners/trajopt/trajopt_motion_planner.h:48 | — | — |
-| `TrajOptMotionPlanner.terminate` | method | tesseract/motion_planners/trajopt/trajopt_motion_planner.h:50 | — | — |
+None.
 
 ### Deviations
 
@@ -1039,25 +1019,20 @@ None.
 
 ### Gaps
 
-| C++ symbol | kind | header:line | missing overload (arity) | issue |
-|---|---|---|---|---|
-| `TrajOptIfoptMotionPlanner.clear` | method | tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_motion_planner.h:47 | — | — |
-| `TrajOptIfoptMotionPlanner.clone` | method | tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_motion_planner.h:49 | — | — |
-| `TrajOptIfoptMotionPlanner.solve` | method | tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_motion_planner.h:43 | — | — |
-| `TrajOptIfoptMotionPlanner.terminate` | method | tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_motion_planner.h:45 | — | — |
+None.
 
 ### Deviations
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `TrajOptIfoptOSQPSolverProfile.getAbsoluteTolerance` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getAdaptiveRho` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getAdaptiveRhoInterval` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getMaxIteration` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getPolish` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getRelativeTolerance` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getVerbosity` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
-| `TrajOptIfoptOSQPSolverProfile.getWarmStart` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | — |
+| `TrajOptIfoptOSQPSolverProfile.getAbsoluteTolerance` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getAdaptiveRho` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getAdaptiveRhoInterval` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getMaxIteration` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getPolish` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getRelativeTolerance` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getVerbosity` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `TrajOptIfoptOSQPSolverProfile.getWarmStart` | method | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
 
 ### Accepted
 
@@ -1467,14 +1442,14 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `OSQPEigenSolver.getAbsoluteTolerance` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getAdaptiveRho` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getAdaptiveRhoInterval` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getMaxIteration` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getPolish` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getRelativeTolerance` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getVerbosity` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
-| `OSQPEigenSolver.getWarmStart` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | — |
+| `OSQPEigenSolver.getAbsoluteTolerance` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getAdaptiveRho` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getAdaptiveRhoInterval` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getMaxIteration` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getPolish` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getRelativeTolerance` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getVerbosity` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
+| `OSQPEigenSolver.getWarmStart` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: `OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes. |
 | `PIQPKKTSolver` | enum | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings. |
 | `PIQPSettings` | class | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings. |
 | `PIQPSolver.defaultSettings` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: Returning form of `setDefaultPIQPSettings`, whose out-param Python can't use. |
