@@ -16,7 +16,6 @@ Use this low-level approach when you need:
 """
 
 import sys
-from pathlib import Path
 
 import numpy as np
 
@@ -39,7 +38,7 @@ from tesseract_robotics.common import (
 )
 from tesseract_robotics.environment import Environment
 from tesseract_robotics.examples.failures import TimeParameterizationFailedError, require_success
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_ompl import (
     OMPLMotionPlanner,
@@ -89,12 +88,8 @@ def run():
     locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     abb_irb2400_urdf_package_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = Path(
-        locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
-    )
-    abb_irb2400_srdf_fname = Path(
-        locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
-    )
+    abb_irb2400_urdf_fname = locate_file(locator, abb_irb2400_urdf_package_url)
+    abb_irb2400_srdf_fname = locate_file(locator, abb_irb2400_srdf_package_url)
 
     t_env = Environment()
 

@@ -55,8 +55,8 @@ in [API Changes: 0.35 → 0.36](../changes-0.36.md).
 | tesseract_common | `JointState::joint_names` → `joint_ids` | `LinkId` / `JointId` / `LinkIdPair` bound once (`bindNameId<Tag>`), imported by every id-using module; `str` converts implicitly; ACM / margin pair overloads; spdlog logging API |
 | tesseract_scene_graph | `parent_link_name` / `child_link_name`, `get*Names` removed | `*_id` attributes, `get*Ids` |
 | tesseract_state_solver | name → id API | id getters; binding-only `setStateByMap` etc. keep their names, kwargs now `joint_ids` |
-| tesseract_collision, tesseract_kinematics, tesseract_environment | links/joints by id | `ContactResult.link_ids`, `KinGroupIKInput.tip_link_id`, `getRootLinkId`, `getGroupJointIds`, id-keyed `dict[LinkId, Isometry3d]` results |
-| tesseract_srdf | group maps keyed by id | `group_tcps` inner key `LinkId` |
+| tesseract_collision, tesseract_kinematics, tesseract_environment | links/joints by id | `ContactResult.link_ids`, `KinGroupIKInput.tip_link_id`, `getRootLinkId`, `getGroupJointIds`, name-keyed `dict[str, Isometry3d]` results |
+| tesseract_srdf | group maps keyed by name | `group_tcps` inner key `str` |
 | tesseract_command_language | waypoint constructors | `getJointIds` / `setJointIds`, constructors take `list[JointId]` |
 | tesseract_geometry | `sdf_mesh.h` removed | `SignedDistanceField` (cherry-picked #129) |
 | tesseract_task_composer | `task_composer_keys.h` removed | `TaskComposerPortMap`, `get{Input,Output}PortMappings`, `setPortMappings`; plugin-pin warning via `TESSERACT_LOG_WARN` (upstream no longer links console_bridge) |
@@ -99,9 +99,10 @@ converts ids with `.name()` at its boundary
   reach this module on Windows, where the registry is per DLL.
 - **Implicit id conversions are invisible to stubgen.** `scripts/generate_stubs.sh`
   runs `scripts/widen_implicit_id_stubs.py`, which widens parameter-position
-  `LinkId` / `JointId` to `| str` and `LinkIdPair` to `| tuple[str, str]`. Mapping
-  keys stay exact (invariance), so a literal `str` lookup on an id-keyed dict
-  type-checks red while working at runtime.
+  `LinkId` / `JointId` to `| str` and `LinkIdPair` to `| tuple[str, str]`. A mapping
+  parameter becomes `Mapping[LinkId, V] | Mapping[str, V]` (keys are invariant). Returned
+  maps are keyed by name, `dict[str, V]` (`name_keyed_dict_caster` in `src/tesseract_nb.h`),
+  so a literal `str` lookup is exactly typed.
 - **`generate_stubs.sh` swallowed stubgen failures** (`|| true`) and hardcoded the
   `default` env, so on this branch it produced nothing and exited 0. It now uses the
   env it runs in and aborts on the first failure:

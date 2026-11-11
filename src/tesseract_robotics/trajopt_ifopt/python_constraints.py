@@ -30,7 +30,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy.sparse
 
-from tesseract_robotics.common import Isometry3d, LinkId
+from tesseract_robotics.common import Isometry3d
 from tesseract_robotics.kinematics import calcManipulability
 from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Bounds, ConstraintSet, calcForwardNumJac
 
@@ -205,7 +205,7 @@ class PointsDown(PyConstraint):
         **options: Unpack[ConstraintOptions],
     ) -> None:
         super().__init__(name, var, [np.cos(max_tilt)], [np.inf], **options)
-        self.manip, self.tcp, self.axis, self.analytic = manip, LinkId(tcp), axis, analytic
+        self.manip, self.tcp, self.axis, self.analytic = manip, tcp, axis, analytic
         self.down = np.asarray(down, dtype=float) / np.linalg.norm(down)
 
     def f(self, q: np.ndarray) -> np.ndarray | Sequence[float]:
@@ -253,7 +253,7 @@ class HoldAxis(PyConstraint):
     ) -> None:
         side = np.sin(tol)
         super().__init__(name, var, [-side, -side, 0.0], [side, side, np.inf], **options)
-        self.manip, self.tcp, self.axis, self.analytic = manip, LinkId(tcp), axis, analytic
+        self.manip, self.tcp, self.axis, self.analytic = manip, tcp, axis, analytic
         direction = np.asarray(direction, dtype=float) / np.linalg.norm(direction)
         self._basis = np.vstack([_perpendicular_pair(direction), direction])
 
@@ -285,7 +285,7 @@ class StayDexterous(PyConstraint):
         **options: Unpack[ConstraintOptions],
     ) -> None:
         super().__init__(name, var, [w_min], [np.inf], **options)
-        self.manip, self.tcp = manip, LinkId(tcp)
+        self.manip, self.tcp = manip, tcp
 
     def f(self, q: np.ndarray) -> np.ndarray | Sequence[float]:
         return [calcManipulability(self.manip.calcJacobian(q, self.tcp)).m.volume]
@@ -308,8 +308,8 @@ class ElbowUp(PyConstraint):
         super().__init__(name, var, [delta], [np.inf], **options)
         self.manip, self.upper_link, self.lower_link, self.axis = (
             manip,
-            LinkId(upper_link),
-            LinkId(lower_link),
+            upper_link,
+            lower_link,
             axis,
         )
 
@@ -339,7 +339,7 @@ class WatchTheTool(PyConstraint):
         **options: Unpack[ConstraintOptions],
     ) -> None:
         super().__init__(name, var, [np.cos(alpha)], [np.inf], **options)
-        self.manip, self.camera, self.tcp = manip, LinkId(camera), LinkId(tcp)
+        self.manip, self.camera, self.tcp = manip, camera, tcp
         self.optical_axis = optical_axis
 
     def f(self, q: np.ndarray) -> np.ndarray | Sequence[float]:
@@ -417,7 +417,7 @@ class WorldHold(PyConstraint):
     ) -> None:
         band = np.broadcast_to(np.asarray(tol, dtype=float), (3,))
         super().__init__(name, var, -band, band, **options)
-        self.manip, self.tcp, self.analytic = manip, LinkId(tcp), analytic
+        self.manip, self.tcp, self.analytic = manip, tcp, analytic
         self.target = np.asarray(target, dtype=float)
         self._base: Callable[[], Isometry3d] = (
             (lambda: base_pose) if isinstance(base_pose, Isometry3d) else base_pose

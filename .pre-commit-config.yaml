@@ -17,9 +17,10 @@ repos:
 
   - repo: local
     hooks:
+      # ty, the type checker of record. pixi from PATH, else its default install location.
       - id: typecheck
-        name: typecheck
-        entry: pixi run typecheck
+        name: typecheck (ty)
+        entry: sh -c 'PIXI=$(command -v pixi || echo "$HOME/.pixi/bin/pixi"); exec "$PIXI" run typecheck-ty'
         language: system
         pass_filenames: false
         always_run: true

@@ -234,13 +234,14 @@ tool0 == "tool0"             # True: ids compare equal to their name
 LinkIdPair("a", "b").orderedNameView()   # ("a", "b"), alphabetical
 ```
 
-Id-keyed results (`SceneState.link_transforms`, `calcFwdKin`) are plain
-`dict[LinkId, ...]`. `LinkId` and `JointId` do not convert into each other.
+Maps keyed by a link or joint (`SceneState.link_transforms`, `calcFwdKin`,
+`getLinkTransforms`, ...) are plain `dict[str, ...]` keyed by name, so
+`transforms["tool0"]` is exactly typed. A parameter that takes such a map accepts
+names or ids as keys. `LinkId` and `JointId` do not convert into each other.
 
 !!! note "Type checkers"
-    The stubs accept `LinkId | str` wherever a parameter takes an id. Looking up an
-    id-keyed dict with a literal `str` (`transforms["tool0"]`) works at runtime but
-    is flagged by type checkers; use `transforms[LinkId("tool0")]` to keep them quiet.
+    The stubs accept `LinkId | str` wherever a parameter takes an id, and
+    `Mapping[LinkId, V] | Mapping[str, V]` wherever it takes an id-keyed map.
 
 ## Resource Locators
 

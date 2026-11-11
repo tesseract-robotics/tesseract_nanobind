@@ -191,9 +191,7 @@ NB_MODULE(kinematics, m) {
     nb::class_<tk::ForwardKinematics>(m, "ForwardKinematics")
         .def("calcFwdKin", [](const tk::ForwardKinematics& self,
                               const Eigen::Ref<const Eigen::VectorXd>& joint_angles) {
-            const auto result = self.calcFwdKin(joint_angles);
-            // LinkIdTransformMap -> plain dict keyed by LinkId (indexable by str)
-            return std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>(result.begin(), result.end());
+            return self.calcFwdKin(joint_angles);  // dict[str, Isometry3d], keyed by link name
         }, "joint_angles"_a)
         .def("calcJacobian", [](const tk::ForwardKinematics& self,
                                 const Eigen::Ref<const Eigen::VectorXd>& joint_angles,
@@ -245,9 +243,7 @@ NB_MODULE(kinematics, m) {
              "name"_a, "joint_ids"_a, "scene_graph"_a, "scene_state"_a)
         .def("calcFwdKin", [](const tk::JointGroup& self,
                               const Eigen::Ref<const Eigen::VectorXd>& joint_angles) {
-            const auto result = self.calcFwdKin(joint_angles);
-            // LinkIdTransformMap -> plain dict keyed by LinkId (indexable by str)
-            return std::unordered_map<tcommon::LinkId, Eigen::Isometry3d>(result.begin(), result.end());
+            return self.calcFwdKin(joint_angles);  // dict[str, Isometry3d], keyed by link name
         }, "joint_angles"_a)
         // The four C++ overloads in header order (joint_group.h:96, :106, :117, :129). nanobind
         // tells (q, link_id, link_point) from (q, base_link_id, link_id) by the third

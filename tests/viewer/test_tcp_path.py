@@ -10,7 +10,6 @@ from tesseract_robotics.command_language import MoveInstructionType as Move
 from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
-    LinkId,
     ManipulatorInfo,
 )
 from tesseract_robotics.environment import Environment
@@ -190,7 +189,7 @@ def test_rail_and_arm_stay_on_the_path():
     path = tcp_path(env, _traj(names, [np.zeros(len(names)), goal]), manip)
 
     fine = np.linspace(0.0, 1.0, FINER * len(path.segments) + 1)
-    truth = np.stack([kin.calcFwdKin(s * goal)[LinkId("tool0")].translation for s in fine])
+    truth = np.stack([kin.calcFwdKin(s * goal)["tool0"].translation for s in fine])
     assert _distance_to_polyline(truth, path.segments).max() < DRAWN_PATH_ATOL_M
 
 

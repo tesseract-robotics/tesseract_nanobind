@@ -46,7 +46,7 @@ from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultMoveProfile,
     TrajOptMotionPlanner,
 )
-from tesseract_robotics.planning.errors import EnvironmentInitError
+from tesseract_robotics.planning.errors import EnvironmentInitError, ResourceNotFoundError
 from tesseract_robotics.time_parameterization import (
     TimeOptimalTrajectoryGeneration,
     TimeOptimalTrajectoryGenerationCompositeProfile,
@@ -78,18 +78,26 @@ SCALING_FACTOR = 1.0
 AXES_LENGTH_M = 0.05
 
 
+def locate(locator: GeneralResourceLocator, url: str) -> Path:
+    """File path of a `package://` resource.
+
+    Raises:
+        ResourceNotFoundError: the locator resolves nothing for `url`.
+    """
+    resource = locator.locateResource(url)
+    if resource is None:
+        raise ResourceNotFoundError(f"Could not locate resource: {url}")
+    return Path(resource.getFilePath())
+
+
 def run():
     # --8<-- [start:load_robot]
     # Load robot
     locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     abb_irb2400_urdf_package_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     abb_irb2400_srdf_package_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
-    abb_irb2400_urdf_fname = Path(
-        locator.locateResource(abb_irb2400_urdf_package_url).getFilePath()
-    )
-    abb_irb2400_srdf_fname = Path(
-        locator.locateResource(abb_irb2400_srdf_package_url).getFilePath()
-    )
+    abb_irb2400_urdf_fname = locate(locator, abb_irb2400_urdf_package_url)
+    abb_irb2400_srdf_fname = locate(locator, abb_irb2400_srdf_package_url)
 
     t_env = Environment()
     if not t_env.init(abb_irb2400_urdf_fname, abb_irb2400_srdf_fname, locator):

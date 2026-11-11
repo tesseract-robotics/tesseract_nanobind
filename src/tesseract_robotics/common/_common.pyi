@@ -1175,7 +1175,7 @@ class CalibrationInfo:
     def __init__(self) -> None: ...
 
     @property
-    def joints(self) -> dict[JointId, Isometry3d]:
+    def joints(self) -> dict[str, Isometry3d]:
         """
         Joint name -> calibrated joint origin. A copy on read: assign the whole dict, or use insert.
         """

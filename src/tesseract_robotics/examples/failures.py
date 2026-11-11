@@ -6,10 +6,17 @@ from typing import Protocol
 
 
 class PlanResult(Protocol):
-    """What `require_success` reads from a `PlanningResult`."""
+    """What `require_success` reads from a planning result.
 
-    successful: bool
-    message: str
+    Read-only members, so a frozen result (the low-level examples' `PipelineResult`)
+    satisfies it as well as a `PlanningResult`.
+    """
+
+    @property
+    def successful(self) -> bool: ...
+
+    @property
+    def message(self) -> str: ...
 
 
 class PlanningFailedError(RuntimeError):

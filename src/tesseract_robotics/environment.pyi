@@ -292,7 +292,7 @@ class ChangeJointPositionLimitsCommand(Command):
     @overload
     def __init__(self, limits: Mapping[tesseract_robotics.common.JointId, tuple[float, float]] | Mapping[str, tuple[float, float]]) -> None: ...
 
-    def getLimits(self) -> dict[tesseract_robotics.common.JointId, tuple[float, float]]: ...
+    def getLimits(self) -> dict[str, tuple[float, float]]: ...
 
     def __eq__(self, other: object, /) -> bool: ...
 
@@ -307,7 +307,7 @@ class ChangeJointVelocityLimitsCommand(Command):
     @overload
     def __init__(self, limits: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float]) -> None: ...
 
-    def getLimits(self) -> dict[tesseract_robotics.common.JointId, float]: ...
+    def getLimits(self) -> dict[str, float]: ...
 
     def __eq__(self, other: object, /) -> bool: ...
 
@@ -322,7 +322,7 @@ class ChangeJointAccelerationLimitsCommand(Command):
     @overload
     def __init__(self, limits: Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float]) -> None: ...
 
-    def getLimits(self) -> dict[tesseract_robotics.common.JointId, float]: ...
+    def getLimits(self) -> dict[str, float]: ...
 
     def __eq__(self, other: object, /) -> bool: ...
 
@@ -676,17 +676,17 @@ class Environment:
         """Every link's current world transform."""
 
     @overload
-    def getLinkTransforms(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> dict[tesseract_robotics.common.LinkId, tesseract_robotics.common.Isometry3d]:
+    def getLinkTransforms(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str], joint_values: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], floating_joints: Mapping[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d] = {}) -> dict[str, tesseract_robotics.common.Isometry3d]:
         """
         Every link's world transform at `joint_values` for `joint_ids`, without changing the environment.
         """
 
     @overload
-    def getCurrentFloatingJointValues(self) -> dict[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d]:
+    def getCurrentFloatingJointValues(self) -> dict[str, tesseract_robotics.common.Isometry3d]:
         """Every floating joint's current transform."""
 
     @overload
-    def getCurrentFloatingJointValues(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str]) -> dict[tesseract_robotics.common.JointId, tesseract_robotics.common.Isometry3d]:
+    def getCurrentFloatingJointValues(self, joint_ids: Sequence[tesseract_robotics.common.JointId | str]) -> dict[str, tesseract_robotics.common.Isometry3d]:
         """
         The current transforms of `joint_ids`; a non-floating id raises KeyError.
         """

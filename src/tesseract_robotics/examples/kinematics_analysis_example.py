@@ -278,7 +278,7 @@ def run() -> dict[str, Any]:
                 ).max()
             )
             for base in group.getStaticLinkIds():
-                change_base = poses[base].inverse()
+                change_base = poses[base.name()].inverse()
                 errors.append(
                     np.abs(
                         group.calcJacobian(Q, base, link, link_point)

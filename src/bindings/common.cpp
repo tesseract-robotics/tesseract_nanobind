@@ -823,10 +823,10 @@ NB_MODULE(_common, m) {
     bind_value_equality(contact_managers_plugin_info);
 
     // ========== CalibrationInfo ==========
-    // joints is a JointIdTransformMap -> dict[JointId, Isometry3d], copied on every access
-    // (rv_policy::copy: the default reference_internal would hand out ids that live in the map's
-    // nodes): assign the whole field or use insert(); an in-place edit of the returned dict
-    // changes a copy.
+    // joints is a JointIdTransformMap -> dict[str, Isometry3d], copied on every access
+    // (rv_policy::copy: the default reference_internal would hand out transforms that live in
+    // the map's nodes): assign the whole field or use insert(); an in-place edit of the returned
+    // dict changes a copy.
     auto calibration_info = nb::class_<tesseract::common::CalibrationInfo>(m, "CalibrationInfo")
         .def(nb::init<>())
         .def_rw("joints", &tesseract::common::CalibrationInfo::joints, nb::rv_policy::copy,

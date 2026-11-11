@@ -216,7 +216,9 @@ def run() -> dict[str, Any]:
 
     # --8<-- [start:link_transforms]
     link_transforms = {
-        "getLinkTransforms()": dict(zip(env.getLinkIds(), env.getLinkTransforms())),
+        "getLinkTransforms()": dict(
+            zip((link.name() for link in env.getLinkIds()), env.getLinkTransforms(), strict=True)
+        ),
         "getLinkTransforms(names, values)": env.getLinkTransforms(names, zeros),
         "getLinkTransforms(names, values, floating)": env.getLinkTransforms(names, zeros, other),
     }

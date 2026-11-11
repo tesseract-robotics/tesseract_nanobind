@@ -40,7 +40,6 @@ from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     GeneralResourceLocator,
     Isometry3d,
-    LinkId,
     ManipulatorInfo,
 )
 from tesseract_robotics.environment import (
@@ -316,8 +315,8 @@ class Robot:
         env_state = self.env.getState()
 
         if joint_names is None:
-            # Get all joint names from the state's joints dict
-            joint_names = [jid.name() for jid in env_state.joints]
+            # The state's joints dict is keyed by joint name
+            joint_names = list(env_state.joints)
 
         positions = env_state.getJointValues(joint_names)
 
@@ -424,7 +423,7 @@ class Robot:
 
         poses = group.calcFwdKin(joint_positions)
 
-        return Pose(poses[LinkId(tip_link)])
+        return Pose(poses[tip_link])
 
     @overload
     def ik(

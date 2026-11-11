@@ -6,7 +6,7 @@
         "scripts/docs_figures/collision_distance.py": "a00e12aebcd1ea99a545ba23f67d676c7fafce7b3f4e51cba071c639c58e3afd",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
         "scripts/docs_figures/managers.py": "9c8463631faac5292f657e810afce65cd23e3bdecd601984531d6e610de61f4c",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
         "tesseract_support:support/urdf/contact_manager_plugins.yaml": "ab1bf29fe5eb833ad2242d7e9d00ef24e5c20886bec7f342a85bb20477f64aab"
       },
@@ -21,7 +21,7 @@
         "scripts/docs_figures/continuous_collision.py": "f91fda2db8b9061d6b567bddbbe0e12902b5e2843aabb6f4a7f633cbe8c317a5",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
         "scripts/docs_figures/managers.py": "9c8463631faac5292f657e810afce65cd23e3bdecd601984531d6e610de61f4c",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
         "tesseract_support:support/urdf/contact_manager_plugins.yaml": "ab1bf29fe5eb833ad2242d7e9d00ef24e5c20886bec7f342a85bb20477f64aab"
       },
@@ -35,7 +35,7 @@
         "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
         "scripts/docs_figures/frames.py": "5d3561c407d0fea6526384a0c845d652a1e9c267304c0f6f7177727aeac77ea9",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
         "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/base_link.stl": "72a144efbbd6996d214cb07b7886b3545462dc8e20f3391a4901aa59c950fca1",
         "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_1.stl": "2b98f6dcd3e02ea65fcad58d3c11a9bd8ccf68bc52c71eff6f4ffd194c5ae8a0",
@@ -84,7 +84,7 @@
         "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
         "scripts/docs_figures/ik_branches.py": "bcbf92b6a6783d8586ccc096acb7494063187c9da37dd0c0ff2ee3fce2356a2e",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
         "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/base_link.stl": "72a144efbbd6996d214cb07b7886b3545462dc8e20f3391a4901aa59c950fca1",
         "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_1.stl": "2b98f6dcd3e02ea65fcad58d3c11a9bd8ccf68bc52c71eff6f4ffd194c5ae8a0",
@@ -134,7 +134,7 @@
         "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
         "scripts/docs_figures/planner_comparison.py": "88027c57eabf6d00ea55a81a98d4d466e49a0f48e9c0d31e64e9ed28a6cf4783",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c"
       },
       "outputs": {
@@ -147,7 +147,7 @@
         "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
         "scripts/docs_figures/raster_toolpath.py": "e47431bd55e3b17d91ef3d6960c377fc13a89f8c7278f81b236f1a207d571eda",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
         "src/tesseract_robotics/planning/profiles/descartes.py": "56137d9ce06a31084de0eda87bbcbf3bc1be4724f8a2ad34d7ca9786f99904c5",
         "src/tesseract_robotics/planning/profiles/names.py": "f5383aac21c145b8e1d9ed3a9db8c61cccbbecb87d9c75b14e28331cd28e0ce6",
@@ -200,7 +200,7 @@
       "inputs": {
         "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
         "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
-        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/scene3d.py": "9d3ae8aab0372dd17463b7a8eec259fb9267e216778276a35da5867ac1bd2c48",
         "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
         "scripts/docs_figures/time_parameterization.py": "72ba79c7a0933fae573f466a8110086754fd11bfeec0527a936cebee7d7c8c35",
         "tesseract_support:support/urdf/abb_irb2400.srdf": "a13489e13a41de3a7c026ab62e21421ac3f1c0d53b66f4707dd15dcd8e8068d9",

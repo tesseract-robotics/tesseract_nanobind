@@ -115,31 +115,16 @@ NB_MODULE(state_solver, m) {
     // SceneGraph, Joint and Link in the solver constructors and MutableStateSolver (else stubs quote the C++ name)
     nb::module_::import_("tesseract_robotics.scene_graph._scene_graph");
 
-    // Id-keyed transform maps leave C++ as plain dicts keyed by LinkId / JointId; ids hash and
-    // compare like their names, so Python can still index them with a str.
-    using LinkTransforms = std::unordered_map<tc::LinkId, Eigen::Isometry3d>;
-    using JointTransforms = std::unordered_map<tc::JointId, Eigen::Isometry3d>;
-
     // ========== SceneState ==========
     nb::class_<tsg::SceneState> scene_state(m, "SceneState");
     scene_state
         .def(nb::init<>())
-        .def_rw("joints", &tsg::SceneState::joints, nb::rv_policy::copy, "Joint values: joint id -> value [rad or m].")
-        .def_rw("floating_joints", &tsg::SceneState::floating_joints, nb::rv_policy::copy, "Floating-joint transforms: joint id -> Isometry3d.")
-        .def_prop_rw("link_transforms",
-            [](const tsg::SceneState& self) {
-                return LinkTransforms(self.link_transforms.begin(), self.link_transforms.end());
-            },
-            [](tsg::SceneState& self, const LinkTransforms& m) {
-                self.link_transforms = tc::LinkIdTransformMap(m.begin(), m.end());
-            }, "World transform of every link: link id -> Isometry3d (a copy).")
-        .def_prop_rw("joint_transforms",
-            [](const tsg::SceneState& self) {
-                return JointTransforms(self.joint_transforms.begin(), self.joint_transforms.end());
-            },
-            [](tsg::SceneState& self, const JointTransforms& m) {
-                self.joint_transforms = tc::JointIdTransformMap(m.begin(), m.end());
-            }, "World transform of every joint: joint id -> Isometry3d (a copy).")
+        .def_rw("joints", &tsg::SceneState::joints, nb::rv_policy::copy, "Joint values: joint name -> value [rad or m].")
+        .def_rw("floating_joints", &tsg::SceneState::floating_joints, nb::rv_policy::copy, "Floating-joint transforms: joint name -> Isometry3d.")
+        .def_rw("link_transforms", &tsg::SceneState::link_transforms, nb::rv_policy::copy,
+                "World transform of every link: link name -> Isometry3d (a copy).")
+        .def_rw("joint_transforms", &tsg::SceneState::joint_transforms, nb::rv_policy::copy,
+                "World transform of every joint: joint name -> Isometry3d (a copy).")
         .def("getJointValues", &tsg::SceneState::getJointValues, "joint_ids"_a, "The values of `joint_ids`, in that order; an unknown id raises KeyError.")
         // #232: upstream's floating_joints.at(name) (scene_state.cpp:48) throws std::out_of_range
         // for an unknown name; a missing mapping key is KeyError in Python.

@@ -13,7 +13,6 @@ Comparison:
 """
 
 import sys
-from pathlib import Path
 
 import numpy as np
 
@@ -36,7 +35,7 @@ from tesseract_robotics.common import (
 )
 from tesseract_robotics.environment import Environment
 from tesseract_robotics.examples.failures import TimeParameterizationFailedError, require_success
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
 from tesseract_robotics.motion_planners import PlannerRequest
 from tesseract_robotics.motion_planners_ompl import (
     OMPLMotionPlanner,
@@ -98,8 +97,8 @@ def run():
     locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     urdf_url = "package://tesseract/support/urdf/abb_irb2400.urdf"
     srdf_url = "package://tesseract/support/urdf/abb_irb2400.srdf"
-    urdf_path = Path(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = Path(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locate_file(locator, urdf_url)
+    srdf_path = locate_file(locator, srdf_url)
 
     t_env = Environment()
     if not t_env.init(urdf_path, srdf_path, locator):

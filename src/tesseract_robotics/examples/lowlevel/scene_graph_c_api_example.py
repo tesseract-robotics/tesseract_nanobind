@@ -20,7 +20,6 @@ Use Cases:
 
 import math
 import sys
-from pathlib import Path
 
 import numpy as np
 
@@ -36,7 +35,7 @@ from tesseract_robotics.environment import (
     MoveJointCommand,
     MoveLinkCommand,
 )
-from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError
+from tesseract_robotics.examples.lowlevel.example_support import EnvironmentInitError, locate_file
 from tesseract_robotics.scene_graph import Joint, JointType
 
 
@@ -53,8 +52,8 @@ def run():
     # Load KUKA IIWA 7-DOF robot
     urdf_url = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
     srdf_url = "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"
-    urdf_path = Path(locator.locateResource(urdf_url).getFilePath())
-    srdf_path = Path(locator.locateResource(srdf_url).getFilePath())
+    urdf_path = locate_file(locator, urdf_url)
+    srdf_path = locate_file(locator, srdf_url)
 
     # Initialize environment (loads URDF/SRDF, builds scene graph)
     env = Environment()

@@ -39,13 +39,14 @@ C++ Reference:
     so does this example. It is a copy, so edit it and pass it in.
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, JointId
 from tesseract_robotics.geometry import Box
 from tesseract_robotics.scene_graph import (
     Collision,
@@ -101,7 +102,7 @@ def agree(transforms: dict[str, Isometry3d], oracle: dict[str, Isometry3d]) -> b
 
 
 def kdl_oracle(
-    scene_graph: SceneGraph, joint_names: list[str], values: np.ndarray
+    scene_graph: SceneGraph, joint_names: Sequence[JointId | str], values: np.ndarray
 ) -> dict[str, Isometry3d]:
     """Link transforms of a KDLStateSolver rebuilt from `scene_graph`."""
     return KDLStateSolver(scene_graph).getState(joint_names, values).link_transforms
@@ -229,7 +230,14 @@ def run() -> dict[str, Any]:
     # getLinkTransforms() lists the current state in getLinkIds() order
     solver.setState(JOINT_VALUES, floating)
     overloads["getLinkTransforms()"] = agree(
-        dict(zip(solver.getLinkIds(), solver.getLinkTransforms())), oracle
+        dict(
+            zip(
+                (link.name() for link in solver.getLinkIds()),
+                solver.getLinkTransforms(),
+                strict=True,
+            )
+        ),
+        oracle,
     )
     # --8<-- [end:overloads]
 
@@ -285,13 +293,13 @@ def run() -> dict[str, Any]:
         # the attach joints have the identity origin: inserted root = parent ∘ origin = parent
         "root_is_parent_times_origin": is_approx(
             transforms[prefixed_root],
-            transforms[root] * prefix_attach.parent_to_joint_origin_transform,
+            transforms[root.name()] * prefix_attach.parent_to_joint_origin_transform,
         ),
         "child_is_root_times_fixed_origin": is_approx(
             transforms[prefixed_child], transforms[prefixed_root] * translation(SUBGRAPH_JOINT_X)
         ),
         # a floating value replaces the attach joint's origin
-        "floating_value_moves_root": is_approx(moved_root, transforms[root] * moved),
+        "floating_value_moves_root": is_approx(moved_root, transforms[root.name()] * moved),
     }
 
     return {
