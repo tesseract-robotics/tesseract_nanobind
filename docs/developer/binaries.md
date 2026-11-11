@@ -20,7 +20,6 @@ flowchart LR
 | `default` | 3.14 (unpinned, `>=3.12`) | `.native/<triplet>` (`pixi run native-build`) | local development |
 | `py312` | 3.12 | same | CI wheel builds (abi3) |
 | `py315` | 3.15 | same; `viser` from PyPI, because its `websockets <17` cap has no conda-forge py315 build | builds the bindings and runs the suite on the newest Python |
-| `upstream` | 3.12 | the `upstream/` submodules, compiled by `pixi run -e upstream build-upstream-cpp` into the env prefix; third-party libraries from conda | 0.36 inner loop ([Building against upstream main](upstream-main.md)) |
 
 The default envs carry the toolchain only (cmake, ninja, ccache, the autotools the vcpkg ports
 need, colcon, vcs2l, libomp on macOS); there are no conda tesseract packages.

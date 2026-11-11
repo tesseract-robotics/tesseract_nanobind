@@ -26,15 +26,12 @@ endif()
 find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
 
-# The tesseract C++ prefix: TESSERACT_CPP_PREFIX when set (the PyPI wheel builds point it at
-# the colcon install of the source-built stack, see .github/workflows/wheels.yml), otherwise
-# the active conda env, whose tesseract-robotics packages provide the libs for development.
-# find_package() resolves them via the CMAKE_PREFIX_PATH entry added below, and the data the
+# The tesseract C++ prefix: TESSERACT_CPP_PREFIX, the colcon install of the source-built stack
+# (scripts/native_stack.py; the wheel workflow and `pixi run install` both point it there).
+# find_package() resolves the stack via the CMAKE_PREFIX_PATH entry added below, and the data the
 # wheel carries is copied from its share/.
 if(NOT "$ENV{TESSERACT_CPP_PREFIX}" STREQUAL "")
   set(TESSERACT_CPP_PREFIX "$ENV{TESSERACT_CPP_PREFIX}")
-elseif(NOT "$ENV{CONDA_PREFIX}" STREQUAL "")
-  set(TESSERACT_CPP_PREFIX "$ENV{CONDA_PREFIX}")
 endif()
 
 # Embed an RPATH to <cpp-prefix>/lib so the built extensions locate the tesseract libs

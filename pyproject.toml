@@ -276,7 +276,7 @@ install = { cmd = "python scripts/native_stack.py exec --libomp-prefix $CONDA_PR
 
 
 # The native stack `pixi run native-build` writes: the default, py312 and py315 envs run the
-# bindings built against it (the upstream env uses its conda prefix instead).
+# bindings built against it.
 [tool.pixi.feature.native.target.osx-arm64.activation.env]
 TESSERACT_CPP_PREFIX = "$PIXI_PROJECT_ROOT/.native/arm64-osx-dynamic-release/ws/install"
 
@@ -378,103 +378,8 @@ audit-typecheck = { cmd = "ty check scripts/audit_*.py tests/audit", description
 audit-telemetry = { cmd = "python scripts/audit_telemetry_report.py", description = "Print each audit step's fact-cache hits and misses and its timed phases (CI, from BINDING_AUDIT_EVENTS logs)" }
 audit-cache-prune = { cmd = "python scripts/audit_cache_prune.py", description = "Drop the libclang fact-cache entries a run did not use (CI, before saving the cache)" }
 
-# Tooling to build and test the bindings against a 0.36 C++ stack, shared by the
-# upstream env (source-built). Built with conda's compilers.
-[tool.pixi.feature.bindings-dev]
-platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
-
-[tool.pixi.feature.bindings-dev.dependencies]
-python = "3.12.*"
-cmake = ">=3.15,<4"
-ninja = "*"
-ccache = "*"
-pkg-config = "*"
-git = "*"
-pip = "*"
-setuptools = ">=68,<82"
-setuptools-scm = ">=8"
-wheel = "*"
-scikit-build-core = ">=0.10,<1"
-nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this version (gh-159)
-pytest = ">=7.0"
-pytest-xdist = ">=3.0"
-
-# Compilers (compiler('c') / compiler('cxx')): these
-# activation packages export CC/CXX, CXXFLAGS and CMAKE_ARGS, which the
-# c-compiler 2.x metapackage no longer pulls in.
-[tool.pixi.feature.bindings-dev.target.osx-arm64.dependencies]
-clang_osx-arm64 = "19.*"
-clangxx_osx-arm64 = "19.*"
-
-[tool.pixi.feature.bindings-dev.target.linux-64.dependencies]
-gcc_linux-64 = "14.*"
-gxx_linux-64 = "14.*"
-
-[tool.pixi.feature.bindings-dev.target.linux-aarch64.dependencies]
-gcc_linux-aarch64 = "14.*"
-gxx_linux-aarch64 = "14.*"
-
-[tool.pixi.feature.bindings-dev.pypi-dependencies]
-numpy = ">=2.0"
-loguru = ">=0.7.0"
-scipy = ">=1.17.1"
-pyyaml = "*"
-
-# Inner loop for upstream main: the upstream/ submodules are compiled incrementally
-# (scripts/build_upstream.sh) and installed into this env's prefix, so the env carries
-# only their third-party deps — the union of the stack's third-party libraries —
-# and no tesseract packages.
-[tool.pixi.feature.upstream]
-platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
-channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
-
-[tool.pixi.feature.upstream.dependencies]
-# third-party C++ deps (conda-forge)
-libboost-devel = "1.88.*"
-eigen-abi-devel = "5.0.1.*"
-cereal = "*"
-tinyxml2 = "*"
-spdlog = "*"
-assimp = "*"
-urdfdom = "*"
-fcl = "*"
-octomap = "*"
-orocos-kdl = "*"
-pcl = "1.15.1.*"
-flann = "*"
-jsoncpp = "*"
-yaml-cpp = "*"
-bullet-cpp = "*"
-blas = "*"
-gtest = "*"
-gmock = "*"
-xz = "*"
-osqp = "*"
-osqp-eigen = "*"
-# trajopt_sco / trajopt_sqp build their PIQP backend when they find it; the bindings require it
-piqp = "0.6.4.*"  # the version trajopt_ext fetches when PIQP is missing
-qpoases = "*"
-ompl = "*"
-taskflow = ">=3.6,<3.8"  # run dep of trajopt; 3.8+ needs C++20
-gperftools = "*"
-ros-industrial-cmake-boilerplate = "*"
-opw-kinematics = "*"
-descartes-light = "*"
-libruckig = "*"
-llvm-openmp = "*"
-
-[tool.pixi.feature.upstream.tasks]
-build-upstream-cpp = { cmd = "bash scripts/build_upstream.sh", description = "Incrementally build the upstream/ C++ submodules into the upstream env" }
-build-upstream = { cmd = "pip install -e . --no-build-isolation", env = { SKBUILD_BUILD_DIR = "build/upstream-{wheel_tag}" }, depends-on = [
-    "build-upstream-cpp",
-], description = "Inner loop: rebuild changed upstream C++, then the bindings against it" }
-test-upstream = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q -n auto", depends-on = [
-    "build-upstream",
-], description = "Run the test suite against the upstream-main build" }
-
 [tool.pixi.environments]
 default = { features = ["profile", "viewer", "native"], solve-group = "default" }
-upstream = { features = ["bindings-dev", "upstream", "viewer"], no-default-feature = true, solve-group = "upstream" }
 py312 = { features = ["py312", "viewer", "native"], solve-group = "py312" }
 py315 = { features = ["py315", "native"], solve-group = "py315" }
 wheel-312 = { features = ["wheel-test", "wheel-py312"], no-default-feature = true, solve-group = "wheel-312" }
