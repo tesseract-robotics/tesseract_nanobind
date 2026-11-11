@@ -118,6 +118,18 @@ CLEARANCE_SCAN_STEP_RAD = 0.005
 # Viewer markers of each cube's closest approach.
 CLEARANCE_COLOR_RGB = (220, 40, 40)
 CLEARANCE_LINE_THICKNESS_M = 0.003
+# The view the labels are laid out for, and the demo recording's camera (manifest.toml) [m, rad].
+VIEW_POSITION_M = (1.55, -1.35, 1.25)
+VIEW_LOOK_AT_M = (0.4, 0.0, 0.6)
+VIEW_FOV_RAD = 0.6109
+# A distance label's size as a fraction of the view's height: the widest, "152 mm", measured
+# 128 x 47 px in the 1054 px tall poster. Labels keep their pixel size as the view zooms.
+LABEL_WIDTH_FRACTION = 128 / 1054
+LABEL_HEIGHT_FRACTION = 47 / 1054
+# Height a label is raised by while it overlaps one placed before it [m].
+LABEL_RAISE_STEP_M = 0.005
+# Highest a label may be raised above its cube's nearest point [m]: past it, give up loudly.
+LABEL_MAX_RAISE_M = 0.5
 TOOLPATH_AXES_LENGTH_M = 0.03
 
 
@@ -451,14 +463,87 @@ def run(
 
 
 # --8<-- [start:markers]
+class LabelPlacementError(RuntimeError):
+    """A label still overlaps another after rising `LABEL_MAX_RAISE_M`."""
+
+
+@dataclass(frozen=True)
+class LabelView:
+    """A pinhole view along which labels must not overlap, world frame (m, rad), z up."""
+
+    position_m: tuple[float, float, float]
+    look_at_m: tuple[float, float, float]
+    fov_rad: float
+
+    def image_xy(self, point_m: np.ndarray) -> np.ndarray:
+        """`point_m` on the image plane at unit depth: (right, up), in units of depth."""
+        forward = np.subtract(self.look_at_m, self.position_m)
+        forward = forward / np.linalg.norm(forward)
+        right = np.cross(forward, (0.0, 0.0, 1.0))
+        right = right / np.linalg.norm(right)
+        up = np.cross(right, forward)
+        ray = np.asarray(point_m) - np.asarray(self.position_m)
+        depth = ray @ forward
+        return np.array([ray @ right, ray @ up]) / depth
+
+    def label_size(self) -> np.ndarray:
+        """A label's (width, height) on the unit-depth image plane."""
+        view_height = 2.0 * np.tan(self.fov_rad / 2.0)
+        return view_height * np.array([LABEL_WIDTH_FRACTION, LABEL_HEIGHT_FRACTION])
+
+    def overlap(self, a_m: np.ndarray, b_m: np.ndarray) -> bool:
+        """Whether labels anchored at `a_m` and `b_m` overlap in this view."""
+        gap = np.abs(self.image_xy(a_m) - self.image_xy(b_m))
+        return bool(np.all(gap < self.label_size()))
+
+
+DEFAULT_VIEW = LabelView(VIEW_POSITION_M, VIEW_LOOK_AT_M, VIEW_FOV_RAD)
+
+
+def label_anchors(clearances: list[Clearance], view: LabelView = DEFAULT_VIEW) -> list[np.ndarray]:
+    """Where each distance label goes: at its cube's nearest point, raised clear of the others.
+
+    Labels keep their pixel size, so whether two overlap depends on the view, not on their
+    distance in space: cubes behind one another along the line of sight put their labels on
+    top of each other however far apart they are. In `clearances` order, a label starts at its
+    cube's nearest point and rises in `LABEL_RAISE_STEP_M` steps until it overlaps no label
+    placed before it in `view`. Rising keeps it above the end of its own line.
+
+    Args:
+        clearances: From `closest_approaches`.
+        view: The view to keep the labels apart in.
+
+    Returns:
+        One world-frame anchor (m) per clearance, in the same order.
+
+    Raises:
+        LabelPlacementError: a label overlaps another after rising `LABEL_MAX_RAISE_M`.
+    """
+    step = np.array([0.0, 0.0, LABEL_RAISE_STEP_M])
+    anchors: list[np.ndarray] = []
+    for clearance in clearances:
+        start = np.array(clearance.cube_point_m, dtype=np.float64)
+        anchor = start
+        while any(view.overlap(anchor, placed) for placed in anchors):
+            anchor = anchor + step
+            if anchor[2] - start[2] > LABEL_MAX_RAISE_M:
+                raise LabelPlacementError(
+                    f"{clearance.cube}: label still overlaps after rising {LABEL_MAX_RAISE_M} m"
+                )
+        anchors.append(anchor)
+    return anchors
+
+
 def draw_clearances(viewer, clearances: list[Clearance]) -> None:
     """Mark each cube's closest approach: a line between the nearest points, labelled in mm at the cube.
+
+    Labels that would overlap in `DEFAULT_VIEW` are stacked apart (`label_anchors`).
 
     Args:
         viewer: The `TesseractViewer` showing the scene.
         clearances: From `closest_approaches`.
     """
-    for clearance in clearances:
+    for clearance, anchor in zip(clearances, label_anchors(clearances), strict=True):
         segment = np.array([[clearance.robot_point_m, clearance.cube_point_m]])
         viewer.server.scene.add_line_segments(
             f"/clearance/{clearance.cube}",
@@ -469,7 +554,7 @@ def draw_clearances(viewer, clearances: list[Clearance]) -> None:
         viewer.server.scene.add_label(
             f"/clearance/{clearance.cube}/label",
             f"{clearance.distance_m * MM_PER_M:.0f} mm",
-            position=clearance.cube_point_m,
+            position=anchor,
         )
 
 
@@ -484,6 +569,10 @@ def main() -> int:
     # Case 2, the thresholded objective, is the one this example introduces.
     shown = cases["threshold"]
     with TesseractViewer() as viewer:
+        # Open on the view the labels are laid out for.
+        viewer.server.initial_camera.position = VIEW_POSITION_M
+        viewer.server.initial_camera.look_at = VIEW_LOOK_AT_M
+        viewer.server.initial_camera.fov = VIEW_FOV_RAD
         viewer.update_environment(shown["robot"].env)
         if shown["result"].raw_results is not None:
             viewer.update_trajectory(shown["result"].raw_results)

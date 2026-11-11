@@ -2,6 +2,7 @@
 
 import importlib
 import sys
+import types
 from pathlib import Path
 
 import numpy as np
@@ -111,3 +112,82 @@ def test_the_ompl_recording_holds_the_cpp_examples_sphere(composer):
     assert shape.geometry.getRadius() == pytest.approx(0.15)
     centre = scene.env.getState().link_transforms["sphere_attached"] * shape.origin
     assert np.asarray(centre.translation) == pytest.approx([0.5, 0.0, 0.55])
+
+
+def _clearance(cube: str, robot_point, cube_point):
+    example = importlib.import_module(
+        "tesseract_robotics.examples.freespace_clearance_objective_example"
+    )
+    return example.Clearance(
+        cube=cube,
+        link="link_7",
+        distance_m=float(np.linalg.norm(np.subtract(cube_point, robot_point))),
+        robot_point_m=np.asarray(robot_point, dtype=float),
+        cube_point_m=np.asarray(cube_point, dtype=float),
+    )
+
+
+CLEARANCE_MODULE = "tesseract_robotics.examples.freespace_clearance_objective_example"
+
+
+def _no_two_overlap(view, anchors) -> bool:
+    return not any(view.overlap(a, b) for i, a in enumerate(anchors) for b in anchors[i + 1 :])
+
+
+def test_labels_of_cubes_behind_one_another_are_stacked_apart():
+    """Two nearest points on one line of sight, far apart in space: their labels still meet."""
+    example = importlib.import_module(CLEARANCE_MODULE)
+    view = example.DEFAULT_VIEW
+    eye = np.asarray(view.position_m)
+    toward = np.asarray(view.look_at_m) - eye
+    near, far = eye + 0.6 * toward, eye + 1.2 * toward
+    clearances = [
+        _clearance("cube_0", near - (0.0, 0.0, 0.05), near),
+        _clearance("cube_1", far - (0.0, 0.0, 0.05), far),
+        _clearance("cube_2", (0.0, 1.0, 0.4), (0.0, 1.0, 0.45)),
+    ]
+    assert view.overlap(near, far)
+
+    anchors = example.label_anchors(clearances)
+
+    assert _no_two_overlap(view, anchors)
+    # The first label, and one with room, stay at their cube's nearest point.
+    assert anchors[0] == pytest.approx(clearances[0].cube_point_m)
+    assert anchors[2] == pytest.approx(clearances[2].cube_point_m)
+    # Labels only rise, so each stays above the end of its own line.
+    for anchor, clearance in zip(anchors, clearances, strict=True):
+        assert anchor[:2] == pytest.approx(clearance.cube_point_m[:2])
+        assert anchor[2] >= clearance.cube_point_m[2]
+
+
+def test_the_labels_are_laid_out_for_the_recordings_camera():
+    example = importlib.import_module(CLEARANCE_MODULE)
+    (entry,) = [
+        e for e in manifest.load_manifest() if e.module == "freespace_clearance_objective_example"
+    ]
+    assert tuple(entry.camera.position_m) == pytest.approx(example.VIEW_POSITION_M)
+    assert tuple(entry.camera.look_at_m) == pytest.approx(example.VIEW_LOOK_AT_M)
+    assert entry.camera.fov_rad == pytest.approx(example.VIEW_FOV_RAD)
+
+
+@pytest.mark.planning
+def test_no_two_recorded_clearance_labels_overlap(composer):
+    example = importlib.import_module(CLEARANCE_MODULE)
+    labels = {}
+
+    class Recorder:
+        """Stands in for the viewer's scene: keeps each label's anchor."""
+
+        def add_line_segments(self, *_args, **_kwargs):
+            pass
+
+        def add_label(self, name, _text, *, position):
+            labels[name] = np.asarray(position, dtype=float)
+
+    viewer = types.SimpleNamespace(server=types.SimpleNamespace(scene=Recorder()))
+    scene = SCENES["freespace_clearance_objective_example"](composer)
+    for decorate in scene.decorations:
+        decorate(viewer)
+
+    assert len(labels) == len(example.CUBES)
+    assert _no_two_overlap(example.DEFAULT_VIEW, list(labels.values()))
