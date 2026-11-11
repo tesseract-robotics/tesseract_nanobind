@@ -5,18 +5,18 @@ builds one `TrajOptQPProblem` and advances a `TrustRegionSQPSolver` one step per
 replan, with the human moved by hand through a joint state publisher; the faithful
 port is `online_planning_sqp_example.py`. This one plans the same gantry + ABB IRB2400
 scene (start, target, model) from scratch through `TrajOptPipeline` each cycle, with
-the human moved along a scripted sine, to show what a full pipeline call costs per
-replan.
+a person walking a scripted loop, to show what a full pipeline call costs per replan.
 
 Scene (tesseract_support `online_planning_example`):
 - Gantry: `gantry_axis_1`, `gantry_axis_2`, prismatic.
 - ABB IRB2400: `joint_1` .. `joint_6`.
 - Human: `human_x_joint`, `human_y_joint`, outside the `manipulator` group, so the
-  obstacle moves with `Environment.setState` and no collision manager is rebuilt.
+  obstacle moves with `Environment.setState` and no collision manager is rebuilt. A figure to
+  scale stands in its cylinder (online_planning_scene.py, shared with the SQP example).
 
 Differences from the C++ example, all deliberate:
 - Every cycle is an independent pipeline call: no warm start, no incremental SQP step.
-- The human follows `HUMAN_AMPLITUDE_M * sin(HUMAN_PHASE_STEP_RAD * k)` along x.
+- The person walks online_planning_scene's loop; the plans are spread evenly over one lap.
 - The C++ collision settings (margin 0.1 m, coefficient 10) come from
   `create_trajopt_default_profiles`, not from this file.
 
@@ -35,6 +35,7 @@ import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.examples import online_planning_scene as scene
 from tesseract_robotics.examples.failures import require_success
 from tesseract_robotics.planning import (
     MotionProgram,
@@ -44,33 +45,6 @@ from tesseract_robotics.planning import (
 )
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
 
-# Peak displacement of the scripted human along x [m].
-HUMAN_AMPLITUDE_M = 0.2
-# Phase advance of the human's sine per replanning cycle [rad].
-HUMAN_PHASE_STEP_RAD = 0.2
-
-
-def update_human_position(robot, human_x, human_y):
-    """Update human obstacle position by changing joint values.
-
-    The human obstacle is modeled as a kinematic chain in the URDF with
-    prismatic joints (human_x_joint, human_y_joint). This allows efficient
-    position updates without rebuilding the collision manager.
-
-    Alternatives, not used here: `moveLink` (rebuilds the collision manager) and
-    adding and removing links (a full environment edit).
-
-    Args:
-        robot: Robot instance with online_planning_example model
-        human_x: X position of human obstacle in meters
-        human_y: Y position of human obstacle in meters
-    """
-    # setState() efficiently updates joint values and recomputes transforms
-    # The collision manager automatically uses the new positions
-    joint_names = ["human_x_joint", "human_y_joint"]
-    joint_values = np.array([human_x, human_y])
-    robot.env.setState(joint_names, joint_values)
-
 
 def run(
     pipeline="TrajOptPipeline",
@@ -79,14 +53,15 @@ def run(
     *,
     composer: TaskComposer | None = None,
 ):
-    """Run online planning example with moving human obstacle.
+    """Run online planning example with a walking person.
 
-    Plans `num_iterations` times while a scripted human obstacle oscillates, and times each
-    plan.
+    Plans `num_iterations` times, spread evenly over one lap of the person's walk, and times
+    each plan.
 
     Args:
         pipeline: Planning pipeline ("TrajOptPipeline" or "TrajOptIfoptPipeline")
-        num_iterations: Number of replanning cycles to run
+        num_iterations: Number of replanning cycles, spread evenly over one lap; the demo
+            recording plans once per tick (`scene.ticks_per_lap()`)
         num_planners: Parallel planners (unused for TrajOpt, relevant for OMPL)
         composer: Composer to plan with. Without one, each call builds a new
             composer and loads the task composer plugins again (seconds per
@@ -94,7 +69,8 @@ def run(
             every call to load them once.
 
     Returns:
-        dict with 'trajectories', 'timings', 'robot', 'joint_names', 'success'
+        dict with 'trajectories', 'ticks' (the walk's tick per plan), 'timings', 'robot',
+        'joint_names', 'success'
     """
     # =========================================================================
     # STEP 1: Load Robot Model
@@ -118,6 +94,7 @@ def run(
     # Start position: all zeros (gantry at origin, arm in home pose)
     start_position = np.zeros(len(joint_names))
     robot.set_joints(start_position, joint_names=joint_names)
+    scene.add_person(robot)
 
     # online_planning_example.cpp: target_joint_position << 5.5, 3, 0, 0, 0, 0, 0, 0
     target_position = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -138,15 +115,14 @@ def run(
 
     trajectories = []
     timings = []
+    ticks = [round(i * scene.ticks_per_lap() / num_iterations) for i in range(num_iterations)]
 
     # =========================================================================
     # STEP 4: Replanning Loop
     # =========================================================================
-    for iteration in range(num_iterations):
-        # --- Update Dynamic Obstacle ---
-        human_x = HUMAN_AMPLITUDE_M * np.sin(HUMAN_PHASE_STEP_RAD * iteration)
-        human_y = 0.0
-        update_human_position(robot, human_x, human_y)
+    for iteration, tick in enumerate(ticks):
+        # --- Move the person to where its walk is at this tick ---
+        scene.move_person(robot.env, tick)
 
         # --- Get Current Robot State ---
         # In a real system, this would come from robot encoders
@@ -175,7 +151,7 @@ def run(
         timings.append(planning_time)
         print(
             f"Iteration {iteration + 1}: Success in {planning_time:.3f}s, "
-            f"{len(result)} waypoints, human_x={human_x:.3f}"
+            f"{len(result)} waypoints, person at {scene.walk_position_m(tick).round(2)}"
         )
         # A real online planner would execute the first segment while planning the
         # next; this example only times the planning.
@@ -190,11 +166,31 @@ def run(
 
     return {
         "trajectories": trajectories,
+        "ticks": ticks,
         "timings": timings,
         "robot": robot,
         "joint_names": joint_names,
         "success": True,
     }
+
+
+def recording_rows(results):
+    """One lap of the walk, one row per tick, showing the plan made last before that tick.
+
+    Columns: the manipulator joints, then `scene.HUMAN_JOINTS`, then the time [s].
+    """
+    plans = [[point.positions for point in result.trajectory] for result in results["trajectories"]]
+    plan_ticks = results["ticks"]
+    plan_of_tick = [
+        max(i for i, start in enumerate(plan_ticks) if start <= tick)
+        for tick in range(scene.ticks_per_lap())
+    ]
+    return scene.playback_rows(plans, plan_of_tick)
+
+
+def recording_joint_names(results):
+    """Column names of `recording_rows`, without the time."""
+    return [*results["joint_names"], *scene.HUMAN_JOINTS]
 
 
 def main() -> int:

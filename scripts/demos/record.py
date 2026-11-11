@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import importlib.metadata
 import shutil
 import sys
@@ -55,12 +56,32 @@ def client_path() -> Path:
     return Path(viser.__file__).parent / "client/build/index.html"
 
 
+def input_sources(module: str) -> list[Path]:
+    """The example, the sibling example modules it imports, and the scenes, in that order.
+
+    A helper the example shares with another (`online_planning_scene`) shapes its recording
+    as much as the example's own file does.
+    """
+    example = EXAMPLES_DIR / f"{module}.py"
+    package = tesseract_robotics.examples.__name__
+    siblings: set[str] = set()
+    for node in ast.walk(ast.parse(example.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.module == package:
+            siblings.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith(f"{package}."):
+            siblings.add(node.module.removeprefix(f"{package}.").split(".")[0])
+    helpers = sorted(EXAMPLES_DIR / f"{name}.py" for name in siblings)
+    return [
+        example,
+        *(path for path in helpers if path.is_file()),
+        Path(__file__).with_name("scenes.py"),
+    ]
+
+
 def inputs_sha256(module: str, floor_size_m: float, fps: float) -> str:
-    """Hash what decides a recording's content: the example, the scenes, and the settings."""
-    sources = b"".join(
-        path.read_bytes()
-        for path in (EXAMPLES_DIR / f"{module}.py", Path(__file__).with_name("scenes.py"))
-    )
+    """Hash what decides a recording's content: the example, its helpers, the scenes, and the
+    settings."""
+    sources = b"".join(path.read_bytes() for path in input_sources(module))
     settings = f"{floor_size_m}|{fps}|{viser.__version__}|{importlib.metadata.version(PACKAGE)}"
     return sha256_bytes(sources + settings.encode())
 

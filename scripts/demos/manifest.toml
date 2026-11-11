@@ -109,7 +109,7 @@ fov_rad = 0.6109
 module = "online_planning_example"
 page = "examples/online-planning.md"
 title = "Online planning"
-blurb = "Replans the trajectory while an obstacle moves."
+blurb = "Replans the trajectory while a person walks a loop through the cell."
 status = "published"
 floor_size_m = 20.0
 [example.camera]

@@ -16,6 +16,7 @@ import pytest
 from scipy.spatial.transform import Rotation
 
 import tesseract_robotics.examples
+from tesseract_robotics.examples import online_planning_scene
 from tesseract_robotics.planning import Robot
 from tesseract_robotics.planning.composer import PlanningResult, TrajectoryPoint
 
@@ -23,11 +24,6 @@ from ..planning_validity import (
     JointGoal,
     assert_trajectory_valid,
 )
-
-# `tesseract_robotics.examples` re-exports each `run` under its module's name: import the modules.
-online_example = importlib.import_module("tesseract_robotics.examples.online_planning_example")
-sqp_example = importlib.import_module("tesseract_robotics.examples.online_planning_sqp_example")
-
 
 # End joints of the freespace examples (rad), as in their C++ originals.
 FREESPACE_GOAL = JointGoal.build([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
@@ -998,12 +994,9 @@ def test_raster_example():
 def test_online_planning_example():
     outcome = tesseract_robotics.examples.online_planning_example()
     assert len(outcome["trajectories"]) == ONLINE_ITERATIONS
-    for iteration, result in enumerate(outcome["trajectories"]):
-        # The human stood elsewhere for each plan: validate against where it stood then.
-        human_x = online_example.HUMAN_AMPLITUDE_M * np.sin(
-            online_example.HUMAN_PHASE_STEP_RAD * iteration
-        )
-        online_example.update_human_position(outcome["robot"], human_x, 0.0)
+    for tick, result in zip(outcome["ticks"], outcome["trajectories"], strict=True):
+        # The person stood elsewhere for each plan: validate against where it stood then.
+        online_planning_scene.move_person(outcome["robot"].env, tick)
         assert_trajectory_valid(outcome["robot"], result, TARGET_8DOF)
 
 
@@ -1012,27 +1005,25 @@ def test_online_planning_example():
 SQP_POSITION_TOL_M = 1e-4
 SQP_ORIENTATION_TOL_RAD = 0.06
 
-# run()'s default replanning cycles of online_planning_example, and of the SQP example.
+# run()'s default replanning cycles of online_planning_example, and of the SQP example: one
+# lap of the person's walk.
 ONLINE_ITERATIONS = 5
-SQP_REPLANS = 10
+SQP_REPLANS = online_planning_scene.ticks_per_lap()
 
 
 @pytest.mark.planning
 def test_online_planning_sqp_example():
     outcome = tesseract_robotics.examples.online_planning_sqp_example()
     assert len(outcome["trajectories"]) == 1 + SQP_REPLANS
-    robot, names, steps = outcome["robot"], outcome["joint_names"], outcome["steps"]
-    final = np.asarray(outcome["trajectories"][-1]).reshape(steps, len(names))
-    human_x = sqp_example.HUMAN_CENTER_M + sqp_example.HUMAN_AMPLITUDE_M * np.sin(
-        sqp_example.HUMAN_PHASE_STEP_RAD * (SQP_REPLANS - 1)
-    )
-    sqp_example.update_human_position(robot, human_x, 0.0)
+    robot, names = outcome["robot"], outcome["joint_names"]
+    final = outcome["plans"][-1]
+    online_planning_scene.move_person(robot.env, outcome["ticks"][-1])
     result = PlanningResult(
         successful=True, trajectory=[TrajectoryPoint(list(names), row) for row in final]
     )
-    # One SQP step per replan does not restore hard feasibility after the human jumps: the final
-    # trajectory may sit inside the estop zones' 0.1 m margin (measured: -2.7 mm penetration).
-    # Limits and the goal are checked; the collision constraint is the solver's, not a promise.
+    # A few SQP steps per tick do not promise hard feasibility: the plan may sit inside the estop
+    # zones' 0.1 m margin. Limits and the goal are checked here; that the zones stay apart on
+    # every tick is test_online_planning_sqp_example's.
     assert_trajectory_valid(robot, result, check_collision=False)
     # The goal is the target tool pose, not the joint vector: the 8-axis chain is redundant.
     target = robot.fk("manipulator", TARGET_8DOF.positions, "tool0")

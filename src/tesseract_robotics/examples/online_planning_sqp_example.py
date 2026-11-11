@@ -28,10 +28,16 @@ C++ Reference:
 
 2. Create TrustRegionSQPSolver with OSQPEigenSolver
 
-3. Loop:
-   - Update obstacle position in environment
-   - stepSQPSolver() for single SQP iteration
+3. Loop, one tick per `TICK_S`:
+   - Move the person one step along its walk (online_planning_scene)
+   - Rebuild the problem seeded with the last solution, as the C++ setupProblem does
+   - stepSQPSolver() until converged, at most `SQP_STEPS_PER_TICK` times
    - Extract trajectory from results
+
+**The person**
+The C++ example moves the human cylinder by hand. Here a figure to scale stands in the
+cylinder and walks a scripted loop at walking speed (online_planning_scene.py), which the
+task composer variant shares.
 """
 
 # --8<-- [start:setup]
@@ -46,19 +52,19 @@ from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 from tesseract_robotics.collision import CollisionEvaluatorType, ContactTestType
 from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.examples import online_planning_scene as scene
 from tesseract_robotics.planning import Robot
 
 # --8<-- [end:setup]
 
-# Waypoint spacing when the viewer plays the final solve [s]. The solver's steps carry no time.
-VIEWER_STEP_S = 0.1
-# The scripted human of the replanning loop: x = CENTER + AMPLITUDE * sin(PHASE_STEP * k) [m, rad].
-# The C++ example has no script: a person drags the human with a joint state publisher.
-HUMAN_CENTER_M = 0.5
-HUMAN_AMPLITUDE_M = 0.3
-HUMAN_PHASE_STEP_RAD = 0.3
 # Initial trust box of the SQP solver, online_planning_example.cpp's default [rad or m].
 TRUST_BOX_SIZE = 0.01
+# Most SQP steps per tick. The C++ loop takes one step per iteration (`num_steps = 1`) and
+# iterates as fast as the solver allows; at walking speed one 0.01 trust-box step per 0.1 s
+# tick lets the person into the plan's margin (worst 2.14 m between zone centres against
+# 2.6 m). Ten keep the margin on every tick of the walk, measured, and take about 40 ms, inside
+# the tick. The loop stops early when a step converges.
+SQP_STEPS_PER_TICK = 10
 
 
 class SolverDidNotConvergeError(RuntimeError):
@@ -74,6 +80,7 @@ def build_optimization_problem(
     steps=10,
     use_continuous_collision=True,
     extra_constraints=None,
+    initial_trajectory=None,
 ):
     """Build the TrajOptQPProblem that online_planning_example.cpp builds.
 
@@ -87,6 +94,12 @@ def build_optimization_problem(
                                   If False, use discrete single-timestep collision.
         extra_constraints: Optional callable (vars_list, manip, env) -> constraint sets,
                            added before setup(), e.g. Python-defined planning rules.
+        initial_trajectory: `(steps, joints)` seed, e.g. the last solution; default the straight
+                            interpolation from start to target. The C++ setupProblem seeds the
+                            variables this way, when it creates them. `NodesVariables.
+                            setVariables` after setup() only writes the values: the collision
+                            constraints keep evaluating the interpolation, and the solver
+                            reports convergence without moving, the person inside the margin.
 
     Returns:
         dict with problem and all objects that must stay alive
@@ -95,8 +108,11 @@ def build_optimization_problem(
     manip = robot.env.getKinematicGroup("manipulator")
     joint_limits = manip.getLimits().joint_limits
 
-    # Interpolate initial trajectory
-    initial_states = ti.interpolate(start_pos, target_pos, steps)
+    # Seed: the given trajectory, or the straight interpolation
+    if initial_trajectory is None:
+        initial_states = ti.interpolate(start_pos, target_pos, steps)
+    else:
+        initial_states = [np.asarray(row, dtype=np.float64) for row in initial_trajectory]
     bounds = ti.toBounds(joint_limits)
 
     # Create NodesVariables — factory handles Node/Var creation on C++ side
@@ -219,13 +235,13 @@ def build_optimization_problem(
 # --8<-- [end:problem]
 
 
-def update_human_position(robot, human_x, human_y):
-    """Update human obstacle position via joint values."""
-    robot.env.setState({"human_x_joint": human_x, "human_y_joint": human_y})
-
-
 def run(
-    steps=12, verbose=False, use_continuous_collision=False, extra_constraints=None, num_replan=10
+    steps=12,
+    verbose=False,
+    use_continuous_collision=False,
+    extra_constraints=None,
+    num_replan=None,
+    sqp_steps_per_tick=SQP_STEPS_PER_TICK,
 ):
     """Run trajectory optimization with low-level SQP API.
 
@@ -235,11 +251,15 @@ def run(
         use_continuous_collision: Use LVS continuous collision (True) or discrete (False)
                                   C++ default: False (discrete collision)
         extra_constraints: see build_optimization_problem
-        num_replan: replanning iterations after the initial solve
+        num_replan: replanning ticks after the initial solve; default one lap of the walk
+        sqp_steps_per_tick: most SQP steps per tick; 1 is the C++ loop's single step
 
     Returns:
-        dict with results
+        dict with results: `trajectories` (solver values per solve, the initial one first),
+        `plans` (the same as `(steps, joints)` arrays), `ticks` (the walk's tick per solve)
     """
+    if num_replan is None:
+        num_replan = scene.ticks_per_lap()
     # Load robot model
     robot = Robot.from_tesseract_support(
         "online_planning_example", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
@@ -252,6 +272,9 @@ def run(
     target_pos = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     robot.set_joints(start_pos, joint_names=joint_names)
+    # The person, at the walk's first point for the initial solve
+    scene.add_person(robot)
+    scene.move_person(robot.env, 0)
 
     # Build initial problem
     collision_mode = "LVS continuous" if use_continuous_collision else "discrete"
@@ -295,15 +318,14 @@ def run(
     # Online replanning loop
     print(f"\nOnline replanning ({num_replan} iterations)...")
 
-    for iteration in range(num_replan):
-        # Move obstacle
-        human_x = HUMAN_CENTER_M + HUMAN_AMPLITUDE_M * np.sin(HUMAN_PHASE_STEP_RAD * iteration)
-        update_human_position(robot, human_x, 0.0)
+    for tick in range(1, num_replan + 1):
+        # The person takes one step of its walk
+        scene.move_person(robot.env, tick)
 
         # The solver leaves the problem's variables at best_var_vals: one row per waypoint
         traj = ti.toTrajArray(problem_data["vars_list"])
 
-        # Rebuild problem with warm-start
+        # Rebuild the problem seeded with the last solution
         t0 = time.perf_counter()
         problem_data = build_optimization_problem(
             robot,
@@ -313,20 +335,18 @@ def run(
             steps,
             use_continuous_collision,
             extra_constraints,
+            initial_trajectory=traj,
         )
         problem = problem_data["problem"]
 
-        # Set warm-start values — flatten trajectory into decision vector
-        problem_data["nodes_variables"].setVariables(traj.flatten())
-
-        # Single SQP step (incremental optimization)
+        # Incremental optimization: a few SQP steps, from the seed
         solver.init(problem)
-        # The return value is False on every step here, converged or not, so it is not
-        # checked; tests/examples validates the trajectory the loop ends with.
-        solver.stepSQPSolver()
-
-        # Reset box size (trust region loop can shrink it to zero)
-        solver.setBoxSize(box_size)
+        for _ in range(sqp_steps_per_tick):
+            converged = solver.stepSQPSolver()
+            # Reset box size (trust region loop can shrink it to zero)
+            solver.setBoxSize(box_size)
+            if converged:
+                break
 
         x = solver.getResults().best_var_vals
         dt = time.perf_counter() - t0
@@ -335,15 +355,19 @@ def run(
 
         if verbose:
             cost = problem.getTotalExactCost()
-            print(f"  Iter {iteration + 1}: cost={cost:.4f}, time={dt * 1000:.1f}ms")
+            print(f"  Tick {tick}: cost={cost:.4f}, time={dt * 1000:.1f}ms")
     # --8<-- [end:sqp_loop]
 
     avg_time = np.mean(timings[1:]) * 1000
     print(f"Replan timing: avg={avg_time:.1f}ms ({1000 / avg_time:.0f} Hz)")
     print(f"Trajectory: {steps} waypoints x {len(joint_names)} joints")
 
+    n_joints = len(joint_names)
+    plans = [np.asarray(t[: steps * n_joints]).reshape(steps, n_joints) for t in trajectories]
     return {
         "trajectories": trajectories,
+        "plans": plans,
+        "ticks": list(range(num_replan + 1)),
         "timings": timings,
         "robot": robot,
         "joint_names": joint_names,
@@ -352,20 +376,17 @@ def run(
     }
 
 
-def style_for_viewer(env) -> None:
-    """Show the human in red and hide the robot's estop zone."""
-    scene = env.getSceneGraph()
-    for v in scene.getLink("human_estop_zone").visual:
-        if v.material:
-            v.material.color = np.array([0.8, 0.0, 0.0, 0.7])
-    scene.getLink("robot_estop_zone").visual.clear()
+def recording_rows(results):
+    """The walk as `Trajectory.from_rows` wants it: one row per tick, the plan of that tick.
+
+    Columns: the manipulator joints, then `scene.HUMAN_JOINTS`, then the time [s].
+    """
+    return scene.playback_rows(results["plans"], results["ticks"])
 
 
-def final_rows(results, *, steps=12):
-    """The final solve as `Trajectory.from_rows` wants it: `[q..., t]` per waypoint."""
-    n_joints = len(results["joint_names"])
-    traj_final = results["trajectories"][-1][: steps * n_joints].reshape(steps, n_joints)
-    return [wp.tolist() + [i * VIEWER_STEP_S] for i, wp in enumerate(traj_final)]
+def recording_joint_names(results):
+    """Column names of `recording_rows`, without the time."""
+    return [*results["joint_names"], *scene.HUMAN_JOINTS]
 
 
 def main() -> int:
@@ -407,14 +428,15 @@ def main() -> int:
 
     print("\n=== Viewer ===")
     print("Robot: 8-DOF gantry (2 linear + 6 rotational)")
-    print("Human: red cylinder at FINAL position (static in viewer)")
+    print("Person: walks its loop; the robot sweeps along the plan of each tick")
 
     env = results["robot"].env
-    style_for_viewer(env)
+    scene.style_for_viewer(env)
+    walk = Trajectory.from_rows(recording_joint_names(results), recording_rows(results))
 
     with TesseractViewer() as viewer:
         viewer.update_environment(env)
-        viewer.update_trajectory(Trajectory.from_rows(results["joint_names"], final_rows(results)))
+        viewer.update_trajectory(walk)
         print(f"Viewer at {viewer.url}")
         input("Press Enter to exit...")
 

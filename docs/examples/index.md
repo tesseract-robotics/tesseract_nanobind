@@ -112,7 +112,7 @@ Replanning while the world changes.
 
     **[Online planning](online-planning.md#overview)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py)
 
-    Replans the trajectory while an obstacle moves.
+    Replans the trajectory while a person walks a loop through the cell.
 
     `tesseract_online_planning_example`
 
@@ -225,7 +225,7 @@ has it). The page column links the walkthrough.
 | [`freespace_ompl_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_ompl_example.py) | `tesseract_freespace_ompl_example` | [OMPL](ompl.md) | OMPL freespace motion |
 | [`freespace_hybrid_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_hybrid_example.py) | `tesseract_freespace_hybrid_example` | [OMPL](ompl.md) | OMPL, then TrajOpt |
 | [`freespace_clearance_objective_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_clearance_objective_example.py) | `tesseract_freespace_clearance_objective_example` | [OMPL](ompl.md) | OMPL objective written in Python; a cost threshold ends the optimize loop |
-| [`online_planning_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py) | `tesseract_online_planning_example` | [Online planning](online-planning.md) | Task composer replanning around a moving obstacle |
+| [`online_planning_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py) | `tesseract_online_planning_example` | [Online planning](online-planning.md) | Task composer replanning around a walking person |
 | [`online_planning_sqp_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) | `tesseract_online_planning_sqp_example` | [Online planning](online-planning.md) | Low-level SQP replanning, warm-started each tick |
 | [`python_constraints_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/python_constraints_example.py) | `tesseract_python_constraints_example` | [Python constraints](python-constraints.md) | Seven constraints written in Python, in a live loop, scripted or driven by sliders |
 | [`tesseract_kinematics_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_kinematics_example.py) | `tesseract_kinematics_example` | [Basics](basic.md) | FK and IK with a kinematic group |
