@@ -1,20 +1,5 @@
 {
   "tesseract_collision": {
-    "BulletCastBVHManagerFactory": {
-      "wont_fix": "plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`)."
-    },
-    "BulletCastSimpleManagerFactory": {
-      "wont_fix": "plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`)."
-    },
-    "BulletDiscreteBVHManagerFactory": {
-      "wont_fix": "plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`)."
-    },
-    "BulletDiscreteSimpleManagerFactory": {
-      "wont_fix": "plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`)."
-    },
-    "BulletFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_CONTACT_MANAGERS_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
     "CollisionObjectSpec.__init__": {
       "wont_fix": "Spells the C++ aggregate initialization `{id, mask_id, shapes, shape_poses, enabled}`; `shapes` refuses None, as `addCollisionObject` does."
     },
@@ -26,12 +11,6 @@
     },
     "ContinuousContactManager.setCollisionObjectsTransformCast": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174)"
-    },
-    "FCLDiscreteBVHManagerFactory": {
-      "wont_fix": "plugin-internal: contact manager plugin factory, loaded by `ContactManagersPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_CONTACT_MANAGERS_PLUGINS`)."
-    },
-    "FCLFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_CONTACT_MANAGERS_PLUGINS`, so a wheel finds the plugins without a system install."
     },
     "tesseract/collision/common.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
@@ -463,50 +442,11 @@
     "JointGroup.calcJacobianWithPoint": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212)"
     },
-    "KDLFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
-    "KDLFwdKinChainFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
-    "KDLInvKinChainLMAFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
-    "KDLInvKinChainNRFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
-    "KDLInvKinChainNR_JLFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
     "KinematicGroup.calcInvKinMultiple": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212)"
     },
-    "OPWFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
-    "OPWInvKinFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
     "PositionerSampleResolution.__init__": {
       "wont_fix": "Spells the C++ aggregate initialization `{name, value, min, max}`; `min` and `max` default to None, the joint's limits."
-    },
-    "REPInvKinFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
-    "REPInvKinFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
-    "ROPInvKinFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
-    "ROPInvKinFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
-    },
-    "URFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_KINEMATICS_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
-    "URInvKinFactory": {
-      "wont_fix": "plugin-internal: solver plugin factory, loaded by `KinematicsPluginFactory`; the binding includes its header only to call the library's `*FactoriesAnchor` (`TESSERACT_KINEMATICS_PLUGINS`)."
     },
     "dampedPInv": {
       "wont_fix": "numpy covers it."
@@ -599,12 +539,6 @@
     },
     "TaskComposerPipeline.__init__": {
       "wont_fix": "`parent_uuid` stays unbound: `TaskComposerGraph::addNode` sets a node's parent when the graph takes it."
-    },
-    "TaskComposerTaskFactoryAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_TASK_COMPOSER_PLUGINS`, so a wheel finds the plugins without a system install."
-    },
-    "TaskComposerTaskflowFactoriesAnchor": {
-      "wont_fix": "plugin-internal: `PLUGIN_ANCHOR_DECL` link anchor; the binding calls it at import to add its plugin library to `TESSERACT_TASK_COMPOSER_PLUGINS`, so a wheel finds the plugins without a system install."
     }
   },
   "tesseract_urdf": {
