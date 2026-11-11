@@ -7,8 +7,8 @@ that builds a pose, or each compose would re-wrap the result in Python.
 import numpy as np
 import pytest
 
+from tesseract_robotics.common import AngleAxisd, Isometry3d, Quaterniond
 from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_common import AngleAxisd, Isometry3d, Quaterniond
 
 
 class _Sub(Pose):

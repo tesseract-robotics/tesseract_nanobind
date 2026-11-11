@@ -56,8 +56,7 @@ from pathlib import Path
 from typing import Any
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import TaskComposer
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     ContactManagersPluginInfo,
     GeneralResourceLocator,
     PluginInfo,
@@ -65,10 +64,11 @@ from tesseract_robotics.tesseract_common import (
     ProfilesPluginInfo,
     TaskComposerPluginInfo,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddContactManagersPluginInfoCommand,
     Environment,
 )
+from tesseract_robotics.planning import TaskComposer
 
 URDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
 SRDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"

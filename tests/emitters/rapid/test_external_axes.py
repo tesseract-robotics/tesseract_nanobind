@@ -18,6 +18,14 @@ import re
 import numpy as np
 import pytest
 
+from tesseract_robotics.command_language import (
+    CompositeInstruction,
+    JointWaypoint,
+    JointWaypointPoly,
+    MoveInstruction,
+    MoveInstructionPoly,
+    MoveInstructionType,
+)
 from tesseract_robotics.emitters.rapid import (
     ExternalAxisKind,
     ExternalAxisLayout,
@@ -25,14 +33,6 @@ from tesseract_robotics.emitters.rapid import (
     RapidProfile,
     UncoordinatedTargetError,
     emit_rapid,
-)
-from tesseract_robotics.tesseract_command_language import (
-    CompositeInstruction,
-    JointWaypoint,
-    JointWaypointPoly,
-    MoveInstruction,
-    MoveInstructionPoly,
-    MoveInstructionType,
 )
 
 _PROFILE = RapidProfile(speed="v200", zone="z10", tool="tool0", wobj="wobj0")

@@ -18,6 +18,7 @@ from audit_types import (
     ID_TEMPLATES,
     STD_NAMESPACES,
     TypeKey,
+    extension_member,
 )
 
 
@@ -31,8 +32,9 @@ def _base_stub(base: str, py: PyApi, stub_roots: Sequence[Path]) -> tuple[PyApi,
     """The stub declaring `base` and the class name in it, or None if no stub declares it.
 
     A plain name is a class of the same stub. nanobind spells a base bound in another
-    extension by its module path (`tesseract_robotics.tesseract_common._tesseract_common.X`),
-    which maps to `<root>/tesseract_robotics/tesseract_common/_tesseract_common.pyi`.
+    extension by its module path (`tesseract_robotics.common._common.X`),
+    which maps to `<root>/tesseract_robotics/common/_common.pyi`; a module that is itself the
+    extension (`tesseract_robotics.collision.X`) maps to `<root>/tesseract_robotics/collision.pyi`.
     """
     module, _, cls = base.rpartition(".")
     if not module:
@@ -175,8 +177,9 @@ def _renamed(name: str, alias: Mapping[str, str]) -> str:
 
 @functools.cache
 def _stubs_under(root: Path) -> tuple[Path, ...]:
-    """Every extension stub (`_<module>.pyi`) below `root`, listed once per audit run."""
-    return tuple(sorted(root.rglob("_*.pyi")))
+    """Every extension stub (`<module>.pyi`, or `_<module>.pyi` inside a wrapped package) below
+    `root`, listed once per audit run."""
+    return tuple(sorted(root.rglob("*.pyi")))
 
 
 def _ancestor_missing(
@@ -214,11 +217,7 @@ def _inherited_from_bound(
 
 
 def _stub_base(expr: str, module: str) -> tuple[str, str]:
-    """(module, class) a stub base expression names: `pkg.mod._mod.Outer.Inner` ->
-    (`mod`, `Outer.Inner`); a bare name is a class of `module`."""
-    parts = expr.split(".")
-    private = [i for i, p in enumerate(parts) if p.startswith("_")]
-    if not private:
-        return module, expr
-    i = private[-1]
-    return parts[i].removeprefix("_"), ".".join(parts[i + 1 :])
+    """(module, class) a stub base expression names (`extension_member`); a bare name is a class
+    of `module`."""
+    owner, cls = extension_member(expr)
+    return (module if owner is None else owner), cls

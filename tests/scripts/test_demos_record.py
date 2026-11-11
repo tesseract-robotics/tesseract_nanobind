@@ -19,8 +19,8 @@ import manifest  # noqa: E402
 import record  # noqa: E402
 from scenes import SCENES, Scene  # noqa: E402
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator  # noqa: E402
-from tesseract_robotics.tesseract_environment import Environment  # noqa: E402
+from tesseract_robotics.common import GeneralResourceLocator  # noqa: E402
+from tesseract_robotics.environment import Environment  # noqa: E402
 from tesseract_robotics.viewer import RecordingPhase, Trajectory  # noqa: E402
 
 FPS_HZ = 10.0

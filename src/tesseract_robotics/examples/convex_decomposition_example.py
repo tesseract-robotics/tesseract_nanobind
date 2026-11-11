@@ -61,15 +61,15 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ConvexDecompositionVHACD,
     FillMode,
     VHACDParameters,
     createConvexHull,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_geometry import createMeshFromPath
-from tesseract_robotics.tesseract_urdf import writeMeshToFile
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.geometry import createMeshFromPath
+from tesseract_robotics.urdf import writeMeshToFile
 
 SEAT_URL = "package://tesseract/support/meshes/car_seat/visual/seat.dae"
 SHIPPED_HULLS_GLOB = "seat_*.stl"

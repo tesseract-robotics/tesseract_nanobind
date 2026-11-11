@@ -8,8 +8,8 @@ import numpy as np
 import trimesh
 from numpy.typing import ArrayLike, NDArray
 
-from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import Isometry3d, Quaterniond
+from tesseract_robotics.environment import Environment
 
 from .errors import UnknownJointError
 

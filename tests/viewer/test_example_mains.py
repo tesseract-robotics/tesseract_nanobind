@@ -16,7 +16,7 @@ import pytest
 
 import tesseract_robotics.examples
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly,
@@ -24,8 +24,8 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+from tesseract_robotics.environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent

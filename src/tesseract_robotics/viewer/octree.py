@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from tesseract_robotics import tesseract_geometry
+from tesseract_robotics import geometry as tesseract_geometry
 
 from .errors import MalformedOctreeStreamError
 

@@ -19,9 +19,9 @@ import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_sqp as tsqp
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.examples.online_planning_sqp_example import build_optimization_problem
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 STEPS = 12  # waypoints; run()'s default, as in the C++ reference
 TARGET_JOINTS = np.array([5.5, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])  # run()'s target, rad/m

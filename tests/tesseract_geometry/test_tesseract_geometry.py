@@ -7,10 +7,16 @@ import numpy.testing as nptest
 import pytest
 
 from tesseract_robotics import (
+    common as tesseract_common,
+)
+from tesseract_robotics import (
+    geometry as tesseract_geometry,
+)
+from tesseract_robotics import (
     get_tesseract_support_path,
-    tesseract_common,
-    tesseract_geometry,
-    tesseract_urdf,
+)
+from tesseract_robotics import (
+    urdf as tesseract_urdf,
 )
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
@@ -703,7 +709,7 @@ def test_create_mesh_from_bytes_instance_types(fn, cls):
     meshes = getattr(tesseract_geometry, fn)("sphere_p25m.stl", SPHERE_STL.read_bytes())
     assert len(meshes) == 1
     assert type(meshes[0]) is cls
-    assert fn in tesseract_geometry.__all__
+    assert hasattr(tesseract_geometry, fn)
 
 
 def test_create_mesh_from_bytes_outlives_the_buffer():
@@ -805,7 +811,6 @@ def test_point_cloud_point_is_nested():
     p = Point(1.0, 2.0, 3.0)
     assert (p.x, p.y, p.z) == (1.0, 2.0, 3.0)
     assert not hasattr(tesseract_geometry, "PointCloudPoint")
-    assert "PointCloudPoint" not in tesseract_geometry.__all__
 
 
 def test_point_cloud_points_round_trip_through_create_octree():

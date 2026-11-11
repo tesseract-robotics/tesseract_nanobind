@@ -1,0 +1,51 @@
+/**
+ * @file urdf.cpp
+ * @brief nanobind bindings for tesseract_urdf
+ */
+
+#include "tesseract_nb.h"
+
+#include <tesseract/urdf/urdf_parser.h>
+#include <tesseract/urdf/utils.h>
+#include <tesseract/geometry/impl/polygon_mesh.h>
+#include <tesseract/scene_graph/graph.h>
+#include <tesseract/common/resource_locator.h>
+
+namespace tu = tesseract::urdf;
+
+NB_MODULE(urdf, m) {
+    m.doc() = "tesseract_urdf Python bindings";
+
+    // Cross-module type registration: parseURDF* return SceneGraph (by value),
+    // whose nb::class_ lives in scene_graph. Import it so the type is
+    // registered even when the caller never imported tesseract_scene_graph —
+    // otherwise the return-value cast fails with "Unable to convert function
+    // return value". Latent since day one: the full test suite always imported
+    // scene_graph during collection; the minimal-import wheel canary exposed it.
+    nb::module_::import_("tesseract_robotics.scene_graph._scene_graph");
+    nb::module_::import_("tesseract_robotics.common._common");
+    // writeMeshToFile takes a PolygonMesh: import its defining module so the stub names it (#168).
+    nb::module_::import_("tesseract_robotics.geometry");
+
+    // parseURDF* release the GIL: XML parsing plus mesh loading. A Python ResourceLocator
+    // subclass still works: its trampoline re-acquires the GIL (scripts/nogil_entry_points.yaml).
+    // parseURDFString - returns unique_ptr, nanobind handles conversion
+    m.def("parseURDFString", &tu::parseURDFString,
+          "urdf_xml_string"_a, "locator"_a, nb::call_guard<nb::gil_scoped_release>(),
+          "Parse a URDF string into a SceneGraph");
+
+    // parseURDFFile
+    m.def("parseURDFFile", &tu::parseURDFFile,
+          "path"_a, "locator"_a, nb::call_guard<nb::gil_scoped_release>(),
+          "Parse a URDF file into a SceneGraph");
+
+    // writeURDFFile
+    m.def("writeURDFFile", &tu::writeURDFFile,
+          "scene_graph"_a, "package_path"_a, "urdf_name"_a = "",
+          "Write a SceneGraph to a URDF file");
+
+    // writeMeshToFile (utils.h:30). `mesh` takes no None: upstream dereferences it unchecked
+    // (urdf/src/utils.cpp:140-155); its "Could not export file" std::runtime_error stays RuntimeError.
+    m.def("writeMeshToFile", &tu::writeMeshToFile, "mesh"_a, "filepath"_a,
+          "Write the mesh as an ASCII PLY file (always PLY, whatever the extension of filepath).");
+}

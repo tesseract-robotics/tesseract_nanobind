@@ -13,8 +13,10 @@ import numpy.testing as nptest
 import pytest
 import yaml
 
-from tesseract_robotics import tesseract_common, tesseract_kinematics, tesseract_state_solver
-from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
+from tesseract_robotics import common as tesseract_common
+from tesseract_robotics import kinematics as tesseract_kinematics
+from tesseract_robotics import state_solver as tesseract_state_solver
+from tesseract_robotics.kinematics import KinematicsPluginFactory
 
 from .test_kdl_kinematics import get_plugin_factory, get_scene_graph
 
@@ -167,12 +169,12 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_kinematics import KinematicsPluginFactory
-from tesseract_robotics.tesseract_state_solver import KDLStateSolver
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.kinematics import KinematicsPluginFactory
+from tesseract_robotics.state_solver import KDLStateSolver
+from tesseract_robotics.urdf import parseURDFFile
 
 support = get_tesseract_support_path() / "urdf"
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
@@ -189,7 +191,7 @@ print("OK:", solver.numJoints(), solver.getSolverName())
 
 _FWD_CALL = 'assert "tool0" in solver.calcFwdKin(np.zeros(7))'
 _INV_CALL = (
-    "from tesseract_robotics.tesseract_common import Isometry3d\n"
+    "from tesseract_robotics.common import Isometry3d\n"
     "pose = np.eye(4)\n"
     "pose[2, 3] = 1.306\n"
     'assert len(solver.calcInvKin({"tool0": Isometry3d(pose)}, np.array([-0.785398, 0.785398] * 3 + [-0.785398]))) > 0'

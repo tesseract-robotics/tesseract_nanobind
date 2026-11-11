@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     InstructionPoly,
     JointWaypoint,
@@ -23,16 +23,16 @@ from tesseract_robotics.tesseract_command_language import (
     ProfileDictionary,
     WaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     VectorIsometry3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_simple import (
     SimpleMotionPlanner,
     SimplePlannerCompositeProfile,
     SimplePlannerFixedSizeAssignMoveProfile,

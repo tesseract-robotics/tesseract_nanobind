@@ -74,6 +74,12 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.motion_planners_trajopt import (
+    TrajOptDefaultCompositeProfile,
+)
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -86,12 +92,6 @@ from tesseract_robotics.planning import (
     create_obstacle,
 )
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultCompositeProfile,
-)
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 TRAJOPT_NS = "TrajOptMotionPlannerTask"

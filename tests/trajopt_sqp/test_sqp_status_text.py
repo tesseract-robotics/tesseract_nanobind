@@ -19,11 +19,7 @@ def test_texts_differ():
     assert len(set(texts)) == len(texts)
 
 
-def test_star_import_exports_every_bound_name():
-    """No __all__: the package re-exports what the extension binds."""
-    from tesseract_robotics.trajopt_sqp import _trajopt_sqp
-
+def test_module_has_no_all():
+    """The extension is the module itself: no __all__, every bound name is public."""
     assert not hasattr(tsqp, "__all__")
-    public = {name for name in dir(_trajopt_sqp) if not name.startswith("_")}
-    assert public <= set(dir(tsqp))
     from tesseract_robotics.trajopt_sqp import toString  # noqa: F401

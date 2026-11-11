@@ -50,7 +50,7 @@ Compute a link's pose from joint values.
     !!! info "Quaternion convention — scalar-last project-wide"
         Project canonical quaternion order is `[qx, qy, qz, qw]` (scalar-last).
         `Pose.qx/qy/qz/qw`, `Pose.quaternion`, `Quaterniond.from_xyzw`,
-        `q.coeffs()`, and every factory in `tesseract_common` follow this.
+        `q.coeffs()`, and every factory in `common` follow this.
 
         The Eigen-native `Quaterniond(w, x, y, z)` 4-double ctor exists for
         interop but is the one exception — prefer `Quaterniond.from_xyzw`.
@@ -72,7 +72,7 @@ Compute a link's pose from joint values.
 
 ```python
 from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 import numpy as np
 
 pose = Pose.from_xyz_rpy(0.5, 0.0, 0.3, 0, 0, np.pi / 4)
@@ -121,7 +121,7 @@ Find joint values that achieve a target pose.
 === "Low-Level API"
 
     ```python
-    from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+    from tesseract_robotics.kinematics import KinGroupIKInput
 
     # Pose subclasses Isometry3d, so KinGroupIKInput accepts it directly.
     working_frame = manip.getBaseLinkId()
@@ -168,8 +168,8 @@ ABB IRB2400:
 ```python
 import numpy as np
 from tesseract_robotics.planning import Pose, Robot
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
-from tesseract_robotics.tesseract_motion_planners import (
+from tesseract_robotics.kinematics import KinGroupIKInput
+from tesseract_robotics.motion_planners import (
     RobotConfig,
     getJointTurns,
     getRobotConfig,
@@ -232,7 +232,7 @@ def is_within_limits(joints: np.ndarray, manip) -> bool:
 The utilities the positioner solvers sample with are callable directly:
 
 ```python
-from tesseract_robotics import tesseract_kinematics as tk
+from tesseract_robotics import kinematics as tk
 
 graph = env.getSceneGraph()
 limits = tk.gatherJointLimits(graph, manip.getJointIds())  # (N, 2) [lower, upper]

@@ -22,9 +22,9 @@ GATE_DEADLINE_S = 30
 _WAIT_AT_GATE = f"""
 import sys
 import time
-from tesseract_robotics.tesseract_task_composer._tesseract_task_composer import _reload_gate_waiters
+from tesseract_robotics.task_composer import _reload_gate_waiters
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 
 def wait_at_gate(server, count):
     deadline = time.monotonic() + {GATE_DEADLINE_S}
@@ -41,12 +41,12 @@ import gc
 import numpy as np
 import tesseract_robotics
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import JointTarget, MotionProgram, Robot
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.task_composer import (
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
     AnyPoly_wrap_ProfileDictionary,
@@ -101,10 +101,10 @@ def _run(script: str, *, planning: bool = True) -> str:
 _WORKER_HANDLER = """
 import threading
 import time
-from tesseract_robotics import tesseract_common
+from tesseract_robotics import common as tesseract_common
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import LogLevel
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import LogLevel
 MAIN = threading.get_ident()
 tesseract_common.getLogger().set_level(LogLevel.debug)
 
@@ -134,7 +134,7 @@ class TestWorkersLoggingIntoPython:
             _WORKER_HANDLER
             + f"""
 import sys
-from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+from tesseract_robotics.task_composer import TaskComposerPluginError
 in_handler = threading.Event()
 main_logged = threading.Event()
 
@@ -188,11 +188,11 @@ _TOUCH_SERVER = (
     + """
 import threading
 import time
-from tesseract_robotics import tesseract_common
+from tesseract_robotics import common as tesseract_common
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import LogLevel, ResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerServer
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import LogLevel, ResourceLocator
+from tesseract_robotics.task_composer import TaskComposerServer
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 touched = threading.Event()
@@ -251,10 +251,10 @@ def _waiting_calls_script(tmp_path) -> str:
         + f"""
 import threading
 import time
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, ResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator, ResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerServer
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import TaskComposerServer
 ROUNDS = {ROUNDS}
 CALLERS = {CALLERS}
 config = {text!r}
@@ -308,9 +308,9 @@ class TestServerReloadAgainstLogHandlers:
         out = _run(
             _WORKER_HANDLER
             + """
-from tesseract_robotics.tesseract_task_composer import TaskComposerServer
+from tesseract_robotics.task_composer import TaskComposerServer
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 server = TaskComposerServer()
 server.loadConfig(config_path, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 errors = []

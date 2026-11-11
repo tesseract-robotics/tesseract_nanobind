@@ -26,22 +26,22 @@ from loguru import logger
 # get_task_composer_config_path resolves the config for both installed wheels
 # (bundled data) and dev envs (conda share/), raising if neither exists (gh-110).
 from tesseract_robotics import get_task_composer_config_path
-from tesseract_robotics.planning import JointTarget, MotionProgram, Robot, TaskComposer
-from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     CollisionEvaluatorType,
     ContactManagerConfig,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.planning import JointTarget, MotionProgram, Robot, TaskComposer
+from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
+from tesseract_robotics.task_composer import (
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
     AnyPoly_wrap_ProfileDictionary,
     TaskComposerDataStorage,
     TaskComposerPluginFactory,
 )
-from tesseract_robotics.tesseract_task_composer_planning import ContactCheckProfile
+from tesseract_robotics.task_composer_planning import ContactCheckProfile
 
 # Pipelines woven into docs/user-guide/task-composer.md — keep the two in sync.
 DOCUMENTED_PIPELINES = (

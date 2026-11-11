@@ -7,23 +7,22 @@
   - `selftest.py` - Self-test entry point
 
 ## C++ nanobind Bindings
-Each subdirectory contains C++ binding code that wraps the corresponding tesseract library:
+`bindings/<module>.cpp` is the nanobind source of the Python module `tesseract_robotics.<module>`.
+It wraps the upstream library `tesseract_<module>` (upstream C++ names keep their prefix):
 
-- `tesseract_common/` - Core utilities, types, resource locators
-- `tesseract_geometry/` - Geometry types (Box, Sphere, Mesh, etc.)
-- `tesseract_scene_graph/` - Scene graph, links, joints
-- `tesseract_collision/` - Collision checking (Bullet, FCL)
-- `tesseract_environment/` - Environment management
-- `tesseract_kinematics/` - Forward/inverse kinematics
-- `tesseract_state_solver/` - State solving
-- `tesseract_urdf/` - URDF parsing
-- `tesseract_srdf/` - SRDF parsing
-- `tesseract_command_language/` - Motion planning instructions
-- `tesseract_motion_planners*/` - Motion planners (OMPL, TrajOpt, Descartes)
-- `tesseract_task_composer/` - Task composition framework
-- `tesseract_time_parameterization/` - Time parameterization
-- `trajopt_ifopt/`, `trajopt_sqp/` - TrajOpt optimization
-- `ifopt/` - Third-party bindings
+- `common`, `geometry`, `scene_graph`, `collision`, `environment`, `kinematics`, `state_solver`
+- `urdf`, `srdf`, `command_language`, `time_parameterization`
+- `motion_planners`, `motion_planners_ompl`, `motion_planners_trajopt`, `motion_planners_descartes`, `motion_planners_simple`, `motion_planners_trajopt_ifopt`
+- `task_composer`, `task_composer_planning`, `serialization`
+- `trajopt_ifopt`, `trajopt_sqp` - TrajOpt optimization
+
+Files that belong to a module but are not its entry point carry its name as a prefix
+(`serialization_planner_cereal_registration.cpp`).
+
+Sixteen modules install directly as `tesseract_robotics/<module>.abi3.so` with a
+`tesseract_robotics/<module>.pyi` stub. Six keep a Python package around a compiled `_<module>`
+because they hold Python code: `common`, `scene_graph`, `motion_planners`,
+`motion_planners_simple`, `motion_planners_descartes`, `motion_planners_trajopt_ifopt`.
 
 ## Shared Header
 - `tesseract_nb.h` - Common nanobind includes and macros

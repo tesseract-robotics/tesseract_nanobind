@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import Isometry3d, LinkId
+from tesseract_robotics.common import Isometry3d, LinkId
 
 from .scenes import Iiwa
 

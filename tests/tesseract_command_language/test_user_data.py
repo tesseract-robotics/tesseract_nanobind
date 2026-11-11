@@ -2,7 +2,7 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
+from tesseract_robotics.command_language import CompositeInstruction
 
 INT_MAX = 2**31 - 1  # C++ `int` on every supported platform
 

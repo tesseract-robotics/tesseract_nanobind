@@ -10,9 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import tesseract_robotics.tesseract_scene_graph as sg
-from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
-from tesseract_robotics.tesseract_state_solver import KDLStateSolver, OFKTStateSolver, SceneState
+import tesseract_robotics.scene_graph as sg
+from tesseract_robotics.common import Isometry3d, Quaterniond
+from tesseract_robotics.state_solver import KDLStateSolver, OFKTStateSolver, SceneState
 
 SOLVERS = {"ofkt": OFKTStateSolver, "kdl": KDLStateSolver}
 ACTIVE_JOINTS = ["joint_1", "joint_2", "joint_3"]

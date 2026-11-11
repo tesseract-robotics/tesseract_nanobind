@@ -30,7 +30,7 @@ def check_openmp(expected: str, order: str) -> None:
 
     if order == "consumer-first":
         load_consumer()
-    importlib.import_module("tesseract_robotics.tesseract_motion_planners_descartes")
+    importlib.import_module("tesseract_robotics.motion_planners_descartes")
     if order == "bindings-first":
         load_consumer()
     dyld = ctypes.CDLL(None)

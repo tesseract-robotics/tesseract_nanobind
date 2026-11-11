@@ -30,7 +30,24 @@ from dataclasses import dataclass
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactResultVector,
+    ContactTestType,
+)
+from tesseract_robotics.common import CollisionMarginData, GeneralResourceLocator
 from tesseract_robotics.examples.freespace_hybrid_example import add_ifopt_profiles
+from tesseract_robotics.motion_planners_ompl import (
+    Cost,
+    MaximizeMinClearanceObjective,
+    MultiOptimizationObjective,
+    OMPLRealVectorMoveProfile,
+    PathLengthOptimizationObjective,
+)
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
+    TrajOptIfoptOSQPSolverProfile,
+)
 from tesseract_robotics.planning import (
     MotionProgram,
     Pose,
@@ -48,25 +65,8 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_ifopt_pipeline_profiles,
     create_ompl_planner_configurators,
 )
-from tesseract_robotics.tesseract_collision import (
-    ContactRequest,
-    ContactResultMap,
-    ContactResultVector,
-    ContactTestType,
-)
-from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
-from tesseract_robotics.tesseract_motion_planners_ompl import (
-    Cost,
-    MaximizeMinClearanceObjective,
-    MultiOptimizationObjective,
-    OMPLRealVectorMoveProfile,
-    PathLengthOptimizationObjective,
-)
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
-    TrajOptIfoptOSQPSolverProfile,
-)
-from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
-from tesseract_robotics.tesseract_task_composer import TaskComposerNodeInfo
+from tesseract_robotics.state_solver import OFKTStateSolver
+from tesseract_robotics.task_composer import TaskComposerNodeInfo
 from tesseract_robotics.trajopt_sqp import SQPCallback
 
 PIPELINE = "FreespaceIfoptPipeline"

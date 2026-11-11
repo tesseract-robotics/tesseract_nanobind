@@ -32,6 +32,7 @@ def _load(name: str):
 
 _widen = _load("widen_implicit_id_stubs")
 _mod = _load("generate_stubs")
+_own = _load("audit_ownership")
 
 MODULES = _mod.discover_modules()
 
@@ -47,7 +48,7 @@ QUOTED_TESSERACT_TYPE = re.compile(r'"[^"\n]*\btesseract::[^"\n]*"')
 
 
 def test_modules_discovered():
-    assert "tesseract_robotics.tesseract_collision._tesseract_collision" in MODULES
+    assert "tesseract_robotics.collision" in MODULES
 
 
 @pytest.mark.parametrize("module", MODULES)
@@ -78,44 +79,58 @@ def test_stub_id_params_are_widened(module):
 
 def test_continuous_manager_geometry_getters_declared():
     """gh-157."""
-    text = _mod.stub_path("tesseract_robotics.tesseract_collision._tesseract_collision").read_text(
-        encoding="utf-8"
-    )
+    text = _mod.stub_path("tesseract_robotics.collision").read_text(encoding="utf-8")
     body = text.split("class ContinuousContactManager:", 1)[1].split("\nclass ", 1)[0]
     assert "def getCollisionObjectGeometries(" in body
     assert "def getCollisionObjectGeometriesTransforms(" in body
 
 
 # Modules whose stubs must name every tesseract type: gh-168 (collision), gh-218 (the core
-# modules that use types another extension defines). tesseract_srdf's last quoted type was
+# modules that use types another extension defines). srdf's last quoted type was
 # the unbound CalibrationInfo (gh-217).
 QUOTE_FREE_MODULES = [
-    "tesseract_collision",
-    "tesseract_kinematics",
-    "tesseract_serialization",
-    "tesseract_srdf",
-    "tesseract_state_solver",
-    "tesseract_urdf",  # writeMeshToFile takes a PolygonMesh (gh-220)
+    "collision",
+    "kinematics",
+    "serialization",
+    "srdf",
+    "state_solver",
+    "urdf",  # writeMeshToFile takes a PolygonMesh (gh-220)
 ]
 
 # gh-218: the defining modules each extension imports itself, so that its stub, rendered in
 # a fresh interpreter, names their types (SceneGraph, Joint, Link: scene_graph; SceneState:
 # state_solver; Environment: environment; CompositeInstruction: command_language).
 DEFINING_MODULE_IMPORTS = {
-    "tesseract_kinematics": ["tesseract_scene_graph", "tesseract_state_solver"],
-    "tesseract_serialization": [
-        "tesseract_command_language",
-        "tesseract_environment",
-        "tesseract_state_solver",
+    "kinematics": ["scene_graph", "state_solver"],
+    "serialization": [
+        "command_language",
+        "environment",
+        "state_solver",
     ],
-    "tesseract_srdf": ["tesseract_scene_graph"],
-    "tesseract_state_solver": ["tesseract_scene_graph"],
-    "tesseract_urdf": ["tesseract_common", "tesseract_geometry", "tesseract_scene_graph"],
+    "srdf": ["scene_graph"],
+    "state_solver": ["scene_graph"],
+    "urdf": ["common", "geometry", "scene_graph"],
 }
 
 
+# Packages that wrap their extension `_<name>`; every other module is itself the extension.
+WRAPPED_PACKAGES = frozenset(
+    {
+        "common",
+        "scene_graph",
+        "motion_planners",
+        "motion_planners_simple",
+        "motion_planners_descartes",
+        "motion_planners_trajopt_ifopt",
+    }
+)
+
+
 def _extension(package: str) -> str:
-    return f"tesseract_robotics.{package}._{package}"
+    """Dotted name of the compiled module of `package`."""
+    if package in WRAPPED_PACKAGES:
+        return f"tesseract_robotics.{package}._{package}"
+    return f"tesseract_robotics.{package}"
 
 
 @pytest.mark.parametrize("package", QUOTE_FREE_MODULES)
@@ -129,7 +144,7 @@ def test_stub_has_no_quoted_tesseract_types(package):
 @pytest.mark.parametrize("package", sorted(DEFINING_MODULE_IMPORTS))
 def test_extension_imports_its_defining_modules(package):
     """gh-218. A fresh interpreter, as the stub generator uses: importing the extension alone
-    (its package __init__ imports nothing else) must load every module whose types it uses."""
+    must load every module whose types it uses."""
     expected = [_extension(dep) for dep in DEFINING_MODULE_IMPORTS[package]]
     code = (
         "import sys\n"
@@ -144,9 +159,7 @@ def test_extension_imports_its_defining_modules(package):
 
 def test_executor_thread_default_is_machine_independent():
     """`hardware_concurrency()` is evaluated at import; its value must not reach the stub."""
-    text = _mod.stub_path(
-        "tesseract_robotics.tesseract_task_composer._tesseract_task_composer"
-    ).read_text(encoding="utf-8")
+    text = _mod.stub_path("tesseract_robotics.task_composer").read_text(encoding="utf-8")
     assert "name: str = 'TaskflowExecutor', num_threads: int = ...)" in text
 
 
@@ -159,9 +172,12 @@ def test_check_reports_unified_diff():
 
 
 def test_binding_sources_match_extension_modules():
-    """The audit (scripts/audit_ownership.py, BINDING_GLOB) takes its module list from
-    src/*/*_bindings.cpp because it must not import the package; this pins that set
-    to the modules the build actually produces."""
-    sources = {p.parent.name for p in (REPO_ROOT / "src").glob("*/*_bindings.cpp")}
+    """The audit (scripts/audit_ownership.py, binding_modules) takes its module list from
+    src/bindings/*.cpp (minus NON_MODULE_SOURCES) because it must not import the package;
+    this pins that set to the modules the build actually produces."""
+    sources = {p.stem for p in (REPO_ROOT / "src" / "bindings").glob("*.cpp")} - set(
+        _own.NON_MODULE_SOURCES
+    )
     built = {m.rsplit(".", 1)[-1].removeprefix("_") for m in MODULES}
     assert sources == built
+    assert sources == set(_own.binding_modules())

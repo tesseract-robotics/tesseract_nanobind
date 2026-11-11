@@ -36,7 +36,7 @@ from typing import Self, overload
 import numpy as np
 from numpy.typing import ArrayLike
 
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     EIGEN_DEFAULT_PREC,
     X_AXIS,
     Y_AXIS,

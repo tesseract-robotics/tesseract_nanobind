@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import LinkIdPair
+from tesseract_robotics.common import LinkIdPair
 
 from .scenes import OVERLAP_X, TwoBoxes, two_boxes_at
 

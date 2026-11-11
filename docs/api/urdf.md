@@ -1,0 +1,49 @@
+# tesseract_robotics.urdf
+
+URDF parsing and writing: `parseURDFString` / `parseURDFFile` build a `SceneGraph`,
+`writeURDFFile` writes one back, and `writeMeshToFile` writes a mesh as the PLY file a written
+URDF references.
+
+```python
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.urdf import parseURDFFile, writeURDFFile
+
+locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])  # the [support] extra
+urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf").getFilePath()
+
+scene_graph = parseURDFFile(urdf, locator)
+writeURDFFile(scene_graph, "/path/to/package", "robot.urdf")
+```
+
+Since tesseract 0.33 the `<robot>` element needs `tesseract:make_convex="true"` or `"false"`
+(`xmlns:tesseract="http://ros.org/wiki/tesseract"`), and a URDF with more than one link needs
+joints connecting them. Mesh URLs resolve through the locator. Prefer `package://` URLs:
+upstream's `file://` handling expects `file:///` followed by an absolute POSIX path
+(resource_locator.cpp:161–163), so `file://C:\...` does not resolve on Windows.
+
+## writeMeshToFile
+
+```python
+from tesseract_robotics.geometry import createMeshFromPath
+from tesseract_robotics.urdf import writeMeshToFile
+
+(mesh,) = createMeshFromPath("model.stl")
+writeMeshToFile(mesh, "model.ply")
+```
+
+The file is always an ASCII PLY, whatever the extension of `filepath` (urdf/src/utils.cpp:140–155).
+`filepath` is a `str`, the native type. `None` for `mesh` raises `TypeError`; a path that cannot be
+written (a missing directory, say) raises `RuntimeError("Could not export file")`.
+
+The string helpers in the same header (`toString`, `trailingSlash`, `noTrailingSlash`,
+`noLeadingSlash`, `makeURDFFilePath`) are not bound: Python's string formatting and `pathlib`
+cover them.
+
+## Auto-generated API Reference
+
+::: tesseract_robotics.urdf
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source

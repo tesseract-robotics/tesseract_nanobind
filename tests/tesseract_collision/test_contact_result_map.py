@@ -6,14 +6,14 @@ Python never holds a reference into the map that a later insert or shrinkToFit i
 
 import pytest
 
-import tesseract_robotics.tesseract_collision as tc
-from tesseract_robotics.tesseract_collision import (
+import tesseract_robotics.collision as tc
+from tesseract_robotics.collision import (
     ContactResult,
     ContactResultMap,
     ContactResultVector,
     ContinuousCollisionType,
 )
-from tesseract_robotics.tesseract_common import LinkIdPair
+from tesseract_robotics.common import LinkIdPair
 
 KEY_AB = ("a", "b")
 KEY_AC = ("a", "c")

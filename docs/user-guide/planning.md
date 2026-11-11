@@ -140,7 +140,7 @@ reachable threshold, so in practice the loop ends on time or count. A Python sub
 cost threshold on the returned objective ends the loop as soon as a path meets it (#362).
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract_robotics.motion_planners_ompl import (
     Cost,
     MaximizeMinClearanceObjective,
     MultiOptimizationObjective,
@@ -210,7 +210,7 @@ state's joint positions (rad, or m for a prismatic joint, in the group's joint o
 tesseract's validators report no clearance, so this is the way to price clearance.
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract_robotics.motion_planners_ompl import (
     Cost,
     OMPLRealVectorMoveProfile,
     StateCostIntegralObjective,
@@ -297,11 +297,11 @@ graph TD
 ### TrajOpt Costs and Constraints
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultMoveProfile,
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 
 # Plan profile (per-waypoint settings)
 plan_profile = TrajOptDefaultMoveProfile()
@@ -322,7 +322,7 @@ composite_profile.smooth_accelerations = True
 
 ```python
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 
 # TrajOptCollisionConfig constructor: (margin, coeff) or default
 collision_config = TrajOptCollisionConfig(0.025, 20.0)  # margin=2.5cm, coeff=20
@@ -368,10 +368,10 @@ TrajOpt distinguishes between **costs** (soft constraints) and **constraints** (
 ### Example: Collision as Cost vs Constraint
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 
 profile = TrajOptDefaultCompositeProfile()
 
@@ -400,7 +400,7 @@ profile.collision_constraint_config.collision_check_config.type = CollisionEvalu
 ### Example: Cartesian Pose as Cost vs Constraint
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultMoveProfile
+from tesseract_robotics.motion_planners_trajopt import TrajOptDefaultMoveProfile
 
 plan_profile = TrajOptDefaultMoveProfile()
 
@@ -476,7 +476,7 @@ result = plan_cartesian(robot, program, profiles=profiles)
     profiles; `CartesianPipeline`, `DescartesFPipeline` and every raster pipeline run it on
     `float` states and read the `F` ones. The helpers register both, and `TaskComposer.plan`
     raises `ProfileTypeMismatchError` if a pipeline would find only the other type (see the
-    [Descartes API page](../api/tesseract_motion_planners_descartes.md#scalar-types-d-and-f)).
+    [Descartes API page](../api/motion_planners_descartes.md#scalar-types-d-and-f)).
 
 ### Custom Edge / State Evaluators in Python
 
@@ -504,7 +504,7 @@ ones you don't want to customize to an inner `DescartesDefaultMoveProfileD`:
 
 ```python
 import numpy as np
-from tesseract_robotics.tesseract_motion_planners_descartes import (
+from tesseract_robotics.motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesEdgeEvaluatorD,
     DescartesMoveProfileD,
@@ -549,7 +549,7 @@ C++ profile; `addProfile` takes the Python subclass directly. Register it yourse
 have no twin of the other scalar type.
 
 ```python
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.command_language import ProfileDictionary
 
 profiles = ProfileDictionary()
 profiles.addProfile(
@@ -645,7 +645,7 @@ the C++ reader's error.
 === "Simple"
 
     ```python
-    from tesseract_robotics.tesseract_motion_planners_simple import SimplePlannerLVSMoveProfile
+    from tesseract_robotics.motion_planners_simple import SimplePlannerLVSMoveProfile
 
     profile = SimplePlannerLVSMoveProfile.from_yaml("min_steps: 4\n")
     assert profile == SimplePlannerLVSMoveProfile(min_steps=4)
@@ -654,7 +654,7 @@ the C++ reader's error.
 === "OMPL"
 
     ```python
-    from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
+    from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
 
     profile = OMPLRealVectorMoveProfile.from_yaml("solver_config:\n  planning_time: 3.5\n")
     assert profile.solver_config.planning_time == 3.5
@@ -666,7 +666,7 @@ the C++ reader's error.
 === "TrajOpt"
 
     ```python
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract_robotics.motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultMoveProfile,
         TrajOptOSQPSolverProfile,
@@ -685,7 +685,7 @@ the C++ reader's error.
 === "TrajOpt-Ifopt"
 
     ```python
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptOSQPSolverProfile,
     )
@@ -699,7 +699,7 @@ the C++ reader's error.
 === "Task composer"
 
     ```python
-    from tesseract_robotics.tesseract_task_composer_planning import (
+    from tesseract_robotics.task_composer_planning import (
         MinLengthProfile,
         UpsampleTrajectoryProfile,
     )
@@ -787,7 +787,7 @@ Use the `MotionProgram` builder — it handles all the poly-type wrapping
 automatically. For reference, the equivalent low-level call would be:
 
 ```python
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint, CartesianWaypointPoly,
     CompositeInstruction, MoveInstruction, MoveInstructionType,
     MoveInstructionPoly,
@@ -819,13 +819,13 @@ The planner puts the tool, `T(tcp_frame) * tcp_offset`, on each Cartesian target
 offset is resolved by the environment at plan time, first from the SRDF `group_tcps` of the
 program's group, then from find-TCP callbacks; a link name there is an error (use it as
 `tcp_frame`). The full rule, with upstream sources, is under
-[TCP offsets](../api/tesseract_environment.md#tcp-offsets); the SRDF side is under
-[Named TCPs](../api/tesseract_srdf.md#named-tcps-group_tcps).
+[TCP offsets](../api/environment.md#tcp-offsets); the SRDF side is under
+[Named TCPs](../api/srdf.md#named-tcps-group_tcps).
 
 ```python
 import numpy as np
 from tesseract_robotics.planning import CartesianTarget, MotionProgram, Pose
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 
 # a named TCP from abb_irb2400.srdf's <group_tcps group="manipulator">
 welder = MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link", tcp_offset="welder")
@@ -892,7 +892,7 @@ if not result.successful:
     # Debug strategies:
 
     # 1. Check if start/goal are collision-free
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract_robotics.collision import (
         ContactRequest, ContactResultMap, ContactTestType,
     )
     manager = robot.env.getDiscreteContactManager()

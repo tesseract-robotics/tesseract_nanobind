@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ConvexDecomposition,
     ConvexDecompositionVHACD,
     FillMode,
@@ -24,7 +24,7 @@ from tesseract_robotics.tesseract_collision import (
     NonTriangleFaceError,
     VHACDParameters,
 )
-from tesseract_robotics.tesseract_geometry import ConvexMesh
+from tesseract_robotics.geometry import ConvexMesh
 
 from .test_convex_hull import BOX_SIDES, _assert_box_hull
 
@@ -223,7 +223,7 @@ def test_extension_has_single_vhacd_copy():
 
     Oracle checked against a TU that includes convex_decomposition_vhacd.h alone: nm finds
     2894 strong VHACD:: definitions there (macOS, 0.35.0)."""
-    import tesseract_robotics.tesseract_collision._tesseract_collision as ext
+    import tesseract_robotics.collision as ext
 
     # nm, then c++filt: conda's cctools nm (first on PATH in a conda env) has no -C
     symbols = subprocess.run(

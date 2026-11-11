@@ -57,8 +57,8 @@ Related Examples
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator, Quaterniond
 from tesseract_robotics.planning import Pose, Robot
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Quaterniond
 
 
 def main():

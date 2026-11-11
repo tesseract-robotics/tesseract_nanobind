@@ -7,28 +7,28 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 
 | module | covered | gaps | deviations | accepted | quoted types | type fallbacks |
 |---|---|---|---|---|---|---|
-| tesseract_collision | 278 | 4 | 2 | 16 | 0 | 8 |
-| tesseract_command_language | 380 | 1 | 0 | 128 | 0 | 16 |
-| tesseract_common | 262 | 89 | 24 | 59 | 0 | 11 |
-| tesseract_environment | 237 | 9 | 7 | 55 | 0 | 0 |
-| tesseract_geometry | 158 | 8 | 4 | 22 | 0 | 1 |
-| tesseract_kinematics | 105 | 6 | 3 | 16 | 0 | 5 |
-| tesseract_motion_planners | 39 | 3 | 0 | 7 | 0 | 3 |
-| tesseract_motion_planners_descartes | 62 | 0 | 0 | 34 | 0 | 4 |
-| tesseract_motion_planners_ompl | 123 | 0 | 1 | 28 | 0 | 0 |
-| tesseract_motion_planners_simple | 104 | 0 | 0 | 29 | 0 | 0 |
-| tesseract_motion_planners_trajopt | 85 | 0 | 0 | 39 | 0 | 0 |
-| tesseract_motion_planners_trajopt_ifopt | 82 | 0 | 0 | 20 | 0 | 0 |
-| tesseract_scene_graph | 196 | 3 | 0 | 22 | 0 | 0 |
-| tesseract_serialization | 0 | 1 | 0 | 24 | 0 | 0 |
-| tesseract_srdf | 45 | 3 | 0 | 1 | 0 | 0 |
-| tesseract_state_solver | 87 | 1 | 2 | 8 | 0 | 0 |
-| tesseract_task_composer | 240 | 4 | 1 | 47 | 0 | 2 |
-| tesseract_task_composer_planning | 70 | 0 | 0 | 21 | 0 | 0 |
-| tesseract_time_parameterization | 75 | 0 | 0 | 10 | 0 | 0 |
-| tesseract_urdf | 4 | 5 | 0 | 0 | 0 | 0 |
+| collision | 278 | 4 | 2 | 16 | 0 | 8 |
+| command_language | 380 | 1 | 0 | 128 | 0 | 16 |
+| common | 262 | 89 | 24 | 59 | 0 | 11 |
+| environment | 237 | 9 | 7 | 55 | 0 | 0 |
+| geometry | 158 | 8 | 4 | 22 | 0 | 1 |
+| kinematics | 105 | 6 | 3 | 16 | 0 | 5 |
+| motion_planners | 39 | 3 | 0 | 7 | 0 | 3 |
+| motion_planners_descartes | 62 | 0 | 0 | 34 | 0 | 4 |
+| motion_planners_ompl | 123 | 0 | 1 | 28 | 0 | 0 |
+| motion_planners_simple | 104 | 0 | 0 | 29 | 0 | 0 |
+| motion_planners_trajopt | 85 | 0 | 0 | 39 | 0 | 0 |
+| motion_planners_trajopt_ifopt | 82 | 0 | 0 | 20 | 0 | 0 |
+| scene_graph | 196 | 3 | 0 | 22 | 0 | 0 |
+| serialization | 0 | 1 | 0 | 24 | 0 | 0 |
+| srdf | 45 | 3 | 0 | 1 | 0 | 0 |
+| state_solver | 87 | 1 | 2 | 8 | 0 | 0 |
+| task_composer | 240 | 4 | 1 | 47 | 0 | 2 |
+| task_composer_planning | 70 | 0 | 0 | 21 | 0 | 0 |
+| time_parameterization | 75 | 0 | 0 | 10 | 0 | 0 |
 | trajopt_ifopt | 334 | 10 | 0 | 47 | 0 | 0 |
 | trajopt_sqp | 188 | 2 | 3 | 34 | 0 | 6 |
+| urdf | 4 | 5 | 0 | 0 | 0 | 0 |
 
 Quoted C++ names in the stubs of audited modules (unbound type, or a missing `nb::module_::import_`):
 
@@ -177,7 +177,7 @@ None.
 !!! warning "Limitations"
     Python member names are checked against every declaration in the TU, so a Python-only member that shares a common C++ name (`size`, `clear`) is not flagged. Overloads are matched by arity and parameter type: each C++ parameter type and each stub annotation map to a key (`scripts/audit_types.py`), and a bound overload covers a C++ one only where the keys agree. A type the mapping does not know (a template parameter, `object`, a quoted C++ name) leaves that position to arity alone; the `type fallbacks` column counts the C++ overloads covered that way. Overloads that differ only in `const` of `this` or `&`/`&&` of a parameter count as one. A C++ overload with trailing defaulted parameters is covered only if a covering Python overload accepts all of them; otherwise the gap names the unreachable ones. An overload taking a raw buffer (a pointer to a non-`char` scalar) has no Python form and is reported whatever the arity, unless it is a `(const uint8_t*, size_t)` pair bound as one `bytes` parameter. A header the binding never includes that does not compile on its own is listed as `unparseable header`, at its first error, and its API is not checked.
 
-## tesseract_collision
+## collision
 
 ### Gaps
 
@@ -192,26 +192,26 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `CollisionObjectSpec.__init__` | overload | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi | 4-5 | won't fix: Spells the C++ aggregate initialization `{id, mask_id, shapes, shape_poses, enabled}`; `shapes` refuses None, as `addCollisionObject` does. |
-| `ContinuousContactManager.setCollisionObjectsTransformCast` | method | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174) |
+| `CollisionObjectSpec.__init__` | overload | src/tesseract_robotics/collision.pyi | 4-5 | won't fix: Spells the C++ aggregate initialization `{id, mask_id, shapes, shape_poses, enabled}`; `shapes` refuses None, as `addCollisionObject` does. |
+| `ContinuousContactManager.setCollisionObjectsTransformCast` | method | src/tesseract_robotics/collision.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:26 #174) |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
-| `CollisionCheckConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactManagerConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
+| `CollisionCheckConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
+| `ContactManagerConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
 | `ContactManagersPluginFactory.__init__` | yaml-node | tesseract/collision/contact_managers_plugin_factory.h:126 |
-| `ContactRequest.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactResult.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactResult.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactResult.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactResultMap.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactResultMap.__iter__` | iterator-pair | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
-| `ContactResultMap.__len__` | container-protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
+| `ContactRequest.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
+| `ContactResult.__copy__` | clone-as-copy | src/tesseract_robotics/collision.pyi |
+| `ContactResult.__deepcopy__` | clone-as-copy | src/tesseract_robotics/collision.pyi |
+| `ContactResult.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
+| `ContactResultMap.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
+| `ContactResultMap.__iter__` | iterator-pair | src/tesseract_robotics/collision.pyi |
+| `ContactResultMap.__len__` | container-protocol | src/tesseract_robotics/collision.pyi |
 | `ContactResultMap.flattenCopyResults` | out-param | tesseract/collision/types.h:233 |
 | `ContactResultMap.flattenWrapperResults` | reference-wrapper-out-param | tesseract/collision/types.h:234 |
-| `ContactResultVector.__len__` | container-protocol | src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi |
+| `ContactResultVector.__len__` | container-protocol | src/tesseract_robotics/collision.pyi |
 | `ContinuousContactManagerFactory` | plugin-author-factory-interface | tesseract/collision/contact_managers_plugin_factory.h:85 |
 | `DiscreteContactManagerFactory` | plugin-author-factory-interface | tesseract/collision/contact_managers_plugin_factory.h:57 |
 | `createConvexHull` | out-param | tesseract/collision/bullet/convex_hull_utils.h:45 |
@@ -220,7 +220,7 @@ None.
 
 None.
 
-## tesseract_command_language
+## command_language
 
 ### Gaps
 
@@ -236,126 +236,126 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `CartesianWaypoint.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CartesianWaypoint.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CartesianWaypoint.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `CartesianWaypoint.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `CartesianWaypoint.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `CartesianWaypoint.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `CartesianWaypointInterface` | type-erasure-interface | tesseract/command_language/poly/cartesian_waypoint_poly.h:50 |
-| `CartesianWaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CartesianWaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CartesianWaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `CartesianWaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `CartesianWaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `CartesianWaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `CartesianWaypointPoly.as` | template-instance-name | tesseract/command_language/poly/cartesian_waypoint_poly.h:282 |
-| `CartesianWaypointPoly.asCartesianWaypoint` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `CartesianWaypointPoly.asCartesianWaypoint` | template-instance-name | src/tesseract_robotics/command_language.pyi |
 | `CartesianWaypointPoly.getCartesianWaypoint` | type-erasure-interface | tesseract/command_language/poly/cartesian_waypoint_poly.h:263 |
 | `CartesianWaypointPoly.getType` | type-index | tesseract/command_language/poly/cartesian_waypoint_poly.h:250 |
-| `CompositeInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.__delitem__` | container-protocol | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.__iter__` | iterator-pair | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.__len__` | container-protocol | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `CompositeInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.__delitem__` | container-protocol | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.__iter__` | iterator-pair | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.__len__` | container-protocol | src/tesseract_robotics/command_language.pyi |
 | `CompositeInstruction.crbegin` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:330 |
 | `CompositeInstruction.crend` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:332 |
 | `CompositeInstruction.data` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:366 |
 | `CompositeInstruction.emplace` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:393 |
 | `CompositeInstruction.emplace_back` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:406 |
 | `CompositeInstruction.insert` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:386 |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `CompositeInstruction.push_back` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
 | `CompositeInstruction.rbegin` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:318 |
 | `CompositeInstruction.rend` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:322 |
-| `CompositeInstruction.setUserData` | reference-setter | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `CompositeInstruction.setUserData` | reference-setter | src/tesseract_robotics/command_language.pyi |
 | `CompositeInstruction.swap` | vector-forwarding-no-python-form | tesseract/command_language/composite_instruction.h:421 |
 | `InstructionInterface` | type-erasure-interface | tesseract/command_language/poly/instruction_poly.h:59 |
-| `InstructionPoly.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `InstructionPoly.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `InstructionPoly.as` | template-instance-name | tesseract/command_language/poly/instruction_poly.h:218 |
-| `InstructionPoly.asCompositeInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.asMoveInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.asSetAnalogInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.asSetDigitalInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.asSetToolInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.asTimerInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `InstructionPoly.asWaitInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `InstructionPoly.asCompositeInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.asMoveInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.asSetAnalogInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.asSetDigitalInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.asSetToolInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.asTimerInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `InstructionPoly.asWaitInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
 | `InstructionPoly.getInstruction` | type-erasure-interface | tesseract/command_language/poly/instruction_poly.h:201 |
 | `InstructionPoly.getType` | type-index | tesseract/command_language/poly/instruction_poly.h:188 |
-| `JointWaypoint.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `JointWaypoint.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `JointWaypoint.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `JointWaypoint.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `JointWaypoint.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `JointWaypoint.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `JointWaypointInterface` | type-erasure-interface | tesseract/command_language/poly/joint_waypoint_poly.h:53 |
-| `JointWaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `JointWaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `JointWaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `JointWaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `JointWaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `JointWaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `JointWaypointPoly.as` | template-instance-name | tesseract/command_language/poly/joint_waypoint_poly.h:289 |
-| `JointWaypointPoly.asJointWaypoint` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `JointWaypointPoly.asJointWaypoint` | template-instance-name | src/tesseract_robotics/command_language.pyi |
 | `JointWaypointPoly.getJointWaypoint` | type-erasure-interface | tesseract/command_language/poly/joint_waypoint_poly.h:285 |
 | `JointWaypointPoly.getType` | type-index | tesseract/command_language/poly/joint_waypoint_poly.h:272 |
-| `MoveInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `MoveInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
+| `MoveInstruction.__init__` | poly-alternative-overloads | src/tesseract_robotics/command_language.pyi |
 | `MoveInstruction.__init__` | serialization-default-ctor | tesseract/command_language/move_instruction.h:59 |
-| `MoveInstruction.setWaypoint` | reference-setter | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `MoveInstruction.setWaypoint` | reference-setter | src/tesseract_robotics/command_language.pyi |
 | `MoveInstructionInterface` | type-erasure-interface | tesseract/command_language/poly/move_instruction_poly.h:60 |
-| `MoveInstructionPoly.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstructionPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `MoveInstructionPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `MoveInstructionPoly.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `MoveInstructionPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `MoveInstructionPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `MoveInstructionPoly.as` | template-instance-name | tesseract/command_language/poly/move_instruction_poly.h:445 |
-| `MoveInstructionPoly.asMoveInstruction` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `MoveInstructionPoly.asMoveInstruction` | template-instance-name | src/tesseract_robotics/command_language.pyi |
 | `MoveInstructionPoly.getMoveInstruction` | type-erasure-interface | tesseract/command_language/poly/move_instruction_poly.h:411 |
 | `MoveInstructionPoly.getType` | type-index | tesseract/command_language/poly/move_instruction_poly.h:398 |
-| `MoveInstructionPoly.setWaypoint` | reference-setter | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `MoveInstructionPoly.setWaypoint` | reference-setter | src/tesseract_robotics/command_language.pyi |
 | `ProfileDictionary.getProfile` | profile-key-template | tesseract/common/profile_dictionary.h:101 |
-| `SetAnalogInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `SetAnalogInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `SetAnalogInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `SetAnalogInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `SetAnalogInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `SetAnalogInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `SetAnalogInstruction.__init__` | serialization-default-ctor | tesseract/command_language/set_analog_instruction.h:45 |
-| `SetDigitalInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `SetDigitalInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `SetDigitalInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `SetDigitalInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `SetDigitalInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `SetDigitalInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `SetDigitalInstruction.__init__` | serialization-default-ctor | tesseract/command_language/set_digital_instruction.h:45 |
-| `SetToolInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `SetToolInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `SetToolInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `SetToolInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `SetToolInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `SetToolInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `SetToolInstruction.__init__` | serialization-default-ctor | tesseract/command_language/set_tool_instruction.h:45 |
-| `StateWaypoint.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `StateWaypoint.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `StateWaypoint.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `StateWaypoint.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `StateWaypoint.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `StateWaypoint.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `StateWaypointInterface` | type-erasure-interface | tesseract/command_language/poly/state_waypoint_poly.h:51 |
-| `StateWaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `StateWaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `StateWaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `StateWaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `StateWaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `StateWaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `StateWaypointPoly.as` | template-instance-name | tesseract/command_language/poly/state_waypoint_poly.h:310 |
-| `StateWaypointPoly.asStateWaypoint` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `StateWaypointPoly.asStateWaypoint` | template-instance-name | src/tesseract_robotics/command_language.pyi |
 | `StateWaypointPoly.getStateWaypoint` | type-erasure-interface | tesseract/command_language/poly/state_waypoint_poly.h:306 |
 | `StateWaypointPoly.getType` | type-index | tesseract/command_language/poly/state_waypoint_poly.h:293 |
-| `TimerInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `TimerInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `TimerInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `TimerInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `TimerInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `TimerInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `TimerInstruction.__init__` | serialization-default-ctor | tesseract/command_language/timer_instruction.h:59 |
-| `WaitInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `WaitInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `WaitInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `WaitInstruction.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `WaitInstruction.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `WaitInstruction.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `WaitInstruction.__init__` | serialization-default-ctor | tesseract/command_language/wait_instruction.h:65 |
 | `WaypointInterface` | type-erasure-interface | tesseract/command_language/poly/waypoint_poly.h:56 |
-| `WaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `WaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `WaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `WaypointPoly.__copy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `WaypointPoly.__deepcopy__` | clone-as-copy | src/tesseract_robotics/command_language.pyi |
+| `WaypointPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/command_language.pyi |
 | `WaypointPoly.as` | template-instance-name | tesseract/command_language/poly/waypoint_poly.h:175 |
-| `WaypointPoly.asCartesianWaypoint` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `WaypointPoly.asJointWaypoint` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
-| `WaypointPoly.asStateWaypoint` | template-instance-name | src/tesseract_robotics/tesseract_command_language/_tesseract_command_language.pyi |
+| `WaypointPoly.asCartesianWaypoint` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `WaypointPoly.asJointWaypoint` | template-instance-name | src/tesseract_robotics/command_language.pyi |
+| `WaypointPoly.asStateWaypoint` | template-instance-name | src/tesseract_robotics/command_language.pyi |
 | `WaypointPoly.getType` | type-index | tesseract/command_language/poly/waypoint_poly.h:139 |
 | `WaypointPoly.getWaypoint` | type-erasure-interface | tesseract/command_language/poly/waypoint_poly.h:152 |
 | `isSetAnalogInstruction` | free-function-as-method | tesseract/command_language/instruction_type.h:31 |
@@ -369,9 +369,9 @@ None.
 
 | header | audited with | status |
 |---|---|---|
-| `tesseract/command_language/cereal_serialization.h` | tesseract_serialization | audited |
+| `tesseract/command_language/cereal_serialization.h` | serialization | audited |
 
-## tesseract_common
+## common
 
 ### Gaps
 
@@ -471,58 +471,58 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `Isometry3d.apply_directions` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Intentional Python-only batched extension (CHANGELOG.md:169). |
-| `Isometry3d.apply_points` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Intentional Python-only batched extension (CHANGELOG.md:169). |
-| `Isometry3d.compose_each` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
-| `Isometry3d.precompose_each` | method | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form for numpy callers over (M, 4, 4) arrays; no C++ counterpart. |
-| `JointId.__getstate__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
-| `JointId.__hash__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
-| `JointId.__setstate__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
-| `LinkId.__getstate__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
-| `LinkId.__hash__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
-| `LinkId.__setstate__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
-| `LinkIdPair.__hash__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
-| `LinkIdPair.__init__` | overload | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | 1 | won't fix: Takes `(link_id1, link_id2)`, the source of the implicit conversion from a tuple. |
-| `LogLevel` | enum | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::level::level_enum`, the type of `getLogger(name).set_level`; no tesseract header declares it. |
-| `LogSink` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::sinks::sink`, the type of `Logger.sinks`; no tesseract header declares it. |
-| `Logger` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::logger`, the type `getLogger` returns; no tesseract header declares it. |
-| `PropertyTree.__contains__` | protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: `key in tree` is `find(key) is not None`. |
-| `PropertyTree.applyConfig` | overload | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | 1-2 | won't fix: Takes the config as YAML text in place of the `YAML::Node`, which no Python type converts to; malformed YAML raises `ValueError`. |
-| `PropertyTree.fromYAML` | overload | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | 1 | won't fix: Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `toYAML` returns text. |
-| `PropertyTree.setValue` | overload | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | 1 | won't fix: Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `getValue` returns text. |
-| `StderrSink` | class | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Binds `spdlog::sinks::stderr_color_sink_mt`, the sink tesseract's default logger starts with; no tesseract header declares it. |
-| `apply_directions_each` | function | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
-| `norm_each` | function | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form for numpy callers over (M, 3) arrays; no C++ counterpart. |
-| `orthonormality_residual_each` | function | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form of `orthonormality_residual` over (M, 4, 4) arrays; no C++ counterpart. |
-| `rotation_determinant_each` | function | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi | — | won't fix: Python-only batch form of `determinant` over the rotation blocks of (M, 4, 4) arrays; no C++ counterpart. |
+| `Isometry3d.apply_directions` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Intentional Python-only batched extension (CHANGELOG.md:169). |
+| `Isometry3d.apply_points` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Intentional Python-only batched extension (CHANGELOG.md:169). |
+| `Isometry3d.compose_each` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
+| `Isometry3d.precompose_each` | method | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (M, 4, 4) arrays; no C++ counterpart. |
+| `JointId.__getstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
+| `JointId.__hash__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
+| `JointId.__setstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
+| `LinkId.__getstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
+| `LinkId.__hash__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
+| `LinkId.__setstate__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: Pickle support: an id's state is its name. |
+| `LinkIdPair.__hash__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: The Python form of the C++ `std::hash` specialization: ids are dict keys. |
+| `LinkIdPair.__init__` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: Takes `(link_id1, link_id2)`, the source of the implicit conversion from a tuple. |
+| `LogLevel` | enum | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::level::level_enum`, the type of `getLogger(name).set_level`; no tesseract header declares it. |
+| `LogSink` | class | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::sinks::sink`, the type of `Logger.sinks`; no tesseract header declares it. |
+| `Logger` | class | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::logger`, the type `getLogger` returns; no tesseract header declares it. |
+| `PropertyTree.__contains__` | protocol | src/tesseract_robotics/common/_common.pyi | — | won't fix: `key in tree` is `find(key) is not None`. |
+| `PropertyTree.applyConfig` | overload | src/tesseract_robotics/common/_common.pyi | 1-2 | won't fix: Takes the config as YAML text in place of the `YAML::Node`, which no Python type converts to; malformed YAML raises `ValueError`. |
+| `PropertyTree.fromYAML` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `toYAML` returns text. |
+| `PropertyTree.setValue` | overload | src/tesseract_robotics/common/_common.pyi | 1 | won't fix: Takes YAML text in place of the `YAML::Node`, which no Python type converts to; `getValue` returns text. |
+| `StderrSink` | class | src/tesseract_robotics/common/_common.pyi | — | won't fix: Binds `spdlog::sinks::stderr_color_sink_mt`, the sink tesseract's default logger starts with; no tesseract header declares it. |
+| `apply_directions_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (N, 4, 4) arrays; no C++ counterpart. |
+| `norm_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form for numpy callers over (M, 3) arrays; no C++ counterpart. |
+| `orthonormality_residual_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form of `orthonormality_residual` over (M, 4, 4) arrays; no C++ counterpart. |
+| `rotation_determinant_each` | function | src/tesseract_robotics/common/_common.pyi | — | won't fix: Python-only batch form of `determinant` over the rotation blocks of (M, 4, 4) arrays; no C++ counterpart. |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
-| `AllowedCollisionMatrix.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
+| `AllowedCollisionMatrix.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
 | `AllowedCollisionMatrix.__str__` | stream-insertion | tesseract/common/allowed_collision_matrix.h:124 |
-| `AngleAxisd.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `BytesResource.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
+| `AngleAxisd.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `BytesResource.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
 | `BytesResource.__init__` | byte-buffer | tesseract/common/resource_locator.h:251 |
 | `BytesResource.__init__` | serialization-default-ctor | tesseract/common/resource_locator.h:248 |
-| `CalibrationInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `CollisionMarginData.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `CollisionMarginPairData.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `ContactManagersPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `EIGEN_DEFAULT_PREC` | eigen-default-precision | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `GeneralResourceLocator.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Hyperplane3d` | eigen-template-instance | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Hyperplane3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Isometry3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointId.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointId.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointState.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointTrajectory.__delitem__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointTrajectory.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointTrajectory.__iter__` | iterator-pair | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointTrajectory.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `JointTrajectory.__setitem__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
+| `CalibrationInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `CollisionMarginData.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `CollisionMarginPairData.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `ContactManagersPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `EIGEN_DEFAULT_PREC` | eigen-default-precision | src/tesseract_robotics/common/_common.pyi |
+| `GeneralResourceLocator.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `Hyperplane3d` | eigen-template-instance | src/tesseract_robotics/common/_common.pyi |
+| `Hyperplane3d.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `Isometry3d.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `JointId.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `JointId.__str__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `JointState.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `JointTrajectory.__delitem__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
+| `JointTrajectory.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `JointTrajectory.__iter__` | iterator-pair | src/tesseract_robotics/common/_common.pyi |
+| `JointTrajectory.__len__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
+| `JointTrajectory.__setitem__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
 | `JointTrajectory.crbegin` | vector-forwarding-no-python-form | tesseract/common/joint_state.h:140 |
 | `JointTrajectory.crend` | vector-forwarding-no-python-form | tesseract/common/joint_state.h:142 |
 | `JointTrajectory.data` | vector-forwarding-no-python-form | tesseract/common/joint_state.h:176 |
@@ -531,45 +531,45 @@ None.
 | `JointTrajectory.rbegin` | vector-forwarding-no-python-form | tesseract/common/joint_state.h:128 |
 | `JointTrajectory.rend` | vector-forwarding-no-python-form | tesseract/common/joint_state.h:132 |
 | `JointTrajectory.swap` | vector-forwarding-no-python-form | tesseract/common/joint_state.h:221 |
-| `KinematicLimits.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `KinematicsPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `LinkId.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `LinkId.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `LinkIdPair.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `ManipulatorInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `ManipulatorInfo.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `ParametrizedLine3d` | eigen-template-instance | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `ParametrizedLine3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `PluginDiscoveryInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `PluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `PluginInfoContainer.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `ProfilesPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `PropertyTree.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `PropertyTree.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
+| `KinematicLimits.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `KinematicsPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `LinkId.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `LinkId.__str__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `LinkIdPair.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `ManipulatorInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `ManipulatorInfo.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `ParametrizedLine3d` | eigen-template-instance | src/tesseract_robotics/common/_common.pyi |
+| `ParametrizedLine3d.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `PluginDiscoveryInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `PluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `PluginInfoContainer.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `ProfilesPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `PropertyTree.__len__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
+| `PropertyTree.__str__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
 | `PropertyTree.setAttribute` | yaml-node | tesseract/common/property_tree.h:292 |
-| `Quaterniond.__init__` | scalar-last-quaternion | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Quaterniond.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Quaterniond.from_rpy` | quaternion-rpy | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Quaterniond.from_xyzw` | scalar-last-quaternion | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Quaterniond.to_rpy` | quaternion-rpy | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `SimpleLocatedResource.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
+| `Quaterniond.__init__` | scalar-last-quaternion | src/tesseract_robotics/common/_common.pyi |
+| `Quaterniond.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `Quaterniond.from_rpy` | quaternion-rpy | src/tesseract_robotics/common/_common.pyi |
+| `Quaterniond.from_xyzw` | scalar-last-quaternion | src/tesseract_robotics/common/_common.pyi |
+| `Quaterniond.to_rpy` | quaternion-rpy | src/tesseract_robotics/common/_common.pyi |
+| `SimpleLocatedResource.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
 | `SimpleLocatedResource.__init__` | serialization-default-ctor | tesseract/common/resource_locator.h:205 |
-| `TaskComposerPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `Translation3d.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `VectorIsometry3d.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `VectorVector3d.__len__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
-| `VectorVector3d.__setitem__` | container-protocol | src/tesseract_robotics/tesseract_common/_tesseract_common.pyi |
+| `TaskComposerPluginInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/common/_common.pyi |
+| `Translation3d.__repr__` | presentation-dunder | src/tesseract_robotics/common/_common.pyi |
+| `VectorIsometry3d.__len__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
+| `VectorVector3d.__len__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
+| `VectorVector3d.__setitem__` | container-protocol | src/tesseract_robotics/common/_common.pyi |
 
 ### Headers audited with another module
 
 | header | audited with | status |
 |---|---|---|
-| `tesseract/common/any_poly.h` | tesseract_task_composer | audited |
-| `tesseract/common/profile.h` | tesseract_command_language | audited |
-| `tesseract/common/profile_dictionary.h` | tesseract_command_language | audited |
-| `tesseract/common/serialization.h` | tesseract_serialization | audited |
+| `tesseract/common/any_poly.h` | task_composer | audited |
+| `tesseract/common/profile.h` | command_language | audited |
+| `tesseract/common/profile_dictionary.h` | command_language | audited |
+| `tesseract/common/serialization.h` | serialization | audited |
 
-## tesseract_environment
+## environment
 
 ### Gaps
 
@@ -589,65 +589,65 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `Environment.getCurrentJointValuesByNames` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
-| `Environment.getStateByMap` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
-| `Environment.getStateByNamesAndValues` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
-| `Environment.link_transforms_batch` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: Python-only batch form of `getLinkTransforms` for numpy callers; no C++ counterpart. |
-| `Environment.setStateByNamesAndValues` | method | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
-| `cast_CommandAppliedEvent` | function | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191) |
-| `cast_SceneStateChangedEvent` | function | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191) |
+| `Environment.getCurrentJointValuesByNames` | method | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
+| `Environment.getStateByMap` | method | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
+| `Environment.getStateByNamesAndValues` | method | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
+| `Environment.link_transforms_batch` | method | src/tesseract_robotics/environment.pyi | — | won't fix: Python-only batch form of `getLinkTransforms` for numpy callers; no C++ counterpart. |
+| `Environment.setStateByNamesAndValues` | method | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187) |
+| `cast_CommandAppliedEvent` | function | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191) |
+| `cast_SceneStateChangedEvent` | function | src/tesseract_robotics/environment.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:82 #191) |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
-| `AddContactManagersPluginInfoCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `AddContactManagersPluginInfoCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `AddContactManagersPluginInfoCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_contact_managers_plugin_info_command.h:47 |
-| `AddKinematicsInformationCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
-| `AddLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `AddKinematicsInformationCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
+| `AddLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `AddLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_link_command.h:47 |
-| `AddSceneGraphCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `AddSceneGraphCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `AddSceneGraphCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_scene_graph_command.h:48 |
-| `AddTrajectoryLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `AddTrajectoryLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `AddTrajectoryLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/add_trajectory_link_command.h:75 |
-| `ChangeCollisionMarginsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeCollisionMarginsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeCollisionMarginsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_collision_margins_command.h:51 |
-| `ChangeJointAccelerationLimitsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeJointAccelerationLimitsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeJointAccelerationLimitsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_acceleration_limits_command.h:48 |
-| `ChangeJointOriginCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeJointOriginCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeJointOriginCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_origin_command.h:52 |
-| `ChangeJointPositionLimitsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeJointPositionLimitsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeJointPositionLimitsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_position_limits_command.h:48 |
-| `ChangeJointVelocityLimitsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeJointVelocityLimitsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeJointVelocityLimitsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_joint_velocity_limits_command.h:48 |
-| `ChangeLinkCollisionEnabledCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeLinkCollisionEnabledCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeLinkCollisionEnabledCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_link_collision_enabled_command.h:47 |
-| `ChangeLinkOriginCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeLinkOriginCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeLinkOriginCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_link_origin_command.h:52 |
-| `ChangeLinkVisibilityCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ChangeLinkVisibilityCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ChangeLinkVisibilityCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/change_link_visibility_command.h:47 |
-| `Command.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
-| `Environment.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `Command.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
+| `Environment.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `Environment.getLinkTransforms` | out-param | tesseract/environment/environment.h:357 |
 | `Environment.getLinkTransforms` | out-param | tesseract/environment/environment.h:373 |
 | `EnvironmentContactAllowedValidator.__init__` | serialization-default-ctor | tesseract/environment/environment.h:77 |
-| `ModifyAllowedCollisionsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ModifyAllowedCollisionsCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ModifyAllowedCollisionsCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/modify_allowed_collisions_command.h:54 |
-| `MoveJointCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `MoveJointCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `MoveJointCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/move_joint_command.h:47 |
-| `MoveLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `MoveLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `MoveLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/move_link_command.h:47 |
-| `RemoveAllowedCollisionLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `RemoveAllowedCollisionLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `RemoveAllowedCollisionLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/remove_allowed_collision_link_command.h:47 |
-| `RemoveJointCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `RemoveJointCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `RemoveJointCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/remove_joint_command.h:47 |
-| `RemoveLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `RemoveLinkCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `RemoveLinkCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/remove_link_command.h:47 |
-| `ReplaceJointCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `ReplaceJointCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `ReplaceJointCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/replace_joint_command.h:46 |
-| `SetActiveContinuousContactManagerCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `SetActiveContinuousContactManagerCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `SetActiveContinuousContactManagerCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/set_active_continuous_contact_manager_command.h:47 |
-| `SetActiveDiscreteContactManagerCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_environment/_tesseract_environment.pyi |
+| `SetActiveDiscreteContactManagerCommand.__hash__` | value-equality-unhashable | src/tesseract_robotics/environment.pyi |
 | `SetActiveDiscreteContactManagerCommand.__init__` | serialization-default-ctor | tesseract/environment/commands/set_active_discrete_contact_manager_command.h:47 |
 | `checkTrajectory` | out-param | tesseract/environment/utils.h:108 |
 | `checkTrajectory` | out-param | tesseract/environment/utils.h:126 |
@@ -661,9 +661,9 @@ None.
 
 | header | audited with | status |
 |---|---|---|
-| `tesseract/environment/cereal_serialization.h` | tesseract_serialization | audited |
+| `tesseract/environment/cereal_serialization.h` | serialization | audited |
 
-## tesseract_geometry
+## geometry
 
 ### Gaps
 
@@ -682,34 +682,34 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `GeometriesConst` | class | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi | — | won't fix: The opaque container class needs a Python name; upstream's typedef is spelled `GeometrysConst` (geometry.h:104). |
-| `SignedDistanceField.__init__` | overload | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi | 4-5 | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
-| `SignedDistanceField.getDomainMax` | method | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
-| `SignedDistanceField.getDomainMin` | method | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
+| `GeometriesConst` | class | src/tesseract_robotics/geometry.pyi | — | won't fix: The opaque container class needs a Python name; upstream's typedef is spelled `GeometrysConst` (geometry.h:104). |
+| `SignedDistanceField.__init__` | overload | src/tesseract_robotics/geometry.pyi | 4-5 | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
+| `SignedDistanceField.getDomainMax` | method | src/tesseract_robotics/geometry.pyi | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
+| `SignedDistanceField.getDomainMin` | method | src/tesseract_robotics/geometry.pyi | — | won't fix: `Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`. |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
-| `Box.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
-| `Capsule.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
+| `Box.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
+| `Capsule.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
 | `CompoundMesh.__init__` | derived-element-container | tesseract/geometry/impl/compound_mesh.h:51 |
 | `CompoundMesh.__init__` | derived-element-container | tesseract/geometry/impl/compound_mesh.h:52 |
 | `CompoundMesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/compound_mesh.h:53 |
-| `Cone.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
+| `Cone.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
 | `ConvexMesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/convex_mesh.h:108 |
-| `Cylinder.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
-| `GeometriesConst.__len__` | container-protocol | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
+| `Cylinder.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
+| `GeometriesConst.__len__` | container-protocol | src/tesseract_robotics/geometry.pyi |
 | `Mesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/mesh.h:94 |
 | `Octree.__init__` | serialization-default-ctor | tesseract/geometry/impl/octree.h:65 |
-| `Plane.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
+| `Plane.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
 | `PolygonMesh.__init__` | serialization-default-ctor | tesseract/geometry/impl/polygon_mesh.h:108 |
 | `SignedDistanceField.__init__` | serialization-default-ctor | tesseract/geometry/impl/signed_distance_field.h:120 |
-| `SignedDistanceField.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
-| `Sphere.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
-| `createConvexMeshFromBytes` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
-| `createConvexMeshFromPath` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
-| `createConvexMeshFromResource` | template-instance-name | src/tesseract_robotics/tesseract_geometry/_tesseract_geometry.pyi |
+| `SignedDistanceField.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
+| `Sphere.__repr__` | presentation-dunder | src/tesseract_robotics/geometry.pyi |
+| `createConvexMeshFromBytes` | template-instance-name | src/tesseract_robotics/geometry.pyi |
+| `createConvexMeshFromPath` | template-instance-name | src/tesseract_robotics/geometry.pyi |
+| `createConvexMeshFromResource` | template-instance-name | src/tesseract_robotics/geometry.pyi |
 | `createMeshFromBytes` | byte-buffer | tesseract/geometry/mesh_parser.h:535 |
 | `readSignedDistanceFieldNVDB` | byte-buffer | tesseract/geometry/impl/signed_distance_field_utils.h:139 |
 | `readSignedDistanceFieldVDB` | byte-buffer | tesseract/geometry/impl/signed_distance_field_utils.h:112 |
@@ -718,7 +718,7 @@ None.
 
 None.
 
-## tesseract_kinematics
+## kinematics
 
 ### Gaps
 
@@ -735,9 +735,9 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `JointGroup.calcJacobianWithPoint` | method | src/tesseract_robotics/tesseract_kinematics/_tesseract_kinematics.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212) |
-| `KinematicGroup.calcInvKinMultiple` | method | src/tesseract_robotics/tesseract_kinematics/_tesseract_kinematics.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212) |
-| `PositionerSampleResolution.__init__` | overload | src/tesseract_robotics/tesseract_kinematics/_tesseract_kinematics.pyi | 2-4 | won't fix: Spells the C++ aggregate initialization `{name, value, min, max}`; `min` and `max` default to None, the joint's limits. |
+| `JointGroup.calcJacobianWithPoint` | method | src/tesseract_robotics/kinematics.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212) |
+| `KinematicGroup.calcInvKinMultiple` | method | src/tesseract_robotics/kinematics.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212) |
+| `PositionerSampleResolution.__init__` | overload | src/tesseract_robotics/kinematics.pyi | 2-4 | won't fix: Spells the C++ aggregate initialization `{name, value, min, max}`; `min` and `max` default to None, the joint's limits. |
 
 ### Accepted
 
@@ -749,12 +749,12 @@ None.
 | `InvKinFactory` | plugin-author-factory-interface | tesseract/kinematics/kinematics_plugin_factory.h:59 |
 | `InverseKinematics.calcInvKin` | out-param | tesseract/kinematics/inverse_kinematics.h:91 |
 | `JointGroup.calcFwdKin` | out-param | tesseract/kinematics/joint_group.h:90 |
-| `KinGroupIKInputs.__len__` | container-protocol | src/tesseract_robotics/tesseract_kinematics/_tesseract_kinematics.pyi |
+| `KinGroupIKInputs.__len__` | container-protocol | src/tesseract_robotics/kinematics.pyi |
 | `KinematicGroup.calcInvKin` | out-param | tesseract/kinematics/kinematic_group.h:134 |
 | `KinematicGroup.calcInvKin` | out-param | tesseract/kinematics/kinematic_group.h:147 |
 | `KinematicsPluginFactory.__init__` | yaml-node | tesseract/kinematics/kinematics_plugin_factory.h:152 |
-| `Manipulability.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_kinematics/_tesseract_kinematics.pyi |
-| `ManipulabilityEllipsoid.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_kinematics/_tesseract_kinematics.pyi |
+| `Manipulability.__repr__` | presentation-dunder | src/tesseract_robotics/kinematics.pyi |
+| `ManipulabilityEllipsoid.__repr__` | presentation-dunder | src/tesseract_robotics/kinematics.pyi |
 | `getRedundantSolutions` | out-param | tesseract/kinematics/utils.h:287 |
 | `numericalJacobian` | out-param | tesseract/kinematics/utils.h:58 |
 | `numericalJacobian` | out-param | tesseract/kinematics/utils.h:74 |
@@ -764,7 +764,7 @@ None.
 
 None.
 
-## tesseract_motion_planners
+## motion_planners
 
 ### Gaps
 
@@ -783,7 +783,7 @@ None.
 | symbol | rule | location |
 |---|---|---|
 | `MotionPlanner.checkRequest` | reason-out-param | tesseract/motion_planners/planner.h:86 |
-| `MotionPlanner.checkRequestReason` | reason-out-param | src/tesseract_robotics/tesseract_motion_planners/_tesseract_motion_planners.pyi |
+| `MotionPlanner.checkRequestReason` | reason-out-param | src/tesseract_robotics/motion_planners/_motion_planners.pyi |
 | `PlannerRequest.data` | type-erased-data | tesseract/motion_planners/types.h:81 |
 | `PlannerResponse.data` | type-erased-data | tesseract/motion_planners/types.h:101 |
 | `contactCheckProgram` | out-param | tesseract/motion_planners/utils.h:111 |
@@ -794,7 +794,7 @@ None.
 
 None.
 
-## tesseract_motion_planners_descartes
+## motion_planners_descartes
 
 ### Gaps
 
@@ -808,28 +808,28 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `DescartesDefaultMoveProfileD.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesDefaultMoveProfileD.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesDefaultMoveProfileF.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesDefaultMoveProfileF.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesEdgeEvaluatorD` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesEdgeEvaluatorF` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
+| `DescartesDefaultMoveProfileD.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesDefaultMoveProfileD.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesDefaultMoveProfileF.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesDefaultMoveProfileF.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesEdgeEvaluatorD` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesEdgeEvaluatorF` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
 | `DescartesLadderGraphSolverProfile.create` | unbound-dependency-type | tesseract/motion_planners/descartes/profile/descartes_ladder_graph_solver_profile.h:43 |
-| `DescartesLadderGraphSolverProfileD.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesLadderGraphSolverProfileD.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesLadderGraphSolverProfileF.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesLadderGraphSolverProfileF.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
+| `DescartesLadderGraphSolverProfileD.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesLadderGraphSolverProfileD.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesLadderGraphSolverProfileF.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesLadderGraphSolverProfileF.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
 | `DescartesSolverProfile.create` | unbound-dependency-type | tesseract/motion_planners/descartes/profile/descartes_profile.h:55 |
-| `DescartesStateD` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesStateEvaluatorD` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesStateEvaluatorF` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesStateF` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesStateSampleD` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesStateSampleF` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesWaypointSamplerD` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesWaypointSamplerD.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesWaypointSamplerF` | template-instance-name | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
-| `DescartesWaypointSamplerF.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_motion_planners_descartes/_tesseract_motion_planners_descartes.pyi |
+| `DescartesStateD` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesStateEvaluatorD` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesStateEvaluatorF` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesStateF` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesStateSampleD` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesStateSampleF` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesWaypointSamplerD` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesWaypointSamplerD.__str__` | presentation-dunder | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesWaypointSamplerF` | template-instance-name | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
+| `DescartesWaypointSamplerF.__str__` | presentation-dunder | src/tesseract_robotics/motion_planners_descartes/_motion_planners_descartes.pyi |
 | `State.__call__` | eigen-value-wrapper | descartes_light/types.h:127 |
 | `State.__getitem__` | eigen-value-wrapper | descartes_light/types.h:125 |
 | `State.__mul__` | eigen-value-wrapper | descartes_light/types.h:82 |
@@ -847,7 +847,7 @@ None.
 
 None.
 
-## tesseract_motion_planners_ompl
+## motion_planners_ompl
 
 ### Gaps
 
@@ -857,7 +857,7 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `Cost.__float__` | protocol | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi | — | won't fix: Python form of `value()`: `float(cost)` reads the cost. |
+| `Cost.__float__` | protocol | src/tesseract_robotics/motion_planners_ompl.pyi | — | won't fix: Python form of `value()`: `float(cost)` reads the cost. |
 
 ### Accepted
 
@@ -865,7 +865,7 @@ None.
 |---|---|---|
 | `BKPIECE1Configurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:170 |
 | `BiTRRTConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:234 |
-| `Cost.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
+| `Cost.__repr__` | presentation-dunder | src/tesseract_robotics/motion_planners_ompl.pyi |
 | `ESTConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:119 |
 | `KPIECE1Configurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:200 |
 | `LBKPIECE1Configurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:143 |
@@ -873,18 +873,18 @@ None.
 | `OMPLMoveProfile.createSimpleSetup` | unbound-dependency-type | tesseract/motion_planners/ompl/profile/ompl_profile.h:87 |
 | `OMPLMoveProfile.createStateExtractor` | unbound-dependency-type | tesseract/motion_planners/ompl/profile/ompl_profile.h:76 |
 | `OMPLPlannerConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:80 |
-| `OMPLRealVectorMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
+| `OMPLRealVectorMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_ompl.pyi |
 | `OMPLRealVectorMoveProfile.__init__` | yaml-node | tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h:73 |
 | `OMPLRealVectorMoveProfile.createSimpleSetup` | unbound-dependency-type | tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h:89 |
 | `OMPLRealVectorMoveProfile.createStateExtractor` | unbound-dependency-type | tesseract/motion_planners/ompl/profile/ompl_real_vector_move_profile.h:86 |
-| `OMPLRealVectorMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
-| `OMPLSolverConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
-| `OMPLSolverConfig.addPlanner` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
-| `OMPLSolverConfig.clearPlanners` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
+| `OMPLRealVectorMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_ompl.pyi |
+| `OMPLSolverConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_ompl.pyi |
+| `OMPLSolverConfig.addPlanner` | copied-vector-field-mutator | src/tesseract_robotics/motion_planners_ompl.pyi |
+| `OMPLSolverConfig.clearPlanners` | copied-vector-field-mutator | src/tesseract_robotics/motion_planners_ompl.pyi |
 | `PRMConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:348 |
 | `PRMstarConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:363 |
-| `RNG_getSeed` | third-party-global | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
-| `RNG_setSeed` | third-party-global | src/tesseract_robotics/tesseract_motion_planners_ompl/_tesseract_motion_planners_ompl.pyi |
+| `RNG_getSeed` | third-party-global | src/tesseract_robotics/motion_planners_ompl.pyi |
+| `RNG_setSeed` | third-party-global | src/tesseract_robotics/motion_planners_ompl.pyi |
 | `RRTConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:255 |
 | `RRTConnectConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:273 |
 | `RRTstarConfigurator.create` | unbound-dependency-type | tesseract/motion_planners/ompl/ompl_planner_configurator.h:297 |
@@ -896,7 +896,7 @@ None.
 
 None.
 
-## tesseract_motion_planners_simple
+## motion_planners_simple
 
 ### Gaps
 
@@ -911,40 +911,40 @@ None.
 | symbol | rule | location |
 |---|---|---|
 | `JointGroupInstructionInfo.getWorkingFrame` | declared-never-defined | tesseract/motion_planners/simple/interpolation.h:71 |
-| `SimplePlannerFixedSizeAssignMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeAssignMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerFixedSizeAssignMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_fixed_size_assign_move_profile.h:49 |
-| `SimplePlannerFixedSizeAssignMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerFixedSizeAssignMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerFixedSizeAssignNoIKMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeAssignMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeAssignMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeAssignNoIKMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerFixedSizeAssignNoIKMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_fixed_size_assign_no_ik_move_profile.h:49 |
-| `SimplePlannerFixedSizeAssignNoIKMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerFixedSizeAssignNoIKMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerFixedSizeMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeAssignNoIKMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeAssignNoIKMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerFixedSizeMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_fixed_size_move_profile.h:48 |
-| `SimplePlannerFixedSizeMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerFixedSizeMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSAssignMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerFixedSizeMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSAssignMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerLVSAssignMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_lvs_assign_move_profile.h:59 |
-| `SimplePlannerLVSAssignMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSAssignMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSAssignNoIKMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerLVSAssignMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSAssignMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSAssignNoIKMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerLVSAssignNoIKMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_lvs_assign_no_ik_move_profile.h:59 |
-| `SimplePlannerLVSAssignNoIKMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSAssignNoIKMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerLVSAssignNoIKMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSAssignNoIKMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerLVSMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_lvs_move_profile.h:62 |
-| `SimplePlannerLVSMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSNoIKMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerLVSMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSNoIKMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 | `SimplePlannerLVSNoIKMoveProfile.__init__` | yaml-node | tesseract/motion_planners/simple/profile/simple_planner_lvs_no_ik_move_profile.h:63 |
-| `SimplePlannerLVSNoIKMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
-| `SimplePlannerLVSNoIKMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_simple/_tesseract_motion_planners_simple.pyi |
+| `SimplePlannerLVSNoIKMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
+| `SimplePlannerLVSNoIKMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_simple/_motion_planners_simple.pyi |
 
 ### Headers audited with another module
 
 None.
 
-## tesseract_motion_planners_trajopt
+## motion_planners_trajopt
 
 ### Gaps
 
@@ -960,34 +960,34 @@ None.
 |---|---|---|
 | `BasicTrustRegionSQP` | solver-behind-profile | trajopt_sco/optimizers.hpp:137 |
 | `BasicTrustRegionSQPMultiThreaded` | solver-behind-profile | trajopt_sco/optimizers.hpp:196 |
-| `BasicTrustRegionSQPParameters.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `BasicTrustRegionSQPParameters.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `BasicTrustRegionSQPResults` | solver-behind-profile | trajopt_sco/optimizers.hpp:230 |
-| `OSQPSettings.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `OSQPSettings.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `OptResults` | solver-behind-profile | trajopt_sco/optimizers.hpp:40 |
 | `OptStatus` | solver-behind-profile | trajopt_sco/optimizers.hpp:25 |
 | `Optimizer` | solver-behind-profile | trajopt_sco/optimizers.hpp:63 |
-| `TrajOptCartesianWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptCartesianWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptCompositeProfile.create` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_profile.h:82 |
-| `TrajOptDefaultCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptDefaultCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptDefaultCompositeProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt/profile/trajopt_default_composite_profile.h:56 |
 | `TrajOptDefaultCompositeProfile.create` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_default_composite_profile.h:80 |
-| `TrajOptDefaultCompositeProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
-| `TrajOptDefaultMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptDefaultCompositeProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt.pyi |
+| `TrajOptDefaultMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptDefaultMoveProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt/profile/trajopt_default_move_profile.h:52 |
 | `TrajOptDefaultMoveProfile.create` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_default_move_profile.h:59 |
-| `TrajOptDefaultMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
-| `TrajOptJointWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptDefaultMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt.pyi |
+| `TrajOptJointWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptMotionPlanner.createProblem` | unbound-dependency-type | tesseract/motion_planners/trajopt/trajopt_motion_planner.h:56 |
 | `TrajOptMoveProfile.create` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_profile.h:67 |
-| `TrajOptOSQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptOSQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptOSQPSolverProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h:47 |
 | `TrajOptOSQPSolverProfile.createSolverConfig` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h:55 |
-| `TrajOptOSQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptOSQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptOSQPSolverProfile.getSolverType` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_osqp_solver_profile.h:53 |
-| `TrajOptPIQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptPIQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptPIQPSolverProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt/profile/trajopt_piqp_solver_profile.h:52 |
 | `TrajOptPIQPSolverProfile.createSolverConfig` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_piqp_solver_profile.h:64 |
-| `TrajOptPIQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt/_tesseract_motion_planners_trajopt.pyi |
+| `TrajOptPIQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt.pyi |
 | `TrajOptPIQPSolverProfile.getSolverType` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_piqp_solver_profile.h:61 |
 | `TrajOptSolverProfile.callbacks` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_profile.h:104 |
 | `TrajOptSolverProfile.createOptimizationCallbacks` | unbound-dependency-type | tesseract/motion_planners/trajopt/profile/trajopt_profile.h:116 |
@@ -1002,7 +1002,7 @@ None.
 
 None.
 
-## tesseract_motion_planners_trajopt_ifopt
+## motion_planners_trajopt_ifopt
 
 ### Gaps
 
@@ -1016,24 +1016,24 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `TrajOptIfoptCartesianWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptDefaultCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptCartesianWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptDefaultCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
 | `TrajOptIfoptDefaultCompositeProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_composite_profile.h:46 |
-| `TrajOptIfoptDefaultCompositeProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptDefaultCompositeProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptDefaultMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptDefaultCompositeProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptDefaultCompositeProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptDefaultMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
 | `TrajOptIfoptDefaultMoveProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_default_move_profile.h:50 |
-| `TrajOptIfoptDefaultMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptDefaultMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptJointWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptOSQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptDefaultMoveProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptDefaultMoveProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptJointWaypointConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptOSQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
 | `TrajOptIfoptOSQPSolverProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h:53 |
-| `TrajOptIfoptOSQPSolverProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
-| `TrajOptIfoptOSQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptOSQPSolverProfile.__init_subclass__` | hook-override-guard | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptOSQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
 | `TrajOptIfoptOSQPSolverProfile.qp_settings` | unbound-dependency-type | tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h:65 |
-| `TrajOptIfoptPIQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptPIQPSolverProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
 | `TrajOptIfoptPIQPSolverProfile.__init__` | yaml-node | tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_piqp_solver_profile.h:53 |
-| `TrajOptIfoptPIQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_motion_planners_trajopt_ifopt/_tesseract_motion_planners_trajopt_ifopt.pyi |
+| `TrajOptIfoptPIQPSolverProfile.from_yaml` | yaml-node | src/tesseract_robotics/motion_planners_trajopt_ifopt/_motion_planners_trajopt_ifopt.pyi |
 | `copyOSQPEigenSettings` | unbound-dependency-type | tesseract/motion_planners/trajopt_ifopt/trajopt_ifopt_utils.h:50 |
 | `operator==` | unbound-dependency-type | tesseract/motion_planners/trajopt_ifopt/profile/trajopt_ifopt_osqp_solver_profile.h:43 |
 
@@ -1041,7 +1041,7 @@ None.
 
 None.
 
-## tesseract_scene_graph
+## scene_graph
 
 ### Gaps
 
@@ -1059,24 +1059,24 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `Joint.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
+| `Joint.__repr__` | presentation-dunder | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
 | `JointCalibration.__str__` | stream-insertion | tesseract/scene_graph/joint.h:201 |
-| `JointDynamics.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
+| `JointDynamics.__repr__` | presentation-dunder | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
 | `JointDynamics.__str__` | stream-insertion | tesseract/scene_graph/joint.h:83 |
-| `JointLimits.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
+| `JointLimits.__repr__` | presentation-dunder | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
 | `JointLimits.__str__` | stream-insertion | tesseract/scene_graph/joint.h:113 |
 | `JointMimic.__str__` | stream-insertion | tesseract/scene_graph/joint.h:228 |
 | `JointSafety.__str__` | stream-insertion | tesseract/scene_graph/joint.h:174 |
 | `JointType.__str__` | stream-insertion | tesseract/scene_graph/joint.h:324 |
-| `Link.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
-| `Link.addCollision` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
-| `Link.addVisual` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
-| `Link.clearCollision` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
-| `Link.clearVisual` | copied-vector-field-mutator | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
-| `SceneGraph.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_scene_graph/_tesseract_scene_graph.pyi |
+| `Link.__repr__` | presentation-dunder | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
+| `Link.addCollision` | copied-vector-field-mutator | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
+| `Link.addVisual` | copied-vector-field-mutator | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
+| `Link.clearCollision` | copied-vector-field-mutator | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
+| `Link.clearVisual` | copied-vector-field-mutator | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
+| `SceneGraph.__repr__` | presentation-dunder | src/tesseract_robotics/scene_graph/_scene_graph.pyi |
 | `SceneState` | bound-in-other-module | tesseract/scene_graph/scene_state.h:51 |
 | `ShortestPath.__str__` | stream-insertion | tesseract/scene_graph/graph.h:609 |
-| `__getattr__` | module-getattr | src/tesseract_robotics/tesseract_scene_graph/__init__.py:8 |
+| `__getattr__` | module-getattr | src/tesseract_robotics/scene_graph/__init__.py:8 |
 | `edge_joint_t` | boost-graph-property-tag | tesseract/scene_graph/graph.h:49 |
 | `graph_root_t` | boost-graph-property-tag | tesseract/scene_graph/graph.h:53 |
 | `property_kind` | boost-graph-property-tag | tesseract/scene_graph/graph.h:58 |
@@ -1086,9 +1086,9 @@ None.
 
 | header | audited with | status |
 |---|---|---|
-| `tesseract/scene_graph/cereal_serialization.h` | tesseract_serialization | audited |
+| `tesseract/scene_graph/cereal_serialization.h` | serialization | audited |
 
-## tesseract_serialization
+## serialization
 
 ### Gaps
 
@@ -1104,36 +1104,36 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `composite_instruction_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `composite_instruction_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `composite_instruction_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `composite_instruction_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `composite_instruction_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `composite_instruction_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `environment_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `environment_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `environment_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `environment_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `environment_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `environment_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `scene_state_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `scene_state_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `scene_state_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `scene_state_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `scene_state_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `scene_state_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `task_composer_log_from_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `task_composer_log_from_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `task_composer_log_from_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `task_composer_log_to_binary` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `task_composer_log_to_file` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
-| `task_composer_log_to_xml` | template-instance-name | src/tesseract_robotics/tesseract_serialization/_tesseract_serialization.pyi |
+| `composite_instruction_from_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `composite_instruction_from_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `composite_instruction_from_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `composite_instruction_to_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `composite_instruction_to_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `composite_instruction_to_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `environment_from_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `environment_from_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `environment_from_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `environment_to_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `environment_to_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `environment_to_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `scene_state_from_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `scene_state_from_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `scene_state_from_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `scene_state_to_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `scene_state_to_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `scene_state_to_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `task_composer_log_from_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `task_composer_log_from_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `task_composer_log_from_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `task_composer_log_to_binary` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `task_composer_log_to_file` | template-instance-name | src/tesseract_robotics/serialization.pyi |
+| `task_composer_log_to_xml` | template-instance-name | src/tesseract_robotics/serialization.pyi |
 
 ### Headers audited with another module
 
 None.
 
-## tesseract_srdf
+## srdf
 
 ### Gaps
 
@@ -1151,13 +1151,13 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `SRDFModel.__repr__` | presentation-dunder | src/tesseract_robotics/tesseract_srdf/_tesseract_srdf.pyi |
+| `SRDFModel.__repr__` | presentation-dunder | src/tesseract_robotics/srdf.pyi |
 
 ### Headers audited with another module
 
 None.
 
-## tesseract_state_solver
+## state_solver
 
 ### Gaps
 
@@ -1169,8 +1169,8 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `StateSolver.setStateByMap` | method | src/tesseract_robotics/tesseract_state_solver/_tesseract_state_solver.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219) |
-| `StateSolver.setStateByNamesAndValues` | method | src/tesseract_robotics/tesseract_state_solver/_tesseract_state_solver.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219) |
+| `StateSolver.setStateByMap` | method | src/tesseract_robotics/state_solver.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219) |
+| `StateSolver.setStateByNamesAndValues` | method | src/tesseract_robotics/state_solver.pyi | — | won't fix: deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219) |
 
 ### Accepted
 
@@ -1181,7 +1181,7 @@ None.
 | `OFKTStateSolver.__init__` | upstream-broken-default | tesseract/state_solver/ofkt/ofkt_state_solver.h:67 |
 | `OFKTStateSolver.getLinkTransforms` | out-param | tesseract/state_solver/ofkt/ofkt_state_solver.h:103 |
 | `OFKTStateSolver.getLinkTransforms` | out-param | tesseract/state_solver/ofkt/ofkt_state_solver.h:108 |
-| `SceneState.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_state_solver/_tesseract_state_solver.pyi |
+| `SceneState.__hash__` | value-equality-unhashable | src/tesseract_robotics/state_solver.pyi |
 | `StateSolver.getLinkTransforms` | out-param | tesseract/state_solver/state_solver.h:133 |
 | `StateSolver.getLinkTransforms` | out-param | tesseract/state_solver/state_solver.h:153 |
 
@@ -1189,7 +1189,7 @@ None.
 
 None.
 
-## tesseract_task_composer
+## task_composer
 
 ### Gaps
 
@@ -1204,55 +1204,55 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `TaskComposerNodePorts.PortDefinition.__init__` | overload | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi | 2 | won't fix: Spells the C++ aggregate initialization `{cardinality, requirement}`. |
+| `TaskComposerNodePorts.PortDefinition.__init__` | overload | src/tesseract_robotics/task_composer.pyi | 2 | won't fix: Spells the C++ aggregate initialization `{cardinality, requirement}`. |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
 | `AnyInterface` | type-erasure-interface | tesseract/common/any_poly.h:49 |
-| `AnyPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `AnyPoly.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
 | `AnyPoly.__init__` | template-instance-name | tesseract/common/any_poly.h:122 |
 | `AnyPoly.__init__` | template-instance-name | tesseract/common/any_poly.h:139 |
 | `AnyPoly.__init__` | type-erasure-interface | tesseract/common/any_poly.h:116 |
 | `AnyPoly.as` | template-instance-name | tesseract/common/any_poly.h:175 |
 | `AnyPoly.get` | type-erasure-interface | tesseract/common/any_poly.h:170 |
 | `AnyPoly.getType` | type-index | tesseract/common/any_poly.h:157 |
-| `AnyPoly.getTypeName` | type-index | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_as_CompositeInstruction` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_as_ContactResultMapVector` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_as_TaskComposerDataStorage` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_wrap_CompositeInstruction` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_wrap_EnvironmentConst` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_wrap_ProfileDictionary` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `AnyPoly_wrap_TaskComposerDataStorage` | template-instance-name | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `AnyPoly.getTypeName` | type-index | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_as_CompositeInstruction` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_as_ContactResultMapVector` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_as_TaskComposerDataStorage` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_wrap_CompositeInstruction` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_wrap_EnvironmentConst` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_wrap_ProfileDictionary` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
+| `AnyPoly_wrap_TaskComposerDataStorage` | template-instance-name | src/tesseract_robotics/task_composer.pyi |
 | `AnyWrapper` | type-erasure-interface | tesseract/common/any_poly.h:80 |
-| `FutureStatus` | std-library-enum | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `TaskComposerContext.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `FutureStatus` | std-library-enum | src/tesseract_robotics/task_composer.pyi |
+| `TaskComposerContext.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerContext.__init__` | serialization-default-ctor | tesseract/task_composer/task_composer_context.h:70 |
-| `TaskComposerDataStorage.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `TaskComposerExecutor.run` | context-from-data-storage | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `TaskComposerDataStorage.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
+| `TaskComposerExecutor.run` | context-from-data-storage | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerExecutorFactory` | plugin-author-factory-interface | tesseract/task_composer/task_composer_plugin_factory.h:87 |
-| `TaskComposerFuture.__copy__` | clone-as-copy | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `TaskComposerFuture.__copy__` | clone-as-copy | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerFuture.waitUntil` | clock-deadline | tesseract/task_composer/task_composer_future.h:85 |
 | `TaskComposerGraph.__init__` | plugin-config-ctor | tesseract/task_composer/task_composer_graph.h:53 |
 | `TaskComposerGraph.addNodePython` | python-hook-method | tesseract/task_composer/task_composer_graph.h:80 |
 | `TaskComposerGraph.dump` | dot-dump-hook | tesseract/task_composer/task_composer_graph.h:168 |
-| `TaskComposerLog.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `TaskComposerLog.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerNode.dump` | dot-dump-hook | tesseract/task_composer/task_composer_node.h:169 |
 | `TaskComposerNodeFactory` | plugin-author-factory-interface | tesseract/task_composer/task_composer_plugin_factory.h:61 |
-| `TaskComposerNodeInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `TaskComposerNodeInfo.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerNodeInfo.__init__` | serialization-default-ctor | tesseract/task_composer/task_composer_node_info.h:52 |
-| `TaskComposerNodeInfoContainer.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `TaskComposerNodePorts.PortDefinition.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `TaskComposerNodePorts.ValidationError.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `TaskComposerNodePorts.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
-| `TaskComposerNodePorts.__str__` | presentation-dunder | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `TaskComposerNodeInfoContainer.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
+| `TaskComposerNodePorts.PortDefinition.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
+| `TaskComposerNodePorts.ValidationError.__str__` | presentation-dunder | src/tesseract_robotics/task_composer.pyi |
+| `TaskComposerNodePorts.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
+| `TaskComposerNodePorts.__str__` | presentation-dunder | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerNodePorts.toString` | to-string-as-str | tesseract/task_composer/task_composer_node_ports.h:97 |
 | `TaskComposerPipeline.__init__` | plugin-config-ctor | tesseract/task_composer/task_composer_pipeline.h:56 |
 | `TaskComposerPluginFactory.__init__` | yaml-node | tesseract/task_composer/task_composer_plugin_factory.h:130 |
 | `TaskComposerPluginFactory.loadConfig` | yaml-node | tesseract/task_composer/task_composer_plugin_factory.h:154 |
-| `TaskComposerPortMap.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer/_tesseract_task_composer.pyi |
+| `TaskComposerPortMap.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer.pyi |
 | `TaskComposerPortMap.__str__` | stream-insertion | tesseract/task_composer/task_composer_port_map.h:78 |
 | `TaskComposerServer.addTaskPython` | python-hook-method | tesseract/task_composer/task_composer_server.h:115 |
 | `TaskComposerServer.loadConfig` | yaml-node | tesseract/task_composer/task_composer_server.h:64 |
@@ -1262,9 +1262,9 @@ None.
 
 | header | audited with | status |
 |---|---|---|
-| `tesseract/task_composer/cereal_serialization.h` | tesseract_serialization | audited |
+| `tesseract/task_composer/cereal_serialization.h` | serialization | audited |
 
-## tesseract_task_composer_planning
+## task_composer_planning
 
 ### Gaps
 
@@ -1278,33 +1278,33 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `ContactCheckProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `ContactCheckProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `ContactCheckProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/contact_check_profile.h:51 |
-| `ContactCheckProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
-| `FixStateBoundsProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `ContactCheckProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
+| `FixStateBoundsProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `FixStateBoundsProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/fix_state_bounds_profile.h:58 |
-| `FixStateBoundsProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
-| `FixStateCollisionProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `FixStateBoundsProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
+| `FixStateCollisionProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `FixStateCollisionProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/fix_state_collision_profile.h:75 |
-| `FixStateCollisionProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
-| `KinematicLimitsCheckProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `FixStateCollisionProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
+| `KinematicLimitsCheckProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `KinematicLimitsCheckProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/kinematic_limits_check_profile.h:42 |
-| `KinematicLimitsCheckProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
-| `MinLengthProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `KinematicLimitsCheckProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
+| `MinLengthProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `MinLengthProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/min_length_profile.h:52 |
-| `MinLengthProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
-| `ProfileSwitchProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `MinLengthProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
+| `ProfileSwitchProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `ProfileSwitchProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/profile_switch_profile.h:47 |
-| `ProfileSwitchProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
-| `UpsampleTrajectoryProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `ProfileSwitchProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
+| `UpsampleTrajectoryProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/task_composer_planning.pyi |
 | `UpsampleTrajectoryProfile.__init__` | yaml-node | tesseract/task_composer/planning/profiles/upsample_trajectory_profile.h:49 |
-| `UpsampleTrajectoryProfile.from_yaml` | yaml-node | src/tesseract_robotics/tesseract_task_composer_planning/_tesseract_task_composer_planning.pyi |
+| `UpsampleTrajectoryProfile.from_yaml` | yaml-node | src/tesseract_robotics/task_composer_planning.pyi |
 
 ### Headers audited with another module
 
 None.
 
-## tesseract_time_parameterization
+## time_parameterization
 
 ### Gaps
 
@@ -1318,40 +1318,16 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `ConstantTCPSpeedParameterizationCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_time_parameterization/_tesseract_time_parameterization.pyi |
+| `ConstantTCPSpeedParameterizationCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/time_parameterization.pyi |
 | `InstructionsTrajectory.__init__` | reference-wrapper-view | tesseract/time_parameterization/instructions_trajectory.h:41 |
-| `IterativeSplineParameterizationCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_time_parameterization/_tesseract_time_parameterization.pyi |
-| `IterativeSplineParameterizationMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_time_parameterization/_tesseract_time_parameterization.pyi |
+| `IterativeSplineParameterizationCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/time_parameterization.pyi |
+| `IterativeSplineParameterizationMoveProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/time_parameterization.pyi |
 | `Path` | algorithm-internal-namespace | tesseract/time_parameterization/totg/time_optimal_trajectory_generation.h:92 |
 | `PathData` | algorithm-internal-namespace | tesseract/time_parameterization/totg/time_optimal_trajectory_generation.h:119 |
 | `PathSegment` | algorithm-internal-namespace | tesseract/time_parameterization/totg/time_optimal_trajectory_generation.h:67 |
-| `RuckigTrajectorySmoothingCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_time_parameterization/_tesseract_time_parameterization.pyi |
-| `TimeOptimalTrajectoryGenerationCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/tesseract_time_parameterization/_tesseract_time_parameterization.pyi |
+| `RuckigTrajectorySmoothingCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/time_parameterization.pyi |
+| `TimeOptimalTrajectoryGenerationCompositeProfile.__hash__` | value-equality-unhashable | src/tesseract_robotics/time_parameterization.pyi |
 | `Trajectory` | algorithm-internal-namespace | tesseract/time_parameterization/totg/time_optimal_trajectory_generation.h:129 |
-
-### Headers audited with another module
-
-None.
-
-## tesseract_urdf
-
-### Gaps
-
-| C++ symbol | kind | header:line | missing overload (arity) | issue |
-|---|---|---|---|---|
-| `makeURDFFilePath` | function | tesseract/urdf/utils.h:23 | — | won't fix: Python `str` and `pathlib` cover it. |
-| `noLeadingSlash` | function | tesseract/urdf/utils.h:21 | — | won't fix: Python `str` and `pathlib` cover it. |
-| `noTrailingSlash` | function | tesseract/urdf/utils.h:19 | — | won't fix: Python `str` and `pathlib` cover it. |
-| `toString` | function | tesseract/urdf/utils.h:15 | — | won't fix: Python `str` and `pathlib` cover it. |
-| `trailingSlash` | function | tesseract/urdf/utils.h:17 | — | won't fix: Python `str` and `pathlib` cover it. |
-
-### Deviations
-
-None.
-
-### Accepted
-
-None.
 
 ### Headers audited with another module
 
@@ -1493,3 +1469,27 @@ None.
 ### Headers audited with another module
 
 None.
+## urdf
+
+### Gaps
+
+| C++ symbol | kind | header:line | missing overload (arity) | issue |
+|---|---|---|---|---|
+| `makeURDFFilePath` | function | tesseract/urdf/utils.h:23 | — | won't fix: Python `str` and `pathlib` cover it. |
+| `noLeadingSlash` | function | tesseract/urdf/utils.h:21 | — | won't fix: Python `str` and `pathlib` cover it. |
+| `noTrailingSlash` | function | tesseract/urdf/utils.h:19 | — | won't fix: Python `str` and `pathlib` cover it. |
+| `toString` | function | tesseract/urdf/utils.h:15 | — | won't fix: Python `str` and `pathlib` cover it. |
+| `trailingSlash` | function | tesseract/urdf/utils.h:17 | — | won't fix: Python `str` and `pathlib` cover it. |
+
+### Deviations
+
+None.
+
+### Accepted
+
+None.
+
+### Headers audited with another module
+
+None.
+

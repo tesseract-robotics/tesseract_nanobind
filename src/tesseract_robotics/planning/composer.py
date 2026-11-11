@@ -33,16 +33,16 @@ if TYPE_CHECKING:
     from tesseract_robotics.planning.core import Robot
     from tesseract_robotics.planning.program import MotionProgram
 
-from tesseract_robotics.planning.profile_types import check_descartes_profile_types
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
 )
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.planning.profile_types import check_descartes_profile_types
+from tesseract_robotics.task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
@@ -309,7 +309,7 @@ class TaskComposer:
             composer = TaskComposer.from_config(num_threads=4)
 
             # Use custom executor
-            from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+            from tesseract_robotics.task_composer import TaskflowTaskComposerExecutor
             executor = TaskflowTaskComposerExecutor("MyExecutor", 8)
             composer = TaskComposer.from_config(executor=executor)
         """

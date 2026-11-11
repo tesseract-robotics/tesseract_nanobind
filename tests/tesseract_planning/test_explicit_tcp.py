@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
 from tesseract_robotics.planning import (
     CartesianTarget,
     JointTarget,
@@ -19,7 +20,6 @@ from tesseract_robotics.planning import (
     Robot,
     TaskComposer,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
 
 GROUP = "manipulator"
 TCP_FRAME = "tool0"

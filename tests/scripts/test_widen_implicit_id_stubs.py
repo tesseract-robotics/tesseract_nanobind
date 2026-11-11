@@ -14,7 +14,7 @@ _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 widen = _mod.widen
 
-Q = "tesseract_robotics.tesseract_common._tesseract_common."
+Q = "tesseract_robotics.common._common."
 
 
 def test_qualified_parameter_ids_accept_str():

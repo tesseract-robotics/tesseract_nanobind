@@ -98,11 +98,8 @@ def test_continuous_numerical_matches_the_analytic_values():
     assert numerical.getCollisionEvaluator() is not None
 
 
-def test_star_import_exports_every_bound_name():
-    """No __all__: the package re-exports what the extension binds."""
-    import tesseract_robotics.trajopt_ifopt as package
-    from tesseract_robotics.trajopt_ifopt import _trajopt_ifopt
+def test_module_has_no_all():
+    """The extension is the module itself: no __all__, every bound name is public."""
+    import tesseract_robotics.trajopt_ifopt as module
 
-    assert not hasattr(package, "__all__")
-    public = {name for name in dir(_trajopt_ifopt) if not name.startswith("_")}
-    assert public <= set(dir(package))
+    assert not hasattr(module, "__all__")

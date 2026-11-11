@@ -22,13 +22,13 @@ import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     LinkId,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import KinematicGroup
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import KinematicGroup
 
 #: [x, y, z, rx, ry, rz]: position tight, standoff ASYMMETRIC (may open, never
 #: close), tilt bounded, rotation about the tool axis free.

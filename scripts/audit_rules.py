@@ -231,39 +231,39 @@ ACCEPTED = {
 # Trailing defaulted C++ parameters left unbound under a named rule (#251):
 # (module, name, unreachable parameter names) -> ACCEPTED key.
 ACCEPTED_DEFAULTS = {
-    ("tesseract_state_solver", "OFKTStateSolver.__init__", ("prefix",)): "upstream-broken-default",
+    ("state_solver", "OFKTStateSolver.__init__", ("prefix",)): "upstream-broken-default",
 }
 # Python and C++ names accepted by a named rule: (module, name) -> ACCEPTED key.
 ACCEPTED_SYMBOLS = {
-    ("tesseract_common", "Quaterniond.__init__"): "scalar-last-quaternion",
-    ("tesseract_common", "Quaterniond.from_xyzw"): "scalar-last-quaternion",
-    ("tesseract_common", "Hyperplane3d"): "eigen-template-instance",
-    ("tesseract_common", "ParametrizedLine3d"): "eigen-template-instance",
-    ("tesseract_common", "Quaterniond.from_rpy"): "quaternion-rpy",
-    ("tesseract_common", "Quaterniond.to_rpy"): "quaternion-rpy",
-    ("tesseract_common", "EIGEN_DEFAULT_PREC"): "eigen-default-precision",
+    ("common", "Quaterniond.__init__"): "scalar-last-quaternion",
+    ("common", "Quaterniond.from_xyzw"): "scalar-last-quaternion",
+    ("common", "Hyperplane3d"): "eigen-template-instance",
+    ("common", "ParametrizedLine3d"): "eigen-template-instance",
+    ("common", "Quaterniond.from_rpy"): "quaternion-rpy",
+    ("common", "Quaterniond.to_rpy"): "quaternion-rpy",
+    ("common", "EIGEN_DEFAULT_PREC"): "eigen-default-precision",
     **{
-        ("tesseract_geometry", f"createConvexMeshFrom{s}"): "template-instance-name"
+        ("geometry", f"createConvexMeshFrom{s}"): "template-instance-name"
         for s in ("Path", "Resource", "Bytes")
     },
     **{
-        ("tesseract_serialization", f"{t}_{d}_{f}"): "template-instance-name"
+        ("serialization", f"{t}_{d}_{f}"): "template-instance-name"
         for t in ("composite_instruction", "environment", "scene_state", "task_composer_log")
         for d in ("to", "from")
         for f in ("xml", "file", "binary")
     },
     **{
-        ("tesseract_scene_graph", f"Link.{op}{field}"): "copied-vector-field-mutator"
+        ("scene_graph", f"Link.{op}{field}"): "copied-vector-field-mutator"
         for op in ("add", "clear")
         for field in ("Visual", "Collision")
     },
     **{
-        ("tesseract_scene_graph", tag): "boost-graph-property-tag"
+        ("scene_graph", tag): "boost-graph-property-tag"
         for tag in ("vertex_link_t", "edge_joint_t", "graph_root_t", "property_kind")
     },
     # #256 group 1.
     **{
-        ("tesseract_command_language", name): "type-erasure-interface"
+        ("command_language", name): "type-erasure-interface"
         for name in (
             "WaypointInterface",
             "CartesianWaypointInterface",
@@ -280,13 +280,13 @@ ACCEPTED_SYMBOLS = {
         )
     },
     **{
-        ("tesseract_time_parameterization", cls): "algorithm-internal-namespace"
+        ("time_parameterization", cls): "algorithm-internal-namespace"
         for cls in ("Path", "PathSegment", "PathData", "Trajectory")
     },
-    ("tesseract_command_language", "MoveInstruction.setWaypoint"): "reference-setter",
-    ("tesseract_command_language", "MoveInstructionPoly.setWaypoint"): "reference-setter",
+    ("command_language", "MoveInstruction.setWaypoint"): "reference-setter",
+    ("command_language", "MoveInstructionPoly.setWaypoint"): "reference-setter",
     # composite_instruction.h:299 `UserData& getUserData()`; the binding converts a dict (#271).
-    ("tesseract_command_language", "CompositeInstruction.setUserData"): "reference-setter",
+    ("command_language", "CompositeInstruction.setUserData"): "reference-setter",
     # Group 2 (trajopt).
     ("trajopt_ifopt", "Component.print"): "stdout-printer",
     ("trajopt_ifopt", "NodesVariables.addObserver"): "unimplemented-observer",
@@ -295,7 +295,7 @@ ACCEPTED_SYMBOLS = {
     # tesseract_task_composer (#256 group 4; ledger phaseF-triage-tc.md). Instances of AnyPoly's
     # forwarding ctor templates (any_poly.h:122, :139): Python-only names.
     **{
-        ("tesseract_task_composer", f"AnyPoly_wrap_{t}"): "template-instance-name"
+        ("task_composer", f"AnyPoly_wrap_{t}"): "template-instance-name"
         for t in (
             "CompositeInstruction",
             "ProfileDictionary",
@@ -303,58 +303,58 @@ ACCEPTED_SYMBOLS = {
             "TaskComposerDataStorage",
         )
     },
-    ("tesseract_task_composer", "AnyInterface"): "type-erasure-interface",
-    ("tesseract_task_composer", "AnyWrapper"): "type-erasure-interface",
-    ("tesseract_task_composer", "AnyPoly.get"): "type-erasure-interface",
+    ("task_composer", "AnyInterface"): "type-erasure-interface",
+    ("task_composer", "AnyWrapper"): "type-erasure-interface",
+    ("task_composer", "AnyPoly.get"): "type-erasure-interface",
     # any_poly.h:156 `getType()`; the binding demangles its name (#322).
-    ("tesseract_task_composer", "AnyPoly.getTypeName"): "type-index",
-    ("tesseract_task_composer", "FutureStatus"): "std-library-enum",
-    ("tesseract_task_composer", "TaskComposerFuture.waitUntil"): "clock-deadline",
-    ("tesseract_task_composer", "TaskComposerNode.dump"): "dot-dump-hook",
-    ("tesseract_task_composer", "TaskComposerGraph.dump"): "dot-dump-hook",
-    ("tesseract_task_composer", "TaskComposerGraph.addNodePython"): "python-hook-method",
-    ("tesseract_task_composer", "TaskComposerServer.addTaskPython"): "python-hook-method",
-    ("tesseract_task_composer", "TaskComposerNodePorts.toString"): "to-string-as-str",
+    ("task_composer", "AnyPoly.getTypeName"): "type-index",
+    ("task_composer", "FutureStatus"): "std-library-enum",
+    ("task_composer", "TaskComposerFuture.waitUntil"): "clock-deadline",
+    ("task_composer", "TaskComposerNode.dump"): "dot-dump-hook",
+    ("task_composer", "TaskComposerGraph.dump"): "dot-dump-hook",
+    ("task_composer", "TaskComposerGraph.addNodePython"): "python-hook-method",
+    ("task_composer", "TaskComposerServer.addTaskPython"): "python-hook-method",
+    ("task_composer", "TaskComposerNodePorts.toString"): "to-string-as-str",
     # interpolation.h:70 and utils.h:242: declared, never defined upstream (the bindings'
     # comments say so).
-    ("tesseract_command_language", "validateSeedStructure"): "declared-never-defined",
+    ("command_language", "validateSeedStructure"): "declared-never-defined",
     (
-        "tesseract_motion_planners_simple",
+        "motion_planners_simple",
         "JointGroupInstructionInfo.getWorkingFrame",
     ): "declared-never-defined",
-    ("tesseract_task_composer", "TaskComposerNodeFactory"): "plugin-author-factory-interface",
-    ("tesseract_task_composer", "TaskComposerExecutorFactory"): "plugin-author-factory-interface",
+    ("task_composer", "TaskComposerNodeFactory"): "plugin-author-factory-interface",
+    ("task_composer", "TaskComposerExecutorFactory"): "plugin-author-factory-interface",
     # C20: the core plugin factory interfaces, under the same rule.
-    ("tesseract_kinematics", "FwdKinFactory"): "plugin-author-factory-interface",
-    ("tesseract_kinematics", "InvKinFactory"): "plugin-author-factory-interface",
-    ("tesseract_collision", "DiscreteContactManagerFactory"): "plugin-author-factory-interface",
-    ("tesseract_collision", "ContinuousContactManagerFactory"): "plugin-author-factory-interface",
+    ("kinematics", "FwdKinFactory"): "plugin-author-factory-interface",
+    ("kinematics", "InvKinFactory"): "plugin-author-factory-interface",
+    ("collision", "DiscreteContactManagerFactory"): "plugin-author-factory-interface",
+    ("collision", "ContinuousContactManagerFactory"): "plugin-author-factory-interface",
     # C12 (accept by explicit entry): the core reference-wrapper flatten.
     (
-        "tesseract_collision",
+        "collision",
         "ContactResultMap.flattenWrapperResults",
     ): "reference-wrapper-out-param",
     # Group 3 (motion planners). R2: type-erased planner payloads.
-    ("tesseract_motion_planners", "PlannerRequest.data"): "type-erased-data",
-    ("tesseract_motion_planners", "PlannerResponse.data"): "type-erased-data",
+    ("motion_planners", "PlannerRequest.data"): "type-erased-data",
+    ("motion_planners", "PlannerResponse.data"): "type-erased-data",
     # C2 (a): the reason overload of checkRequest under its own name (#332).
-    ("tesseract_motion_planners", "MotionPlanner.checkRequestReason"): "reason-out-param",
+    ("motion_planners", "MotionPlanner.checkRequestReason"): "reason-out-param",
     # #393: `operator==(const piqp::Settings<double>&, …)` of piqp/settings_utils.h is bound as
     # `PIQPSettings.__eq__` in trajopt_sqp, the module that binds the class. The structural
     # rule looks for the dunder in the stub of the module that owns the header, so it cannot
     # see a class another module binds.
-    ("tesseract_motion_planners", "operator=="): "free-function-as-method",
+    ("motion_planners", "operator=="): "free-function-as-method",
     # R14 (C13 = keep): OMPL's process-global RNG.
-    ("tesseract_motion_planners_ompl", "RNG_setSeed"): "third-party-global",
-    ("tesseract_motion_planners_ompl", "RNG_getSeed"): "third-party-global",
+    ("motion_planners_ompl", "RNG_setSeed"): "third-party-global",
+    ("motion_planners_ompl", "RNG_getSeed"): "third-party-global",
     # ompl_solver_config.h:75 `planners` is a bound std::vector field (#302).
     **{
-        ("tesseract_motion_planners_ompl", f"OMPLSolverConfig.{m}"): "copied-vector-field-mutator"
+        ("motion_planners_ompl", f"OMPLSolverConfig.{m}"): "copied-vector-field-mutator"
         for m in ("addPlanner", "clearPlanners")
     },
     # R21: the classic-TrajOpt optimizer in optimizers.hpp, next to the bound parameters.
     **{
-        ("tesseract_motion_planners_trajopt", name): "solver-behind-profile"
+        ("motion_planners_trajopt", name): "solver-behind-profile"
         for name in (
             "Optimizer",
             "BasicTrustRegionSQP",
@@ -370,7 +370,7 @@ ACCEPTED_SYMBOLS = {
     # `vector<shared_ptr<trajopt::TermInfo>>`, and the four `create` hooks return them,
     # so the hooks have no Python form either (#339).
     **{
-        ("tesseract_motion_planners_trajopt", name): UNBOUND_DEPENDENCY
+        ("motion_planners_trajopt", name): UNBOUND_DEPENDENCY
         for name in (
             "TrajOptMoveProfile.create",
             "TrajOptDefaultMoveProfile.create",
@@ -385,38 +385,38 @@ ACCEPTED_SYMBOLS = {
     # `double` and `float` instances (#350).
     **{
         (
-            "tesseract_motion_planners_descartes",
+            "motion_planners_descartes",
             f"Descartes{name}{scalar}",
         ): "template-instance-name"
         for name in ("State", "StateSample", "EdgeEvaluator", "WaypointSampler", "StateEvaluator")
         for scalar in ("D", "F")
     },
     # waypoint_sampler.h:63, the hook of the friend `operator<<` (#310).
-    ("tesseract_motion_planners_descartes", "WaypointSampler.print"): "stream-insertion",
+    ("motion_planners_descartes", "WaypointSampler.print"): "stream-insertion",
 }
 # Classes that wrap one bound Eigen vector field; their operators forward to it (R32):
 # (module, C++ class).
-EIGEN_VALUE_WRAPPERS = frozenset({("tesseract_motion_planners_descartes", "State")})
+EIGEN_VALUE_WRAPPERS = frozenset({("motion_planners_descartes", "State")})
 # A C++ member template bound once per instance, under a name Python can spell
 # (`InstructionPoly::as<MoveInstructionPoly>()` → `asMoveInstruction`): (module, C++ dotted
 # name) -> the Python dotted names of its instances. The C++ row is accepted only when every
 # listed instance is bound; each instance is accepted on the Python side (template-instance-name).
 TEMPLATE_INSTANCES: dict[tuple[str, str], tuple[str, ...]] = {
-    ("tesseract_command_language", "InstructionPoly.as"): tuple(
+    ("command_language", "InstructionPoly.as"): tuple(
         f"InstructionPoly.as{t}Instruction"
         for t in ("Move", "Composite", "Wait", "Timer", "SetAnalog", "SetDigital", "SetTool")
     ),
     # The waypoint and move-instruction Polys' `as<T>()` (#268): to the typed Polys on
     # `WaypointPoly`, to the concrete type on each typed Poly.
-    ("tesseract_command_language", "WaypointPoly.as"): tuple(
+    ("command_language", "WaypointPoly.as"): tuple(
         f"WaypointPoly.as{t}Waypoint" for t in ("Cartesian", "Joint", "State")
     ),
     **{
-        ("tesseract_command_language", f"{t}Poly.as"): (f"{t}Poly.as{t}",)
+        ("command_language", f"{t}Poly.as"): (f"{t}Poly.as{t}",)
         for t in ("CartesianWaypoint", "JointWaypoint", "StateWaypoint", "MoveInstruction")
     },
     # tesseract_task_composer (#256 group 4): `template <T> T& AnyPoly::as()`.
-    ("tesseract_task_composer", "AnyPoly.as"): (
+    ("task_composer", "AnyPoly.as"): (
         "AnyPoly_as_CompositeInstruction",
         "AnyPoly_as_TaskComposerDataStorage",
         "AnyPoly_as_ContactResultMapVector",
@@ -427,10 +427,10 @@ TEMPLATE_INSTANCE_RULE = "template-instance-name"
 # A C++ overload accepted unbound: (module, dotted name, `str(Arity)`) -> ACCEPTED rule. For a
 # symbol Python binds, where the other overloads stay checked (T4).
 ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
-    ("tesseract_command_language", "ProfileDictionary.getProfile", "2-3"): "profile-key-template",
+    ("command_language", "ProfileDictionary.getProfile", "2-3"): "profile-key-template",
     # composite_instruction.h:386 `template <class InputIt> insert(pos, first, last)` (#269).
     (
-        "tesseract_command_language",
+        "command_language",
         "CompositeInstruction.insert",
         "3",
     ): "vector-forwarding-no-python-form",
@@ -446,23 +446,23 @@ ACCEPTED_CPP_OVERLOADS: dict[tuple[str, str, str], str] = {
     ("trajopt_ifopt", "calcNumericalConstraintGradient", "2-3"): "ifopt-problem-only",
     # tesseract_task_composer (#256 group 4). any_poly.h:116 `AnyPoly(const AnyInterface&)`: the
     # arity-1 forwarding ctor templates (:122, :139) are template-instance-name before this table.
-    ("tesseract_task_composer", "AnyPoly.__init__", "1"): "type-erasure-interface",
+    ("task_composer", "AnyPoly.__init__", "1"): "type-erasure-interface",
     # taskflow_task_composer_executor.h:71 `(std::string name, const YAML::Node& config)`: no
     # YAML-text sibling, so `yaml-node` falls through to here (T1).
-    ("tesseract_task_composer", "TaskflowTaskComposerExecutor.__init__", "2"): "plugin-config-ctor",
+    ("task_composer", "TaskflowTaskComposerExecutor.__init__", "2"): "plugin-config-ctor",
     # task_composer_graph.h:53, task_composer_pipeline.h:56 `(name, config, plugin_factory)`:
     # what `TaskComposerTaskFactory<T>::create` calls (task_composer_task_plugin_factory.cpp:48).
-    ("tesseract_task_composer", "TaskComposerGraph.__init__", "3"): "plugin-config-ctor",
-    ("tesseract_task_composer", "TaskComposerPipeline.__init__", "3"): "plugin-config-ctor",
+    ("task_composer", "TaskComposerGraph.__init__", "3"): "plugin-config-ctor",
+    ("task_composer", "TaskComposerPipeline.__init__", "3"): "plugin-config-ctor",
     # task_composer_node_info.h:52 "Required for serialization": the free `serialize` is in
     # cereal_serialization.h, which the binding does not include, so no friend marks it (#319).
     (
-        "tesseract_task_composer",
+        "task_composer",
         "TaskComposerNodeInfo.__init__",
         "0",
     ): "serialization-default-ctor",
     # planner.h:84 `checkRequest(request, std::string& reason)`: `checkRequestReason` (C2).
-    ("tesseract_motion_planners", "MotionPlanner.checkRequest", "2"): "reason-out-param",
+    ("motion_planners", "MotionPlanner.checkRequest", "2"): "reason-out-param",
 }
 # A Python-only overload accepted: (module, dotted name, `PyOverload.params`) -> ACCEPTED rule.
 # Two overloads of one arity differ by their annotations (G2: `setWarmStart(bool)`).
@@ -493,7 +493,7 @@ ACCEPTED_PY_OVERLOADS: dict[tuple[str, str, tuple[str, ...]], str] = {
     ): "split-var-pair",
     # tesseract_task_composer (#256 group 4; C23 keeps the rule).
     (
-        "tesseract_task_composer",
+        "task_composer",
         "TaskComposerExecutor.run",
         ("TaskComposerNode", "TaskComposerDataStorage", "bool", "str"),
     ): "context-from-data-storage",
