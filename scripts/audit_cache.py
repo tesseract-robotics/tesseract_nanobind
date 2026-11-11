@@ -12,18 +12,15 @@ other. The rules that turn facts into report rows always run; only extraction is
 `fetch` holds a lock per entry: xdist workers asking for one fact at once compute it once.
 CI restores the cache directory between runs and prunes what a run did not use (`prune`).
 
-Usage:
-    pixi run -e audit audit-cache-prune CACHE_DIR STAMP
+`scripts/audit_cache_prune.py` is the prune CLI (`pixi run -e audit audit-cache-prune`).
 """
 
 from __future__ import annotations
 
-import argparse
 import fcntl
 import hashlib
 import json
 import os
-import sys
 import tempfile
 from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
@@ -195,21 +192,3 @@ class FactCache:
         ) as f:
             f.write(text)
         Path(f.name).replace(entry)
-
-
-def main(argv: list[str] | None = None) -> int:
-    """`prune CACHE_DIR STAMP`: drop the entries no fetch used since STAMP's mtime."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    sub = parser.add_subparsers(dest="command", required=True)
-    prune = sub.add_parser("prune", help="drop the entries no fetch used since STAMP was touched")
-    prune.add_argument("root", type=Path, help="the cache directory")
-    prune.add_argument("stamp", type=Path, help="a file touched when the run started")
-    args = parser.parse_args(argv)
-    removed = FactCache(args.root).prune(args.stamp.stat().st_mtime_ns)
-    kept = len(list(args.root.glob(f"*/*{ENTRY_SUFFIX}")))
-    print(f"fact cache: kept {kept} entries, dropped {len(removed)} unused")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
