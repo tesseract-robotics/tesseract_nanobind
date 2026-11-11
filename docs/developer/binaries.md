@@ -125,6 +125,11 @@ patch keeps `#!/usr/bin/env python3`.
 
 ## Conda package: tesseract-robotics-nanobind
 
+The PyPI wheels need no conda (see [Building a wheel](#building-a-wheel)); the conda
+package is the other way to install the bindings, for conda envs that already hold the
+tesseract stack. Both build the same `CMakeLists.txt`: the wheel against a colcon prefix
+(`TESSERACT_CPP_PREFIX`), the package against the conda host prefix.
+
 The bindings get a feedstock of their own, `tesseract-robotics-nanobind-feedstock`,
 laid out like `tesseract-robotics-python-feedstock`: rattler-build, conda-smithy,
 GitHub Actions on linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, Python
@@ -147,9 +152,9 @@ The recipe (`recipe/recipe.yaml`):
 | Section | Contents | Why |
 |---|---|---|
 | `source` | `archive/<sha>.tar.gz` of this repository on the `dev` branch; the release tag on `master` | the dev track pins the merge SHA of the license PR (#368) or later: earlier commits have no `LICENSE` / `NOTICE` |
-| `build` | `pip install . --no-deps --no-build-isolation`, `SETUPTOOLS_SCM_PRETEND_VERSION` = the recipe version, `CONDA_PREFIX` = the host prefix | the archive has no `.git` for setuptools-scm; `CMakeLists.txt` finds the C++ stack and its data through `$CONDA_PREFIX` |
+| `build` | `pip install . --no-deps --no-build-isolation`, `SETUPTOOLS_SCM_PRETEND_VERSION` = the recipe version, `CONDA_PREFIX` = the host prefix | the archive has no `.git` for setuptools-scm; with `TESSERACT_CPP_PREFIX` unset (the wheel build sets it to its colcon prefix), `CMakeLists.txt` finds the C++ stack and its data through `$CONDA_PREFIX` |
 | `host` | `python`, `pip`, `scikit-build-core >=0.11`, `setuptools-scm`, `nanobind ==2.12.0`, `tesseract-robotics`, `tesseract-robotics-planning`, `trajopt`, `descartes-light`, `libboost-devel`, `eigen-abi-devel`, `taskflow 3.11.*` | every `find_package` in `CMakeLists.txt` resolves from these and their run deps |
-| `run` | `numpy >=2.0`, `scipy >=1.17.1`, `loguru`, `pyyaml >=6.0`, `viser >=1.1.1`, `trimesh >=4`, `pillow`, `taskflow 3.11.*`, plus the C++ packages' `run_exports` | the `[project] dependencies`, so `pip check` passes |
+| `run` | `numpy >=2.0`, `scipy >=1.17.1`, `loguru`, `pyyaml`, `viser >=1.1.1`, `trimesh >=4`, `pillow`, `taskflow 3.11.*`, plus the C++ packages' `run_exports` | the `[project] dependencies`, so `pip check` passes. Not `tesseract-robotics-nanobind-support`: the robot models are already in `tesseract-robotics`' `share/tesseract`, which `get_tesseract_resource_path()` finds through `$CONDA_PREFIX` |
 | `run_constraints` | `tesseract-robotics-python <0.0a0` | both packages install `tesseract_robotics` |
 | `tests` | imports + `pip check`; `pytest tests/tesseract_collision tests/tesseract_kinematics` from the source tree | the two suites load the contact-manager and kinematics plugins and need no planner. `tesseract_nanobind_selftest` is not used: it runs tests bundled under `tesseract_robotics/tests`, which no build installs |
 | `about` | `license: Apache-2.0`, `license_file: [LICENSE, NOTICE]` | #368 |
@@ -287,11 +292,12 @@ search paths. Data is found through functions the caller uses explicitly:
 
 - **Task composer config.** `get_task_composer_config_path()`:
   `TESSERACT_TASK_COMPOSER_CONFIG_FILE` when set, else the config the wheel bundles in
-  `tesseract_robotics/data/`, else the pixi env's `share/` for an editable install.
+  `tesseract_robotics/data/`, else the conda env's `share/` (an editable install).
 - **Support data.** tesseract's robot models and meshes are a separate wheel,
   `tesseract-robotics-nanobind-support` (the `[support]` extra), built from the same prefix by
   `packaging/tesseract-robotics-nanobind-support`. `get_tesseract_resource_path()` returns its
-  directory (or the pixi env's `share/`), to pass to
+  directory, or the conda env's `share/` (an editable install, or the conda package
+  `tesseract-robotics-nanobind`), to pass to
   `GeneralResourceLocator(paths=[...])` or `addPath()`; `get_tesseract_support_path()` is its
   `tesseract/support/`. Without either it raises `SupportDataNotFoundError`.
 - **Windows DLLs.** A wheel needs nothing: delvewheel adds its bundled DLL directory. For a

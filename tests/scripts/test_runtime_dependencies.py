@@ -2,7 +2,9 @@
 
 The conda recipe's import test caught `tesseract_robotics.planning` importing `yaml`
 without `pyyaml` in `[project] dependencies` (#162): a plain `pip install` of the wheel
-failed on `import tesseract_robotics.planning`.
+failed on `import tesseract_robotics.planning`. An import counts as declared when a
+`[project] dependencies` entry or an extra (`support`, from `scripts/support_metadata.py`)
+names its distribution.
 """
 
 import ast
@@ -16,6 +18,13 @@ from packaging.utils import canonicalize_name
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PACKAGE = REPO_ROOT / "src" / "tesseract_robotics"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from support_metadata import dynamic_metadata  # noqa: E402
+
+# This repository's own distributions, by import name: the dev env need not have them
+# installed (it reads the support data from the conda env's share/).
+OWN_DISTRIBUTIONS = {"tesseract_robotics_support": "tesseract-robotics-nanobind-support"}
 
 # Imports a module may make without a declared dependency, with the reason.
 # selftest.py runs the bundled test suite through pytest; it is not part of the runtime API.
@@ -35,18 +44,20 @@ def _top_level_imports(path: Path) -> set[str]:
 
 def test_third_party_imports_are_declared() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
-    declared = {
-        canonicalize_name(Requirement(spec).name) for spec in pyproject["project"]["dependencies"]
-    }
+    extras = dynamic_metadata("optional-dependencies", {}, {"version": "0"})
+    specs = [*pyproject["project"]["dependencies"], *(s for reqs in extras.values() for s in reqs)]
+    declared = {canonicalize_name(Requirement(spec).name) for spec in specs}
     module_to_dists = packages_distributions()
 
     missing: dict[str, list[str]] = {}
     for path in sorted(PACKAGE.rglob("*.py")):
-        relative = str(path.relative_to(REPO_ROOT))
+        relative = path.relative_to(REPO_ROOT).as_posix()
         allowed = UNDECLARED_ALLOWED.get(relative, set())
         third_party = _top_level_imports(path) - set(sys.stdlib_module_names)
         for module in third_party - {"tesseract_robotics"} - allowed:
             dists = {canonicalize_name(d) for d in module_to_dists.get(module, [])}
+            if module in OWN_DISTRIBUTIONS:
+                dists.add(canonicalize_name(OWN_DISTRIBUTIONS[module]))
             if not dists & declared:
                 missing.setdefault(module, []).append(relative)
-    assert missing == {}, f"imported but not in [project] dependencies: {missing}"
+    assert missing == {}, f"imported but not in [project] dependencies or extras: {missing}"
