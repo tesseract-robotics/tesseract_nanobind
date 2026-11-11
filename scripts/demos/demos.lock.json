@@ -6,7 +6,7 @@
     "basic_cartesian_example": "f1e735b6b0d2dd69fafb025d9a1da3fdd90d26ba820532ea777f223bef009de2",
     "car_seat_example": "00feead9debcbc5fa2b935cab5721566293ebce33784a2a9f209911c399ce41e",
     "chain_example": "4ad560021b64bb43397e160f44264a4fbf0ff6622ac313260ec082d2d0851c99",
-    "freespace_clearance_objective_example": "44aaf5ad601a60f0ea961117a715840ca4bf6918f0fab246c628dffa6bc1f8c2",
+    "freespace_clearance_objective_example": "994a27ecefd29511d38d73c4eb54a443fa2bdb3ca68851ef17e143f1c0b5c6f8",
     "freespace_hybrid_example": "16f6a9e86c804026809d8961bf89e83d1f5a81e679d0e6b05d66a231c502e876",
     "freespace_ompl_example": "f5246c50f1c0b31fc7f25faf2ca1f4636f3adc1277f32e66a3455db582e9faa8",
     "geometry_showcase_example": "e6b3e7f28897851b33bd3357d7f1f360560affe1b852a844be9aa13f704f56a8",
@@ -63,12 +63,12 @@
     },
     "freespace_clearance_objective_example": {
       "identity": {
-        "inputs_sha256": "a8efa353a8e240b4e9895489f65599c0f06515607aaa9d4e285c999147329bab",
+        "inputs_sha256": "323c1c04e8182d4b145264fcf2a61f85ad22cf43706c59ec6c328e918ac526d8",
         "package_version": "0.35.0.9.dev774",
         "viser_version": "1.1.1"
       },
-      "recording_sha256": "143cd030b9bb6e4453c9209bc7499fca2a7810923d95009b4092f1020daa81d5",
-      "size_bytes": 1309534
+      "recording_sha256": "792ccaf98a6b939f53e9af2903994c358a8bd0c20918a00fb01e4320d029c084",
+      "size_bytes": 1309235
     },
     "freespace_hybrid_example": {
       "identity": {
