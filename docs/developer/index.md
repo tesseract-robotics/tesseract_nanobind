@@ -122,7 +122,6 @@ Environments defined in `pyproject.toml`:
 | `default` | from lockfile | Local development |
 | `py312` | 3.12.x | CI wheels (abi3) |
 | `py315` | 3.15.x | Suite on the newest Python |
-| `upstream` | 3.12.x | 0.36 inner loop, C++ built from `upstream/` |
 
 [How the binaries are built](binaries.md#pixi-environments) lists where each environment gets its C++.
 
