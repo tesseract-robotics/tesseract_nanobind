@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.audit._load import audit
+from tests.audit._load import audit, native_stack
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -195,11 +195,15 @@ def test_ompl_include_is_versioned_or_plain(tmp_path):
         audit.ompl_include(tmp_path)
 
 
-def _native_stack(root, triplets=("x64-linux-dynamic-release",)):
+def _native_stack(root, triplet="x64-linux-dynamic-release", host_triplet="x64-linux"):
+    """A native stack as scripts/native_stack.py lays it out: vcpkg installs the host
+    triplet's tools beside the target triplet, and the vcpkg stage's identity names the target."""
     (root / "ws" / "install" / "include").mkdir(parents=True)
-    for t in triplets:
-        (root / "vcpkg" / "installed" / t / "include" / "ompl").mkdir(parents=True)
-    (root / "vcpkg" / "installed" / "vcpkg").mkdir(parents=True)  # vcpkg's own bookkeeping dir
+    installed = root / "vcpkg" / "installed"
+    for t in (triplet, host_triplet):
+        (installed / t / "include" / "ompl").mkdir(parents=True)
+    (installed / "vcpkg").mkdir(parents=True)  # vcpkg's own bookkeeping dir
+    native_stack.write_identity(installed, {"triplet": triplet})
     return root
 
 
@@ -210,14 +214,19 @@ def test_native_include_roots_are_the_install_and_the_one_vcpkg_triplet(tmp_path
     assert vcpkg == root / "vcpkg" / "installed" / "x64-linux-dynamic-release" / "include"
 
 
-def test_native_stack_missing_or_ambiguous_raises_by_name(tmp_path):
+def test_native_stack_missing_raises_by_name(tmp_path):
     with pytest.raises(audit.NativeStackMissingError, match="native-build"):
         audit.native_include_roots(tmp_path)
-    root = _native_stack(tmp_path / "two", ("a-linux", "b-linux"))
-    with pytest.raises(audit.NativeStackMissingError, match="a-linux.*b-linux"):
-        audit.native_include_roots(root)
-    bare = tmp_path / "bare"
-    (bare / "vcpkg" / "installed" / "a-linux" / "include").mkdir(parents=True)
+    unrecorded = _native_stack(tmp_path / "unrecorded")
+    (unrecorded / "vcpkg" / "installed" / native_stack.IDENTITY_FILE).unlink()
+    with pytest.raises(audit.NativeStackMissingError, match="native-build"):
+        audit.native_include_roots(unrecorded)
+    stale = _native_stack(tmp_path / "stale")
+    native_stack.write_identity(stale / "vcpkg" / "installed", {"triplet": "arm64-linux"})
+    with pytest.raises(audit.NativeStackMissingError, match="arm64-linux"):
+        audit.native_include_roots(stale)
+    bare = _native_stack(tmp_path / "bare")
+    (bare / "ws" / "install" / "include").rmdir()
     with pytest.raises(audit.NativeStackMissingError, match="ws/install/include"):
         audit.native_include_roots(bare)
 
