@@ -158,8 +158,10 @@ process, and writes JSON and this table to `build/ompl_seed_report/`.
 It plans with `FreespaceIfoptOMPLOutputPipeline` (`scripts/ompl_seed_report_task_composer.yaml`).
 That is stock `FreespaceIfoptPipeline` except for one key: OMPL hands its program to
 TrajOptIfopt under `ompl_output_data` instead of `output_data`, which TrajOptIfopt overwrote,
-so one run yields both stages' paths. On a fixed seed with one planner its final program is
-bit-identical to stock's (`test_ompl_output_variant_is_bit_identical_to_stock`).
+so one run yields both stages' paths. A test parses both configs: in the two plugins the variant
+copies, only that key and the task names differ, and the header matches except `search_paths`.
+On a fixed seed with one planner its final program is bit-identical to stock's
+(`test_ompl_output_variant_is_bit_identical_to_stock`).
 
 ```mermaid
 flowchart LR
@@ -218,6 +220,8 @@ N = 10 seeds, Darwin arm64, Python 3.14.10, pipeline `FreespaceIfoptOMPLOutputPi
 | TrajOptIfopt took 2 to 6 SQP iterations in this run | default 2 to 5, threshold 2 to 6; highest `overall_iteration` its callback saw | table |
 | Both cases ended 26.7 to 51.0 mm from the cubes in this run | final min clearance; final length 2.72 to 2.91 rad | table |
 | Both cases' OMPL paths sit at the 10 mm collision margin | default 10.0 to 10.1 mm, threshold 10.0 mm (0.0007 to 0.094 mm before the margin fix) | table, OMPL min clearance |
+| The report's config differs from stock only in the hand-off | in the two plugins it copies, parsed configs differ in OMPL's output key, TrajOptIfopt's input key and the task names; the header matches except `search_paths` | `tests/scripts/test_ompl_seed_report.py` |
+| A run of the report's pipeline keeps the OMPL program | a run keeps an OMPL program under the key, one state per final state, and stock keeps none | `tests/scripts/test_ompl_seed_report.py` |
 | The report's pipeline plans what stock plans | final program bit-identical to stock `FreespaceIfoptPipeline`'s on seed 1, one planner; stock reproduces itself on the seed | `tests/scripts/test_ompl_seed_report.py` |
 
 !!! note "One run is not a bound"

@@ -40,6 +40,8 @@ FIRST_PATH_MODE = "first"
 PROBE_NUM_PLANNERS = 1
 # One planner on one seed with no second path scored: the same path is bit-identical.
 COMPARED_FIELDS = ("ompl_len", "ompl_states")
+# s: one case's OMPL stage, capped at `planning_time`, plus the rest of the child.
+PROBE_CHILD_TIMEOUT_S = example.PLANNING_TIME_S + report.CHILD_OVERHEAD_S
 
 
 class FirstPathMismatchError(RuntimeError):
@@ -60,6 +62,18 @@ class MarginMismatchError(RuntimeError):
 
 class ProbeRunError(RuntimeError):
     """A child process running one seed and mode failed."""
+
+
+class ProbeHungError(ProbeRunError):
+    """A child process outlived its bound; `stdout` and `stderr` hold what it printed."""
+
+    def __init__(self, seed: int, mode: str, timeout_s: float, stdout: str, stderr: str) -> None:
+        super().__init__(
+            f"seed {seed}, mode {mode} still running after {timeout_s} s, killed.\n"
+            f"--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
+        )
+        self.stdout = stdout
+        self.stderr = stderr
 
 
 def _check_margin(row: dict[str, Any]) -> None:
@@ -145,18 +159,38 @@ def probe(seed: int, mode: str) -> dict[str, Any]:
     }
 
 
-def probe_in_subprocess(seed: int, mode: str) -> dict[str, Any]:
+def probe_in_subprocess(
+    seed: int, mode: str, *, timeout_s: float = PROBE_CHILD_TIMEOUT_S
+) -> dict[str, Any]:
     """Run `probe` in a fresh process and return its row.
 
+    Args:
+        seed: OMPL RNG seed.
+        mode: `THRESHOLD_MODE` or `FIRST_PATH_MODE`.
+        timeout_s: How long the child may run (s).
+
     Raises:
+        ProbeHungError: The child outlived `timeout_s`.
         ProbeRunError: The child exited non-zero; the message carries its stderr.
     """
-    completed = subprocess.run(
-        [sys.executable, str(Path(__file__)), "--seed", str(seed), "--mode", mode],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            # -u: what the child printed survives the kill.
+            [sys.executable, "-u", str(Path(__file__)), "--seed", str(seed), "--mode", mode],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired as expired:
+        raise ProbeHungError(
+            seed,
+            mode,
+            timeout_s,
+            report.captured_text(expired.stdout),
+            report.captured_text(expired.stderr),
+        ) from expired
     if completed.returncode != 0:
         raise ProbeRunError(
             f"seed {seed}, mode {mode} exited {completed.returncode}:\n{completed.stderr}"

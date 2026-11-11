@@ -49,6 +49,16 @@ OMPL_OUTPUT_KEY = "ompl_output_data"
 MOTION_PLANNING_NODE = "MotionPlanningTask"
 TRAJOPT_NODE = "TrajOptIfoptMotionPlannerTask"
 DEFAULT_OUT_DIR = Path("build/ompl_seed_report")
+# s: a child's time outside OMPL's capped solves (imports, plugin loading, TrajOptIfopt, clearance
+# scans): 3 x the worst whole-child pass seen (32.6, a first cold child on a loaded machine), 97.8
+# rounded up.
+CHILD_OVERHEAD_S = 100.0
+# s: both cases' OMPL stages, each capped at `planning_time`, plus the rest of the child.
+SEED_CHILD_TIMEOUT_S = 2 * example.PLANNING_TIME_S + CHILD_OVERHEAD_S
+GIT_COMMAND = ("git",)
+# s: one git call. 100 x the slowest seen (0.27, `git status` with warm caches, load 20 on 10
+# cores): cold caches are unmeasured, and this bound only costs the wait, 27 rounded up.
+GIT_TIMEOUT_S = 30.0
 
 COLUMNS = (
     ("seed", "seed"),
@@ -74,6 +84,31 @@ class UnplannedWaypointError(ValueError):
 
 class SeedRunError(RuntimeError):
     """A seed's child process failed."""
+
+
+class SeedHungError(SeedRunError):
+    """A seed's child process outlived its bound; `stdout` and `stderr` hold what it printed."""
+
+    def __init__(self, seed: int, timeout_s: float, stdout: str, stderr: str) -> None:
+        super().__init__(
+            f"seed {seed} still running after {timeout_s} s, killed.\n"
+            f"--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
+        )
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+class GitHungError(RuntimeError):
+    """A `git` child outlived its bound; `stdout` and `stderr` hold what it printed."""
+
+    def __init__(self, command: Sequence[str], timeout_s: float, stdout: str, stderr: str) -> None:
+        super().__init__(
+            f"{' '.join(command)} still running after {timeout_s} s, killed.\n"
+            f"--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
+        )
+        self.command = tuple(command)
+        self.stdout = stdout
+        self.stderr = stderr
 
 
 class TrajOptIterationCounter(SQPCallback):
@@ -213,16 +248,44 @@ def run_seed(seed: int) -> list[SeedRow]:
     return rows
 
 
-def report(seeds: Sequence[int]) -> list[SeedRow]:
-    """Run `run_seed` for each seed in its own process."""
+def captured_text(stream: bytes | str | None) -> str:
+    """A stream of `subprocess.TimeoutExpired` as text.
+
+    It holds bytes even with `text=True` where the parent reads the pipes itself, and a str on
+    Windows, where `subprocess.run` collects them after the kill.
+    """
+    if stream is None:
+        return ""
+    return stream.decode("utf-8", "replace") if isinstance(stream, bytes) else stream
+
+
+def report(seeds: Sequence[int], *, timeout_s: float = SEED_CHILD_TIMEOUT_S) -> list[SeedRow]:
+    """Run `run_seed` for each seed in its own process.
+
+    Args:
+        seeds: The seeds to run.
+        timeout_s: How long one seed's child may run (s).
+
+    Raises:
+        SeedHungError: A child outlived `timeout_s`.
+        SeedRunError: A child exited non-zero; the message carries its stderr.
+    """
     rows: list[SeedRow] = []
     for seed in seeds:
-        proc = subprocess.run(
-            [sys.executable, __file__, "--seed", str(seed), "--json"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            proc = subprocess.run(
+                # -u: what the child printed survives the kill.
+                [sys.executable, "-u", __file__, "--seed", str(seed), "--json"],
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired as expired:
+            raise SeedHungError(
+                seed, timeout_s, captured_text(expired.stdout), captured_text(expired.stderr)
+            ) from expired
         if proc.returncode != 0:
             raise SeedRunError(f"seed {seed} exited {proc.returncode}:\n{proc.stderr}")
         rows.extend(SeedRow(**row) for row in json.loads(proc.stdout.strip().splitlines()[-1]))
@@ -252,16 +315,35 @@ def to_markdown(rows: Sequence[SeedRow], *, commit: str, platform: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _commit() -> str:
-    head = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
-    ).stdout.strip()
-    dirty = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=no"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
+def _git_output(command: Sequence[str], timeout_s: float) -> str:
+    """Stripped stdout of one bounded `git` call.
+
+    Raises:
+        GitHungError: The call outlived `timeout_s`.
+        subprocess.CalledProcessError: The call exited non-zero.
+    """
+    try:
+        return subprocess.run(
+            command, capture_output=True, text=True, check=True, timeout=timeout_s
+        ).stdout.strip()
+    except subprocess.TimeoutExpired as expired:
+        raise GitHungError(
+            command, timeout_s, captured_text(expired.stdout), captured_text(expired.stderr)
+        ) from expired
+
+
+def _commit(*, git: Sequence[str] = GIT_COMMAND, timeout_s: float = GIT_TIMEOUT_S) -> str:
+    """The short HEAD, with `+dirty` when a tracked file changed.
+
+    Args:
+        git: The command that runs git.
+        timeout_s: How long each git call may run (s).
+
+    Raises:
+        GitHungError: A call outlived `timeout_s`.
+    """
+    head = _git_output([*git, "rev-parse", "--short", "HEAD"], timeout_s)
+    dirty = _git_output([*git, "status", "--porcelain", "--untracked-files=no"], timeout_s)
     return f"{head}+dirty" if dirty else head
 
 

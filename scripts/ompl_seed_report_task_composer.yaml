@@ -7,8 +7,8 @@
 # OMPL program to TrajOptIfopt in place under `output_data`, where TrajOptIfopt overwrites
 # it; here OMPLMotionPlannerTask writes `ompl_output_data` and TrajOptIfoptMotionPlannerTask
 # reads it, so the OMPL program stays in FreespaceIfoptOMPLOutputTask's data storage after
-# the run. tests/scripts/test_ompl_seed_report.py checks that the final program is
-# bit-identical to stock FreespaceIfoptPipeline's on a fixed seed.
+# the run. tests/scripts/test_ompl_seed_report.py parses this file against stock and checks
+# that the final program is bit-identical to stock FreespaceIfoptPipeline's on a fixed seed.
 task_composer_plugins:
   search_paths:
     - /usr/local/lib
