@@ -153,10 +153,11 @@ class PlanningResult:
 
 
 # What a pipeline's ErrorTask, the pipeline node, and every composite a failure propagates
-# through report. The node that actually failed carries its own, specific message.
-ABORT_PROPAGATION_MESSAGE = "Error (Abort Triggered)"
-# TaskComposerNodeInfo.status_code of a node that took its failure branch.
-FAILED_STATUS_CODE = 0
+# through report: "Error (Abort Triggered)" after a node took its failure branch, "Aborted" after a
+# node threw. The node that actually failed carries its own, specific message.
+ABORT_PROPAGATION_MESSAGES: Final = frozenset({"Error (Abort Triggered)", "Aborted"})
+# TaskComposerNodeInfo.status_code of a node that failed: 0 took its failure branch, -1 threw.
+FAILED_STATUS_CODES: Final = frozenset({0, -1})
 
 
 def _failure_message(
@@ -165,7 +166,7 @@ def _failure_message(
     """Name the node that failed, not the ErrorTask a pipeline routes every failure into.
 
     When a node fails, the pipeline triggers an abort, and its ErrorTask, the pipeline itself and each
-    composite on the way up all report "Error (Abort Triggered)". The informative message — a planner
+    composite on the way up all report "Error (Abort Triggered)" (or "Aborted" when the node threw). The informative message — a planner
     that ran out of iterations, a contact check that found a collision — is on the node that failed.
     Reporting the aborting node alone returned "ErrorTask: Error (Abort Triggered)" for a TrajOpt
     solve that had ended at OPT_SCO_ITERATION_LIMIT.
@@ -183,9 +184,9 @@ def _failure_message(
     specific = sorted(
         f"{info.name}: {info.status_message}"
         for info in infos
-        if info.status_code == FAILED_STATUS_CODE
+        if info.status_code in FAILED_STATUS_CODES
         and info.status_message
-        and info.status_message != ABORT_PROPAGATION_MESSAGE
+        and info.status_message not in ABORT_PROPAGATION_MESSAGES
     )
     if specific:
         return "; ".join(specific)
