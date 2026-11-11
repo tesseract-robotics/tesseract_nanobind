@@ -99,7 +99,15 @@ jobs:
         fetch-depth: 0  # setuptools-scm derives the version from the tag history
     - name: apt
       # Only the toolchain and the tools vcpkg ports need; all libraries come from vcpkg
+      # The x64 runners' apt-mirrors.txt lists azure.archive.ubuntu.com first; when that name
+      # stops resolving (2026-11-11 outage) apt fails instead of falling over to the next entry.
+      # Drop the Azure mirror so apt goes to archive.ubuntu.com directly, and retry transient fetches.
       run: >
+        if [ -f /etc/apt/apt-mirrors.txt ]; then
+        sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt &&
+        { grep -q '//archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt ||
+        echo 'http://archive.ubuntu.com/ubuntu/' | sudo tee -a /etc/apt/apt-mirrors.txt >/dev/null; }; fi &&
+        echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null &&
         sudo apt-get update -qq &&
         sudo apt-get install python3-pip python3-venv python3-dev git cmake ninja-build
         build-essential pkg-config curl zip unzip tar autoconf autoconf-archive automake
