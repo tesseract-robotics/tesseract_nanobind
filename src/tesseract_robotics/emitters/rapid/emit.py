@@ -9,7 +9,7 @@ keeps the public ``emit_rapid`` signature and re-exports the error names that
 
 from __future__ import annotations
 
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
+from tesseract_robotics.command_language import CompositeInstruction
 
 from ..core.backend import drive
 from ..core.errors import EmitterError as EmitterError

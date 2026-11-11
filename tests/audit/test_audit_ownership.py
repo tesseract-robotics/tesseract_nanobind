@@ -57,7 +57,7 @@ def test_unaudited_pattern_matches_below_the_longest_prefix():
 
 
 def test_duplicate_prefix_raises(monkeypatch):
-    monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "tesseract_srdf", ("tesseract/common/",))
+    monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "srdf", ("tesseract/common/",))
     with pytest.raises(own.DuplicatePrefixError, match="tesseract/common/"):
         own.owner_prefixes()
 
@@ -85,21 +85,21 @@ def test_unclassified_module_raises():
 
 
 def test_module_in_both_tables_raises(monkeypatch):
-    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_srdf", ("x", ("tesseract/srdf/",)))
-    with pytest.raises(own.ConflictingCoverageError, match="tesseract_srdf"):
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "srdf", ("x", ("tesseract/srdf/",)))
+    with pytest.raises(own.ConflictingCoverageError, match="srdf"):
         own.check_coverage(own.binding_modules())
 
 
 def test_table_entry_that_is_not_a_binding_raises():
-    modules = [m for m in own.binding_modules() if m != "tesseract_srdf"]
-    with pytest.raises(own.UnknownModuleError, match="tesseract_srdf"):
+    modules = [m for m in own.binding_modules() if m != "srdf"]
+    with pytest.raises(own.UnknownModuleError, match="srdf"):
         own.check_coverage(modules)
 
 
 def test_unaudited_module_raises_with_its_reason(monkeypatch):
-    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_srdf", ("Binds a probe.", ()))
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "srdf", ("Binds a probe.", ()))
     with pytest.raises(own.UnauditedModuleError, match="Binds a probe"):
-        audit.resolve_module("tesseract_srdf")
+        audit.resolve_module("srdf")
 
 
 def test_main_checks_coverage_before_parsing(monkeypatch):
@@ -121,7 +121,7 @@ def test_main_checks_coverage_before_parsing(monkeypatch):
 def test_owner_prefixes_come_from_the_tables_only():
     """No `tesseract/<x>/` guess: every binding module's prefixes are stated in a table."""
     prefixes = own.owner_prefixes()
-    assert prefixes["tesseract_motion_planners_simple"] == ("tesseract/motion_planners/simple/",)
+    assert prefixes["motion_planners_simple"] == ("tesseract/motion_planners/simple/",)
     assert prefixes["trajopt_ifopt"] == ("trajopt_ifopt/", "trajopt_common/")
     assert set(prefixes) == set(own.binding_modules())
 
@@ -143,7 +143,7 @@ def test_parent_never_audits_a_directly_included_nested_header():
 
 def test_prefix_without_trailing_slash_raises(monkeypatch):
     """`tesseract/motion_planners` would also own `tesseract/motion_planners_x/`."""
-    monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "tesseract_srdf", ("tesseract/srdf",))
+    monkeypatch.setitem(own.AUDITED_HEADER_PREFIX, "srdf", ("tesseract/srdf",))
     with pytest.raises(own.MalformedPrefixError, match="tesseract/srdf"):
         own.owner_prefixes()
 
@@ -154,8 +154,8 @@ def test_real_prefixes_end_with_a_slash():
 
 def test_owner_prefixes_refuses_a_module_in_both_tables(monkeypatch):
     """`owner_prefixes` does not rely on `check_coverage` having run first."""
-    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_srdf", ("x", ("tesseract/srdf/",)))
-    with pytest.raises(own.ConflictingCoverageError, match="tesseract_srdf"):
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "srdf", ("x", ("tesseract/srdf/",)))
+    with pytest.raises(own.ConflictingCoverageError, match="srdf"):
         own.owner_prefixes()
 
 
@@ -166,11 +166,11 @@ def test_coverage_counts_the_binding_modules():
 def test_unaudited_rows_ordered_by_reason_then_name(monkeypatch):
     """Rows sort by reason, then module; every binding module is audited, so these are probes."""
     assert own.coverage().unaudited == {}
-    for module in ("tesseract_srdf", "tesseract_urdf"):
+    for module in ("srdf", "urdf"):
         monkeypatch.delitem(own.AUDITED_HEADER_PREFIX, module)
-    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_urdf", ("a", ()))
-    monkeypatch.setitem(own.UNAUDITED_MODULES, "tesseract_srdf", ("b", ()))
-    assert list(own.coverage().unaudited) == ["tesseract_urdf", "tesseract_srdf"]
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "urdf", ("a", ()))
+    monkeypatch.setitem(own.UNAUDITED_MODULES, "srdf", ("b", ()))
+    assert list(own.coverage().unaudited) == ["urdf", "srdf"]
 
 
 CLASH = {
@@ -215,3 +215,28 @@ def test_audit_tu_refuses_a_prefix_that_disagrees_with_prefixes(monkeypatch):
             (FIXTURE_INCLUDE,),
             prefixes={"fixture": ("tesseract/other/",)},
         )
+
+
+def test_binding_modules_are_the_sources_in_src_bindings():
+    """One module per `src/bindings/<module>.cpp`; the sources linked into a module are not."""
+    modules = own.binding_modules()
+    assert "collision" in modules and "trajopt_sqp" in modules
+    assert not set(own.NON_MODULE_SOURCES) & set(modules)
+    assert all(own.binding_source(m).is_file() for m in modules)
+    assert all((own.BINDINGS_DIR / f"{s}.cpp").is_file() for s in own.NON_MODULE_SOURCES)
+
+
+def test_compiled_module_is_its_own_stub():
+    """`tesseract_robotics.collision` is the extension: `collision.pyi`, no package `__init__`."""
+    assert own.committed_stub("collision") == own.STUB_ROOT / "collision.pyi"
+    assert own.package_init("collision") is None
+
+
+def test_wrapped_module_stub_sits_in_its_package():
+    """`tesseract_robotics.common` is a package around the extension `_common`."""
+    assert own.committed_stub("common") == own.STUB_ROOT / "common" / "_common.pyi"
+    assert own.package_init("common") == own.STUB_ROOT / "common" / "__init__.py"
+
+
+def test_every_binding_module_has_a_committed_stub():
+    assert all(own.committed_stub(m).is_file() for m in own.binding_modules())

@@ -177,7 +177,7 @@ that set when its solve returns.
 | `ContinuousCollisionEvaluator` | Base class | |
 
 Set the type with `config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE`
-(`CollisionEvaluatorType` is in `tesseract_robotics.tesseract_collision`).
+(`CollisionEvaluatorType` is in `tesseract_robotics.collision`).
 
 `CollisionCache` was removed in 0.34 — caching is internal to each evaluator.
 
@@ -239,6 +239,19 @@ directly (see [changes](../changes.md)).
 numerical = calcNumericalConstraintGradient(nodes_variables, my_constraint)
 assert np.allclose(numerical.toarray(), my_constraint.getJacobian().toarray(), atol=1e-6)
 ```
+
+## Python-defined rules
+
+`tesseract_robotics.trajopt_ifopt.python_constraints` holds `PyConstraint`, a `ConstraintSet`
+base for a rule written as `f(q)` on one waypoint's joints, and the rules built on it; see
+[`PyConstraint`: a rule from `f(q)`](../user-guide/low-level-sqp.md#pyconstraint-a-rule-from-fq).
+
+::: tesseract_robotics.trajopt_ifopt.python_constraints
+    options:
+      show_root_heading: true
+      show_source: true
+      members_order: source
+      heading_level: 3
 
 ## Module API
 

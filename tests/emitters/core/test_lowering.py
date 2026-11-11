@@ -5,6 +5,18 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from tesseract_robotics.command_language import (
+    CartesianWaypoint,
+    CartesianWaypointPoly,
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly,
+    MoveInstructionType,
+    SetToolInstruction,
+    TimerInstruction,
+    TimerInstructionType,
+    WaitInstruction,
+)
 from tesseract_robotics.emitters.core.errors import (
     EmptyProgramError,
     UnsupportedInstructionError,
@@ -18,18 +30,6 @@ from tesseract_robotics.emitters.core.events import (
 )
 from tesseract_robotics.emitters.core.lowering import lower
 from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_command_language import (
-    CartesianWaypoint,
-    CartesianWaypointPoly,
-    CompositeInstruction,
-    MoveInstruction,
-    MoveInstructionPoly,
-    MoveInstructionType,
-    SetToolInstruction,
-    TimerInstruction,
-    TimerInstructionType,
-    WaitInstruction,
-)
 
 
 def _cart_move(pose, move_type=MoveInstructionType.LINEAR, profile="P"):

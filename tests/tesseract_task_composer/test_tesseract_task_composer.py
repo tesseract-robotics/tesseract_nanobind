@@ -11,12 +11,12 @@ import yaml
 
 import tesseract_robotics
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     PluginInfo,
     ResourceLocator,
 )
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     TaskComposerNodeInfo,
     TaskComposerNodeInfoContainer,
     TaskComposerPluginFactory,
@@ -101,7 +101,7 @@ class TestTaskComposerPluginFactory:
 
     def test_future_wait_for_returns_future_status(self):
         """waitFor returns a bound FutureStatus, not an unconvertible std::future_status."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             FutureStatus,
             TaskComposerDataStorage,
         )
@@ -267,9 +267,9 @@ _NODE_OUTLIVES_FACTORY_SCRIPT = """
 import gc
 import tesseract_robotics
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import (
     TaskComposerDataStorage, TaskComposerPluginFactory,
 )
 config = tesseract_robotics.get_task_composer_config_path()
@@ -376,7 +376,7 @@ class TestAnyPolyDataStorage:
     that the framework nests under a parent's data_storage keyed by node UUID."""
 
     def test_anypoly_wrap_data_storage_not_null(self):
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_wrap_TaskComposerDataStorage,
             TaskComposerDataStorage,
         )
@@ -388,7 +388,7 @@ class TestAnyPolyDataStorage:
 
     def test_anypoly_roundtrip_data_storage(self):
         """Wrap a DataStorage in AnyPoly, unwrap, confirm we got the same instance back."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_as_TaskComposerDataStorage,
             AnyPoly_wrap_TaskComposerDataStorage,
             TaskComposerDataStorage,
@@ -410,10 +410,10 @@ class TestAnyPolyDataStorage:
         UUID key; navigate parent.getData(uuid) -> as_TaskComposerDataStorage ->
         getData('input_data') to recover the mid-pipeline AnyPoly that the
         framework would have placed there (e.g. RasterSimple's densified output)."""
-        from tesseract_robotics.tesseract_command_language import (
+        from tesseract_robotics.command_language import (
             CompositeInstruction,
         )
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_as_CompositeInstruction,
             AnyPoly_as_TaskComposerDataStorage,
             AnyPoly_wrap_CompositeInstruction,
@@ -436,7 +436,7 @@ class TestAnyPolyDataStorage:
     def test_unwrap_null_anypoly_raises(self):
         """A null AnyPoly cannot be unwrapped — verify the binding surfaces the error
         rather than returning a silently-null shared_ptr."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly,
             AnyPoly_as_TaskComposerDataStorage,
         )
@@ -459,13 +459,13 @@ class TestCreateRaisesOnFailure:
     """createTaskComposerNode / createTaskComposerExecutor raise instead of returning None (gh-203)."""
 
     def test_error_is_a_runtime_error(self):
-        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+        from tesseract_robotics.task_composer import TaskComposerPluginError
 
         assert issubclass(TaskComposerPluginError, RuntimeError)
         assert TaskComposerPluginError.__doc__
 
     def test_unknown_node_raises_naming_configured_plugins(self):
-        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+        from tesseract_robotics.task_composer import TaskComposerPluginError
 
         factory = TaskComposerPluginFactory(
             _resolve_task_composer_config(),
@@ -476,7 +476,7 @@ class TestCreateRaisesOnFailure:
         assert "TrajOptPipeline" in str(exc.value)
 
     def test_unknown_executor_raises_naming_configured_plugins(self):
-        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+        from tesseract_robotics.task_composer import TaskComposerPluginError
 
         factory = TaskComposerPluginFactory(
             _resolve_task_composer_config(),
@@ -500,7 +500,7 @@ class TestCreateRaisesOnFailure:
 
     def test_configured_node_that_cannot_build_raises(self, tmp_path):
         """TrajOptPipeline without its TrajOptTask sibling is configured but cannot build."""
-        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+        from tesseract_robotics.task_composer import TaskComposerPluginError
 
         config = _config_with_only(tmp_path, "TrajOptPipeline")
         factory = TaskComposerPluginFactory(
@@ -510,7 +510,7 @@ class TestCreateRaisesOnFailure:
             factory.createTaskComposerNode("TrajOptPipeline")
 
     def test_exported_from_package(self):
-        from tesseract_robotics import tesseract_task_composer
+        from tesseract_robotics import task_composer as tesseract_task_composer
 
         assert hasattr(tesseract_task_composer, "TaskComposerPluginError")
 
@@ -521,7 +521,7 @@ class TestAnyPolyEnvironment:
     def test_anypoly_wrap_environment_const(self):
         """Wrap an Environment in AnyPoly for TaskComposerDataStorage."""
         from tesseract_robotics.planning import Robot
-        from tesseract_robotics.tesseract_task_composer import AnyPoly_wrap_EnvironmentConst
+        from tesseract_robotics.task_composer import AnyPoly_wrap_EnvironmentConst
 
         robot = Robot.from_tesseract_support(
             "lbr_iiwa_14_r820", GeneralResourceLocator(paths=[get_tesseract_resource_path()])
@@ -535,7 +535,7 @@ class TestGetAllData:
     {key: AnyPoly} map of stored entries."""
 
     def test_empty_storage_returns_empty_dict(self):
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             TaskComposerDataStorage,
         )
 
@@ -543,8 +543,8 @@ class TestGetAllData:
         assert ds.getData() == {}
 
     def test_returns_all_keys_set(self):
-        from tesseract_robotics.tesseract_command_language import CompositeInstruction
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.command_language import CompositeInstruction
+        from tesseract_robotics.task_composer import (
             AnyPoly_wrap_CompositeInstruction,
             TaskComposerDataStorage,
         )
@@ -559,8 +559,8 @@ class TestGetAllData:
 
     def test_values_roundtrip_through_anypoly(self):
         """Values returned by getData() are AnyPolys with intact payloads."""
-        from tesseract_robotics.tesseract_command_language import CompositeInstruction
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.command_language import CompositeInstruction
+        from tesseract_robotics.task_composer import (
             AnyPoly_as_CompositeInstruction,
             AnyPoly_wrap_CompositeInstruction,
             TaskComposerDataStorage,
@@ -580,8 +580,8 @@ class TestAnyPolyAsContactResultMapVector:
     test below."""
 
     def test_wrong_typed_anypoly_raises(self):
-        from tesseract_robotics.tesseract_command_language import CompositeInstruction
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.command_language import CompositeInstruction
+        from tesseract_robotics.task_composer import (
             AnyPoly_as_ContactResultMapVector,
             AnyPoly_wrap_CompositeInstruction,
         )
@@ -591,7 +591,7 @@ class TestAnyPolyAsContactResultMapVector:
             AnyPoly_as_ContactResultMapVector(ap)
 
     def test_null_anypoly_raises(self):
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly,
             AnyPoly_as_ContactResultMapVector,
         )
@@ -619,6 +619,13 @@ class TestPipelineDataStorageExposure:
 
         config_file = _resolve_task_composer_config()
 
+        from tesseract_robotics.collision import (
+            CollisionEvaluatorType,
+            ContactManagerConfig,
+        )
+        from tesseract_robotics.motion_planners import (
+            assignCurrentStateAsSeed,
+        )
         from tesseract_robotics.planning import (
             JointTarget,
             MotionProgram,
@@ -628,20 +635,13 @@ class TestPipelineDataStorageExposure:
         from tesseract_robotics.planning.profiles import (
             create_freespace_pipeline_profiles,
         )
-        from tesseract_robotics.tesseract_collision import (
-            CollisionEvaluatorType,
-            ContactManagerConfig,
-        )
-        from tesseract_robotics.tesseract_motion_planners import (
-            assignCurrentStateAsSeed,
-        )
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_wrap_CompositeInstruction,
             AnyPoly_wrap_EnvironmentConst,
             AnyPoly_wrap_ProfileDictionary,
             TaskComposerDataStorage,
         )
-        from tesseract_robotics.tesseract_task_composer_planning import (
+        from tesseract_robotics.task_composer_planning import (
             ContactCheckProfile,
         )
 
@@ -698,7 +698,7 @@ class TestPipelineDataStorageExposure:
         """DiscreteContactCheckTask, on a colliding trajectory, stores the per-step
         results under 'contact_results' on its node info's data_storage;
         AnyPoly_as_ContactResultMapVector unwraps that to list[ContactResultMap]."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_as_ContactResultMapVector,
         )
 

@@ -14,11 +14,11 @@ import pytest
 _SHAPES = """
 import os
 from pathlib import Path
-from tesseract_robotics.tesseract_collision import ContactManagersPluginFactory
+from tesseract_robotics.collision import ContactManagersPluginFactory
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
-from tesseract_robotics.tesseract_geometry import Box
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.geometry import Box
 cfg = get_tesseract_support_path() / "urdf" / "contact_manager_plugins.yaml"
 factory = ContactManagersPluginFactory(cfg, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))
 manager = factory.create{kind}ContactManager("{plugin}")
@@ -31,19 +31,19 @@ _VARS = """
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 call = lambda: ti.{cls}(np.zeros(2), [None] * 6, np.ones(1), "c")  # jerk needs >= 6
 """
 
 CASES = {
     "CombinedContactAllowedValidator": (
-        "from tesseract_robotics.tesseract_common import (\n"
+        "from tesseract_robotics.common import (\n"
         "    CombinedContactAllowedValidator, CombinedContactAllowedValidatorType)\n"
         "call = lambda: CombinedContactAllowedValidator([None], CombinedContactAllowedValidatorType.AND)\n",
         "validators[0]",
     ),
     "CompoundMesh": (
-        "from tesseract_robotics.tesseract_geometry import CompoundMesh\n"
+        "from tesseract_robotics.geometry import CompoundMesh\n"
         "call = lambda: CompoundMesh([None, None])  # upstream needs more than one mesh\n",
         "meshes[0]",
     ),

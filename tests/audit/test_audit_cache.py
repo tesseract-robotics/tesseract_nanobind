@@ -1,43 +1,33 @@
 """Contract tests of the fact cache (`scripts/audit_cache.py`): a hit only when every file the
 parse read is byte-identical, one computation per key across processes, loud on a bad entry.
 
-Loads `audit_cache` alone: it needs no libclang, so these tests run in any env.
+Needs no libclang (`_free`), so these tests run in any env.
 """
 
-import importlib.util
+import dataclasses
 import multiprocessing
 import os
-import sys
 import time
 from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parent.parent.parent / "scripts" / "audit_cache.py"
+from ._free import load_free
+
+ac = load_free("audit_cache")
+tc = load_free("audit_toolchain")
 
 
-def _load_cache_module():
-    if "audit_cache" in sys.modules:
-        return sys.modules["audit_cache"]
-    spec = importlib.util.spec_from_file_location("audit_cache", SCRIPT)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["audit_cache"] = module  # dataclasses resolve annotations via sys.modules
-    spec.loader.exec_module(module)
-    return module
-
-
-ac = _load_cache_module()
-
-
-def _load_prune_cli():
-    """The prune CLI; it imports `audit_cache`, which `_load_cache_module` registered."""
-    path = SCRIPT.with_name("audit_cache_prune.py")
-    spec = importlib.util.spec_from_file_location("audit_cache_prune", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def toolchain(tag: str = "t0") -> "tc.Toolchain":
+    """A toolchain that differs from another only by `tag`."""
+    return tc.Toolchain.build(
+        args=(tag,),
+        options=0,
+        env=tc.digest_of("env"),
+        search_env={},
+        repo_dirs={},
+        extractors=tc.digest_of("extractors"),
+    )
 
 
 class Counter:
@@ -62,8 +52,8 @@ def tree(tmp_path):
     return src
 
 
-def key(source: Path, toolchain: str = "t0") -> "ac.FactKey":
-    return ac.FactKey(kind="decl", source=source, toolchain=toolchain)
+def key(source: Path, tag: str = "t0") -> "ac.FactKey":
+    return ac.FactKey(kind="decl", source=source, toolchain=toolchain(tag))
 
 
 def test_miss_computes_and_a_hit_does_not(tmp_path, tree):
@@ -125,9 +115,9 @@ def test_another_toolchain_is_another_entry(tmp_path, tree):
 def test_kind_and_source_are_part_of_the_key(tmp_path, tree):
     cache = ac.FactCache(tmp_path / "cache")
     compute = Counter("v", [tree / "a.h"])
-    cache.fetch(ac.FactKey("decl", tree / "a.h", "t"), compute)
-    cache.fetch(ac.FactKey("bound", tree / "a.h", "t"), compute)
-    cache.fetch(ac.FactKey("decl", tree / "b.h", "t"), compute)
+    cache.fetch(ac.FactKey("decl", tree / "a.h", toolchain()), compute)
+    cache.fetch(ac.FactKey("bound", tree / "a.h", toolchain()), compute)
+    cache.fetch(ac.FactKey("decl", tree / "b.h", toolchain()), compute)
     assert compute.calls == 3
 
 
@@ -173,40 +163,28 @@ def test_digest_is_stable_across_processes(tmp_path, tree):
     """The digest names the entry on disk: it must not depend on `hash()` randomisation."""
     k = key(tree / "a.h")
     with multiprocessing.get_context("spawn").Pool(1) as pool:
-        other = pool.apply(_digest_in_child, (str(SCRIPT), str(tree / "a.h")))
+        other = pool.apply(_digest_in_child, (str(tree / "a.h"),))
     assert other == k.digest()
 
 
-def _digest_in_child(script: str, source: str) -> str:
-    spec = importlib.util.spec_from_file_location("audit_cache", script)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["audit_cache"] = module
-    spec.loader.exec_module(module)
-    return module.FactKey(kind="decl", source=Path(source), toolchain="t0").digest()
+def _digest_in_child(source: str) -> str:
+    return key(Path(source)).digest()
 
 
-def _fetch_in_child(script: str, root: str, source: str, dep: str, log: str) -> object:
-    spec = importlib.util.spec_from_file_location("audit_cache", script)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["audit_cache"] = module
-    spec.loader.exec_module(module)
-
+def _fetch_in_child(root: str, source: str, dep: str, log: str) -> object:
     def compute():
         with Path(log).open("a", encoding="utf-8") as f:
             f.write("x")
         time.sleep(0.5)  # long enough that an unlocked second worker would also compute
         return "v", [Path(dep)]
 
-    k = module.FactKey(kind="decl", source=Path(source), toolchain="t0")
-    return module.FactCache(Path(root)).fetch(k, compute)
+    return ac.FactCache(Path(root)).fetch(key(Path(source)), compute)
 
 
 def test_concurrent_workers_compute_once(tmp_path, tree):
     """xdist workers asking for one fact at once: one parses, the others wait and read."""
     log = tmp_path / "calls.log"
-    args = (str(SCRIPT), str(tmp_path / "cache"), str(tree / "a.h"), str(tree / "a.h"), str(log))
+    args = (str(tmp_path / "cache"), str(tree / "a.h"), str(tree / "a.h"), str(log))
     with multiprocessing.get_context("spawn").Pool(3) as pool:
         results = pool.starmap(_fetch_in_child, [args] * 3)
     assert results == ["v", "v", "v"]
@@ -225,6 +203,48 @@ def test_prune_command_keeps_what_the_run_used(tmp_path, tree):
     os.utime(stamp, ns=(10**18, 10**18))
     os.utime(cache.entry_path(unused), ns=(1, 1))
     os.utime(cache.entry_path(used), ns=(2 * 10**18, 2 * 10**18))
-    assert _load_prune_cli().main([str(root), str(stamp)]) == 0
+    assert load_free("audit_cache_prune").main([str(root), str(stamp)]) == 0
     assert not cache.entry_path(unused).exists()
     assert cache.entry_path(used).exists()
+
+
+def _selection(*audited: str) -> "tc.Selection":
+    return tc.Selection.build(
+        audited=[Path(a) for a in audited],
+        not_api=[],
+        dependency_roots=[],
+        dependency_namespaces=[],
+    )
+
+
+def test_unsaved_text_is_part_of_the_key(tmp_path):
+    source = tmp_path / "a_unincluded_headers.cpp"
+    plain = ac.FactKey(kind="api", source=source, toolchain=toolchain())
+    digests = {
+        dataclasses.replace(plain, unsaved=text).digest()
+        for text in (None, "", "#include <a.h>\n", "#include <b.h>\n")
+    }
+    assert len(digests) == 4
+
+
+def test_the_selection_is_part_of_the_key(tmp_path):
+    plain = ac.FactKey(kind="api", source=tmp_path / "a.cpp", toolchain=toolchain())
+    digests = {
+        dataclasses.replace(plain, selection=s).digest()
+        for s in (None, _selection(), _selection("/inc/a.h"), _selection("/inc/b.h"))
+    }
+    assert len(digests) == 4
+
+
+def test_an_unsaved_main_file_is_no_dependency(tmp_path, tree):
+    """A synthetic TU's main file is not on disk: its text is in the key, each text an entry."""
+    cache = ac.FactCache(tmp_path / "cache")
+    source = tree / "a_unincluded_headers.cpp"
+    compute = Counter("v", [tree / "a.h"])
+    one = ac.FactKey(kind="api", source=source, toolchain=toolchain(), unsaved="#include <a.h>\n")
+    two = dataclasses.replace(one, unsaved="#include <b.h>\n")
+    cache.fetch(one, compute)
+    cache.fetch(one, compute)
+    assert compute.calls == 1
+    cache.fetch(two, compute)
+    assert compute.calls == 2

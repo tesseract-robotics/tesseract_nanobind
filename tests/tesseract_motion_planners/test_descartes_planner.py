@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_collision import ACMOverrideType, ContactManagerConfig
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.collision import ACMOverrideType, ContactManagerConfig
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -20,7 +20,7 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     AngleAxisd,
     GeneralResourceLocator,
@@ -30,10 +30,10 @@ from tesseract_robotics.tesseract_common import (
     Translation3d,
     VectorIsometry3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import KinematicGroup
-from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_descartes import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import KinematicGroup
+from tesseract_robotics.motion_planners import MotionPlanner, PlannerRequest
+from tesseract_robotics.motion_planners_descartes import (
     DescartesDefaultMoveProfileD,
     DescartesEdgeEvaluatorD,
     DescartesLadderGraphSolverProfileD,
@@ -50,7 +50,7 @@ from tesseract_robotics.tesseract_motion_planners_descartes import (
     sampleToolYAxis,
     sampleToolZAxis,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
 
 DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 
@@ -524,16 +524,16 @@ CHILD_TIMEOUT_S = 60.0
 _KINEMATIC_GROUP_KEEPS_ENV_ALIVE = textwrap.dedent(
     """
     from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.common import GeneralResourceLocator
     import gc
     from pathlib import Path
 
     import numpy as np
 
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-    from tesseract_robotics.tesseract_environment import Environment
-    from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
-    from tesseract_robotics.tesseract_motion_planners_descartes import DescartesDefaultMoveProfileD
+    from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.environment import Environment
+    from tesseract_robotics.kinematics import KinGroupIKInput
+    from tesseract_robotics.motion_planners_descartes import DescartesDefaultMoveProfileD
 
     locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
     support = "package://tesseract/support/urdf/abb_irb2400"

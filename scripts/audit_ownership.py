@@ -12,9 +12,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src"
 STUB_ROOT = SRC / "tesseract_robotics"
 
-# One extension module per binding TU: src/<module>/<module>_bindings.cpp.
-# tests/scripts/test_generate_stubs.py pins this set == generate_stubs.discover_modules().
-BINDING_GLOB = "*/*_bindings.cpp"
+# One extension module per binding TU: src/bindings/<module>.cpp, except the helper sources in
+# NON_MODULE_SOURCES. tests/scripts/test_generate_stubs.py pins this set ==
+# generate_stubs.discover_modules().
+BINDINGS_DIR = SRC / "bindings"
+BINDING_GLOB = "*.cpp"
+# Sources in src/bindings/ that are linked into a module, not a module of their own.
+NON_MODULE_SOURCES = frozenset(
+    {"serialization_planner_cereal_registration", "task_composer_plugin_pinning"}
+)
 
 # Directly included headers under these prefixes (relative to an include dir) are a module's
 # audited API; every other declaration in the TU only resolves Python names. Explicit per
@@ -24,48 +30,48 @@ BINDING_GLOB = "*/*_bindings.cpp"
 # The core modules audited before #256.
 CORE_MODULES = frozenset(
     {
-        "tesseract_collision",
-        "tesseract_common",
-        "tesseract_environment",
-        "tesseract_geometry",
-        "tesseract_kinematics",
-        "tesseract_scene_graph",
-        "tesseract_serialization",
-        "tesseract_srdf",
-        "tesseract_state_solver",
-        "tesseract_urdf",
+        "collision",
+        "common",
+        "environment",
+        "geometry",
+        "kinematics",
+        "scene_graph",
+        "serialization",
+        "srdf",
+        "state_solver",
+        "urdf",
     }
 )
 AUDITED_HEADER_PREFIX: dict[str, tuple[str, ...]] = {
-    "tesseract_collision": ("tesseract/collision/",),
-    "tesseract_command_language": ("tesseract/command_language/",),
-    "tesseract_common": ("tesseract/common/",),
-    "tesseract_environment": ("tesseract/environment/",),
-    "tesseract_geometry": ("tesseract/geometry/",),
-    "tesseract_kinematics": ("tesseract/kinematics/",),
-    "tesseract_scene_graph": ("tesseract/scene_graph/",),
+    "collision": ("tesseract/collision/",),
+    "command_language": ("tesseract/command_language/",),
+    "common": ("tesseract/common/",),
+    "environment": ("tesseract/environment/",),
+    "geometry": ("tesseract/geometry/",),
+    "kinematics": ("tesseract/kinematics/",),
+    "scene_graph": ("tesseract/scene_graph/",),
     # No such directory: the module wraps templates in other modules' headers, so it audits
     # only the foreign headers it is the first binding to #include (`header_auditor`).
-    "tesseract_serialization": ("tesseract/serialization/",),
-    "tesseract_srdf": ("tesseract/srdf/",),
-    "tesseract_state_solver": ("tesseract/state_solver/",),
-    "tesseract_task_composer": ("tesseract/task_composer/",),
-    "tesseract_task_composer_planning": ("tesseract/task_composer/planning/",),
-    "tesseract_time_parameterization": ("tesseract/time_parameterization/",),
-    "tesseract_urdf": ("tesseract/urdf/",),
-    "tesseract_motion_planners": ("tesseract/motion_planners/",),
-    "tesseract_motion_planners_simple": ("tesseract/motion_planners/simple/",),
-    "tesseract_motion_planners_ompl": ("tesseract/motion_planners/ompl/",),
+    "serialization": ("tesseract/serialization/",),
+    "srdf": ("tesseract/srdf/",),
+    "state_solver": ("tesseract/state_solver/",),
+    "task_composer": ("tesseract/task_composer/",),
+    "task_composer_planning": ("tesseract/task_composer/planning/",),
+    "time_parameterization": ("tesseract/time_parameterization/",),
+    "urdf": ("tesseract/urdf/",),
+    "motion_planners": ("tesseract/motion_planners/",),
+    "motion_planners_simple": ("tesseract/motion_planners/simple/",),
+    "motion_planners_ompl": ("tesseract/motion_planners/ompl/",),
     # Classic TrajOpt: its SQP layer (`trajopt_sco/`) and problem description (`trajopt/`)
     # are reached only through this planner (spec D2).
-    "tesseract_motion_planners_trajopt": (
+    "motion_planners_trajopt": (
         "tesseract/motion_planners/trajopt/",
         "trajopt_sco/",
         "trajopt/",
     ),
-    "tesseract_motion_planners_trajopt_ifopt": ("tesseract/motion_planners/trajopt_ifopt/",),
+    "motion_planners_trajopt_ifopt": ("tesseract/motion_planners/trajopt_ifopt/",),
     # descartes_light, the graph-search library behind this planner (spec D2).
-    "tesseract_motion_planners_descartes": (
+    "motion_planners_descartes": (
         "tesseract/motion_planners/descartes/",
         "descartes_light/",
     ),
@@ -352,17 +358,33 @@ class UnknownPrefixError(LookupError):
 
 def binding_modules() -> list[str]:
     """Short names of all binding modules, sorted."""
-    return sorted(p.parent.name for p in SRC.glob(BINDING_GLOB))
+    return sorted(
+        p.stem for p in BINDINGS_DIR.glob(BINDING_GLOB) if p.stem not in NON_MODULE_SOURCES
+    )
 
 
 def binding_source(module: str) -> Path:
-    """`tesseract_collision` → `src/tesseract_collision/tesseract_collision_bindings.cpp`."""
-    return SRC / module / f"{module}_bindings.cpp"
+    """`collision` → `src/bindings/collision.cpp`."""
+    return BINDINGS_DIR / f"{module}.cpp"
+
+
+def package_init(module: str) -> Path | None:
+    """The `__init__.py` of a wrapped module's package, or None for a module that is itself the
+    compiled extension (`tesseract_robotics.collision`)."""
+    init = STUB_ROOT / module / "__init__.py"
+    return init if init.is_file() else None
 
 
 def committed_stub(module: str) -> Path:
-    """`tesseract_collision` → `src/tesseract_robotics/tesseract_collision/_tesseract_collision.pyi`."""
-    return STUB_ROOT / module / f"_{module}.pyi"
+    """The committed stub of a module.
+
+    A compiled module is its own stub, `common` → `src/tesseract_robotics/common/_common.pyi`
+    when the package wraps the extension `_common` (`package_init`), else
+    `collision` → `src/tesseract_robotics/collision.pyi`.
+    """
+    if package_init(module) is not None:
+        return STUB_ROOT / module / f"_{module}.pyi"
+    return STUB_ROOT / f"{module}.pyi"
 
 
 def header_auditor(includers: Iterable[str]) -> str:

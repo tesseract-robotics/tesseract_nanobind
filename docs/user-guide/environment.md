@@ -40,7 +40,7 @@ The `Environment` is the central data structure in tesseract_robotics — it own
     ```
 
 !!! info "`Environment.init()` signature"
-    `Robot.from_files()` wraps `Environment.init(urdf_path, srdf_path, locator)`. See `src/tesseract_environment/tesseract_environment_bindings.cpp` for the other overloads (scene graph, URDF string, etc.).
+    `Robot.from_files()` wraps `Environment.init(urdf_path, srdf_path, locator)`. See `src/bindings/environment.cpp` for the other overloads (scene graph, URDF string, etc.).
 
 ## Scene Graph Structure
 
@@ -80,15 +80,15 @@ joint = scene.getJoint("joint_6")
 
 ## Modifying the Scene
 
-Scene modifications are issued as **commands** applied through `env.applyCommand(...)`. The command classes live in `tesseract_robotics.tesseract_environment`.
+Scene modifications are issued as **commands** applied through `env.applyCommand(...)`. The command classes live in `tesseract_robotics.environment`.
 
 ### Adding Objects
 
 ```python
-from tesseract_robotics.tesseract_common import Isometry3d
-from tesseract_robotics.tesseract_environment import AddLinkCommand
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.environment import AddLinkCommand
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import (
     Collision, Joint, JointType, Link, Visual,
 )
 import numpy as np
@@ -133,7 +133,7 @@ env.applyCommand(AddLinkCommand(obstacle_link, obstacle_joint))
 `MoveLinkCommand` takes a replacement `Joint` that re-parents the child link.
 
 ```python
-from tesseract_robotics.tesseract_environment import MoveLinkCommand
+from tesseract_robotics.environment import MoveLinkCommand
 
 origin = np.eye(4)
 origin[:3, 3] = [2.0, 0.0, 0.5]
@@ -145,7 +145,7 @@ env.applyCommand(MoveLinkCommand(obstacle_joint))
 ### Removing Objects
 
 ```python
-from tesseract_robotics.tesseract_environment import RemoveLinkCommand
+from tesseract_robotics.environment import RemoveLinkCommand
 
 env.applyCommand(RemoveLinkCommand("obstacle"))
 ```
@@ -195,7 +195,7 @@ print(f"TCP rotation:\n{tcp_transform.rotation()}")    # np.ndarray(3, 3)
 Collision checking runs through the environment's discrete (or continuous) contact manager. This is the canonical pattern used throughout the examples:
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest, ContactResultMap, ContactTestType,
 )
 
@@ -223,8 +223,8 @@ if acm.isCollisionAllowed(("link_1", "link_2")):
 To add or remove entries, issue a `ModifyAllowedCollisionsCommand`:
 
 ```python
-from tesseract_robotics.tesseract_common import AllowedCollisionMatrix
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.common import AllowedCollisionMatrix
+from tesseract_robotics.environment import (
     ModifyAllowedCollisionsCommand, ModifyAllowedCollisionsType,
 )
 
@@ -237,7 +237,7 @@ env.applyCommand(
 
 ## Environment Commands
 
-All scene modifications use the command pattern. The full list is bound in `tesseract_environment/tesseract_environment_bindings.cpp`:
+All scene modifications use the command pattern. The full list is bound in `src/bindings/environment.cpp`:
 
 | Command | Purpose |
 |---------|---------|

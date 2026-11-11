@@ -74,6 +74,7 @@ tesseract_pointcloud_octree_collision_example = "tesseract_robotics.examples.poi
 tesseract_pick_and_place_example = "tesseract_robotics.examples.pick_and_place_example:main"
 tesseract_plugin_configuration_example = "tesseract_robotics.examples.plugin_configuration_example:main"
 tesseract_puzzle_piece_auxillary_axes_example = "tesseract_robotics.examples.puzzle_piece_auxillary_axes_example:main"
+tesseract_python_constraints_example = "tesseract_robotics.examples.python_constraints_example:main"
 tesseract_raster_example = "tesseract_robotics.examples.raster_example:main"
 tesseract_scene_graph_example = "tesseract_robotics.examples.scene_graph_example:main"
 tesseract_sdf_collision_example = "tesseract_robotics.examples.sdf_collision_example:main"
@@ -117,7 +118,7 @@ provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.setuptools_scm]
 root = "."
-tag_regex = "^(?P<version>\\d+\\.\\d+\\.\\d+\\.\\d+)$"
+tag_regex = "^(?P<version>\\d+\\.\\d+\\.\\d+\\.\\d+(?:rc\\d+)?)$"
 # PyPI rejects PEP 440 local-version segments (the "+g<sha>.d<date>" suffix the default
 # node-and-date scheme stamps onto a dirty build tree) with HTTP 400. CI wheel jobs can
 # dirty the tree (generated .pyi stubs / in-place YAML patches), so without this twine
@@ -149,7 +150,7 @@ ignore = ["E501"]                       # line too long (handled by formatter)
 
 [tool.ruff.lint.per-file-ignores]
 # nanobind extension modules use star imports - ruff can't see into .so files
-"src/tesseract_robotics/tesseract_*/__init__.py" = ["F403", "F405"]
+"src/tesseract_robotics/*/__init__.py" = ["F403", "F405"]
 # examples __init__.py re-export run()/main() entry points for REPL/`python -m` use
 "src/tesseract_robotics/examples/**/__init__.py" = ["F401", "F403", "I001"]
 
@@ -166,37 +167,23 @@ exclude = ["*.md"]
 
 [tool.pixi.workspace]
 name = "tesseract_robotics_dev"
-# tesseract-robotics ships the prebuilt tesseract C++ libs + CMake configs. The 0.36 dev
-# packages (all four platforms) live on its `dev` label, built by the feedstocks' `dev`
-# branches on CI. The label also carries forks of three conda-forge packages: pcl without
-# VTK, and bullet-cpp and ompl without a Python pin. Those two pins and VTK's are what kept
-# Python 3.15 from solving. The label wins for every package it carries.
-# conda-forge stays ahead of tesseract-robotics `main` so common deps (boost, eigen, …)
-# resolve from there exactly as the tesseract feedstocks were built against.
-channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
+# The native C++ stack (tesseract, trajopt, tesseract_planning, ... on vcpkg's third-party
+# libraries) is not installed from conda: `pixi run native-build` builds it into .native/ with
+# scripts/native_stack.py, the script the wheel workflow runs. This env carries the toolchain.
+channels = ["conda-forge"]
 platforms = ["osx-arm64", "linux-64", "win-64", "linux-aarch64"]
 
 [tool.pixi.dependencies]
 python = ">=3.12"
 
-# Build tools
+# Build tools (scripts/native_stack.py and the bindings build). The compiler is the system's:
+# Apple clang, gcc/g++ on Linux, MSVC on Windows.
 cmake = ">=3.15,<4"
 ninja = "*"
 make = "*"
 pkg-config = "*"
+ccache = "*"
 git = "*"  # needed by setuptools-scm for version derivation; CI pixi envs don't see system git
-
-# Prebuilt tesseract C++ libs (CMake configs + headers + .so/.dylib) from the
-# tesseract-robotics channel's `dev` label: the 0.36 dev stack this binding set targets
-# (tesseract_nanobind#161). Every C++ dependency (boost, eigen, ompl, bullet, fcl, …)
-# arrives transitively as a run/host dep of these packages, matched to how the
-# feedstocks were built; don't pin those here (an explicit eigen pin deadlocks the solve).
-tesseract-robotics = "==0.36.0.dev20261103"
-tesseract-robotics-planning = "==0.36.0.dev20261014"
-trajopt = "==0.36.0.dev20261013"
-# header-only, no run_exports, run dep unpinned in the planning recipe: match the
-# taskflow tesseract-robotics-planning was built with (its rendered_recipe.yaml)
-taskflow = "3.11.*"
 
 # Python build deps
 pip = "*"
@@ -213,6 +200,18 @@ pytest-benchmark = "*"
 pyyaml = ">=6.0"  # tests (task composer config fixtures) and scripts/audit_gil.py
 ruff = ">=0.8.0"
 pre-commit = ">=3.0"
+
+# Tools the vcpkg ports build with (the wheel workflow installs them with brew and apt).
+[tool.pixi.target.unix.dependencies]
+autoconf = "*"
+automake = "*"
+autoconf-archive = "*"
+bison = "*"
+flex = "*"
+
+# macOS: Apple clang's OpenMP is an external libomp (scripts/native_stack.py --libomp-prefix).
+[tool.pixi.target.osx-arm64.dependencies]
+llvm-openmp = "*"
 
 # patchelf: ELF-only (Linux). macOS uses install_name_tool (in base system).
 # Windows DLLs have no rpath; delvewheel handles bundling instead.
@@ -232,6 +231,10 @@ scipy = ">=1.17.1"             # Required for nanobind Eigen sparse matrix conve
 pyright = ">=1.1"
 pytest-testmon = ">=2.0"  # PyPI version for pytest>=7 compat
 
+# Build the native stack (scripts/native_stack.py): the same tools the wheel workflow pip-installs.
+colcon-common-extensions = "*"
+vcs2l = "*"
+
 [tool.pixi.tasks]
 check-wheel-sources = { cmd = "python scripts/check_wheel_sources.py", description = "Check wheel sources against upstream development submodules" }
 test = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q -n auto", depends-on = [
@@ -243,10 +246,13 @@ test-benchmark = { cmd = "python -m pytest tests/benchmarks -x -q", depends-on =
 lint = "ruff check ."
 fmt = "ruff format ."
 typecheck = { cmd = "pyright src/tesseract_robotics", description = "Type check with pyright" }
-install = { cmd = "pip install -e . --no-build-isolation", description = "Install bindings (editable); C++ libs come from the tesseract-robotics conda packages" }
+native-build = { cmd = "python scripts/native_stack.py all", description = "Build the native C++ stack into .native/<triplet>, exactly as the wheel workflow does (scripts/native_stack.py); skipped when its inputs are unchanged" }
+install = { cmd = "python scripts/native_stack.py exec -- pip install -e . --no-build-isolation && python scripts/native_stack.py exec -- pip install packaging/tesseract-robotics-nanobind-support --no-deps --no-build-isolation", depends-on = [
+    "native-build",
+], description = "Install the bindings (editable) and the support data against .native/<triplet>" }
 build = { depends-on = [
     "install",
-], description = "Install bindings against the conda tesseract C++ libs" }
+], description = "Build the native stack if needed, then install the bindings against it" }
 ompl-first-path-probe = { cmd = "python scripts/ompl_first_path_probe.py", description = "OMPL path of the clearance example's threshold case against its first path (#362)" }
 ompl-seed-report = { cmd = "python scripts/ompl_seed_report.py", description = "Per-seed OMPL/TrajOptIfopt report of the clearance example (#362): JSON and Markdown into build/ompl_seed_report" }
 check-changelog = { cmd = "python scripts/check_changelog.py", description = "Check CHANGELOG.md release structure (the Docs workflow runs it too)" }
@@ -294,6 +300,14 @@ index-feedstock-channel = { cmd = "pixi exec --spec 'rattler-index==0.30.11' rat
 build-feedstock = { cmd = "pixi run index-feedstock-channel", depends-on = [
     "build-feedstock-planning",
 ], description = "Build the upstream-main C++ stack from the packaging/ feedstocks, then index them as a local channel" }
+
+[tool.pixi.target.osx-arm64.tasks]
+# Same as above plus the libomp prefix: Apple clang has no OpenMP of its own.
+native-build = { cmd = "python scripts/native_stack.py all --libomp-prefix $CONDA_PREFIX", description = "Build the native C++ stack into .native/<triplet>, exactly as the wheel workflow does (scripts/native_stack.py); skipped when its inputs are unchanged" }
+install = { cmd = "python scripts/native_stack.py exec --libomp-prefix $CONDA_PREFIX -- pip install -e . --no-build-isolation && python scripts/native_stack.py exec --libomp-prefix $CONDA_PREFIX -- pip install packaging/tesseract-robotics-nanobind-support --no-deps --no-build-isolation", depends-on = [
+    "native-build",
+], description = "Install the bindings (editable) and the support data against .native/<triplet>" }
+
 
 [tool.pixi.target.osx-arm64.activation.env]
 FEEDSTOCK_CONFIG = "osx_arm64_"
@@ -394,6 +408,7 @@ audit-gil = { cmd = "python scripts/audit_gil.py", description = "Check every GI
 # which imports the (uninstalled) extension modules.
 audit-test = { cmd = "python -m pytest -o addopts='-ra --strict-markers --tb=short' --noconftest tests/audit -n auto", description = "Contract tests of the binding API audit" }
 audit-typecheck = { cmd = "ty check scripts/audit_*.py tests/audit", description = "Type-check the binding API audit scripts and tests" }
+audit-telemetry = { cmd = "python scripts/audit_telemetry_report.py", description = "Print each audit step's fact-cache hits and misses and its timed phases (CI, from BINDING_AUDIT_EVENTS logs)" }
 audit-cache-prune = { cmd = "python scripts/audit_cache_prune.py", description = "Drop the libclang fact-cache entries a run did not use (CI, before saving the cache)" }
 
 # Tooling to build and test the bindings against a 0.36 C++ stack, shared by the
@@ -445,6 +460,7 @@ pyyaml = "*"
 # and no tesseract packages.
 [tool.pixi.feature.upstream]
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
 
 [tool.pixi.feature.upstream.dependencies]
 # third-party C++ deps (versions as pinned in the feedstocks' conda_build_config / .ci_support)
@@ -497,7 +513,7 @@ test-upstream = { cmd = "python -m pytest tests --ignore=tests/benchmarks -x -q 
 # a local channel) and run `pixi run index-feedstock-channel` first.
 [tool.pixi.feature.packaged]
 platforms = ["osx-arm64"]
-channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }]
+channels = [{ channel = "tesseract-robotics/label/dev", priority = 10 }, "conda-forge", "tesseract-robotics"]
 
 [tool.pixi.feature.packaged.dependencies]
 tesseract-robotics = "==0.36.0.dev20261103"

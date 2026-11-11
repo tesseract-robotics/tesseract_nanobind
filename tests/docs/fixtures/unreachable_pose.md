@@ -13,7 +13,7 @@ from tesseract_robotics.planning import (
     Robot,
     plan_freespace,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 robot = Robot.from_tesseract_support("abb_irb2400", locator)

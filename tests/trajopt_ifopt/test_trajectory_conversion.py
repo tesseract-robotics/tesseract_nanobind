@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import JointTrajectory
+from tesseract_robotics.common import JointTrajectory
 
 JOINT_NAMES = ["j0", "j1", "j2"]
 STATES = [np.array([0.0, 0.1, 0.2]), np.array([0.3, 0.4, 0.5]), np.array([0.6, 0.7, 0.8])]

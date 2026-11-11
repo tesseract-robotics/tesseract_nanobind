@@ -7,11 +7,11 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from tesseract_robotics.tesseract_command_language import MoveInstructionType
-from tesseract_robotics.tesseract_common import Isometry3d, LinkId, ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import JointGroup
-from tesseract_robotics.tesseract_scene_graph import JointType
+from tesseract_robotics.command_language import MoveInstructionType
+from tesseract_robotics.common import Isometry3d, LinkId, ManipulatorInfo
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import JointGroup
+from tesseract_robotics.scene_graph import JointType
 
 from .errors import (
     MovingWorkingFrameError,

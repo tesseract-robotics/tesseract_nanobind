@@ -120,7 +120,7 @@ def test_bound_type_in_a_not_api_header_stays_a_gap(monkeypatch):
         PLANNER_PREFIX,
         (FIXTURE_INCLUDE,),
         stub_roots=(PLANNER,),
-        bound=lambda m: elsewhere if m == "tesseract_common" else {},
+        bound=lambda m: elsewhere if m == "common" else {},
     )
     gaps = {g.symbol for g in report.gaps}
     assert {"Hooks.createTerm", "Hooks.callbacks", "ForwardHooks.create"} <= gaps
@@ -139,13 +139,14 @@ def test_header_is_unaudited_reads_the_owning_prefix(monkeypatch):
     assert not own.header_is_unaudited("vendor/internal/term.h", prefixes)  # no owner
 
 
-def test_ompl_root_is_the_versioned_include():
-    """`header_rel` spells OMPL headers `ompl-<v>/ompl/…`; a bare `ompl/` root never matches."""
+def test_ompl_root_is_where_header_rel_spells_ompl():
+    """`header_rel` spells OMPL headers relative to vcpkg's include dir, `ompl-<v>/ompl/…` or
+    `ompl/…` by the port's layout; the root must name a real directory there."""
     roots = parse.UNBOUND_DEPENDENCY_ROOTS
     assert "OsqpEigen/" in roots
-    ompl = [r for r in roots if r.endswith("/ompl/")]
-    assert len(ompl) == 1 and ompl[0].startswith("ompl-")
-    assert (audit.CONDA_INCLUDE / ompl[0]).is_dir()
+    ompl = [r for r in roots if r.endswith("ompl/")]
+    assert len(ompl) == 1
+    assert (audit.NATIVE_INCLUDES[1] / ompl[0]).is_dir()
 
 
 def test_planner_fixture_rows_exact(planner_report):

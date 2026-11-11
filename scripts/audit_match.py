@@ -10,7 +10,7 @@ from types import MappingProxyType
 
 import audit_types
 from audit_anchor import check_anchor_headers, check_anchor_includes_current
-from audit_facts import bound_facts, decl_facts
+from audit_facts import Synthetic, api_facts, bound_facts, decl_facts, include_facts
 from audit_lookup import (
     NO_ALIAS,
     BoundLookup,
@@ -29,7 +29,6 @@ from audit_ownership import (
     AUDITED_HEADER_PREFIX,
     PLUGIN_ANCHOR_INCLUDES,
     SRC,
-    STUB_ROOT,
     UNAUDITED_MODULES,
     UnauditedModuleError,
     UnknownModuleError,
@@ -39,6 +38,7 @@ from audit_ownership import (
     header_auditor,
     is_unaudited,
     owner_prefixes,
+    package_init,
 )
 from audit_parse import (
     INCLUDE_DIRS,
@@ -49,13 +49,14 @@ from audit_parse import (
     CppSymbol,
     HeaderParseError,
     Kind,
-    audited_headers,
+    api_selection,
     binding_module,
-    cpp_api,
     direct_include_spellings,
     foreign_headers,
     header_rel,
+    not_api_headers,
     own_header_lines,
+    owned_direct,
     parse_tu,
     prefix_headers,
 )
@@ -92,6 +93,8 @@ from audit_stub import (
     py_api,
     rel,
 )
+from audit_symbols import resolve_bound
+from audit_telemetry import EVENTS
 from audit_types import NO_ANCESTORS, NO_BASES, Ancestors, Bases, TypeKey
 
 
@@ -760,8 +763,14 @@ def _header_gaps(
     text = f'#include "{cpp_path.name}"\n' + "".join(
         f"#include <{spelling}>\n" for spelling in sorted(headers.values())
     )
-    tu = parse_tu(synthetic, extra_include_dirs, unsaved=text)
-    lines = own_header_lines(cpp_api(tu, frozenset(headers)))
+    unsaved = Synthetic(text, cpp_path)
+    # One parse for both facts, and none when both are stored.
+    tu = functools.cache(lambda: parse_tu(synthetic, extra_include_dirs, unsaved=text))
+    included = include_facts(synthetic, extra_include_dirs, tu, unsaved)
+    audited = frozenset(headers)
+    not_api = not_api_headers(included.inclusions, audited, owner_prefixes())
+    selection = api_selection(audited, not_api)
+    lines = own_header_lines(api_facts(synthetic, extra_include_dirs, selection, tu, unsaved))
     gaps = []
     for h, spelling in headers.items():
         found = lines.get(header_rel(h))
@@ -774,7 +783,7 @@ def audit_tu(
     module: str,
     cpp_path: Path,
     stub_path: Path,
-    init_path: Path,
+    init_path: Path | None,
     prefix: tuple[str, ...],
     extra_include_dirs: Sequence[Path] = (),
     other_bindings: Sequence[Path] = (),
@@ -782,7 +791,7 @@ def audit_tu(
     prefixes: Mapping[str, tuple[str, ...]] | None = None,
     bound: BoundLookup | None = None,
 ) -> ModuleReport:
-    """Audit one translation unit against one stub and package `__init__.py`.
+    """Audit one translation unit against one stub and, if the module has one, package `__init__.py`.
 
     Audits every header under `prefix` (the module's prefixes) that the module owns, except
     `UNAUDITED_HEADERS` and headers that the binding
@@ -821,9 +830,16 @@ def audit_tu(
         """Some binding module (or this TU) binds the class: it has a Python form (R13)."""
         return any(qualified in lookup(m).values() for m in modules)
 
-    tu = parse_tu(cpp_path, extra_include_dirs)
-    decl = decl_facts(cpp_path, extra_include_dirs, lambda: tu)
-    direct = audited_headers(tu, module, prefixes, include_dirs)
+    @functools.cache
+    def tu():  # noqa: ANN202  (a libclang TranslationUnit; this module does not import it)
+        """The declarations parse: once, and only when a fact misses or an anchor header
+        needs its cursors."""
+        with EVENTS.timed("decl-parse"):
+            return parse_tu(cpp_path, extra_include_dirs)
+
+    includes = include_facts(cpp_path, extra_include_dirs, tu)
+    decl = decl_facts(cpp_path, extra_include_dirs, tu)
+    direct = owned_direct(includes.direct, module, prefixes, include_dirs)
     own_includes = direct_include_spellings([cpp_path])
     check_anchor_includes_current(module, own_includes, prefixes)
     other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
@@ -844,39 +860,52 @@ def audit_tu(
             )
         else:
             audited[h] = spelling
-    check_anchor_headers(tu, anchor_headers)
+    if anchor_headers:
+        check_anchor_headers(tu(), anchor_headers)
     audited |= foreign_headers(module, own_includes, other_includes, prefixes, include_dirs)
-    included = frozenset(Path(i.include.name).resolve() for i in tu.get_includes())
-    report = match(
-        module,
-        cpp_api(tu, frozenset(audited) & included, prefixes, bound_anywhere),
-        decl.names,
-        py_api(load_stub(stub_path), rel(stub_path)),
-        rel(stub_path),
-        stub_roots,
-        decl.ancestors,
-        lookup,
-        decl.bases,
-        _bound_of(cpp_path, tuple(extra_include_dirs))[1],
-    )
+    included = includes.included
+    selected = frozenset(audited) & included
+    not_api = not_api_headers(includes.inclusions, selected, prefixes)
+    with EVENTS.timed("cpp-api"):
+        # The stored extraction, then the one rule that reads other modules (R13).
+        cpp = resolve_bound(
+            api_facts(cpp_path, extra_include_dirs, api_selection(selected, not_api), tu),
+            bound_anywhere,
+        )
+    with EVENTS.timed("match"):
+        report = match(
+            module,
+            cpp,
+            decl.names,
+            py_api(load_stub(stub_path), rel(stub_path)),
+            rel(stub_path),
+            stub_roots,
+            decl.ancestors,
+            lookup,
+            decl.bases,
+            _bound_of(cpp_path, tuple(extra_include_dirs))[1],
+        )
     unincluded = {h: s for h, s in audited.items() if h not in included}
-    report.gaps = sorted(
-        [*report.gaps, *unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)]
-    )
+    with EVENTS.timed("unincluded-headers"):
+        unincluded_gaps = unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)
+    report.gaps = sorted([*report.gaps, *unincluded_gaps])
     # `__init_subclass__` on a class the package `__init__.py` guards is that guard's hook.
-    guarded = override_guarded(init_path)
+    # A module that is itself the extension has no package `__init__.py`, so nothing to read.
+    guarded = override_guarded(init_path) if init_path is not None else frozenset()
+    init_deviations = init_findings(init_path) if init_path is not None else []
+    init_hooks = init_accepted(init_path) if init_path is not None else []
     hooks = [
         d
         for d in report.deviations
         if d.name.endswith(".__init_subclass__") and d.name.rpartition(".")[0] in guarded
     ]
     report.deviations = sorted(
-        [*(d for d in report.deviations if d not in hooks), *init_findings(init_path)]
+        [*(d for d in report.deviations if d not in hooks), *init_deviations]
     )
     report.accepted = sorted(
         [
             *report.accepted,
-            *init_accepted(init_path),
+            *init_hooks,
             *(Accepted(d.name, "hook-override-guard", d.location) for d in hooks),
         ]
     )
@@ -898,7 +927,7 @@ def audit_module(module: str) -> ModuleReport:
         module,
         binding_source(module),
         committed_stub(module),
-        STUB_ROOT / module / "__init__.py",
+        package_init(module),
         AUDITED_HEADER_PREFIX[module],
         other_bindings=[binding_source(m) for m in binding_modules() if m != module],
         prefixes=owner_prefixes(),

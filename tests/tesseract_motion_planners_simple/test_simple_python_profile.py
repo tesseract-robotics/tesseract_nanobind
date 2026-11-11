@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -28,16 +28,16 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     JointState,
     ManipulatorInfo,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import JointGroup, KinematicGroup
-from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import JointGroup, KinematicGroup
+from tesseract_robotics.motion_planners import MotionPlanner, PlannerRequest
+from tesseract_robotics.motion_planners_simple import (
     JointGroupInstructionInfo,
     KinematicGroupInstructionInfo,
     ProfileOverrideNotDispatchedError,
@@ -507,13 +507,13 @@ def test_interpolate_fixed_size(irb2400_env, manip_info, fn, start_cart, end_car
 _CHILD_PREAMBLE = textwrap.dedent(
     """
     from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.common import GeneralResourceLocator
     import gc
     from pathlib import Path
 
     import numpy as np
 
-    from tesseract_robotics.tesseract_command_language import (
+    from tesseract_robotics.command_language import (
         CompositeInstruction,
         JointWaypoint,
         JointWaypointPoly,
@@ -522,10 +522,10 @@ _CHILD_PREAMBLE = textwrap.dedent(
         MoveInstructionType,
         ProfileDictionary,
     )
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-    from tesseract_robotics.tesseract_environment import Environment
-    from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-    from tesseract_robotics.tesseract_motion_planners_simple import (
+    from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.environment import Environment
+    from tesseract_robotics.motion_planners import PlannerRequest
+    from tesseract_robotics.motion_planners_simple import (
         JointGroupInstructionInfo,
         KinematicGroupInstructionInfo,
         SimpleMotionPlanner,
@@ -624,8 +624,8 @@ _STORED_BASE_INSTRUCTION = textwrap.dedent(
 # must raise, not dispatch back into the override until the stack runs out.
 _SUPER_GENERATE = textwrap.dedent(
     """
-    from tesseract_robotics.tesseract_command_language import InstructionPoly
-    from tesseract_robotics.tesseract_motion_planners_simple import (
+    from tesseract_robotics.command_language import InstructionPoly
+    from tesseract_robotics.motion_planners_simple import (
         SimplePlannerPureVirtualCallError,
     )
 
@@ -675,8 +675,8 @@ _SUPER_GENERATE = textwrap.dedent(
 # a success. Both are refused before upstream sees them.
 _BAD_GENERATE_RESULTS = textwrap.dedent(
     """
-    from tesseract_robotics.tesseract_command_language import MoveInstructionPoly
-    from tesseract_robotics.tesseract_motion_planners_simple import (
+    from tesseract_robotics.command_language import MoveInstructionPoly
+    from tesseract_robotics.motion_planners_simple import (
         SimplePlannerEmptyGenerateError,
         SimplePlannerNullInstructionError,
     )
@@ -812,14 +812,11 @@ def test_planner_never_runs_a_concrete_profile_override():
 
 
 def test_override_error_lives_in_the_motion_planners_package():
-    import tesseract_robotics.tesseract_motion_planners as core
-    import tesseract_robotics.tesseract_motion_planners_descartes as descartes
-    import tesseract_robotics.tesseract_motion_planners_trajopt_ifopt as trajopt_ifopt
+    import tesseract_robotics.motion_planners as core
+    import tesseract_robotics.motion_planners_descartes as descartes
+    import tesseract_robotics.motion_planners_trajopt_ifopt as trajopt_ifopt
 
-    assert (
-        ProfileOverrideNotDispatchedError.__module__
-        == "tesseract_robotics.tesseract_motion_planners"
-    )
+    assert ProfileOverrideNotDispatchedError.__module__ == "tesseract_robotics.motion_planners"
     assert core.ProfileOverrideNotDispatchedError is ProfileOverrideNotDispatchedError
     assert descartes.ProfileOverrideNotDispatchedError is ProfileOverrideNotDispatchedError
     assert trajopt_ifopt.ProfileOverrideNotDispatchedError is ProfileOverrideNotDispatchedError

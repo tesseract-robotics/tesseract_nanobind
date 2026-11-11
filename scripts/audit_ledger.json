@@ -1,5 +1,5 @@
 {
-  "tesseract_collision": {
+  "collision": {
     "CollisionObjectSpec.__init__": {
       "wont_fix": "Spells the C++ aggregate initialization `{id, mask_id, shapes, shape_poses, enabled}`; `shapes` refuses None, as `addCollisionObject` does."
     },
@@ -19,12 +19,12 @@
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
     }
   },
-  "tesseract_command_language": {
+  "command_language": {
     "Profile.createKey": {
       "wont_fix": "Template over the key-owning profile base; each bound key-owning base class has its own static `createKey()` (#344, #346)."
     }
   },
-  "tesseract_common": {
+  "common": {
     "Isometry3d.apply_directions": {
       "wont_fix": "Intentional Python-only batched extension (CHANGELOG.md:169)."
     },
@@ -356,7 +356,7 @@
       "wont_fix": "Validator template for `PropertyTree.addValidator`, which stays C++; `validate()` runs a schema's validators."
     }
   },
-  "tesseract_environment": {
+  "environment": {
     "Command.__init__": {
       "wont_fix": "A base `Command` claiming a derived type would be undefined behaviour under the `getType` + `static_pointer_cast` dispatch; unverified (environment.cpp not read, phaseB E3)."
     },
@@ -406,7 +406,7 @@
       "wont_fix": "Recursion helper behind `getActiveLinkIds`."
     }
   },
-  "tesseract_geometry": {
+  "geometry": {
     "GeometriesConst": {
       "wont_fix": "The opaque container class needs a Python name; upstream's typedef is spelled `GeometrysConst` (geometry.h:104)."
     },
@@ -438,7 +438,7 @@
       "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
     }
   },
-  "tesseract_kinematics": {
+  "kinematics": {
     "JointGroup.calcJacobianWithPoint": {
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212)"
     },
@@ -467,26 +467,20 @@
       "wont_fix": "plugin-internal: robot-with-tool-positioner solver, created by `KinematicsPluginFactory` from the `RTPInvKinFactory` plugin config and reached as an `InverseKinematics` (as the `rep_*` / `rop_*` headers)."
     }
   },
-  "tesseract_motion_planners": {
+  "motion_planners": {
     "PlannerResponse.failed_instructions": {
       "wont_fix": "Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty."
     },
     "PlannerResponse.succeeded_instructions": {
       "wont_fix": "Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty."
-    },
-    "isValidState": {
-      "issue": "#333"
-    },
-    "operator==": {
-      "issue": "#393"
     }
   },
-  "tesseract_motion_planners_ompl": {
+  "motion_planners_ompl": {
     "Cost.__float__": {
       "wont_fix": "Python form of `value()`: `float(cost)` reads the cost."
     }
   },
-  "tesseract_scene_graph": {
+  "scene_graph": {
     "SceneGraph.getEdge": {
       "wont_fix": "Returns a Boost Graph descriptor."
     },
@@ -497,12 +491,12 @@
       "wont_fix": "KDL tree types; KDL is never exposed to Python."
     }
   },
-  "tesseract_serialization": {
+  "serialization": {
     "Serialization": {
       "wont_fix": "Static template class; its instances are the bound `<type>_to_xml` … functions."
     }
   },
-  "tesseract_srdf": {
+  "srdf": {
     "compareLinkPairAlphabetically": {
       "wont_fix": "Sorting helper for SRDF writing."
     },
@@ -513,7 +507,7 @@
       "wont_fix": "`parseConfigFilePath` takes a `tinyxml2::XMLElement*`: internal to the SRDF parser."
     }
   },
-  "tesseract_state_solver": {
+  "state_solver": {
     "KDLStateSolver.__init__": {
       "wont_fix": "`data` is a `KDLTreeData`, a KDL tree type; KDL is never exposed to Python."
     },
@@ -524,7 +518,7 @@
       "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219)"
     }
   },
-  "tesseract_task_composer": {
+  "task_composer": {
     "TaskComposerNode.DynamicPortsTag": {
       "wont_fix": "Constructor tag for C++ nodes with configuration-defined ports."
     },
@@ -539,23 +533,6 @@
     },
     "TaskComposerPipeline.__init__": {
       "wont_fix": "`parent_uuid` stays unbound: `TaskComposerGraph::addNode` sets a node's parent when the graph takes it."
-    }
-  },
-  "tesseract_urdf": {
-    "makeURDFFilePath": {
-      "wont_fix": "Python `str` and `pathlib` cover it."
-    },
-    "noLeadingSlash": {
-      "wont_fix": "Python `str` and `pathlib` cover it."
-    },
-    "noTrailingSlash": {
-      "wont_fix": "Python `str` and `pathlib` cover it."
-    },
-    "toString": {
-      "wont_fix": "Python `str` and `pathlib` cover it."
-    },
-    "trailingSlash": {
-      "wont_fix": "Python `str` and `pathlib` cover it."
     }
   },
   "trajopt_ifopt": {
@@ -599,6 +576,23 @@
     },
     "PIQPSolver.solver": {
       "wont_fix": "unbound-dependency-type: returns `piqp::SparseSolver<double>`, which no module binds (piqp has no binding module; `PIQPSettings` is the only piqp type bound)."
+    }
+  },
+  "urdf": {
+    "makeURDFFilePath": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "noLeadingSlash": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "noTrailingSlash": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "toString": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
+    },
+    "trailingSlash": {
+      "wont_fix": "Python `str` and `pathlib` cover it."
     }
   }
 }

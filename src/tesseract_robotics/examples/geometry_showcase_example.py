@@ -66,12 +66,11 @@ from tesseract_robotics import (
     get_tesseract_resource_path,
     get_tesseract_support_path,
 )
-from tesseract_robotics.planning import Pose, Robot
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     VectorVector3d,
 )
-from tesseract_robotics.tesseract_geometry import (
+from tesseract_robotics.geometry import (
     Box,
     Capsule,
     Cone,
@@ -87,7 +86,8 @@ from tesseract_robotics.tesseract_geometry import (
     readSignedDistanceFieldVDB,
     writeSignedDistanceFieldVDB,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.planning import Pose, Robot
+from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
     JointType,

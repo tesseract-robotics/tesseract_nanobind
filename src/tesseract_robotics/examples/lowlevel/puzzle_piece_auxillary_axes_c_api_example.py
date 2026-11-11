@@ -29,6 +29,17 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.command_language import (
+    CartesianWaypoint,
+    CartesianWaypointPoly,
+    CompositeInstruction,
+    MoveInstruction,
+    MoveInstructionPoly,
+    MoveInstructionType,
+    ProfileDictionary,
+)
+from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
 from tesseract_robotics.examples.lowlevel.example_support import (
     load_support_environment,
     run_pipeline,
@@ -41,24 +52,13 @@ from tesseract_robotics.examples.lowlevel.puzzle_piece_c_api_example import (
     TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
     make_puzzle_tool_poses,
 )
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import (
-    CartesianWaypoint,
-    CartesianWaypointPoly,
-    CompositeInstruction,
-    MoveInstruction,
-    MoveInstructionPoly,
-    MoveInstructionType,
-    ProfileDictionary,
-)
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptOSQPSolverProfile,

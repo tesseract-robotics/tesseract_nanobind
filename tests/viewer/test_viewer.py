@@ -15,9 +15,9 @@ import websockets
 import zstandard
 from loguru import logger
 
+from tesseract_robotics import geometry as tg
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics import tesseract_geometry as tg
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     JointWaypoint,
     JointWaypointPoly,
@@ -27,18 +27,18 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     LinkId,
     ManipulatorInfo,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddLinkCommand,
     Environment,
     RemoveLinkCommand,
 )
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType, Link, Visual
+from tesseract_robotics.scene_graph import Joint, JointType, Link, Visual
 from tesseract_robotics.viewer import TesseractViewer, Trajectory
 from tesseract_robotics.viewer.errors import (
     NoEnvironmentError,

@@ -4,10 +4,10 @@ import importlib
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.command_language import ProfileDictionary
 
 REMOVED = {
-    "tesseract_motion_planners_ompl": [
+    "motion_planners_ompl": [
         "OMPLMoveProfile_as_ProfileConstPtr",
         "OMPLPlanProfile_as_ProfileConstPtr",
         "ProfileDictionary_addOMPLMoveProfile",
@@ -15,7 +15,7 @@ REMOVED = {
         "OMPLPlanProfile",
         "OMPLRealVectorPlanProfile",
     ],
-    "tesseract_motion_planners_trajopt": [
+    "motion_planners_trajopt": [
         "ProfileDictionary_addTrajOptMoveProfile",
         "ProfileDictionary_addTrajOptPlanProfile",
         "ProfileDictionary_addTrajOptCompositeProfile",
@@ -25,7 +25,7 @@ REMOVED = {
         "TrajOptCollisionConfig",
         "CollisionEvaluatorType",
     ],
-    "tesseract_motion_planners_trajopt_ifopt": [
+    "motion_planners_trajopt_ifopt": [
         "ProfileDictionary_addTrajOptIfoptMoveProfile",
         "ProfileDictionary_addTrajOptIfoptPlanProfile",
         "ProfileDictionary_addTrajOptIfoptCompositeProfile",
@@ -33,7 +33,7 @@ REMOVED = {
         "TrajOptIfoptPlanProfile",
         "TrajOptIfoptDefaultPlanProfile",
     ],
-    "tesseract_motion_planners_descartes": [
+    "motion_planners_descartes": [
         "cast_DescartesSolverProfileD",
         "cast_DescartesMoveProfileD",
         "cast_DescartesPlanProfileD",
@@ -43,12 +43,12 @@ REMOVED = {
 }
 
 PACKAGES = [
-    "tesseract_motion_planners",
-    "tesseract_motion_planners_ompl",
-    "tesseract_motion_planners_trajopt",
-    "tesseract_motion_planners_trajopt_ifopt",
-    "tesseract_motion_planners_simple",
-    "tesseract_motion_planners_descartes",
+    "motion_planners",
+    "motion_planners_ompl",
+    "motion_planners_trajopt",
+    "motion_planners_trajopt_ifopt",
+    "motion_planners_simple",
+    "motion_planners_descartes",
 ]
 
 
@@ -68,15 +68,15 @@ def test_package_has_no_all(module):
 
 def test_star_import_binds_the_move_profiles():
     namespace: dict[str, object] = {}
-    exec("from tesseract_robotics.tesseract_motion_planners_ompl import *", namespace)
+    exec("from tesseract_robotics.motion_planners_ompl import *", namespace)
     assert "OMPLRealVectorMoveProfile" in namespace
     assert "RNG_setSeed" in namespace
 
 
 def test_trajopt_ifopt_keeps_its_config_reexports():
     """#335: these configure the TrajOpt-Ifopt profile fields from one import."""
-    pkg = _package("tesseract_motion_planners_trajopt_ifopt")
-    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+    pkg = _package("motion_planners_trajopt_ifopt")
+    from tesseract_robotics.collision import CollisionEvaluatorType
     from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
     from tesseract_robotics.trajopt_sqp import SQPParameters
 
@@ -86,18 +86,18 @@ def test_trajopt_ifopt_keeps_its_config_reexports():
 
 
 def _profiles():
-    from tesseract_robotics.tesseract_motion_planners_descartes import (
+    from tesseract_robotics.motion_planners_descartes import (
         DescartesDefaultMoveProfileD,
         DescartesLadderGraphSolverProfileD,
         DescartesMoveProfileD,
     )
-    from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
+    from tesseract_robotics.motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultMoveProfile,
         TrajOptOSQPSolverProfile,
     )
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptOSQPSolverProfile,
     )

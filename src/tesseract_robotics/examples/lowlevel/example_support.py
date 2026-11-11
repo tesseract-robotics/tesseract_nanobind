@@ -15,12 +15,12 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_task_composer_config_path, get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import CompositeInstruction, ProfileDictionary
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
-from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
-from tesseract_robotics.tesseract_geometry import Geometry
-from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link, Visual
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.command_language import CompositeInstruction, ProfileDictionary
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.environment import AddLinkCommand, Environment
+from tesseract_robotics.geometry import Geometry
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link, Visual
+from tesseract_robotics.task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,

@@ -51,7 +51,7 @@ EIGEN_DTYPES = {
     ci.TypeKind.LONGLONG: "int64",
     ci.TypeKind.BOOL: "bool",
 }
-# Eigen geometry templates bound as classes in tesseract_common, by canonical spelling.
+# Eigen geometry templates bound as classes in the `common` module, by canonical spelling.
 EIGEN_CLASSES = {
     "Eigen::Transform<double, 3, 1>": "Isometry3d",
     "Eigen::Quaternion<double>": "Quaterniond",
@@ -66,7 +66,7 @@ CONVERTED_RECORDS = {
     "boost::uuids::uuid": ("str",),
     "spdlog::level::level_enum": ("class", "LogLevel"),  # no tesseract header declares it
 }
-# Instances of the id templates tesseract_common binds, by canonical spelling. A typedef is lost
+# Instances of the id templates the `common` module binds, by canonical spelling. A typedef is lost
 # at depth (`vector<JointId>` is `vector<NameId<JointTag>>`), so the instance names the class.
 ID_INSTANCES = {
     "tesseract::common::NameId<tesseract::common::LinkTag>": "LinkId",
@@ -88,7 +88,7 @@ EIGEN_NAMESPACE = "Eigen"  # its classes are keyed by `_eigen_key`, not by their
 # os.PathLike`): the path annotation covers the string parameter, never the reverse.
 STR_KEY = ("str",)
 PATH_KEY = ("path",)
-# Id classes tesseract_common binds with an implicit conversion, and its source. Their stubs are
+# Id classes the `common` module binds with an implicit conversion, and its source. Their stubs are
 # widened to `LinkId | str` by scripts/widen_implicit_id_stubs.py: one C++ type, keyed as the id.
 IMPLICIT_ID_SOURCES = {
     ("class", "LinkId"): STR_KEY,
@@ -252,11 +252,33 @@ def _dotted(node: ast.expr) -> str | None:
     return None
 
 
-def _class_name(dotted: str) -> str:
-    """`pkg.mod._mod.Outer.Inner` → `Outer.Inner`: the part after the extension module."""
+PACKAGE = "tesseract_robotics"
+
+
+def extension_member(dotted: str) -> tuple[str | None, str]:
+    """(module, class path) a stub's dotted class name spells.
+
+    `tesseract_robotics.mod._mod.Outer.Inner` (a wrapped module) and
+    `tesseract_robotics.mod.Outer.Inner` (a module that is itself the extension) both give
+    (`mod`, `Outer.Inner`). Any other dotted name splits after its last `_`-prefixed part; a
+    name with no module part gives (None, name).
+    """
     parts = dotted.split(".")
+    if parts[0] == PACKAGE and len(parts) > 2:
+        owner, rest = parts[1], parts[2:]
+        if rest[0] == f"_{owner}" and len(rest) > 1:
+            rest = rest[1:]
+        return owner, ".".join(rest)
     private = [i for i, p in enumerate(parts) if p.startswith("_")]
-    return ".".join(parts[private[-1] + 1 :] if private else parts)
+    if not private:
+        return None, dotted
+    i = private[-1]
+    return parts[i].removeprefix("_"), ".".join(parts[i + 1 :])
+
+
+def _class_name(dotted: str) -> str:
+    """`tesseract_robotics.mod._mod.Outer.Inner` → `Outer.Inner`: the part after the extension."""
+    return extension_member(dotted)[1]
 
 
 def _union_members(node: ast.expr) -> list[ast.expr]:

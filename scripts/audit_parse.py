@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import os
 import sysconfig
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from enum import StrEnum
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from functools import partial
 from pathlib import Path
 
@@ -26,10 +24,20 @@ from audit_ownership import (
     owner_prefixes,
     owning_prefix,
 )
-from audit_types import RECORD_KINDS, TypeKey, record_path
+from audit_symbols import (
+    NO_DEPENDENCY,
+    UNBOUND_DEPENDENCY,
+    Arity,
+    CppOverload,
+    CppSymbol,
+    Dependency,
+    Kind,
+    resolve_bound,
+)
+from audit_toolchain import Selection
+from audit_types import RECORD_KINDS, record_path
 
 CONDA_PREFIX = Path(os.environ["CONDA_PREFIX"])
-CONDA_INCLUDE = CONDA_PREFIX / "include"
 # Major version of the `clang-22` package in the pixi `audit` feature (pyproject.toml).
 LIBCLANG_MAJOR = 22
 # Builtin headers (stdarg.h, stddef.h) shipped by `clang-22`; libclang does not find
@@ -37,40 +45,107 @@ LIBCLANG_MAJOR = 22
 CLANG_RESOURCE_DIR = CONDA_PREFIX / "lib" / "clang" / str(LIBCLANG_MAJOR)
 # Matches CMakeLists.txt `set(CMAKE_CXX_STANDARD 17)`.
 CXX_STD = "c++17"
+# The native stack the wheels link against (scripts/native_stack.py): `ws/install` holds
+# tesseract, trajopt, tesseract_planning; `vcpkg/installed/<triplet>` the third-party libraries.
+# CI points this at the restored native install; locally it is `pixi run native-build`'s output.
+NATIVE_ROOT_ENV = "AUDIT_NATIVE_ROOT"
 
 
 class IncludeDirError(FileNotFoundError):
     """A versioned include dir of the binding build is missing or ambiguous."""
 
 
-def versioned_include(name: str, include: Path) -> Path:
-    """The one `include/<name>-<version>` dir (OMPL installs under `include/ompl-1.7`).
+class NativeStackMissingError(FileNotFoundError):
+    """The native stack the bindings build against is absent or ambiguous under its root."""
+
+
+def ompl_include(include: Path) -> Path:
+    """The include dir that holds `ompl/`: `include/ompl-<version>` or `include` itself.
 
     Raises:
-        IncludeDirError: no such dir, or more than one (an upstream bump left two).
+        IncludeDirError: no OMPL headers, or more than one versioned dir.
     """
-    found = sorted(d for d in include.glob(f"{name}-*") if d.is_dir())
-    if len(found) != 1:
-        raise IncludeDirError(
-            f"expected one {include / name}-<version> dir, found {len(found)}: "
-            f"{[d.name for d in found]}"
+    found = sorted(d for d in include.glob("ompl-*") if d.is_dir())
+    if len(found) > 1:
+        raise IncludeDirError(f"expected one {include / 'ompl'}-<version> dir, found {len(found)}")
+    if found:
+        return found[0]
+    if (include / "ompl").is_dir():
+        return include
+    raise IncludeDirError(f"no OMPL headers under {include}: no ompl/ and no ompl-<version>/")
+
+
+def native_root() -> Path:
+    """The native stack root: `$AUDIT_NATIVE_ROOT`, else the one dev build under `.native/`.
+
+    Raises:
+        NativeStackMissingError: no variable and not exactly one `.native/<triplet>` dir.
+    """
+    explicit = os.environ.get(NATIVE_ROOT_ENV)
+    if explicit:
+        return Path(explicit)
+    builds = sorted(d for d in (REPO_ROOT / ".native").glob("*") if d.is_dir())
+    if len(builds) != 1:
+        raise NativeStackMissingError(
+            f"set {NATIVE_ROOT_ENV}, or build the native stack (`pixi run native-build`) so that "
+            f"exactly one .native/<triplet> exists; found {[d.name for d in builds]}"
         )
-    return found[0]
+    return builds[0]
 
 
-# Header search path of the binding build: tesseract, yaml-cpp and console_bridge
-# from the conda prefix; Eigen under include/eigen3; OMPL under include/ompl-<version> and
-# OSQP under include/osqp (the ompl and osqp CMake targets export both); tesseract_nb.h from
-# src/; nanobind and Python headers from their packages.
-INCLUDE_DIRS = (
-    CONDA_INCLUDE,
-    CONDA_INCLUDE / "eigen3",
-    versioned_include("ompl", CONDA_INCLUDE),
-    CONDA_INCLUDE / "osqp",
-    SRC,
-    Path(nanobind.include_dir()),
-    Path(sysconfig.get_paths()["include"]),
-)
+def native_include_roots(root: Path) -> tuple[Path, Path]:
+    """The two include roots of a native stack: the colcon install and vcpkg's installed prefix.
+
+    Raises:
+        NativeStackMissingError: either root is missing, or vcpkg holds not exactly one triplet.
+    """
+    install = root / "ws" / "install" / "include"
+    triplets = sorted(
+        d for d in (root / "vcpkg" / "installed").glob("*") if d.is_dir() and d.name != "vcpkg"
+    )
+    if len(triplets) != 1:
+        raise NativeStackMissingError(
+            f"expected one vcpkg triplet under {root / 'vcpkg' / 'installed'}, "
+            f"found {[d.name for d in triplets]}; build the native stack "
+            f"(`pixi run native-build`) or set {NATIVE_ROOT_ENV} to its root"
+        )
+    vcpkg = triplets[0] / "include"
+    for include in (install, vcpkg):
+        if not include.is_dir():
+            raise NativeStackMissingError(f"{include} does not exist (native stack at {root})")
+    return install, vcpkg
+
+
+def native_include_dirs(root: Path) -> tuple[Path, ...]:
+    """Header search path of the binding build, from the native stack at `root`.
+
+    Both include roots, vcpkg's Eigen (`include/eigen3`), its OMPL dir (`ompl_include`) and an
+    `osqp` dir where a root has one (the ompl and osqp CMake targets export both); then
+    `tesseract_nb.h` from src/, and the nanobind and Python headers from their packages.
+
+    Raises:
+        NativeStackMissingError: see `native_include_roots`; or no root has an `osqp` dir.
+        IncludeDirError: see `ompl_include`.
+    """
+    install, vcpkg = native_include_roots(root)
+    osqp = [d for d in (install / "osqp", vcpkg / "osqp") if d.is_dir()]
+    if not osqp:
+        raise NativeStackMissingError(f"no osqp/ include dir under {install} or {vcpkg}")
+    return (
+        install,
+        vcpkg,
+        vcpkg / "eigen3",
+        ompl_include(vcpkg),
+        *osqp,
+        SRC,
+        Path(nanobind.include_dir()),
+        Path(sysconfig.get_paths()["include"]),
+    )
+
+
+NATIVE_ROOT = native_root()
+NATIVE_INCLUDES = native_include_roots(NATIVE_ROOT)
+INCLUDE_DIRS = native_include_dirs(NATIVE_ROOT)
 PARSE_ARGS = (
     "-x",
     "c++",
@@ -204,102 +279,42 @@ RAW_BUFFER_POINTEES = frozenset(
 )
 
 
-class Kind(StrEnum):
-    """What a report row refers to."""
-
-    CLASS = "class"
-    ENUM = "enum"
-    FUNCTION = "function"
-    METHOD = "method"
-    CONSTRUCTOR = "constructor"
-    FIELD = "field"
-    ENUMERATOR = "enumerator"
-    OPERATOR = "operator"
-    OVERLOAD = "overload"
-    CONSTANT = "constant"
-    PROTOCOL = "protocol"
-    FAIL_LOUD = "fail-loud"
-    HEADER = "header"
-    UNPARSEABLE_HEADER = "unparseable header"
-    BASE = "base"  # a stub base class vs the bound C++ bases (T5)
-
-
-@dataclass(frozen=True)
-class Arity:
-    """Accepted positional-argument counts; `hi is None` means unbounded (`*args`)."""
-
-    lo: int
-    hi: int | None
-
-    def overlaps(self, other: Arity) -> bool:
-        return (self.hi is None or other.lo <= self.hi) and (
-            other.hi is None or self.lo <= other.hi
-        )
-
-    def reduced(self, k: int) -> Arity:
-        """Arity after `k` out-params move to the return value."""
-        return Arity(max(0, self.lo - k), None if self.hi is None else self.hi - k)
-
-    def __str__(self) -> str:
-        if self.hi is None:
-            return f"{self.lo}+"
-        return str(self.lo) if self.lo == self.hi else f"{self.lo}-{self.hi}"
-
-
-@dataclass(frozen=True)
-class CppOverload:
-    arity: Arity
-    out_params: tuple[str, ...]  # pointee type spellings
-    location: str
-    returns_void: bool = False
-    mapped: str | None = None  # ACCEPTED rule when bound under its mapped Python name
-    absent_ok: str | None = None  # ACCEPTED rule under which leaving it unbound is accepted
-    raw_buffer: bool = False  # takes a pointer to a non-char scalar: never covered by arity alone
-    # Python positions of (const uint8_t*, size_t) pairs, each counted as one `bytes` parameter
-    byte_buffers: tuple[int, ...] = ()
-    # Keys a stub annotation may take, per parameter (a byte-buffer pair as one `bytes`);
-    # empty: no parameter types to compare (`audit_types`, #247)
-    params: tuple[frozenset[TypeKey] | None, ...] = ()
-    out_positions: tuple[int, ...] = ()  # indices into `params` of the out-params
-    # takes a `std::vector<std::reference_wrapper<T>>`: a view a sibling overload builds (R4)
-    reference_wrapper_view: bool = False
-    yaml_position: int | None = None  # index into `params` of the first `YAML::Node` parameter
-    names: tuple[str, ...] = ()  # C++ parameter names, parallel to `params`
-
-    def returned_out_params(self) -> tuple[frozenset[TypeKey] | None, ...]:
-        """`params` of the Python form that returns the out-params."""
-        return tuple(k for i, k in enumerate(self.params) if i not in self.out_positions)
-
-    def returned_out_names(self) -> tuple[str, ...]:
-        """`names` of the Python form that returns the out-params."""
-        return tuple(n for i, n in enumerate(self.names) if i not in self.out_positions)
-
-
-@dataclass
-class CppSymbol:
-    name: str
-    kind: Kind
-    location: str
-    overloads: list[CppOverload] = field(default_factory=list)
-    qualified: str = ""  # `audit_types.qualified_path`, for Kind.CLASS and Kind.ENUM
-    inherited_from: str | None = None  # `record_path` of the base declaring an inherited member
-    # ACCEPTED rule under which leaving the whole symbol unbound is accepted, for symbols
-    # without overloads (fields); read through `WHOLE_SYMBOL_ABSENT_OK`
-    absent_ok: str | None = None
-
-
 def header_rel(path: Path) -> str:
-    """A header path relative to the conda include dir or the repo; else absolute (an SDK header)."""
+    """A header path relative to a native include root or the repo; else absolute (an SDK header)."""
     path = path.resolve()
-    for base in (CONDA_INCLUDE, REPO_ROOT):
+    for base in (*NATIVE_INCLUDES, REPO_ROOT):
         if path.is_relative_to(base):
             return path.relative_to(base).as_posix()
     return path.as_posix()
 
 
 def location(cursor: ci.Cursor) -> str:
-    """`header:line`, relative to the conda include dir or the repo."""
+    """`header:line`, relative to a native include root or the repo."""
     return f"{header_rel(Path(cursor.location.file.name))}:{cursor.location.line}"
+
+
+def inclusions(tu: ci.TranslationUnit) -> tuple[tuple[str, Path], ...]:
+    """Every inclusion directive of the TU, from any file: its spelling and the resolved file."""
+    return tuple(
+        (c.spelling, Path(c.get_included_file().name).resolve())
+        for c in tu.cursor.get_children()
+        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
+    )
+
+
+def direct_includes(tu: ci.TranslationUnit) -> tuple[Path, ...]:
+    """The files the TU's main file `#include`s itself, resolved, in order.
+
+    Read from the main file's inclusion directives, not `get_includes()` depth: a header
+    that an earlier include already pulled in is reported there only at that depth.
+    """
+    main = Path(tu.spelling).resolve()
+    return tuple(
+        Path(c.get_included_file().name).resolve()
+        for c in tu.cursor.get_children()
+        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
+        and Path(c.location.file.name).resolve() == main
+    )
 
 
 def audited_headers(
@@ -308,20 +323,19 @@ def audited_headers(
     prefixes: Mapping[str, tuple[str, ...]],
     include_dirs: Sequence[Path],
 ) -> frozenset[Path]:
-    """Headers the TU's main file `#include`s itself that `module` owns (`owning_prefix`),
-    except `THIRD_PARTY_HEADERS`.
+    """`owned_direct` of the TU's own includes (`direct_includes`)."""
+    return owned_direct(direct_includes(tu), module, prefixes, include_dirs)
 
-    Read from the main file's inclusion directives, not `get_includes()` depth: a header
-    that an earlier include already pulled in is reported there only at that depth.
-    """
+
+def owned_direct(
+    direct: Iterable[Path],
+    module: str,
+    prefixes: Mapping[str, tuple[str, ...]],
+    include_dirs: Sequence[Path],
+) -> frozenset[Path]:
+    """Of the files a main file `#include`s itself (`direct_includes`), those `module` owns
+    (`owning_prefix`), except `THIRD_PARTY_HEADERS`."""
     roots = [((d / p).resolve(), p) for d in include_dirs for p in prefixes[module]]
-    main = Path(tu.spelling).resolve()
-    direct = (
-        Path(c.get_included_file().name).resolve()
-        for c in tu.cursor.get_children()
-        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
-        and Path(c.location.file.name).resolve() == main
-    )
     return frozenset(
         h
         for h in direct
@@ -366,7 +380,7 @@ def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
 
 
 def binding_module(path: Path) -> str:
-    """`src/tesseract_srdf/tesseract_srdf_bindings.cpp` → `tesseract_srdf`."""
+    """`src/bindings/srdf.cpp` → `srdf`; a test fixture `other_bindings.cpp` → `other`."""
     return path.stem.removesuffix("_bindings")
 
 
@@ -500,18 +514,18 @@ def _is_reference_wrapper_vector(parm: ci.Cursor) -> bool:
 
 
 # Header roots of third-party libraries the bindings never bind: a type declared under one has
-# no Python form (spec D8). OMPL's include dir is versioned (`include/ompl-1.7/ompl/…`), so its
-# root, as `header_rel` spells it, comes from `versioned_include` (`ompl-1.7/ompl/`, not
-# `ompl/`). Eigen, std and boost have casters and are absent.
+# no Python form (spec D8). OMPL's include dir may be versioned (`include/ompl-1.7/ompl/…`), so
+# its root, as `header_rel` spells it, comes from `ompl_include` (`ompl-1.7/ompl/` or `ompl/`). Eigen, std and boost have casters and are absent.
 UNBOUND_DEPENDENCY_ROOTS = (
     "OsqpEigen/",
-    f"{versioned_include('ompl', CONDA_INCLUDE).relative_to(CONDA_INCLUDE).as_posix()}/ompl/",
+    f"{ompl_include(NATIVE_INCLUDES[1]).relative_to(NATIVE_INCLUDES[1]).as_posix()}/ompl/".removeprefix(
+        "./"
+    ),
 )
 # Namespaces of the same libraries, for types an owned header only forward-declares: the
 # tesseract OMPL headers declare `namespace ompl::base { class Planner; }` and never include
 # OMPL, so the declaration such a type resolves to sits in a tesseract header, under no root.
 UNBOUND_DEPENDENCY_NAMESPACES = ("ompl::",)
-UNBOUND_DEPENDENCY = "unbound-dependency-type"
 
 
 def no_bound_class(qualified: str) -> bool:
@@ -519,42 +533,55 @@ def no_bound_class(qualified: str) -> bool:
     return False
 
 
-def _names_unbound_dependency(
-    t: ci.Type, not_api: frozenset[Path], is_bound: Callable[[str], bool]
-) -> bool:
-    """Whether `t`, through pointers, references, template arguments and `std::function`
-    signatures, names a type with no Python form: declared under an `UNBOUND_DEPENDENCY_ROOTS`
+def api_selection(audited: Iterable[Path], not_api: Iterable[Path]) -> Selection:
+    """The part of an `api` fact's key that tables decide: the headers `extract_api` reads and
+    this module's `UNBOUND_DEPENDENCY_*` as they are now (a test may have patched them)."""
+    return Selection.build(
+        audited=audited,
+        not_api=not_api,
+        dependency_roots=UNBOUND_DEPENDENCY_ROOTS,
+        dependency_namespaces=UNBOUND_DEPENDENCY_NAMESPACES,
+    )
+
+
+def _unbound_dependency(t: ci.Type, not_api: frozenset[Path]) -> Dependency:
+    """The types with no Python form that `t` names, through pointers, references, template
+    arguments and `std::function` signatures: declared under an `UNBOUND_DEPENDENCY_ROOTS`
     header (`std::unique_ptr<OsqpEigen::Solver>`) or in an `UNBOUND_DEPENDENCY_NAMESPACES`
     namespace (`ompl::base::PlannerPtr`), or in one of `not_api`, the owned not-API
-    headers this TU includes but does not audit (`trajopt::TermInfo`, `_not_api_headers`).
-    A class some module binds (`is_bound`, by qualified name; not a template instance) has a
-    Python form wherever it is declared (`sco::BasicTrustRegionSQPParameters`)."""
+    headers this TU includes but does not audit (`trajopt::TermInfo`, `not_api_headers`).
+    A class some module binds (by qualified name; not a template instance) has a Python form
+    wherever it is declared (`sco::BasicTrustRegionSQPParameters`): such a class is returned
+    in `unless_bound` and decided after extraction (`audit_symbols.resolve_bound`), because
+    what other modules bind is not a property of this TU."""
     t = t.get_canonical()
     while t.kind in (ci.TypeKind.POINTER, ci.TypeKind.LVALUEREFERENCE, ci.TypeKind.RVALUEREFERENCE):
         t = t.get_pointee().get_canonical()
     if t.kind == ci.TypeKind.FUNCTIONPROTO:
-        return _names_unbound_dependency(t.get_result(), not_api, is_bound) or any(
-            _names_unbound_dependency(a, not_api, is_bound) for a in t.argument_types()
-        )
+        dep = _unbound_dependency(t.get_result(), not_api)
+        for a in t.argument_types():
+            dep |= _unbound_dependency(a, not_api)
+        return dep
     decl = t.get_declaration()
     qualified = audit_types.qualified_path(decl) if decl.kind in RECORD_KINDS else ""
     flagged = bool(qualified) and qualified.startswith(UNBOUND_DEPENDENCY_NAMESPACES)
     if not flagged and decl.location.file is not None:
         path = Path(decl.location.file.name).resolve()
-        # `header_rel` spells only the conda and repo trees; the SDK's libc++ is in neither.
-        spelled = path.is_relative_to(CONDA_INCLUDE) or path.is_relative_to(REPO_ROOT)
+        # `header_rel` spells only the native and repo trees; the SDK's libc++ is in neither.
+        spelled = any(path.is_relative_to(b) for b in (*NATIVE_INCLUDES, REPO_ROOT))
         flagged = (spelled and header_rel(path).startswith(UNBOUND_DEPENDENCY_ROOTS)) or (
             path in not_api
         )
     if flagged:
         # `bound_classes` drops template arguments (`std::vector<Item>` is `std::vector`), so
-        # only a class that is no template instance counts as bound by name. Checked last:
-        # `is_bound` reads every binding's TU on its first call.
-        return not (qualified and t.get_num_template_arguments() <= 0 and is_bound(qualified))
-    return any(
-        _names_unbound_dependency(t.get_template_argument_type(i), not_api, is_bound)
-        for i in range(max(0, t.get_num_template_arguments()))
-    )
+        # only a class that is no template instance can be bound by name.
+        if qualified and t.get_num_template_arguments() <= 0:
+            return Dependency(unless_bound=frozenset({qualified}))
+        return Dependency(always=True)
+    dep = NO_DEPENDENCY
+    for i in range(max(0, t.get_num_template_arguments())):
+        dep |= _unbound_dependency(t.get_template_argument_type(i), not_api)
+    return dep
 
 
 # The key of a `(const uint8_t*, size_t)` pair: one Python `bytes` argument.
@@ -606,18 +633,19 @@ def _befriends_cereal(record: ci.Cursor) -> bool:
 OWNED_ROOTS = ("tesseract/", "trajopt", "descartes_light/")
 
 
-def _not_api_headers(
-    tu: ci.TranslationUnit, audited: frozenset[Path], prefixes: Mapping[str, tuple[str, ...]]
+def not_api_headers(
+    included: Iterable[tuple[str, Path]],
+    audited: frozenset[Path],
+    prefixes: Mapping[str, tuple[str, ...]],
 ) -> frozenset[Path]:
-    """Headers the TU includes, not in `audited`, whose `#include` spelling a module in
-    `prefixes` owns and lists as not API (R13's not-API half). The include spelling, not
-    `header_rel`, is what ownership prefixes match (a fixture header lives in the repo)."""
+    """Of a TU's inclusion directives (`inclusions`), the files not in `audited` whose
+    `#include` spelling a module in `prefixes` owns and lists as not API (R13's not-API half).
+    The include spelling, not `header_rel`, is what ownership prefixes match (a fixture header
+    lives in the repo)."""
     return frozenset(
         path
-        for c in tu.cursor.get_children()
-        if c.kind == ci.CursorKind.INCLUSION_DIRECTIVE
-        and (path := Path(c.get_included_file().name).resolve()) not in audited
-        and header_is_unaudited(c.spelling, prefixes)
+        for spelling, path in included
+        if path not in audited and header_is_unaudited(spelling, prefixes)
     )
 
 
@@ -711,7 +739,9 @@ def _base_definition(base: ci.Cursor) -> ci.Cursor | None:
 AbsentOkTest = Callable[[ci.Cursor, list[ci.Cursor], Callable[[ci.Type], bool]], bool]
 # The structural `absent_ok` rules, first match wins (interfaces "Conflict points"). `yaml-node`
 # comes first: it overrides every other rule. A nullary overload no rule matches keeps its
-# class's `nullary_absent_ok` (`serialization-default-ctor`).
+# class's `nullary_absent_ok` (`serialization-default-ctor`). `UNBOUND_DEPENDENCY` holds its
+# place in the order, but `_overload` does not decide it: it stores the `Dependency` and the
+# rule that applies when that does not hold (`audit_symbols.resolve_bound` decides).
 ABSENT_OK_RULES: tuple[tuple[AbsentOkTest, str], ...] = (
     (lambda c, params, unbound: any(_is_yaml_node(p) for p in params), "yaml-node"),
     (lambda c, params, unbound: _is_forwarding_ctor_template(c), "template-instance-name"),
@@ -727,10 +757,11 @@ ABSENT_OK_RULES: tuple[tuple[AbsentOkTest, str], ...] = (
 
 
 def _overload(
-    c: ci.Cursor, unbound: Callable[[ci.Type], bool], nullary_absent_ok: str | None = None
+    c: ci.Cursor, unbound: Callable[[ci.Type], Dependency], nullary_absent_ok: str | None = None
 ) -> CppOverload:
     """The Python-facing form of one C++ function, method or constructor; `unbound` is R13's
-    type test (`_names_unbound_dependency` bound to the TU's audited headers)."""
+    type test (`_unbound_dependency` bound to the TU's not-API headers). R13 is left
+    unresolved in `dependency`, and only where no earlier rule matched."""
     params = [p for p in c.get_children() if p.kind == ci.CursorKind.PARM_DECL]
     n_default = sum(_has_default(p) for p in params)
     out = tuple(_out_param_type(p) for p in params if _is_out_param(p))
@@ -739,7 +770,16 @@ def _overload(
     n = len(params) - len(pairs)
     arity = Arity(n - n_default, n)
     void = c.result_type.kind == ci.TypeKind.VOID
-    structural = next((rule for test, rule in ABSENT_OK_RULES if test(c, params, unbound)), None)
+    dependency = NO_DEPENDENCY
+    structural = None
+    for test, rule in ABSENT_OK_RULES:
+        if rule == UNBOUND_DEPENDENCY:
+            dependency = unbound(c.result_type)
+            for p in params:
+                dependency |= unbound(p.type)
+        elif test(c, params, lambda t: unbound(t) != NO_DEPENDENCY):
+            structural = rule
+            break
     absent_ok = structural or (nullary_absent_ok if arity.hi == 0 else None)
     raw = any(_is_raw_buffer(p) for i, p in enumerate(params) if i not in paired)
     pointers = {pos + k for k, pos in enumerate(pairs)}
@@ -762,6 +802,7 @@ def _overload(
         out_positions=out_positions,
         yaml_position=yaml_position,
         names=tuple(p.spelling for _, p in python_params),
+        dependency=dependency,
     )
 
 
@@ -774,7 +815,21 @@ def cpp_api(
     """The audited C++ API: public, non-deprecated declarations in `headers`.
 
     `prefixes` (module -> owned prefixes; None: `owner_prefixes`) and `is_bound` (whether some
-    module binds a qualified class) decide R13's `unbound-dependency-type`.
+    module binds a qualified class) decide R13's `unbound-dependency-type`. This is
+    `extract_api`, the part the fact cache stores, followed by `resolve_bound`.
+    """
+    not_api = not_api_headers(
+        inclusions(tu), headers, owner_prefixes() if prefixes is None else prefixes
+    )
+    return resolve_bound(extract_api(tu, headers, not_api), is_bound)
+
+
+def extract_api(
+    tu: ci.TranslationUnit, headers: frozenset[Path], not_api: frozenset[Path]
+) -> dict[str, CppSymbol]:
+    """The public, non-deprecated declarations in `headers`, R13 unresolved: a function of
+    the TU, `headers`, `not_api` (`not_api_headers`) and this module's constants only, so the
+    fact cache can store it (`audit_facts.api_facts`).
 
     Keys are dotted names within the namespace; operators that a binding maps to a
     dunder are keyed by the dunder, constructors by `__init__`. A class also holds the public
@@ -783,8 +838,7 @@ def cpp_api(
     symbols: dict[str, CppSymbol] = {}
     seen: set[str] = set()
     owned = _owned_headers(tu)
-    not_api = _not_api_headers(tu, headers, owner_prefixes() if prefixes is None else prefixes)
-    unbound = partial(_names_unbound_dependency, not_api=not_api, is_bound=is_bound)
+    unbound = partial(_unbound_dependency, not_api=not_api)
     # Inherited overloads dedupe per (derived class, USR), never through `seen`: the base's
     # own record must keep its members, and each derived class its inherited copy.
     inherited: set[tuple[str, str]] = set()
@@ -860,8 +914,7 @@ def cpp_api(
                 leaf, kind = member
                 if kind is Kind.FIELD:
                     sym = add(f"{name}.{leaf}", kind, m)
-                    if unbound(m.type):
-                        sym.absent_ok = UNBOUND_DEPENDENCY
+                    sym.dependency |= unbound(m.type)
                 else:
                     add_callable(f"{name}.{leaf}", kind, m)
             elif m.kind in RECORD_KINDS and m.is_definition():
@@ -907,8 +960,8 @@ def cpp_api(
                 )
                 if kind is not Kind.FIELD:
                     add_overload(sym, _overload(m, unbound))
-                elif unbound(m.type):
-                    sym.absent_ok = UNBOUND_DEPENDENCY
+                else:
+                    sym.dependency |= unbound(m.type)
             add_inherited(name, base, hidden | _declared_leaves(base))
 
     def visit(scope: ci.Cursor) -> None:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     CollisionCheckProgramType,
     CollisionEvaluatorType,
     ContactRequest,

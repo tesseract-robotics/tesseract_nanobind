@@ -43,5 +43,5 @@ packages = ["tesseract_robotics_support"]
 # (a tag build pins both with SETUPTOOLS_SCM_PRETEND_VERSION_FOR_<NAME>).
 [tool.setuptools_scm]
 root = "../.."
-tag_regex = "^(?P<version>\\d+\\.\\d+\\.\\d+\\.\\d+)$"
+tag_regex = "^(?P<version>\\d+\\.\\d+\\.\\d+\\.\\d+(?:rc\\d+)?)$"
 local_scheme = "no-local-version"

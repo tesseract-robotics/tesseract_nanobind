@@ -11,13 +11,13 @@ import sys
 import pytest
 import yaml
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactManagersPluginFactory,
     ContactRequest,
     ContactResultMap,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 
 from .test_contact_manager_config import _get_discrete_factory, _two_overlapping_boxes
 
@@ -132,14 +132,14 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.collision import (
     ContactManagersPluginFactory, ContactRequest, ContactResultMap, ContactTestType,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     CollisionMarginData, GeneralResourceLocator, Isometry3d, VectorIsometry3d,
 )
-from tesseract_robotics.tesseract_geometry import Box, GeometriesConst
+from tesseract_robotics.geometry import Box, GeometriesConst
 
 cfg = get_tesseract_support_path() / "urdf" / "contact_manager_plugins.yaml"
 factory = ContactManagersPluginFactory(cfg, GeneralResourceLocator(paths=[get_tesseract_resource_path()]))

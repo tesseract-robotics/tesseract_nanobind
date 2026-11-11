@@ -17,4 +17,4 @@ def test_reeds_shepp_example_has_no_entry_point():
 
 
 def test_the_ompl_planner_still_imports():
-    assert importlib.util.find_spec("tesseract_robotics.tesseract_motion_planners_ompl") is not None
+    assert importlib.util.find_spec("tesseract_robotics.motion_planners_ompl") is not None

@@ -1,7 +1,7 @@
 """`ProfileDictionary`: multi-name `addProfile`, `getProfileEntry`, `getAllProfileEntries` (#272)."""
 
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_simple import SimplePlannerLVSMoveProfile
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.motion_planners_simple import SimplePlannerLVSMoveProfile
 
 
 def _dictionary():

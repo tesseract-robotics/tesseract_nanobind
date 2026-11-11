@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CompositeInstruction,
     JointWaypoint,
@@ -24,7 +24,7 @@ from tesseract_robotics.tesseract_command_language import (
     toDelimitedFile,
     toJointTrajectory,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 
 NAMES = ["j1", "j2"]
 

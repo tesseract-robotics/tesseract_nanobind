@@ -13,11 +13,11 @@ import pytest
 import scipy.sparse
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics import tesseract_motion_planners_trajopt_ifopt as trajopt_ifopt_planners
+from tesseract_robotics import motion_planners_trajopt_ifopt as trajopt_ifopt_planners
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     JointWaypoint,
     JointWaypointPoly,
@@ -26,15 +26,15 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     ManipulatorInfo,
 )
-from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_motion_planners import MotionPlanner, PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.environment import AddLinkCommand, Environment
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.motion_planners import MotionPlanner, PlannerRequest
+from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     ProfileOverrideNotDispatchedError,
     TrajOptIfoptCartesianWaypointConfig,
     TrajOptIfoptCompositeProfile,
@@ -54,7 +54,7 @@ from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
     createCollisionConstraints,
     createJointVelocityConstraint,
 )
-from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 from tesseract_robotics.trajopt_sqp import SQPCallback, SQPParameters
 
@@ -989,7 +989,7 @@ _CHILD_PREAMBLE = textwrap.dedent(
     import scipy.sparse
 
     from tesseract_robotics import trajopt_ifopt as ti
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptCompositeProfile,
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptDefaultMoveProfile,
@@ -1030,7 +1030,7 @@ _CHILD_PREAMBLE = textwrap.dedent(
 _TASK_COMPOSER_RELEASE = textwrap.dedent(
     """
     from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.common import GeneralResourceLocator
     from tesseract_robotics.planning import (
         JointTarget,
         MotionProgram,
@@ -1076,10 +1076,10 @@ _TASK_COMPOSER_RELEASE = textwrap.dedent(
 _KEPT_WAYPOINT_INFO = textwrap.dedent(
     """
     from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.common import GeneralResourceLocator
     from pathlib import Path
 
-    from tesseract_robotics.tesseract_command_language import (
+    from tesseract_robotics.command_language import (
         CompositeInstruction,
         JointWaypoint,
         JointWaypointPoly,
@@ -1088,11 +1088,11 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
         MoveInstructionType,
         ProfileDictionary,
     )
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-    from tesseract_robotics.tesseract_environment import Environment
-    from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-    from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.environment import Environment
+    from tesseract_robotics.motion_planners import PlannerRequest
+    from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptMotionPlanner,
         TrajOptIfoptOSQPSolverProfile,
         TrajOptIfoptWaypointInfoInUseError,
@@ -1169,19 +1169,19 @@ _KEPT_WAYPOINT_INFO = textwrap.dedent(
 _SUPER_CREATE = textwrap.dedent(
     """
     from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.common import GeneralResourceLocator
     from pathlib import Path
 
-    from tesseract_robotics.tesseract_command_language import (
+    from tesseract_robotics.command_language import (
         JointWaypoint,
         JointWaypointPoly,
         MoveInstruction,
         MoveInstructionPoly,
         MoveInstructionType,
     )
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-    from tesseract_robotics.tesseract_environment import Environment
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.environment import Environment
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptPureVirtualCallError,
     )
 
@@ -1230,10 +1230,10 @@ _SUPER_CREATE = textwrap.dedent(
 _KEEP_FROM_CREATE = textwrap.dedent(
     """
     from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
+    from tesseract_robotics.common import GeneralResourceLocator
     from pathlib import Path
 
-    from tesseract_robotics.tesseract_command_language import (
+    from tesseract_robotics.command_language import (
         CompositeInstruction,
         JointWaypoint,
         JointWaypointPoly,
@@ -1242,11 +1242,11 @@ _KEEP_FROM_CREATE = textwrap.dedent(
         MoveInstructionType,
         ProfileDictionary,
     )
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-    from tesseract_robotics.tesseract_environment import Environment
-    from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-    from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+    from tesseract_robotics.environment import Environment
+    from tesseract_robotics.motion_planners import PlannerRequest
+    from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptMotionPlanner,
         TrajOptIfoptOSQPSolverProfile,
     )

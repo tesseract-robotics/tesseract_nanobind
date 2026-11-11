@@ -5,7 +5,7 @@ Expected values follow upstream collision_margin_data.cpp (tesseract 0.35.0).
 
 import pytest
 
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     CollisionMarginData,
     CollisionMarginPairData,
     CollisionMarginPairOverrideType,

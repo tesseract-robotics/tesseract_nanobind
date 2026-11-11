@@ -6,9 +6,9 @@ import numpy as np
 import numpy.testing as nptest
 import pytest
 
-from tesseract_robotics import tesseract_kinematics as tk
-from tesseract_robotics import tesseract_state_solver
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics import kinematics as tk
+from tesseract_robotics import state_solver as tesseract_state_solver
+from tesseract_robotics.common import Isometry3d
 
 from . import test_kdl_kinematics as kdl
 from . import test_opw_kinematics as opw

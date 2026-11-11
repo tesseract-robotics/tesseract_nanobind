@@ -17,9 +17,10 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics import get_tesseract_resource_path, tesseract_kinematics
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics import kinematics as tesseract_kinematics
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 
 # Byte-equivalent to the gh-72 forensic reproducer: module globals in this
 # exact order made interpreter teardown destroy env (unmapping the OPW plugin
@@ -28,10 +29,10 @@ from tesseract_robotics.tesseract_environment import Environment
 _TEARDOWN_SCRIPT = """\
 from pathlib import Path
 import numpy as np
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()
@@ -140,11 +141,11 @@ _ROP_EXPECTED_JOINTS = [
 
 _ROP_TEARDOWN_SCRIPT = """\
 from pathlib import Path
-from tesseract_robotics import tesseract_kinematics as tk
+from tesseract_robotics import kinematics as tk
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400_on_positioner.srdf").getFilePath()
@@ -202,10 +203,10 @@ def test_rop_solver_usable_after_factory_and_env_release():
 # plugin info, so the test does not hard-code the support SRDF's plugin list.
 _NAMED_MANAGER_TEARDOWN_SCRIPT = """\
 from pathlib import Path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf").getFilePath()
 srdf = locator.locateResource("package://tesseract/support/urdf/abb_irb2400.srdf").getFilePath()

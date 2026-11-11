@@ -5,7 +5,11 @@ name: Binding audit
 # unledgered rows, stale report or failing contract test show up on main after it lands, before a
 # release. workflow_dispatch runs it on a branch by hand. The full audit is computed once, last:
 # contract tests without the ledger row test, the GIL list, then the one audit pass, whose findings
-# the ledger test reads and whose report is compared with the committed one.
+# the ledger test reads and whose report is compared with the committed one. libclang parses the
+# bindings against the native stack the wheels link against (tesseract, trajopt, tesseract_planning
+# on vcpkg), restored from a wheel-workflow artifact or built by scripts/native_stack.py, never
+# against conda headers. The repository is checked out at tesseract_nanobind/, beside the stack's
+# ws/ and vcpkg/ (the layout of the wheel workflow).
 on:
   push:
     branches: [main]
@@ -16,18 +20,40 @@ on:
 
 permissions:
   contents: read
+  actions: read  # the native-cache action finds the wheel workflow's artifacts
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The native stack's root: scripts/audit_parse.py reads ws/install and vcpkg/installed from it.
+  AUDIT_NATIVE_ROOT: ${{ github.workspace }}
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 1G
+  CCACHE_BASEDIR: ${{ github.workspace }}
+
+defaults:
+  run:
+    working-directory: tesseract_nanobind
+
 jobs:
   audit:
-    runs-on: ubuntu-latest
-    # Longest successful run 64 min; a hung job otherwise holds a runner for 6 h.
-    timeout-minutes: 120
+    # The wheel workflow's runner image: a native stack restored from its artifact must match it.
+    runs-on: ubuntu-24.04
+    # Longest successful run 64 min with a restored native stack; a cold native build adds about an hour. A hung job otherwise holds a runner for 6 h.
+    timeout-minutes: 180
     steps:
     - uses: actions/checkout@v4
+      with:
+        path: tesseract_nanobind
+        fetch-depth: 0  # native-cache diffs the producer's revision against HEAD
+
+    - name: native stack
+      uses: ./tesseract_nanobind/.github/actions/native-linux
+      with:
+        arch: x64
+        vcpkg-triplet: x64-linux-dynamic-release
 
     - name: setup pixi
       uses: prefix-dev/setup-pixi@v0.8.0
@@ -36,7 +62,7 @@ jobs:
         # Explicit, as in the wheel workflows: without it setup-pixi v0.8.0 auto-detects
         # the manifest by parsing pyproject.toml with a TOML parser that predates dotted
         # keys and fails on `wheel.py-api = ...` (tool.scikit-build).
-        manifest-path: pyproject.toml
+        manifest-path: tesseract_nanobind/pyproject.toml
         environments: audit
         cache: true
         # Same rule as the wheel workflows: a lock that drifts from pyproject.toml fails
@@ -49,17 +75,23 @@ jobs:
     - name: Restore the fact cache
       uses: actions/cache/restore@v4
       with:
-        path: .cache/binding-audit
+        path: tesseract_nanobind/.cache/binding-audit
         key: binding-audit-facts-${{ github.run_id }}
         restore-keys: binding-audit-facts-
 
-    # Entries used after this stamp survive the prune below.
+    # Entries used after this stamp survive the prune below. The event logs (one per step,
+    # scripts/audit_telemetry.py) live outside the cache directory: they are this run's only.
     - name: Stamp the run start
-      run: touch "$RUNNER_TEMP/audit-start"
+      id: stamp
+      run: |
+        touch "$RUNNER_TEMP/audit-start"
+        mkdir "$RUNNER_TEMP/audit-events"
 
     # tests/audit (fixtures and the real binding TUs): the contract tests of the audit. The ledger
     # row test audits every module, so it runs below on the one audit pass instead.
     - name: Contract tests
+      env:
+        BINDING_AUDIT_EVENTS: ${{ runner.temp }}/audit-events/1-tests.jsonl
       run: >-
         pixi run -e audit audit-test
         --deselect
@@ -68,17 +100,22 @@ jobs:
     # Every GIL release is listed, with its reason, in scripts/nogil_entry_points.yaml, and
     # every listed entry point still releases it (#124; docs/developer/threading.md).
     - name: GIL releases match the list
+      env:
+        BINDING_AUDIT_EVENTS: ${{ runner.temp }}/audit-events/2-gil.jsonl
       run: pixi run -e audit audit-gil
 
     # The one audit pass: writes the report and, for the next step, the findings.
     - name: Audit
       id: audit
+      env:
+        BINDING_AUDIT_EVENTS: ${{ runner.temp }}/audit-events/3-audit.jsonl
       run: pixi run -e audit audit-bindings --json "$RUNNER_TEMP/binding-audit.json"
 
     # Missing outcomes and stale entries in one message: the whole debt, not half of it.
     - name: Every open row has an outcome, every entry a row
       env:
         BINDING_AUDIT_JSON: ${{ runner.temp }}/binding-audit.json
+        BINDING_AUDIT_EVENTS: ${{ runner.temp }}/audit-events/4-ledger.jsonl
       run: >-
         pixi run -e audit python -m pytest -o addopts='-ra --strict-markers --tb=short'
         --noconftest
@@ -103,5 +140,13 @@ jobs:
       if: ${{ !cancelled() }}
       uses: actions/cache/save@v4
       with:
-        path: .cache/binding-audit
+        path: tesseract_nanobind/.cache/binding-audit
         key: binding-audit-facts-${{ github.run_id }}
+
+    # Per step: hits and misses per fact kind, extraction and lock-wait seconds, and the
+    # seconds of each uncached phase. Also after a failed step: its numbers explain it. Last,
+    # so a log it cannot read costs neither the prune nor the save; not when the job failed
+    # before the stamp step made the directory (that failure is the one to read).
+    - name: Fact cache use
+      if: ${{ !cancelled() && steps.stamp.outcome == 'success' }}
+      run: pixi run -e audit audit-telemetry "$RUNNER_TEMP/audit-events"

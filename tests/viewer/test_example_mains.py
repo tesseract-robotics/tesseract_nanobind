@@ -16,7 +16,7 @@ import pytest
 
 import tesseract_robotics.examples
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly,
@@ -24,8 +24,8 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+from tesseract_robotics.environment import Environment
 from tesseract_robotics.viewer import TesseractViewer
 
 EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
@@ -34,11 +34,13 @@ EXAMPLES_DIR = Path(tesseract_robotics.examples.__file__).parent
 NEEDS_SUBMODULE = {"twc_workcell_positioner_viewer"}
 
 # Mains that keep their real run(): it plans nothing through a planner, and the main reads
-# the example's own scene (online_planning_sqp: its gantry and estop zones).
+# the example's own scene (online_planning_sqp: its gantry and estop zones; python_constraints:
+# its cell's instrument links and the rows that pose them).
 REAL_RUN = {
     "geometry_showcase_example",
     "lowlevel.scene_graph_c_api_example",
     "online_planning_sqp_example",
+    "python_constraints_example",
     "scene_graph_example",
     "shapes_viewer",
     "tesseract_material_mesh_viewer",

@@ -17,7 +17,7 @@ import logging
 from collections.abc import Sequence
 from typing import ClassVar
 
-from tesseract_robotics.tesseract_common import Quaterniond
+from tesseract_robotics.common import Quaterniond
 
 from ..core.dsl import Block, Command, Writer
 from .profile import (

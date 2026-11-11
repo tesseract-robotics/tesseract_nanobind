@@ -6,7 +6,7 @@ This guide walks you through your first motion planning task using the high-leve
 
 ```python
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
 # Load an example robot from tesseract's support data (ABB IRB2400, KUKA LBR IIWA, etc.),
@@ -62,7 +62,7 @@ else:
 Use the environment's discrete contact manager directly:
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType,

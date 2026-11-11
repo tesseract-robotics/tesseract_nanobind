@@ -149,7 +149,7 @@ def read_counts(raw: Path) -> list[tuple[str, int, str, str, int]]:
 
 
 def release(binding: str) -> Release:
-    """`tesseract_environment: Environment.getState` -> its nogil_entry_points.yaml key."""
+    """`environment: Environment.getState` -> its nogil_entry_points.yaml key."""
     module, qualname = binding.split(": ", 1)
     scope, _, name = qualname.rpartition(".")
     return Release(module, scope or MODULE_SCOPE, name)

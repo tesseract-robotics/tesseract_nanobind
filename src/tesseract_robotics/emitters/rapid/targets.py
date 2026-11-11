@@ -16,8 +16,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import ArrayLike
 
+from tesseract_robotics.common import Quaterniond
 from tesseract_robotics.planning import Pose
-from tesseract_robotics.tesseract_common import Quaterniond
 
 from .profile import RapidProfile
 from .utils import format_ext_axis

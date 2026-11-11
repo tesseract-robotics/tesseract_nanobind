@@ -15,8 +15,8 @@ import gc
 from pathlib import Path
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 
 
 def test_kdl_kinematics_plugin_loads():

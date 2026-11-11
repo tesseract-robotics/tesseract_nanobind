@@ -14,9 +14,9 @@ import pytest
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import KinematicGroup
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import KinematicGroup
 
 TOOL_Z = np.array([0.0, 0.0, 1.0])
 BASE_X = np.array([1.0, 0.0, 0.0])

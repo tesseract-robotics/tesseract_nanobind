@@ -63,6 +63,7 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import (
     MotionProgram,
     Pose,
@@ -76,7 +77,6 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
     create_trajopt_upright_profiles,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):

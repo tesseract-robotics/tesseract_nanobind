@@ -101,8 +101,8 @@ def test_failed_yaml_premise_falls_through_to_the_overload_table(monkeypatch):
 @pytest.mark.parametrize(
     ("module", "symbol"),
     [
-        ("tesseract_collision", "ContactManagersPluginFactory.__init__"),
-        ("tesseract_kinematics", "KinematicsPluginFactory.__init__"),
+        ("collision", "ContactManagersPluginFactory.__init__"),
+        ("kinematics", "KinematicsPluginFactory.__init__"),
     ],
 )
 def test_yaml_premise_keeps_core_rows(module, symbol):

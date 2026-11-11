@@ -153,29 +153,30 @@ nav:
     - Planning Examples: examples/planning.md
     - OMPL Examples: examples/ompl.md
     - Online Planning: examples/online-planning.md
+    - Python Constraints: examples/python-constraints.md
   - API Reference:
     - api/index.md
     - High-Level:
       - tesseract_robotics.planning: api/planning.md
     - Core Modules:
-      - tesseract_robotics.tesseract_common: api/tesseract_common.md
-      - tesseract_robotics.tesseract_geometry: api/tesseract_geometry.md
-      - tesseract_robotics.tesseract_scene_graph: api/tesseract_scene_graph.md
-      - tesseract_robotics.tesseract_urdf: api/tesseract_urdf.md
-      - tesseract_robotics.tesseract_srdf: api/tesseract_srdf.md
-      - tesseract_robotics.tesseract_state_solver: api/tesseract_state_solver.md
-      - tesseract_robotics.tesseract_environment: api/tesseract_environment.md
-      - tesseract_robotics.tesseract_collision: api/tesseract_collision.md
-      - tesseract_robotics.tesseract_kinematics: api/tesseract_kinematics.md
-      - tesseract_robotics.tesseract_serialization: api/tesseract_serialization.md
+      - tesseract_robotics.common: api/common.md
+      - tesseract_robotics.geometry: api/geometry.md
+      - tesseract_robotics.scene_graph: api/scene_graph.md
+      - tesseract_robotics.urdf: api/urdf.md
+      - tesseract_robotics.srdf: api/srdf.md
+      - tesseract_robotics.state_solver: api/state_solver.md
+      - tesseract_robotics.environment: api/environment.md
+      - tesseract_robotics.collision: api/collision.md
+      - tesseract_robotics.kinematics: api/kinematics.md
+      - tesseract_robotics.serialization: api/serialization.md
     - Planning Modules:
-      - tesseract_robotics.tesseract_command_language: api/tesseract_command_language.md
-      - tesseract_robotics.tesseract_motion_planners: api/tesseract_motion_planners.md
-      - tesseract_robotics.tesseract_motion_planners_ompl: api/tesseract_motion_planners_ompl.md
-      - tesseract_robotics.tesseract_motion_planners_trajopt: api/tesseract_motion_planners_trajopt.md
-      - tesseract_robotics.tesseract_motion_planners_descartes: api/tesseract_motion_planners_descartes.md
-      - tesseract_robotics.tesseract_motion_planners_simple: api/tesseract_motion_planners_simple.md
-      - tesseract_robotics.tesseract_task_composer: api/tesseract_task_composer.md
+      - tesseract_robotics.command_language: api/command_language.md
+      - tesseract_robotics.motion_planners: api/motion_planners.md
+      - tesseract_robotics.motion_planners_ompl: api/motion_planners_ompl.md
+      - tesseract_robotics.motion_planners_trajopt: api/motion_planners_trajopt.md
+      - tesseract_robotics.motion_planners_descartes: api/motion_planners_descartes.md
+      - tesseract_robotics.motion_planners_simple: api/motion_planners_simple.md
+      - tesseract_robotics.task_composer: api/task_composer.md
     - SQP Modules:
       - tesseract_robotics.trajopt_ifopt: api/trajopt_ifopt.md
       - tesseract_robotics.trajopt_sqp: api/trajopt_sqp.md
@@ -190,6 +191,7 @@ nav:
     - Binding Audit Coverage: developer/binding-audit-coverage.md
     - Threading and the GIL: developer/threading.md
     - How the Binaries Are Built: developer/binaries.md
+    - The Native Stack Build: developer/native-stack.md
     - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md

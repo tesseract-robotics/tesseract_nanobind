@@ -2,7 +2,7 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -17,7 +17,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypointPoly,
     WaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.common import Isometry3d, ManipulatorInfo
 
 
 def _joint_waypoint():

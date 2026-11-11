@@ -1,7 +1,7 @@
 """Widen id parameters in generated stubs to the types nanobind implicitly converts.
 
 The bindings declare `str -> LinkId`, `str -> JointId` and `tuple[str, str] -> LinkIdPair`
-implicitly convertible (tesseract_common_bindings.cpp), so `Link("base_link")` works at
+implicitly convertible (src/bindings/common.cpp), so `Link("base_link")` works at
 runtime. nanobind's stubgen does not record implicit conversions and annotates the
 parameter as `LinkId`, which makes every type checker reject the call. This rewrites
 parameter annotations only; return types stay exact (a getter really returns a `LinkId`).
@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-_QUAL = r"(?:tesseract_robotics\.tesseract_common\._tesseract_common\.)?"
+_QUAL = r"(?:tesseract_robotics\.common\._common\.)?"
 # An id type name not already widened (`LinkId | str`) and not part of a longer name.
 # Mapping/dict keys are left to `_widen_mappings`: keys are invariant, so
 # `Mapping[LinkId | str, X]` would reject the `dict[LinkId, X]` the bindings hand out

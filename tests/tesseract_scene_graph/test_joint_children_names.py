@@ -12,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import tesseract_robotics.tesseract_scene_graph as sg
-from tesseract_robotics.tesseract_common import Isometry3d, Quaterniond
+import tesseract_robotics.scene_graph as sg
+from tesseract_robotics.common import Isometry3d, Quaterniond
 
 # createTestSceneGraph offsets every joint 1.25 along x or y (tesseract_scene_graph_unit.cpp:57-80)
 JOINT_OFFSET = 1.25

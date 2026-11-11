@@ -109,6 +109,18 @@ tesseract_nb_find_plugin_target(tesseract_kinematics_kdl_factories tesseract::ki
 tesseract_nb_find_plugin_target(tesseract_kinematics_opw_factory tesseract::kinematics)
 tesseract_nb_find_plugin_target(tesseract_kinematics_ur_factory tesseract::kinematics)
 
+# Modules whose package keeps Python code around the compiled module (constants, lazy re-exports,
+# profile-override guards): the extension is installed as tesseract_robotics/<name>/_<name> and the
+# package __init__ re-exports it. Every other module is installed directly as tesseract_robotics/<name>.
+set(TESSERACT_NB_WRAPPED_MODULES
+  common
+  scene_graph
+  motion_planners
+  motion_planners_simple
+  motion_planners_descartes
+  motion_planners_trajopt_ifopt
+)
+
 # Define reusable function for nanobind extensions
 function(add_tesseract_nanobind_extension module_name source_file)
   nanobind_add_module(
@@ -142,29 +154,37 @@ function(add_tesseract_nanobind_extension module_name source_file)
     VISIBILITY_INLINES_HIDDEN OFF)
 
   # Install the module
-  install(TARGETS _${module_name}
-          LIBRARY DESTINATION tesseract_robotics/${module_name})
+  if(module_name IN_LIST TESSERACT_NB_WRAPPED_MODULES)
+    # _<name> in the package directory: NB_MODULE(_<name>, m)
+    install(TARGETS _${module_name}
+            LIBRARY DESTINATION tesseract_robotics/${module_name})
+  else()
+    # <name> directly in tesseract_robotics: NB_MODULE(<name>, m)
+    set_target_properties(_${module_name} PROPERTIES OUTPUT_NAME ${module_name})
+    install(TARGETS _${module_name}
+            LIBRARY DESTINATION tesseract_robotics)
+  endif()
 endfunction()
 
 # Add tesseract_common module
 add_tesseract_nanobind_extension(
-  tesseract_common
-  src/tesseract_common/tesseract_common_bindings.cpp
+  common
+  src/bindings/common.cpp
   tesseract::common
 )
 
 # Add tesseract_geometry module
 add_tesseract_nanobind_extension(
-  tesseract_geometry
-  src/tesseract_geometry/tesseract_geometry_bindings.cpp
+  geometry
+  src/bindings/geometry.cpp
   tesseract::geometry
   tesseract::common
 )
 
 # Add tesseract_scene_graph module
 add_tesseract_nanobind_extension(
-  tesseract_scene_graph
-  src/tesseract_scene_graph/tesseract_scene_graph_bindings.cpp
+  scene_graph
+  src/bindings/scene_graph.cpp
   tesseract::scene_graph
   tesseract::geometry
   tesseract::common
@@ -172,8 +192,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_srdf module
 add_tesseract_nanobind_extension(
-  tesseract_srdf
-  src/tesseract_srdf/tesseract_srdf_bindings.cpp
+  srdf
+  src/bindings/srdf.cpp
   tesseract::srdf
   tesseract::scene_graph
   tesseract::common
@@ -181,8 +201,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_urdf module
 add_tesseract_nanobind_extension(
-  tesseract_urdf
-  src/tesseract_urdf/tesseract_urdf_bindings.cpp
+  urdf
+  src/bindings/urdf.cpp
   tesseract::urdf
   tesseract::scene_graph
   tesseract::common
@@ -190,8 +210,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_collision module
 add_tesseract_nanobind_extension(
-  tesseract_collision
-  src/tesseract_collision/tesseract_collision_bindings.cpp
+  collision
+  src/bindings/collision.cpp
   tesseract::collision
   tesseract::collision_bullet
   tesseract::collision_vhacd_convex_decomposition
@@ -203,8 +223,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_state_solver module
 add_tesseract_nanobind_extension(
-  tesseract_state_solver
-  src/tesseract_state_solver/tesseract_state_solver_bindings.cpp
+  state_solver
+  src/bindings/state_solver.cpp
   tesseract::state_solver_kdl
   tesseract::state_solver_ofkt
   tesseract::scene_graph
@@ -213,8 +233,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_kinematics module
 add_tesseract_nanobind_extension(
-  tesseract_kinematics
-  src/tesseract_kinematics/tesseract_kinematics_bindings.cpp
+  kinematics
+  src/bindings/kinematics.cpp
   tesseract::kinematics
   tesseract::scene_graph
   tesseract::state_solver_kdl
@@ -227,8 +247,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_environment module
 add_tesseract_nanobind_extension(
-  tesseract_environment
-  src/tesseract_environment/tesseract_environment_bindings.cpp
+  environment
+  src/bindings/environment.cpp
   tesseract::environment
   tesseract::kinematics
   tesseract::collision
@@ -239,16 +259,16 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_command_language module
 add_tesseract_nanobind_extension(
-  tesseract_command_language
-  src/tesseract_command_language/tesseract_command_language_bindings.cpp
+  command_language
+  src/bindings/command_language.cpp
   tesseract::command_language
   tesseract::common
 )
 
 # Add tesseract_serialization module (XML/binary serialization for root types)
 add_tesseract_nanobind_extension(
-  tesseract_serialization
-  src/tesseract_serialization/tesseract_serialization_bindings.cpp
+  serialization
+  src/bindings/serialization.cpp
   tesseract::command_language
   tesseract::environment
   tesseract::scene_graph
@@ -262,8 +282,8 @@ find_package(tesseract_planning REQUIRED COMPONENTS motion_planners motion_plann
 
 # Add tesseract_motion_planners module
 add_tesseract_nanobind_extension(
-  tesseract_motion_planners
-  src/tesseract_motion_planners/tesseract_motion_planners_bindings.cpp
+  motion_planners
+  src/bindings/motion_planners.cpp
   tesseract::motion_planners
   tesseract::environment
   tesseract::command_language
@@ -272,8 +292,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_motion_planners_simple module
 add_tesseract_nanobind_extension(
-  tesseract_motion_planners_simple
-  src/tesseract_motion_planners_simple/tesseract_motion_planners_simple_bindings.cpp
+  motion_planners_simple
+  src/bindings/motion_planners_simple.cpp
   tesseract::motion_planners_simple
   tesseract::motion_planners
   tesseract::environment
@@ -283,8 +303,8 @@ add_tesseract_nanobind_extension(
 
 # Add tesseract_motion_planners_ompl module
 add_tesseract_nanobind_extension(
-  tesseract_motion_planners_ompl
-  src/tesseract_motion_planners_ompl/tesseract_motion_planners_ompl_bindings.cpp
+  motion_planners_ompl
+  src/bindings/motion_planners_ompl.cpp
   tesseract::motion_planners_ompl
   tesseract::motion_planners
   tesseract::environment
@@ -296,8 +316,8 @@ add_tesseract_nanobind_extension(
 find_package(tesseract_planning REQUIRED COMPONENTS motion_planners_descartes)
 find_package(descartes_light REQUIRED)
 add_tesseract_nanobind_extension(
-  tesseract_motion_planners_descartes
-  src/tesseract_motion_planners_descartes/tesseract_motion_planners_descartes_bindings.cpp
+  motion_planners_descartes
+  src/bindings/motion_planners_descartes.cpp
   tesseract::motion_planners_descartes
   tesseract::motion_planners
   tesseract::environment
@@ -310,8 +330,8 @@ add_tesseract_nanobind_extension(
 find_package(tesseract_planning REQUIRED COMPONENTS motion_planners_trajopt)
 find_package(trajopt REQUIRED)
 add_tesseract_nanobind_extension(
-  tesseract_motion_planners_trajopt
-  src/tesseract_motion_planners_trajopt/tesseract_motion_planners_trajopt_bindings.cpp
+  motion_planners_trajopt
+  src/bindings/motion_planners_trajopt.cpp
   tesseract::motion_planners_trajopt
   tesseract::motion_planners
   tesseract::environment
@@ -326,8 +346,8 @@ find_package(trajopt_ifopt REQUIRED)
 find_package(trajopt_sqp REQUIRED)
 find_package(trajopt_common REQUIRED)
 add_tesseract_nanobind_extension(
-  tesseract_motion_planners_trajopt_ifopt
-  src/tesseract_motion_planners_trajopt_ifopt/tesseract_motion_planners_trajopt_ifopt_bindings.cpp
+  motion_planners_trajopt_ifopt
+  src/bindings/motion_planners_trajopt_ifopt.cpp
   tesseract::motion_planners_trajopt_ifopt
   tesseract::motion_planners
   tesseract::environment
@@ -340,7 +360,7 @@ add_tesseract_nanobind_extension(
 # Add trajopt_ifopt module (variables, constraints, costs for IFOPT-based trajectory optimization)
 add_tesseract_nanobind_extension(
   trajopt_ifopt
-  src/trajopt_ifopt/trajopt_ifopt_bindings.cpp
+  src/bindings/trajopt_ifopt.cpp
   trajopt::trajopt_ifopt
   trajopt::trajopt_common
   tesseract::kinematics
@@ -352,18 +372,22 @@ add_tesseract_nanobind_extension(
 # Add trajopt_sqp module (SQP solver with stepSQPSolver for real-time planning)
 add_tesseract_nanobind_extension(
   trajopt_sqp
-  src/trajopt_sqp/trajopt_sqp_bindings.cpp
+  src/bindings/trajopt_sqp.cpp
   trajopt::trajopt_sqp
   trajopt::trajopt_ifopt
   tesseract::common
 )
+# PIQPSettings' operator== lives in the header-only tesseract/motion_planners/piqp/settings_utils.h
+# (#393): its include path only, no tesseract_planning library linked.
+target_include_directories(_trajopt_sqp PRIVATE
+  $<TARGET_PROPERTY:tesseract::motion_planners,INTERFACE_INCLUDE_DIRECTORIES>)
 
 # Find and add tesseract_time_parameterization
 find_package(tesseract_planning REQUIRED COMPONENTS time_parameterization time_parameterization_isp time_parameterization_totg time_parameterization_kdl time_parameterization_ruckig)
 
 add_tesseract_nanobind_extension(
-  tesseract_time_parameterization
-  src/tesseract_time_parameterization/tesseract_time_parameterization_bindings.cpp
+  time_parameterization
+  src/bindings/time_parameterization.cpp
   tesseract::time_parameterization_isp
   tesseract::time_parameterization_totg
   tesseract::time_parameterization_kdl
@@ -381,8 +405,8 @@ tesseract_nb_find_plugin_target(tesseract_task_composer_planning_factories tesse
 tesseract_nb_find_plugin_target(tesseract_task_composer_taskflow_factories tesseract::task_composer)
 
 add_tesseract_nanobind_extension(
-  tesseract_task_composer
-  src/tesseract_task_composer/tesseract_task_composer_bindings.cpp
+  task_composer
+  src/bindings/task_composer.cpp
   tesseract::task_composer
   tesseract::task_composer_taskflow
   tesseract::environment
@@ -394,11 +418,11 @@ add_tesseract_nanobind_extension(
   tesseract::tesseract_task_composer_taskflow_factories
 )
 # Pins the plugin libraries the task composer loads (macOS, Windows).
-target_sources(_tesseract_task_composer PRIVATE src/tesseract_task_composer/plugin_pinning.cpp)
+target_sources(_task_composer PRIVATE src/bindings/task_composer_plugin_pinning.cpp)
 
 add_tesseract_nanobind_extension(
-  tesseract_task_composer_planning
-  src/tesseract_task_composer_planning/tesseract_task_composer_planning_bindings.cpp
+  task_composer_planning
+  src/bindings/task_composer_planning.cpp
   tesseract::task_composer_planning_nodes
   tesseract::task_composer
   tesseract::motion_planners_trajopt
@@ -409,8 +433,8 @@ add_tesseract_nanobind_extension(
 
 # Registers the planners' cereal types with the serialization module: it has to see every planner,
 # and their targets are imported above.
-target_sources(_tesseract_serialization PRIVATE src/tesseract_serialization/planner_cereal_registration.cpp)
-target_link_libraries(_tesseract_serialization PRIVATE
+target_sources(_serialization PRIVATE src/bindings/serialization_planner_cereal_registration.cpp)
+target_link_libraries(_serialization PRIVATE
   tesseract::motion_planners_simple
   tesseract::motion_planners_ompl
   tesseract::motion_planners_descartes
@@ -423,7 +447,7 @@ target_link_libraries(_tesseract_serialization PRIVATE
   tesseract::time_parameterization_totg
 )
 # MSVC: the registrations and archives exceed the default COFF section limit (C1128).
-target_compile_options(_tesseract_serialization PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+target_compile_options(_serialization PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 
 message(STATUS "============= Build Configuration =============")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")

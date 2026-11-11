@@ -84,6 +84,7 @@ handles optional viewer launch, `run()` returns results for testing / reuse.
 |---------|----------------|-------------|
 | `online_planning_example.py` | `tesseract_online_planning_example` | TaskComposer replanning |
 | `online_planning_sqp_example.py` | `tesseract_online_planning_sqp_example` | Low-level SQP replanning ([rates](online-planning.md#performance-comparison)) |
+| [`python_constraints_example.py`](python-constraints.md) | `tesseract_python_constraints_example` | Seven Python-defined constraints in a live loop, scripted or driven with sliders |
 
 ### Visualization
 

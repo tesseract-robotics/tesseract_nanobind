@@ -59,14 +59,14 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import Robot, TaskComposer
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     GeneralResourceLocator,
     Isometry3d,
     LinkIdPair,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.planning import Robot, TaskComposer
+from tesseract_robotics.scene_graph import (
     Joint,
     JointCalibration,
     JointDynamics,

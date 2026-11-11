@@ -8,8 +8,8 @@ import sys
 import pytest
 
 FIRST_IMPORTS = [
-    "tesseract_robotics.tesseract_scene_graph",
-    "tesseract_robotics.tesseract_state_solver",
+    "tesseract_robotics.scene_graph",
+    "tesseract_robotics.state_solver",
 ]
 
 
@@ -17,11 +17,11 @@ FIRST_IMPORTS = [
 def test_scene_state_reexport_in_fresh_interpreter(first):
     code = (
         f"import {first}\n"
-        "from tesseract_robotics.tesseract_scene_graph import SceneState\n"
-        "from tesseract_robotics.tesseract_state_solver import SceneState as Bound\n"
+        "from tesseract_robotics.scene_graph import SceneState\n"
+        "from tesseract_robotics.state_solver import SceneState as Bound\n"
         "assert SceneState is Bound\n"
         "ns = {}\n"
-        "exec('from tesseract_robotics.tesseract_scene_graph import *', ns)\n"
+        "exec('from tesseract_robotics.scene_graph import *', ns)\n"
         "assert ns['SceneState'] is Bound\n"
     )
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
@@ -29,7 +29,7 @@ def test_scene_state_reexport_in_fresh_interpreter(first):
 
 
 def test_scene_graph_unknown_attribute_raises():
-    import tesseract_robotics.tesseract_scene_graph as sg
+    import tesseract_robotics.scene_graph as sg
 
     with pytest.raises(AttributeError, match="no_such_name"):
         sg.no_such_name

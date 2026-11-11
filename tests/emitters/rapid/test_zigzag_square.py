@@ -21,6 +21,7 @@ from typing import Final
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.emitters.rapid import RapidProfile, emit_rapid
 from tesseract_robotics.planning import (
     CartesianTarget,
@@ -29,7 +30,6 @@ from tesseract_robotics.planning import (
     Robot,
 )
 from tesseract_robotics.planning.toolpaths import OUTLINE_POSE_COUNT, ZIGZAG_LINE_COUNT
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
 
 #: TCP frame name — the robot link the planner / emitter treats as the tool tip.
 TCP_FRAME: Final[str] = "tool0"

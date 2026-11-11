@@ -65,36 +65,36 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
-from tesseract_robotics.planning.profiles import (
-    TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
-    create_freespace_pipeline_profiles,
-)
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, makeConvexMesh
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.collision import CollisionEvaluatorType, makeConvexMesh
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     GeneralResourceLocator,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddLinkCommand,
     ModifyAllowedCollisionsCommand,
     ModifyAllowedCollisionsType,
     MoveLinkCommand,
 )
-from tesseract_robotics.tesseract_geometry import createMeshFromResource
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.geometry import createMeshFromResource
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.planning import MotionProgram, Robot, StateTarget, TaskComposer
+from tesseract_robotics.planning.profiles import (
+    TRAJOPT_IFOPT_DEFAULT_NAMESPACE,
+    create_freespace_pipeline_profiles,
+)
+from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
     JointType,

@@ -22,16 +22,16 @@ FIXTURE_INCLUDE = FIXTURES / "include"
 
 # The 10 core modules audited before #256: their rows must not move under TF-1.
 CORE_MODULES = (
-    "tesseract_collision",
-    "tesseract_common",
-    "tesseract_environment",
-    "tesseract_geometry",
-    "tesseract_kinematics",
-    "tesseract_scene_graph",
-    "tesseract_serialization",
-    "tesseract_srdf",
-    "tesseract_state_solver",
-    "tesseract_urdf",
+    "collision",
+    "common",
+    "environment",
+    "geometry",
+    "kinematics",
+    "scene_graph",
+    "serialization",
+    "srdf",
+    "state_solver",
+    "urdf",
 )
 
 
@@ -232,7 +232,7 @@ STRUCTURAL_RULE = "serialization-default-ctor"
 def _structural_place(monkeypatch):
     """`audit_tu` with the 3-ary `Shelf.place` carrying a structural `absent_ok`, and the
     overload table naming the same overload."""
-    real = match_.cpp_api
+    real = match_.resolve_bound  # after the fact cache: a wrapper before it would be stored
 
     def cpp_api(*args, **kwargs):
         cpp = real(*args, **kwargs)
@@ -243,7 +243,7 @@ def _structural_place(monkeypatch):
             ]
         return cpp
 
-    monkeypatch.setattr(match_, "cpp_api", cpp_api)
+    monkeypatch.setattr(match_, "resolve_bound", cpp_api)
     monkeypatch.setitem(audit.ACCEPTED, FIXTURE_OVERLOAD_RULE, "x")
     monkeypatch.setitem(
         audit.ACCEPTED_CPP_OVERLOADS, ("poly", "Shelf.place", "3"), FIXTURE_OVERLOAD_RULE
@@ -446,7 +446,7 @@ def test_clone_covered_by_the_copy_protocol(poly_report):
 
 @pytest.fixture(scope="module")
 def common_report():
-    return audit.audit_module("tesseract_common")
+    return audit.audit_module("common")
 
 
 def test_vector_forwarding_core_diff_is_the_8_joint_trajectory_rows(common_report):

@@ -7,10 +7,10 @@ import pytest
 
 from tests.audit._load import audit
 
-TC = "tesseract_task_composer"
-TCP = "tesseract_task_composer_planning"
-KIN = "tesseract_kinematics"
-COLLISION = "tesseract_collision"
+TC = "task_composer"
+TCP = "task_composer_planning"
+KIN = "kinematics"
+COLLISION = "collision"
 PLUGIN_AUTHOR = "plugin-author-factory-interface"
 # C20 (Jelle 2026-10-16: apply to core): the core won't-fix factory interfaces.
 CORE_FACTORY_INTERFACES = (
@@ -125,7 +125,7 @@ def test_class_extension_trait_has_no_row(g4_reports):
 def test_any_poly_ctor_rules_by_location(g4_reports):
     """Each AnyPoly ctor gets its own rule; the overload-table key "1" must not hide the forwarding
     ctor templates. Lines are read from the header, so an upstream edit above them moves both."""
-    lines = (audit.CONDA_INCLUDE / ANY_POLY_H).read_text(encoding="utf-8").splitlines()
+    lines = (audit.NATIVE_INCLUDES[0] / ANY_POLY_H).read_text(encoding="utf-8").splitlines()
 
     def line_of(declaration: str) -> str:
         [number] = [i for i, text in enumerate(lines, 1) if text.strip() == declaration]
@@ -210,7 +210,7 @@ def test_tc_patterns_do_not_reach_planning(monkeypatch, g4_reports):
 
 
 def test_tc_yaml_utils_pattern_keeps_the_common_header():
-    common = audit.audit_module("tesseract_common")
+    common = audit.audit_module("common")
     assert "tesseract/common/yaml_utils.h" in {g.symbol for g in common.gaps}
 
 

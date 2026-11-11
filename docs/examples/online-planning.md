@@ -155,7 +155,7 @@ needs `LVS_DISCRETE` (the example's continuous mode, about 20 Hz), and
 `LVSContinuousCollisionEvaluator` needs `LVS_CONTINUOUS` or `CONTINUOUS`:
 
 ```python
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 from tesseract_robotics.trajopt_ifopt import (
     ContinuousCollisionConstraint,
     LVSContinuousCollisionEvaluator,

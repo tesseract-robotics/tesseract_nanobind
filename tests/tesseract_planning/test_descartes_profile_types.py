@@ -11,8 +11,12 @@ import numpy as np
 import pytest
 import yaml
 
-import tesseract_robotics.tesseract_motion_planners_descartes as descartes
+import tesseract_robotics.motion_planners_descartes as descartes
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.collision import ContactManagerConfig
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.common import GeneralResourceLocator, PluginInfo
+from tesseract_robotics.motion_planners import ProfileOverrideNotDispatchedError
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -26,10 +30,6 @@ from tesseract_robotics.planning.profiles import (
     DESCARTES_DEFAULT_NAMESPACE,
     DESCARTES_PROFILE_NAMES,
 )
-from tesseract_robotics.tesseract_collision import ContactManagerConfig
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, PluginInfo
-from tesseract_robotics.tesseract_motion_planners import ProfileOverrideNotDispatchedError
 
 # m, the vertex contact margin of the infeasible profile. Every link of the IRB2400 lies within
 # 3 m of every other (the arm reaches 1.55 m from its base), so at 10 m each link pair the

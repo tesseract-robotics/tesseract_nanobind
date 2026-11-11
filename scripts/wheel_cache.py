@@ -19,6 +19,7 @@ NATIVE_INPUTS = (
     ".github/workflows/vcpkg_",
     ".github/actions/native-cache/",
     "scripts/wheel_cache",
+    "scripts/native_stack",
     "upstream/",
 )
 

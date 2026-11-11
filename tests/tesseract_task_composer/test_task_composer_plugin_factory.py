@@ -6,13 +6,13 @@ import pytest
 import yaml
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import TaskComposer
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     PluginInfo,
     TaskComposerPluginInfo,
 )
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.planning import TaskComposer
+from tesseract_robotics.task_composer import (
     TaskComposerConfigError,
     TaskComposerPluginFactory,
     TaskComposerServer,
@@ -179,7 +179,7 @@ class TestPluginRegistry:
         assert executor.getName() == "Unconfigured"
 
     def test_create_node_from_bad_plugin_info_raises(self, factory):
-        from tesseract_robotics.tesseract_task_composer import TaskComposerPluginError
+        from tesseract_robotics.task_composer import TaskComposerPluginError
 
         info = PluginInfo()
         info.class_name = "NoSuchFactory"

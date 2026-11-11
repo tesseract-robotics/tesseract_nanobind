@@ -33,8 +33,7 @@ from enum import Enum, auto
 import numpy as np
 from numpy.typing import ArrayLike
 
-from tesseract_robotics.planning.transforms import Pose
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     DEFAULT_PROFILE_KEY,
     CartesianWaypoint,
     CartesianWaypointPoly,
@@ -47,7 +46,8 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.planning.transforms import Pose
 
 
 class MoveType(Enum):
