@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -26,7 +26,7 @@ from tesseract_robotics.tesseract_command_language import (
     getJointPosition,
     setJointPosition,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 
 
 def _move():

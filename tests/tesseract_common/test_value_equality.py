@@ -10,7 +10,7 @@ from typing import override
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     BytesResource,
     CollisionMarginData,

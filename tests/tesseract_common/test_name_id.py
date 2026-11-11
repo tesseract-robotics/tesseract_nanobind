@@ -8,7 +8,7 @@ and keep ids interchangeable with their names as dict keys.
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     CollisionMarginData,
     Isometry3d,

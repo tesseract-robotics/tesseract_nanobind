@@ -29,7 +29,6 @@ from audit_ownership import (
     AUDITED_HEADER_PREFIX,
     PLUGIN_ANCHOR_INCLUDES,
     SRC,
-    STUB_ROOT,
     UNAUDITED_MODULES,
     UnauditedModuleError,
     UnknownModuleError,
@@ -39,6 +38,7 @@ from audit_ownership import (
     header_auditor,
     is_unaudited,
     owner_prefixes,
+    package_init,
 )
 from audit_parse import (
     INCLUDE_DIRS,
@@ -774,7 +774,7 @@ def audit_tu(
     module: str,
     cpp_path: Path,
     stub_path: Path,
-    init_path: Path,
+    init_path: Path | None,
     prefix: tuple[str, ...],
     extra_include_dirs: Sequence[Path] = (),
     other_bindings: Sequence[Path] = (),
@@ -782,7 +782,7 @@ def audit_tu(
     prefixes: Mapping[str, tuple[str, ...]] | None = None,
     bound: BoundLookup | None = None,
 ) -> ModuleReport:
-    """Audit one translation unit against one stub and package `__init__.py`.
+    """Audit one translation unit against one stub and, if the module has one, package `__init__.py`.
 
     Audits every header under `prefix` (the module's prefixes) that the module owns, except
     `UNAUDITED_HEADERS` and headers that the binding
@@ -864,19 +864,22 @@ def audit_tu(
         [*report.gaps, *unincluded_header_gaps(cpp_path, unincluded, extra_include_dirs)]
     )
     # `__init_subclass__` on a class the package `__init__.py` guards is that guard's hook.
-    guarded = override_guarded(init_path)
+    # A module that is itself the extension has no package `__init__.py`, so nothing to read.
+    guarded = override_guarded(init_path) if init_path is not None else frozenset()
+    init_deviations = init_findings(init_path) if init_path is not None else []
+    init_hooks = init_accepted(init_path) if init_path is not None else []
     hooks = [
         d
         for d in report.deviations
         if d.name.endswith(".__init_subclass__") and d.name.rpartition(".")[0] in guarded
     ]
     report.deviations = sorted(
-        [*(d for d in report.deviations if d not in hooks), *init_findings(init_path)]
+        [*(d for d in report.deviations if d not in hooks), *init_deviations]
     )
     report.accepted = sorted(
         [
             *report.accepted,
-            *init_accepted(init_path),
+            *init_hooks,
             *(Accepted(d.name, "hook-override-guard", d.location) for d in hooks),
         ]
     )
@@ -898,7 +901,7 @@ def audit_module(module: str) -> ModuleReport:
         module,
         binding_source(module),
         committed_stub(module),
-        STUB_ROOT / module / "__init__.py",
+        package_init(module),
         AUDITED_HEADER_PREFIX[module],
         other_bindings=[binding_source(m) for m in binding_modules() if m != module],
         prefixes=owner_prefixes(),

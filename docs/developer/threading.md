@@ -76,7 +76,7 @@ that takes `nb::object`, `nb::handle`, `nb::callable`, `nb::bytes` or `nb::args`
 ```mermaid
 flowchart LR
     subgraph static["Static: audit.yml, on merge to main, on tags, by hand"]
-        tu["binding TUs<br/>src/*/*_bindings.cpp"] --> audit["audit_gil.py<br/>(libclang, bodies parsed)"]
+        tu["binding TUs<br/>src/bindings/*.cpp"] --> audit["audit_gil.py<br/>(libclang, bodies parsed)"]
         yaml["nogil_entry_points.yaml"] --> audit
         audit -->|"release not listed,<br/>or listed but gone"| fail["CI fails"]
     end
@@ -125,21 +125,21 @@ one sample is 10 ms.
 
 | Binding | Mean per call | Calls | Run | Decision |
 |---|---:|---:|---|---|
-| `tesseract_serialization: environment_from_file` | 3.6 s | 1 | tests | released: replays commands into a new `Environment`, which has no callbacks yet |
-| `tesseract_serialization: environment_to_file` | 2.2 s | 1 | tests | released: reads under the shared lock, as `clone()` does |
-| `tesseract_serialization: environment_{to,from}_{xml,binary}` | 12.2 s together | - | tests | released: same reasons (to and from share a test line, so no per-call mean) |
-| `tesseract_motion_planners_simple: generateInterpolatedProgram` | 106 ms | 37 | tests | released: interpolation and a state solve per step; only reads `env` |
-| `tesseract_geometry: createMeshFromResource` | 2.5 ms | 69 | tests | released, with the `Path` loaders and the `ConvexMesh` variants: file IO plus assimp, like `parseURDFFile` |
-| `tesseract_environment: Environment.init` | 0.85 s / 0.93 s | 303 / 438 | bench / tests | GIL-held: `Environment` method, see the deadlock below |
-| `tesseract_environment: Environment.getKinematicGroup` | 0.83 s / 0.54 s | 35 / 146 | bench / tests | GIL-held: `Environment` method |
-| `tesseract_task_composer: TaskComposerPluginFactory.createTaskComposerNode` | 26 ms / 1.6 s | 570 / 338 | bench / tests | GIL-held: unsynchronised factory cache |
-| `tesseract_task_composer: TaskComposerPluginFactory.createTaskComposerExecutor` | 0.73 s / 0.99 s | 2 / 48 | bench / tests | GIL-held: unsynchronised factory cache |
-| `tesseract_kinematics: KinematicsPluginFactory.createFwdKin` / `createInvKin` | 0.92 s / 0.46 s | 19 / 12 | tests | GIL-held: unsynchronised factory cache |
-| `tesseract_collision: ContactManagersPluginFactory.createDiscreteContactManager` / `createContinuousContactManager` | 0.50 s / 0.56 s | 22 / 17 | tests | GIL-held: unsynchronised factory cache |
-| `tesseract_motion_planners_descartes: DescartesMoveProfileD.createKinematicGroup` | 0.96 s | 3 | tests | GIL-held: its cost is `Environment.getKinematicGroup`; decide with it |
-| `tesseract_motion_planners_trajopt_ifopt: TrajOptIfoptCompositeProfile.create` | 84 ms | 5 | tests | GIL-held: the binding runs Python-side contract checks around a trampoline |
-| `tesseract_task_composer: TaskComposerPluginFactory.getAvailableTaskComposerNodePlugins` | 410 ms | 2 | tests | GIL-held: a getter |
-| `tesseract_geometry: PolygonMesh.getVertices` / `getFaces` | 80 µs | 1257 | tests | GIL-held: getters (the cost is copying to NumPy) |
+| `serialization: environment_from_file` | 3.6 s | 1 | tests | released: replays commands into a new `Environment`, which has no callbacks yet |
+| `serialization: environment_to_file` | 2.2 s | 1 | tests | released: reads under the shared lock, as `clone()` does |
+| `serialization: environment_{to,from}_{xml,binary}` | 12.2 s together | - | tests | released: same reasons (to and from share a test line, so no per-call mean) |
+| `motion_planners_simple: generateInterpolatedProgram` | 106 ms | 37 | tests | released: interpolation and a state solve per step; only reads `env` |
+| `geometry: createMeshFromResource` | 2.5 ms | 69 | tests | released, with the `Path` loaders and the `ConvexMesh` variants: file IO plus assimp, like `parseURDFFile` |
+| `environment: Environment.init` | 0.85 s / 0.93 s | 303 / 438 | bench / tests | GIL-held: `Environment` method, see the deadlock below |
+| `environment: Environment.getKinematicGroup` | 0.83 s / 0.54 s | 35 / 146 | bench / tests | GIL-held: `Environment` method |
+| `task_composer: TaskComposerPluginFactory.createTaskComposerNode` | 26 ms / 1.6 s | 570 / 338 | bench / tests | GIL-held: unsynchronised factory cache |
+| `task_composer: TaskComposerPluginFactory.createTaskComposerExecutor` | 0.73 s / 0.99 s | 2 / 48 | bench / tests | GIL-held: unsynchronised factory cache |
+| `kinematics: KinematicsPluginFactory.createFwdKin` / `createInvKin` | 0.92 s / 0.46 s | 19 / 12 | tests | GIL-held: unsynchronised factory cache |
+| `collision: ContactManagersPluginFactory.createDiscreteContactManager` / `createContinuousContactManager` | 0.50 s / 0.56 s | 22 / 17 | tests | GIL-held: unsynchronised factory cache |
+| `motion_planners_descartes: DescartesMoveProfileD.createKinematicGroup` | 0.96 s | 3 | tests | GIL-held: its cost is `Environment.getKinematicGroup`; decide with it |
+| `motion_planners_trajopt_ifopt: TrajOptIfoptCompositeProfile.create` | 84 ms | 5 | tests | GIL-held: the binding runs Python-side contract checks around a trampoline |
+| `task_composer: TaskComposerPluginFactory.getAvailableTaskComposerNodePlugins` | 410 ms | 2 | tests | GIL-held: a getter |
+| `geometry: PolygonMesh.getVertices` / `getFaces` | 80 µs | 1257 | tests | GIL-held: getters (the cost is copying to NumPy) |
 
 In the benchmarks, 90% of GIL-held samples fall in unlisted bindings, and over 99% of those are
 `Environment.init`, `Environment.getKinematicGroup` and the task composer factory. In real

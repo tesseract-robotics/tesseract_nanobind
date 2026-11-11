@@ -1198,7 +1198,7 @@ SEEDS_THAT_BROKE_TOTG = (1, 9, 16, 22, 23, 30, 38)
 @pytest.mark.planning
 @pytest.mark.parametrize("seed", SEEDS_THAT_BROKE_TOTG)
 def test_lowlevel_trajopt_ifopt_example_on_seeds_that_broke_totg(seed):
-    from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
+    from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 
     RNG_setSeed(seed)
     tesseract_robotics.examples.tesseract_planning_lowlevel_trajopt_ifopt_example()
@@ -1214,7 +1214,7 @@ SEEDS_THAT_GRAZED_THE_SPHERE = (39, 43, 96)
 @pytest.mark.planning
 @pytest.mark.parametrize("seed", SEEDS_THAT_GRAZED_THE_SPHERE)
 def test_freespace_ompl_example_on_seeds_that_grazed_the_sphere(seed):
-    from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
+    from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 
     RNG_setSeed(seed)
     tesseract_robotics.examples.freespace_ompl_example()
@@ -1235,14 +1235,14 @@ CAR_SEAT_COST_MARGIN_M = 0.005
 
 def _min_distance_to(obstacle, env, joint_names, positions):
     """Minimum signed distance between any robot link and `obstacle` along a joint path."""
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract_robotics.collision import (
         ContactRequest,
         ContactResultMap,
         ContactResultVector,
         ContactTestType,
     )
-    from tesseract_robotics.tesseract_common import CollisionMarginData
-    from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
+    from tesseract_robotics.common import CollisionMarginData
+    from tesseract_robotics.state_solver import OFKTStateSolver
 
     solver = OFKTStateSolver(env.getSceneGraph())
     manager = env.getDiscreteContactManager()

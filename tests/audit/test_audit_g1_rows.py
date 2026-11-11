@@ -15,7 +15,7 @@ from tests.audit._load import audit, load
 
 own = load("audit_ownership")
 
-G1 = ("tesseract_command_language", "tesseract_time_parameterization")
+G1 = ("command_language", "time_parameterization")
 CL, TP = G1
 CL_PREFIX = "tesseract/command_language/"
 
@@ -119,9 +119,7 @@ def test_profile_headers_are_audited_with_command_language(g1_reports):
 
 
 def test_cereal_serialization_header_is_delegated_to_serialization(g1_reports):
-    assert g1_reports[CL].delegated == {
-        f"{CL_PREFIX}cereal_serialization.h": "tesseract_serialization"
-    }
+    assert g1_reports[CL].delegated == {f"{CL_PREFIX}cereal_serialization.h": "serialization"}
 
 
 def test_value_equality_rows_are_covered(g1_reports):

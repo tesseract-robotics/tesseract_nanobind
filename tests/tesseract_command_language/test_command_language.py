@@ -9,8 +9,8 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics import tesseract_command_language
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics import command_language as tesseract_command_language
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     # Poly wrappers
     CartesianWaypointPoly,
@@ -37,7 +37,7 @@ from tesseract_robotics.tesseract_command_language import (
     WaitInstruction,
     WaitInstructionType,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     Isometry3d,
     JointState,
     ManipulatorInfo,
@@ -478,8 +478,8 @@ class TestNoTaskComposerReexport:
         """Runs in a fresh interpreter: this process may already hold the task composer."""
         code = (
             "import sys\n"
-            "import tesseract_robotics.tesseract_command_language\n"
-            "loaded = sorted(m for m in sys.modules if m.startswith('tesseract_robotics.tesseract_task_composer'))\n"
+            "import tesseract_robotics.command_language\n"
+            "loaded = sorted(m for m in sys.modules if m.startswith('tesseract_robotics.task_composer'))\n"
             "assert loaded == [], loaded\n"
         )
         subprocess.run([sys.executable, "-c", code], check=True)
@@ -490,7 +490,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_composite_instruction(self):
         """Test wrapping CompositeInstruction in AnyPoly."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_wrap_CompositeInstruction,
         )
 
@@ -511,7 +511,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_wrap_profile_dictionary(self):
         """Test wrapping ProfileDictionary in AnyPoly."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_wrap_ProfileDictionary,
         )
 
@@ -522,7 +522,7 @@ class TestAnyPolyWrappers:
 
     def test_anypoly_roundtrip_composite_instruction(self):
         """Test wrapping and unwrapping CompositeInstruction via AnyPoly."""
-        from tesseract_robotics.tesseract_task_composer import (
+        from tesseract_robotics.task_composer import (
             AnyPoly_as_CompositeInstruction,
             AnyPoly_wrap_CompositeInstruction,
         )
@@ -619,7 +619,7 @@ class TestWaitInstruction:
     def test_scan_program_interleaves_moves_and_waits(self):
         """Concrete usage: a scan program where each move is followed by a
         wait for the camera-done IO line."""
-        from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+        from tesseract_robotics.common import Isometry3d, Translation3d
 
         program = CompositeInstruction("DEFAULT")
         for x in (0.0, 0.1, 0.2):

@@ -13,7 +13,7 @@
 #   3. does not mutate state Python code typically shares across threads.
 # Value types, getters, setters and constructors never qualify.
 
-tesseract_task_composer:
+task_composer:
   TaskComposerFuture:
     wait: >-
       Blocks until the executor finishes. Mandatory, not a speed-up: a Python profile or cost
@@ -58,13 +58,13 @@ tesseract_task_composer:
   TaskflowTaskComposerExecutor:
     run: Re-exposed TaskComposerExecutor.run; same reason.
 
-tesseract_motion_planners:
+motion_planners:
   MotionPlanner:
     solve: Seconds of CPU for OMPL, TrajOpt, TrajOpt-Ifopt and Descartes.
   module:
     contactCheckProgram: Collision-checks every state of a program; pure C++ loop.
 
-tesseract_motion_planners_simple:
+motion_planners_simple:
   SimpleMotionPlanner:
     solve: >-
       Interpolates and runs IK for every segment; a Python move profile re-acquires the GIL
@@ -80,7 +80,7 @@ trajopt_sqp:
   TrustRegionSQPSolver:
     solve: Runs the full SQP optimization.
 
-tesseract_kinematics:
+kinematics:
   InverseKinematics:
     calcInvKin: Numerical solvers (TRAC-IK, KDL) iterate until their timeout.
   KinematicGroup:
@@ -89,20 +89,20 @@ tesseract_kinematics:
   module:
     checkKinematics: FK then IK for every working frame and tip link.
 
-tesseract_time_parameterization:
+time_parameterization:
   TimeParameterization:
     compute: >-
       TOTG, ISP, constant-TCP and Ruckig scale with trajectory length. Only reads env, so no
       Environment event callback fires inside it.
 
-tesseract_urdf:
+urdf:
   module:
     parseURDFString: >-
       XML parsing plus mesh loading. A Python ResourceLocator re-acquires the GIL through its
       trampoline.
     parseURDFFile: See parseURDFString.
 
-tesseract_geometry:
+geometry:
   module:
     writeSignedDistanceFieldVDB: >-
       Encodes the whole grid; the field is discretized first with the GIL held, because a sampler
@@ -116,7 +116,7 @@ tesseract_geometry:
       nanobind's shared_ptr deleter for it takes the GIL itself.
     createConvexMeshFromResource: See createMeshFromResource; plus a convex hull.
 
-tesseract_serialization:
+serialization:
   module:
     environment_to_xml: >-
       Serializes the whole command history: seconds for a mesh-heavy scene (gil-hotspots).
@@ -129,7 +129,7 @@ tesseract_serialization:
     environment_from_binary: See environment_from_xml.
     environment_from_file: See environment_from_xml; plus file IO.
 
-tesseract_collision:
+collision:
   DiscreteContactManager:
     contactTest: Broad and narrow phase over every enabled object; called in loops.
     setCollisionObjectsTransform: >-
@@ -146,7 +146,7 @@ tesseract_collision:
       assigning a shape's members during the call affects only later calls, and the copies keep a
       shape's geometry alive. A Python distance, gradient or field sampler takes the GIL per call.
 
-tesseract_environment:
+environment:
   Environment:
     link_transforms_batch: >-
       Forward kinematics over every row of a joint-value array, pure C++ into a buffer allocated
@@ -177,7 +177,7 @@ tesseract_environment:
     _find_tcp_offset_on_native_thread: >-
       Private test oracle (gh-183): joins a native thread that must take the GIL itself.
 
-tesseract_common:
+common:
   module:
     removeLogRecordHandler: >-
       Mandatory, not a speed-up: upstream waits for the handler's in-flight calls on other threads,

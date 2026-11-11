@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import LinkId, LinkIdPair
+from tesseract_robotics.common import LinkId, LinkIdPair
 
 
 def _unordered(pairs):

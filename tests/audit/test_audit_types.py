@@ -101,6 +101,11 @@ def test_every_mapping_rule_gives_the_stub_key(typed_cpp, typed_py):
         ),
         ("object", None),
         ('"tesseract::fixture::Owner"', None),  # an unbound C++ type: no key
+        # A class of another module, spelled through a wrapped package (`common._common`) or
+        # through a module that is itself the extension (`geometry`).
+        ("tesseract_robotics.common._common.Isometry3d", ("class", "Isometry3d")),
+        ("tesseract_robotics.geometry.Geometry", ("class", "Geometry")),
+        ("tesseract_robotics.collision.Outer.Inner", ("class", "Outer.Inner")),
         # A nanobind implicit conversion scripts/widen_implicit_id_stubs.py spells in the stub:
         # one C++ parameter type, keyed as the id class.
         ("LinkId | str", ("class", "LinkId")),

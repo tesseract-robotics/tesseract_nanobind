@@ -48,9 +48,9 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
     JointType,
@@ -58,8 +58,8 @@ from tesseract_robotics.tesseract_scene_graph import (
     SceneGraph,
     Visual,
 )
-from tesseract_robotics.tesseract_state_solver import KDLStateSolver, OFKTStateSolver, StateSolver
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.state_solver import KDLStateSolver, OFKTStateSolver, StateSolver
+from tesseract_robotics.urdf import parseURDFFile
 
 URDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
 FLOATING_JOINT = "joint_a1"

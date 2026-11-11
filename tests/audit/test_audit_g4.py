@@ -7,10 +7,10 @@ import pytest
 
 from tests.audit._load import audit
 
-TC = "tesseract_task_composer"
-TCP = "tesseract_task_composer_planning"
-KIN = "tesseract_kinematics"
-COLLISION = "tesseract_collision"
+TC = "task_composer"
+TCP = "task_composer_planning"
+KIN = "kinematics"
+COLLISION = "collision"
 PLUGIN_AUTHOR = "plugin-author-factory-interface"
 # C20 (Jelle 2026-10-16: apply to core): the core won't-fix factory interfaces.
 CORE_FACTORY_INTERFACES = (
@@ -210,7 +210,7 @@ def test_tc_patterns_do_not_reach_planning(monkeypatch, g4_reports):
 
 
 def test_tc_yaml_utils_pattern_keeps_the_common_header():
-    common = audit.audit_module("tesseract_common")
+    common = audit.audit_module("common")
     assert "tesseract/common/yaml_utils.h" in {g.symbol for g in common.gaps}
 
 

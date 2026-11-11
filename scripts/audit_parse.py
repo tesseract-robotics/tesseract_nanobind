@@ -366,7 +366,7 @@ def direct_include_spellings(sources: Sequence[Path]) -> frozenset[str]:
 
 
 def binding_module(path: Path) -> str:
-    """`src/tesseract_srdf/tesseract_srdf_bindings.cpp` → `tesseract_srdf`."""
+    """`src/bindings/srdf.cpp` → `srdf`; a test fixture `other_bindings.cpp` → `other`."""
     return path.stem.removesuffix("_bindings")
 
 

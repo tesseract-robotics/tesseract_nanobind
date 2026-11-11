@@ -4,7 +4,7 @@
 
 ### ProfileDictionary.addProfile - RESOLVED
 
-The cross-module inheritance for Profile types now works. We use `nb::class_<DerivedProfile, BaseProfile>` in nanobind to register the base class relationship, and nanobind's module import mechanism loads the base type from `tesseract_command_language`.
+The cross-module inheritance for Profile types now works. We use `nb::class_<DerivedProfile, BaseProfile>` in nanobind to register the base class relationship, and nanobind's module import mechanism loads the base type from `command_language`.
 
 **Solution:** `ProfileDictionary.addProfile` takes a profile from any planner module. The
 per-module `ProfileDictionary_add*Profile` helpers are removed (#334):
@@ -33,7 +33,7 @@ RuntimeError: TypeErasureBase, tried to cast 'tesseract_planning::JointWaypointP
 
 ## Poly Types (Type Erasure)
 
-The tesseract_command_language uses type-erased "Poly" types (WaypointPoly, InstructionPoly, etc.) for runtime polymorphism. These require careful handling:
+The command_language uses type-erased "Poly" types (WaypointPoly, InstructionPoly, etc.) for runtime polymorphism. These require careful handling:
 
 - Cast with the Poly methods: `instr.asMoveInstruction()`, `wp.asStateWaypoint()`, …
 - Check waypoint type with `isStateWaypoint()`, `isJointWaypoint()`, etc. before casting
@@ -70,9 +70,9 @@ The SWIG bindings had a `flatten()` method on `CompositeInstruction`. In nanobin
 
 ## Cross-Module Type Resolution
 
-When a method returns a type from another module (e.g., `Environment.getKinematicGroup()` returns `KinematicGroup` from `tesseract_kinematics`), the module containing that type must be imported first.
+When a method returns a type from another module (e.g., `Environment.getKinematicGroup()` returns `KinematicGroup` from `kinematics`), the module containing that type must be imported first.
 
-**Solution:** The `tesseract_environment/__init__.py` imports `tesseract_kinematics` to ensure `KinematicGroup` is registered.
+**Solution:** `src/bindings/environment.cpp` imports the `kinematics` module to ensure `KinematicGroup` is registered.
 
 ## Viewer Trajectory Visualization - RESOLVED
 
@@ -90,17 +90,17 @@ These don't affect functionality but should be investigated and fixed.
 
 ## TaskComposerPluginFactory and cross-module types
 
-`TaskComposerPluginFactory` takes a `ResourceLocator&`, a type bound in `tesseract_common`.
+`TaskComposerPluginFactory` takes a `ResourceLocator&`, a type bound in `common`.
 An earlier binding accepted an `nb::handle` and checked `isinstance` against
 `GeneralResourceLocator` by hand, behind a free function `createTaskComposerPluginFactory`.
-Neither is needed: the module imports `tesseract_common` at init, so nanobind resolves the
+Neither is needed: the module imports `common` at init, so nanobind resolves the
 `ResourceLocator` base across modules, and any subclass (`GeneralResourceLocator`, a Python
 subclass) is accepted directly (gh-150). The free function was removed (#338).
 
 **C++ Binding:**
 ```cpp
-// In tesseract_task_composer_bindings.cpp: import the module that binds the type first
-nb::module_::import_("tesseract_robotics.tesseract_common._tesseract_common");
+// In src/bindings/task_composer.cpp: import the module that binds the type first
+nb::module_::import_("tesseract_robotics.common._common");
 
 // StrictPath (tesseract_nb.h): an os.PathLike is a config file, a str is YAML text (#337)
 .def("__init__", [](Factory* self, const tesseract_nb::StrictPath& config_path, const tc::ResourceLocator& locator) {
@@ -229,7 +229,7 @@ trajopt_composite_profile.collision_constraint_config.enabled = False
 trajopt_composite_profile.collision_cost_config.enabled = True
 # contact_manager_config.default_margin replaces safety_margin
 trajopt_composite_profile.collision_cost_config.contact_manager_config.default_margin = 0.025
-# CollisionEvaluatorType is now in tesseract_collision; DISCRETE replaces SINGLE_TIMESTEP
+# CollisionEvaluatorType is now in collision; DISCRETE replaces SINGLE_TIMESTEP
 trajopt_composite_profile.collision_cost_config.collision_check_config.type = CollisionEvaluatorType.DISCRETE
 # collision_coeff_data.setDefaultCollisionCoeff() replaces .coeff
 trajopt_composite_profile.collision_cost_config.collision_coeff_data.setDefaultCollisionCoeff(20.0)
@@ -261,7 +261,7 @@ profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", trajopt_composite_pro
     failed the pipeline's contact check at -0.0000 m. With the cost margin set, the closest
     pass was 4.98 mm and none failed.
 
-**CollisionEvaluatorType** (moved to `tesseract_collision`):
+**CollisionEvaluatorType** (moved to `collision`):
 - `DISCRETE` - check at each waypoint (was `SINGLE_TIMESTEP`)
 - `LVS_DISCRETE` - longest valid segment discrete
 - `CONTINUOUS` - continuous collision checking

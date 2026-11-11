@@ -81,7 +81,7 @@ python -c "from tesseract_robotics.planning import Robot; print('ok')"
 
 ### Rebuild After C++ Changes
 
-If you modify a C++ binding file (`src/*_bindings.cpp`):
+If you modify a C++ binding file (`src/bindings/<module>.cpp`):
 
 ```bash
 # Reinstall bindings only (fast, ~30s)
@@ -176,57 +176,85 @@ graph TD
         D[tesseract_planning]
     end
 
-    subgraph "nanobind Modules"
-        E[tesseract_environment]
-        F[tesseract_kinematics]
-        G[tesseract_collision]
-        H[tesseract_motion_planners]
+    subgraph "src/bindings/ (nanobind sources)"
+        E[environment.cpp]
+        F[kinematics.cpp]
+        G[collision.cpp]
+        H[motion_planners.cpp]
     end
 
-    subgraph "Python API"
+    subgraph "tesseract_robotics (Python modules)"
+        E2[environment]
+        F2[kinematics]
+        G2[collision]
+        H2[motion_planners]
+    end
+
+    subgraph "High-level API"
         I[tesseract_robotics.planning]
         J[Robot, MotionProgram, TaskComposer,<br/>plan_freespace / plan_ompl / plan_cartesian]
     end
 
-    A --> E
-    B --> F
-    C --> G
-    D --> H
-    E --> I
-    F --> I
-    G --> I
-    H --> I
+    A --> E --> E2
+    B --> F --> F2
+    C --> G --> G2
+    D --> H --> H2
+    E2 --> I
+    F2 --> I
+    G2 --> I
+    H2 --> I
     I --> J
 ```
 
+The C++ libraries keep their upstream names (`tesseract_collision`); the Python modules drop the
+`tesseract_` prefix (`tesseract_robotics.collision`, issue #42). The old names import for one
+release with a `DeprecationWarning` ([module names](../breaking-changes.md#036-module-names)).
+
+### Module Layout
+
+Each `src/bindings/<module>.cpp` builds one nanobind extension. Two install shapes:
+
+```mermaid
+graph LR
+    subgraph direct["Direct install (16 modules)"]
+        D1["src/bindings/collision.cpp"] --> D2["tesseract_robotics/collision.abi3.so"]
+        D3["src/tesseract_robotics/collision.pyi"] -.stub.-> D2
+    end
+
+    subgraph wrapped["Wrapped package (6 modules)"]
+        W1["src/bindings/common.cpp"] --> W2["tesseract_robotics/common/_common.abi3.so"]
+        W3["tesseract_robotics/common/__init__.py"] --> W2
+    end
+```
+
+- **Direct install:** `collision`, `command_language`, `environment`, `geometry`, `kinematics`,
+  `motion_planners_ompl`, `motion_planners_trajopt`, `serialization`, `srdf`, `state_solver`,
+  `task_composer`, `task_composer_planning`, `time_parameterization`, `urdf`, `trajopt_ifopt`,
+  `trajopt_sqp`. The extension is the module; `<module>.pyi` beside it is its stub. There is no
+  `__init__.py` re-export wrapper.
+- **Wrapped package:** a Python `__init__.py` around a compiled `_<module>`, because the module
+  holds Python code. `common` (axis constants), `scene_graph` (lazy `SceneState` re-export) and
+  `motion_planners`, `motion_planners_simple`, `motion_planners_descartes`,
+  `motion_planners_trajopt_ifopt` (profile-override guards).
+- Sources that belong to a module but are not its entry point sit beside it in `src/bindings/`,
+  prefixed with the module name (`serialization_planner_cereal_registration.cpp`).
+
 ### Project Layout
 
-```
-tesseract_nanobind/
-├── pyproject.toml             # pixi workspace + package config
-├── pixi.lock                  # locked deps
-├── CMakeLists.txt             # nanobind module build
-├── src/
-│   ├── tesseract_robotics/    # Python package
-│   │   ├── planning/          # High-level API (pure Python)
-│   │   ├── viewer/            # 3D visualization
-│   │   ├── trajopt_ifopt/     # Low-level optimization
-│   │   ├── trajopt_sqp/       # SQP solver
-│   │   └── <module>/          # nanobind module + __init__.py + .pyi
-│   ├── tesseract_nb.h         # Shared precompiled header
-│   └── <module>/              # C++ binding source (*_bindings.cpp)
-├── tests/                     # pytest tests
-├── examples/                  # Usage examples
-├── scripts/
-│   ├── generate_stubs.py      # Regenerate / check .pyi stubs
-│   ├── audit_gil.py           # GIL releases vs nogil_entry_points.yaml (libclang)
-│   ├── gil_hotspots.py        # Rank GIL-held time per binding (py-spy --gil)
-│   ├── gil_call_counts.py     # pytest plugin: binding calls per call site
-│   ├── gil_entry_points.py    # nogil_entry_points.yaml loader
-│   ├── nogil_entry_points.yaml # Every binding that releases the GIL, and why
-│   └── build_upstream.sh      # 0.36 inner loop: build upstream/ into the env
-├── upstream/                  # tesseract, trajopt, tesseract_planning, bpl submodules (0.36)
-└── packaging/                 # forked feedstock submodules (0.36 outer loop)
+```mermaid
+graph LR
+    root["tesseract_nanobind/"]
+    root --> cfg["pyproject.toml, pixi.lock, CMakeLists.txt"]
+    root --> src["src/"]
+    root --> tests["tests/"]
+    root --> scripts["scripts/ (stubs, GIL audit, upstream build)"]
+    root --> up["upstream/ (tesseract, trajopt, tesseract_planning submodules)"]
+    root --> pk["packaging/ (forked feedstock submodules)"]
+    src --> pkg["tesseract_robotics/ (Python package, .pyi stubs, direct-install modules land here)"]
+    src --> bind["bindings/ (one <module>.cpp per extension)"]
+    src --> hdr["tesseract_nb.h (shared precompiled header)"]
+    pkg --> pl["planning/, viewer/, emitters/ (pure Python)"]
+    pkg --> wr["common/, scene_graph/, motion_planners*/ (wrapped packages)"]
 ```
 
 ---
@@ -238,7 +266,7 @@ nanobind maintains separate type registries per module. When a function returns 
 ```cpp
 NB_MODULE(_my_module, m) {
     // Import module that defines the type BEFORE using it
-    nb::module_::import_("tesseract_robotics.tesseract_collision._tesseract_collision");
+    nb::module_::import_("tesseract_robotics.collision");
 
     // Now can return DiscreteContactManager from functions
     .def("getContactManager", [...] { return self.getDiscreteContactManager(); })
@@ -281,7 +309,7 @@ pixi run stubs
 ```
 
 This finds every nanobind extension module in the installed package and writes each
-stub to `src/tesseract_robotics/<module>/`. Each module is rendered by
+stub to `src/tesseract_robotics/<module>.pyi` (`<module>/_<module>.pyi` for the wrapped packages). Each module is rendered by
 `nanobind.stubgen` in a fresh interpreter, because which cross-module types resolve
 depends on what is already imported. Stubs are committed for IDE support and type
 checking.

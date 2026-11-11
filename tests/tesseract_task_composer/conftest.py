@@ -10,11 +10,11 @@ import pytest
 
 import tesseract_robotics
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.motion_planners import assignCurrentStateAsSeed
 from tesseract_robotics.planning import JointTarget, MotionProgram, Robot
 from tesseract_robotics.planning.profiles import create_trajopt_default_profiles
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_motion_planners import assignCurrentStateAsSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,
     AnyPoly_wrap_ProfileDictionary,

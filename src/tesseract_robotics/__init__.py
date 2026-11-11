@@ -41,6 +41,10 @@ def _tesseract_dll_path_() -> None:
 _tesseract_dll_path_()
 del _tesseract_dll_path_
 
+from tesseract_robotics import _legacy_names  # noqa: E402
+
+_legacy_names.install()
+
 try:
     __version__ = version("tesseract-robotics-nanobind")
 except PackageNotFoundError:

@@ -8,16 +8,16 @@ import numpy as np
 import pytest
 import yaml
 
-import tesseract_robotics.tesseract_common as tc
+import tesseract_robotics.common as tc
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     ContactManagersPluginInfo,
     GeneralResourceLocator,
     Isometry3d,
     Quaterniond,
 )
-from tesseract_robotics.tesseract_srdf import SRDFModel
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.srdf import SRDFModel
+from tesseract_robotics.urdf import parseURDFFile
 
 IIWA_URDF = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
 IIWA_SRDF = "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"

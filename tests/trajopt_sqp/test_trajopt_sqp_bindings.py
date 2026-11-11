@@ -23,11 +23,11 @@ import scipy.sparse
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.environment import Environment
 from tests.trajopt_sqp.child_stderr import child_stderr
 
 
@@ -611,7 +611,7 @@ class TestContinuousCollisionBindings:
 
     def test_lvs_discrete_collision_evaluator(self, kuka_setup):
         """Test LVSDiscreteCollisionEvaluator creation (0.34: no cache)."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract_robotics.collision import CollisionEvaluatorType
 
         env, manip, joint_names, _ = kuka_setup
 
@@ -624,7 +624,7 @@ class TestContinuousCollisionBindings:
 
     def test_lvs_continuous_collision_evaluator(self, kuka_setup):
         """Test LVSContinuousCollisionEvaluator creation (0.34: no cache)."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract_robotics.collision import CollisionEvaluatorType
 
         env, manip, joint_names, _ = kuka_setup
 
@@ -636,7 +636,7 @@ class TestContinuousCollisionBindings:
 
     def test_continuous_collision_constraint(self, kuka_setup):
         """Test ContinuousCollisionConstraint creation."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract_robotics.collision import CollisionEvaluatorType
 
         env, manip, joint_names, joint_limits = kuka_setup
 
@@ -657,7 +657,7 @@ class TestContinuousCollisionBindings:
 
     def test_continuous_vs_discrete_evaluator_types(self, kuka_setup):
         """Test that continuous evaluators inherit from correct base."""
-        from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+        from tesseract_robotics.collision import CollisionEvaluatorType
 
         env, manip, _, _ = kuka_setup
 
@@ -887,7 +887,7 @@ _TRAJOPT_QP_TEARDOWN_SCRIPT = """\
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics import trajopt_sqp as tsqp
 nodes = ti.createNodesVariables(
     "trajectory", ["j0"], [np.array([float(k)]) for k in range(6)],
@@ -1374,7 +1374,7 @@ _BEFORE_CONVEXIFY_SCRIPT = f"""\
 import numpy as np
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics import trajopt_sqp as tsqp
 nodes = ti.createNodesVariables(
     "trajectory", ["j0"], [np.array([v]) for v in (0.0, {SEED_NODE_1}, 0.0)],

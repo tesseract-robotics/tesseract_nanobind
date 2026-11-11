@@ -3,9 +3,9 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_support_path
-from tesseract_robotics.tesseract_common import ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_kinematics import (
+from tesseract_robotics.common import ManipulatorInfo
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.kinematics import (
     KinGroupIKInput,
     KinGroupIKInputs,
 )
@@ -133,7 +133,7 @@ def test_tesseract_redundant_solutions_tesseract_function():
     limits = kin_group.getLimits()
     redundancy_indices = list(kin_group.getRedundancyCapableJointIndices())
 
-    import tesseract_robotics.tesseract_kinematics as tes_com
+    import tesseract_robotics.kinematics as tes_com
 
     sol = np.ones(6) * np.deg2rad(5)  # 1D array, not 2D
     redun_sol = tes_com.getRedundantSolutions(sol, limits.joint_limits, redundancy_indices)

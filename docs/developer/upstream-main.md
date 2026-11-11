@@ -288,7 +288,7 @@ converts ids with `.name()` at its boundary
   planner's types are registered once its `.so` is in the process; on macOS and
   Windows only in a TU that includes its `cereal_serialization.h`. Without help,
   saving raises on macOS and Windows, and loading on Linux fails in a process
-  without that planner. `src/tesseract_serialization/planner_cereal_registration.cpp`
+  without that planner. `src/bindings/serialization_planner_cereal_registration.cpp`
   includes every planner's header and the module links the planners, which makes
   all three the same; a registration in a planner's own binding module would not
   reach this module on Windows, where the registry is per DLL.

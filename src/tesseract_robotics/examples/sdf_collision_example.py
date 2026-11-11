@@ -58,15 +58,14 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import Pose, Robot, create_obstacle
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
-from tesseract_robotics.tesseract_geometry import (
+from tesseract_robotics.common import CollisionMarginData, GeneralResourceLocator
+from tesseract_robotics.geometry import (
     GeometryType,
     Octree,
     OctreeSubType,
@@ -78,7 +77,8 @@ from tesseract_robotics.tesseract_geometry import (
     writeSignedDistanceFieldNVDB,
     writeSignedDistanceFieldVDB,
 )
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.planning import Pose, Robot, create_obstacle
+from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
     JointType,

@@ -7,8 +7,8 @@ import traceback
 from typing import override
 
 from tesseract_robotics import get_tesseract_support_path
-from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import ResourceLocator, SimpleLocatedResource
+from tesseract_robotics.environment import Environment
 
 shapes_urdf = """
 <robot name="multipleshapes" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">

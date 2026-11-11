@@ -11,17 +11,17 @@ import sys
 
 import pytest
 
-from tesseract_robotics.tesseract_collision import ContactManagerConfig, ContactTrajectoryResults
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.collision import ContactManagerConfig, ContactTrajectoryResults
+from tesseract_robotics.common import (
     CalibrationInfo,
     Isometry3d,
     JointId,
     JointState,
     LinkId,
 )
-from tesseract_robotics.tesseract_scene_graph import ShortestPath
-from tesseract_robotics.tesseract_srdf import KinematicsInformation
-from tesseract_robotics.tesseract_state_solver import SceneState
+from tesseract_robotics.scene_graph import ShortestPath
+from tesseract_robotics.srdf import KinematicsInformation
+from tesseract_robotics.state_solver import SceneState
 
 # Enough entries that the freed nodes are reused by the refill below
 NUM_IDS = 64

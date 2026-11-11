@@ -22,16 +22,16 @@ FIXTURE_INCLUDE = FIXTURES / "include"
 
 # The 10 core modules audited before #256: their rows must not move under TF-1.
 CORE_MODULES = (
-    "tesseract_collision",
-    "tesseract_common",
-    "tesseract_environment",
-    "tesseract_geometry",
-    "tesseract_kinematics",
-    "tesseract_scene_graph",
-    "tesseract_serialization",
-    "tesseract_srdf",
-    "tesseract_state_solver",
-    "tesseract_urdf",
+    "collision",
+    "common",
+    "environment",
+    "geometry",
+    "kinematics",
+    "scene_graph",
+    "serialization",
+    "srdf",
+    "state_solver",
+    "urdf",
 )
 
 
@@ -446,7 +446,7 @@ def test_clone_covered_by_the_copy_protocol(poly_report):
 
 @pytest.fixture(scope="module")
 def common_report():
-    return audit.audit_module("tesseract_common")
+    return audit.audit_module("common")
 
 
 def test_vector_forwarding_core_diff_is_the_8_joint_trajectory_rows(common_report):

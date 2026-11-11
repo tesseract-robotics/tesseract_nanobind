@@ -77,7 +77,7 @@ _REMAP_CHILD = textwrap.dedent(
     sys.path.insert(0, {scripts!r})
     import ompl_seed_report as report
     from tesseract_robotics.planning import TaskComposer
-    from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
+    from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 
     ex = importlib.import_module("tesseract_robotics.examples.freespace_clearance_objective_example")
     variant = sys.argv[1] == "variant"

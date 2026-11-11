@@ -15,8 +15,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly,
@@ -25,8 +24,9 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+from tesseract_robotics.planning import Robot
+from tesseract_robotics.time_parameterization import (
     ConstantTCPSpeedParameterization,
     ConstantTCPSpeedParameterizationCompositeProfile,
     InstructionsTrajectory,
@@ -370,12 +370,12 @@ def test_instructions_trajectory_stale_read_does_not_crash(appends):
     code = f"""
 import numpy as np
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.command_language import (
     CompositeInstruction, MoveInstruction, MoveInstructionPoly,
     MoveInstructionType, StateWaypoint, StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract_robotics.time_parameterization import (
     InstructionsTrajectory, StaleTrajectoryError,
 )
 

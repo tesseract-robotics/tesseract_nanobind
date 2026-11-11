@@ -24,8 +24,7 @@ import time
 
 import numpy as np
 
-from tesseract_robotics.planning import Pose, Robot, create_obstacle, sphere
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly,
@@ -34,9 +33,9 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import ManipulatorInfo
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract_robotics.common import ManipulatorInfo
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_ompl import (
     Cost,
     OMPLMotionPlanner,
     OMPLRealVectorMoveProfile,
@@ -44,6 +43,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     RRTConnectConfigurator,
     StateCostIntegralObjective,
 )
+from tesseract_robotics.planning import Pose, Robot, create_obstacle, sphere
 
 ARMS = ("cpp", "python")
 RUNS_PER_ARM = 5  # median of 5 processes per arm

@@ -20,8 +20,8 @@ from typing import override
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import ResourceLocator, SimpleLocatedResource
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import ResourceLocator, SimpleLocatedResource
+from tesseract_robotics.environment import Environment
 
 
 def _find_twc_support() -> Path:

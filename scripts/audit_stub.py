@@ -256,7 +256,7 @@ def init_findings(path: Path) -> list[Deviation]:
 
 
 # The helper a package `__init__.py` calls to install `__init_subclass__` on a bound concrete
-# profile (tesseract_motion_planners/_profile_overrides.py).
+# profile (motion_planners/_profile_overrides.py).
 OVERRIDE_GUARD = "refuse_hook_overrides"
 
 

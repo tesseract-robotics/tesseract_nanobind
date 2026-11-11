@@ -4,7 +4,7 @@ import gc
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     JointWaypoint,
     JointWaypointPoly,

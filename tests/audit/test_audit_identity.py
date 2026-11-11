@@ -51,7 +51,7 @@ def test_bound_classes_rejects_a_tu_without_function_bodies():
 
 
 def test_bound_classes_reads_each_nb_class():
-    tu = audit.parse_tu(audit.binding_source("tesseract_time_parameterization"), bodies=True)
+    tu = audit.parse_tu(audit.binding_source("time_parameterization"), bodies=True)
     bound = audit.bound_classes(tu)
     assert bound["TimeOptimalTrajectoryGenerationCompositeProfile"] == (
         "tesseract::time_parameterization::TimeOptimalTrajectoryGenerationCompositeProfile"
@@ -84,7 +84,7 @@ def test_cpp_api_sets_qualified_on_classes_and_enums():
 
 def test_cpp_api_is_the_same_on_a_tu_with_function_bodies():
     """One TU may feed both `cpp_api` and `bound_classes`: bodies add no API symbol."""
-    cpp = audit.binding_source("tesseract_time_parameterization")
+    cpp = audit.binding_source("time_parameterization")
     plain, bodies = audit.parse_tu(cpp), audit.parse_tu(cpp, bodies=True)
 
     def owned(tu):

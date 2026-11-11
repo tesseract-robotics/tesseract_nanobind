@@ -6,8 +6,8 @@ A schema is a `tesseract_common.PropertyTree`; Python passes and reads its YAML 
 
 import pytest
 
-from tesseract_robotics.tesseract_common import PropertyTree
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.common import PropertyTree
+from tesseract_robotics.task_composer import (
     TaskComposerGraph,
     TaskComposerNodePorts,
     TaskComposerPipeline,

@@ -14,9 +14,9 @@ in tests/examples/test_examples.py.
 
 import pytest
 
+from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 from tesseract_robotics.planning import Pose
 from tesseract_robotics.planning.toolpaths import zigzag_square
-from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
 
 # Arbitrary nonzero value; any fixed seed works (zero is rejected by OMPL once
 # generation has started). Changing it just selects a different fixed path.

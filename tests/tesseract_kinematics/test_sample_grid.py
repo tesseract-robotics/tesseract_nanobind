@@ -12,8 +12,8 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_support_path
-from tesseract_robotics import tesseract_kinematics as tk
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics import kinematics as tk
+from tesseract_robotics.environment import Environment
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 

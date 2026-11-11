@@ -59,7 +59,7 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     CollisionCheckConfig,
     CollisionCheckExitType,
     CollisionCheckProgramType,
@@ -69,13 +69,13 @@ from tesseract_robotics.tesseract_collision import (
     ContactResultMap,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     JointState,
     JointTrajectory,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddLinkCommand,
     AddTrajectoryLinkCommand,
     Environment,
@@ -83,8 +83,8 @@ from tesseract_robotics.tesseract_environment import (
     checkTrajectorySegment,
     checkTrajectoryState,
 )
-from tesseract_robotics.tesseract_geometry import Sphere
-from tesseract_robotics.tesseract_scene_graph import Collision, Joint, JointType, Link, Visual
+from tesseract_robotics.geometry import Sphere
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link, Visual
 
 BOXBOT_URDF_URL = "package://tesseract/support/urdf/boxbot.urdf"
 BOXBOT_SRDF_URL = "package://tesseract/support/urdf/boxbot.srdf"

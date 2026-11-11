@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
+from tesseract_robotics.command_language import CompositeInstruction
 
 from ..core.backend import drive
 from ..core.identity import EmitIdentity

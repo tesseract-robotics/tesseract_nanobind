@@ -11,8 +11,8 @@ from typing import override
 
 import pytest
 
-import tesseract_robotics.tesseract_collision as tc
-from tesseract_robotics.tesseract_collision import (
+import tesseract_robotics.collision as tc
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResult,
     ContactResultMap,
@@ -139,15 +139,15 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.collision import (
     ContactManagersPluginFactory, ContactRequest, ContactResultMap, ContactResultValidator,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     CollisionMarginData, GeneralResourceLocator, Isometry3d, VectorIsometry3d,
 )
-from tesseract_robotics.tesseract_geometry import Box, GeometriesConst
+from tesseract_robotics.geometry import Box, GeometriesConst
 
 
 class Raising(ContactResultValidator):

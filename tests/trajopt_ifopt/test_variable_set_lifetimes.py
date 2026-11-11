@@ -169,7 +169,7 @@ junk = churn()
 print(*group.getJointIds())
 """,
     "cart_line_info_outlives_constraint": """
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 from tests.trajopt_ifopt.scenes import load_iiwa
 iiwa = load_iiwa()
 var = iiwa.nodes(np.zeros(len(iiwa.joint_names))).getNodes()[0].getVar("joints")
@@ -183,7 +183,7 @@ junk = churn()
 print(held.source_frame, held.target_frame, len(held.manip.getJointIds()))
 """,
     "ik_info_outlives_constraint": """
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 from tests.trajopt_ifopt.scenes import load_iiwa
 iiwa = load_iiwa()
 n = len(iiwa.joint_names)

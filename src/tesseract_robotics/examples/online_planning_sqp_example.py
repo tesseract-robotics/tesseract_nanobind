@@ -48,9 +48,9 @@ import numpy as np
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
+from tesseract_robotics.collision import CollisionEvaluatorType, ContactTestType
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType, ContactTestType
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
 
 # --8<-- [end:setup]
 

@@ -120,7 +120,7 @@ def test_bound_type_in_a_not_api_header_stays_a_gap(monkeypatch):
         PLANNER_PREFIX,
         (FIXTURE_INCLUDE,),
         stub_roots=(PLANNER,),
-        bound=lambda m: elsewhere if m == "tesseract_common" else {},
+        bound=lambda m: elsewhere if m == "common" else {},
     )
     gaps = {g.symbol for g in report.gaps}
     assert {"Hooks.createTerm", "Hooks.callbacks", "ForwardHooks.create"} <= gaps

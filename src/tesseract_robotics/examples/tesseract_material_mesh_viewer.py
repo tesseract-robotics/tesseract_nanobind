@@ -3,8 +3,8 @@
 import sys
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 
 shapes_urdf = """
 <robot name="mesh_viewer" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="true">

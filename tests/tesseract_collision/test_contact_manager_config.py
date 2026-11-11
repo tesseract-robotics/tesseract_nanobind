@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_support_path
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ACMOverrideType,
     CollisionCheckConfig,
     CollisionCheckExitType,
@@ -27,7 +27,7 @@ from tesseract_robotics.tesseract_collision import (
     ContinuousContactManager,
     DiscreteContactManager,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     ACMContactAllowedValidator,
     AllowedCollisionMatrix,
     CollisionMarginData,
@@ -38,7 +38,7 @@ from tesseract_robotics.tesseract_common import (
     Isometry3d,
     VectorIsometry3d,
 )
-from tesseract_robotics.tesseract_geometry import Box, GeometriesConst
+from tesseract_robotics.geometry import Box, GeometriesConst
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_common import LinkId
+from tesseract_robotics.common import LinkId
 
 from .test_contact_manager_config import _box, _get_discrete_factory
 

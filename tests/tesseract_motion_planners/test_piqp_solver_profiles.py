@@ -7,9 +7,9 @@ PIQP's sparse backend rejects (piqp/settings_utils.h).
 
 import pytest
 
-from tesseract_robotics.tesseract_motion_planners import checkPIQPSettings
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptPIQPSolverProfile
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners import checkPIQPSettings
+from tesseract_robotics.motion_planners_trajopt import TrajOptPIQPSolverProfile
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptPIQPSolverProfile,
 )
 from tesseract_robotics.trajopt_sqp import PIQPKKTSolver, PIQPSettings, PIQPSolver

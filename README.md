@@ -30,7 +30,7 @@ for an excellent overview of `Tesseract's` architecture & features see [this pre
 
 ## Test suite
 
-1900+ pytest tests in `tests/`, mirroring the module layout (`tesseract_collision`, `tesseract_kinematics`, `tesseract_task_composer`, `trajopt_sqp`, …) plus the high-level `planning` API, examples and viewer. CI installs each built wheel into a clean environment and runs the full suite on Linux, macOS and Windows before anything is published to PyPI. See [Running tests](https://tesseract-robotics.github.io/tesseract_nanobind/developer/#running-tests).
+1900+ pytest tests in `tests/`, mirroring the module layout (`collision`, `kinematics`, `task_composer`, `trajopt_sqp`, …) plus the high-level `planning` API, examples and viewer. CI installs each built wheel into a clean environment and runs the full suite on Linux, macOS and Windows before anything is published to PyPI. See [Running tests](https://tesseract-robotics.github.io/tesseract_nanobind/developer/#running-tests).
 
 ## Installation
 
@@ -64,7 +64,7 @@ The source is in [`src/tesseract_robotics/examples`](https://github.com/tesserac
 
 ```python
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import (
     Robot, MotionProgram, JointTarget, CartesianTarget, Pose, TaskComposer,
 )
@@ -102,8 +102,8 @@ For direct C++ API access:
 
 <!-- snippet: skip -->
 ```python
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
 
 env = Environment()
 locator = GeneralResourceLocator()

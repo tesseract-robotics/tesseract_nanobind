@@ -15,7 +15,7 @@ import inspect
 import os
 from typing import Any
 
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
+from tesseract_robotics.command_language import ProfileDictionary
 
 
 class UnknownPlannerTypeError(ValueError):
@@ -71,8 +71,8 @@ def _create_trajopt_profiles():
         Must set collision_check_config.type and collision_coeff_data to match C++ examples.
         Uses LVS_CONTINUOUS for continuous collision checking (critical for attached objects).
     """
-    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract_robotics.collision import CollisionEvaluatorType
+    from tesseract_robotics.motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultMoveProfile,
     )
@@ -132,8 +132,8 @@ def _create_trajopt_upright_profiles():
     """
     import numpy as np
 
-    from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract_robotics.collision import CollisionEvaluatorType
+    from tesseract_robotics.motion_planners_trajopt import (
         TrajOptDefaultCompositeProfile,
         TrajOptDefaultMoveProfile,
     )
@@ -224,7 +224,7 @@ def create_trajopt_ifopt_default_profiles(
         Both knob sets are reachable from the planner module, which re-exports
         CollisionEvaluatorType and TrajOptCollisionConfig for this purpose:
 
-        from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+        from tesseract_robotics.motion_planners_trajopt_ifopt import (
             CollisionEvaluatorType,
             TrajOptIfoptDefaultCompositeProfile,
             TrajOptIfoptOSQPSolverProfile,
@@ -254,7 +254,7 @@ def create_trajopt_ifopt_default_profiles(
         )
         composite.collision_constraint_config.max_num_cnt = 3
     """
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptDefaultMoveProfile,
         TrajOptIfoptOSQPSolverProfile,
@@ -451,7 +451,7 @@ def create_ompl_default_profiles(
             max_solutions=1
         )
     """
-    from tesseract_robotics.tesseract_motion_planners_ompl import (
+    from tesseract_robotics.motion_planners_ompl import (
         OMPLRealVectorMoveProfile,
         RRTConnectConfigurator,
     )
@@ -533,7 +533,7 @@ def create_ompl_planner_configurators(
         )
         ```
     """
-    from tesseract_robotics import tesseract_motion_planners_ompl as ompl
+    from tesseract_robotics import motion_planners_ompl as ompl
 
     if planners is None:
         planners = ["RRTConnect"]
@@ -661,7 +661,7 @@ def create_descartes_default_profiles(
         custom.use_redundant_joint_solutions = True
         profiles = create_descartes_default_profiles(move_profile=custom)
     """
-    from tesseract_robotics.tesseract_motion_planners_descartes import (
+    from tesseract_robotics.motion_planners_descartes import (
         DescartesDefaultMoveProfileD,
         DescartesLadderGraphSolverProfileD,
         DescartesLadderGraphSolverProfileF,
@@ -743,8 +743,8 @@ def _descartes_move_twin(profile: Any) -> Any:
             subclass of `DescartesMoveProfileD` / `DescartesMoveProfileF` has hooks no
             profile of the other scalar type can call.
     """
-    from tesseract_robotics.tesseract_motion_planners import ProfileOverrideNotDispatchedError
-    from tesseract_robotics.tesseract_motion_planners_descartes import (
+    from tesseract_robotics.motion_planners import ProfileOverrideNotDispatchedError
+    from tesseract_robotics.motion_planners_descartes import (
         DescartesDefaultMoveProfileD,
         DescartesDefaultMoveProfileF,
         DescartesMoveProfileD,
@@ -884,7 +884,7 @@ def _add_trajopt_ifopt_to_profiles(
     profile_names: list[str] | None = None,
 ) -> None:
     """Add TrajOptIfopt profiles to existing ProfileDictionary (internal helper)."""
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptDefaultMoveProfile,
         TrajOptIfoptOSQPSolverProfile,
@@ -1110,8 +1110,8 @@ def create_time_optimal_parameterization() -> Any:
         from tesseract_robotics.planning.profiles import (
             create_time_optimal_parameterization
         )
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
-        from tesseract_robotics.tesseract_time_parameterization import (
+        from tesseract_robotics.command_language import ProfileDictionary
+        from tesseract_robotics.time_parameterization import (
             TimeOptimalTrajectoryGenerationCompositeProfile
         )
 
@@ -1131,7 +1131,7 @@ def create_time_optimal_parameterization() -> Any:
         Kunz & Stilman, "Time-Optimal Trajectory Generation for Path Following
         with Bounded Acceleration and Velocity", RSS 2012
     """
-    from tesseract_robotics.tesseract_time_parameterization import (
+    from tesseract_robotics.time_parameterization import (
         TimeOptimalTrajectoryGeneration,
     )
 
@@ -1156,8 +1156,8 @@ def create_iterative_spline_parameterization() -> Any:
         from tesseract_robotics.planning.profiles import (
             create_iterative_spline_parameterization
         )
-        from tesseract_robotics.tesseract_command_language import ProfileDictionary
-        from tesseract_robotics.tesseract_time_parameterization import (
+        from tesseract_robotics.command_language import ProfileDictionary
+        from tesseract_robotics.time_parameterization import (
             IterativeSplineParameterizationCompositeProfile
         )
 
@@ -1178,7 +1178,7 @@ def create_iterative_spline_parameterization() -> Any:
         time-optimal trajectories. Use ISP when computation speed matters
         more than trajectory time.
     """
-    from tesseract_robotics.tesseract_time_parameterization import (
+    from tesseract_robotics.time_parameterization import (
         IterativeSplineParameterization,
     )
 

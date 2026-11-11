@@ -8,11 +8,13 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import (
+    environment as tesseract_environment,
+)
+from tesseract_robotics import (
     get_tesseract_resource_path,
     get_tesseract_support_path,
-    tesseract_environment,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     ContactManagersPluginInfo,
     GeneralResourceLocator,
@@ -22,7 +24,7 @@ from tesseract_robotics.tesseract_common import (
     JointTrajectory,
     LinkId,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddContactManagersPluginInfoCommand,
     AddLinkCommand,
     AddTrajectoryLinkCommand,
@@ -45,8 +47,8 @@ from tesseract_robotics.tesseract_environment import (
     RemoveLinkCommand,
     ReplaceJointCommand,
 )
-from tesseract_robotics.tesseract_geometry import Box
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType, Link, Visual
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import Joint, JointType, Link, Visual
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 
@@ -303,7 +305,7 @@ class TestChangeCollisionMarginsCommand:
 
     def test_constructor_with_pair_data(self):
         # 0.33 API: For pair overrides, use CollisionMarginPairData
-        from tesseract_robotics.tesseract_common import (
+        from tesseract_robotics.common import (
             CollisionMarginPairData,
             CollisionMarginPairOverrideType,
         )
@@ -319,7 +321,7 @@ class TestChangeCollisionMarginsCommand:
 
     def test_pair_data_override_type_defaults_to_modify(self):
         """#247: upstream's default is MODIFY (merge the pairs), not REPLACE."""
-        from tesseract_robotics.tesseract_common import (
+        from tesseract_robotics.common import (
             CollisionMarginPairData,
             CollisionMarginPairOverrideType,
         )
@@ -330,7 +332,7 @@ class TestChangeCollisionMarginsCommand:
     def test_constructor_with_default_margin_and_pair_data(self):
         """#247: the default margin and the pair margins in one command, upstream's
         (default_margin, pair_margins, pair_override_type = MODIFY)."""
-        from tesseract_robotics.tesseract_common import (
+        from tesseract_robotics.common import (
             CollisionMarginPairData,
             CollisionMarginPairOverrideType,
             LinkIdPair,
@@ -718,7 +720,7 @@ class TestCommandHistory:
         """nanobind passes a None element of list[Command] as a null shared_ptr; C++ would
         dereference it. A subprocess, so the unguarded segfault fails the test, not the run."""
         code = (
-            "from tesseract_robotics.tesseract_environment import Environment, RemoveLinkCommand\n"
+            "from tesseract_robotics.environment import Environment, RemoveLinkCommand\n"
             "try:\n"
             f"    Environment().{call}([RemoveLinkCommand('a'), None])\n"
             "except TypeError as e:\n"

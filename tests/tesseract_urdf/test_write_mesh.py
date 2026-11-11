@@ -2,7 +2,9 @@
 
 import pytest
 
-from tesseract_robotics import get_tesseract_support_path, tesseract_geometry, tesseract_urdf
+from tesseract_robotics import geometry as tesseract_geometry
+from tesseract_robotics import get_tesseract_support_path
+from tesseract_robotics import urdf as tesseract_urdf
 
 SPHERE_STL = get_tesseract_support_path() / "meshes/sphere_p25m.stl"
 

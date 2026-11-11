@@ -1,6 +1,6 @@
 """`PluginDiscoveryInfo` (#373), the base of every `*PluginInfo`: search paths and libraries."""
 
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     ContactManagersPluginInfo,
     KinematicsPluginInfo,
     PluginDiscoveryInfo,

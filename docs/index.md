@@ -26,12 +26,12 @@ graph TB
     end
 
     subgraph low["Low-Level Modules"]
-        env["tesseract_environment"]
-        col["tesseract_collision"]
-        kin["tesseract_kinematics"]
-        cmd["tesseract_command_language"]
-        mp["tesseract_motion_planners"]
-        tc["tesseract_task_composer"]
+        env["environment"]
+        col["collision"]
+        kin["kinematics"]
+        cmd["command_language"]
+        mp["motion_planners"]
+        tc["task_composer"]
     end
 
     subgraph sqp["SQP (Real-time Optimization)"]
@@ -54,7 +54,7 @@ graph TB
 ```python
 import numpy as np
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import (
     Robot, MotionProgram, JointTarget, CartesianTarget, Pose, plan_freespace,
 )

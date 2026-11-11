@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import trajopt_ifopt as ti
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 
 from .scenes import OVERLAP_X, Iiwa, TwoBoxes, two_boxes_at
 

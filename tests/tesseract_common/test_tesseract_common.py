@@ -7,7 +7,7 @@ import numpy as np
 import numpy.testing as nptest
 import pytest
 
-from tesseract_robotics import tesseract_common
+from tesseract_robotics import common as tesseract_common
 
 
 def test_bytes_resource():
