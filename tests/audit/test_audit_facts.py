@@ -96,6 +96,22 @@ def test_every_include_dir_in_the_repo_is_listed():
     assert not any(Path(d).is_relative_to(audit.CONDA_PREFIX) for d in listed)
 
 
+def test_a_native_root_holding_the_repo_leaves_the_repo_listed(monkeypatch):
+    """CI: AUDIT_NATIVE_ROOT is the workspace, a parent of the repo checkout."""
+    workspace = audit.REPO_ROOT.parent
+    monkeypatch.setattr(facts_, "NATIVE_DIRS", audit.native_stack_dirs(workspace))
+    assert facts_._in_repo(audit.SRC)
+
+
+def test_a_native_stack_inside_the_repo_is_not_listed(monkeypatch):
+    """Local: `.native/<triplet>` under the repo is covered by header hashes, not listings."""
+    root = audit.REPO_ROOT / ".native" / "x64-linux-dynamic-release"
+    monkeypatch.setattr(facts_, "NATIVE_DIRS", audit.native_stack_dirs(root))
+    assert not facts_._in_repo(root / "vcpkg" / "installed" / "x64-linux-dynamic-release")
+    assert not facts_._in_repo(root / "ws" / "install" / "include")
+    assert facts_._in_repo(audit.SRC)
+
+
 # #397 stage 3: the include structure and the extracted API of a TU, also a synthetic one.
 
 match_ = load("audit_match")
