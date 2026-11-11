@@ -183,8 +183,7 @@ def run():
     # the optimizer. Time-optimal TOTG fails on a share of TrajOptIfopt's trajectories:
     # its corner blends degenerate on the short segments the optimizer leaves, and it
     # stops with "Negative path velocity". Across OMPL seeds 1-200, TOTG failed 14 of
-    # this example's trajectories and ISP none (#103). A fixed seed hid that on Linux
-    # and macOS; on Windows OMPL is a static library the seed cannot reach.
+    # this example's trajectories and ISP none (#103). A fixed seed hid that.
     # 0.33 API: TimeParameterization.compute() takes (CompositeInstruction, Environment, ProfileDictionary)
     # instead of (InstructionsTrajectory, velocity, acceleration, jerk) arrays.
     print("Running time parameterization...")

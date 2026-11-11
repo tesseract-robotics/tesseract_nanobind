@@ -216,12 +216,12 @@ class TestOMPLPlanning:
 
 
 # NOTE(#103): a TestOMPLSeedDeterminism contract test (same seed -> bit-identical
-# path via single-planner + optimize=False) lived here briefly. It cannot pass on
-# Windows: conda-forge win-64 ompl ships only a static Library/lib/ompl.lib, so
-# the planner DLL and the Python extension each embed their own copy of OMPL's
-# RNGSeedGenerator - RNG_setSeed seeds the extension's copy, RRTConnect draws
-# from the DLL's. Restore the test once OMPL is shared on Windows or upstream
-# OMPLSolverConfig grows a seed field applied inside parallelPlan.
+# path via single-planner + optimize=False) lived here briefly. It was removed while
+# Windows linked OMPL statically into both the planner DLL and the Python extension,
+# each with its own copy of OMPL's RNGSeedGenerator. The Windows wheel now keeps
+# OMPL's RNG state in the shared ompl_runtime.dll, and the wheel workflow checks that a
+# seed set through one DLL is visible through another (docs/developer/windows-wheels.md).
+# Restoring the test would show whether RNG_setSeed reaches RRTConnect there too.
 
 
 class TestSimplePlanner:

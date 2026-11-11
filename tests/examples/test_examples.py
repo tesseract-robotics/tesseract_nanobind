@@ -1188,9 +1188,9 @@ def test_lowlevel_trajopt_ifopt_example():
 
 
 # OMPL seeds whose TrajOptIfopt trajectory TOTG could not parameterize ("Negative path
-# velocity"); the example now uses ISP, which accepted all of seeds 1-200 (#103). Where the
-# seed reaches OMPL (Linux, macOS) each case replays its old failure deterministically, so a
-# return to a fragile parameterization fails here rather than as a Windows coin flip.
+# velocity"); the example now uses ISP, which accepted all of seeds 1-200 (#103). Each case
+# replays its old failure deterministically, so a return to a fragile parameterization fails
+# here.
 SEEDS_THAT_BROKE_TOTG = (1, 9, 16, 22, 23, 30, 38)
 
 

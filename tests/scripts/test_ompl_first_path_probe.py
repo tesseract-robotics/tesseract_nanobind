@@ -24,6 +24,13 @@ LONG = LIMIT + LENGTH_OFFSET
 STATES = 300
 CHILD_EXIT_CODE = 3
 CHILD_STDERR = "planning failed in the child"
+CHILD_STDOUT = "printed before the hang"
+# s: longer than `CHILD_TIMEOUT_S`, so only the bound can end the child.
+CHILD_HANG_SLEEP_S = 600
+# s: from spawn, so it must cover the child's interpreter start before its print. Measured here:
+# 0.02 to 0.03 s warm at load 54 on 10 cores, 0.25 to 0.5 s cold. A cold start on a loaded CI
+# runner is unmeasured, so 60 x the cold figure: 30. Only a hang case waits this long.
+CHILD_TIMEOUT_S = 30
 
 
 def _row(mode, length=SHORT, states=STATES, margin=MARGIN):
@@ -174,3 +181,25 @@ def test_a_failed_child_raises_with_its_stderr(monkeypatch, tmp_path):
 def test_a_child_returns_its_last_line_as_the_row(monkeypatch, tmp_path):
     _child(monkeypatch, tmp_path, "print('a plugin chatters')\nprint('{\"seed\": 2}')\n")
     assert probe.probe_in_subprocess(2, probe.THRESHOLD_MODE) == {"seed": 2}
+
+
+def test_a_hung_child_raises_with_what_it_printed(monkeypatch, tmp_path):
+    """The print is unflushed; `CHILD_HANG_SLEEP_S` is longer than the bound that ends the child."""
+    _child(
+        monkeypatch,
+        tmp_path,
+        "import sys, time\n"
+        f"print({CHILD_STDOUT!r})\n"
+        f"sys.stderr.write({CHILD_STDERR!r})\n"
+        f"time.sleep({CHILD_HANG_SLEEP_S})\n",
+    )
+    with pytest.raises(probe.ProbeHungError) as hung:
+        probe.probe_in_subprocess(2, probe.FIRST_PATH_MODE, timeout_s=CHILD_TIMEOUT_S)
+    assert isinstance(hung.value, probe.ProbeRunError)
+    assert CHILD_STDOUT in hung.value.stdout
+    assert CHILD_STDERR in hung.value.stderr
+    message = str(hung.value)
+    assert CHILD_STDOUT in message
+    assert CHILD_STDERR in message
+    assert "seed 2" in message
+    assert probe.FIRST_PATH_MODE in message

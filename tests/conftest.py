@@ -2,14 +2,14 @@
 
 OMPL RNG seeding: example and planning tests run OMPL (RRTConnect et al.),
 which seeds its samplers from entropy per process. Pinning the seed per test
-makes a run reproducible on Linux and macOS (shared libompl: one
-RNGSeedGenerator per process). It is not what makes the tests pass: on Windows
-the conda-forge ompl is a STATIC lib, so the planner DLL has its own
-unreachable seed generator, this fixture is inert there, and every run plans
-a fresh path. A test therefore has to pass for every seed. Sweeping seeds
-found two stages that did not (#103), TOTG time parameterization after
-TrajOptIfopt and a TrajOpt collision cost with no margin; both were replaced,
-and the seeds that exposed them replay in tests/examples/test_examples.py.
+makes a run reproducible: the binding and the planner share one
+RNGSeedGenerator per process (a shared libompl on Linux and macOS; on Windows
+the wheel keeps OMPL's RNG state in the shared `ompl_runtime.dll`, see
+docs/developer/windows-wheels.md). It is not what makes the tests pass: a test
+has to pass for every seed. Sweeping seeds found two stages that did not
+(#103), TOTG time parameterization after TrajOptIfopt and a TrajOpt collision
+cost with no margin; both were replaced, and the seeds that exposed them replay
+in tests/examples/test_examples.py.
 """
 
 import pytest
