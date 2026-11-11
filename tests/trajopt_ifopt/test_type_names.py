@@ -14,7 +14,13 @@ from pathlib import Path
 # s: a child imports trajopt_ifopt and reads a few signatures
 CHILD_TIMEOUT_S = 60.0
 
-STUB = Path(__file__).resolve().parents[2] / "src" / "tesseract_robotics" / "trajopt_ifopt.pyi"
+STUB = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "tesseract_robotics"
+    / "trajopt_ifopt"
+    / "_trajopt_ifopt.pyi"
+)
 
 _CHILD_SCRIPT = """\
 import tesseract_robotics.trajopt_ifopt as ti

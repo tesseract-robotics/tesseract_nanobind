@@ -8,7 +8,7 @@ import numpy
 from numpy.typing import NDArray
 import scipy.sparse
 
-import tesseract_robotics.trajopt_ifopt
+import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 
 
 class QPProblemExpiredError(RuntimeError):
@@ -528,10 +528,10 @@ class OSQPEigenSolver(QPSolver):
 class QPProblem:
     """Abstract base class for QP problems (convexified NLP)"""
 
-    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt.ConstraintSet) -> None:
+    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None:
         """Add a set of constraints"""
 
-    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None:
+    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None:
         """Add a cost term with specified penalty type"""
 
     def setup(self) -> None:
@@ -682,14 +682,14 @@ class TrajOptQPProblem(QPProblem):
     TrajOpt-Ifopt planner builds. Costs and constraints are added directly.
     """
 
-    def __init__(self, variables: tesseract_robotics.trajopt_ifopt.Variables) -> None:
+    def __init__(self, variables: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Variables) -> None:
         """
         Construct over the optimization variables (e.g. createNodesVariables(...))
         """
 
-    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt.ConstraintSet) -> None: ...
+    def addConstraintSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet) -> None: ...
 
-    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None: ...
+    def addCostSet(self, constraint_set: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet, penalty_type: CostPenaltyType) -> None: ...
 
     def setup(self) -> None: ...
 

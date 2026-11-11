@@ -117,13 +117,22 @@ def test_numerical_jacobian_wrong_length_raises_value_error(joint_group, fwd_kin
 # --- calcManipulability / isNearSingularity ---
 
 
+# condition = (s_max / s_min)**2 rounds twice; the ratio of the reported eigenvalues s**2 rounds
+# three times (each square, then the quotient). Five roundings of half an ulp: 2.5 eps, so 3 eps.
+_CONDITION_RTOL = 3 * np.finfo(np.float64).eps
+
+
 def test_calc_manipulability_full_rank(joint_group):
     J = joint_group.calcJacobian(_REGULAR_Q, "tool0")
     manip = tk.calcManipulability(J)
     a = J @ J.T
     expected = np.linalg.eigvalsh(a)
     nptest.assert_allclose(np.sort(manip.m.eigen_values), expected, rtol=0, atol=_eig_atol(a))
-    assert manip.m.condition == manip.m.eigen_values.max() / manip.m.eigen_values.min()
+    # Upstream takes both from the SVD of J (tesseract#1396): condition is measure squared,
+    # bit for bit; the eigenvalue ratio rounds differently, so it agrees only to rounding.
+    assert manip.m.condition == manip.m.measure * manip.m.measure
+    ratio = manip.m.eigen_values.max() / manip.m.eigen_values.min()
+    assert manip.m.condition == pytest.approx(ratio, rel=_CONDITION_RTOL, abs=0)
     assert isinstance(manip.m_linear, tk.ManipulabilityEllipsoid)
     assert "measure=" in repr(manip.m)
     assert "m_linear=" in repr(manip)

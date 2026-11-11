@@ -122,6 +122,7 @@ WRAPPED_PACKAGES = frozenset(
         "motion_planners_simple",
         "motion_planners_descartes",
         "motion_planners_trajopt_ifopt",
+        "trajopt_ifopt",
     }
 )
 
