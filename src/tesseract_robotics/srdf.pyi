@@ -54,7 +54,10 @@ class KinematicsInformation:
     def group_states(self, arg: Mapping[str, Mapping[str, Mapping[tesseract_robotics.common.JointId, float] | Mapping[str, float]]], /) -> None: ...
 
     @property
-    def group_tcps(self) -> dict[str, dict[str, tesseract_robotics.common.Isometry3d]]: ...
+    def group_tcps(self) -> dict[str, dict[str, tesseract_robotics.common.Isometry3d]]:
+        """
+        Named TCP offsets per group: group name -> TCP link name -> Isometry3d.
+        """
 
     @group_tcps.setter
     def group_tcps(self, arg: Mapping[str, Mapping[tesseract_robotics.common.LinkId, tesseract_robotics.common.Isometry3d] | Mapping[str, tesseract_robotics.common.Isometry3d]], /) -> None: ...
