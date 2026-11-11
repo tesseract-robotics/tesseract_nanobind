@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "scikit-build-core >=0.10",
+    "scikit-build-core >=0.11",  # PEP 639 License-Expression / License-File
     "nanobind ==2.12.0",  # exact: committed .pyi stubs are stubgen output of this version (gh-159)
     "setuptools-scm >=8",
 ]
@@ -10,6 +10,8 @@ build-backend = "scikit_build_core.build"
 name = "tesseract-robotics-nanobind"
 description = "Tesseract robotics Python bindings (nanobind)"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 # One cp312-abi3 wheel per platform (wheel.py-api below) covers 3.12 and up, Rhino 9's CPython 3.13 included.
 requires-python = ">=3.12"
 dependencies = [
@@ -41,7 +43,6 @@ classifiers = [
     "Programming Language :: Python :: 3.15",  # covered by the cp312-abi3 wheel
     "Programming Language :: C++",
     "Programming Language :: Python :: Implementation :: CPython",
-    "License :: OSI Approved :: Apache Software License",
 ]
 dynamic = ["version", "optional-dependencies"]
 
@@ -189,7 +190,7 @@ pip = "*"
 setuptools = ">=68,<82"
 setuptools-scm = ">=8"
 wheel = "*"
-scikit-build-core = ">=0.10,<1"
+scikit-build-core = ">=0.11,<1"
 nanobind = "==2.12.0"  # exact: committed .pyi stubs are stubgen output of this version (gh-159)
 
 # Dev/test deps

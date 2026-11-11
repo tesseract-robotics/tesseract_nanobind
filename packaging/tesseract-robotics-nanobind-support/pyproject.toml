@@ -17,6 +17,9 @@ description = "Robot models and meshes from tesseract's support package, for tes
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0 AND BSD-3-Clause"  # tesseract's package.xml: Apache 2.0, BSD
+# The texts are upstream tesseract's LICENSE.Apache-2.0 and LICENSE.BSD-3-Clause, which its
+# top-level LICENSE names as the licenses of the files in the repository.
+license-files = ["licenses/LICENSE.Apache-2.0", "licenses/LICENSE.BSD-3-Clause"]
 dynamic = ["version"]
 authors = [
     { name = "Jelle Feringa", email = "jelle@terrestrial.construction" },

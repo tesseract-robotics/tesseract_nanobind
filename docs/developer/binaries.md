@@ -53,6 +53,8 @@ flowchart LR
 6. The Linux x86_64 job also builds `tesseract-robotics-nanobind-support`, a `py3-none-any`
    wheel of tesseract's robot models and meshes (`packaging/tesseract-robotics-nanobind-support`),
    copied from `ws/install/share/tesseract`. The bindings install it with the `[support]` extra.
+   It declares `Apache-2.0 AND BSD-3-Clause`, tesseract's `package.xml` licenses, and ships
+   upstream's `LICENSE.Apache-2.0` and `LICENSE.BSD-3-Clause` (`licenses/`) as `License-File`s (#368).
 
 ### Plugin anchors
 
