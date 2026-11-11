@@ -18,6 +18,8 @@ TESSERACT_TASK_COMPOSER_PLUGINS), so the copies the wheel bundles are the ones l
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
@@ -52,18 +54,17 @@ def _filesystem_path(resource: object) -> Path | None:
     return resource if isinstance(resource, Path) else None
 
 
-def _conda_share(relative: str) -> Path | None:
-    """`$CONDA_PREFIX/share/<relative>` (or conda on Windows' `Library/share`), if it exists.
+def _prefix_share(relative: str) -> Path | None:
+    """`share/<relative>` of `$TESSERACT_CPP_PREFIX`, if it exists.
 
-    The editable install (pixi dev env) gets its data from the tesseract-robotics conda packages.
+    The editable install (pixi dev env) gets its data from the native stack's install prefix
+    (`pixi run native-build`; the env sets `TESSERACT_CPP_PREFIX`).
     """
-    prefix = os.environ.get("CONDA_PREFIX")
+    prefix = os.environ.get("TESSERACT_CPP_PREFIX")
     if not prefix:
         return None
-    for share in (Path(prefix) / "share", Path(prefix) / "Library" / "share"):
-        if (share / relative).exists():
-            return share
-    return None
+    share = Path(prefix) / "share"
+    return share if (share / relative).exists() else None
 
 
 def get_data_path() -> Path:
@@ -72,6 +73,10 @@ def get_data_path() -> Path:
     if path is None:
         raise FileNotFoundError("tesseract_robotics is not installed as a directory on disk")
     return path
+
+
+# Import name of the tesseract-robotics-nanobind-support wheel (the [support] extra).
+SUPPORT_PACKAGE = "tesseract_robotics_support"
 
 
 class SupportDataNotFoundError(FileNotFoundError):
@@ -86,18 +91,15 @@ def get_tesseract_resource_path() -> Path:
         GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 
     It comes from the tesseract-robotics-nanobind-support wheel, or for an editable install from
-    the conda env's share/.
+    `$TESSERACT_CPP_PREFIX`'s share/.
 
     Raises:
         SupportDataNotFoundError: neither is installed.
     """
-    try:
-        import tesseract_robotics_support
-    except ImportError:
-        pass
-    else:
-        return tesseract_robotics_support.data_dir()
-    share = _conda_share("tesseract/package.xml")
+    # The [support] extra is optional: absent → no spec. A present but broken install raises.
+    if importlib.util.find_spec(SUPPORT_PACKAGE) is not None:
+        return importlib.import_module(SUPPORT_PACKAGE).data_dir()
+    share = _prefix_share("tesseract/package.xml")
     if share is not None:
         return share
     raise SupportDataNotFoundError(
@@ -116,7 +118,7 @@ def get_tesseract_support_path() -> Path:
 
 
 class TaskComposerConfigNotFoundError(FileNotFoundError):
-    """No task composer config found via env var, bundled data, or conda share."""
+    """No task composer config found via env var, bundled data, or prefix share."""
 
 
 _TASK_COMPOSER_CONFIG = "task_composer_plugins.yaml"
@@ -126,7 +128,7 @@ def get_task_composer_config_path() -> Path:
     """The task composer plugin config file.
 
     TESSERACT_TASK_COMPOSER_CONFIG_FILE when set, else the config the wheel bundles, else (editable
-    install) the conda env's.
+    install) `$TESSERACT_CPP_PREFIX`'s.
 
     Raises:
         TaskComposerConfigNotFoundError: nothing resolves to an existing file, or the env var
@@ -145,10 +147,10 @@ def get_task_composer_config_path() -> Path:
     if bundled is not None and bundled.is_file():
         return bundled
     relative = f"tesseract_planning/task_composer/config/{_TASK_COMPOSER_CONFIG}"
-    share = _conda_share(relative)
+    share = _prefix_share(relative)
     if share is not None:
         return share / relative
     raise TaskComposerConfigNotFoundError(
         "no task composer config found: checked TESSERACT_TASK_COMPOSER_CONFIG_FILE, the bundled "
-        "data/task_composer_config/, and $CONDA_PREFIX share"
+        "data/task_composer_config/, and $TESSERACT_CPP_PREFIX share"
     )
