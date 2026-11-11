@@ -91,6 +91,11 @@ def test_kinematics_plugins_example():
     assert group["criterion"] < group["bound"]
 
 
+# condition = (s_max / s_min)**2 rounds twice; the ratio of the reported eigenvalues s**2 rounds
+# three times (each square, then the quotient). Five roundings of half an ulp: 2.5 eps, so 3 eps.
+CONDITION_RTOL = 3 * np.finfo(np.float64).eps
+
+
 @pytest.mark.basic
 def test_kinematics_analysis_example():
     ex = importlib.import_module("tesseract_robotics.examples.kinematics_analysis_example")
@@ -117,9 +122,11 @@ def test_kinematics_analysis_example():
     assert zero["near_singularity"]
 
     for name, ellipsoid in result["manipulability"]["upstream"].items():
-        assert (
-            ellipsoid["condition"] == ellipsoid["max_eigen_value"] / ellipsoid["min_eigen_value"]
-        ), name
+        # Upstream takes both from the SVD of J (tesseract#1396): condition is measure squared, bit
+        # for bit; the eigenvalue ratio rounds differently, so it agrees only to rounding.
+        assert ellipsoid["condition"] == ellipsoid["measure"] * ellipsoid["measure"], name
+        ratio = ellipsoid["max_eigen_value"] / ellipsoid["min_eigen_value"]
+        assert ellipsoid["condition"] == pytest.approx(ratio, rel=CONDITION_RTOL, abs=0), name
         assert ellipsoid["measure"] == np.sqrt(ellipsoid["condition"]), name
         assert ellipsoid["volume_residual"] <= ex.VOLUME_RTOL, name
     singular = result["manipulability"]["zero"]["m"]
