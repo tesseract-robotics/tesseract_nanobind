@@ -124,7 +124,7 @@ Environments defined in `pyproject.toml`:
 | `py315` | 3.15.x | Suite on the newest Python |
 | `upstream` | 3.12.x | 0.36 inner loop, C++ built from `upstream/` |
 
-[How the binaries are built](binaries.md#pixi-environments-where-each-one-gets-its-c) lists where each environment gets its C++.
+[How the binaries are built](binaries.md#pixi-environments) lists where each environment gets its C++.
 
 ### Dependency Management
 
