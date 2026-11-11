@@ -55,6 +55,19 @@ from tesseract_robotics.planning.profiles import (
 )
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
+# freespace_hybrid_example.cpp: collision margin [m] and coefficient [-] of the TrajOptIfopt
+# profile (213-214); the sphere obstacle's radius [m] and position on base_link [m] (103-104);
+# start and end joints [rad] (146-160), joint_a1 -0.4 then 0.4.
+COLLISION_MARGIN_M = 0.025
+COLLISION_COEFF = 20.0
+SPHERE_RADIUS_M = 0.15
+SPHERE_XYZ_M = (0.5, 0.0, 0.55)
+START_JOINTS_RAD = (-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0)
+END_JOINTS_RAD = (0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0)
+# OMPL parallel planners [-] and RRT step range [m] the C++ example is run with.
+NUM_PLANNERS = 2
+PLANNER_RANGE_M = 0.01
+
 
 def add_ifopt_profiles(profiles):
     """Add the TrajOptIfopt composite profile of the C++ example's `if (ifopt_)` branch.
@@ -66,8 +79,10 @@ def add_ifopt_profiles(profiles):
         profiles: ProfileDictionary to add the composite profile to, under "FREESPACE".
     """
     composite = TrajOptIfoptDefaultCompositeProfile()
-    composite.collision_constraint_config = TrajOptCollisionConfig(0.025, 20.0)
-    composite.collision_cost_config = TrajOptCollisionConfig(0.025, 20.0)
+    composite.collision_constraint_config = TrajOptCollisionConfig(
+        COLLISION_MARGIN_M, COLLISION_COEFF
+    )
+    composite.collision_cost_config = TrajOptCollisionConfig(COLLISION_MARGIN_M, COLLISION_COEFF)
     composite.velocity_coeff = np.ones(1)
     composite.acceleration_coeff = np.ones(1)
     composite.jerk_coeff = np.ones(1)
@@ -106,8 +121,8 @@ def run(
     create_obstacle(
         robot,
         "sphere_attached",
-        sphere(0.15),  # 15cm radius sphere
-        Pose.from_xyz(0.5, 0.0, 0.55),  # Positioned in robot workspace
+        sphere(SPHERE_RADIUS_M),
+        Pose.from_xyz(*SPHERE_XYZ_M),
     )
 
     # Get joint names from "manipulator" kinematic group
@@ -117,8 +132,8 @@ def run(
     # Start and end joint configurations from C++ example
     # Motion: swing joint 1 from -0.4 rad to +0.4 rad (others fixed)
     # Path must curve around sphere obstacle
-    joint_start = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-    joint_end = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+    joint_start = np.array(START_JOINTS_RAD)
+    joint_end = np.array(END_JOINTS_RAD)
 
     robot.set_joints(joint_start, joint_names=joint_names)
 
@@ -145,8 +160,8 @@ def run(
         else create_freespace_pipeline_profiles
     )
     profiles = create_profiles(
-        num_planners=num_planners or 2,  # C++ uses 2
-        planner_range=0.01,  # C++ uses 0.01
+        num_planners=num_planners or NUM_PLANNERS,
+        planner_range=PLANNER_RANGE_M,
     )
     if use_ifopt:
         add_ifopt_profiles(profiles)

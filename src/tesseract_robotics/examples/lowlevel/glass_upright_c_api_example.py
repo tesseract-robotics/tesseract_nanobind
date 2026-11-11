@@ -60,6 +60,10 @@ JOINT_NAMES = [f"joint_a{i}" for i in range(1, 8)]
 JOINT_START = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 JOINT_END = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
 
+# addSphere() (glass_upright_example.cpp:104-105): radius [m] and position on base_link [m].
+SPHERE_RADIUS_M = 0.15
+SPHERE_XYZ_M = (0.5, 0.0, 0.55)
+
 # Collision margin and margin buffer of both the cost and the constraint (m).
 COLLISION_MARGIN_M = 0.01
 COLLISION_MARGIN_BUFFER_M = 0.01
@@ -119,8 +123,8 @@ def run(ifopt: bool = False):
         env,
         "sphere_attached",
         "joint_sphere_attached",
-        Sphere(0.15),
-        Isometry3d.Identity() * Translation3d(0.5, 0, 0.55),
+        Sphere(SPHERE_RADIUS_M),
+        Isometry3d.Identity() * Translation3d(*SPHERE_XYZ_M),
     )
     env.setState(JOINT_NAMES, JOINT_START)
 

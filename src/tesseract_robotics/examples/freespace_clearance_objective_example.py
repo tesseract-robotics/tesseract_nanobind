@@ -70,6 +70,8 @@ from tesseract_robotics.task_composer import TaskComposerNodeInfo
 from tesseract_robotics.trajopt_sqp import SQPCallback
 
 PIPELINE = "FreespaceIfoptPipeline"
+# Millimetres in a metre [mm/m].
+MM_PER_M = 1000
 PROFILE = "FREESPACE"
 OMPL_NODE = "OMPLMotionPlannerTask"
 
@@ -440,7 +442,7 @@ def run(
         cases["threshold"]["robot"], cases["threshold"]["result"]
     )
     for clearance in cases["clearances"]:
-        print(f"{clearance.cube}: {clearance.distance_m * 1000:.1f} mm from {clearance.link}")
+        print(f"{clearance.cube}: {clearance.distance_m * MM_PER_M:.1f} mm from {clearance.link}")
     touching = [c.cube for c in cases["clearances"] if c.distance_m <= 0]
     if touching:
         raise CubeContactError(f"case 2's path touches {touching}")
@@ -466,7 +468,7 @@ def draw_clearances(viewer, clearances: list[Clearance]) -> None:
         )
         viewer.server.scene.add_label(
             f"/clearance/{clearance.cube}/label",
-            f"{clearance.distance_m * 1000:.0f} mm",
+            f"{clearance.distance_m * MM_PER_M:.0f} mm",
             position=clearance.cube_point_m,
         )
 

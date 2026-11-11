@@ -65,6 +65,16 @@ from tesseract_robotics.common import CollisionMarginData, GeneralResourceLocato
 from tesseract_robotics.planning import Pose, Robot, create_fixed_joint, sphere
 from tesseract_robotics.scene_graph import Collision, Link, Visual
 
+# The IRB 2400's six joints, an obstacle sphere's radius [m] and position on the world [m],
+# the collision margin [m], and the sweep of joint_1: 10 steps of 5 degrees from -25 degrees.
+JOINT_COUNT = 6
+OBSTACLE_RADIUS_M = 0.1
+OBSTACLE_XYZ_M = (0.7, 0.0, 1.5)
+COLLISION_MARGIN_M = 0.1
+SWEEP_FIRST_STEP = -5
+SWEEP_LAST_STEP = 5
+SWEEP_STEP_DEG = 5
+
 
 def main():
     # =========================================================================
@@ -78,7 +88,7 @@ def main():
     # Create an obstacle sphere in the robot's workspace
     # This sphere will be positioned where the robot may collide during motion
     sphere_link = Link("sphere_link")
-    sphere_geom = sphere(0.1)  # 10cm radius sphere
+    sphere_geom = sphere(OBSTACLE_RADIUS_M)
 
     # Visual component for rendering (optional but helpful for debugging)
     visual = Visual()
@@ -97,7 +107,7 @@ def main():
         name="sphere_joint",
         parent_link="base_link",
         child_link="sphere_link",
-        origin=Pose.from_xyz(0.7, 0, 1.5),  # 70cm forward, 1.5m high
+        origin=Pose.from_xyz(*OBSTACLE_XYZ_M),
     )
     robot.add_link(sphere_link, sphere_joint)
 
@@ -115,18 +125,18 @@ def main():
     # Collision margin: report contacts when objects are within 10cm
     # Larger margin = earlier detection but more false positives
     # TrajOpt uses margin for gradient-based optimization
-    manager.setCollisionMarginData(CollisionMarginData(0.1))
+    manager.setCollisionMarginData(CollisionMarginData(COLLISION_MARGIN_M))
 
     # =========================================================================
     # STEP 3: Collision Query Loop
     # =========================================================================
     # ABB IRB2400 has 6 revolute joints named joint_1 through joint_6
-    joint_names = [f"joint_{i + 1}" for i in range(6)]
-    joint_pos = np.zeros(6)
+    joint_names = [f"joint_{i + 1}" for i in range(JOINT_COUNT)]
+    joint_pos = np.zeros(JOINT_COUNT)
 
     # Sweep joint_1 (base rotation) to move arm toward/away from obstacle
-    for i in range(-5, 5):
-        joint_pos[0] = i * np.deg2rad(5)  # -25 to +20 degrees
+    for i in range(SWEEP_FIRST_STEP, SWEEP_LAST_STEP):
+        joint_pos[0] = i * np.deg2rad(SWEEP_STEP_DEG)  # -25 to +20 degrees
         print(f"Contact check at robot position: {joint_pos}")
 
         # Update environment state with new joint positions

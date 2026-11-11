@@ -70,6 +70,16 @@ MM_PER_M = 1000.0
 
 # Solver settings of both branches (opt_params).
 MAX_ITER = 200
+# Cartesian constraint coeffs [x, y, z, rx, ry, rz] (puzzle_piece_example.cpp:230-231, 255-256):
+# rotation about the tool z-axis free; TrajOptIfopt weights 1, TrajOpt weights 10.
+IFOPT_CARTESIAN_COEFF = (1.0, 1.0, 1.0, 1.0, 1.0, 0.0)
+CARTESIAN_COEFF = (10.0, 10.0, 10.0, 10.0, 10.0, 0.0)
+# Collision cost margin [m] and coefficients [-] (cpp:235, 260).
+COST_MARGIN_M = 0.025
+IFOPT_COST_COEFF = 2
+COST_COEFF = 20
+# OSQP threads: 0 lets the solver decide (cpp:265).
+SOLVER_NUM_THREADS = 0
 MIN_APPROX_IMPROVE = 1e-3
 MIN_TRUST_BOX_SIZE = 1e-3
 
@@ -104,18 +114,20 @@ def _profiles(ifopt: bool) -> ProfileDictionary:
     if ifopt:
         move_profile = TrajOptIfoptDefaultMoveProfile()
         # Cartesian constraint coeff [1, 1, 1, 1, 1, 0]: rotation about the tool z-axis is free.
-        move_profile.cartesian_constraint_config.coeff = np.array([1.0, 1, 1, 1, 1, 0])
+        move_profile.cartesian_constraint_config.coeff = np.array(IFOPT_CARTESIAN_COEFF)
         composite_profile = TrajOptIfoptDefaultCompositeProfile()
-        composite_profile.collision_cost_config = TrajOptCollisionConfig(0.025, 2)
+        composite_profile.collision_cost_config = TrajOptCollisionConfig(
+            COST_MARGIN_M, IFOPT_COST_COEFF
+        )
         solver_profile = TrajOptIfoptOSQPSolverProfile()
         namespace = TRAJOPT_IFOPT_DEFAULT_NAMESPACE
     else:
         move_profile = TrajOptDefaultMoveProfile()
-        move_profile.cartesian_constraint_config.coeff = np.array([10.0, 10, 10, 10, 10, 0])
+        move_profile.cartesian_constraint_config.coeff = np.array(CARTESIAN_COEFF)
         composite_profile = TrajOptDefaultCompositeProfile()
-        composite_profile.collision_cost_config = TrajOptCollisionConfig(0.025, 20)
+        composite_profile.collision_cost_config = TrajOptCollisionConfig(COST_MARGIN_M, COST_COEFF)
         solver_profile = TrajOptOSQPSolverProfile()
-        solver_profile.opt_params.num_threads = 0
+        solver_profile.opt_params.num_threads = SOLVER_NUM_THREADS
         namespace = TRAJOPT_DEFAULT_NAMESPACE
 
     move_profile.joint_cost_config.enabled = False

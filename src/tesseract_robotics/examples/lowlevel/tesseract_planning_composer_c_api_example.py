@@ -129,6 +129,13 @@ NUM_OMPL_PLANNERS = 2
 OMPL_PLANNING_TIME_S = 10.0
 
 # Target orientation, scalar-last (x, y, z, w): 180 deg about the (1, 0, 1) axis.
+# Start pose of every joint [rad], and the waypoints' shared x and z and their ys [m].
+START_JOINT_RAD = 0.1
+WAYPOINT_X_M = 0.8
+WAYPOINT_Z_M = 1.455
+WAYPOINT_Y_M = (-0.3, 0.3)
+
+
 TOOL_XYZW = (0.707, 0.0, 0.707, 0.0)
 
 
@@ -143,13 +150,15 @@ def run():
 
     # A seed away from the all-zero singularity.
     joint_names = [jid.name() for jid in env.getJointGroup("manipulator").getJointIds()]
-    env.setState(joint_names, np.full(len(joint_names), 0.1))
+    env.setState(joint_names, np.full(len(joint_names), START_JOINT_RAD))
 
     # Two Cartesian FREESPACE targets: the pipeline solves IK for them.
     program = CompositeInstruction("DEFAULT", ManipulatorInfo("manipulator", "base_link", "tool0"))
-    for y in (-0.3, 0.3):
+    for y in WAYPOINT_Y_M:
         pose = (
-            Isometry3d.Identity() * Translation3d(0.8, y, 1.455) * Quaterniond.from_xyzw(*TOOL_XYZW)
+            Isometry3d.Identity()
+            * Translation3d(WAYPOINT_X_M, y, WAYPOINT_Z_M)
+            * Quaterniond.from_xyzw(*TOOL_XYZW)
         )
         program.push_back(
             MoveInstructionPoly(

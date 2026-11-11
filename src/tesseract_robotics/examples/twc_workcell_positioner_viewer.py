@@ -166,6 +166,13 @@ def restore_rail(urdf: str) -> str:
     )
 
 
+# Animation length [s] and frame rate [Hz]; each joint oscillates at the base frequency [Hz]
+# plus a step per joint [Hz], so no two move in step.
+ANIMATION_DURATION_S = 60.0
+ANIMATION_FPS = 30.0
+BASE_FREQ_HZ = 0.2
+FREQ_STEP_HZ = 0.05
+
 WORKCELLS = {
     "positioner": {
         "urdf": "urdf/workcell_positioner.urdf",
@@ -198,7 +205,9 @@ WORKCELLS = {
 }
 
 
-def animation_rows(workcell: str, duration: float = 60.0, fps: float = 30.0):
+def animation_rows(
+    workcell: str, duration: float = ANIMATION_DURATION_S, fps: float = ANIMATION_FPS
+):
     """Sinusoidal joint motion, one row `[q..., t]` per frame.
 
     Returns:
@@ -211,7 +220,7 @@ def animation_rows(workcell: str, duration: float = 60.0, fps: float = 30.0):
         row = []
         for i, (lo, hi) in enumerate(animated_joints.values()):
             # Each joint oscillates at a different frequency for visual interest
-            freq = 0.2 + i * 0.05
+            freq = BASE_FREQ_HZ + i * FREQ_STEP_HZ
             mid = (lo + hi) / 2
             amp = (hi - lo) / 2
             row.append(mid + amp * math.sin(2 * math.pi * freq * t))

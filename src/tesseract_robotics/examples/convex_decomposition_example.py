@@ -142,11 +142,20 @@ def boolean(text: str) -> bool:
     raise argparse.ArgumentTypeError(f"invalid bool value: {text!r}")
 
 
+# Option limits of create_convex_decomposition.cpp: most hulls [-], the volume percent error
+# range [%], the fewest vertices a hull may be limited to [-], and the largest unsigned 32-bit
+# integer [-].
+MAX_HULLS_LIMIT = 32
+VOLUME_ERROR_LIMITS = (0.001, 10.0)
+MIN_HULL_VERTICES = 4
+UINT32_MAX = 2**32 - 1
+
+
 # --8<-- [start:options]
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """create_convex_decomposition.cpp's options; defaults from VHACDParameters()."""
     defaults = VHACDParameters()
-    unsigned_max = 2**32 - 1
+    unsigned_max = UINT32_MAX
     parser = argparse.ArgumentParser(description="Create a convex decomposition of a mesh")
     parser.add_argument("-i", "--input", help="File path to mesh used to create a convex hull.")
     parser.add_argument(
@@ -158,7 +167,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "-n",
         "--max_convex_hulls",
-        type=in_range(int, 1, 32),
+        type=in_range(int, 1, MAX_HULLS_LIMIT),
         default=defaults.max_convex_hulls,
         help="Maximum number of convex hulls",
     )
@@ -172,7 +181,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "-e",
         "--min_volume_percent_error",
-        type=in_range(float, 0.001, 10.0),
+        type=in_range(float, VOLUME_ERROR_LIMITS[0], VOLUME_ERROR_LIMITS[1]),
         default=defaults.minimum_volume_percent_error_allowed,
         help="If the voxels are within this threshold percentage of the volume of the hull, "
         "we consider this a close enough approximation",
@@ -194,7 +203,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "-v",
         "--max_num_vertices",
-        type=in_range(int, 4, unsigned_max),
+        type=in_range(int, MIN_HULL_VERTICES, unsigned_max),
         default=defaults.max_num_vertices_per_ch,
         help="Maximum number of vertices per convex hull",
     )

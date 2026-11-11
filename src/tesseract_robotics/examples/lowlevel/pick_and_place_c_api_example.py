@@ -88,6 +88,22 @@ BOX_SIZE_M = 0.2
 BOX_POSITION_M = (0.15, 0.4)
 
 JOINT_NAMES = [f"iiwa_joint_a{i}" for i in range(1, 8)]
+# Move profile coefficients [-] (pick_and_place_example.cpp:280-282): joint constraint 5 on
+# the one-wide velocity weight, Cartesian constraint 10 on all six axes.
+JOINT_CONSTRAINT_COEFF = 5.0
+CARTESIAN_CONSTRAINT_COEFF = 10.0
+CARTESIAN_DOF = 6
+# Collision constraint and cost (cpp:285-297): margins [m], coefficients [-], buffers [m].
+CONSTRAINT_MARGIN_M = 0.0
+CONSTRAINT_COEFF = 10
+CONSTRAINT_BUFFER_M = 0.005
+COST_MARGIN_M = 0.005
+COST_COEFF = 50
+COST_BUFFER_M = 0.01
+# OSQP iteration limit [-] (pick_and_place_example.cpp, solver profile).
+SOLVER_MAX_ITER = 100
+
+
 JOINT_START = np.array([0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0])
 
 # C++ Eigen::Quaterniond(w, x, y, z) is scalar-first; Quaterniond.from_xyzw takes scalar-last.
@@ -133,12 +149,18 @@ def create_pick_and_place_profiles(ifopt: bool = False) -> ProfileDictionary:
     move_profile.joint_cost_config.enabled = False
     move_profile.cartesian_cost_config.enabled = False
     move_profile.joint_constraint_config.enabled = True
-    move_profile.joint_constraint_config.coeff = np.full(1, 5.0)
+    move_profile.joint_constraint_config.coeff = np.full(1, JOINT_CONSTRAINT_COEFF)
     move_profile.cartesian_constraint_config.enabled = True
-    move_profile.cartesian_constraint_config.coeff = np.full(6, 10.0)
+    move_profile.cartesian_constraint_config.coeff = np.full(
+        CARTESIAN_DOF, CARTESIAN_CONSTRAINT_COEFF
+    )
 
-    composite_profile.collision_constraint_config = _collision_config(0.0, 10, 0.005)
-    composite_profile.collision_cost_config = _collision_config(0.005, 50, 0.01)
+    composite_profile.collision_constraint_config = _collision_config(
+        CONSTRAINT_MARGIN_M, CONSTRAINT_COEFF, CONSTRAINT_BUFFER_M
+    )
+    composite_profile.collision_cost_config = _collision_config(
+        COST_MARGIN_M, COST_COEFF, COST_BUFFER_M
+    )
     composite_profile.smooth_velocities = True
     composite_profile.velocity_coeff = np.ones(1)
     composite_profile.smooth_accelerations = True
@@ -146,7 +168,7 @@ def create_pick_and_place_profiles(ifopt: bool = False) -> ProfileDictionary:
     composite_profile.smooth_jerks = True
     composite_profile.jerk_coeff = np.ones(1)
 
-    solver_profile.opt_params.max_iter = 100
+    solver_profile.opt_params.max_iter = SOLVER_MAX_ITER
 
     profiles = ProfileDictionary()
     profiles.addProfile(namespace, "CARTESIAN", move_profile)
@@ -234,7 +256,7 @@ def run(ifopt: bool = False):
     joint_box2.child_link_id = LINK_BOX_NAME
     joint_box2.type = JointType.FIXED
     joint_box2.parent_to_joint_origin_transform = Isometry3d.Identity() * Translation3d(
-        0, 0, BOX_SIZE_M / 2.0
+        0.0, 0.0, BOX_SIZE_M / 2.0
     )
     add_ac = AllowedCollisionMatrix()
     add_ac.addAllowedCollision(LINK_BOX_NAME, LINK_END_EFFECTOR_NAME, "Never")

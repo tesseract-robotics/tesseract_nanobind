@@ -90,12 +90,31 @@ from tesseract_robotics.planning import (
 
 # Component of the unit quaternion [qx, qy, qz, qw] = [h, 0, h, 0]: 2 h^2 = 1.
 SQRT_HALF = math.sqrt(0.5)
+# Console banner width [characters] and how many link names the listing shows [-].
+BANNER_WIDTH = 60
+LINKS_SHOWN = 5
+# Zero pose: the six joints of the IRB 2400.
+JOINT_COUNT = 6
+# A pose by factories: position [m], and a yaw of 1.57 rad (a rounded pi/2) [rad].
+FACTORY_POSITION_M = (0.5, 0.0, 0.8)
+FACTORY_YAW_RAD = 1.57
+# Obstacles: the table's size [m], position [m] and colour [r, g, b, a], which clears the
+# robot; the ball's radius [m], position [m] and colour.
+TABLE_SIZE_M = (0.8, 0.8, 0.05)
+TABLE_XYZ_M = (0.75, 0.0, 0.3)
+TABLE_RGBA = (0.6, 0.4, 0.2, 1.0)
+BALL_RADIUS_M = 0.1
+BALL_XYZ_M = (0.4, 0.2, 0.6)
+BALL_RGBA = (1.0, 0.0, 0.0, 1.0)
+# Cartesian targets [m]: both look along +x of the tool, a quarter turn about y.
+TARGET_1_XYZ_M = (0.8, -0.2, 0.8)
+TARGET_2_XYZ_M = (0.8, 0.2, 0.8)
 
 
 def main() -> int:
-    print("=" * 60)
+    print("=" * BANNER_WIDTH)
     print("Pythonic API Example")
-    print("=" * 60)
+    print("=" * BANNER_WIDTH)
 
     # =========================================================================
     # 1. Load Robot
@@ -111,7 +130,7 @@ def main() -> int:
     )
 
     print(f"   Loaded: {robot}")
-    print(f"   Links: {robot.get_link_names()[:5]}...")
+    print(f"   Links: {robot.get_link_names()[:LINKS_SHOWN]}...")
     print(f"   Manipulator joints: {robot.get_joint_names('manipulator')}")
 
     # =========================================================================
@@ -127,16 +146,7 @@ def main() -> int:
 
     # WHY dict input: Avoids joint ordering errors - the wrapper extracts
     # names and values in correct order for Environment.setState()
-    robot.set_joints(
-        {
-            "joint_1": 0.0,
-            "joint_2": 0.0,
-            "joint_3": 0.0,
-            "joint_4": 0.0,
-            "joint_5": 0.0,
-            "joint_6": 0.0,
-        }
-    )
+    robot.set_joints({f"joint_{i}": 0.0 for i in range(1, JOINT_COUNT + 1)})
     print("   Set joints to zero position")
 
     # =========================================================================
@@ -164,12 +174,12 @@ def main() -> int:
 
     # WHY from_xyz_quat: project canonical quaternion order is scalar-last
     # `[qx, qy, qz, qw]`. The factory bridges to Eigen's internal layout.
-    t1 = Pose.from_xyz_quat([0.5, 0, 0.8], [0, 0, SQRT_HALF, SQRT_HALF])
+    t1 = Pose.from_xyz_quat(FACTORY_POSITION_M, [0, 0, SQRT_HALF, SQRT_HALF])
     print(f"   From position_quaternion: {t1}")
 
     # WHY @ chaining: Reads left-to-right as "translate then rotate"
     # Equivalent to t2 = Isometry3d.Identity() * Translation3d(...) * Quaterniond(...)
-    t2 = translation(0.5, 0, 0.8) @ rotation_z(1.57)
+    t2 = translation(*FACTORY_POSITION_M) @ rotation_z(FACTORY_YAW_RAD)
     print(f"   From factories: {t2}")
 
     # WHY numpy properties: direct interop with numpy without manual extraction
@@ -192,10 +202,10 @@ def main() -> int:
     create_obstacle(
         robot,
         name="table",
-        geometry=box(0.8, 0.8, 0.05),
+        geometry=box(*TABLE_SIZE_M),
         # Clear of the robot: at x = 0.5 the table's edge cuts link_1 and no plan exists.
-        transform=Pose.from_xyz(0.75, 0, 0.3),
-        color=(0.6, 0.4, 0.2, 1.0),
+        transform=Pose.from_xyz(*TABLE_XYZ_M),
+        color=TABLE_RGBA,
     )
     print("   Added table obstacle")
 
@@ -203,9 +213,9 @@ def main() -> int:
     create_obstacle(
         robot,
         name="ball",
-        geometry=sphere(0.1),
-        transform=Pose.from_xyz(0.4, 0.2, 0.6),
-        color=(1.0, 0.0, 0.0, 1.0),
+        geometry=sphere(BALL_RADIUS_M),
+        transform=Pose.from_xyz(*BALL_XYZ_M),
+        color=BALL_RGBA,
     )
     print("   Added ball obstacle")
 
@@ -226,15 +236,13 @@ def main() -> int:
         MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
         .set_joint_names(robot.get_joint_names("manipulator"))
         # Start at current position (joints)
-        .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+        .move_to(JointTarget([0] * JOINT_COUNT))
         # Move to Cartesian target
-        .move_to(
-            CartesianTarget(Pose.from_xyz_quat([0.8, -0.2, 0.8], [SQRT_HALF, 0, SQRT_HALF, 0]))
-        )
+        .move_to(CartesianTarget(Pose.from_xyz_quat(TARGET_1_XYZ_M, [SQRT_HALF, 0, SQRT_HALF, 0])))
         # Another Cartesian target
-        .move_to(CartesianTarget.from_xyz_quat([0.8, 0.2, 0.8], [SQRT_HALF, 0, SQRT_HALF, 0]))
+        .move_to(CartesianTarget.from_xyz_quat(TARGET_2_XYZ_M, [SQRT_HALF, 0, SQRT_HALF, 0]))
         # Back to joint target
-        .move_to(JointTarget([0, 0, 0, 0, 0, 0]))
+        .move_to(JointTarget([0] * JOINT_COUNT))
     )
 
     print(f"   Created program with {len(program)} targets")
@@ -270,9 +278,9 @@ def main() -> int:
     trajectory_array = result.to_numpy()
     print(f"   Trajectory shape: {trajectory_array.shape}")
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * BANNER_WIDTH)
     print("Example completed!")
-    print("=" * 60)
+    print("=" * BANNER_WIDTH)
 
     return 0
 

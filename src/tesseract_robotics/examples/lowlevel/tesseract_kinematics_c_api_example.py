@@ -130,6 +130,15 @@ from tesseract_robotics.kinematics import KinGroupIKInput, KinGroupIKInputs
 # export TESSERACT_RESOURCE_PATH="$(pwd)/tesseract/"
 
 
+# The IRB 2400's six joints; the pose the forward kinematics runs at [deg]; and a second
+# tool0 pose to compare against: position [m] and scalar-last orientation [qx, qy, qz, qw]
+# (0.7171 and 0.70711 are about sin and cos of pi/4, not exactly).
+JOINT_COUNT = 6
+JOINT_POS_DEG = (10, 20, -5, 70, 30, 90)
+TOOL0_XYZ_M = (0.7, -0.1, 1.0)
+TOOL0_QUAT_XYZW = (0.0, 0.7171, 0.0, 0.70711)
+
+
 def main():
     # =========================================================================
     # STEP 1: Environment Initialization
@@ -156,7 +165,7 @@ def main():
         raise EnvironmentInitError(f"failed to initialize the environment from {urdf_path}")
 
     # ABB IRB2400 joint naming convention: joint_1 through joint_6
-    _robot_joint_names = [f"joint_{i + 1}" for i in range(6)]  # noqa: F841
+    _robot_joint_names = [f"joint_{i + 1}" for i in range(JOINT_COUNT)]  # noqa: F841
 
     # =========================================================================
     # STEP 2: Get Kinematic Group
@@ -170,7 +179,7 @@ def main():
     # =========================================================================
     # Joint configuration: 6 angles in radians
     # np.deg2rad converts from human-readable degrees
-    robot_joint_pos = np.deg2rad(np.array([10, 20, -5, 70, 30, 90], dtype=np.float64))
+    robot_joint_pos = np.deg2rad(np.array(JOINT_POS_DEG, dtype=np.float64))
 
     # calcFwdKin returns TransformMap: dict mapping link names to Isometry3d
     # Contains transforms for ALL links in the kinematic chain
@@ -195,8 +204,8 @@ def main():
     # Quaternion in project canonical scalar-last [qx, qy, qz, qw].
     tool0_transform2 = (
         Isometry3d.Identity()
-        * Translation3d(0.7, -0.1, 1)
-        * Quaterniond.from_xyzw(0, 0.7171, 0, 0.70711)
+        * Translation3d(*TOOL0_XYZ_M)
+        * Quaterniond.from_xyzw(*TOOL0_QUAT_XYZW)
     )
 
     # KinGroupIKInput specifies a single IK request

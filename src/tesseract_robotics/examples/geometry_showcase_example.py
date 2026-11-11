@@ -52,12 +52,10 @@ for visual comparison.
 """
 
 import sys
-from pathlib import Path
 
 import numpy as np
 
 from tesseract_robotics import (
-    SupportDataNotFoundError,
     get_tesseract_resource_path,
     get_tesseract_support_path,
 )
@@ -92,12 +90,78 @@ from tesseract_robotics.scene_graph import (
 
 # Viewer (skip import during testing)
 
+# Colours [r, g, b, a], each in 0..1.
+GREY = (0.5, 0.5, 0.5, 1.0)
+RED = (0.9, 0.2, 0.2, 1.0)
+GREEN = (0.2, 0.9, 0.2, 1.0)
+BLUE = (0.2, 0.2, 0.9, 1.0)
+YELLOW = (0.9, 0.9, 0.2, 1.0)
+ORANGE = (0.9, 0.5, 0.2, 1.0)
+PURPLE = (0.6, 0.2, 0.8, 1.0)
+CYAN = (0.2, 0.8, 0.8, 1.0)
+OLIVE = (0.4, 0.7, 0.4, 1.0)
+TAN = (0.7, 0.7, 0.4, 1.0)
+
+# Primitive dimensions [m].
+BOX_EDGE_M = 0.15
+SPHERE_RADIUS_M = 0.08
+CYLINDER_RADIUS_M = 0.06
+CYLINDER_LENGTH_M = 0.2
+CAPSULE_RADIUS_M = 0.05
+CAPSULE_LENGTH_M = 0.15
+CONE_RADIUS_M = 0.08
+CONE_LENGTH_M = 0.2
+# The z = 0 plane, as a x + b y + c z + d = 0.
+FLOOR_PLANE = (0, 0, 1, 0)
+
+# Grid layout [m]: distance in front of the robot, spacing along y, height of the first row
+# and the rise to the second and third rows.
+GRID_X_M = 0.8
+GRID_Y_PITCH_M = 0.35
+GRID_Z_M = 0.5
+GRID_ROW2_RISE_M = 0.35
+GRID_ROW3_RISE_M = 0.7
+
+# A tetrahedron [m]: an apex above three base corners, and its four triangles, wound
+# counter-clockwise seen from outside.
+TETRAHEDRON_VERTICES_M = (
+    (0.0, 0.0, 0.1),
+    (0.1, 0.0, -0.05),
+    (-0.05, 0.087, -0.05),
+    (-0.05, -0.087, -0.05),
+)
+TETRAHEDRON_TRIANGLES = ((0, 1, 2), (0, 2, 3), (0, 3, 1), (1, 3, 2))
+# A square pyramid [m]: apex, then the base corners; six triangles (the square base is two).
+PYRAMID_VERTICES_M = (
+    (0.0, 0.0, 0.15),
+    (0.1, 0.1, 0.0),
+    (0.1, -0.1, 0.0),
+    (-0.1, -0.1, 0.0),
+    (-0.1, 0.1, 0.0),
+)
+PYRAMID_TRIANGLES = ((0, 1, 2), (0, 2, 3), (0, 3, 4), (0, 4, 1), (1, 4, 3), (1, 3, 2))
+# Vertices of a face in the faces array, which each face starts with [-].
+TRIANGLE_VERTICES = 3
+
+# Sphere distance field: default radius [m], samples per axis [-], and how far the grid
+# reaches past the sphere, as a multiple of its radius [-].
+SDF_RADIUS_M = 0.08
+SDF_SAMPLES = 17
+SDF_DOMAIN_MARGIN = 1.5
+# A probe at the grid's corner, outside the sphere [m].
+SDF_PROBE_M = 0.15
+# Scale applied to the meshes loaded from file [-]: 30 % on the sphere, 5 % on the 2 m box.
+SPHERE_FILE_SCALE = 0.3
+BOX_FILE_SCALE = 0.05
+# Width of the console banner [characters].
+BANNER_WIDTH = 60
+
 
 def create_geometry_link(
     name: str,
     geometry,
     transform: Pose,
-    color: tuple = (0.5, 0.5, 0.5, 1.0),
+    color: tuple = GREY,
     add_collision: bool = True,
 ) -> tuple:
     """
@@ -147,6 +211,14 @@ def create_geometry_link(
     return link, joint
 
 
+def _faces(triangles) -> np.ndarray:
+    """Triangles of vertex indices as the faces array: `[3, v0, v1, v2]` per face."""
+    return np.array(
+        [index for triangle in triangles for index in (TRIANGLE_VERTICES, *triangle)],
+        dtype=np.int32,
+    )
+
+
 def create_tetrahedron_vertices_faces():
     """
     Create vertices and faces for a tetrahedron (simplest 3D mesh).
@@ -158,36 +230,12 @@ def create_tetrahedron_vertices_faces():
         Tuple of (list of (3,) vertex arrays, numpy faces array)
     """
     # Each vertex is a 3D point in local coordinates
-    vertices = []
-    vertices.append(np.array([0.0, 0.0, 0.1], dtype=np.float64))  # apex
-    vertices.append(np.array([0.1, 0.0, -0.05], dtype=np.float64))
-    vertices.append(np.array([-0.05, 0.087, -0.05], dtype=np.float64))
-    vertices.append(np.array([-0.05, -0.087, -0.05], dtype=np.float64))
+    vertices = [np.array(vertex, dtype=np.float64) for vertex in TETRAHEDRON_VERTICES_M]
 
     # Faces use indexed format: [vertex_count, idx0, idx1, idx2, ...]
     # For triangles: [3, v0, v1, v2] per face
     # Vertex winding determines face normal (counter-clockwise = outward)
-    faces = np.array(
-        [
-            3,
-            0,
-            1,
-            2,  # front face
-            3,
-            0,
-            2,
-            3,  # left face
-            3,
-            0,
-            3,
-            1,  # right face
-            3,
-            1,
-            3,
-            2,  # bottom face (base triangle)
-        ],
-        dtype=np.int32,
-    )
+    faces = _faces(TETRAHEDRON_TRIANGLES)
 
     return vertices, faces
 
@@ -204,49 +252,16 @@ def create_pyramid_vertices_faces():
         Tuple of (list of (3,) vertex arrays, numpy faces array)
     """
     # Square pyramid: 5 vertices (apex + 4 base corners)
-    vertices = []
-    vertices.append(np.array([0.0, 0.0, 0.15], dtype=np.float64))  # apex at top
-    vertices.append(np.array([0.1, 0.1, 0.0], dtype=np.float64))  # base corners
-    vertices.append(np.array([0.1, -0.1, 0.0], dtype=np.float64))
-    vertices.append(np.array([-0.1, -0.1, 0.0], dtype=np.float64))
-    vertices.append(np.array([-0.1, 0.1, 0.0], dtype=np.float64))
+    vertices = [np.array(vertex, dtype=np.float64) for vertex in PYRAMID_VERTICES_M]
 
     # Faces: 4 triangular sides + square base (triangulated as 2 triangles)
     # Note: All non-triangular polygons must be triangulated
-    faces = np.array(
-        [
-            3,
-            0,
-            1,
-            2,  # front side
-            3,
-            0,
-            2,
-            3,  # right side
-            3,
-            0,
-            3,
-            4,  # back side
-            3,
-            0,
-            4,
-            1,  # left side
-            3,
-            1,
-            4,
-            3,  # base triangle 1
-            3,
-            1,
-            3,
-            2,  # base triangle 2
-        ],
-        dtype=np.int32,
-    )
+    faces = _faces(PYRAMID_TRIANGLES)
 
     return vertices, faces
 
 
-def create_sphere_sdf(radius: float = 0.08, samples: int = 17):
+def create_sphere_sdf(radius: float = SDF_RADIUS_M, samples: int = SDF_SAMPLES):
     """
     Bake an analytic sphere into a SignedDistanceField.
 
@@ -265,7 +280,7 @@ def create_sphere_sdf(radius: float = 0.08, samples: int = 17):
     Returns:
         SignedDistanceField spanning a cube that comfortably contains the sphere
     """
-    half_extent = radius * 1.5
+    half_extent = radius * SDF_DOMAIN_MARGIN
     domain_min = np.full(3, -half_extent)
     domain_max = np.full(3, half_extent)
     dimensions = np.full(3, samples, dtype=np.int32)
@@ -284,9 +299,9 @@ def run(**kwargs):
     Returns:
         dict with robot (for viewer compatibility)
     """
-    print("=" * 60)
+    print("=" * BANNER_WIDTH)
     print("Tesseract Geometry Showcase")
-    print("=" * 60)
+    print("=" * BANNER_WIDTH)
 
     # Load KUKA IIWA robot as base
     robot = Robot.from_tesseract_support(
@@ -296,9 +311,9 @@ def run(**kwargs):
     print(f"Links: {len(robot.get_link_names())}")
 
     # Grid layout parameters
-    x_offset = 0.8  # Distance from robot
-    y_spacing = 0.35  # Horizontal spacing
-    z_base = 0.5  # Base height
+    x_offset = GRID_X_M  # Distance from robot
+    y_spacing = GRID_Y_PITCH_M  # Horizontal spacing
+    z_base = GRID_Z_M  # Base height
 
     # =========================================================================
     # 1. PRIMITIVE SHAPES
@@ -308,70 +323,70 @@ def run(**kwargs):
     print("\n--- Primitive Shapes ---")
 
     # Box: defined by length (x), width (y), height (z) centered at origin
-    box = Box(0.15, 0.15, 0.15)
+    box = Box(BOX_EDGE_M, BOX_EDGE_M, BOX_EDGE_M)
     print(f"Box: {box.getX():.2f} x {box.getY():.2f} x {box.getZ():.2f}")
     assert box.getType() == GeometryType.BOX
     link, joint = create_geometry_link(
         "box_link",
         box,
         Pose.from_xyz(x_offset, -2 * y_spacing, z_base),
-        color=(0.9, 0.2, 0.2, 1.0),  # red
+        color=RED,
     )
     robot.add_link(link, joint)
 
     # Sphere
-    sphere = Sphere(0.08)
+    sphere = Sphere(SPHERE_RADIUS_M)
     print(f"Sphere: radius={sphere.getRadius():.2f}")
     assert sphere.getType() == GeometryType.SPHERE
     link, joint = create_geometry_link(
         "sphere_link",
         sphere,
         Pose.from_xyz(x_offset, -1 * y_spacing, z_base),
-        color=(0.2, 0.9, 0.2, 1.0),  # green
+        color=GREEN,
     )
     robot.add_link(link, joint)
 
     # Cylinder
-    cylinder = Cylinder(0.06, 0.2)
+    cylinder = Cylinder(CYLINDER_RADIUS_M, CYLINDER_LENGTH_M)
     print(f"Cylinder: r={cylinder.getRadius():.2f}, l={cylinder.getLength():.2f}")
     assert cylinder.getType() == GeometryType.CYLINDER
     link, joint = create_geometry_link(
         "cylinder_link",
         cylinder,
         Pose.from_xyz(x_offset, 0, z_base),
-        color=(0.2, 0.2, 0.9, 1.0),  # blue
+        color=BLUE,
     )
     robot.add_link(link, joint)
 
     # Capsule: cylinder with hemispherical end caps
     # Ideal for representing swept volumes or robot links - smooth collision
-    capsule = Capsule(0.05, 0.15)
+    capsule = Capsule(CAPSULE_RADIUS_M, CAPSULE_LENGTH_M)
     print(f"Capsule: r={capsule.getRadius():.2f}, l={capsule.getLength():.2f}")
     assert capsule.getType() == GeometryType.CAPSULE
     link, joint = create_geometry_link(
         "capsule_link",
         capsule,
         Pose.from_xyz(x_offset, 1 * y_spacing, z_base),
-        color=(0.9, 0.9, 0.2, 1.0),  # yellow
+        color=YELLOW,
     )
     robot.add_link(link, joint)
 
     # Cone
-    cone = Cone(0.08, 0.2)
+    cone = Cone(CONE_RADIUS_M, CONE_LENGTH_M)
     print(f"Cone: r={cone.getRadius():.2f}, l={cone.getLength():.2f}")
     assert cone.getType() == GeometryType.CONE
     link, joint = create_geometry_link(
         "cone_link",
         cone,
         Pose.from_xyz(x_offset, 2 * y_spacing, z_base),
-        color=(0.9, 0.5, 0.2, 1.0),  # orange
+        color=ORANGE,
     )
     robot.add_link(link, joint)
 
     # Plane: infinite half-space defined by equation ax + by + cz + d = 0
     # Here: 0x + 0y + 1z + 0 = 0, i.e., the z=0 floor plane
     # Used for ground/wall collision - everything below/behind plane collides
-    plane = Plane(0, 0, 1, 0)
+    plane = Plane(*FLOOR_PLANE)
     print(f"Plane: {plane.getA()}x + {plane.getB()}y + {plane.getC()}z + {plane.getD()} = 0")
     assert plane.getType() == GeometryType.PLANE
     # Note: Plane is collision-only geometry - cannot be visualized as a shape
@@ -385,7 +400,7 @@ def run(**kwargs):
     # - ConvexMesh: GJK algorithm, requires convex shape, faster
     print("\n--- Mesh Types (programmatic) ---")
 
-    z_row2 = z_base + 0.35
+    z_row2 = z_base + GRID_ROW2_RISE_M
 
     # Mesh: general triangulated surface - supports any topology including concave
     # Use for complex visual geometry or when collision accuracy matters more than speed
@@ -397,7 +412,7 @@ def run(**kwargs):
         "mesh_link",
         mesh,
         Pose.from_xyz(x_offset, -1 * y_spacing, z_row2),
-        color=(0.6, 0.2, 0.8, 1.0),  # purple
+        color=PURPLE,
     )
     robot.add_link(link, joint)
 
@@ -414,7 +429,7 @@ def run(**kwargs):
         "convex_mesh_link",
         convex_mesh,
         Pose.from_xyz(x_offset, 0, z_row2),
-        color=(0.2, 0.8, 0.8, 1.0),  # cyan
+        color=CYAN,
     )
     robot.add_link(link, joint)
 
@@ -428,11 +443,11 @@ def run(**kwargs):
     # a convex hull cannot.
     print("\n--- Signed Distance Field ---")
 
-    sdf = create_sphere_sdf(radius=0.08)
+    sdf = create_sphere_sdf(radius=SDF_RADIUS_M)
     dims = sdf.getDimensions()
     print(f"SignedDistanceField: {dims[0]}x{dims[1]}x{dims[2]} samples")
     print(f"  distance at centre:  {sdf.getDistance(np.zeros(3)):+.4f} m (inside)")
-    print(f"  distance at corner:  {sdf.getDistance(np.full(3, 0.15)):+.4f} m (outside)")
+    print(f"  distance at corner:  {sdf.getDistance(np.full(3, SDF_PROBE_M)):+.4f} m (outside)")
     assert sdf.getType() == GeometryType.SIGNED_DISTANCE_FIELD
 
     # Fields round-trip through the standard OpenVDB and NanoVDB grid formats, so a
@@ -455,62 +470,50 @@ def run(**kwargs):
     # Scale parameter allows resizing on import: [sx, sy, sz]
     print("\n--- Mesh Types (from file) ---")
 
-    z_row3 = z_base + 0.7
+    z_row3 = z_base + GRID_ROW3_RISE_M
 
-    # tesseract's support data (the `[support]` extra) has example meshes
-    try:
-        tesseract_support = str(get_tesseract_support_path())
-    except SupportDataNotFoundError:
-        tesseract_support = None
-    if tesseract_support:
-        # createMeshFromPath returns a list because some formats (DAE) contain
-        # multiple meshes. For single-mesh files like STL, use meshes[0].
-        sphere_mesh_path = Path(tesseract_support) / "meshes" / "sphere_p25m.stl"
-        if sphere_mesh_path.exists():
-            meshes = createMeshFromPath(
-                str(sphere_mesh_path),
-                np.array([0.3, 0.3, 0.3]),  # uniform scale to 30%
-            )
-            if meshes and len(meshes) > 0:
-                loaded_mesh = meshes[0]
-                print(
-                    f"Loaded mesh: {loaded_mesh.getVertexCount()} vertices, {loaded_mesh.getFaceCount()} faces"
-                )
-                link, joint = create_geometry_link(
-                    "loaded_mesh_link",
-                    loaded_mesh,
-                    Pose.from_xyz(x_offset, -1 * y_spacing, z_row3),
-                    color=(0.4, 0.7, 0.4, 1.0),  # olive
-                )
-                robot.add_link(link, joint)
+    # tesseract's support data (the `[support]` extra) has example meshes; without it
+    # get_tesseract_support_path() raises SupportDataNotFoundError, naming the fix.
+    tesseract_support = get_tesseract_support_path()
 
-        # createConvexMeshFromPath: same as createMeshFromPath but computes
-        # convex hull automatically. Use for collision geometry of complex CAD.
-        box_mesh_path = Path(tesseract_support) / "meshes" / "box_2m.stl"
-        if box_mesh_path.exists():
-            convex_meshes = createConvexMeshFromPath(
-                str(box_mesh_path),
-                np.array([0.05, 0.05, 0.05]),  # scale to 5% (2m -> 0.1m)
-            )
-            if convex_meshes and len(convex_meshes) > 0:
-                loaded_convex = convex_meshes[0]
-                print(f"Loaded ConvexMesh: {loaded_convex.getVertexCount()} vertices")
-                link, joint = create_geometry_link(
-                    "loaded_convex_link",
-                    loaded_convex,
-                    Pose.from_xyz(x_offset, 0, z_row3),
-                    color=(0.7, 0.7, 0.4, 1.0),  # tan
-                )
-                robot.add_link(link, joint)
-    else:
-        print("tesseract support data not installed, skipping file-based meshes")
+    # createMeshFromPath returns a list because some formats (DAE) contain
+    # multiple meshes; an STL holds one.
+    (loaded_mesh,) = createMeshFromPath(
+        str(tesseract_support / "meshes" / "sphere_p25m.stl"),
+        np.full(3, SPHERE_FILE_SCALE),  # uniform scale to 30%
+    )
+    print(
+        f"Loaded mesh: {loaded_mesh.getVertexCount()} vertices, {loaded_mesh.getFaceCount()} faces"
+    )
+    link, joint = create_geometry_link(
+        "loaded_mesh_link",
+        loaded_mesh,
+        Pose.from_xyz(x_offset, -1 * y_spacing, z_row3),
+        color=OLIVE,
+    )
+    robot.add_link(link, joint)
+
+    # createConvexMeshFromPath: same as createMeshFromPath but computes
+    # convex hull automatically. Use for collision geometry of complex CAD.
+    (loaded_convex,) = createConvexMeshFromPath(
+        str(tesseract_support / "meshes" / "box_2m.stl"),
+        np.full(3, BOX_FILE_SCALE),  # scale to 5% (2m -> 0.1m)
+    )
+    print(f"Loaded ConvexMesh: {loaded_convex.getVertexCount()} vertices")
+    link, joint = create_geometry_link(
+        "loaded_convex_link",
+        loaded_convex,
+        Pose.from_xyz(x_offset, 0, z_row3),
+        color=TAN,
+    )
+    robot.add_link(link, joint)
 
     # =========================================================================
     # SUMMARY
     # =========================================================================
-    print("\n" + "=" * 60)
+    print("\n" + "=" * BANNER_WIDTH)
     print("Geometry Summary")
-    print("=" * 60)
+    print("=" * BANNER_WIDTH)
     print("""
 Primitive Shapes (front row, left to right):
   - Box (red):     3D rectangular solid

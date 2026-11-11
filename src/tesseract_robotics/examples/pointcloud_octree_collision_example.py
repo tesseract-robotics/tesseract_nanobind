@@ -118,6 +118,17 @@ def build_octree_obstacle(points_m: np.ndarray, resolution: float) -> Octree:
 # so the arm at full forward extension can sweep sideways through it.
 PIECE_ORIGIN = (1.3, 0.3, 0.0)
 
+# Margins [m]: the permissive contact check's, so no realistic penetration registers; and the
+# zero margin of the explicit check.
+PERMISSIVE_MARGIN_M = -10.0
+ZERO_MARGIN_M = 0.0
+# Octree leaf size [m] for `run`, and for the command line.
+OCTREE_RESOLUTION_M = 0.04
+CLI_RESOLUTION_M = 0.02
+# Trajectory colours in the viewer [r, g, b, a].
+RED_RGBA = (0.85, 0.15, 0.15, 1.0)
+GREEN_RGBA = (0.15, 0.75, 0.25, 1.0)
+
 # Start/goal: a base-rotation sweep aimed at the cloud's bearing
 # (atan2(0.3, 1.3) ≈ 0.23 rad). Wrist sits at tool0 z ≈ 0.13 m — right at
 # the top of the cloud (whose z-range after the 2× bake is roughly
@@ -194,14 +205,14 @@ def _trajopt_profiles_without_collision():
     # Register a permissive ContactCheckProfile (huge negative margin so no
     # realistic penetration registers) so the naive plan is allowed to finish.
     permissive = ContactCheckProfile()
-    permissive.contact_manager_config.default_margin = -10.0
+    permissive.contact_manager_config.default_margin = PERMISSIVE_MARGIN_M
     for name in STANDARD_PROFILE_NAMES:
         profiles.addProfile("DiscreteContactCheckTask", name, permissive)
 
     return profiles
 
 
-def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
+def run(cloud_path: Path | None = None, resolution: float = OCTREE_RESOLUTION_M) -> dict:
     """Build the scene, demonstrate collision vs. TrajOpt-planned trajectory.
 
     Returns a dict with `colliding_contacts`, `aware_contacts`, `result`
@@ -240,7 +251,7 @@ def run(cloud_path: Path | None = None, resolution: float = 0.04) -> dict:
     # Zero margin: only report actual penetrations, not near-misses. This
     # makes the colliding-vs-collision-aware comparison binary — the
     # collision-aware trajectory should report 0 contacts.
-    manager.setCollisionMarginData(CollisionMarginData(0.0))
+    manager.setCollisionMarginData(CollisionMarginData(ZERO_MARGIN_M))
 
     joint_names = robot.get_joint_names("manipulator")
 
@@ -343,8 +354,8 @@ def main() -> int:
     p.add_argument(
         "--resolution",
         type=float,
-        default=0.02,
-        help="octree leaf resolution in metres (default: 0.02)",
+        default=CLI_RESOLUTION_M,
+        help=f"octree leaf resolution in metres (default: {CLI_RESOLUTION_M})",
     )
     args = p.parse_args()
 
@@ -357,8 +368,8 @@ def main() -> int:
     # Tint every robot link visual so the colour reflects which path the
     # viewer is currently animating. The octree link has no Visual.material
     # set, so it keeps the default grey.
-    red = np.array([0.85, 0.15, 0.15, 1.0])
-    green = np.array([0.15, 0.75, 0.25, 1.0])
+    red = np.array(RED_RGBA)
+    green = np.array(GREEN_RGBA)
 
     colliding_result = results["colliding_result"]
     have_aware = result.successful and result.raw_results is not None

@@ -50,6 +50,9 @@ OMPL_DEFAULT_NAMESPACE = "OMPLMotionPlannerTask"
 
 # FreespaceOMPLExample constructor defaults (freespace_ompl_example.h).
 RANGE = 0.01
+# addSphere() (freespace_ompl_example.cpp:102): radius [m] and position on base_link [m].
+SPHERE_RADIUS_M = 0.15
+SPHERE_XYZ_M = (0.5, 0.0, 0.55)
 PLANNING_TIME_S = 60.0
 
 JOINT_NAMES = [f"joint_a{i}" for i in range(1, 8)]
@@ -70,8 +73,8 @@ def run():
         env,
         "sphere_attached",
         "joint_sphere_attached",
-        Sphere(0.15),
-        Isometry3d.Identity() * Translation3d(0.5, 0, 0.55),
+        Sphere(SPHERE_RADIUS_M),
+        Isometry3d.Identity() * Translation3d(*SPHERE_XYZ_M),
     )
     env.setState(JOINT_NAMES, JOINT_START)
 
