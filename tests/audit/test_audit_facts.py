@@ -206,6 +206,7 @@ def test_a_failed_parse_stores_nothing(cache, parses):
         with pytest.raises(audit.HeaderParseError, match="redefinition"):
             audit._header_gaps(FIXTURES / "nested_bindings.cpp", CLASH, (FIXTURE_INCLUDE,))
     assert len(parses) == 2
+    assert not list(cache.root.glob("*/*.json"))
 
 
 def test_a_second_audit_of_a_tu_parses_nothing_and_reports_the_same(cache, parses):

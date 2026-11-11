@@ -74,8 +74,8 @@ The report is the source of these numbers. This table is copied from it once per
 
 Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the typed key, the listing rule and the telemetry ran green cold and warm at 06c5ff2a. The cost that was left then (§ Telemetry: the synthetic TUs of unincluded headers, `cpp_api`, the declarations parse) is now cached too (§ Include structure and API).
 
-!!! warning "Under verification"
-    The `includes` and `api` facts are implemented and their libclang-free contract is tested (86 tests). The libclang path has not run yet: it is validated only by a dispatched audit, cold and then warm, with "Report is current" green in both. No timing below reflects it.
+!!! note "Status"
+    Confirmed on a cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43035541479), 47a5133f): 1073 contract tests passed, "Report is current" green, and the audit step, which reads what the contract tests stored, took 0:13 with no miss. Under verification: the contract tests on a warm cache (the run after this one).
 
 | step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) | warm cache, main at 16a89e46 ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43003311837)) |
 |---|---|---|---|---|
@@ -127,6 +127,26 @@ The listing names every file a parse could include: everything except the suffix
 A synthetic TU includes its binding source, a `.cpp`, which the listing skips. `require_listed` exempts it as a sibling: a quoted include is searched first in the main file's own directory, so no listed dir can shadow it, and it is a recorded dependency. A sibling in another directory raises `NotASiblingError`.
 
 A contract test that patches a table and audits builds another `Selection` or another synthetic text, so another entry. Nothing that a test patches on `audit_match` runs inside a fetch: `api_facts` calls `extract_api` directly, and the test that rewrites an overload wraps `resolve_bound`, after the cache. A parse that fails stores nothing.
+
+Measured at 47a5133f on a cold cache (`ENTRY_FORMAT` 3 matched no stored entry), same job as the tables in § Telemetry, which are the "before":
+
+| step | before, cold (06c5ff2a) | before, warm (06c5ff2a) | after, cold (47a5133f) |
+|---|---|---|---|
+| contract tests | 9:56 | 14:15 | 9:00 |
+| GIL list | 6:13 | 0:01 | 8:37 |
+| audit | 2:52 | 5:03 | 0:13 |
+| job | 19:18 | 21:08 | 18:16 |
+
+| audit step, 22 modules | before, cold s | before, warm s | after s |
+|---|---|---|---|
+| `unincluded-headers` | 75.5 | 133.8 | 1.5 |
+| `cpp-api` | 67.3 | 112.1 | 0.4 |
+| `decl-parse` | 17.3 (22 calls) | 37.8 (22 calls) | 4.3 (3 calls) |
+| `match` | 0.6 | 1.1 | 0.8 |
+
+In the audit step every fetch hit: `api` 41, `includes` 41, `bound` 22, `decl` 22. The contract tests computed them: `api` 75 misses (235.0 s), `includes` 67 (138.5 s), over 120 `audit_tu` calls in 7 processes, with `cpp-api` at 205.0 s and `unincluded-headers` at 245.7 s against 422.1 s and 465.7 s before. The GIL list was all-cold (22 misses, 516.4 s) and is unchanged by this work; warm it takes a second. The job on a warm cache is therefore the contract tests plus under a minute.
+
+`cpp-api` times the fetch and `resolve_bound`. When `include_facts` hits and `api_facts` misses (a table edit that changes a `Selection` and no header), the parse runs inside that fetch and its seconds count under `decl-parse` as well.
 
 Still parsed on every audit: the binding TU of the three modules with `PLUGIN_ANCHOR_INCLUDES` headers (collision, kinematics, task composer), because `check_anchor_headers` reads cursors. That is about 3/22 of the `decl-parse` row below.
 
