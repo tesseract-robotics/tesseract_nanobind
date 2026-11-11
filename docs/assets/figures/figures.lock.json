@@ -152,7 +152,7 @@
         "src/tesseract_robotics/planning/profiles/descartes.py": "56137d9ce06a31084de0eda87bbcbf3bc1be4724f8a2ad34d7ca9786f99904c5",
         "src/tesseract_robotics/planning/profiles/names.py": "f5383aac21c145b8e1d9ed3a9db8c61cccbbecb87d9c75b14e28331cd28e0ce6",
         "src/tesseract_robotics/planning/profiles/pipelines.py": "1b20bc3ef95b891cdaece18ce0f4dc150a9cae8710e3994e8dff408444d3e476",
-        "src/tesseract_robotics/planning/profiles/trajopt.py": "2dba5414bd67b11a6cda15c9a81451a8b715dc586e52ca4ae393b6d608456967",
+        "src/tesseract_robotics/planning/profiles/trajopt.py": "72271c5f988d644731fe94bf49b9bfc1158844ecc344299e5c65674cc685a2ed",
         "task_composer_config:task_composer_plugins.yaml": "7d722d83d101fa57ba7ff292f65817bbc26fc5ffc9bc7a218eb29a2c1fe36771",
         "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/base_link.stl": "72a144efbbd6996d214cb07b7886b3545462dc8e20f3391a4901aa59c950fca1",
         "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_1.stl": "2b98f6dcd3e02ea65fcad58d3c11a9bd8ccf68bc52c71eff6f4ffd194c5ae8a0",

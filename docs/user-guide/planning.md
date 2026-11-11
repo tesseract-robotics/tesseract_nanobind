@@ -850,8 +850,8 @@ result = plan_freespace(robot, program, profiles=profiles)
 Equivalent manual setup:
 
 ```python
-# In TrajOpt plan profile — position free (0), orientation constrained (5)
-plan_profile.cartesian_constraint_config.coeff = [0, 0, 0, 5, 5, 5]
+# In TrajOpt plan profile — position free (0), orientation constrained (1)
+plan_profile.cartesian_constraint_config.coeff = [0, 0, 0, 1, 1, 1]
 ```
 
 ### Joint constraints
