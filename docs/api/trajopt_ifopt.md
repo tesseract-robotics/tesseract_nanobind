@@ -240,6 +240,19 @@ numerical = calcNumericalConstraintGradient(nodes_variables, my_constraint)
 assert np.allclose(numerical.toarray(), my_constraint.getJacobian().toarray(), atol=1e-6)
 ```
 
+## Python-defined rules
+
+`tesseract_robotics.trajopt_ifopt.python_constraints` holds `PyConstraint`, a `ConstraintSet`
+base for a rule written as `f(q)` on one waypoint's joints, and the rules built on it; see
+[`PyConstraint`: a rule from `f(q)`](../user-guide/low-level-sqp.md#pyconstraint-a-rule-from-fq).
+
+::: tesseract_robotics.trajopt_ifopt.python_constraints
+    options:
+      show_root_heading: true
+      show_source: true
+      members_order: source
+      heading_level: 3
+
 ## Module API
 
 ::: tesseract_robotics.trajopt_ifopt

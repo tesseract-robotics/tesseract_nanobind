@@ -60,7 +60,13 @@ VIEWER_STEP_S = 0.1
 
 # --8<-- [start:problem]
 def build_optimization_problem(
-    robot, joint_names, start_pos, target_pos, steps=10, use_continuous_collision=True
+    robot,
+    joint_names,
+    start_pos,
+    target_pos,
+    steps=10,
+    use_continuous_collision=True,
+    extra_constraints=None,
 ):
     """Build the TrajOptQPProblem that online_planning_example.cpp builds.
 
@@ -72,6 +78,8 @@ def build_optimization_problem(
         steps: Number of trajectory waypoints
         use_continuous_collision: If True, use LVS continuous collision.
                                   If False, use discrete single-timestep collision.
+        extra_constraints: Optional callable (vars_list, manip, env) -> constraint sets,
+                           added before setup(), e.g. Python-defined planning rules.
 
     Returns:
         dict with problem and all objects that must stay alive
@@ -178,6 +186,11 @@ def build_optimization_problem(
             collision_evaluators.append(collision_evaluator)
             collision_constraints.append(collision_constraint)
 
+    # Extra constraint sets, e.g. Python-defined rules (python_constraints.PyConstraint)
+    extra_sets = list(extra_constraints(vars_list, manip, robot.env)) if extra_constraints else []
+    for extra in extra_sets:
+        problem.addConstraintSet(extra)
+
     # Setup the problem (must be called after adding all sets)
     problem.setup()
 
@@ -192,6 +205,7 @@ def build_optimization_problem(
         "collision_evaluators": collision_evaluators,
         "collision_constraints": collision_constraints,
         "manip": manip,
+        "extra_sets": extra_sets,
     }
 
 
@@ -203,7 +217,9 @@ def update_human_position(robot, human_x, human_y):
     robot.env.setState({"human_x_joint": human_x, "human_y_joint": human_y})
 
 
-def run(steps=12, verbose=False, use_continuous_collision=False):
+def run(
+    steps=12, verbose=False, use_continuous_collision=False, extra_constraints=None, num_replan=10
+):
     """Run trajectory optimization with low-level SQP API.
 
     Args:
@@ -211,6 +227,8 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
         verbose: Print debug info
         use_continuous_collision: Use LVS continuous collision (True) or discrete (False)
                                   C++ default: False (discrete collision)
+        extra_constraints: see build_optimization_problem
+        num_replan: replanning iterations after the initial solve
 
     Returns:
         dict with results
@@ -232,7 +250,13 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     collision_mode = "LVS continuous" if use_continuous_collision else "discrete"
     print(f"Building optimization problem (collision: {collision_mode})...")
     problem_data = build_optimization_problem(
-        robot, joint_names, start_pos, target_pos, steps, use_continuous_collision
+        robot,
+        joint_names,
+        start_pos,
+        target_pos,
+        steps,
+        use_continuous_collision,
+        extra_constraints,
     )
     problem = problem_data["problem"]
     problem.print()
@@ -259,7 +283,6 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
     timings = [solve_time]
 
     # Online replanning loop
-    num_replan = 10
     print(f"\nOnline replanning ({num_replan} iterations)...")
 
     for iteration in range(num_replan):
@@ -279,6 +302,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
             target_pos,
             steps,
             use_continuous_collision,
+            extra_constraints,
         )
         problem = problem_data["problem"]
 
@@ -311,6 +335,7 @@ def run(steps=12, verbose=False, use_continuous_collision=False):
         "timings": timings,
         "robot": robot,
         "joint_names": joint_names,
+        "steps": steps,
         "success": len(trajectories) > 0,
     }
 
