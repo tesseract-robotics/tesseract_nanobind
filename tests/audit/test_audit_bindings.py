@@ -1104,3 +1104,18 @@ def test_provenance_without_an_audited_pin_raises(tmp_path):
     rosinstall.write_text("- git: {local-name: tesseract, uri: u, version: abc}\n")
     with pytest.raises(audit.UpstreamPinError, match="tesseract_planning, trajopt"):
         audit.upstream_pins(rosinstall)
+
+
+def test_a_base_named_by_a_wrapped_package_public_path_resolves_to_its_private_stub():
+    """The stub generator writes `tesseract_robotics.motion_planners.MotionPlanner` for a base
+    bound in `motion_planners/_motion_planners`; members inherited from it are covered, not gaps
+    (DescartesMotionPlanner.solve etc. were reported as gaps when this lookup failed)."""
+    stub = REPO_ROOT / "src" / "tesseract_robotics" / "motion_planners" / "_motion_planners.pyi"
+    py = audit._stub_py_api(stub)
+    found = audit._base_stub(
+        "tesseract_robotics.motion_planners.MotionPlanner", py, (REPO_ROOT / "src",)
+    )
+    assert found is not None
+    base_py, cls = found
+    assert cls == "MotionPlanner"
+    assert "MotionPlanner.solve" in base_py.symbols
