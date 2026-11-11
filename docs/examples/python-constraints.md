@@ -115,18 +115,10 @@ staying close to the frame before. `CarriageFollows` asks.
 
 ## Solve times
 
-Per frame, on a shared 2-vCPU cloud VM (Intel Xeon, 2.1 GHz). Indicative: run the example for
-local numbers, which it prints per act.
-
-| Act | Rules | Median | Slowest frame |
-|---|---|---|---|
-| 2 | 1 | 0.9 ms | 1.4 ms |
-| 3 | 2 | 2.4 ms | 5.1 ms |
-| 4 | 3 | 3.9 ms | 7.0 ms |
-| 5 | 4 | 4.6 ms | 8.6 ms |
-| 6 | 4 | 4.6 ms | 16.0 ms |
-| 7 | 4 | 3.9 ms | 24.0 ms |
-| 8 | 7 | 11.3 ms | 30.0 ms |
+Each act's caption carries the median solve of its frames, and the last ruler of the panel
+shows every frame's solve against the 33 ms a 30 Hz loop has. The numbers are those of the
+machine the recording was made on, a shared 2-vCPU cloud VM (Intel Xeon, 2.1 GHz). Run the
+example for local numbers: it prints the median and the slowest frame per act.
 
 `StayDexterous`, `WatchTheTool`, `ElbowUp` and `Clearance` use the default forward-difference
 Jacobian; `Clearance` queries the contact manager for each column.
