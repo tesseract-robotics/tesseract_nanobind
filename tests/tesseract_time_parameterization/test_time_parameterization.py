@@ -563,3 +563,34 @@ def test_profile_create_key_matches_instance_key(cls):
 def test_profile_create_keys_distinct():
     keys = {c.createKey() for c, _, _ in PROFILE_FIELD_CHANGES}
     assert len(keys) == len(PROFILE_FIELD_CHANGES)
+
+
+# rad/s^2: TOTG integrates in 1 ms steps; the sampled acceleration on a constant-acceleration
+# phase is the limit to round-off. 1e-6 relative of the 1.309 limit.
+TOTG_ACCEL_REL_TOL = 1e-6
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="upstream TOTG: a waypoint on a segment boundary gets a zero time step and "
+    "getAcceleration returns 0 (tesseract_planning time_optimal_trajectory_generation.cpp; "
+    "fix proposed in tesseract-robotics/tesseract_planning#797)",
+)
+def test_totg_acceleration_on_accelerating_phase_between_collinear_waypoints(abb_env):
+    """Waypoint 1 of 5 collinear waypoints sits on the accelerating phase: a = +a_max, not 0."""
+    program = CompositeInstruction("DEFAULT")
+    program.setManipulatorInfo(_manipulator_info())
+    for s in np.linspace(0.0, 1.0, 5):
+        q = np.zeros(6)
+        q[0] = s
+        program.push_back(_move(q))
+    profiles = ProfileDictionary()
+    profiles.addProfile("TOTG", "DEFAULT", TimeOptimalTrajectoryGenerationCompositeProfile())
+    assert TimeOptimalTrajectoryGeneration().compute(program, abb_env, profiles)
+
+    a_max = abb_env.getJointGroup("manipulator").getLimits().acceleration_limits[0, 1]
+    traj = InstructionsTrajectory(program)
+    # Decelerating side: already right (backward integration never lands a step on a waypoint).
+    assert traj.getAcceleration(3)[0] == pytest.approx(-a_max, rel=TOTG_ACCEL_REL_TOL)
+    # Accelerating side: reads exactly 0.0 today.
+    assert traj.getAcceleration(1)[0] == pytest.approx(a_max, rel=TOTG_ACCEL_REL_TOL)
