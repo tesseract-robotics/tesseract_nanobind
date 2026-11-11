@@ -47,8 +47,9 @@ UPRIGHT_COLLISION_COEFF: Final = 1.0
 UPRIGHT_SMOOTHING_COEFF: Final = 1.0
 
 # Cartesian constraint weights of the UPRIGHT profile, [x, y, z, rx, ry, rz]: position free (0),
-# orientation constrained (5), from the C++ glass_upright_example.
-UPRIGHT_CARTESIAN_COEFF: Final = (0.0, 0.0, 0.0, 5.0, 5.0, 5.0)
+# orientation constrained (1), as the C++ glass_upright_example sets them
+# (`Eigen::VectorXd::Constant(6, 1)` with the first three zeroed).
+UPRIGHT_CARTESIAN_COEFF: Final = (0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
 
 
 def create_trajopt_profile_pair() -> tuple[
@@ -319,7 +320,7 @@ def create_trajopt_upright_profiles(
 
     This creates profiles matching the C++ glass_upright_example.cpp:
     - Collision: margin=0.01 m, collision_margin_buffer=0.01 m, coeff=1 (`DISCRETE` evaluator)
-    - Cartesian constraint: coeff=[0,0,0,5,5,5] (position free, orientation constrained)
+    - Cartesian constraint: coeff=[0,0,0,1,1,1] (position free, orientation constrained)
 
     The UPRIGHT profile keeps tool orientation constant while allowing position to vary.
     Essential for tasks like carrying a glass of water without spilling.

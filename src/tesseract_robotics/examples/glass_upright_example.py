@@ -13,7 +13,7 @@ Pipeline Overview:
     5. TrajOpt optimizes trajectory while respecting orientation + collision constraints
 
 Concept: "UPRIGHT" Profile Constraint
-    The UPRIGHT profile applies Cartesian constraints with coeff=[0,0,0,5,5,5]:
+    The UPRIGHT profile applies Cartesian constraints with coeff=[0,0,0,1,1,1]:
         - Position (x,y,z): coeff=0 -> unconstrained, robot can move freely in space
         - Orientation (rx,ry,rz): coeff=5 -> strongly constrained, must stay upright
 
@@ -40,7 +40,7 @@ C++ Profile Configuration (verified):
         - smooth_velocities: true
     Plan Profile (UPRIGHT):
         - cartesian_constraint: enabled
-        - coeff = [0, 0, 0, 5, 5, 5]  (position free, orientation constrained)
+        - coeff = [0, 0, 0, 1, 1, 1]  (position free, orientation constrained)
         - joint_cost: disabled
 
 C++ Parameters (verified):
@@ -78,6 +78,13 @@ from tesseract_robotics.planning.profiles import (
     create_freespace_pipeline_profiles,
     create_trajopt_upright_profiles,
 )
+
+# The sphere obstacle (glass_upright_example.cpp:104-105): radius [m], position on base_link [m].
+SPHERE_RADIUS_M = 0.15
+SPHERE_XYZ_M = (0.5, 0.0, 0.55)
+# Start and end joints [rad] (cpp:140-157): only joint_a1 differs, -0.4 then 0.4.
+START_JOINTS_RAD = (-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0)
+END_JOINTS_RAD = (0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0)
 
 
 def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer | None = None):
@@ -122,10 +129,10 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     create_obstacle(
         robot,
         name="sphere_attached",
-        geometry=sphere(0.15),  # 15cm radius (C++ default)
-        transform=Pose.from_xyz(0.5, 0, 0.55),  # C++ position
+        geometry=sphere(SPHERE_RADIUS_M),
+        transform=Pose.from_xyz(*SPHERE_XYZ_M),
     )
-    print("Added sphere obstacle r=0.15 at (0.5, 0, 0.55)")
+    print(f"Added sphere obstacle r={SPHERE_RADIUS_M} at {SPHERE_XYZ_M}")
 
     # Get joint names for manipulator group
     joint_names = robot.get_joint_names("manipulator")
@@ -133,14 +140,14 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     # Start/end configurations from C++ example
     # Only joint_a1 changes (-0.4 -> 0.4 rad = ~46 degrees)
     # This creates a horizontal "sweep" while maintaining tool orientation
-    joint_start_pos = np.array([-0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
-    joint_end_pos = np.array([0.4, 0.2762, 0.0, -1.3348, 0.0, 1.4959, 0.0])
+    joint_start_pos = np.array(START_JOINTS_RAD)
+    joint_end_pos = np.array(END_JOINTS_RAD)
 
     # Set initial state for planning
     robot.set_joints(joint_start_pos, joint_names=joint_names)
 
     # Build motion program with UPRIGHT profile
-    # UPRIGHT profile: coeff=[0,0,0,5,5,5] constrains orientation, frees position
+    # UPRIGHT profile: coeff=[0,0,0,1,1,1] constrains orientation, frees position
     # LINEAR motion type ensures Cartesian interpolation at intermediate points
     # StateTarget specifies joint config - TrajOpt uses FK for Cartesian constraint
     program = (
@@ -153,7 +160,7 @@ def run(pipeline="TrajOptPipeline", num_planners=None, *, composer: TaskComposer
     )
 
     print("\nProgram: LINEAR motion with UPRIGHT profile")
-    print("Orientation locked (coeff=[0,0,0,5,5,5]), position free")
+    print("Orientation locked (coeff=[0,0,0,1,1,1]), position free")
 
     # Select profiles - TrajOpt required for orientation constraints
     if "Freespace" in pipeline or "OMPL" in pipeline:
