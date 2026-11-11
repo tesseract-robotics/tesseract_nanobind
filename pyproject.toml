@@ -205,6 +205,7 @@ pre-commit = ">=3.0"
 autoconf = "*"
 automake = "*"
 autoconf-archive = "*"
+libtool = "*"
 bison = "*"
 flex = "*"
 

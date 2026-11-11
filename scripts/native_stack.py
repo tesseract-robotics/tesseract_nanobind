@@ -40,6 +40,9 @@ PORT_OVERLAYS_WINDOWS = WORKFLOWS / "vcpkg_overlays_windows"
 IDENTITY_FILE = ".native-stack-identity.json"
 # Deployment target of the vcpkg_triplets osx triplets and the colcon build (macOS release).
 OSX_DEPLOYMENT_TARGET = "12.0"
+# Apple's libtool builds static archives (CMake's CMAKE_LIBTOOL); GNU libtool, which the autotools
+# ports need for libtoolize, must not shadow it on PATH.
+APPLE_LIBTOOL = Path("/usr/bin/libtool")
 # Linux builds two colcon packages at a time, each with every core: four at once peak past a
 # 16 GB runner.
 LINUX_COLCON_WORKERS = "2"
@@ -135,6 +138,17 @@ class Stack:
 
     def planning_port_overlays(self) -> Path:
         return self.src / "tesseract_planning" / ".github" / "workflows" / "vcpkg_overlays"
+
+    def toolchain_env(self) -> dict[str, str]:
+        """PATH for the build tools: on macOS Apple's libtool stays ahead of GNU libtool."""
+        if self.host.name != "osx":
+            return {}
+        shims = self.root / "shims"
+        shims.mkdir(parents=True, exist_ok=True)
+        link = shims / "libtool"
+        if not link.is_symlink():
+            link.symlink_to(APPLE_LIBTOOL)
+        return {"PATH": prepend(str(shims), os.environ.get("PATH"))}
 
     def runtime_library_env(self) -> dict[str, str]:
         """Library search path entries for a process that loads the stack's shared libraries."""
@@ -318,6 +332,7 @@ def build_vcpkg(stack: Stack) -> None:
     args.append(f"--overlay-ports={stack.planning_port_overlays()}")
     args += config["packages"]
     env = {
+        **stack.toolchain_env(),
         "VCPKG_ROOT": str(stack.vcpkg_root),
         "VCPKG_DEFAULT_BINARY_CACHE": str(stack.binary_cache),
         "VCPKG_DISABLE_METRICS": "1",
@@ -331,7 +346,11 @@ def build_vcpkg(stack: Stack) -> None:
 def colcon_command(stack: Stack) -> tuple[list[str], dict[str, str]]:
     """The colcon invocation and environment of the stack's platform."""
     host = stack.host.name
-    env = {"CMAKE_PREFIX_PATH": str(stack.vcpkg_prefix), **stack.runtime_library_env()}
+    env = {
+        "CMAKE_PREFIX_PATH": str(stack.vcpkg_prefix),
+        **stack.toolchain_env(),
+        **stack.runtime_library_env(),
+    }
     ignore = ["tesseract_examples", "gtest"]
     cmake_args = [
         "-GNinja",
