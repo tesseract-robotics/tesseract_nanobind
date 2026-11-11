@@ -75,7 +75,7 @@ The report is the source of these numbers. This table is copied from it once per
 Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the typed key, the listing rule and the telemetry ran green cold and warm at 06c5ff2a. The cost that was left then (§ Telemetry: the synthetic TUs of unincluded headers, `cpp_api`, the declarations parse) is now cached too (§ Include structure and API).
 
 !!! note "Status"
-    Confirmed on a cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43035541479), 47a5133f): 1073 contract tests passed, "Report is current" green, and the audit step, which reads what the contract tests stored, took 0:13 with no miss. Under verification: the contract tests on a warm cache (the run after this one).
+    Confirmed on a cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43035541479), 47a5133f): 1073 contract tests passed, "Report is current" green, and the audit step, which reads what the contract tests stored, took 0:13 with no miss. Confirmed on a warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43038657462), da0f6bac): the same, and the contract tests took 1:54.
 
 | step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) | warm cache, main at 16a89e46 ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43003311837)) |
 |---|---|---|---|---|
@@ -130,12 +130,12 @@ A contract test that patches a table and audits builds another `Selection` or an
 
 Measured at 47a5133f on a cold cache (`ENTRY_FORMAT` 3 matched no stored entry), same job as the tables in § Telemetry, which are the "before":
 
-| step | before, cold (06c5ff2a) | before, warm (06c5ff2a) | after, cold (47a5133f) |
-|---|---|---|---|
-| contract tests | 9:56 | 14:15 | 9:00 |
-| GIL list | 6:13 | 0:01 | 8:37 |
-| audit | 2:52 | 5:03 | 0:13 |
-| job | 19:18 | 21:08 | 18:16 |
+| step | before, cold (06c5ff2a) | before, warm (06c5ff2a) | after, cold (47a5133f) | after, warm (da0f6bac) |
+|---|---|---|---|---|
+| contract tests | 9:56 | 14:15 | 9:00 | 1:54 |
+| GIL list | 6:13 | 0:01 | 8:37 | < 0:01 |
+| audit | 2:52 | 5:03 | 0:13 | 0:13 |
+| job | 19:18 | 21:08 | 18:16 | 2:43 |
 
 | audit step, 22 modules | before, cold s | before, warm s | after s |
 |---|---|---|---|
@@ -144,7 +144,8 @@ Measured at 47a5133f on a cold cache (`ENTRY_FORMAT` 3 matched no stored entry),
 | `decl-parse` | 17.3 (22 calls) | 37.8 (22 calls) | 4.3 (3 calls) |
 | `match` | 0.6 | 1.1 | 0.8 |
 
-In the audit step every fetch hit: `api` 41, `includes` 41, `bound` 22, `decl` 22. The contract tests computed them: `api` 75 misses (235.0 s), `includes` 67 (138.5 s), over 120 `audit_tu` calls in 7 processes, with `cpp-api` at 205.0 s and `unincluded-headers` at 245.7 s against 422.1 s and 465.7 s before. The GIL list was all-cold (22 misses, 516.4 s) and is unchanged by this work; warm it takes a second. The job on a warm cache is therefore the contract tests plus under a minute.
+In the audit step every fetch hit: `api` 41, `includes` 41, `bound` 22, `decl` 22. The contract tests computed them: `api` 75 misses (235.0 s), `includes` 67 (138.5 s), over 120 `audit_tu` calls in 7 processes, with `cpp-api` at 205.0 s and `unincluded-headers` at 245.7 s against 422.1 s and 465.7 s before. The GIL list was all-cold (22 misses, 516.4 s) and is unchanged by this work; warm it takes a second. 
+Warm, the contract tests' timed phases fall from 2337 s to 56 s over 7 processes (`unincluded-headers` 1072.7 → 10.8, `cpp-api` 960.9 → 4.2, `decl-parse` 295.1 → 32.5 in 16 parses, `match` 8.2 → 8.7), and the audit step is unchanged from the cold run's. The misses left there (`api` 13, `includes` 7, `decl` 21, `bound` 5, `gil` 1; 47 s of compute) are all tests of the cache itself: the miss-sources table names only `tests/audit/fixtures/` TUs audited against a fresh cache and files under pytest's temp directory. No real module misses.
 
 `cpp-api` times the fetch and `resolve_bound`. When `include_facts` hits and `api_facts` misses (a table edit that changes a `Selection` and no header), the parse runs inside that fetch and its seconds count under `decl-parse` as well.
 
