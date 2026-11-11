@@ -67,7 +67,7 @@ from typing import Any, override
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactManagersPluginFactory,
     ContactRequest,
     ContactResult,
@@ -77,7 +77,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactTestType,
     makeConvexMesh,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     CollisionMarginData,
     CollisionMarginPairData,
@@ -88,13 +88,13 @@ from tesseract_robotics.tesseract_common import (
     PluginInfo,
     getAllowedCollisions,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     Environment,
     EnvironmentContactAllowedValidator,
     SetActiveContinuousContactManagerCommand,
     SetActiveDiscreteContactManagerCommand,
 )
-from tesseract_robotics.tesseract_geometry import Box, createMeshFromPath
+from tesseract_robotics.geometry import Box, createMeshFromPath
 
 PLUGINS_URL = "package://tesseract/support/urdf/contact_manager_plugins.yaml"
 BOX_2M_URL = "package://tesseract/support/meshes/box_2m.ply"

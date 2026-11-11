@@ -13,7 +13,7 @@ The **Environment** is the central data structure containing:
 
 ```python
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import Robot
 
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
@@ -49,7 +49,7 @@ Used in Python:
 
 ```python
 import numpy as np
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput
+from tesseract_robotics.kinematics import KinGroupIKInput
 
 # Get the kinematic group
 manip = env.getKinematicGroup("manipulator")
@@ -86,7 +86,7 @@ The **Command Language** describes motion tasks:
 - **CompositeInstruction**: Container for multiple instructions
 
 ```python
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     StateWaypoint, StateWaypointPoly,
     CartesianWaypoint, CartesianWaypointPoly,
     MoveInstruction, MoveInstructionType, MoveInstructionPoly,
@@ -157,8 +157,8 @@ The **Task Composer** orchestrates complex planning tasks:
 **Profiles** configure planner behavior without code changes:
 
 ```python
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
 
 # Profiles are named configurations
 # "DEFAULT" is used if no specific profile is set
@@ -180,7 +180,7 @@ profiles.addProfile("OMPLMotionPlannerTask", "my_profile", ompl_profile)
 Checks collision at a single configuration:
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType,
@@ -210,7 +210,7 @@ Checks collision along a trajectory segment (swept volume):
 Interpolates between waypoints and checks at discrete points:
 
 ```python
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
 # Configured via the collision check config
@@ -241,7 +241,7 @@ The Tesseract library uses several common C++ storage and pointer patterns:
 The Tesseract library uses C++ container templates extensively. These are wrapped by nanobind.
 Typical examples include `std::vector`, `std::map`, and `std::unordered_map`. Each specific
 implementation of the template is wrapped, for example `std::vector<std::string>` is `StringVector`.
-Most of these templates are in `tesseract_common`, however they can be found in many modules.
+Most of these templates are in `common`, however they can be found in many modules.
 These template types roughly correspond to lists and dictionaries in Python. They can normally be
 implicitly created using lists and dictionaries, and when returned have roughly the same accessor
 methods.
@@ -255,10 +255,10 @@ An Eigen argument also accepts a list or a tuple (nested for a matrix) of the ex
 integers convert to `float64`. A function that writes into its argument in place needs the
 NumPy array itself.
 
-Some Eigen geometry types are wrapped as classes in the `tesseract_common` module:
+Some Eigen geometry types are wrapped as classes in the `common` module:
 
 ```python
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 import numpy as np
 
 # Identity transform
@@ -288,7 +288,7 @@ locator searches is up to you. tesseract's example robots are in the `[support]`
 
 ```python
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 assert locator.locateResource("package://tesseract/support/urdf/abb_irb2400.urdf") is not None
@@ -303,7 +303,7 @@ The command language uses type erasure extensively. In Python, the `*Poly` const
 instructions and waypoints, and the `as*` methods cast them back:
 
 ```python
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
 )
@@ -327,12 +327,12 @@ profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", ompl_profile)
 Tesseract logs through spdlog. Its default logger, `"tesseract"`, sets the level:
 
 ```python
-from tesseract_robotics.tesseract_common import LogLevel, getLogger
+from tesseract_robotics.common import LogLevel, getLogger
 
 getLogger().set_level(LogLevel.warn)
 ```
 
-See [tesseract_common logging](../api/tesseract_common.md#logging) for record handlers.
+See [common logging](../api/common.md#logging) for record handlers.
 
 ## Next Steps
 

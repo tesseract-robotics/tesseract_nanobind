@@ -5,10 +5,16 @@ import numpy as np
 import numpy.testing as nptest
 
 from tesseract_robotics import (
+    collision as tesseract_collision,
+)
+from tesseract_robotics import (
+    common as tesseract_common,
+)
+from tesseract_robotics import (
+    geometry as tesseract_geometry,
+)
+from tesseract_robotics import (
     get_tesseract_support_path,
-    tesseract_collision,
-    tesseract_common,
-    tesseract_geometry,
 )
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator

@@ -8,18 +8,15 @@ import importlib
 
 import pytest
 
-AUDITED_MODULES = (
-    "tesseract_common",
-    "tesseract_collision",
-    "tesseract_environment",
-    "tesseract_scene_graph",
-    "tesseract_command_language",
-)
+# Modules with a Python package around the compiled `_<name>` extension
+WRAPPED = ("common", "scene_graph")
+DIRECT = ("collision", "environment", "command_language")
 
 
 @pytest.mark.parametrize(
     "qualname",
-    [f"tesseract_robotics.{m}{ext}" for m in AUDITED_MODULES for ext in ("", f"._{m}")],
+    [f"tesseract_robotics.{m}{ext}" for m in WRAPPED for ext in ("", f"._{m}")]
+    + [f"tesseract_robotics.{m}" for m in DIRECT],
 )
 def test_no_enum_alias_constants(qualname):
     module = importlib.import_module(qualname)

@@ -28,7 +28,7 @@ TOOL_ID = sys.monitoring.PROFILER_ID
 TOOL_NAME = "gil_call_counts"
 
 # (file, line, module, qualname): file and line of the calling Python frame, module as named in
-# nogil_entry_points.yaml (`tesseract_environment`), qualname as nanobind reports it
+# nogil_entry_points.yaml (`environment`), qualname as nanobind reports it
 # (`Environment.getState`, or `parseURDFFile` for a module function).
 CallSite = tuple[str, int, str, str]
 

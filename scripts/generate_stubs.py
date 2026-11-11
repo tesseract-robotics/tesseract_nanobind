@@ -30,9 +30,10 @@ from widen_implicit_id_stubs import widen
 
 import tesseract_robotics
 
-# Modules are discovered in the installed package (editable or wheel); stubs are
-# compared against / written to the repo checkout.
-PACKAGE_DIR = Path(tesseract_robotics.__path__[0])
+# Modules are discovered in the installed package (editable or wheel: an editable install
+# splits the package between the source tree and site-packages, so every path entry is
+# walked); stubs are compared against / written to the repo checkout.
+PACKAGE_PATHS = list(tesseract_robotics.__path__)
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STUB_ROOT = REPO_ROOT / "src" / "tesseract_robotics"
 
@@ -54,8 +55,8 @@ class StubRenderError(RuntimeError):
 def discover_modules() -> list[str]:
     """Return the dotted names of all compiled extension modules, sorted."""
     names = []
-    for info in pkgutil.walk_packages([str(PACKAGE_DIR)], "tesseract_robotics."):
-        if info.ispkg or not info.name.rsplit(".", 1)[-1].startswith("_"):
+    for info in pkgutil.walk_packages(PACKAGE_PATHS, "tesseract_robotics."):
+        if info.ispkg:
             continue
         spec = importlib.util.find_spec(info.name)
         if spec is not None and isinstance(spec.loader, importlib.machinery.ExtensionFileLoader):
@@ -64,7 +65,11 @@ def discover_modules() -> list[str]:
 
 
 def stub_path(module: str) -> Path:
-    """Committed stub location: `tesseract_robotics.a._a` → `src/tesseract_robotics/a/_a.pyi`."""
+    """Committed stub location, beside the module.
+
+    `tesseract_robotics.a` → `src/tesseract_robotics/a.pyi`;
+    `tesseract_robotics.b._b` → `src/tesseract_robotics/b/_b.pyi`.
+    """
     parts = module.split(".")[1:]
     return STUB_ROOT.joinpath(*parts).with_suffix(".pyi")
 

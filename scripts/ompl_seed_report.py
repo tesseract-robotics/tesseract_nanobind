@@ -24,11 +24,11 @@ from pathlib import Path
 
 import numpy as np
 
+from tesseract_robotics.command_language import CompositeInstruction
+from tesseract_robotics.motion_planners_ompl import RNG_setSeed
 from tesseract_robotics.planning import TaskComposer
 from tesseract_robotics.planning.composer import PlanningResult, TrajectoryPoint
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
-from tesseract_robotics.tesseract_motion_planners_ompl import RNG_setSeed
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_as_TaskComposerDataStorage,
 )

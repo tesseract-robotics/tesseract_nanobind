@@ -1,6 +1,6 @@
 # Geometry Examples
 
-Meshes as `tesseract_geometry` loads, builds and writes them. The example takes
+Meshes as `geometry` loads, builds and writes them. The example takes
 its meshes and parameters from upstream tesseract: the support meshes
 `box_2m.ply` and `tesseract_material_mesh.glb`, and the expected counts of
 `tesseract_geometry_unit.cpp`, cited in the module docstring. Every value
@@ -91,7 +91,7 @@ the same UUID.
 
 ### Writing and reloading
 
-`writeMeshToFile` (in `tesseract_urdf`) always writes an ASCII PLY file of
+`writeMeshToFile` (in `urdf`) always writes an ASCII PLY file of
 vertex positions and faces, with seven decimals (`ply_io.cpp:102`).
 
 ```python title="mesh_roundtrip_example.py"

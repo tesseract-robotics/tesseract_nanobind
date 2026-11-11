@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     FutureStatus,
     TaskComposerContext,
     TaskComposerDataStorage,

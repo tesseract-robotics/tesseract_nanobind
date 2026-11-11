@@ -93,28 +93,28 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     CollisionMarginData,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import AddLinkCommand, Environment
-from tesseract_robotics.tesseract_geometry import Sphere
-from tesseract_robotics.tesseract_scene_graph import (
+from tesseract_robotics.environment import AddLinkCommand, Environment
+from tesseract_robotics.geometry import Sphere
+from tesseract_robotics.scene_graph import (
     Collision,
     Joint,
     JointType,
     Link,
     Visual,
 )
-from tesseract_robotics.tesseract_state_solver import OFKTStateSolver
+from tesseract_robotics.state_solver import OFKTStateSolver
 
 # Initialize Environment with a robot from URDF file
 # The collision checker is configured using a yaml configuration file specified by the SRDF file. This configuration

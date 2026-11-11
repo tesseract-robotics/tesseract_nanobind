@@ -11,8 +11,8 @@ from PIL import Image
 from trimesh.visual.material import PBRMaterial
 from trimesh.visual.texture import TextureVisuals
 
-from tesseract_robotics import tesseract_geometry as tg
-from tesseract_robotics.tesseract_scene_graph import Material, Visual
+from tesseract_robotics import geometry as tg
+from tesseract_robotics.scene_graph import Material, Visual
 
 from .errors import UnsupportedGeometryError
 from .octree import octree_voxels

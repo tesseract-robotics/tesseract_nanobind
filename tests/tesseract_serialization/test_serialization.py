@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     JointWaypoint,
     JointWaypointPoly,
@@ -20,9 +20,9 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionPoly,
     MoveInstructionType,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_serialization import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.serialization import (
     composite_instruction_from_binary,
     composite_instruction_from_file,
     composite_instruction_from_xml,

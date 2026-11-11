@@ -48,20 +48,20 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     PluginInfo,
     calcTransformError,
 )
-from tesseract_robotics.tesseract_kinematics import (
+from tesseract_robotics.kinematics import (
     ForwardKinematics,
     KinematicGroup,
     KinematicsPluginFactory,
     KinGroupIKInput,
 )
-from tesseract_robotics.tesseract_state_solver import KDLStateSolver
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.state_solver import KDLStateSolver
+from tesseract_robotics.urdf import parseURDFFile
 
 URDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
 PLUGINS_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820_plugins.yaml"

@@ -12,8 +12,8 @@ import viser
 import zstandard
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 from tesseract_robotics.viewer import RecordingPhase, TesseractViewer, Trajectory
 from tesseract_robotics.viewer.errors import (
     NoEnvironmentError,

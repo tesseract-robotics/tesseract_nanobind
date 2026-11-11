@@ -43,6 +43,20 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactResultVector,
+    ContactTestType,
+)
+from tesseract_robotics.common import CollisionMarginData, GeneralResourceLocator
+from tesseract_robotics.geometry import (
+    Octree,
+    OctreeSubType,
+    PointCloud,
+    createMeshFromPath,
+    createOctree,
+)
 from tesseract_robotics.planning import (
     JointTarget,
     MotionProgram,
@@ -56,20 +70,6 @@ from tesseract_robotics.planning.profiles import (
     TRAJOPT_DEFAULT_NAMESPACE,
     TRAJOPT_PROFILE_NAMES,
     create_trajopt_default_profiles,
-)
-from tesseract_robotics.tesseract_collision import (
-    ContactRequest,
-    ContactResultMap,
-    ContactResultVector,
-    ContactTestType,
-)
-from tesseract_robotics.tesseract_common import CollisionMarginData, GeneralResourceLocator
-from tesseract_robotics.tesseract_geometry import (
-    Octree,
-    OctreeSubType,
-    PointCloud,
-    createMeshFromPath,
-    createOctree,
 )
 
 # OSQP iteration cap for the collision-aware plan, 8 x OSQP's default 8192. Each voxel near
@@ -157,7 +157,7 @@ def _count_traj_contacts(robot, manager, joint_names, planning_result) -> int:
 
 def _trajopt_profiles_with_collision():
     """Default TrajOpt profiles with an OSQP budget that fits a fine octree's QPs."""
-    from tesseract_robotics.tesseract_motion_planners_trajopt import (
+    from tesseract_robotics.motion_planners_trajopt import (
         TrajOptOSQPSolverProfile,
     )
 
@@ -178,9 +178,9 @@ def _trajopt_profiles_without_collision():
     to a smoothed joint-space straight line — the "naive" path that drives
     the wrist through the cloud.
     """
+    from tesseract_robotics.command_language import ProfileDictionary
     from tesseract_robotics.planning.profiles import _create_trajopt_profiles
-    from tesseract_robotics.tesseract_command_language import ProfileDictionary
-    from tesseract_robotics.tesseract_task_composer_planning import ContactCheckProfile
+    from tesseract_robotics.task_composer_planning import ContactCheckProfile
 
     composite, plan = _create_trajopt_profiles()
     composite.collision_cost_config.enabled = False

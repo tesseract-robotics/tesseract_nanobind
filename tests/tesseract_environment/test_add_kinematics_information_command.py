@@ -11,19 +11,19 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     KinematicsPluginInfo,
     PluginInfo,
     PluginInfoContainer,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddKinematicsInformationCommand,
     Command,
     Environment,
 )
-from tesseract_robotics.tesseract_kinematics import KinGroupIKInput, KinGroupIKInputs
-from tesseract_robotics.tesseract_srdf import KinematicsInformation
+from tesseract_robotics.kinematics import KinGroupIKInput, KinGroupIKInputs
+from tesseract_robotics.srdf import KinematicsInformation
 
 # A self-contained 6-revolute chain (base_link -> link_1..6 -> tool0) — enough
 # DOF for a full 6-DOF IK round trip, no meshes / no package:// so a plain

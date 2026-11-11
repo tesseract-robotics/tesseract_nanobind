@@ -9,8 +9,8 @@ from importlib import import_module
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
     TrajOptOSQPSolverProfile,
@@ -81,12 +81,12 @@ CPP_IFOPT_MAX_ITERATIONS = 200
 
 def test_ifopt_profiles_match_upstream():
     """The high-level port's ifopt profiles are the C++ example's `if (ifopt_)` branch."""
-    from tesseract_robotics.planning.profiles import TRAJOPT_IFOPT_DEFAULT_NAMESPACE
-    from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+    from tesseract_robotics.motion_planners_trajopt_ifopt import (
         TrajOptIfoptDefaultCompositeProfile,
         TrajOptIfoptDefaultMoveProfile,
         TrajOptIfoptOSQPSolverProfile,
     )
+    from tesseract_robotics.planning.profiles import TRAJOPT_IFOPT_DEFAULT_NAMESPACE
     from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 
     profiles = highlevel.create_ifopt_profiles()

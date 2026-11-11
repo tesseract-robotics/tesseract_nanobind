@@ -27,10 +27,16 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 
 pytest.importorskip("pytest_benchmark")
 
+from tesseract_robotics.collision import (
+    ContactRequest,
+    ContactResultMap,
+    ContactResultVector,
+    ContactTestType,
+)
 from tesseract_robotics.planning import (
     JointTarget,
     MotionProgram,
@@ -41,12 +47,6 @@ from tesseract_robotics.planning import (
     sphere,
 )
 from tesseract_robotics.planning.profiles import create_freespace_pipeline_profiles
-from tesseract_robotics.tesseract_collision import (
-    ContactRequest,
-    ContactResultMap,
-    ContactResultVector,
-    ContactTestType,
-)
 
 
 class FixtureStateInCollisionError(RuntimeError):

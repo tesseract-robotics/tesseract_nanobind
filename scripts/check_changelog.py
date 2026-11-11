@@ -48,7 +48,8 @@ BRACKETED = re.compile(r"^\[(?P<name>[^\]]+)\](?P<rest>.*)$")
 RELEASE_DATE = re.compile(r"^ - (?P<date>\d{4}-\d{2}-\d{2})(?=\s|$)")
 # Markdown matches reference labels case-insensitively, so names are keyed lower-cased.
 LINK_DEFINITION = re.compile(r"^\[(?P<name>[^\]]+)\]:\s+(?P<url>\S+)")
-VERSION = re.compile(r"^\d+(?:\.\d+)+$")
+PRERELEASE = re.compile(r"^(?P<release>\d+(?:\.\d+)+)(?:rc(?P<rc>\d+))?$")
+VERSION = PRERELEASE
 COMPARE = re.compile(r"/compare/(?P<base>[^/]+?)\.\.\.(?P<head>[^/]+)$")
 
 
@@ -105,8 +106,16 @@ class Release:
 
 
 def parse_version(name: str) -> Version:
-    """The integer parts of a dotted version, e.g. `0.35.0.8` -> `(0, 35, 0, 8)`."""
-    return tuple(int(part) for part in name.split("."))
+    """The sortable parts of a version: `0.35.0.8` -> `(0, 35, 0, 8, 1, 0)`.
+
+    A release candidate sorts before its final release: `0.36.0.0rc1` is
+    `(0, 36, 0, 0, 0, 1)`, `0.36.0.0` is `(0, 36, 0, 0, 1, 0)`.
+    """
+    match = PRERELEASE.match(name)
+    if not match:
+        raise ValueError(f"not a version: {name}")
+    parts = tuple(int(part) for part in match["release"].split("."))
+    return (*parts, 0, int(match["rc"])) if match["rc"] else (*parts, 1, 0)
 
 
 def heading_name(heading: Heading) -> str | None:

@@ -63,6 +63,14 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.geometry import Octree, OctreeSubType, PointCloud, createOctree
+from tesseract_robotics.motion_planners_trajopt import (
+    TrajOptDefaultCompositeProfile,
+    TrajOptDefaultMoveProfile,
+)
 from tesseract_robotics.planning import (
     CartesianTarget,
     MotionProgram,
@@ -76,14 +84,6 @@ from tesseract_robotics.planning.profiles import (
     TRAJOPT_DEFAULT_NAMESPACE,
     create_freespace_pipeline_profiles,
     create_trajopt_default_profiles,
-)
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_geometry import Octree, OctreeSubType, PointCloud, createOctree
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
-    TrajOptDefaultCompositeProfile,
-    TrajOptDefaultMoveProfile,
 )
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
 

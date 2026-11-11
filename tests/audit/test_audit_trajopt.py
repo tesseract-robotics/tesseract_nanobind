@@ -91,18 +91,18 @@ def test_k_prefix_rejects_non_mechanical_names(solver_report):
 
 # The 10 core modules and the group 1 modules: no binding of theirs includes OsqpEigen.
 CORE_AND_G1 = (
-    "tesseract_collision",
-    "tesseract_common",
-    "tesseract_environment",
-    "tesseract_geometry",
-    "tesseract_kinematics",
-    "tesseract_scene_graph",
-    "tesseract_serialization",
-    "tesseract_srdf",
-    "tesseract_state_solver",
-    "tesseract_urdf",
-    "tesseract_command_language",
-    "tesseract_time_parameterization",
+    "collision",
+    "common",
+    "environment",
+    "geometry",
+    "kinematics",
+    "scene_graph",
+    "serialization",
+    "srdf",
+    "state_solver",
+    "urdf",
+    "command_language",
+    "time_parameterization",
 )
 
 

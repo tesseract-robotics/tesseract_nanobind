@@ -10,13 +10,13 @@ import gc
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactManagersPluginFactory,
     ContactRequest,
     ContactResultMap,
     ContactTestType,
 )
-from tesseract_robotics.tesseract_common import CollisionMarginData, Isometry3d
+from tesseract_robotics.common import CollisionMarginData, Isometry3d
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
 from .test_contact_manager_config import _box

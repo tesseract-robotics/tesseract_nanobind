@@ -11,15 +11,15 @@ import weakref
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ImplicitSDFCollisionConfig,
     ImplicitSDFContact,
     ImplicitSDFShape,
     collideImplicitSDF,
     makeImplicitSDFShape,
 )
-from tesseract_robotics.tesseract_common import Isometry3d
-from tesseract_robotics.tesseract_geometry import (
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.geometry import (
     Mesh,
     SignedDistanceField,
     Sphere,

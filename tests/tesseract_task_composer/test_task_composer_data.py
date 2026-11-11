@@ -5,9 +5,9 @@ import sys
 
 import pytest
 
-from tesseract_robotics import tesseract_task_composer
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics import task_composer as tesseract_task_composer
+from tesseract_robotics.command_language import CompositeInstruction
+from tesseract_robotics.task_composer import (
     AnyPoly,
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
@@ -173,7 +173,7 @@ class TestAnyPoly:
         """In a fresh process that imports only the task composer, the wrappers' signatures
         name the Python types, not quoted C++ names (#312)."""
         script = (
-            "from tesseract_robotics.tesseract_task_composer import _tesseract_task_composer as m\n"
+            "import tesseract_robotics.task_composer as m\n"
             "for name in " + repr(_TYPED_WRAPPERS) + ":\n"
             "    print(name, getattr(m, name).__doc__.splitlines()[0])\n"
         )

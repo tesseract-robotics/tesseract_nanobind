@@ -6,9 +6,9 @@ from typing import override
 import numpy as np
 import pytest
 
-import tesseract_robotics.tesseract_motion_planners_descartes as descartes
+import tesseract_robotics.motion_planners_descartes as descartes
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -17,20 +17,20 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.motion_planners import (
     MotionPlanner,
     PlannerRequest,
     ProfileOverrideNotDispatchedError,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import generateInterpolatedProgram
+from tesseract_robotics.motion_planners_simple import generateInterpolatedProgram
 
 DESCARTES_DEFAULT_NAMESPACE = "DescartesMotionPlannerTask"
 

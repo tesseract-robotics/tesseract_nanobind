@@ -9,8 +9,8 @@ import sys
 
 _SCRIPT = """
 import sys
-import tesseract_robotics.tesseract_collision._tesseract_collision
-print("GEOMETRY_LOADED" if "tesseract_robotics.tesseract_geometry._tesseract_geometry" in sys.modules else "GEOMETRY_MISSING")
+import tesseract_robotics.collision
+print("GEOMETRY_LOADED" if "tesseract_robotics.geometry" in sys.modules else "GEOMETRY_MISSING")
 """
 
 

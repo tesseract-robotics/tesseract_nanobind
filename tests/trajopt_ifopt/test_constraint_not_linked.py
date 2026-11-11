@@ -36,10 +36,10 @@ import numpy as np
 
 from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.environment import Environment
 
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 urdf = locator.locateResource("package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf")

@@ -98,8 +98,7 @@ import sys
 import numpy as np
 
 from tesseract_robotics import get_task_composer_config_path, get_tesseract_resource_path
-from tesseract_robotics.examples.lowlevel.example_support import locate_file
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -108,19 +107,20 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.examples.lowlevel.example_support import locate_file
+from tesseract_robotics.motion_planners_ompl import (
     OMPLRealVectorMoveProfile,
     RRTConnectConfigurator,
 )
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     AnyPoly_as_CompositeInstruction,
     AnyPoly_wrap_CompositeInstruction,
     AnyPoly_wrap_EnvironmentConst,

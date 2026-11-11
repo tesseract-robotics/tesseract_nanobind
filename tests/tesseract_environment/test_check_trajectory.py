@@ -7,7 +7,7 @@ The native out-param `std::vector<ContactResultMap>& contacts` is returned inste
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     CollisionCheckConfig,
     CollisionEvaluatorType,
     ContactRequest,
@@ -15,7 +15,7 @@ from tesseract_robotics.tesseract_collision import (
     ContactTrajectoryResults,
     ContinuousCollisionType,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     checkTrajectory,
     checkTrajectorySegment,
     checkTrajectoryState,

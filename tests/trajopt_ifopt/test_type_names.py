@@ -11,12 +11,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import tesseract_robotics.trajopt_ifopt as trajopt_ifopt
-
 # s: a child imports trajopt_ifopt and reads a few signatures
 CHILD_TIMEOUT_S = 60.0
 
-STUB = Path(trajopt_ifopt.__file__).parent / "_trajopt_ifopt.pyi"
+STUB = Path(__file__).resolve().parents[2] / "src" / "tesseract_robotics" / "trajopt_ifopt.pyi"
 
 _CHILD_SCRIPT = """\
 import tesseract_robotics.trajopt_ifopt as ti
@@ -42,9 +40,9 @@ def test_first_import_names_the_classes():
         check=True,
     )
     assert "tesseract::" not in child.stdout
-    assert "tesseract_kinematics._tesseract_kinematics.JointGroup" in child.stdout
-    assert "tesseract_kinematics._tesseract_kinematics.KinematicGroup" in child.stdout
-    assert "tesseract_environment._tesseract_environment.Environment" in child.stdout
+    assert "tesseract_robotics.kinematics.JointGroup" in child.stdout
+    assert "tesseract_robotics.kinematics.KinematicGroup" in child.stdout
+    assert "tesseract_robotics.environment.Environment" in child.stdout
 
 
 def test_stub_has_no_quoted_cpp_names():

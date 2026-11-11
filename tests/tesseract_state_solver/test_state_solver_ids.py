@@ -5,10 +5,16 @@ import os
 import numpy as np
 
 from tesseract_robotics import (
+    common as tesseract_common,
+)
+from tesseract_robotics import (
     get_tesseract_support_path,
-    tesseract_common,
-    tesseract_state_solver,
-    tesseract_urdf,
+)
+from tesseract_robotics import (
+    state_solver as tesseract_state_solver,
+)
+from tesseract_robotics import (
+    urdf as tesseract_urdf,
 )
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator

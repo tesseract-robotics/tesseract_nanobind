@@ -8,12 +8,12 @@ import numpy as np
 import pytest
 from trimesh.visual.texture import TextureVisuals
 
+from tesseract_robotics import geometry as tg
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics import tesseract_geometry as tg
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 from tesseract_robotics.examples.pointcloud_octree_collision_example import build_octree_obstacle
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_scene_graph import Material, Visual
+from tesseract_robotics.scene_graph import Material, Visual
 from tesseract_robotics.viewer.errors import UnsupportedGeometryError
 from tesseract_robotics.viewer.geometry import RGBA_BYTE_MAX, visual_to_trimesh
 

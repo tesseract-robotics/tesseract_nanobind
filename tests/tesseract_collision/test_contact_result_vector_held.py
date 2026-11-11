@@ -11,7 +11,7 @@ import gc
 
 import pytest
 
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactResult,
     ContactResultHeldError,
     ContactResultMap,

@@ -117,3 +117,19 @@ def test_cross_module_base_with_the_same_class_raises_no_row():
     index = {**OWN_INDEX, "bases_remote": {"Jogger": "tesseract::bases::Jogger"}}
     report = bases_report_with(bound=lambda m: index.get(m, {}))
     assert not _rows_of(report, "RemoteJogger")
+
+
+@pytest.mark.parametrize(
+    ("expr", "expected"),
+    [
+        ("tesseract_robotics.common._common.Outer.Inner", ("common", "Outer.Inner")),
+        ("tesseract_robotics.collision.Outer.Inner", ("collision", "Outer.Inner")),
+        ("tesseract_robotics.collision.Manager", ("collision", "Manager")),
+        ("bases_remote._bases_remote.Jogger", ("bases_remote", "Jogger")),
+        ("Outer.Inner", ("here", "Outer.Inner")),
+    ],
+)
+def test_stub_base_names_its_module_and_class(expr, expected):
+    """A wrapped module spells its extension `_<m>`; a module that is itself the extension
+    does not."""
+    assert audit._stub_base(expr, "here") == expected

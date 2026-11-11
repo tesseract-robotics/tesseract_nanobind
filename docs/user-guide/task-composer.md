@@ -52,8 +52,8 @@ graph TD
     ```python
     from pathlib import Path
 
-    from tesseract_robotics.tesseract_common import GeneralResourceLocator
-    from tesseract_robotics.tesseract_task_composer import (
+    from tesseract_robotics.common import GeneralResourceLocator
+    from tesseract_robotics.task_composer import (
         AnyPoly_wrap_CompositeInstruction,
         AnyPoly_wrap_EnvironmentConst,
         AnyPoly_wrap_ProfileDictionary,
@@ -153,7 +153,7 @@ See `TaskComposer.get_available_pipelines()` at runtime for the full 36.
 
 !!! info "Pipeline count is not a contract"
     The exact number is driven by `task_composer_plugins.yaml` in the
-    packaged `tesseract_task_composer` data. It may grow or shrink in
+    packaged `task_composer` data. It may grow or shrink in
     future versions. Treat `get_available_pipelines()` as the source of
     truth, not the literal "36".
 
@@ -223,8 +223,8 @@ Every `TaskComposerNode` exports its task graph as [Graphviz DOT](https://graphv
 ```python
 from pathlib import Path
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_task_composer import TaskComposerPluginFactory
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.task_composer import TaskComposerPluginFactory
 
 locator = GeneralResourceLocator()
 factory = TaskComposerPluginFactory(Path(config_path), locator)
@@ -306,10 +306,10 @@ This run was aborted by `DiscreteContactCheckTask` — the planners upstream suc
 ## Config Schemas
 
 Each node and executor type describes the YAML config it accepts as a schema, a
-`tesseract_common.PropertyTree`. Its YAML crosses as text:
+`common.PropertyTree`. Its YAML crosses as text:
 
 ```python
-from tesseract_robotics.tesseract_task_composer import (
+from tesseract_robotics.task_composer import (
     TaskComposerGraph, TaskComposerNodePorts, TaskComposerTask,
 )
 
@@ -347,9 +347,9 @@ result = composer.plan(robot, program, pipeline="TrajOptPipeline", profiles=prof
 For a manual `ProfileDictionary`:
 
 ```python
-from tesseract_robotics.tesseract_command_language import ProfileDictionary
-from tesseract_robotics.tesseract_motion_planners_ompl import OMPLRealVectorMoveProfile
-from tesseract_robotics.tesseract_motion_planners_trajopt import TrajOptDefaultMoveProfile
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.motion_planners_ompl import OMPLRealVectorMoveProfile
+from tesseract_robotics.motion_planners_trajopt import TrajOptDefaultMoveProfile
 
 # addProfile(namespace, profile name, profile): the namespace is the planner task's name
 profiles = ProfileDictionary()
@@ -386,7 +386,7 @@ a failed `PlanningResult`.
 The Task Composer uses Taskflow for parallel execution. Override the thread count via `TaskComposer.from_config(num_threads=...)` or pass a pre-built executor:
 
 ```python
-from tesseract_robotics.tesseract_task_composer import TaskflowTaskComposerExecutor
+from tesseract_robotics.task_composer import TaskflowTaskComposerExecutor
 
 # Override YAML-configured thread count
 composer = TaskComposer.from_config(num_threads=8)

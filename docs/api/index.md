@@ -14,24 +14,24 @@ Auto-generated API documentation from docstrings.
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.tesseract_common`](tesseract_common.md) | Common types (Isometry3d, etc.) |
-| [`tesseract_robotics.tesseract_geometry`](tesseract_geometry.md) | Geometric primitives |
-| [`tesseract_robotics.tesseract_scene_graph`](tesseract_scene_graph.md) | Links, joints, scene graph |
-| [`tesseract_robotics.tesseract_environment`](tesseract_environment.md) | Environment, commands |
-| [`tesseract_robotics.tesseract_collision`](tesseract_collision.md) | Collision managers, contacts |
-| [`tesseract_robotics.tesseract_kinematics`](tesseract_kinematics.md) | Kinematic groups, solvers |
+| [`tesseract_robotics.common`](common.md) | Common types (Isometry3d, etc.) |
+| [`tesseract_robotics.geometry`](geometry.md) | Geometric primitives |
+| [`tesseract_robotics.scene_graph`](scene_graph.md) | Links, joints, scene graph |
+| [`tesseract_robotics.environment`](environment.md) | Environment, commands |
+| [`tesseract_robotics.collision`](collision.md) | Collision managers, contacts |
+| [`tesseract_robotics.kinematics`](kinematics.md) | Kinematic groups, solvers |
 
 ### Planning Modules
 
 | Module | Description |
 |--------|-------------|
-| [`tesseract_robotics.tesseract_command_language`](tesseract_command_language.md) | Waypoints, instructions |
-| [`tesseract_robotics.tesseract_motion_planners`](tesseract_motion_planners.md) | Base planner types |
-| [`tesseract_robotics.tesseract_motion_planners_ompl`](tesseract_motion_planners_ompl.md) | OMPL planner |
-| [`tesseract_robotics.tesseract_motion_planners_trajopt`](tesseract_motion_planners_trajopt.md) | TrajOpt planner |
-| [`tesseract_robotics.tesseract_motion_planners_descartes`](tesseract_motion_planners_descartes.md) | Descartes planner |
-| [`tesseract_robotics.tesseract_motion_planners_simple`](tesseract_motion_planners_simple.md) | Simple interpolation |
-| [`tesseract_robotics.tesseract_task_composer`](tesseract_task_composer.md) | Task composition |
+| [`tesseract_robotics.command_language`](command_language.md) | Waypoints, instructions |
+| [`tesseract_robotics.motion_planners`](motion_planners.md) | Base planner types |
+| [`tesseract_robotics.motion_planners_ompl`](motion_planners_ompl.md) | OMPL planner |
+| [`tesseract_robotics.motion_planners_trajopt`](motion_planners_trajopt.md) | TrajOpt planner |
+| [`tesseract_robotics.motion_planners_descartes`](motion_planners_descartes.md) | Descartes planner |
+| [`tesseract_robotics.motion_planners_simple`](motion_planners_simple.md) | Simple interpolation |
+| [`tesseract_robotics.task_composer`](task_composer.md) | Task composition |
 
 ### Low-Level SQP Modules
 
@@ -70,9 +70,9 @@ result = composer.plan(robot, program, pipeline="TrajOptPipeline")
 ### Direct Module Access
 
 ```python
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_scene_graph import Link, Joint
-from tesseract_robotics.tesseract_geometry import Box, Sphere
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.scene_graph import Link, Joint
+from tesseract_robotics.geometry import Box, Sphere
 ```
 
 ### SQP API
@@ -86,7 +86,7 @@ from tesseract_robotics.trajopt_sqp import TrajOptQPProblem, TrustRegionSQPSolve
 
 | C++ Type | Python Type |
 |----------|-------------|
-| `Eigen::Isometry3d` | `tesseract_common.Isometry3d` |
+| `Eigen::Isometry3d` | `common.Isometry3d` |
 | `Eigen::VectorXd` | `numpy.ndarray` |
 | `Eigen::MatrixXd` | `numpy.ndarray` |
 | `std::vector<std::string>` | `list[str]` |

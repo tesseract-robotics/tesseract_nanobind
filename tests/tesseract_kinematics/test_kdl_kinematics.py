@@ -8,12 +8,22 @@ import numpy.testing as nptest
 import pytest
 
 from tesseract_robotics import (
+    common as tesseract_common,
+)
+from tesseract_robotics import (
+    environment as tesseract_environment,
+)
+from tesseract_robotics import (
     get_tesseract_support_path,
-    tesseract_common,
-    tesseract_environment,
-    tesseract_kinematics,
-    tesseract_state_solver,
-    tesseract_urdf,
+)
+from tesseract_robotics import (
+    kinematics as tesseract_kinematics,
+)
+from tesseract_robotics import (
+    state_solver as tesseract_state_solver,
+)
+from tesseract_robotics import (
+    urdf as tesseract_urdf,
 )
 
 from ..tesseract_support_resource_locator import TesseractSupportResourceLocator
@@ -324,14 +334,14 @@ from pathlib import Path
 
 import numpy as np
 
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
+from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_kinematics import (
+from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.kinematics import (
     KinematicGroup, KinematicsPluginFactory, KinGroupIKInput,
 )
-from tesseract_robotics.tesseract_state_solver import KDLStateSolver
-from tesseract_robotics.tesseract_urdf import parseURDFFile
+from tesseract_robotics.state_solver import KDLStateSolver
+from tesseract_robotics.urdf import parseURDFFile
 
 support = get_tesseract_support_path() / "urdf"
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])

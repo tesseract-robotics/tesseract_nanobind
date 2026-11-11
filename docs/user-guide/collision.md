@@ -8,7 +8,7 @@ The collision API is driven by the environment's contact manager — there is no
 
 ```python
 from tesseract_robotics.planning import Robot
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,
@@ -102,7 +102,7 @@ graph LR
 ## Discrete Collision Checking
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType,
@@ -126,7 +126,7 @@ contacts = ContactResultMap()
 manager.contactTest(contacts, request)
 
 # Iterate pairs via flattened vector (simplest idiom)
-from tesseract_robotics.tesseract_collision import ContactResultVector
+from tesseract_robotics.collision import ContactResultVector
 results = ContactResultVector()
 contacts.flattenMoveResults(results)
 for i in range(len(results)):
@@ -139,7 +139,7 @@ for i in range(len(results)):
 Check for collisions along a motion segment. Each active link needs a start and end transform, set with the three-argument (or two-mapping) `setCollisionObjectsTransform`:
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactTestType,
@@ -168,13 +168,13 @@ Each continuous `ContactResult` says where along the sweep the contact happened.
 
 ## Trajectory Checking
 
-`checkTrajectory` (from `tesseract_environment`) checks a whole joint trajectory and stops at the first collision. It is a port of the C++ `tesseract::environment::checkTrajectory`, with one difference: C++ fills a `contacts` out-parameter, while Python gets it back as the second element of the returned tuple. That element holds one `ContactResultMap` per checked step or segment.
+`checkTrajectory` (from `environment`) checks a whole joint trajectory and stops at the first collision. It is a port of the C++ `tesseract::environment::checkTrajectory`, with one difference: C++ fills a `contacts` out-parameter, while Python gets it back as the second element of the returned tuple. That element holds one `ContactResultMap` per checked step or segment.
 
 ```python
 import numpy as np
 
-from tesseract_robotics.tesseract_collision import CollisionCheckConfig, CollisionEvaluatorType
-from tesseract_robotics.tesseract_environment import checkTrajectory
+from tesseract_robotics.collision import CollisionCheckConfig, CollisionEvaluatorType
+from tesseract_robotics.environment import checkTrajectory
 
 traj = np.linspace(start_joints, end_joints, 10)  # (steps, joints), one row per step
 
@@ -197,7 +197,7 @@ Every overload accepts either a `DiscreteContactManager` or a `ContinuousContact
 
 To check one state or one segment instead of a whole trajectory, use `checkTrajectoryState` or
 `checkTrajectorySegment`; both return a `ContactResultMap`. See
-[Single-state collision checks](../api/tesseract_environment.md#single-state-collision-checks).
+[Single-state collision checks](../api/environment.md#single-state-collision-checks).
 
 ## LVS (Longest Valid Segment)
 
@@ -219,7 +219,7 @@ Used in TrajOpt for efficient continuous collision approximation:
 
 ```python
 from tesseract_robotics.trajopt_ifopt import TrajOptCollisionConfig
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
+from tesseract_robotics.collision import CollisionEvaluatorType
 
 # TrajOptCollisionConfig(margin, coeff)
 config = TrajOptCollisionConfig(0.025, 20.0)  # 2.5cm margin, coeff=20
@@ -228,14 +228,14 @@ config.collision_check_config.type = CollisionEvaluatorType.LVS_DISCRETE
 config.collision_check_config.longest_valid_segment_length = 0.05  # 5cm interpolation
 ```
 
-`CollisionEvaluatorType` members (from `tesseract_collision`): `DISCRETE`, `CONTINUOUS`, `LVS_DISCRETE`, `LVS_CONTINUOUS`.
+`CollisionEvaluatorType` members (from `collision`): `DISCRETE`, `CONTINUOUS`, `LVS_DISCRETE`, `LVS_CONTINUOUS`.
 
 ## Contact Margins
 
-Contact margins define the safety buffer around objects. Use `CollisionMarginData` from `tesseract_common`:
+Contact margins define the safety buffer around objects. Use `CollisionMarginData` from `common`:
 
 ```python
-from tesseract_robotics.tesseract_common import CollisionMarginData
+from tesseract_robotics.common import CollisionMarginData
 
 # Default margin for all pairs (applied to the contact manager)
 manager.setCollisionMarginData(CollisionMarginData(0.02))  # 2cm
@@ -279,8 +279,8 @@ if acm.isCollisionAllowed(("link_1", "link_2")):
 To add entries, issue a scene graph command through the environment (see `car_seat_example.py` for the canonical pattern):
 
 ```python
-from tesseract_robotics.tesseract_common import AllowedCollisionMatrix
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.common import AllowedCollisionMatrix
+from tesseract_robotics.environment import (
     ModifyAllowedCollisionsCommand, ModifyAllowedCollisionsType,
 )
 
@@ -300,7 +300,7 @@ per call. The batch calls apply one update per batch where the backend supports 
 as the single calls in order:
 
 ```python
-from tesseract_robotics.tesseract_collision import CollisionObjectSpec
+from tesseract_robotics.collision import CollisionObjectSpec
 
 specs = [CollisionObjectSpec(name, 0, shapes, shape_poses) for name in ("a", "b", "c")]
 assert manager.addCollisionObjects(specs)  # a repeated id: the last entry decides
@@ -325,10 +325,10 @@ Python callables:
 
 ```python
 import numpy as np
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ImplicitSDFCollisionConfig, ImplicitSDFShape, collideImplicitSDF, makeImplicitSDFShape,
 )
-from tesseract_robotics.tesseract_geometry import Sphere
+from tesseract_robotics.geometry import Sphere
 
 ball = ImplicitSDFShape()
 ball.distance = lambda p: float(np.linalg.norm(p) - 0.5)   # negative inside
@@ -364,7 +364,7 @@ Python shapes are correct but slow.
 
 !!! tip "Choose the Right Test Type"
     ```python
-    from tesseract_robotics.tesseract_collision import (
+    from tesseract_robotics.collision import (
         ContactTestType,
     )
 
@@ -417,7 +417,7 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
     For complex meshes, use `makeConvexMesh` to build a convex hull:
 
     ```python
-    from tesseract_robotics.tesseract_collision import makeConvexMesh
+    from tesseract_robotics.collision import makeConvexMesh
 
     convex = makeConvexMesh(mesh)
     ```
@@ -433,7 +433,7 @@ Collision margins for TrajOpt pipelines live in `TrajOptCollisionConfig` (see LV
 ## Point Clouds as Collision Obstacles
 
 Sensor-derived obstacles — depth-camera scans, LiDAR, fused mapping output —
-go through a `tesseract_geometry.Octree`. Each occupied voxel becomes a
+go through a `geometry.Octree`. Each occupied voxel becomes a
 sub-shape the discrete contact manager checks against the robot, so
 planners and collision queries treat the cloud just like any other
 geometry.
@@ -441,13 +441,13 @@ geometry.
 **1. Build the octree and attach it as a link.** 
 
 Load your points into a `PointCloud`, pass it through `createOctree`, and wrap
-the result in `tesseract_geometry.Octree`. Then hand the geometry to
+the result in `geometry.Octree`. Then hand the geometry to
 `create_obstacle()`.
 
 ```python
 import numpy as np
 from tesseract_robotics.planning import Pose, create_obstacle
-from tesseract_robotics.tesseract_geometry import (
+from tesseract_robotics.geometry import (
     Octree, OctreeSubType, PointCloud, createOctree,
 )
 
@@ -501,7 +501,7 @@ walkthrough, see the
 
 ## Signed Distance Fields as Collision Obstacles
 
-A `tesseract_geometry.SignedDistanceField` stores the distance to a surface —
+A `geometry.SignedDistanceField` stores the distance to a surface —
 negative inside, positive outside — sampled on a regular grid, rather than
 storing the surface itself. Two reasons to reach for one over a mesh or an
 octree:
@@ -554,7 +554,7 @@ A field baked offline loads the same way — `readSignedDistanceFieldVDB`
 
 ```python
 from pathlib import Path
-from tesseract_robotics.tesseract_geometry import readSignedDistanceFieldVDB
+from tesseract_robotics.geometry import readSignedDistanceFieldVDB
 
 field = readSignedDistanceFieldVDB(Path("scan.vdb").read_bytes())
 ```
@@ -640,7 +640,7 @@ pixi run python -m tesseract_robotics.examples.sdf_collision_example
 ## Debugging Collisions
 
 ```python
-from tesseract_robotics.tesseract_collision import (
+from tesseract_robotics.collision import (
     ContactRequest,
     ContactResultMap,
     ContactResultVector,

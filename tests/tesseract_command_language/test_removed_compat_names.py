@@ -5,8 +5,8 @@ import copy
 import numpy as np
 import pytest
 
-from tesseract_robotics import tesseract_command_language as tcl
-from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+from tesseract_robotics import command_language as tcl
+from tesseract_robotics.common import Isometry3d, Translation3d
 
 
 @pytest.mark.parametrize(
@@ -16,14 +16,14 @@ from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
 def test_move_instruction_type_constants_removed(name):
     """#275: the enum members are the only spelling."""
     assert not hasattr(tcl, name)
-    assert not hasattr(tcl._tesseract_command_language, name)
+    assert not hasattr(tcl, name)
 
 
 def test_package_has_no_all():
     """#275: `import *` exports every public name of the extension, not a hand-kept list."""
     assert not hasattr(tcl, "__all__")
     namespace: dict[str, object] = {}
-    exec("from tesseract_robotics.tesseract_command_language import *", namespace)
+    exec("from tesseract_robotics.command_language import *", namespace)
     assert "toJointTrajectory" in namespace
     assert "moveFilter" in namespace
 

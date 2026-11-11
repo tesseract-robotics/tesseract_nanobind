@@ -110,7 +110,7 @@ in `[x, y, z, rx, ry, rz]` order, ahead of `manip`. Build the band with `toBound
 ```python
 import numpy as np
 from tesseract_robotics import trajopt_ifopt
-from tesseract_robotics.tesseract_common import Isometry3d
+from tesseract_robotics.common import Isometry3d
 
 #                   x      y        z       rx      ry      rz
 lower = np.array([-5e-4, -5e-4, -1.5e-3, -0.087, -0.087, -np.pi])
@@ -252,7 +252,7 @@ running a plan:
 `ABSOLUTE`, `HINGE`).
 
 ```python
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
 )
@@ -286,7 +286,7 @@ problem that uses them gets the planner's coefficients and sparsity choices:
 
 ```python
 import numpy as np
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     createCollisionConstraints,
     createJointVelocityConstraint,
 )

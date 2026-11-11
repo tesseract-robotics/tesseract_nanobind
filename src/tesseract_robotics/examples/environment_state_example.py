@@ -54,14 +54,14 @@ from typing import Any
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d, ManipulatorInfo
+from tesseract_robotics.environment import (
     ChangeLinkCollisionEnabledCommand,
     ChangeLinkVisibilityCommand,
     Environment,
     ReplaceJointCommand,
 )
-from tesseract_robotics.tesseract_scene_graph import Joint, JointType
+from tesseract_robotics.scene_graph import Joint, JointType
 
 URDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.urdf"
 SRDF_URL = "package://tesseract/support/urdf/lbr_iiwa_14_r820.srdf"

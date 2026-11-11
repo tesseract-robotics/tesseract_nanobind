@@ -5,14 +5,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import tesseract_robotics.tesseract_motion_planners_trajopt as trajopt
-import tesseract_robotics.tesseract_task_composer_planning as tcp_module
-from tesseract_robotics.tesseract_collision import CollisionCheckConfig
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+import tesseract_robotics.motion_planners_trajopt as trajopt
+import tesseract_robotics.task_composer_planning as tcp_module
+from tesseract_robotics.collision import CollisionCheckConfig
+from tesseract_robotics.motion_planners_trajopt import (
     BasicTrustRegionSQPParameters,
     TrajOptJointWaypointConfig,
 )
-from tesseract_robotics.tesseract_task_composer_planning import (
+from tesseract_robotics.task_composer_planning import (
     ContactCheckProfile,
     FixStateBoundsProfile,
     FixStateCollisionProfile,

@@ -104,7 +104,7 @@ real cause.
     binding. Re-registration is a no-op on Linux/macOS (cereal tolerates
     duplicate registrations of the same `{type, archive}` pair) and
     populates the consumer's per-DLL registry on Windows. See
-    `src/tesseract_serialization/tesseract_serialization_bindings.cpp` for
+    `src/bindings/serialization.cpp` for
     the canonical placement; keep `CEREAL_FORCE_DYNAMIC_INIT(LibName)` as
     belt-and-suspenders on the producer side.
 

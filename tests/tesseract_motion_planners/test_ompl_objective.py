@@ -13,8 +13,7 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.planning import Pose, Robot, create_obstacle, sphere
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly,
@@ -23,9 +22,9 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, ManipulatorInfo
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract_robotics.common import GeneralResourceLocator, ManipulatorInfo
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_ompl import (
     Cost,
     MaximizeMinClearanceObjective,
     MechanicalWorkOptimizationObjective,
@@ -40,6 +39,7 @@ from tesseract_robotics.tesseract_motion_planners_ompl import (
     SpaceInformation,
     StateCostIntegralObjective,
 )
+from tesseract_robotics.planning import Pose, Robot, create_obstacle, sphere
 
 OMPL_NAMESPACE = "OMPLMotionPlannerTask"
 PROFILE = "FREESPACE"

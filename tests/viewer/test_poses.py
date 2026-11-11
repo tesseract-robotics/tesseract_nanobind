@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import GeneralResourceLocator, Isometry3d
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.common import GeneralResourceLocator, Isometry3d
+from tesseract_robotics.environment import Environment
 from tesseract_robotics.viewer.errors import UnknownJointError
 from tesseract_robotics.viewer.poses import isometry_to_pose, link_poses
 

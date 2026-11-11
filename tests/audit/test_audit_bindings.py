@@ -18,31 +18,31 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 FIXTURE_INCLUDE = FIXTURES / "include"
 
 
-FIRST_PASS = ("tesseract_collision", "tesseract_common", "tesseract_environment")
+FIRST_PASS = ("collision", "common", "environment")
 
 
 @pytest.mark.parametrize("module", FIRST_PASS)
 def test_real_binding_tu_parses_clean(module):
     """No error diagnostics: a partial AST would silently under-report."""
-    tu = audit.parse_tu(REPO_ROOT / "src" / module / f"{module}_bindings.cpp")
+    tu = audit.parse_tu(REPO_ROOT / "src" / "bindings" / f"{module}.cpp")
     assert tu.cursor is not None
 
 
 # Phase C: the tesseract core modules and their header prefixes.
 CORE_PREFIX = {
-    "tesseract_geometry": "tesseract/geometry/",
-    "tesseract_scene_graph": "tesseract/scene_graph/",
-    "tesseract_state_solver": "tesseract/state_solver/",
-    "tesseract_srdf": "tesseract/srdf/",
-    "tesseract_urdf": "tesseract/urdf/",
-    "tesseract_kinematics": "tesseract/kinematics/",
+    "geometry": "tesseract/geometry/",
+    "scene_graph": "tesseract/scene_graph/",
+    "state_solver": "tesseract/state_solver/",
+    "srdf": "tesseract/srdf/",
+    "urdf": "tesseract/urdf/",
+    "kinematics": "tesseract/kinematics/",
 }
 
 
 @pytest.mark.parametrize("module", sorted(CORE_PREFIX))
 def test_core_binding_tu_parses_clean(module):
     """No error diagnostics in the binding TU itself."""
-    tu = audit.parse_tu(REPO_ROOT / "src" / module / f"{module}_bindings.cpp")
+    tu = audit.parse_tu(REPO_ROOT / "src" / "bindings" / f"{module}.cpp")
     assert tu.cursor is not None
 
 
@@ -50,7 +50,7 @@ def test_core_binding_tu_parses_clean(module):
 def test_core_unincluded_headers_parse_clean(module):
     """E0's synthetic TU (every unincluded, non-unaudited header) parses: one error aborts the module."""
     prefixes = audit.owner_prefixes()
-    cpp = REPO_ROOT / "src" / module / f"{module}_bindings.cpp"
+    cpp = REPO_ROOT / "src" / "bindings" / f"{module}.cpp"
     tu = audit.parse_tu(cpp)
     included = {Path(i.include.name).resolve() for i in tu.get_includes()}
     headers = {
@@ -76,9 +76,9 @@ def test_core_module_audits(module):
 def test_serialization_audits_the_serialization_headers_it_includes():
     """tesseract_serialization has no header directory of its own: it audits the foreign
     headers it is first to #include, and tesseract_common lists serialization.h as audited there."""
-    common = audit.audit_module("tesseract_common")
-    assert common.delegated["tesseract/common/serialization.h"] == "tesseract_serialization"
-    report = audit.audit_module("tesseract_serialization")
+    common = audit.audit_module("common")
+    assert common.delegated["tesseract/common/serialization.h"] == "serialization"
+    report = audit.audit_module("serialization")
     assert ("Serialization", "tesseract/common/serialization.h") in {
         (g.symbol, g.location.rsplit(":", 1)[0]) for g in report.gaps
     }
@@ -86,7 +86,7 @@ def test_serialization_audits_the_serialization_headers_it_includes():
 
 def test_create_mesh_from_bytes_is_a_byte_buffer(core_reports):
     """#210: createMeshFromBytes(url, bytes, bytes_len, ...) is bound as (url, data: bytes, ...)."""
-    report = core_reports["tesseract_geometry"]
+    report = core_reports["geometry"]
     assert ("createMeshFromBytes", "byte-buffer") in {(a.symbol, a.rule) for a in report.accepted}
     assert "createMeshFromBytes" not in {g.symbol for g in report.gaps}
     assert "createMeshFromBytes" not in {d.name for d in report.deviations}
@@ -94,33 +94,33 @@ def test_create_mesh_from_bytes_is_a_byte_buffer(core_reports):
 
 def test_create_mesh_from_bytes_instances_are_template_instance_names():
     """#210: the Bytes instance of createMeshFromBytes<T> joins its Path / Resource siblings."""
-    key = ("tesseract_geometry", "createConvexMeshFromBytes")
+    key = ("geometry", "createConvexMeshFromBytes")
     assert audit.ACCEPTED_SYMBOLS[key] == "template-instance-name"
 
 
 @pytest.fixture(scope="module")
 def core_reports():
-    return {m: audit.audit_module(m) for m in [*CORE_PREFIX, "tesseract_serialization"]}
+    return {m: audit.audit_module(m) for m in [*CORE_PREFIX, "serialization"]}
 
 
 @pytest.mark.parametrize(
     ("module", "symbol", "rule"),
     [
         # G2: Mesh befriends cereal through its base PolygonMesh.
-        ("tesseract_geometry", "Mesh.__init__", "serialization-default-ctor"),
+        ("geometry", "Mesh.__init__", "serialization-default-ctor"),
         # G8 + Z1: one Python function per instance of a C++ template.
-        ("tesseract_geometry", "createConvexMeshFromPath", "template-instance-name"),
-        ("tesseract_geometry", "createConvexMeshFromResource", "template-instance-name"),
-        ("tesseract_serialization", "environment_to_xml", "template-instance-name"),
-        ("tesseract_serialization", "scene_state_from_binary", "template-instance-name"),
+        ("geometry", "createConvexMeshFromPath", "template-instance-name"),
+        ("geometry", "createConvexMeshFromResource", "template-instance-name"),
+        ("serialization", "environment_to_xml", "template-instance-name"),
+        ("serialization", "scene_state_from_binary", "template-instance-name"),
         # S4: the vector fields convert to a fresh list on each access.
-        ("tesseract_scene_graph", "Link.addVisual", "copied-vector-field-mutator"),
-        ("tesseract_scene_graph", "Link.clearCollision", "copied-vector-field-mutator"),
+        ("scene_graph", "Link.addVisual", "copied-vector-field-mutator"),
+        ("scene_graph", "Link.clearCollision", "copied-vector-field-mutator"),
         # S6: boost graph property tags.
-        ("tesseract_scene_graph", "vertex_link_t", "boost-graph-property-tag"),
-        ("tesseract_scene_graph", "property_kind", "boost-graph-property-tag"),
+        ("scene_graph", "vertex_link_t", "boost-graph-property-tag"),
+        ("scene_graph", "property_kind", "boost-graph-property-tag"),
         # S7: SceneState is bound in tesseract_state_solver.
-        ("tesseract_scene_graph", "SceneState", "bound-in-other-module"),
+        ("scene_graph", "SceneState", "bound-in-other-module"),
     ],
 )
 def test_core_rows_accepted_by_phase_c_rules(core_reports, module, symbol, rule):
@@ -136,13 +136,13 @@ def test_core_rows_accepted_by_phase_c_rules(core_reports, module, symbol, rule)
 @pytest.mark.parametrize(
     ("module", "header"),
     [
-        ("tesseract_kinematics", "tesseract/kinematics/ikfast/ikfast_inv_kin.h"),
-        ("tesseract_kinematics", "tesseract/kinematics/kdl/kdl_fwd_kin_chain.h"),
-        ("tesseract_kinematics", "tesseract/kinematics/opw/opw_inv_kin.h"),
-        ("tesseract_kinematics", "tesseract/kinematics/ur/ur_inv_kin.h"),
-        ("tesseract_kinematics", "tesseract/kinematics/rep_inv_kin.h"),
-        ("tesseract_kinematics", "tesseract/kinematics/rop_factory.h"),
-        ("tesseract_state_solver", "tesseract/state_solver/ofkt/ofkt_nodes.h"),
+        ("kinematics", "tesseract/kinematics/ikfast/ikfast_inv_kin.h"),
+        ("kinematics", "tesseract/kinematics/kdl/kdl_fwd_kin_chain.h"),
+        ("kinematics", "tesseract/kinematics/opw/opw_inv_kin.h"),
+        ("kinematics", "tesseract/kinematics/ur/ur_inv_kin.h"),
+        ("kinematics", "tesseract/kinematics/rep_inv_kin.h"),
+        ("kinematics", "tesseract/kinematics/rop_factory.h"),
+        ("state_solver", "tesseract/state_solver/ofkt/ofkt_nodes.h"),
     ],
 )
 def test_core_plugin_and_internal_headers_unaudited(core_reports, module, header):
@@ -151,29 +151,29 @@ def test_core_plugin_and_internal_headers_unaudited(core_reports, module, header
 
 
 def test_ofkt_node_class_unaudited(core_reports):
-    assert "OFKTNode" not in {g.symbol for g in core_reports["tesseract_state_solver"].gaps}
+    assert "OFKTNode" not in {g.symbol for g in core_reports["state_solver"].gaps}
 
 
 def test_state_solver_kdl_still_audited(core_reports):
     """K7's `kdl/*` pattern must not hide `KDLStateSolver`, which the binding includes directly."""
-    names = {g.symbol for g in core_reports["tesseract_state_solver"].gaps}
+    names = {g.symbol for g in core_reports["state_solver"].gaps}
     assert any(n.startswith("KDLStateSolver.") for n in names)
 
 
 # #256: the planning and trajopt bindings, audited group by group.
 PLANNING = (
-    "tesseract_command_language",
-    "tesseract_time_parameterization",
+    "command_language",
+    "time_parameterization",
     "trajopt_ifopt",
     "trajopt_sqp",
-    "tesseract_motion_planners",
-    "tesseract_motion_planners_simple",
-    "tesseract_motion_planners_ompl",
-    "tesseract_motion_planners_trajopt",
-    "tesseract_motion_planners_trajopt_ifopt",
-    "tesseract_motion_planners_descartes",
-    "tesseract_task_composer",
-    "tesseract_task_composer_planning",
+    "motion_planners",
+    "motion_planners_simple",
+    "motion_planners_ompl",
+    "motion_planners_trajopt",
+    "motion_planners_trajopt_ifopt",
+    "motion_planners_descartes",
+    "task_composer",
+    "task_composer_planning",
 )
 
 
@@ -201,7 +201,7 @@ def test_syntax_error_raises_header_parse_error():
 def test_binding_modules_are_the_22_extension_modules():
     modules = audit.binding_modules()
     assert len(modules) == 22
-    assert {"tesseract_collision", "trajopt_sqp"} <= set(modules)
+    assert {"collision", "trajopt_sqp"} <= set(modules)
     assert "ompl_base" not in modules  # #258
 
 
@@ -212,9 +212,9 @@ def test_unknown_module_raises():
 
 def test_unmapped_module_raises(monkeypatch):
     """#256: a binding module listed in UNAUDITED_MODULES is refused with its reason."""
-    monkeypatch.setitem(audit.UNAUDITED_MODULES, "tesseract_srdf", ("Binds a probe.", ()))
+    monkeypatch.setitem(audit.UNAUDITED_MODULES, "srdf", ("Binds a probe.", ()))
     with pytest.raises(audit.UnauditedModuleError, match="not audited: Binds a probe"):
-        audit.resolve_module("tesseract_srdf")
+        audit.resolve_module("srdf")
 
 
 @pytest.mark.parametrize("module", FIRST_PASS)
@@ -568,9 +568,7 @@ def test_including_binding_audits_a_foreign_header_its_owner_does_not_include():
 
 def test_foreign_header_auditor_is_the_first_including_module():
     """Several bindings include the same foreign header: exactly one audits it."""
-    assert audit.header_auditor(["tesseract_task_composer", "tesseract_command_language"]) == (
-        "tesseract_command_language"
-    )
+    assert audit.header_auditor(["task_composer", "command_language"]) == ("command_language")
 
 
 def test_unaudited_header_pattern_is_never_parsed(fixture_report):
@@ -689,7 +687,7 @@ def test_stream_insertion_operator_on_an_enum_keyed_on_the_enum(fixture_cpp):
 
 def test_scene_graph_joint_type_operator_is_not_a_free_function(core_reports):
     """#215: joint.h:321 `operator<<(std::ostream&, const JointType&)` maps to JointType.__str__."""
-    assert "operator<<" not in {g.symbol for g in core_reports["tesseract_scene_graph"].gaps}
+    assert "operator<<" not in {g.symbol for g in core_reports["scene_graph"].gaps}
 
 
 def test_new_accepted_rules_rendered_with_reasons(fixture_report):
@@ -721,18 +719,18 @@ def real_reports():
 
 
 def test_contact_trajectory_results_has_zero_gaps(real_reports):
-    gaps = [g for g in real_reports["tesseract_collision"].gaps
+    gaps = [g for g in real_reports["collision"].gaps
             if g.symbol.split(".")[0] == "ContactTrajectoryResults"]  # fmt: skip
     assert gaps == []
 
 
 def test_contact_result_cc_fields_covered(real_reports):
-    names = {g.symbol for g in real_reports["tesseract_collision"].gaps}
+    names = {g.symbol for g in real_reports["collision"].gaps}
     assert not {"ContactResult.cc_time", "ContactResult.cc_type"} & names
 
 
 def test_check_trajectory_covered_via_out_param(real_reports):
-    report = real_reports["tesseract_environment"]
+    report = real_reports["environment"]
     assert [g for g in report.gaps if g.symbol == "checkTrajectory"] == []
     assert [d for d in report.deviations if d.name == "checkTrajectory"] == []
     rules = [a.rule for a in report.accepted if a.symbol == "checkTrajectory"]
@@ -742,7 +740,7 @@ def test_check_trajectory_covered_via_out_param(real_reports):
 def test_eigen_ref_out_params_covered_in_kinematics():
     """gh-213: numericalJacobian's three overloads and ForwardKinematics.calcJacobian :104 return
     their `Eigen::Ref<Eigen::MatrixXd>` out-param, so none is a gap or a deviation."""
-    report = audit.audit_module("tesseract_kinematics")
+    report = audit.audit_module("kinematics")
     names = {"numericalJacobian", "ForwardKinematics.calcJacobian"}
     assert [g for g in report.gaps if g.symbol in names] == []
     assert [d for d in report.deviations if d.name in names] == []
@@ -755,38 +753,38 @@ def test_eigen_ref_out_params_covered_in_kinematics():
 
 
 def test_satisfies_limits_all_overloads_covered(real_reports):
-    report = real_reports["tesseract_common"]
+    report = real_reports["common"]
     assert [g for g in report.gaps if g.symbol == "satisfiesLimits"] == []
     assert [d for d in report.deviations if d.name == "satisfiesLimits"] == []
 
 
 def test_quaternion_scalar_last_accepted(real_reports):
-    accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
+    accepted = {(a.symbol, a.rule) for a in real_reports["common"].accepted}
     assert ("Quaterniond.from_xyzw", "scalar-last-quaternion") in accepted
 
 
 @pytest.mark.parametrize(
     ("module", "symbol", "rule"),
     [
-        ("tesseract_collision", "ContactResultMap.__len__", "container-protocol"),
-        ("tesseract_collision", "ContactResultVector.__len__", "container-protocol"),
-        ("tesseract_common", "VectorVector3d.__setitem__", "container-protocol"),
-        ("tesseract_common", "Isometry3d.__repr__", "presentation-dunder"),
-        ("tesseract_common", "SimpleLocatedResource.__init__", "serialization-default-ctor"),
-        ("tesseract_environment", "AddLinkCommand.__init__", "serialization-default-ctor"),
-        ("tesseract_common", "ContactManagersPluginInfo.__hash__", "value-equality-unhashable"),
-        ("tesseract_common", "TaskComposerPluginInfo.__hash__", "value-equality-unhashable"),
-        ("tesseract_common", "ProfilesPluginInfo.__hash__", "value-equality-unhashable"),
+        ("collision", "ContactResultMap.__len__", "container-protocol"),
+        ("collision", "ContactResultVector.__len__", "container-protocol"),
+        ("common", "VectorVector3d.__setitem__", "container-protocol"),
+        ("common", "Isometry3d.__repr__", "presentation-dunder"),
+        ("common", "SimpleLocatedResource.__init__", "serialization-default-ctor"),
+        ("environment", "AddLinkCommand.__init__", "serialization-default-ctor"),
+        ("common", "ContactManagersPluginInfo.__hash__", "value-equality-unhashable"),
+        ("common", "TaskComposerPluginInfo.__hash__", "value-equality-unhashable"),
+        ("common", "ProfilesPluginInfo.__hash__", "value-equality-unhashable"),
         (
-            "tesseract_environment",
+            "environment",
             "AddContactManagersPluginInfoCommand.__hash__",
             "value-equality-unhashable",
         ),
-        ("tesseract_common", "Hyperplane3d", "eigen-template-instance"),
-        ("tesseract_common", "ParametrizedLine3d", "eigen-template-instance"),
-        ("tesseract_common", "Quaterniond.from_rpy", "quaternion-rpy"),
-        ("tesseract_common", "Quaterniond.to_rpy", "quaternion-rpy"),
-        ("tesseract_common", "EIGEN_DEFAULT_PREC", "eigen-default-precision"),
+        ("common", "Hyperplane3d", "eigen-template-instance"),
+        ("common", "ParametrizedLine3d", "eigen-template-instance"),
+        ("common", "Quaterniond.from_rpy", "quaternion-rpy"),
+        ("common", "Quaterniond.to_rpy", "quaternion-rpy"),
+        ("common", "EIGEN_DEFAULT_PREC", "eigen-default-precision"),
     ],
 )
 def test_real_rows_accepted_by_new_rules(real_reports, module, symbol, rule):
@@ -800,21 +798,21 @@ def test_real_rows_accepted_by_new_rules(real_reports, module, symbol, rule):
 )
 def test_eigen_templated_mul_is_not_a_deviation(real_reports, symbol):
     """M13: Eigen declares `operator*` as a member template; `__mul__` is its binding."""
-    assert symbol not in {d.name for d in real_reports["tesseract_common"].deviations}
+    assert symbol not in {d.name for d in real_reports["common"].deviations}
 
 
 @pytest.mark.parametrize(
     ("module", "header"),
     [
-        ("tesseract_collision", "tesseract/collision/yaml_extensions.h"),  # PE-C4
-        ("tesseract_common", "tesseract/common/yaml_extensions.h"),  # PE-M9
-        ("tesseract_common", "tesseract/common/cereal_make_array.h"),  # PE-M8
-        ("tesseract_common", "tesseract/common/serialization_extensions.h"),
-        ("tesseract_common", "tesseract/common/sfinae_utils.h"),
-        ("tesseract_common", "tesseract/common/unit_test_utils.h"),
-        ("tesseract_environment", "tesseract/environment/environment_cache.h"),  # PE-E4
-        ("tesseract_environment", "tesseract/environment/environment_monitor.h"),  # PE-E5
-        ("tesseract_environment", "tesseract/environment/environment_monitor_interface.h"),
+        ("collision", "tesseract/collision/yaml_extensions.h"),  # PE-C4
+        ("common", "tesseract/common/yaml_extensions.h"),  # PE-M9
+        ("common", "tesseract/common/cereal_make_array.h"),  # PE-M8
+        ("common", "tesseract/common/serialization_extensions.h"),
+        ("common", "tesseract/common/sfinae_utils.h"),
+        ("common", "tesseract/common/unit_test_utils.h"),
+        ("environment", "tesseract/environment/environment_cache.h"),  # PE-E4
+        ("environment", "tesseract/environment/environment_monitor.h"),  # PE-E5
+        ("environment", "tesseract/environment/environment_monitor_interface.h"),
     ],
 )
 def test_post_e0_wont_fix_headers_have_no_row(real_reports, module, header):
@@ -824,10 +822,10 @@ def test_post_e0_wont_fix_headers_have_no_row(real_reports, module, header):
 def test_bytes_resource_byte_buffer_ctor_accepted(real_reports):
     """E2 covers the arity-0 ctor; BytesResource(url, ptr, len, parent) is the `bytes` overload
     (M3, #166: won't fix as its own binding; #210: reported as the byte-buffer rule, not a gap)."""
-    accepted = {(a.symbol, a.rule) for a in real_reports["tesseract_common"].accepted}
+    accepted = {(a.symbol, a.rule) for a in real_reports["common"].accepted}
     assert ("BytesResource.__init__", "serialization-default-ctor") in accepted
     assert ("BytesResource.__init__", "byte-buffer") in accepted
-    assert "BytesResource.__init__" not in {g.symbol for g in real_reports["tesseract_common"].gaps}
+    assert "BytesResource.__init__" not in {g.symbol for g in real_reports["common"].gaps}
 
 
 PROV = {"tesseract-robotics": "==0.35.0", "libclang": "clang version 23", "stubs": "abc1234"}
@@ -1002,8 +1000,6 @@ def test_call_operator_is_neither_gap_nor_deviation(fixture_report):
 
 def test_common_audits_directly_included_acm():
     """C1: allowed_collision_matrix.h reaches the TU via utils.h before its own #include."""
-    tu = audit.parse_tu(audit.binding_source("tesseract_common"))
-    headers = audit.audited_headers(
-        tu, "tesseract_common", audit.owner_prefixes(), audit.INCLUDE_DIRS
-    )
+    tu = audit.parse_tu(audit.binding_source("common"))
+    headers = audit.audited_headers(tu, "common", audit.owner_prefixes(), audit.INCLUDE_DIRS)
     assert "allowed_collision_matrix.h" in {h.name for h in headers}

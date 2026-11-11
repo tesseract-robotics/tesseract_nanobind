@@ -8,7 +8,7 @@ import gc
 import numpy as np
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     JointWaypoint,
@@ -20,7 +20,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypointPoly,
     WaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, Translation3d
+from tesseract_robotics.common import Isometry3d, Translation3d
 
 
 def _cartesian_move():

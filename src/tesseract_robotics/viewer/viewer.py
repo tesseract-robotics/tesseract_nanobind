@@ -16,9 +16,9 @@ import viser
 from loguru import logger
 from numpy.typing import ArrayLike, NDArray
 
-from tesseract_robotics.tesseract_command_language import CompositeInstruction
-from tesseract_robotics.tesseract_common import ManipulatorInfo
-from tesseract_robotics.tesseract_environment import Environment
+from tesseract_robotics.command_language import CompositeInstruction
+from tesseract_robotics.common import ManipulatorInfo
+from tesseract_robotics.environment import Environment
 
 from .errors import (
     NoEnvironmentError,

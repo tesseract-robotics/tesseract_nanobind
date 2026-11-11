@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     CompositeInstruction,
@@ -27,31 +27,31 @@ from tesseract_robotics.tesseract_command_language import (
     MoveInstructionType,
     ProfileDictionary,
 )
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     GeneralResourceLocator,
     Isometry3d,
     ManipulatorInfo,
     Quaterniond,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import Environment
-from tesseract_robotics.tesseract_motion_planners import PlannerRequest
-from tesseract_robotics.tesseract_motion_planners_ompl import (
+from tesseract_robotics.environment import Environment
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_ompl import (
     OMPLMotionPlanner,
     OMPLRealVectorMoveProfile,
     OMPLSolverConfig,
     RRTConnectConfigurator,
 )
-from tesseract_robotics.tesseract_motion_planners_simple import (
+from tesseract_robotics.motion_planners_simple import (
     generateInterpolatedProgram,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
     TrajOptIfoptMotionPlanner,
     TrajOptIfoptOSQPSolverProfile,
 )
-from tesseract_robotics.tesseract_time_parameterization import (
+from tesseract_robotics.time_parameterization import (
     IterativeSplineParameterization,
     IterativeSplineParameterizationCompositeProfile,
 )

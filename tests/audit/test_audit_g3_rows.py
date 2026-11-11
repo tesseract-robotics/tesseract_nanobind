@@ -14,12 +14,12 @@ from tests.audit._load import audit, load
 
 own = load("audit_ownership")
 
-MP = "tesseract_motion_planners"
-SIMPLE = "tesseract_motion_planners_simple"
-OMPL = "tesseract_motion_planners_ompl"
-TRAJOPT = "tesseract_motion_planners_trajopt"
-IFOPT = "tesseract_motion_planners_trajopt_ifopt"
-DESCARTES = "tesseract_motion_planners_descartes"
+MP = "motion_planners"
+SIMPLE = "motion_planners_simple"
+OMPL = "motion_planners_ompl"
+TRAJOPT = "motion_planners_trajopt"
+IFOPT = "motion_planners_trajopt_ifopt"
+DESCARTES = "motion_planners_descartes"
 G3 = (MP, SIMPLE, OMPL, TRAJOPT, IFOPT)
 
 

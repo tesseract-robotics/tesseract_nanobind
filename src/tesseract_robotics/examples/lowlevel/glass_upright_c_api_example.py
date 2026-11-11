@@ -27,13 +27,8 @@ import sys
 
 import numpy as np
 
-from tesseract_robotics.examples.lowlevel.example_support import (
-    add_fixed_link,
-    load_support_environment,
-    run_pipeline,
-)
-from tesseract_robotics.tesseract_collision import CollisionEvaluatorType
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.collision import CollisionEvaluatorType
+from tesseract_robotics.command_language import (
     CompositeInstruction,
     MoveInstruction,
     MoveInstructionPoly,
@@ -42,13 +37,18 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, ManipulatorInfo, Translation3d
-from tesseract_robotics.tesseract_geometry import Sphere
-from tesseract_robotics.tesseract_motion_planners_trajopt import (
+from tesseract_robotics.common import Isometry3d, ManipulatorInfo, Translation3d
+from tesseract_robotics.examples.lowlevel.example_support import (
+    add_fixed_link,
+    load_support_environment,
+    run_pipeline,
+)
+from tesseract_robotics.geometry import Sphere
+from tesseract_robotics.motion_planners_trajopt import (
     TrajOptDefaultCompositeProfile,
     TrajOptDefaultMoveProfile,
 )
-from tesseract_robotics.tesseract_motion_planners_trajopt_ifopt import (
+from tesseract_robotics.motion_planners_trajopt_ifopt import (
     TrajOptIfoptDefaultCompositeProfile,
     TrajOptIfoptDefaultMoveProfile,
 )

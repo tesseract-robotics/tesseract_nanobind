@@ -1,7 +1,7 @@
 # TrajOpt-Ifopt constraint bindings
 
 All ten constraint classes of trajopt 0.35.0's `trajopt_ifopt` are bound, in
-[`src/trajopt_ifopt/trajopt_ifopt_bindings.cpp`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/trajopt_ifopt/trajopt_ifopt_bindings.cpp).
+[`src/bindings/trajopt_ifopt.cpp`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/bindings/trajopt_ifopt.cpp).
 The [`trajopt_ifopt` reference](../api/trajopt_ifopt.md#constraints) has how each one enters a
 `TrajOptQPProblem`: as a constraint, or as a cost with the penalty types its row bounds allow.
 This page records what the bindings do beyond a one-to-one wrap, and why. That covers the
@@ -39,7 +39,7 @@ cost sets' hints, so a Python cost set on its own raised `ValueError: vector`. 0
 storage grows as needed (#146).
 
 **`TrajOptQPProblem` is bound directly.** trajopt 0.35.0 defaulted the move constructor in the
-header, where the PIMPL type is incomplete, so `src/trajopt_sqp/trajopt_sqp_bindings.cpp` bound a
+header, where the PIMPL type is incomplete, so `src/bindings/trajopt_sqp.cpp` bound a
 non-movable subclass instead. trajopt#615 defines the move operations out of line, and the
 subclass is gone (#146).
 

@@ -6,13 +6,13 @@ Each class binds its C++ operator==/operator!= as __eq__/__ne__ and sets __hash_
 import pytest
 
 from tesseract_robotics import get_tesseract_resource_path
-from tesseract_robotics.tesseract_common import (
+from tesseract_robotics.common import (
     AllowedCollisionMatrix,
     GeneralResourceLocator,
     Isometry3d,
     Translation3d,
 )
-from tesseract_robotics.tesseract_environment import (
+from tesseract_robotics.environment import (
     AddKinematicsInformationCommand,
     AddLinkCommand,
     AddSceneGraphCommand,
@@ -35,8 +35,8 @@ from tesseract_robotics.tesseract_environment import (
     RemoveLinkCommand,
     ReplaceJointCommand,
 )
-from tesseract_robotics.tesseract_scene_graph import Joint, Link, SceneGraph
-from tesseract_robotics.tesseract_srdf import KinematicsInformation
+from tesseract_robotics.scene_graph import Joint, Link, SceneGraph
+from tesseract_robotics.srdf import KinematicsInformation
 
 from .test_environment_commands import SIMPLE_URDF
 

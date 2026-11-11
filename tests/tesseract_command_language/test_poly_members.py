@@ -2,7 +2,7 @@
 
 import pytest
 
-from tesseract_robotics.tesseract_command_language import (
+from tesseract_robotics.command_language import (
     CartesianWaypoint,
     CartesianWaypointPoly,
     JointWaypoint,
@@ -13,7 +13,7 @@ from tesseract_robotics.tesseract_command_language import (
     StateWaypoint,
     StateWaypointPoly,
 )
-from tesseract_robotics.tesseract_common import Isometry3d, JointState
+from tesseract_robotics.common import Isometry3d, JointState
 
 # ---- #267 ----
 
