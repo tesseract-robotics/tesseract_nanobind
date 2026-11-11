@@ -19,7 +19,7 @@ locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 ```
 
-<!-- snippet: skip -->
+<!-- snippet: skip (fixture: must never run) -->
 ```python
 raise RuntimeError("skip-marked block was executed")
 ```
@@ -36,4 +36,8 @@ program = (
 )
 result = plan_freespace(robot, program)
 assert result.successful, result.message
+```
+
+```python
+--8<-- "include block was executed"
 ```

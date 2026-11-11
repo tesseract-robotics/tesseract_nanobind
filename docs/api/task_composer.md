@@ -1,5 +1,28 @@
 # tesseract_robotics.task_composer
 
+<!-- snippet: ambient
+from pathlib import Path
+
+import tesseract_robotics
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.task_composer import (
+    AnyPoly_wrap_CompositeInstruction, TaskComposerDataStorage, TaskComposerPluginFactory,
+)
+from tests.docs.doc_assets import enter_scratch_dir, joint_program
+
+enter_scratch_dir()
+config_path = tesseract_robotics.get_task_composer_config_path()
+program = joint_program(robot)
+profiles = ProfileDictionary()
+factory = TaskComposerPluginFactory(config_path, locator)
+executor = factory.createTaskComposerExecutor("TaskflowExecutor")
+task = factory.createTaskComposerNode("TrajOptPipeline")
+plugin_info = factory.getTaskComposerNodePlugins()["TrajOptPipeline"]
+data_storage = TaskComposerDataStorage()
+data = data_storage
+any_poly = AnyPoly_wrap_CompositeInstruction(program)
+-->
+
 Task composition and planning pipelines.
 
 ## Overview
@@ -228,6 +251,9 @@ first = graph.addNode(factory.createTaskComposerNode("TrajOptPipeline"))
 second = graph.addNode(factory.createTaskComposerNode("TrajOptPipeline"))
 graph.addEdges(first, [second])
 graph.setTerminals([second])
+# A graph has no port contract of its own: its boundary mappings declare the ports
+nodes = graph.getNodes()
+graph.setPortMappings(nodes[first].getInputPortMappings(), nodes[second].getOutputPortMappings())
 assert graph.isValid()[0]
 future = executor.run(graph, data)
 ```
@@ -286,6 +312,7 @@ from tesseract_robotics.serialization import (
 )
 from tesseract_robotics.task_composer import TaskComposerLog
 
+task = factory.createTaskComposerNode("TrajOptPipeline")
 log = TaskComposerLog("failing plan")
 log.initial_data = data            # a copy, taken before the run
 future = executor.run(task, data)
@@ -378,9 +405,9 @@ output_ports = task.getOutputPortMappings()
 
 # Check available ports; write to the storage key the port maps to
 if input_ports.contains("planning_input"):
-    data.setData(input_ports.single("planning_input"), ...)
+    data.setData(input_ports.single("planning_input"), any_poly)
 elif input_ports.contains("program"):
-    data.setData(input_ports.single("program"), ...)
+    data.setData(input_ports.single("program"), any_poly)
 ```
 
 ## AnyPoly Wrapping
@@ -469,10 +496,6 @@ if result.successful:
         print(point.positions)
 ```
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.task_composer
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

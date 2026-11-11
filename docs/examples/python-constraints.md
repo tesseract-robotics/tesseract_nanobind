@@ -1,4 +1,4 @@
-# Python Constraints
+# Python constraints
 
 Seven constraints written in Python, switched on one after another in a live loop.
 

@@ -1,4 +1,4 @@
-# Environment Examples
+# Environment examples
 
 The `Environment` below the high-level `Robot` API: how it is built from
 commands, what state it keeps, and the plugin information it loads. Each example
@@ -15,7 +15,7 @@ tesseract_plugin_configuration_example
 pixi run python -m tesseract_robotics.examples.environment_commands_example
 ```
 
-## Environment Commands
+## Environment commands
 
 Every change to an `Environment` is a command, and `getCommandHistory()`
 returns them in order. The example builds ABB IRB2400 environments from files,
@@ -135,7 +135,7 @@ and `BytesResource ==` counts whether a parent is set, so the two are unequal.
 --8<-- "src/tesseract_robotics/examples/environment_commands_example.py:bytes_resource"
 ```
 
-## Environment State
+## Environment state
 
 The IIWA environment's state, with its first joint made FLOATING: every native
 `setState` / `getState` / `getLinkTransforms` overload, the joint and link
@@ -252,7 +252,7 @@ TCP offset with its TCP frame, as upstream's `ManipulatorInfo` unit test shows:
 --8<-- "src/tesseract_robotics/examples/environment_state_example.py:manipulator_info"
 ```
 
-## Plugin Configuration
+## Plugin configuration
 
 The plugin information tesseract reads from YAML, built in Python: contact
 managers, profiles and the task composer. Each info type has `search_paths`,

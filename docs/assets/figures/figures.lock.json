@@ -1,0 +1,229 @@
+{
+  "figures": {
+    "collision_distance": {
+      "inputs": {
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/collision_distance.py": "a00e12aebcd1ea99a545ba23f67d676c7fafce7b3f4e51cba071c639c58e3afd",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/managers.py": "9c8463631faac5292f657e810afce65cd23e3bdecd601984531d6e610de61f4c",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
+        "tesseract_support:support/urdf/contact_manager_plugins.yaml": "ab1bf29fe5eb833ad2242d7e9d00ef24e5c20886bec7f342a85bb20477f64aab"
+      },
+      "outputs": {
+        "docs/assets/figures/collision_distance-dark.svg": "1eec5b2a3d1527c568de9138b0d47aefd1a24bbd75e58d16c7ab346aa832b336",
+        "docs/assets/figures/collision_distance.svg": "981588a11a1cb026ba4ca4206a32cd04c867fd4928568b1a4759e7c7b1b9bd74"
+      }
+    },
+    "continuous_collision": {
+      "inputs": {
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/continuous_collision.py": "f91fda2db8b9061d6b567bddbbe0e12902b5e2843aabb6f4a7f633cbe8c317a5",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/managers.py": "9c8463631faac5292f657e810afce65cd23e3bdecd601984531d6e610de61f4c",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
+        "tesseract_support:support/urdf/contact_manager_plugins.yaml": "ab1bf29fe5eb833ad2242d7e9d00ef24e5c20886bec7f342a85bb20477f64aab"
+      },
+      "outputs": {
+        "docs/assets/figures/continuous_collision-dark.svg": "cf3929bfe5578e7ab8a4c75bb9795381caee41649e4e2ef1d9c5b48532416577",
+        "docs/assets/figures/continuous_collision.svg": "5dae7e73503f9f51ae97106da532686cc9f3282121427b0b7df3f4c09e2604f7"
+      }
+    },
+    "frames": {
+      "inputs": {
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/frames.py": "5d3561c407d0fea6526384a0c845d652a1e9c267304c0f6f7177727aeac77ea9",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/base_link.stl": "72a144efbbd6996d214cb07b7886b3545462dc8e20f3391a4901aa59c950fca1",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_1.stl": "2b98f6dcd3e02ea65fcad58d3c11a9bd8ccf68bc52c71eff6f4ffd194c5ae8a0",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_2.stl": "2e0e53896b4230354ba6508437ab8f50f3e922693ee2f031d44d49a0839f8a69",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_2_whole.stl": "2c3b09dcc8d2c0438249941b3c54e2f927a3611f74fb62f798ccd663c8eae3b4",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_3.stl": "725137010791be6051b30eab9251370629846cf178cb9f3a45dc499fb79ac84d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_4.stl": "866b38c2ca9cedbe3df412e539ba1bf1e132b2b427190d32d2ae73a3a6b7cf2d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_5.stl": "8f8cc723ea08c7375c0130aa237a6b1c66dde6e9b4c9bc3965bca04ef8230d17",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_6.stl": "286380d4dfb7723de150ed34c374292c3f4519a8f9f1bfcf9892bd53928e25ba",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/base_link.dae": "492cbaa3e0956c1cca3535efc4f58272941657d41e238b42df5ee84141c4b59b",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_1.dae": "a74441a4701abfabcff8f6bbaaf8ca055d53805e37db6cf02788a32087354389",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_2.dae": "1b94c4056869eb0298f9ce95f9cf5429dd6f11cd022ec7ff74cff507e31431ad",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_3.dae": "6f393a7eba0733b93c67c67b3ad6de44af3a25bf783be012972916533e413ee6",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_4.dae": "3a74f982405de0e41e822349bd46dd3d63eb30e576788716c5a22983b7224886",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_5.dae": "1a763bd44cad041f0d1ec13b8fb6c6fe01c13b0d3580a7483f060989b6b49d5b",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_6.dae": "d3caaa06a8754575b58e7fdac54eaee95be8199981b3c3620a2b8a386759d244",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/base_link.stl": "81db26b652454cb6455e8b45dffd87b14c89688f555e99bf5fb406f772d982ff",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_1.stl": "d54a2551f7c2d1ee3408de82870aa419e8806ad65aef046fc1d1884b3e6b5e6e",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_2.stl": "855d6e3c0f14f171a3be70ebe9f867937e5e93abbbb1c56d1825d9704925dbc7",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_3.stl": "69b661da64918639d54f080a26aed1d69639e0439763b5a8ef7f6f309fce6a6f",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_4.stl": "012c2bd364e9ea322b317cd6705248964061ee26b87742df962e636ab10b4b57",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_5.stl": "4022217a6ede00faa264c0cc1b36457b2bdcedd548395734b9709b722ff9f19c",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_6.stl": "afac0c844137c67b09c6ec658159d0b92bf63f3b07fd894f9f560e9dc466f68d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_lever_a.stl": "5892e53236d21e2c57395901e7b9edea233d441bd2a297d7947bc30918be8055",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_lever_b.stl": "c3c95c1468c3ea0bf0f9e8b39614fe5231582a864e43bd1630df58313523a0dd",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/base_link.dae": "78a80ffecdc67b1b0f02a9fe2a5cd1f797e8365b50e09ba480c3a984383b7066",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_1.dae": "c5c4d2da7f40bdce531eed4b74285b59835c97576a2050a47254bea67c2468e8",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_2.dae": "b93ab2d1ef2cfe7ee068e49e7c4d25469ec7bccbec6ab8487048bc6858546c48",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_3.dae": "e2dc114e9c8c3d962ccef8c73cfbd83d699991515805d81b12cba809fe734d54",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_4.dae": "4cde2b881b2e40642e157418e0982fb6bb7c1dd837eaaa075a95fcd9a7c44b46",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_5.dae": "413297ceca8c528b6aa1e45e0346d8e4c714cc3501e97473a9eee14d31608f2a",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_6.dae": "c4a6c883d78d3bd634510e7e71b01be9bb3432628599810444217d2e06984dc1",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_lever_a.dae": "cfa3315d1dd1aca46de9251f5a859f297f8ad977fac358e4f0011fbd176bb5ee",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_lever_b.dae": "2c6334003441abafe3a4ed585bfb0c03e2a3c0957fb7a300e3ce1218a09ec244",
+        "tesseract_support:support/urdf/abb_irb2400.srdf": "a13489e13a41de3a7c026ab62e21421ac3f1c0d53b66f4707dd15dcd8e8068d9",
+        "tesseract_support:support/urdf/abb_irb2400.urdf": "42e9e95ab48a356bc6f6e302617b8cebb784362e918dc859207816dcf9e98df0",
+        "tesseract_support:support/urdf/abb_irb2400_plugins.yaml": "7baecdb1fd804b60ac398e4e3d21bbbfd6f16eff570e110c5ae84039749aee2b"
+      },
+      "outputs": {
+        "docs/assets/figures/frames-dark.svg": "4f5bf9e51632b082ae5eaaa2d04436b24a241f6d3c3a3e4cfed92fbf87fc91fc",
+        "docs/assets/figures/frames.svg": "f067b9902875cefc5d57476aef5793584d11157f5f61340a82c8eb63cc4e0dd2"
+      }
+    },
+    "ik_branches": {
+      "inputs": {
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/ik_branches.py": "bcbf92b6a6783d8586ccc096acb7494063187c9da37dd0c0ff2ee3fce2356a2e",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/base_link.stl": "72a144efbbd6996d214cb07b7886b3545462dc8e20f3391a4901aa59c950fca1",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_1.stl": "2b98f6dcd3e02ea65fcad58d3c11a9bd8ccf68bc52c71eff6f4ffd194c5ae8a0",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_2.stl": "2e0e53896b4230354ba6508437ab8f50f3e922693ee2f031d44d49a0839f8a69",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_2_whole.stl": "2c3b09dcc8d2c0438249941b3c54e2f927a3611f74fb62f798ccd663c8eae3b4",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_3.stl": "725137010791be6051b30eab9251370629846cf178cb9f3a45dc499fb79ac84d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_4.stl": "866b38c2ca9cedbe3df412e539ba1bf1e132b2b427190d32d2ae73a3a6b7cf2d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_5.stl": "8f8cc723ea08c7375c0130aa237a6b1c66dde6e9b4c9bc3965bca04ef8230d17",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_6.stl": "286380d4dfb7723de150ed34c374292c3f4519a8f9f1bfcf9892bd53928e25ba",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/base_link.dae": "492cbaa3e0956c1cca3535efc4f58272941657d41e238b42df5ee84141c4b59b",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_1.dae": "a74441a4701abfabcff8f6bbaaf8ca055d53805e37db6cf02788a32087354389",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_2.dae": "1b94c4056869eb0298f9ce95f9cf5429dd6f11cd022ec7ff74cff507e31431ad",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_3.dae": "6f393a7eba0733b93c67c67b3ad6de44af3a25bf783be012972916533e413ee6",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_4.dae": "3a74f982405de0e41e822349bd46dd3d63eb30e576788716c5a22983b7224886",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_5.dae": "1a763bd44cad041f0d1ec13b8fb6c6fe01c13b0d3580a7483f060989b6b49d5b",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_6.dae": "d3caaa06a8754575b58e7fdac54eaee95be8199981b3c3620a2b8a386759d244",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/base_link.stl": "81db26b652454cb6455e8b45dffd87b14c89688f555e99bf5fb406f772d982ff",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_1.stl": "d54a2551f7c2d1ee3408de82870aa419e8806ad65aef046fc1d1884b3e6b5e6e",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_2.stl": "855d6e3c0f14f171a3be70ebe9f867937e5e93abbbb1c56d1825d9704925dbc7",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_3.stl": "69b661da64918639d54f080a26aed1d69639e0439763b5a8ef7f6f309fce6a6f",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_4.stl": "012c2bd364e9ea322b317cd6705248964061ee26b87742df962e636ab10b4b57",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_5.stl": "4022217a6ede00faa264c0cc1b36457b2bdcedd548395734b9709b722ff9f19c",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_6.stl": "afac0c844137c67b09c6ec658159d0b92bf63f3b07fd894f9f560e9dc466f68d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_lever_a.stl": "5892e53236d21e2c57395901e7b9edea233d441bd2a297d7947bc30918be8055",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_lever_b.stl": "c3c95c1468c3ea0bf0f9e8b39614fe5231582a864e43bd1630df58313523a0dd",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/base_link.dae": "78a80ffecdc67b1b0f02a9fe2a5cd1f797e8365b50e09ba480c3a984383b7066",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_1.dae": "c5c4d2da7f40bdce531eed4b74285b59835c97576a2050a47254bea67c2468e8",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_2.dae": "b93ab2d1ef2cfe7ee068e49e7c4d25469ec7bccbec6ab8487048bc6858546c48",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_3.dae": "e2dc114e9c8c3d962ccef8c73cfbd83d699991515805d81b12cba809fe734d54",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_4.dae": "4cde2b881b2e40642e157418e0982fb6bb7c1dd837eaaa075a95fcd9a7c44b46",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_5.dae": "413297ceca8c528b6aa1e45e0346d8e4c714cc3501e97473a9eee14d31608f2a",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_6.dae": "c4a6c883d78d3bd634510e7e71b01be9bb3432628599810444217d2e06984dc1",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_lever_a.dae": "cfa3315d1dd1aca46de9251f5a859f297f8ad977fac358e4f0011fbd176bb5ee",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_lever_b.dae": "2c6334003441abafe3a4ed585bfb0c03e2a3c0957fb7a300e3ce1218a09ec244",
+        "tesseract_support:support/urdf/abb_irb2400.srdf": "a13489e13a41de3a7c026ab62e21421ac3f1c0d53b66f4707dd15dcd8e8068d9",
+        "tesseract_support:support/urdf/abb_irb2400.urdf": "42e9e95ab48a356bc6f6e302617b8cebb784362e918dc859207816dcf9e98df0",
+        "tesseract_support:support/urdf/abb_irb2400_plugins.yaml": "7baecdb1fd804b60ac398e4e3d21bbbfd6f16eff570e110c5ae84039749aee2b"
+      },
+      "outputs": {
+        "docs/assets/figures/ik_branches-dark.svg": "08b8b8bac1e7c580530b031eef7874b9866ae9a7aafa03d5f0e186102297d702",
+        "docs/assets/figures/ik_branches.svg": "b3ffb86eae6329a05102d1d3fa30f51d02dadfc71a96537ae7c9a2066399ac13"
+      }
+    },
+    "planner_comparison": {
+      "inputs": {
+        "docs/assets/figures/data/planner_comparison.json": "57f68ab0513eaef2397859aa58843d78765b47b7907e8cd057297d7350582503",
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/planner_comparison.py": "88027c57eabf6d00ea55a81a98d4d466e49a0f48e9c0d31e64e9ed28a6cf4783",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c"
+      },
+      "outputs": {
+        "docs/assets/figures/planner_comparison-dark.svg": "1330741d717778c681c02fddd212b3a181412ffdaf148c9f34fbe46b9b14c15f",
+        "docs/assets/figures/planner_comparison.svg": "36a7397582df3ddacc2fc84655c2cc07cf3215166c1422a6d1bdddc72c2d730a"
+      }
+    },
+    "raster_toolpath": {
+      "inputs": {
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/raster_toolpath.py": "e47431bd55e3b17d91ef3d6960c377fc13a89f8c7278f81b236f1a207d571eda",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
+        "src/tesseract_robotics/planning/profiles/descartes.py": "56137d9ce06a31084de0eda87bbcbf3bc1be4724f8a2ad34d7ca9786f99904c5",
+        "src/tesseract_robotics/planning/profiles/names.py": "f5383aac21c145b8e1d9ed3a9db8c61cccbbecb87d9c75b14e28331cd28e0ce6",
+        "src/tesseract_robotics/planning/profiles/pipelines.py": "1b20bc3ef95b891cdaece18ce0f4dc150a9cae8710e3994e8dff408444d3e476",
+        "src/tesseract_robotics/planning/profiles/trajopt.py": "2dba5414bd67b11a6cda15c9a81451a8b715dc586e52ca4ae393b6d608456967",
+        "task_composer_config:task_composer_plugins.yaml": "7d722d83d101fa57ba7ff292f65817bbc26fc5ffc9bc7a218eb29a2c1fe36771",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/base_link.stl": "72a144efbbd6996d214cb07b7886b3545462dc8e20f3391a4901aa59c950fca1",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_1.stl": "2b98f6dcd3e02ea65fcad58d3c11a9bd8ccf68bc52c71eff6f4ffd194c5ae8a0",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_2.stl": "2e0e53896b4230354ba6508437ab8f50f3e922693ee2f031d44d49a0839f8a69",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_2_whole.stl": "2c3b09dcc8d2c0438249941b3c54e2f927a3611f74fb62f798ccd663c8eae3b4",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_3.stl": "725137010791be6051b30eab9251370629846cf178cb9f3a45dc499fb79ac84d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_4.stl": "866b38c2ca9cedbe3df412e539ba1bf1e132b2b427190d32d2ae73a3a6b7cf2d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_5.stl": "8f8cc723ea08c7375c0130aa237a6b1c66dde6e9b4c9bc3965bca04ef8230d17",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/collision/link_6.stl": "286380d4dfb7723de150ed34c374292c3f4519a8f9f1bfcf9892bd53928e25ba",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/base_link.dae": "492cbaa3e0956c1cca3535efc4f58272941657d41e238b42df5ee84141c4b59b",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_1.dae": "a74441a4701abfabcff8f6bbaaf8ca055d53805e37db6cf02788a32087354389",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_2.dae": "1b94c4056869eb0298f9ce95f9cf5429dd6f11cd022ec7ff74cff507e31431ad",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_3.dae": "6f393a7eba0733b93c67c67b3ad6de44af3a25bf783be012972916533e413ee6",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_4.dae": "3a74f982405de0e41e822349bd46dd3d63eb30e576788716c5a22983b7224886",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_5.dae": "1a763bd44cad041f0d1ec13b8fb6c6fe01c13b0d3580a7483f060989b6b49d5b",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400/visual/link_6.dae": "d3caaa06a8754575b58e7fdac54eaee95be8199981b3c3620a2b8a386759d244",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/base_link.stl": "81db26b652454cb6455e8b45dffd87b14c89688f555e99bf5fb406f772d982ff",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_1.stl": "d54a2551f7c2d1ee3408de82870aa419e8806ad65aef046fc1d1884b3e6b5e6e",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_2.stl": "855d6e3c0f14f171a3be70ebe9f867937e5e93abbbb1c56d1825d9704925dbc7",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_3.stl": "69b661da64918639d54f080a26aed1d69639e0439763b5a8ef7f6f309fce6a6f",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_4.stl": "012c2bd364e9ea322b317cd6705248964061ee26b87742df962e636ab10b4b57",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_5.stl": "4022217a6ede00faa264c0cc1b36457b2bdcedd548395734b9709b722ff9f19c",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_6.stl": "afac0c844137c67b09c6ec658159d0b92bf63f3b07fd894f9f560e9dc466f68d",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_lever_a.stl": "5892e53236d21e2c57395901e7b9edea233d441bd2a297d7947bc30918be8055",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/collision/link_lever_b.stl": "c3c95c1468c3ea0bf0f9e8b39614fe5231582a864e43bd1630df58313523a0dd",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/base_link.dae": "78a80ffecdc67b1b0f02a9fe2a5cd1f797e8365b50e09ba480c3a984383b7066",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_1.dae": "c5c4d2da7f40bdce531eed4b74285b59835c97576a2050a47254bea67c2468e8",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_2.dae": "b93ab2d1ef2cfe7ee068e49e7c4d25469ec7bccbec6ab8487048bc6858546c48",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_3.dae": "e2dc114e9c8c3d962ccef8c73cfbd83d699991515805d81b12cba809fe734d54",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_4.dae": "4cde2b881b2e40642e157418e0982fb6bb7c1dd837eaaa075a95fcd9a7c44b46",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_5.dae": "413297ceca8c528b6aa1e45e0346d8e4c714cc3501e97473a9eee14d31608f2a",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_6.dae": "c4a6c883d78d3bd634510e7e71b01be9bb3432628599810444217d2e06984dc1",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_lever_a.dae": "cfa3315d1dd1aca46de9251f5a859f297f8ad977fac358e4f0011fbd176bb5ee",
+        "tesseract_support:support/meshes/abb_irb2400/irb2400_common/visual/link_lever_b.dae": "2c6334003441abafe3a4ed585bfb0c03e2a3c0957fb7a300e3ce1218a09ec244",
+        "tesseract_support:support/urdf/abb_irb2400.srdf": "a13489e13a41de3a7c026ab62e21421ac3f1c0d53b66f4707dd15dcd8e8068d9",
+        "tesseract_support:support/urdf/abb_irb2400.urdf": "42e9e95ab48a356bc6f6e302617b8cebb784362e918dc859207816dcf9e98df0",
+        "tesseract_support:support/urdf/abb_irb2400_plugins.yaml": "7baecdb1fd804b60ac398e4e3d21bbbfd6f16eff570e110c5ae84039749aee2b"
+      },
+      "outputs": {
+        "docs/assets/figures/raster_toolpath-dark.svg": "b770120bed8bd3cc4d4faad3e51178e43274bb6c0035887e88e945e0feedfa2a",
+        "docs/assets/figures/raster_toolpath.svg": "a2b628405b83fd232d0f80a3e2c978e77009db7bd36ffc69a49ba802dffb3a65"
+      }
+    },
+    "time_parameterization": {
+      "inputs": {
+        "scripts/docs_figures/__main__.py": "31e46fd4c08856d0017f6e7f075cbe994576f8cbf9fc46d1a1bc5cf8741249e3",
+        "scripts/docs_figures/lock.py": "09961305117a572f18e3284e8be810e46afe1acf9416d4cb173d1f44dbbd20b7",
+        "scripts/docs_figures/scene3d.py": "d8042575741cad912d56bac3c3e497a2f183bbeb8f0309e4326ffdc5604caa26",
+        "scripts/docs_figures/style.py": "877e4b34f88e90dc8a8ffb82e481f6005705708931fd9b39d77bb8af8e6de30c",
+        "scripts/docs_figures/time_parameterization.py": "72ba79c7a0933fae573f466a8110086754fd11bfeec0527a936cebee7d7c8c35",
+        "tesseract_support:support/urdf/abb_irb2400.srdf": "a13489e13a41de3a7c026ab62e21421ac3f1c0d53b66f4707dd15dcd8e8068d9",
+        "tesseract_support:support/urdf/abb_irb2400.urdf": "42e9e95ab48a356bc6f6e302617b8cebb784362e918dc859207816dcf9e98df0"
+      },
+      "outputs": {
+        "docs/assets/figures/time_parameterization-dark.svg": "37461709021ee64db73593ed9b4ed3e69d2298183400e0cdff0d1b6efeb0c57c",
+        "docs/assets/figures/time_parameterization.svg": "57ed228d148ced6fee7c549b97c71c8af3dc0f7853251a32015950636cdf64ad"
+      }
+    }
+  },
+  "format": 2,
+  "render_platform": {
+    "freetype": "2.14.3",
+    "machine": "arm64",
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.4",
+    "system": "Darwin",
+    "trimesh": "4.12.2"
+  },
+  "upstream": {
+    "tesseract-robotics/tesseract": "4cf644d704bd8961c7cdaf193f72488fa501f5c0",
+    "tesseract-robotics/tesseract_planning": "4e27d94b160f757e064dbad2a5277657cd33bbf8",
+    "tesseract-robotics/trajopt": "98b85d559e9fc7cb60a4dbfeb6d3baa177c94df5"
+  }
+}

@@ -1,5 +1,11 @@
 # tesseract_robotics.trajopt_sqp
 
+<!-- snippet: ambient
+from tests.docs.doc_assets import sqp_scene
+
+globals().update(sqp_scene(robot))
+-->
+
 Sequential Quadratic Programming (SQP) solver for trajectory optimization.
 See the [Low-Level SQP guide](../user-guide/low-level-sqp.md) for the user-guide walkthrough.
 
@@ -12,6 +18,10 @@ from tesseract_robotics import trajopt_ifopt as ti
 from tesseract_robotics import trajopt_sqp as tsqp
 
 nodes_variables = ti.createNodesVariables("trajectory", joint_names, states, bounds)
+vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
+joint_constraint = ti.JointPosConstraint(states[0], vars_list[0], np.ones(len(joint_names)), "Joints")
+collision_constraint = ti.DiscreteCollisionConstraint(evaluator, vars_list[1])
+vel_cost = ti.JointVelConstraint(np.zeros(len(joint_names)), vars_list, np.ones(1), "Velocity")
 
 problem = tsqp.TrajOptQPProblem(nodes_variables)
 problem.addConstraintSet(joint_constraint)                  # joint / Cartesian constraints
@@ -88,14 +98,16 @@ Before the first `solve()` only `updateBounds` stores bounds; `updateLowerBound`
 `updateUpperBound` return `False` until OSQP is set up.
 
 ```python
-solver = tsqp.OSQPEigenSolver()
-solver.init(2, 2)
-solver.updateHessianMatrix(scipy.sparse.identity(2, format="csr"))
-solver.updateGradient([-2.0, -4.0])
-solver.updateLinearConstraintsMatrix(scipy.sparse.identity(2, format="csr"))
-solver.updateBounds([-10.0, -10.0], [0.5, 10.0])
-solver.solve()
-solver.getSolution()  # [0.5, 2.0]
+import scipy.sparse
+
+qp_solver = tsqp.OSQPEigenSolver()
+qp_solver.init(2, 2)
+qp_solver.updateHessianMatrix(scipy.sparse.identity(2, format="csr"))
+qp_solver.updateGradient([-2.0, -4.0])
+qp_solver.updateLinearConstraintsMatrix(scipy.sparse.identity(2, format="csr"))
+qp_solver.updateBounds([-10.0, -10.0], [0.5, 10.0])
+qp_solver.solve()
+qp_solver.getSolution()  # [0.5, 2.0]
 ```
 
 `setWarmStart` has two forms: `setWarmStart(True)` / `setWarmStart(False)` sets the OSQP
@@ -143,14 +155,9 @@ class MyCallback(tsqp.SQPCallback):
 solver.registerCallback(MyCallback())
 ```
 
-## Module API
+## Reference
 
 ::: tesseract_robotics.trajopt_sqp
-    options:
-      show_root_heading: true
-      show_source: false
-      members_order: source
-      heading_level: 3
 
 ## See also
 

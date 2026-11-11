@@ -1,4 +1,4 @@
-# Kinematics Examples
+# Kinematics examples
 
 Kinematics below the high-level `Robot` API: solver plugins, Jacobians and
 manipulability, and state solvers. Each example is a port of an upstream
@@ -13,7 +13,7 @@ tesseract_kinematics_plugins_example
 pixi run python -m tesseract_robotics.examples.kinematics_plugins_example
 ```
 
-## Kinematics Plugins
+## Kinematics plugins
 
 KUKA LBR IIWA 14 R820 forward and inverse kinematics built from the plugin
 YAML the SRDF names (`lbr_iiwa_14_r820_plugins.yaml`): one forward solver,
@@ -78,7 +78,7 @@ the list overload.
 --8<-- "src/tesseract_robotics/examples/kinematics_plugins_example.py:kinematic_group"
 ```
 
-## Kinematics Analysis
+## Kinematics analysis
 
 ```bash
 tesseract_kinematics_analysis_example
@@ -182,7 +182,7 @@ clamped difference 0.15 (upstream's `calcJacobianTransformErrorDiff_Toleranced`)
 --8<-- "src/tesseract_robotics/examples/kinematics_analysis_example.py:tolerances"
 ```
 
-## State Solver
+## State solver
 
 ```bash
 tesseract_state_solver_example

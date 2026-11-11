@@ -1,4 +1,4 @@
-# Geometry Examples
+# Geometry examples
 
 Meshes as `geometry` loads, builds and writes them. The example takes
 its meshes and parameters from upstream tesseract: the support meshes
@@ -17,7 +17,7 @@ pixi run python -m tesseract_robotics.examples.mesh_roundtrip_example
 For the primitive shapes (`Box`, `Sphere`, `Cylinder`, ...) see
 `geometry_showcase_example.py` under [Basic Examples](basic.md).
 
-## Mesh Round Trip
+## Mesh round trip
 
 ### Loading from bytes
 
@@ -143,7 +143,7 @@ Primitive shapes from a URDF, in the viewer. Drag to orbit.
 tesseract_shapes_viewer
 ```
 
-## Material Mesh
+## Material mesh
 
 --8<-- "docs/demos/players/tesseract_material_mesh_viewer.html"
 

@@ -1,5 +1,24 @@
 # tesseract_robotics.kinematics
 
+<!-- snippet: ambient
+from pathlib import Path
+
+from tesseract_robotics import get_tesseract_support_path
+from tesseract_robotics.kinematics import KinGroupIKInput, KinematicsPluginFactory
+from tests.docs.doc_assets import enter_scratch_dir
+
+enter_scratch_dir()
+factory = KinematicsPluginFactory(
+    get_tesseract_support_path() / "urdf" / "abb_irb2400_plugins.yaml", locator
+)
+scene_graph = env.getSceneGraph()
+scene_state = env.getState()
+joint_names = [str(j) for j in env.getGroupJointIds("manipulator")]
+q = np.zeros(6)
+group = env.getKinematicGroup("manipulator")
+manip = group
+-->
+
 Forward and inverse kinematics solvers.
 
 ## Kinematic Groups
@@ -31,7 +50,7 @@ inverse kinematics solver the plugin factory created. The group takes a copy
 it, and so its factory, alive.
 
 ```python
-inv_kin = factory.createInvKin("manipulator", "KDLInvKinChainLMA", scene_graph, scene_state)
+inv_kin = factory.createInvKin("manipulator", "OPWInvKin", scene_graph, scene_state)
 manip = KinematicGroup("manipulator", joint_names, inv_kin, scene_graph, scene_state)
 ```
 
@@ -65,8 +84,8 @@ J = group.calcJacobian(q, "link_2", "tool0")        # expressed in link_2
 J = group.calcJacobian(q, "link_2", "tool0", p)
 ```
 
-An unknown link name raises `KeyError`. `calcJacobianWithPoint(q, link, p)` is
-an alias of `calcJacobian(q, link, p)`.
+An unknown link name raises `KeyError`. `calcJacobianWithPoint` is removed:
+pass the point to `calcJacobian(q, link, p)`.
 
 ## Forward Kinematics
 
@@ -83,8 +102,8 @@ transforms = manip.calcFwdKin(joint_values)
 
 # Get specific link
 tcp_pose = transforms["tool0"]
-print(f"TCP position: {tcp_pose.translation()}")
-print(f"TCP rotation:\n{tcp_pose.rotation()}")
+print(f"TCP position: {tcp_pose.translation}")
+print(f"TCP rotation:\n{tcp_pose.rotation}")
 ```
 
 ## Inverse Kinematics
@@ -100,10 +119,8 @@ import numpy as np
 
 manip = env.getKinematicGroup("manipulator")
 
-# Build target
-mat = np.eye(4)
-mat[:3, 3] = [0.5, 0.2, 0.3]
-target_pose = Isometry3d(mat)
+# Build a reachable target: the tool0 pose at known joint values
+target_pose = Isometry3d(manip.calcFwdKin(np.array([0.0, -0.5, 0.5, 0.0, 0.5, 0.0]))["tool0"])
 
 ik_input = KinGroupIKInput(target_pose, "base_link", "tool0")
 seed = np.zeros(6)
@@ -120,9 +137,10 @@ else:
 ### Batch IK
 
 `calcInvKin` also takes a list of `KinGroupIKInput` (or a `KinGroupIKInputs`),
-one per tip link; `calcInvKinMultiple` is an alias of the list form.
+one per tip link. `calcInvKinMultiple` is removed.
 
 ```python
+another_input = KinGroupIKInput(target_pose, "base_link", "tool0")
 solutions = manip.calcInvKin([ik_input, another_input], seed)
 ```
 
@@ -170,10 +188,10 @@ isNearSingularity(J)                 # smallest singular value < 0.01 (threshold
 
 qs = np.array([3 * np.pi / 2, -3 * np.pi / 2, 5.0])
 harmonizeTowardZero(qs, [0, 1])      # in place: [-pi/2, pi/2, 5.0]
-harmonizeTowardMedian(qs, [0, 1], limits)  # in place, around each joint's limit midpoint
+harmonizeTowardMedian(qs, [0, 1], limits.joint_limits)  # in place, around each joint's limit midpoint
 
 isValid([0.0] * 6)                   # all six finite
-checkKinematics(kin_group)           # FK -> IK round trip, tol=1e-3 (m and rad)
+checkKinematics(env.getKinematicGroup("manipulator"))  # FK -> IK round trip, tol=1e-3 (m and rad)
 ```
 
 | function | raises |
@@ -206,7 +224,7 @@ from tesseract_robotics.kinematics import (
 )
 
 # Get default parameters
-params = UR10Parameters()
+params = UR10Parameters  # a ready-made URParameters, not a class
 print(f"d1: {params.d1}")
 print(f"a2: {params.a2}")
 print(f"a3: {params.a3}")
@@ -224,9 +242,11 @@ SRDF's kinematics plugin config; a factory can also be built from a config file
 ```python
 from pathlib import Path
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics.kinematics import KinematicsPluginFactory
 
-factory = KinematicsPluginFactory(Path("robot_plugins.yaml"), locator)
+plugins_path = get_tesseract_support_path() / "urdf" / "abb_irb2400_plugins.yaml"
+factory = KinematicsPluginFactory(plugins_path, locator)
 
 # Solvers per group: {group_name: PluginInfoContainer}
 fwd = factory.getFwdKinPlugins()
@@ -279,7 +299,7 @@ fk = manip.calcFwdKin(joints)
 current_pose = fk["tool0"]
 
 # Move 10cm in X — build a new 4x4 matrix
-mat = current_pose.matrix().copy()
+mat = current_pose.matrix.copy()
 mat[0, 3] += 0.1
 target_pose = Isometry3d(mat)
 
@@ -292,7 +312,7 @@ if solutions:
     check_pose = fk_check["tool0"]
 
     error = np.linalg.norm(
-        target_pose.translation() - check_pose.translation()
+        target_pose.translation - check_pose.translation
     )
     print(f"Position error: {error:.6f} m")
 ```
@@ -304,10 +324,6 @@ if solutions:
 3. **Joint Limits**: IK solvers respect joint limits
 4. **Analytical vs Numerical**: OPW (UR, ABB) is analytical and fast; KDL is numerical
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.kinematics
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

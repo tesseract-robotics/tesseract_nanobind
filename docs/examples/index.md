@@ -1,101 +1,246 @@
 # Examples
 
-Learn tesseract_robotics through working examples.
+Every example is a script that runs on its own: installed as a console script, importable as a
+module, and tested in CI. The recorded ones play in the browser on their page: click a poster,
+then orbit, scrub and change the playback speed, with nothing installed.
 
-## Example Categories
+```bash
+tesseract_car_seat_example                              # an installed console script
+python -m tesseract_robotics.examples.car_seat_example  # the same, as a module
+```
+
+Run as a script, an example plans, opens the [viewer](../user-guide/viewer.md) and prints its URL.
+Its `run()` function plans without the viewer and returns the results; the tests call that. A
+plan that fails raises `PlanningFailedError` or `TimeParameterizationFailedError`
+(`tesseract_robotics.examples.failures`) and the script exits non-zero.
+
+## Planning
+
+Cartesian toolpaths, orientation constraints, attach-and-place and multi-step programs.
 
 <div class="grid cards" markdown>
 
--   :material-robot-industrial:{ .lg .middle } **Basic Examples**
+-   [![Car seat demo, opening frame](../demos/posters/car_seat_example.png)](planning.md#multi-step-with-task-composer-car-seat)
 
-    ---
+    **[Car seat](planning.md#multi-step-with-task-composer-car-seat)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/car_seat_example.py)
 
-    Fundamentals: kinematics, collision, scene graph
+    Picks a seat off a conveyor and places it through a car's door opening, on a rail-mounted robot.
 
-    [:octicons-arrow-right-24: Basic Examples](basic.md)
+    `tesseract_car_seat_example`
 
--   :material-map-marker-path:{ .lg .middle } **Planning Examples**
+-   [![Pick and place demo, opening frame](../demos/posters/pick_and_place_example.png)](planning.md#pick-and-place)
 
-    ---
+    **[Pick and place](planning.md#pick-and-place)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pick_and_place_example.py)
 
-    Motion planning with OMPL, TrajOpt, Descartes
+    Picks a box, attaches it to the tool and places it on a shelf.
 
-    [:octicons-arrow-right-24: Planning Examples](planning.md)
+    `tesseract_pick_and_place_example`
 
--   :material-clock-fast:{ .lg .middle } **Online Planning**
+-   [![Raster demo, opening frame](../demos/posters/raster_example.png)](planning.md#raster-pattern)
 
-    ---
+    **[Raster](planning.md#raster-pattern)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/raster_example.py)
 
-    Real-time replanning with low-level SQP API
+    An industrial raster pattern, as used for welding or milling.
 
-    [:octicons-arrow-right-24: Online Planning](online-planning.md)
+    `tesseract_raster_example`
+
+-   [![Puzzle piece demo, opening frame](../demos/posters/puzzle_piece_auxillary_axes_example.png)](planning.md#9-dof-with-external-axis-puzzle-piece)
+
+    **[Puzzle piece](planning.md#9-dof-with-external-axis-puzzle-piece)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/puzzle_piece_auxillary_axes_example.py)
+
+    A 9-DOF Cartesian toolpath: a robot and two auxiliary axes grind a part's edge.
+
+    `tesseract_puzzle_piece_auxillary_axes_example`
+
+-   [![Chained raster demo, opening frame](../demos/posters/chain_example.png)](planning.md#descartes-trajopt-chaining)
+
+    **[Chained raster](planning.md#descartes-trajopt-chaining)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/chain_example.py)
+
+    A raster planned with Descartes and refined with TrajOpt.
+
+    `tesseract_chain_example`
+
+-   [![Glass upright demo, opening frame](../demos/posters/glass_upright_example.png)](planning.md#glass-upright-orientation-constraint)
+
+    **[Glass upright](planning.md#glass-upright-orientation-constraint)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/glass_upright_example.py)
+
+    Moves a tool while an orientation constraint keeps it upright.
+
+    `tesseract_glass_upright_example`
+
+-   [![Basic Cartesian demo, opening frame](../demos/posters/basic_cartesian_example.png)](planning.md#basic-cartesian)
+
+    **[Basic Cartesian](planning.md#basic-cartesian)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/basic_cartesian_example.py)
+
+    A Cartesian path planned with TrajOpt.
+
+    `tesseract_basic_cartesian_example`
 
 </div>
 
-## Running Examples
+## Sampling-based and hybrid
 
-Examples install as console scripts via `[project.scripts]` in `pyproject.toml`.
-Once the package is installed (via `pip` or `pixi install`) they are on `PATH`:
+OMPL alone, and OMPL followed by TrajOpt.
 
-```bash
-# Activate environment
-pixi shell
+<div class="grid cards" markdown>
 
-# Run an example (installed console script)
-tesseract_freespace_ompl_example
+-   [![Freespace OMPL demo, opening frame](../demos/posters/freespace_ompl_example.png)](ompl.md#freespace-ompl)
 
-# Or via Python module invocation
-pixi run python -m tesseract_robotics.examples.freespace_ompl_example
-```
+    **[Freespace OMPL](ompl.md#freespace-ompl)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_ompl_example.py)
 
-Every example module has both `main()` and `run()` entry points — `main()`
-handles optional viewer launch, `run()` returns results for testing / reuse.
+    Freespace motion around an obstacle, planned with OMPL.
 
-## Example Index
+    `tesseract_freespace_ompl_example`
 
-### Basic
+-   [![Freespace hybrid demo, opening frame](../demos/posters/freespace_hybrid_example.png)](ompl.md#hybrid-planning-ompl-trajopt)
 
-| Example | Console script | Description |
-|---------|----------------|-------------|
-| `tesseract_kinematics_example.py` | `tesseract_kinematics_example` | FK/IK with joint groups |
-| `tesseract_collision_example.py` | `tesseract_collision_example` | Discrete collision checking |
-| `scene_graph_example.py` | `tesseract_scene_graph_example` | Scene graph manipulation |
-| `geometry_showcase_example.py` | `tesseract_geometry_showcase_example` | All geometry types |
-| `pointcloud_octree_collision_example.py` | `tesseract_pointcloud_octree_collision_example` | Point cloud → Octree → TrajOpt with collision on/off, toggleable in the viewer |
+    **[Freespace hybrid](ompl.md#hybrid-planning-ompl-trajopt)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_hybrid_example.py)
 
-### Planning
+    OMPL finds a path around an obstacle; TrajOpt smooths it.
 
-| Example | Console script | Description |
-|---------|----------------|-------------|
-| [`freespace_ompl_example.py`](ompl.md) | `tesseract_freespace_ompl_example` | OMPL freespace motion |
-| `basic_cartesian_example.py` | `tesseract_basic_cartesian_example` | Cartesian path with TrajOpt |
-| `glass_upright_example.py` | `tesseract_glass_upright_example` | Orientation constraints |
-| `pick_and_place_example.py` | `tesseract_pick_and_place_example` | Pick, attach, place workflow |
-| `car_seat_example.py` | `tesseract_car_seat_example` | Complex multi-step planning |
-| `raster_example.py` | `tesseract_raster_example` | Industrial raster patterns |
-| `puzzle_piece_auxillary_axes_example.py` | `tesseract_puzzle_piece_auxillary_axes_example` | 9-DOF with external axis |
-| [`freespace_hybrid_example.py`](ompl.md) | `tesseract_freespace_hybrid_example` | OMPL + TrajOpt hybrid |
-| [`freespace_clearance_objective_example.py`](ompl.md) | `tesseract_freespace_clearance_objective_example` | OMPL objective from Python; a cost threshold ends the optimize loop |
-| `chain_example.py` | `tesseract_chain_example` | Descartes + TrajOpt chaining |
+    `tesseract_freespace_hybrid_example`
 
-### Real-Time
+</div>
 
-| Example | Console script | Description |
-|---------|----------------|-------------|
-| `online_planning_example.py` | `tesseract_online_planning_example` | TaskComposer replanning |
-| `online_planning_sqp_example.py` | `tesseract_online_planning_sqp_example` | Low-level SQP replanning ([rates](online-planning.md#performance-comparison)) |
-| [`python_constraints_example.py`](python-constraints.md) | `tesseract_python_constraints_example` | Seven Python-defined constraints in a live loop, scripted or driven with sliders |
+## Online planning
 
-### Visualization
+Replanning while the world changes.
 
-| Example | Console script | Description |
-|---------|----------------|-------------|
-| `shapes_viewer.py` | `tesseract_shapes_viewer` | Basic shapes in viewer |
-| `tesseract_material_mesh_viewer.py` | `tesseract_material_mesh_viewer` | Materials and meshes |
-| `abb_irb2400_viewer.py` | `tesseract_abb_irb2400_viewer` | Robot visualization |
-| `twc_workcell_positioner_viewer.py` | `tesseract_twc_workcell_positioner_viewer` | Industrial workcell (positioner, requires submodule) |
+<div class="grid cards" markdown>
 
-### Low-level (bindings only)
+-   [![Online planning demo, opening frame](../demos/posters/online_planning_example.png)](online-planning.md#overview)
+
+    **[Online planning](online-planning.md#overview)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py)
+
+    Replans the trajectory while an obstacle moves.
+
+    `tesseract_online_planning_example`
+
+-   [![Online planning, SQP demo, opening frame](../demos/posters/online_planning_sqp_example.png)](online-planning.md#low-level-sqp-example)
+
+    **[Online planning, SQP](online-planning.md#low-level-sqp-example)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py)
+
+    Replanning through the low-level SQP API, one warm-started solve per tick.
+
+    `tesseract_online_planning_sqp_example`
+
+</div>
+
+## Collision and scenes
+
+Point clouds, signed distance fields, workcells, scene graphs and geometry.
+
+<div class="grid cards" markdown>
+
+-   [![Point cloud collision demo, opening frame](../demos/posters/pointcloud_octree_collision_example.png)](basic.md#point-cloud-octree-example)
+
+    **[Point cloud collision](basic.md#point-cloud-octree-example)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pointcloud_octree_collision_example.py)
+
+    Plans around an obstacle known only as a point cloud, through an octree.
+
+    `tesseract_pointcloud_octree_collision_example`
+
+-   [![SDF collision demo, opening frame](../demos/posters/sdf_collision_example.png)](collision.md#signed-distance-field)
+
+    **[SDF collision](collision.md#signed-distance-field)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/sdf_collision_example.py)
+
+    A probe swept through a signed distance field.
+
+    `tesseract_sdf_collision_example`
+
+-   [![TWC workcell demo, opening frame](../demos/posters/twc_workcell_positioner_viewer.png)](../user-guide/viewer.md#industrial-workcells)
+
+    **[TWC workcell](../user-guide/viewer.md#industrial-workcells)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/twc_workcell_positioner_viewer.py)
+
+    An industrial workcell: a robot on a 12 m rail, beside a positioner.
+
+    `tesseract_twc_workcell_positioner_viewer`
+
+-   [![ABB IRB2400 demo, opening frame](../demos/posters/abb_irb2400_viewer.png)](planning.md#visualization)
+
+    **[ABB IRB2400](planning.md#visualization)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/abb_irb2400_viewer.py)
+
+    Plans a move on the ABB IRB2400 and draws its TCP path.
+
+    `tesseract_abb_irb2400_viewer`
+
+-   [![Scene graph demo, opening frame](../demos/posters/scene_graph_example.png)](basic.md#scene-graph-example)
+
+    **[Scene graph](basic.md#scene-graph-example)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/scene_graph_example.py)
+
+    A robot built from a scene graph.
+
+    `tesseract_scene_graph_example`
+
+-   [![Geometry showcase demo, opening frame](../demos/posters/geometry_showcase_example.png)](basic.md#geometry-showcase)
+
+    **[Geometry showcase](basic.md#geometry-showcase)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/geometry_showcase_example.py)
+
+    Every geometry type the environment holds: box, sphere, cylinder, mesh and more.
+
+    `tesseract_geometry_showcase_example`
+
+-   [![Shapes demo, opening frame](../demos/posters/shapes_viewer.png)](geometry.md#shapes)
+
+    **[Shapes](geometry.md#shapes)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/shapes_viewer.py)
+
+    Primitive shapes in the viewer.
+
+    `tesseract_shapes_viewer`
+
+-   [![Material mesh demo, opening frame](../demos/posters/tesseract_material_mesh_viewer.png)](geometry.md#material-mesh)
+
+    **[Material mesh](geometry.md#material-mesh)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_material_mesh_viewer.py)
+
+    A mesh with materials and textures.
+
+    `tesseract_material_mesh_viewer`
+
+</div>
+
+## Every example
+
+The console script is the module name with a `tesseract_` prefix (kept when the module already
+has it). The page column links the walkthrough.
+
+| Module | Console script | Page | What it shows |
+| --- | --- | --- | --- |
+| [`basic_cartesian_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/basic_cartesian_example.py) | `tesseract_basic_cartesian_example` | [Planning](planning.md) | Cartesian path with TrajOpt |
+| [`glass_upright_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/glass_upright_example.py) | `tesseract_glass_upright_example` | [Planning](planning.md) | Linear move with an orientation constraint |
+| [`pick_and_place_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pick_and_place_example.py) | `tesseract_pick_and_place_example` | [Planning](planning.md) | Pick, attach, place |
+| [`raster_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/raster_example.py) | `tesseract_raster_example` | [Planning](planning.md) | Raster toolpath with freespace transitions |
+| [`car_seat_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/car_seat_example.py) | `tesseract_car_seat_example` | [Planning](planning.md) | Multi-step program on a rail-mounted robot |
+| [`chain_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/chain_example.py) | `tesseract_chain_example` | [Planning](planning.md) | Descartes raster refined with TrajOpt |
+| [`puzzle_piece_auxillary_axes_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/puzzle_piece_auxillary_axes_example.py) | `tesseract_puzzle_piece_auxillary_axes_example` | [Planning](planning.md) | 9-DOF Cartesian toolpath: a 7-DOF arm and a 2-DOF positioner |
+| [`abb_irb2400_viewer`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/abb_irb2400_viewer.py) | `tesseract_abb_irb2400_viewer` | [Planning](planning.md) | A planned move and its TCP path in the viewer |
+| [`pythonic_api_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pythonic_api_example.py) | `tesseract_pythonic_api_example` | [Low-level examples](#low-level-examples) | The low-level examples' steps through `tesseract_robotics.planning` |
+| [`freespace_ompl_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_ompl_example.py) | `tesseract_freespace_ompl_example` | [OMPL](ompl.md) | OMPL freespace motion |
+| [`freespace_hybrid_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_hybrid_example.py) | `tesseract_freespace_hybrid_example` | [OMPL](ompl.md) | OMPL, then TrajOpt |
+| [`freespace_clearance_objective_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/freespace_clearance_objective_example.py) | `tesseract_freespace_clearance_objective_example` | [OMPL](ompl.md) | OMPL objective written in Python; a cost threshold ends the optimize loop |
+| [`online_planning_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_example.py) | `tesseract_online_planning_example` | [Online planning](online-planning.md) | Task composer replanning around a moving obstacle |
+| [`online_planning_sqp_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) | `tesseract_online_planning_sqp_example` | [Online planning](online-planning.md) | Low-level SQP replanning, warm-started each tick |
+| [`python_constraints_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/python_constraints_example.py) | `tesseract_python_constraints_example` | [Python constraints](python-constraints.md) | Seven constraints written in Python, in a live loop, scripted or driven by sliders |
+| [`tesseract_kinematics_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_kinematics_example.py) | `tesseract_kinematics_example` | [Basics](basic.md) | FK and IK with a kinematic group |
+| [`tesseract_collision_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_collision_example.py) | `tesseract_collision_example` | [Basics](basic.md) | Discrete collision check |
+| [`scene_graph_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/scene_graph_example.py) | `tesseract_scene_graph_example` | [Basics](basic.md) | Build and query a scene graph |
+| [`geometry_showcase_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/geometry_showcase_example.py) | `tesseract_geometry_showcase_example` | [Basics](basic.md) | Every geometry type |
+| [`pointcloud_octree_collision_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pointcloud_octree_collision_example.py) | `tesseract_pointcloud_octree_collision_example` | [Basics](basic.md) | Point cloud to octree to collision-aware TrajOpt |
+| [`kinematics_plugins_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/kinematics_plugins_example.py) | `tesseract_kinematics_plugins_example` | [Kinematics](kinematics.md) | Kinematics plugin factory: solvers, configs |
+| [`kinematics_analysis_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/kinematics_analysis_example.py) | `tesseract_kinematics_analysis_example` | [Kinematics](kinematics.md) | Jacobians, twists, manipulability, limits |
+| [`state_solver_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/state_solver_example.py) | `tesseract_state_solver_example` | [Kinematics](kinematics.md) | State solver: floating joints, Jacobians |
+| [`contact_managers_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/contact_managers_example.py) | `tesseract_contact_managers_example` | [Collision](collision.md) | Contact managers, margins, ACM, cast manager |
+| [`trajectory_collision_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/trajectory_collision_example.py) | `tesseract_trajectory_collision_example` | [Collision](collision.md) | Trajectory checks, LVS, rebuilt from their parts |
+| [`convex_decomposition_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/convex_decomposition_example.py) | `tesseract_convex_decomposition_example` | [Collision](collision.md) | Convex decomposition options and fill modes |
+| [`sdf_collision_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/sdf_collision_example.py) | `tesseract_sdf_collision_example` | [Collision](collision.md) | A probe swept through a signed distance field |
+| [`environment_commands_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/environment_commands_example.py) | `tesseract_environment_commands_example` | [Environment](environment.md) | Commands, history, replay, calibration |
+| [`environment_state_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/environment_state_example.py) | `tesseract_environment_state_example` | [Environment](environment.md) | State, floating joints, TCPs, manipulator info |
+| [`plugin_configuration_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/plugin_configuration_example.py) | `tesseract_plugin_configuration_example` | [Environment](environment.md) | Contact manager and task composer plugin configuration |
+| [`mesh_roundtrip_example`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/mesh_roundtrip_example.py) | `tesseract_mesh_roundtrip_example` | [Geometry](geometry.md) | Meshes from bytes, materials, round trips |
+| [`shapes_viewer`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/shapes_viewer.py) | `tesseract_shapes_viewer` | [Geometry](geometry.md) | Primitive shapes in the viewer |
+| [`tesseract_material_mesh_viewer`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_material_mesh_viewer.py) | `tesseract_material_mesh_viewer` | [Geometry](geometry.md) | Materials and textures |
+| [`twc_workcell_positioner_viewer`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/twc_workcell_positioner_viewer.py) | `tesseract_twc_workcell_positioner_viewer` | [Viewer](../user-guide/viewer.md) | Industrial workcell with a positioner (needs `git submodule update --init`) |
+
+## Low-level examples
 
 `tesseract_robotics.examples.lowlevel` ports the C++ `tesseract_planning/examples` with
 the binding types alone, never `tesseract_robotics.planning`, and with the C++ parameters
@@ -121,37 +266,3 @@ python -m tesseract_robotics.examples.lowlevel.freespace_ompl_c_api_example
 
 `pythonic_api_example.py` (console module `tesseract_robotics.examples.pythonic_api_example`)
 shows the same steps through `tesseract_robotics.planning`.
-
-## Prerequisites
-
-Most examples require:
-
-```python
-# tesseract_robotics installed
-import tesseract_robotics
-
-# For visualization
-from tesseract_robotics.viewer import TesseractViewer
-```
-
-Install the package:
-
-```bash
-pip install tesseract-robotics-nanobind
-```
-
-## Viewer Usage
-
-Most examples include visualization:
-
-```python
-from tesseract_robotics.viewer import TesseractViewer
-
-with TesseractViewer() as viewer:  # serving from here until the block ends
-    viewer.update_environment(robot.env)
-    viewer.update_trajectory(result.raw_results)
-    print(f"Viewer at {viewer.url}")
-    input("Press Enter to exit...")
-```
-
-Open the printed URL in your browser; see the [viewer guide](../user-guide/viewer.md).

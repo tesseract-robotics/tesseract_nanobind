@@ -1,5 +1,13 @@
 # tesseract_robotics.environment
 
+<!-- snippet: ambient
+from tesseract_robotics.common import Isometry3d
+
+base_pose = Isometry3d.Identity()
+start_joints = np.zeros(6)
+end_joints = np.full(6, 0.1)
+-->
+
 Environment management and scene modification commands.
 
 ## Environment
@@ -9,22 +17,29 @@ Central class containing robot model, collision, and kinematics.
 ```python
 from pathlib import Path
 
+from tesseract_robotics import get_tesseract_support_path
 from tesseract_robotics.environment import Environment
+
+urdf_path = get_tesseract_support_path() / "urdf" / "abb_irb2400.urdf"
+srdf_path = get_tesseract_support_path() / "urdf" / "abb_irb2400.srdf"
 
 # Create empty environment
 env = Environment()
 
 # From URDF + SRDF files (+ ResourceLocator for mesh resolution)
-env.init(Path(urdf_path), Path(srdf_path), locator)
+assert env.init(Path(urdf_path), Path(srdf_path), locator)
 
 # Or from raw XML strings
-env.init(urdf_xml, srdf_xml, locator)
+env = Environment()
+urdf_xml, srdf_xml = urdf_path.read_text(), srdf_path.read_text()
+assert env.init(urdf_xml, srdf_xml, locator)
 
 # Or use the high-level Robot helper (takes BOTH URDF and SRDF)
 from tesseract_robotics.planning import Robot
 robot = Robot.from_urdf(
-    "package://my_robot/urdf/robot.urdf",
-    "package://my_robot/urdf/robot.srdf",
+    "package://tesseract/support/urdf/abb_irb2400.urdf",
+    "package://tesseract/support/urdf/abb_irb2400.srdf",
+    locator,
 )
 env = robot.env
 ```
@@ -65,7 +80,22 @@ env.setState({"joint_1": 0.5, "joint_2": -0.3})
 env.setState(["joint_1", "joint_2"], np.array([0.5, -0.3]))
 
 # Floating joints: every getState / setState form takes a {joint_name: Isometry3d} dict,
-# either as the trailing floating_joints argument or on its own
+# either as the trailing floating_joints argument or on its own. The IRB2400 has none, so
+# this adds a free-floating box with one, named "base_joint".
+from tesseract_robotics.environment import AddLinkCommand
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
+
+floater = Link("floater")
+box = Collision()
+box.geometry = Box(0.1, 0.1, 0.1)
+floater.addCollision(box)
+floating_joint = Joint("base_joint")
+floating_joint.type = JointType.FLOATING
+floating_joint.parent_link_id = "base_link"
+floating_joint.child_link_id = "floater"
+assert env.applyCommand(AddLinkCommand(floater, floating_joint))
+
 env.setState({"base_joint": base_pose})
 env.setState({"joint_1": 0.5}, {"base_joint": base_pose})
 moved = env.getState(["joint_1"], np.array([0.5]), {"base_joint": base_pose})
@@ -95,9 +125,9 @@ name that is not an active joint.
     `{}` converts to both a joint-value dict and a floating-joint dict, so `getState({})` and
     `setState({})` take the joint-value form. Both forms do the same thing for an empty dict.
 
-`getStateByMap`, `getStateByNamesAndValues`, `setStateByNamesAndValues` and
-`getCurrentJointValuesByNames` are the older Python-only names for the same overloads. They
-still work, with the same validation.
+The Python-only names `getStateByMap`, `getStateByNamesAndValues`, `setStateByNamesAndValues`
+and `getCurrentJointValuesByNames` are removed: call the overloads of `getState`, `setState` and
+`getCurrentJointValues`.
 
 ### Per-link and per-joint lookups
 
@@ -224,6 +254,7 @@ graph alive after the environment is gone.
 ```python
 from tesseract_robotics.common import (
     ACMContactAllowedValidator,
+    AllowedCollisionMatrix,
     CombinedContactAllowedValidator,
     CombinedContactAllowedValidatorType,
 )
@@ -231,10 +262,11 @@ from tesseract_robotics.environment import EnvironmentContactAllowedValidator
 
 validator = env.getDiscreteContactManager().getContactAllowedValidator()
 assert isinstance(validator, EnvironmentContactAllowedValidator)
-validator("link_1", "link_2")  # True: the SRDF disables this pair
+validator(("base_link", "link_1"))  # True: the SRDF disables this pair
 
 # Build one for any scene graph, e.g. to combine it with an extra ACM
 own = EnvironmentContactAllowedValidator(env.getSceneGraph())
+extra_acm = AllowedCollisionMatrix()
 extra = ACMContactAllowedValidator(extra_acm)
 combined = CombinedContactAllowedValidator([own, extra], CombinedContactAllowedValidatorType.OR)
 env.getDiscreteContactManager().setContactAllowedValidator(combined)
@@ -311,18 +343,21 @@ Add a new link to the scene.
 
 ```python
 from tesseract_robotics.environment import AddLinkCommand
-from tesseract_robotics.scene_graph import Link, Joint, JointType
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import Collision, Joint, JointType, Link
 
 link = Link("obstacle")
-# ... configure link with visual/collision
+collision = Collision()
+collision.geometry = Box(0.1, 0.1, 0.1)
+link.addCollision(collision)
 
 joint = Joint("obstacle_joint")
 joint.type = JointType.FIXED
-joint.parent_link_id = "world"
+joint.parent_link_id = "base_link"
 joint.child_link_id = "obstacle"
 
 cmd = AddLinkCommand(link, joint)
-env.applyCommand(cmd)
+assert env.applyCommand(cmd)
 ```
 
 ### RemoveLinkCommand
@@ -331,21 +366,25 @@ env.applyCommand(cmd)
 from tesseract_robotics.environment import RemoveLinkCommand
 
 cmd = RemoveLinkCommand("obstacle")
-env.applyCommand(cmd)
+assert env.applyCommand(cmd)
 ```
 
 ### MoveLinkCommand
 
-Move a link to a new parent.
+Move a link to a new parent: the joint names the link as its child and the new parent.
 
 ```python
 from tesseract_robotics.environment import MoveLinkCommand
 
-joint = Joint("new_joint")
-# ... configure joint
+assert env.applyCommand(AddLinkCommand(link, joint))  # the obstacle is back, under base_link
 
-cmd = MoveLinkCommand(joint)
-env.applyCommand(cmd)
+moved = Joint("obstacle_joint")
+moved.type = JointType.FIXED
+moved.parent_link_id = "tool0"
+moved.child_link_id = "obstacle"
+
+cmd = MoveLinkCommand(moved)
+assert env.applyCommand(cmd)
 ```
 
 ### ChangeJointOriginCommand
@@ -391,8 +430,8 @@ Enable/disable collision for a link.
 ```python
 from tesseract_robotics.environment import ChangeLinkCollisionEnabledCommand
 
-cmd = ChangeLinkCollisionEnabledCommand("gripper", False)  # disable
-env.applyCommand(cmd)
+cmd = ChangeLinkCollisionEnabledCommand("obstacle", False)  # disable
+assert env.applyCommand(cmd)
 ```
 
 ### ModifyAllowedCollisionsCommand
@@ -425,7 +464,7 @@ Update collision margins.
 ```python
 from tesseract_robotics.environment import ChangeCollisionMarginsCommand
 
-# Simplified 0.34 constructor — just pass the new default margin
+# The constructor takes the new default margin (m)
 cmd = ChangeCollisionMarginsCommand(0.05)
 env.applyCommand(cmd)
 
@@ -541,7 +580,7 @@ Subscribe to environment changes. A callback receives each event as its own clas
 directly; `event.type` says which one it is.
 
 ```python
-from tesseract_robotics.environment import EventCallbackFn, Events
+from tesseract_robotics.environment import Events
 
 def on_event(event):
     if event.type == Events.COMMAND_APPLIED:
@@ -550,13 +589,15 @@ def on_event(event):
     elif event.type == Events.SCENE_STATE_CHANGED:
         print(f"State changed: {len(event.state.joints)} joints")
 
-env.addEventCallback(1, EventCallbackFn(on_event))  # 1: any int key, for removeEventCallback(1)
+key = env.addEventCallback(on_event)  # the key for removeEventCallback
+env.setState(["joint_1"], np.array([0.1]))
+env.removeEventCallback(key)
 ```
 
-!!! warning "An event is valid only inside its callback"
-    The event refers to C++ data that is gone once the callback returns. Copy what you
-    need (`event.revision`, `dict(event.state.joints)`); never store the event itself.
-    `event.commands` is already a copy, so the list stays valid.
+!!! note "An event is the callback's own copy"
+    Each event holds its own copy of the command history or scene state, so a callback may
+    keep it after it returns. A callback must not change the environment that fired it: the
+    environment holds its lock while the callback runs.
 
 `cast_CommandAppliedEvent(event)` and `cast_SceneStateChangedEvent(event)` remain for
 existing code. They return the same object they are given, and raise `EventTypeError`
@@ -565,16 +606,18 @@ existing code. They return the same object they are given, and raise `EventTypeE
 ```python
 from tesseract_robotics.environment import EventTypeError, cast_CommandAppliedEvent
 
-try:
-    cast_CommandAppliedEvent(state_event)
-except EventTypeError as e:
-    print(e)  # cast_CommandAppliedEvent: event type is Events.SCENE_STATE_CHANGED, expected Events.COMMAND_APPLIED
+def check(event):
+    try:
+        cast_CommandAppliedEvent(event)
+    except EventTypeError as e:
+        print(e)  # cast_CommandAppliedEvent: event type is Events.SCENE_STATE_CHANGED, expected Events.COMMAND_APPLIED
+
+
+key = env.addEventCallback(check)
+env.setState(["joint_1"], np.array([0.2]))  # a SCENE_STATE_CHANGED event
+env.removeEventCallback(key)
 ```
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.environment
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

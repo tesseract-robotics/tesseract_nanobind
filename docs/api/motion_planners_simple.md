@@ -1,5 +1,20 @@
 # tesseract_robotics.motion_planners_simple
 
+<!-- snippet: ambient
+from tesseract_robotics.command_language import ProfileDictionary
+from tests.docs.doc_assets import joint_program
+
+program = joint_program(robot)
+profiles = ProfileDictionary()
+profile_dict = profiles
+from tesseract_robotics.common import Isometry3d
+
+target_pose = Isometry3d.Identity()
+q_goal = np.full(6, 0.2)
+_moves = [i.asMoveInstruction() for i in program]
+start, goal = _moves[0], _moves[1]
+-->
+
 Simple joint-space interpolation planner.
 
 ## Overview
@@ -43,8 +58,7 @@ from tesseract_robotics.motion_planners_simple import generateInterpolatedProgra
 interpolated = generateInterpolatedProgram(
     program,
     env,
-    profiles,
-    max_step=0.1  # max joint step between waypoints
+    state_longest_valid_segment_length=0.1,  # max joint step between waypoints (rad)
 )
 ```
 
@@ -57,7 +71,7 @@ import numpy as np
 from tesseract_robotics.common import Isometry3d
 from tesseract_robotics.motion_planners_simple import interpolate
 
-poses = interpolate(Isometry3d.Identity(), target_pose, 10)   # VectorIsometry3d, 11 poses
+poses = interpolate(Isometry3d.Identity(), target_pose, 10)   # list[Isometry3d], 11 poses
 states = interpolate(np.zeros(6), q_goal, 10)                  # 6 x 11 array, one state per column
 ```
 
@@ -80,7 +94,7 @@ from tesseract_robotics.command_language import InstructionPoly
 from tesseract_robotics.motion_planners_simple import SimplePlannerLVSMoveProfile
 
 profile = SimplePlannerLVSMoveProfile()
-moves = profile.generate(start, start, goal, InstructionPoly(), env, manip_info)
+moves = profile.generate(start, start, goal, InstructionPoly(), env, program.getManipulatorInfo())
 ```
 
 `from_yaml` builds a profile from the same YAML keys the C++ profile reads:
@@ -126,7 +140,7 @@ if response.successful:
 
 - **No collision checking**: Path may collide with obstacles
 - **Joint-space only**: Cartesian interpolation not supported
-- **No optimization**: Just linear interpolation
+- **No optimization**: linear interpolation only
 
 ## Tips
 
@@ -134,10 +148,6 @@ if response.successful:
 2. **Verify collision** after planning with simple planner
 3. **Good for short motions** where collision is unlikely
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.motion_planners_simple._motion_planners_simple
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

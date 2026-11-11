@@ -1,10 +1,29 @@
-# Developer Guide
+# Developer guide
+
+For contributors: building the package, changing a binding, releasing wheels. A user of the
+package needs none of this; start at [Getting started](../getting-started/installation.md).
+This page covers setup, the pixi tasks, tests and the repository layout; the pages below go deeper.
+
+| Page | For | Covers |
+| --- | --- | --- |
+| [The native stack build](native-stack.md) | anyone building from source | the one script that builds the C++ stack, for CI and development |
+| [How the binaries are built](binaries.md) | release engineers | every binary from upstream source to the PyPI wheel |
+| [Wheel build caching](wheel-caching.md) | CI maintainers | the cache layers of the wheel workflow |
+| [Building against upstream main](upstream-main.md) | binding authors tracking upstream | the `upstream-main` branch and the API changes it absorbs |
+| [Linux](linux-wheels.md), [macOS](macos-wheels.md), [Windows](windows-wheels.md) wheels | release engineers | platform traps met while shipping wheels |
+| [Binding conventions](binding-conventions.md) | binding authors | names, errors, lifetimes and the GIL, rule by rule |
+| [Binding API audit](binding-api-audit.md) | binding authors | generated diff of each binding against its C++ API |
+| [Binding audit coverage](binding-audit-coverage.md) | binding authors | which modules the audit covers and who owns each open row |
+| [Threading and the GIL](threading.md) | binding authors, users of threads | which calls release the GIL and why |
+| [TrajOpt-Ifopt constraints](trajopt_ifopt_missing_constraints.md) | binding authors | what the constraint bindings do beyond a one-to-one wrap |
+| [TrajOpt collision memory](trajopt-collision-memory.md) | anyone planning long trajectories | the per-waypoint contact manager copies and their memory cost |
+| [SWIG to nanobind](migration.md) | users of the SWIG `tesseract_python` | what changed from the SWIG bindings |
 
 ## Pixi Workspace
 
-This project uses [pixi](https://pixi.sh) exclusively for package management. Pixi manages all C++ libraries, Python packages, build tools, and platform-specific dependencies through a single lockfile (`pixi.lock`). No pip, conda, poetry, or venv.
+This project uses [pixi](https://pixi.sh) exclusively for package management. Pixi manages the Python packages, build tools and platform-specific dependencies through a single lockfile (`pixi.lock`); the C++ stack comes from `scripts/native_stack.py`. No pip, conda, poetry, or venv.
 
-The tesseract C++ libraries are not built here: they are prebuilt conda packages from the `tesseract-robotics` channel. [How the binaries are built](binaries.md) traces every binary from the upstream source to the PyPI wheel.
+The tesseract C++ stack is built by `scripts/native_stack.py` (`pixi run native-build`), the script the wheel workflow runs, so a development build and a wheel compile the same sources. [The native stack](native-stack.md) describes it; [How the binaries are built](binaries.md) traces every binary from the upstream source to the PyPI wheel.
 
 ### First-Time Setup
 
@@ -18,7 +37,7 @@ cd tesseract_nanobind
 pixi run build
 ```
 
-`pixi run build` resolves the environment, which pulls the prebuilt C++ libraries, and compiles only the nanobind extensions.
+`pixi run build` resolves the environment, builds the C++ stack into `.native/<triplet>/` (skipped when its inputs are unchanged), then compiles the nanobind extensions against it.
 
 ### Available Tasks
 
@@ -28,8 +47,9 @@ pixi task list
 
 | Task | Description | What it does |
 |------|-------------|--------------|
+| `native-build` | Build the C++ stack | `scripts/native_stack.py all` into `.native/<triplet>/`; no-op when unchanged |
 | `build` | Build bindings | alias for `install` |
-| `install` | Install bindings | editable `pip install -e . --no-build-isolation` against the conda tesseract libs |
+| `install` | Install bindings | `native-build`, then editable `pip install -e . --no-build-isolation` against `.native/<triplet>/ws/install` |
 | `test` | Run tests | pytest with xdist parallel, excluding benchmarks (depends on `install`) |
 | `test-benchmark` | Run benchmarks | benchmark tests, serial |
 | `typecheck` | Type check | pyright on `src/tesseract_robotics/` |
@@ -54,10 +74,32 @@ pixi run test                              # full suite, parallel
 pixi shell && pytest tests -x --testmon    # incremental (only changed)
 ```
 
+### Documentation snippets
+
+`tests/docs/test_getting_started_snippets.py` runs every `python` fence of the README, the docs
+home and the getting-started, concepts, user-guide, API and examples pages, one page per
+subprocess, the blocks of a page in order. A broken snippet fails CI.
+
+- The getting-started and concepts pages, README and home run bare, as a reader pasting them
+  would. The home page shows the README's Quick Start block; `test_readme_structure.py` keeps the
+  two identical, and the README's copy is the one that runs.
+- A reference page starts with `np` and the `locator`, `robot` and `env` of the IRB2400. Names a
+  page shows in isolation (`program`, `problem`, `factory`) come from an invisible
+  `<!-- snippet: ambient ... -->` comment at the top of the page; helpers that build them live in
+  `tests/docs/doc_assets.py`, which also writes the small mesh, texture and VDB files the
+  snippets read, into a scratch directory.
+- A block that only includes a shipped example (`--8<--`) is the example's source, which the example
+  tests run.
+- `<!-- snippet: skip (reason) -->` on the line above a fence skips it; the reason is
+  required. Use it for a browser viewer, a robot controller or a path only the reader has.
+
+`tests/docs/test_examples_gallery.py` checks that the examples page lists every example console
+script and shows a card for every published demo recording.
+
 ### Daily Workflow
 
 ```bash
-# First time setup (installs the conda C++ libs, compiles the bindings)
+# First time setup (builds the native C++ stack, compiles the bindings)
 pixi run build
 
 # Run tests
@@ -143,24 +185,18 @@ pixi install
 pixi list
 ```
 
-The C++ stack is not pinned here: `dependencies.rosinstall` and `scripts/native_stack.toml` declare it (see [The native stack build](native-stack.md)).
+The C++ stack is not a pixi dependency: it is pinned by the commits in `dependencies.rosinstall` and the vcpkg revision and packages in `scripts/native_stack.toml`.
 
-### CONDA_PREFIX and Worktrees
+### Worktrees
 
-When working in a git worktree, the `CONDA_PREFIX` env var may point to the main repo's `.pixi/envs/default` instead of the worktree's. This causes build failures (e.g. missing `cereal`). Override when building manually:
-
-```bash
-CONDA_PREFIX=$(pwd)/.pixi/envs/default pip install -e . --no-build-isolation
-```
-
-Using `pixi run` handles this automatically.
+Each git worktree needs its own `.native/<triplet>/` (a full native build) and its own pixi environment. Run builds through `pixi run`, which uses the worktree's environment; a raw `pip install` from a shell whose `CONDA_PREFIX` points at another checkout's environment builds against the wrong toolchain.
 
 ### Building Portable Wheels
 
 Editable installs bake absolute paths, so they aren't portable. The PyPI wheels are
 built without conda by `.github/workflows/wheels.yml`: the tesseract C++ stack is built
-from source with colcon against vcpkg dependencies, and auditwheel, delvewheel or
-delocate bundles it. See [binaries](binaries.md#building-a-wheel).
+from source with `scripts/native_stack.py` (colcon against vcpkg dependencies), and auditwheel, delvewheel or
+a batched Mach-O repair bundles it. See [binaries](binaries.md#building-a-wheel).
 
 ---
 

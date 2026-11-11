@@ -1,5 +1,24 @@
 # tesseract_robotics.geometry
 
+<!-- snippet: ambient
+from tests.docs.doc_assets import enter_scratch_dir, write_collada, write_png, write_stl
+from pathlib import Path
+from tesseract_robotics.geometry import createDiscreteSignedDistanceField, writeSignedDistanceFieldVDB
+
+scratch = enter_scratch_dir()
+write_stl(Path("model.stl"))
+write_collada(Path("textured.dae"))
+write_png(Path("texture.png"))
+
+dims = np.array([17, 17, 17], dtype=np.int32)
+lo, hi = np.full(3, -1.0), np.full(3, 1.0)
+sphere = lambda p: float(np.linalg.norm(p)) - 0.5
+Path("part.vdb").write_bytes(
+    writeSignedDistanceFieldVDB(createDiscreteSignedDistanceField(sphere, lo, hi, dims))
+)
+p = np.array([0.1, 0.2, 0.3])
+-->
+
 Geometric primitives for collision and visualization.
 
 ## Primitives
@@ -144,10 +163,11 @@ convex.setCreationMethod(ConvexMesh.CreationMethod.MESH)
 Multiple mesh parts as single geometry.
 
 ```python
-from tesseract_robotics.geometry import CompoundMesh
+from tesseract_robotics.geometry import CompoundMesh, createMeshFromPath
 
-# Combine multiple meshes
-compound = CompoundMesh(meshes)
+# Combine multiple meshes (a compound needs more than one)
+parts = createMeshFromPath("model.stl") + createMeshFromPath("model.stl")
+compound = CompoundMesh(parts)
 ```
 
 ## SignedDistanceField
@@ -269,7 +289,10 @@ field.discretize()      # materialize the grid up front
     `getDistance()` still calls the sampler, taking the GIL, every time. For pure data, build the
     field with `createDiscreteSignedDistanceField`:
 
+    <!-- snippet: skip (needs a robot whose SRDF configures no continuous contact manager: the IRB2400's does, and a signed distance field has no cast support; see the collision guide) -->
     ```python
+    from tesseract_robotics.planning import create_obstacle
+
     field = createDiscreteSignedDistanceField(sphere, lo, hi, dims)
     create_obstacle(robot, name="field", geometry=field)
     ```
@@ -483,10 +506,6 @@ data = Path("model.stl").read_bytes()
 meshes = createMeshFromBytes("model.stl", data)
 ```
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.geometry
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

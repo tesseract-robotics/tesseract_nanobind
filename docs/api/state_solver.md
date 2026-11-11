@@ -1,5 +1,12 @@
 # tesseract_robotics.state_solver
 
+<!-- snippet: ambient
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.state_solver import OFKTStateSolver
+
+scene_graph = env.getSceneGraph()
+-->
+
 Forward kinematics of a whole scene graph: joint values in, `SceneState` (joint values and
 every link and joint transform) out. `OFKTStateSolver` is the mutable solver an `Environment`
 uses; `KDLStateSolver` is built on a KDL tree. Both take the `SceneGraph` in their constructor.
@@ -16,15 +23,16 @@ solver.setState({names[0]: 0.3})                # by name
 solver.setState(names[:1], np.array([0.3]))     # names and values
 state = solver.getState()                       # current SceneState
 probe = solver.getState({names[0]: 0.5})        # a state for other values; the solver is unchanged
-jac = solver.getJacobian({names[0]: 0.5}, "tool0")
+jac = solver.getJacobian(names, np.full(len(names), 0.5), "tool0")  # values in getActiveJointIds() order
 transforms = solver.getLinkTransforms(names, np.zeros(len(names)))  # dict[str, Isometry3d]
 ```
 
 ## Overloads and validation
 
-`setState`, `getState` and `getJacobian` take the joint values as a vector over the active
+`setState` and `getState` take the joint values as a vector over the active
 joints, a `dict` by name, or names plus values, each with an optional
-`floating_joint_values` (`dict[str, Isometry3d]`). `setState(floating_joint_values)` and
+`floating_joint_values` (`dict[str, Isometry3d]`); `getJacobian` takes names plus values, or a vector
+over the active joints, with the link. It has no `dict` form. `setState(floating_joint_values)` and
 `getState(floating_joint_values)` set only floating joints. A `dict` of floats selects the
 joint-value form and a `dict` of `Isometry3d` the floating form; an empty `{}` is the
 joint-value form.
@@ -35,9 +43,6 @@ values of different lengths, or a vector whose length is not the number of activ
 unknown link in `getJacobian` raises `KeyError`. Upstream `OFKTStateSolver` dereferences a null
 node for an unknown joint name (the GH #43 crash), so this validation is what keeps the process
 alive.
-
-`setStateByMap` and `setStateByNamesAndValues` are Python-only aliases of `setState`, bound to
-the same functions, so they validate the same way.
 
 !!! note
     `KDLStateSolver` ignores `floating_joint_values`, and `setState(floating_joint_values)` /
@@ -50,6 +55,20 @@ are `dict[str, Isometry3d]`. Each transform map is a copy on read and is assigne
 so `state.link_transforms["tool0"] = tf` changes nothing.
 
 ```python
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import Joint, JointType, Link, SceneGraph
+
+graph = SceneGraph()
+graph.addLink(Link("base_link"))
+graph.addLink(Link("floater"))
+floating = Joint("joint_f")
+floating.type = JointType.FLOATING
+floating.parent_link_id = "base_link"
+floating.child_link_id = "floater"
+graph.addJoint(floating)
+solver = OFKTStateSolver(graph)
+names = solver.getActiveJointIds()
+
 solver.setState({"joint_f": Isometry3d.Identity()})
 state = solver.getState()
 state.floating_joints                         # {"joint_f": Isometry3d}
@@ -69,9 +88,6 @@ with `joint`, whose parent is a link of the solver and whose child is the insert
 root (with `prefix` already applied). It returns `False`, as upstream, when a link is missing
 or the joint name exists.
 
+## Reference
+
 ::: tesseract_robotics.state_solver
-    options:
-      show_root_heading: true
-      show_source: false
-      members_order: source
-      heading_level: 3

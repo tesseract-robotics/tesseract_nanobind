@@ -51,3 +51,16 @@ def test_development_detail_lives_in_the_docs():
     development = _section("Development")
     assert len(development) <= MAX_DEVELOPMENT_LINES, development
     assert f"{SITE}developer/" in "\n".join(development)
+
+
+def _first_python_block(text: str) -> str:
+    match = re.search(r"^```python\n(?P<code>.*?)^```$", text, flags=re.MULTILINE | re.DOTALL)
+    assert match is not None
+    return match["code"]
+
+
+def test_docs_home_shows_the_readme_quick_start_verbatim():
+    """The docs home skips its copy of the block; this keeps it the block the README runs."""
+    home = (ROOT / "docs" / "index.md").read_text("utf-8")
+    quick_start = README.split("\n## Quick Start\n", 1)[1]
+    assert _first_python_block(home) == _first_python_block(quick_start)

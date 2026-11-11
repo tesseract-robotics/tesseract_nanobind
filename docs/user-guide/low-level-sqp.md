@@ -1,6 +1,24 @@
-# Low-Level SQP API
+# Low-level SQP
 
-Real-time trajectory optimization via Sequential Quadratic Programming. Use this when you need sub-10ms optimizer steps for online replanning — lower-level than `TaskComposer`, higher-control than `plan_cartesian`.
+<!-- snippet: ambient
+from tests.docs.doc_assets import sqp_scene
+
+globals().update(sqp_scene(robot))
+
+from tests.docs.doc_assets import joint_program
+
+_program = joint_program(robot)
+manip_info = _program.getManipulatorInfo()
+moves = [instruction.asMoveInstruction() for instruction in _program]
+n_joints = len(joint_names)
+-->
+
+The low-level SQP API builds a trajectory optimization problem term by term (variables,
+constraints, costs) and solves it with a trust-region SQP solver, one step at a time if you
+want. Use it when you replan repeatedly from the previous solution, such as around a moving
+obstacle, or when a constraint has to be written in Python. It sits below the task composer: no
+profiles, no pipeline, every term explicit. The modules are `trajopt_ifopt` (variables and
+terms) and `trajopt_sqp` (problem and solver).
 
 ## When to reach for this
 
@@ -8,10 +26,10 @@ Real-time trajectory optimization via Sequential Quadratic Programming. Use this
 |---|---|
 | Offline, one-shot plan | `plan_freespace` / `plan_cartesian` |
 | Multi-stage pipeline (sampling → optimize → time-param) | `TaskComposer` |
-| **Online replanning with moving obstacle, ~100 Hz** | **Low-level SQP (this page)** |
+| **Online replanning with a moving obstacle** | **Low-level SQP (this page)** |
 
-Measured step rates for a reference 8-DOF gantry problem are printed at runtime by
-[`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) — run it locally to see numbers on your machine.
+The reference 8-DOF gantry problem prints its replan timing at runtime; run
+[`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py) to see numbers on your machine. The SQP loop has no latency bound: a step's time depends on the problem and the collision mode, so measure before relying on a control rate.
 
 ## Modules
 
@@ -24,7 +42,7 @@ The standalone `tesseract_robotics.ifopt` module was **removed in 0.34**.
 All types merged into `tesseract_robotics.trajopt_ifopt`. See the
 [0.33 → 0.34 migration guide](../changes.md) for details.
 
-## Variable Hierarchy (0.34+)
+## Variable hierarchy (0.34+)
 
 The `JointPosition` class is gone. Variables now use a three-level hierarchy:
 
@@ -37,7 +55,7 @@ Build the full hierarchy with `createNodesVariables`:
 ```python
 from tesseract_robotics.trajopt_ifopt import Bounds, createNodesVariables
 
-bounds = Bounds(-3.14, 3.14)
+bounds = [Bounds(-3.14, 3.14)] * len(joint_names)  # one Bounds per joint
 nodes_variables = createNodesVariables(
     "trajectory", joint_names, initial_states, bounds,
 )
@@ -49,13 +67,13 @@ Get `Var` references for passing to constraints:
 vars_list = [node.getVar("joints") for node in nodes_variables.getNodes()]
 ```
 
-## Problem Setup
+## Problem setup
 
 ```python
 --8<-- "src/tesseract_robotics/examples/online_planning_sqp_example.py:setup"
 ```
 
-## Constraints and Costs
+## Constraints and costs
 
 The `build_optimization_problem` function builds the problem tesseract_planning's
 `online_planning_example.cpp` builds: a `TrajOptQPProblem` over the `NodesVariables`, the
@@ -171,6 +189,7 @@ bounds = [
     trajopt_ifopt.Bounds(0.0, 0.0),      # joint 0 pinned
     trajopt_ifopt.Bounds(-np.inf, 1.2),  # joint 1 at most 1.2 rad
     trajopt_ifopt.Bounds(-0.5, 0.5),     # joint 2 within a band
+    *[trajopt_ifopt.Bounds(-3.14, 3.14)] * 3,  # joints 3-5 within their limits
 ]
 constraint = trajopt_ifopt.JointPosConstraint(bounds, var, np.array([5.0]), "band")
 ```
@@ -178,7 +197,7 @@ constraint = trajopt_ifopt.JointPosConstraint(bounds, var, np.array([5.0]), "ban
 By default a range becomes two one-sided rows (`RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES`), because the QP problems accept only equality and one-sided rows; pass `KEEP_AS_IS` to keep it as one. A length-1 `coeffs` weights every row.
 
 
-## SQP Solver Loop
+## SQP solver loop
 
 The solver loop: initial global `solve`, then per-tick `setVariables` + `stepSQPSolver`
 for warm-started incremental optimization. `setBoxSize` resets the trust region each
@@ -321,6 +340,8 @@ class Progress(SQPCallback):
         return True
 
 
+from tesseract_robotics.motion_planners_trajopt_ifopt import TrajOptIfoptOSQPSolverProfile
+
 solver_profile = TrajOptIfoptOSQPSolverProfile()
 solver_profile.callbacks = [Progress()]  # assign the whole list; it is copied
 ```
@@ -337,7 +358,7 @@ solver_profile.callbacks = [Progress()]  # assign the whole list; it is copied
     solver dropped the `False` and kept stepping: there, bound a solve with
     `opt_params.max_iterations` or `opt_params.max_time`.
 
-## Python Subclassing
+## Python subclassing
 
 You can subclass `ConstraintSet` from Python to define custom constraints — the
 trampoline landed in 0.34.1.1 (see the

@@ -1,4 +1,4 @@
-# Collision Examples
+# Collision examples
 
 Collision checking below the high-level `Robot` API: contact-manager plugins,
 collision margins, contact validation, continuous checks and convex
@@ -17,7 +17,7 @@ tesseract_convex_decomposition_example
 pixi run python -m tesseract_robotics.examples.contact_managers_example
 ```
 
-## Contact Managers
+## Contact managers
 
 A port of upstream's `box_box_example.cpp`, run on every discrete backend, then
 the rest of the contact-manager API on the same scene.
@@ -54,7 +54,7 @@ The example itself: a unit box inside the 2 m hull, then moved to x = 1.6, a
 The backends agree on which pair collides, not on how deep: the analytic
 penetration is 1.3 m, which FCL reports. Upstream's own box-box unit test
 avoids `box_2m.ply` for Bullet for this reason (`collision_box_box_unit.hpp:58`).
-`BulletDiscreteSimpleManager` also reports `link_names` in the other order, so
+`BulletDiscreteSimpleManager` also reports `link_ids` in the other order, so
 the example compares the `ContactResultMap` keys, which are always ordered.
 
 !!! note "The margin 0.1 case is a boundary"
@@ -130,7 +130,7 @@ search lists:
 ### Allowed collision matrix
 
 Upstream's `TestGetAllowedCollisions` entries, built from a dict keyed by
-`makeOrderedLinkPair`. The result equals an ACM built entry by entry with
+ordered `LinkIdPair`s. The result equals an ACM built entry by entry with
 `addAllowedCollision`. `getAllowedCollisions` lists the links allowed to collide
 with any of `link1`, `link3`, `cause_duplicate`: 5 names, or 6 when duplicates
 are kept. `removeAllowedCollision("link1")` drops every entry involving `link1`:
@@ -205,7 +205,7 @@ and the `SetActive*ContactManagerCommand` pair switches the active ones:
 --8<-- "src/tesseract_robotics/examples/contact_managers_example.py:environment"
 ```
 
-## Trajectory Collision
+## Trajectory collision
 
 Collision checks of a single state, a swept segment and a whole trajectory, and
 a trajectory turned into a collision link.
@@ -301,7 +301,7 @@ over 2 states (`environment.cpp:1412–1471`):
 | `GLOBAL_PER_LINK_CONVEX_HULL` | 7 | one hull per active link |
 | `GLOBAL_CONVEX_HULL` | 1 | one hull for everything |
 
-## Convex Decomposition
+## Convex decomposition
 
 A port of upstream's `create_convex_decomposition` command-line tool: split a
 mesh into convex hulls with V-HACD and write each hull to a PLY file. The input
@@ -382,7 +382,7 @@ Each gives its own decomposition. The default-constructed
 The decomposition shipped with tesseract support, `car_seat/collision/seat_*.stl`,
 was made with other, unrecorded parameters. It is reported, not compared.
 
-## Signed Distance Field
+## Signed distance field
 
 --8<-- "docs/demos/players/sdf_collision_example.html"
 

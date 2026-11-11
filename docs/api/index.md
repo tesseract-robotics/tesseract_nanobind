@@ -1,6 +1,6 @@
 # API Reference
 
-Auto-generated API documentation from docstrings.
+Reference documentation generated from the docstrings and type stubs of each module.
 
 ## Modules Overview
 
@@ -32,6 +32,17 @@ Auto-generated API documentation from docstrings.
 | [`tesseract_robotics.motion_planners_descartes`](motion_planners_descartes.md) | Descartes planner |
 | [`tesseract_robotics.motion_planners_simple`](motion_planners_simple.md) | Simple interpolation |
 | [`tesseract_robotics.task_composer`](task_composer.md) | Task composition |
+| [`tesseract_robotics.task_composer_planning`](task_composer_planning.md) | Profiles of the planning nodes (contact check, fixes, upsampling) |
+| [`tesseract_robotics.time_parameterization`](time_parameterization.md) | TOTG, ISP, constant TCP speed, Ruckig |
+| [`tesseract_robotics.motion_planners_trajopt_ifopt`](motion_planners_trajopt_ifopt.md) | TrajOpt-Ifopt planner and profiles |
+
+### Tooling
+
+| Module | Description |
+|--------|-------------|
+| [`tesseract_robotics.viewer`](viewer.md) | Browser viewer for environments and trajectories |
+| [`tesseract_robotics.emitters`](emitters.md) | Controller program emitters (RAPID, KRL, JBI, LS, URScript) |
+| [`tesseract_robotics.build_identity`](build_identity.md) | Upstream sources a wheel was built from |
 
 ### Low-Level SQP Modules
 
@@ -105,9 +116,15 @@ Objects are reference-counted via nanobind/pybind. Generally:
     C++ `std::vector` members return copies. Use explicit methods:
 
     ```python
+    from tesseract_robotics.scene_graph import Link, Visual
+
+    link, visual = Link("part"), Visual()
+
     # Wrong (silent no-op)
     link.visual.append(visual)
+    assert len(link.visual) == 0
 
     # Correct
     link.addVisual(visual)
+    assert len(link.visual) == 1
     ```

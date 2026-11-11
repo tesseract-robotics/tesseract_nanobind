@@ -1,0 +1,1472 @@
+{
+  "format": 1,
+  "hardware": {
+    "cpu": "Apple M1 Max",
+    "load_average_1_5_15": [
+      20.08,
+      20.19,
+      20.95
+    ],
+    "logical_cpus": 10,
+    "memory_gib": 64.0,
+    "os": "macOS-15.3.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.10"
+  },
+  "library": {
+    "git_commit": "332fd163a72e9ff682b7994babd1aaf351db83bd",
+    "git_dirty": true,
+    "tesseract_robotics": "0.35.0.9.dev726",
+    "upstream": {
+      "tesseract-robotics/tesseract": "4cf644d704bd8961c7cdaf193f72488fa501f5c0",
+      "tesseract-robotics/tesseract_planning": "4e27d94b160f757e064dbad2a5277657cd33bbf8",
+      "tesseract-robotics/trajopt": "98b85d559e9fc7cb60a4dbfeb6d3baa177c94df5"
+    }
+  },
+  "measured_at": "2026-11-11T19:26:44+00:00",
+  "problem": {
+    "joint_end": [
+      0.4,
+      0.2762,
+      0.0,
+      -1.3348,
+      0.0,
+      1.4959,
+      0.0
+    ],
+    "joint_start": [
+      -0.4,
+      0.2762,
+      0.0,
+      -1.3348,
+      0.0,
+      1.4959,
+      0.0
+    ],
+    "obstacle": {
+      "radius_m": 0.15,
+      "xyz_m": [
+        0.5,
+        0.0,
+        0.55
+      ]
+    },
+    "robot": "lbr_iiwa_14_r820"
+  },
+  "rows": [
+    {
+      "clearance_m": 0.01695619658612202,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.8692243343719515,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.5107938330038451,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.012268583,
+      "seed": 1,
+      "success": true,
+      "tcp_path_m": 2.682480781347313,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.005312240389244938,
+      "goal_error_rad": 1.726892265493704e-23,
+      "joint_path_rad": 0.8643163512281699,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5574944159889128,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.066014042,
+      "seed": 1,
+      "success": true,
+      "tcp_path_m": 0.4591337187360151,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5160805829800665,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.034210084,
+      "seed": 1,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5244183329923544,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007313875,
+      "seed": 1,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028499300082048457,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.970357404123096,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4820569159928709,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007258541,
+      "seed": 2,
+      "success": true,
+      "tcp_path_m": 2.7061686354172,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004944197270504019,
+      "goal_error_rad": 2.4502398847968776e-20,
+      "joint_path_rad": 0.8582668324979588,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5474104580061976,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.051952124999999995,
+      "seed": 2,
+      "success": true,
+      "tcp_path_m": 0.4543695751212444,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5393752910022158,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.035435875000000006,
+      "seed": 2,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.6315321250003763,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.005605709,
+      "seed": 2,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.020853354557456544,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.190116544946365,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4933385000040289,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007393958,
+      "seed": 3,
+      "success": true,
+      "tcp_path_m": 3.370197004931588,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004985699171731167,
+      "goal_error_rad": 2.67948476752694e-20,
+      "joint_path_rad": 0.8585284995226388,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.560119041998405,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.057465831999999994,
+      "seed": 3,
+      "success": true,
+      "tcp_path_m": 0.45473677988356753,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5128914580272976,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.03438975,
+      "seed": 3,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5033239159965888,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.005487583,
+      "seed": 3,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028499300082048457,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.432463726970097,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.48418616599519737,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.008502625,
+      "seed": 4,
+      "success": true,
+      "tcp_path_m": 2.018892708560303,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.0049368237289395545,
+      "goal_error_rad": 2.4342629808996167e-20,
+      "joint_path_rad": 0.8582569909900786,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.540143291989807,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.059501625,
+      "seed": 4,
+      "success": true,
+      "tcp_path_m": 0.45436109621402004,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5208094580157194,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.034704875,
+      "seed": 4,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.510275874985382,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.0051912500000000006,
+      "seed": 4,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.022164167628003772,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.154704527055819,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.492278207995696,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.00726225,
+      "seed": 5,
+      "success": true,
+      "tcp_path_m": 2.817427786818512,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004949499178299094,
+      "goal_error_rad": 4.825712213144039e-21,
+      "joint_path_rad": 0.8645555752651641,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5883722500002477,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.096883834,
+      "seed": 5,
+      "success": true,
+      "tcp_path_m": 0.4601474181301729,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5433436250023078,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.034443333,
+      "seed": 5,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5045282499922905,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.00575225,
+      "seed": 5,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.02607156017490858,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 10.89178007473152,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4957287089782767,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.017322167,
+      "seed": 6,
+      "success": true,
+      "tcp_path_m": 4.45860539798459,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004934715690923269,
+      "goal_error_rad": 7.779686781183954e-23,
+      "joint_path_rad": 0.8588892946771491,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5624664580100216,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.063102375,
+      "seed": 6,
+      "success": true,
+      "tcp_path_m": 0.45521060305824024,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5394212499959394,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.03827875,
+      "seed": 6,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5157042090140749,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.004978042,
+      "seed": 6,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.019242962760215587,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.95627597219796,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.48039675000472926,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.008519333,
+      "seed": 7,
+      "success": true,
+      "tcp_path_m": 2.294217300555145,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004835546737299606,
+      "goal_error_rad": 8.1588605412458e-21,
+      "joint_path_rad": 0.8646762588748772,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5327062500000466,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.048169791999999996,
+      "seed": 7,
+      "success": true,
+      "tcp_path_m": 0.46015091988152945,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5238494590157643,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.038561291,
+      "seed": 7,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5013591249880847,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.00464175,
+      "seed": 7,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.010444349089702792,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.864522906125425,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4883837919915095,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.013774416000000001,
+      "seed": 8,
+      "success": true,
+      "tcp_path_m": 1.456419460017004,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004986450485826938,
+      "goal_error_rad": 1.9087843777833605e-20,
+      "joint_path_rad": 0.8583584472644077,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5453670830174815,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.057671834000000005,
+      "seed": 8,
+      "success": true,
+      "tcp_path_m": 0.4546129254640945,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5180856249935459,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.036542792,
+      "seed": 8,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5413809170131572,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.0052175419999999995,
+      "seed": 8,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.026779052490102734,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.245692102216173,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.48652945799403824,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.012016667,
+      "seed": 9,
+      "success": true,
+      "tcp_path_m": 1.6889403804106085,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.0049024850798798925,
+      "goal_error_rad": 9.395492929158713e-21,
+      "joint_path_rad": 0.8675281717120786,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5728720420156606,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.09128800000000001,
+      "seed": 9,
+      "success": true,
+      "tcp_path_m": 0.45256909556622343,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5739487500104588,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.037923125,
+      "seed": 9,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5329707080090884,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007309291,
+      "seed": 9,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.016462702183022093,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.88936460798917,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4965029169979971,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.011250625,
+      "seed": 10,
+      "success": true,
+      "tcp_path_m": 1.3759165724502007,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.0049943395362867515,
+      "goal_error_rad": 1.111727701984945e-11,
+      "joint_path_rad": 0.8716908770503622,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5818958750169259,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.069270541,
+      "seed": 10,
+      "success": true,
+      "tcp_path_m": 0.46137329158692597,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5260287089913618,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.036377417,
+      "seed": 10,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5230451249808539,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.005601,
+      "seed": 10,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.026878990235240485,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.847752604072202,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4981708749837708,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.013191416999999999,
+      "seed": 11,
+      "success": true,
+      "tcp_path_m": 2.0418335560697307,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.0050763809378009395,
+      "goal_error_rad": 1.4074798114711025e-20,
+      "joint_path_rad": 0.860061922457992,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5828771670057904,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.0664295,
+      "seed": 11,
+      "success": true,
+      "tcp_path_m": 0.4562014912073805,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5238791250158101,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.036423667,
+      "seed": 11,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.515842207998503,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.0052561249999999995,
+      "seed": 11,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028499300082048457,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.854382782260545,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.49525837498367764,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.012389209,
+      "seed": 12,
+      "success": true,
+      "tcp_path_m": 1.6083147380664191,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004994681427559017,
+      "goal_error_rad": 2.8981514614335065e-20,
+      "joint_path_rad": 0.8585760160076588,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5745029159879778,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.076742917,
+      "seed": 12,
+      "success": true,
+      "tcp_path_m": 0.45460089773342405,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.625236500025494,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.036231334,
+      "seed": 12,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5116629579861183,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.0048762499999999995,
+      "seed": 12,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028499300082048457,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.4176418116420955,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.48954029101878405,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.012368917,
+      "seed": 13,
+      "success": true,
+      "tcp_path_m": 1.7986965662714207,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.005531712853386356,
+      "goal_error_rad": 1.9442633486192577e-24,
+      "joint_path_rad": 0.8626975030826529,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5763853749958798,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.068944167,
+      "seed": 13,
+      "success": true,
+      "tcp_path_m": 0.4572315024921056,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5400395829929039,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.038963375,
+      "seed": 13,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5138715410139412,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.005108041,
+      "seed": 13,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.0229596538207838,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.928326018623902,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.5873646250111051,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.008786792,
+      "seed": 14,
+      "success": true,
+      "tcp_path_m": 3.0076312544097172,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.0049517286354751056,
+      "goal_error_rad": 1.4714400425924876e-20,
+      "joint_path_rad": 0.8582599705833468,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.703137542004697,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.063102,
+      "seed": 14,
+      "success": true,
+      "tcp_path_m": 0.4545340048878881,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5357615830143914,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.036089875,
+      "seed": 14,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5696424169873353,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.006376834,
+      "seed": 14,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028294232761901322,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.320482568615675,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.5269560840097256,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.008654249999999999,
+      "seed": 15,
+      "success": true,
+      "tcp_path_m": 1.9937340712728504,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.005210032378803131,
+      "goal_error_rad": 5.85689043953073e-24,
+      "joint_path_rad": 0.8624433169352598,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5854216660081875,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.055141666000000006,
+      "seed": 15,
+      "success": true,
+      "tcp_path_m": 0.45708796250512757,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5452112089842558,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.038584791,
+      "seed": 15,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.7053758339898195,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.004870625000000001,
+      "seed": 15,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.024365087783919354,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.605187208187278,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.5175935000006575,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.012359291000000001,
+      "seed": 16,
+      "success": true,
+      "tcp_path_m": 2.2642497535573485,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004942854655471757,
+      "goal_error_rad": 2.3243935316784533e-20,
+      "joint_path_rad": 0.8582675916935092,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5804595000226982,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.059217875,
+      "seed": 16,
+      "success": true,
+      "tcp_path_m": 0.45436169599493714,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5542541250179056,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.037218416,
+      "seed": 16,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.6893206250097137,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.005347083,
+      "seed": 16,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028499300082048457,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.206581778588255,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.5048167089989875,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007364208,
+      "seed": 17,
+      "success": true,
+      "tcp_path_m": 1.847045944894624,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.005100055074024112,
+      "goal_error_rad": 4.121121449640877e-24,
+      "joint_path_rad": 0.8608852071234625,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.6267600419814698,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.10327787399999999,
+      "seed": 17,
+      "success": true,
+      "tcp_path_m": 0.4569880854165832,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5486193749820814,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.038239042,
+      "seed": 17,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5397515840013511,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007072124999999999,
+      "seed": 17,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.014817457022695935,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 8.086088405002979,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.5236902089964133,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.019341792,
+      "seed": 18,
+      "success": true,
+      "tcp_path_m": 3.256208837839799,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.005030907775741916,
+      "goal_error_rad": 1.8371974000894168e-23,
+      "joint_path_rad": 0.863523561398862,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5690211670007557,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.068477,
+      "seed": 18,
+      "success": true,
+      "tcp_path_m": 0.4581457477853393,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.7056237919896375,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.041691292,
+      "seed": 18,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5452234170224983,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.006798958,
+      "seed": 18,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.019278862758060816,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.64918241120264,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.49577658300404437,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.01498775,
+      "seed": 19,
+      "success": true,
+      "tcp_path_m": 1.4775030318544078,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004942396952037298,
+      "goal_error_rad": 2.4197574799996516e-20,
+      "joint_path_rad": 0.8582678027200658,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5604555839963723,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.074525542,
+      "seed": 19,
+      "success": true,
+      "tcp_path_m": 0.4543604014650885,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5039398749941029,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.0329215,
+      "seed": 19,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.47735308299888857,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.004417292,
+      "seed": 19,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.028499300082048457,
+      "goal_error_rad": 0.0,
+      "joint_path_rad": 5.822346317081326,
+      "message": "Planning successful",
+      "pipeline": "OMPLPipeline",
+      "plan_time_s": 0.4877896250109188,
+      "planner": "OMPL",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask"
+      ],
+      "planner_time_s": 0.007409416,
+      "seed": 20,
+      "success": true,
+      "tcp_path_m": 2.6704909258239833,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004960488551831371,
+      "goal_error_rad": 1.7455324974657404e-20,
+      "joint_path_rad": 0.8584680192265626,
+      "message": "Planning successful",
+      "pipeline": "FreespacePipeline",
+      "plan_time_s": 0.5659657079959288,
+      "planner": "OMPL + TrajOpt",
+      "planner_nodes": [
+        "OMPLMotionPlannerTask",
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.046347542000000005,
+      "seed": 20,
+      "success": true,
+      "tcp_path_m": 0.45457613219328585,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.004952975920451963,
+      "goal_error_rad": 1.8659981182433111e-22,
+      "joint_path_rad": 0.8597774253606371,
+      "message": "Planning successful",
+      "pipeline": "TrajOptPipeline",
+      "plan_time_s": 0.5360012500023004,
+      "planner": "TrajOpt",
+      "planner_nodes": [
+        "TrajOptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.035513667,
+      "seed": 20,
+      "success": true,
+      "tcp_path_m": 0.45599974863926535,
+      "waypoints": 11
+    },
+    {
+      "clearance_m": 0.007103869271459534,
+      "goal_error_rad": 2.220446049250313e-16,
+      "joint_path_rad": 1.7450624427221764,
+      "message": "Planning successful",
+      "pipeline": "TrajOptIfoptPipeline",
+      "plan_time_s": 0.5184118339966517,
+      "planner": "TrajOptIfopt",
+      "planner_nodes": [
+        "TrajOptIfoptMotionPlannerTask"
+      ],
+      "planner_time_s": 0.006071083,
+      "seed": 20,
+      "success": true,
+      "tcp_path_m": 0.6244821581401534,
+      "waypoints": 11
+    }
+  ],
+  "settings": {
+    "densify_step_rad": 0.005,
+    "n": 20,
+    "ompl_first_solution": true,
+    "ompl_planners": 1,
+    "ompl_planning_time_s": 10.0,
+    "pipelines": {
+      "OMPL": "OMPLPipeline",
+      "OMPL + TrajOpt": "FreespacePipeline",
+      "TrajOpt": "TrajOptPipeline",
+      "TrajOptIfopt": "TrajOptIfoptPipeline"
+    },
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ]
+  }
+}

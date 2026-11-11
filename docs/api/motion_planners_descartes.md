@@ -1,5 +1,21 @@
 # tesseract_robotics.motion_planners_descartes
 
+<!-- snippet: ambient
+from tesseract_robotics.command_language import ProfileDictionary
+from tests.docs.doc_assets import joint_program
+
+program = joint_program(robot)
+profiles = ProfileDictionary()
+profile_dict = profiles
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.planning import TaskComposer
+
+composer = TaskComposer.from_config()
+tool_pose = Isometry3d.Identity()
+move = program[0].asMoveInstruction()
+manip_info = program.getManipulatorInfo()
+-->
+
 Descartes graph-based Cartesian planner.
 
 ## Overview
@@ -36,10 +52,14 @@ the defaults:
 ```python
 from tesseract_robotics.command_language import ProfileDictionary
 from tesseract_robotics.motion_planners_descartes import DescartesDefaultMoveProfileD
+from tesseract_robotics.planning import ProfileTypeMismatchError
 
 profiles = ProfileDictionary()
 profiles.addProfile("DescartesMotionPlannerTask", "DEFAULT", DescartesDefaultMoveProfileD())
-composer.plan(robot, program, pipeline="CartesianPipeline", profiles=profiles)
+try:
+    composer.plan(robot, program, pipeline="CartesianPipeline", profiles=profiles)
+except ProfileTypeMismatchError as error:
+    print(error)
 # ProfileTypeMismatchError: Pipeline 'CartesianPipeline' would never find these profiles ...
 #   node 'CartesianPipeline/MotionPlanningTask/DescartesMotionPlannerTask' reads
 #   'DescartesMoveProfileF' in namespace 'DescartesMotionPlannerTask', but profile 'DEFAULT'
@@ -121,7 +141,7 @@ samples = sampler.sample()   # list[DescartesStateSampleD], one per IK solution
 ## Tool-pose samplers
 
 The functions behind `DescartesDefaultMoveProfileD.target_pose_sample_*` turn one tool pose into
-candidate poses, returned as a `common.VectorIsometry3d`:
+candidate poses, returned as a `list[Isometry3d]`:
 
 | Function | Samples |
 |---|---|
@@ -151,14 +171,28 @@ indifferent to.
 3. **Edge costs**: Based on joint motion between solutions
 4. **Find path**: Dijkstra's algorithm finds minimum-cost path
 
-```
-Waypoint 1      Waypoint 2      Waypoint 3
-    ○──────────────○──────────────○
-    │              │              │
-    ○──────────────○──────────────○
-    │              │              │
-    ○──────────────○──────────────○
-   (IK solutions)
+Each column is a waypoint and each node one of its IK solutions; an edge joins every
+solution of a waypoint to every solution of the next, weighted by the joint motion between them.
+
+```mermaid
+flowchart LR
+    subgraph W1[Waypoint 1]
+        a1((IK 1))
+        a2((IK 2))
+        a3((IK 3))
+    end
+    subgraph W2[Waypoint 2]
+        b1((IK 1))
+        b2((IK 2))
+        b3((IK 3))
+    end
+    subgraph W3[Waypoint 3]
+        c1((IK 1))
+        c2((IK 2))
+        c3((IK 3))
+    end
+    a1 & a2 & a3 --> b1 & b2 & b3
+    b1 & b2 & b3 --> c1 & c2 & c3
 ```
 
 ## Use Cases
@@ -181,10 +215,6 @@ Waypoint 1      Waypoint 2      Waypoint 3
 3. **Reduce waypoint density** if planning is too slow
 4. **Check reachability** before planning - Descartes fails if any waypoint is unreachable
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.motion_planners_descartes._motion_planners_descartes
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

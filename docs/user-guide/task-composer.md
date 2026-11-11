@@ -1,6 +1,36 @@
-# Task Composer
+# Task composer
 
-The Task Composer orchestrates complex planning pipelines by chaining planners (OMPL, TrajOpt, Descartes), collision checks, and time parameterization into a dataflow graph. The high-level `TaskComposer` wrapper lives in `tesseract_robotics.planning`.
+<!-- snippet: ambient
+import tesseract_robotics
+from tesseract_robotics.planning import TaskComposer
+from tesseract_robotics.command_language import ProfileDictionary
+from tesseract_robotics.task_composer import (
+    AnyPoly_wrap_CompositeInstruction, AnyPoly_wrap_EnvironmentConst, AnyPoly_wrap_ProfileDictionary,
+    TaskComposerDataStorage, TaskComposerPluginFactory,
+)
+from tests.docs.doc_assets import enter_scratch_dir, joint_program
+
+enter_scratch_dir()
+config_path = tesseract_robotics.get_task_composer_config_path()
+composer = TaskComposer.from_config()
+program = joint_program(robot)
+composite = program
+profiles = ProfileDictionary()
+programs = [program]
+factory = TaskComposerPluginFactory(config_path, locator)
+task = factory.createTaskComposerNode("FreespacePipeline")
+task_data = TaskComposerDataStorage()
+task_data.setData("planning_input", AnyPoly_wrap_CompositeInstruction(program))
+task_data.setData("environment", AnyPoly_wrap_EnvironmentConst(env))
+task_data.setData("profiles", AnyPoly_wrap_ProfileDictionary(ProfileDictionary()))
+-->
+
+The task composer runs **pipelines**: graphs of tasks (planners, collision checks, fix-ups,
+time parameterization) defined in YAML and loaded as plugins. The `plan_*` calls of the
+[planning guide](planning.md) each run one; use the task composer directly to pick another
+pipeline, keep the plugins loaded across plans, pass your own profiles, inspect what each task
+did, or define a pipeline of your own. The wrapper is `tesseract_robotics.planning.TaskComposer`;
+the bound C++ types are in `tesseract_robotics.task_composer`.
 
 ## Overview
 
@@ -17,7 +47,7 @@ graph TD
     H --> I[Output Trajectory]
 ```
 
-## Basic Usage
+## Basic usage
 
 === "High-Level API"
 
@@ -88,15 +118,13 @@ graph TD
     profile selection and trajectory extraction. Drop to the low-level API
     only when you need to assemble a custom task graph at runtime.
 
-## Plugin Warmup
+## Plugin warmup
 
-!!! warning "First `plan()` call is slow (~10-15 s)"
-    The Task Composer uses dynamic plugin loading (`boost_plugin_loader` /
-    `dlopen`). The first call to `createTaskComposerNode(...)` loads the
-    shared library for TrajOpt, OMPL, Descartes, etc. Subsequent calls in
-    the same process are instant (plugins cached in memory). This is
-    inherent to the plugin architecture — the same behaviour is observed in
-    the C++ TaskComposer.
+The task composer loads its tasks as plugins (`boost_plugin_loader`, `dlopen`). Building a
+`TaskComposer` loads the factory, and the first plan through a pipeline creates its nodes; later
+plans through the same composer reuse them. Measured on an Apple M1 Max (10 cores):
+`TaskComposer.from_config()` takes 0.3 to 1.0 s, and the first `basic_cartesian_example` plan
+1.9 s against 1.5 s for the next ones. The C++ task composer behaves the same way.
 
 `TaskComposer.warmup(...)` amortizes that cost up front. See
 `planning/composer.py` for the full docstring.
@@ -106,7 +134,7 @@ from tesseract_robotics.planning import TaskComposer
 
 # Option 1: explicit warmup — clearest timing profile
 composer = TaskComposer.from_config()
-composer.warmup(["FreespacePipeline"])          # ~10-15 s
+composer.warmup(["FreespacePipeline"])          # create the pipeline's nodes now
 result = composer.plan(robot, program, pipeline="FreespacePipeline")  # fast
 
 # Option 2: warmup=True — loads a curated set of common pipelines
@@ -128,7 +156,7 @@ composer = TaskComposer.from_config(
 
 - Single-run scripts — total wall-clock time is roughly the same either way.
 
-## Available Pipelines
+## Available pipelines
 
 `TaskComposer.get_available_pipelines()` takes the configured node names from the factory (`TaskComposerPluginFactory.getTaskComposerNodePlugins()`), builds each one once, and returns those that built. The config is read as the C++ factory loaded it, so `!include` works, and a `TaskComposer` built from a factory without `config_path` lists its pipelines too. As of the current `task_composer_plugins.yaml` this is **36 pipelines**:
 
@@ -192,7 +220,7 @@ may take. The second call loads the plugin libraries.
 
 ```python
 composer.plan_freespace(robot, program)   # TrajOptPipeline
-composer.plan_ompl(robot, program)        # OMPLPipeline
+composer.plan_ompl(robot, program)        # FreespacePipeline (pipeline="OMPLPipeline" for raw OMPL)
 composer.plan_cartesian(robot, program)   # DescartesDPipeline
 ```
 
@@ -205,7 +233,7 @@ result = plan_freespace(robot, program)
 ```
 
 Without a `composer`, each module-level call builds a new composer and loads the task composer
-plugins again, about 4.3 s on macOS arm64, so timing a solve through it measures the load.
+plugins again, so timing a solve through it measures the load.
 Build one composer and pass it to every call; you own its lifetime (#137):
 
 ```python
@@ -216,7 +244,7 @@ for program in programs:
     result = plan_cartesian(robot, program, composer=composer)
 ```
 
-## Visualizing Pipelines
+## Visualizing pipelines
 
 Every `TaskComposerNode` exports its task graph as [Graphviz DOT](https://graphviz.org/) — the same `dump()` mechanism the C++ task composer uses:
 
@@ -288,7 +316,7 @@ This run was aborted by `DiscreteContactCheckTask` — the planners upstream suc
     shows you *where* — including nodes that never ran because an earlier
     stage aborted the pipeline.
 
-## Task Types
+## Task types
 
 | Task | Purpose |
 |------|---------|
@@ -303,7 +331,7 @@ This run was aborted by `DiscreteContactCheckTask` — the planners upstream suc
 | `FixStateBoundsTask` | Clamp to joint limits |
 | `FixStateCollisionTask` | Push out of collision |
 
-## Config Schemas
+## Config schemas
 
 Each node and executor type describes the YAML config it accepts as a schema, a
 `common.PropertyTree`. Its YAML crosses as text:
@@ -329,7 +357,13 @@ schema.applyConfig("inputs: {program: in}\noutputs: {program: out}\nbogus_key: 1
 gives a `ValidationError` instead, whose `toString()` (also `str()`) is `inputs.<port>: <message>`:
 
 ```python
-(error,) = ports.validate(inputs, outputs)  # inputs maps an undeclared port "bogus_port"
+from tesseract_robotics.task_composer import TaskComposerPortMap
+
+inputs, outputs = TaskComposerPortMap(), TaskComposerPortMap()
+inputs.set("program", "in")
+inputs.set("bogus_port", "in")   # a port the contract does not declare
+outputs.set("program", "out")
+(error,) = ports.validate(inputs, outputs)
 error.toString()                            # 'inputs.bogus_port: undeclared port'
 ```
 
@@ -357,7 +391,7 @@ profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", OMPLRealVectorMoveProfil
 profiles.addProfile("TrajOptMotionPlannerTask", "DEFAULT", TrajOptDefaultMoveProfile())
 ```
 
-## Error Handling
+## Error handling
 
 `TaskComposer.plan(...)` always returns a `PlanningResult`. On failure the result is populated from the task composer's aborting node info:
 
@@ -367,7 +401,7 @@ if not result.successful:
     print(f"Planning failed: {result.message}")
 ```
 
-### Common Failures
+### Common failures
 
 | Error | Cause | Solution |
 |-------|-------|----------|
@@ -381,7 +415,7 @@ On the raw factory, `createTaskComposerNode` and `createTaskComposerExecutor` ra
 `TaskComposerPluginError` (a `RuntimeError`) instead of returning `None`; `plan` turns it into
 a failed `PlanningResult`.
 
-## Parallel Execution
+## Parallel execution
 
 The Task Composer uses Taskflow for parallel execution. Override the thread count via `TaskComposer.from_config(num_threads=...)` or pass a pre-built executor:
 
@@ -400,7 +434,7 @@ composer = TaskComposer.from_config(executor=executor)
     Independent tasks (such as IK for different waypoints) run in parallel
     automatically. The task graph determines dependencies.
 
-## Custom Pipelines
+## Custom pipelines
 
 Define custom task graphs in YAML and point `TaskComposer.from_config(path)` at them:
 
@@ -429,7 +463,7 @@ task_composer_plugins:
           depends: [smooth_trajopt]
 ```
 
-## Integration Example
+## Integration example
 
 Use a warmed-up composer behind a small service class:
 
@@ -448,7 +482,7 @@ class PlanningServer:
         )
 ```
 
-## Next Steps
+## Next steps
 
-- [Low-Level SQP](low-level-sqp.md) — Real-time trajectory optimization
+- [Low-Level SQP](low-level-sqp.md) — Trajectory optimization
 - [Online Planning Example](../examples/online-planning.md) — Dynamic replanning

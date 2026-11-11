@@ -1,5 +1,32 @@
 # tesseract_robotics.motion_planners
 
+<!-- snippet: ambient
+from tesseract_robotics.command_language import ProfileDictionary
+from tests.docs.doc_assets import joint_program
+
+program = joint_program(robot)
+profiles = ProfileDictionary()
+profile_dict = profiles
+from tesseract_robotics.motion_planners import PlannerRequest
+from tesseract_robotics.motion_planners_ompl import (
+    OMPLMotionPlanner, OMPLRealVectorMoveProfile, RRTConnectConfigurator,
+)
+
+_profile = OMPLRealVectorMoveProfile()
+_profile.solver_config.planning_time = 2.0
+_profile.solver_config.addPlanner(RRTConnectConfigurator())
+profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", _profile)
+planner = OMPLMotionPlanner("OMPLMotionPlannerTask")
+request = PlannerRequest()
+request.env = env
+request.instructions = program
+request.profiles = profiles
+response = planner.solve(request)
+move_instruction = program[0].asMoveInstruction()
+joint_names = robot.get_joint_names("manipulator")
+joint_values = np.zeros(6)
+-->
+
 Base motion planner types and request/response structures.
 
 ## Overview
@@ -18,7 +45,6 @@ request = PlannerRequest()
 request.env = env                    # Environment
 request.instructions = program       # CompositeInstruction
 request.profiles = profile_dict      # ProfileDictionary
-request.plan_profile_remapping = {}  # Optional profile overrides
 ```
 
 | Attribute | Type | Description |
@@ -26,7 +52,6 @@ request.plan_profile_remapping = {}  # Optional profile overrides
 | `env` | `Environment` | Robot environment |
 | `instructions` | `CompositeInstruction` | Motion program |
 | `profiles` | `ProfileDictionary` | Planner profiles |
-| `plan_profile_remapping` | `dict` | Profile name overrides |
 
 ## PlannerResponse
 
@@ -120,7 +145,7 @@ changed = formatProgram(program, env)
 
 World-frame TCP poses of a program; the working frame in the `ManipulatorInfo` does not
 change them. Takes a `CompositeInstruction`, `MoveInstructionPoly` or `InstructionPoly`;
-returns a list with one `VectorIsometry3d` per sub-composite (one for a flat program).
+returns a list with one `list[Isometry3d]` per sub-composite (one for a flat program).
 
 ```python
 from tesseract_robotics.motion_planners import toToolpath
@@ -160,7 +185,7 @@ Motion planners are typically used via TaskComposer pipelines rather than direct
 # Direct planner usage (lower level)
 from tesseract_robotics.motion_planners_ompl import OMPLMotionPlanner
 
-planner = OMPLMotionPlanner()
+planner = OMPLMotionPlanner("OMPLMotionPlannerTask")
 request = PlannerRequest()
 request.env = env
 request.instructions = program
@@ -185,10 +210,6 @@ from tesseract_robotics.task_composer import (
 | `motion_planners_descartes` | Descartes | Graph-based Cartesian |
 | `motion_planners_simple` | Simple | Joint interpolation |
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.motion_planners._motion_planners
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

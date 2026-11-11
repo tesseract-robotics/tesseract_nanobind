@@ -1,4 +1,4 @@
-# Planning Examples
+# Planning examples
 
 Motion planning examples from simple freespace to complex industrial tasks.
 
@@ -31,7 +31,7 @@ tesseract_basic_cartesian_example
 See the source at
 [`basic_cartesian_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/basic_cartesian_example.py).
 
-## Glass Upright (Orientation Constraint)
+## Glass upright (orientation constraint)
 
 --8<-- "docs/demos/players/glass_upright_example.html"
 
@@ -45,7 +45,7 @@ tesseract_glass_upright_example
 See the source at
 [`glass_upright_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/glass_upright_example.py).
 
-## Pick and Place
+## Pick and place
 
 --8<-- "docs/demos/players/pick_and_place_example.html"
 
@@ -66,7 +66,7 @@ tesseract_pick_and_place_example
 Full source:
 [`pick_and_place_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pick_and_place_example.py).
 
-## Raster Pattern
+## Raster pattern
 
 --8<-- "docs/demos/players/raster_example.html"
 
@@ -96,7 +96,7 @@ tesseract_raster_example
 Full source:
 [`raster_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/raster_example.py).
 
-## Multi-Step with Task Composer (Car Seat)
+## Multi-step with task composer (car seat)
 
 --8<-- "docs/demos/players/car_seat_example.html"
 
@@ -117,7 +117,7 @@ tesseract_car_seat_example
 Full source:
 [`car_seat_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/car_seat_example.py).
 
-## Descartes + TrajOpt Chaining
+## Descartes + TrajOpt chaining
 
 --8<-- "docs/demos/players/chain_example.html"
 
@@ -138,11 +138,14 @@ tesseract_chain_example
 Full source:
 [`chain_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/chain_example.py).
 
-## 9-DOF with External Axis (Puzzle Piece)
+## 9-DOF with external axis (puzzle piece)
 
 --8<-- "docs/demos/players/puzzle_piece_auxillary_axes_example.html"
 
-Cartesian toolpath planning with a 9-DOF system (robot + positioner + rail):
+A Cartesian toolpath along a part's edge, planned for nine joints: a 7-DOF KUKA IIWA and a
+2-DOF positioner (turntable and tilt) that holds the part. The toolpath is given in the part's
+frame, which moves with the positioner, and TrajOpt distributes the motion over all nine joints. The plan takes
+33 to 34 s on an Apple M1 Max (10 cores).
 
 ```bash
 tesseract_puzzle_piece_auxillary_axes_example
@@ -157,6 +160,7 @@ See the source at
 
 All examples can be visualized:
 
+<!-- snippet: skip (starts the viewer on its default port and waits for Enter) -->
 ```python
 from tesseract_robotics.viewer import TesseractViewer
 
@@ -168,8 +172,8 @@ with TesseractViewer() as viewer:
     input("Press Enter to exit...")
 ```
 
-## Next Steps
+## Next steps
 
 - [OMPL Examples](ompl.md) - Sampling-based planning and optimization objectives
-- [Online Planning](online-planning.md) - Real-time replanning examples
+- [Online Planning](online-planning.md) - Replanning examples
 - [Low-Level SQP Guide](../user-guide/low-level-sqp.md) - Direct solver access

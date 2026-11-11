@@ -2,108 +2,105 @@
 
 --8<-- "docs/demos/players/hero.html"
 
-Python bindings for the Tesseract Motion Planning Framework.
+Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract), the
+ROS-Industrial motion planning framework. Load a robot, check collisions, solve kinematics and
+plan collision-free trajectories from Python, without ROS.
+{ .tr-lede }
 
-## Overview
+`tesseract_robotics` binds the Tesseract C++ libraries module by module: the environment and
+scene graph, kinematics (KDL, OPW, UR), collision checking (Bullet, FCL), the OMPL, TrajOpt,
+TrajOpt-Ifopt and Descartes planners, time parameterization and the task composer that chains
+them into pipelines. On top sits a short Python layer: a planning API, a browser viewer that
+plays trajectories, and emitters that write controller programs (ABB RAPID, KUKA KRL, Fanuc TP,
+Yaskawa INFORM, URScript). One wheel per platform covers Python 3.12 and later.
 
-**tesseract_robotics** provides Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract), an industrial-grade motion planning framework. It enables:
+## Plan and watch a trajectory
 
-- **Robot modeling** from URDF/SRDF files
-- **Collision detection** using FCL and Bullet
-- **Forward/inverse kinematics** with KDL and OPW solvers
-- **Motion planning** with OMPL, TrajOpt, Descartes, and more
-- **Real-time trajectory optimization** with the low-level SQP API
-
-## Architecture
-
-```mermaid
-graph TB
-    subgraph high["High-Level API"]
-        Robot["Robot"]
-        MP["MotionProgram"]
-        PF["plan_freespace / plan_ompl / plan_cartesian"]
-        TC["TaskComposer"]
-    end
-
-    subgraph low["Low-Level Modules"]
-        env["environment"]
-        col["collision"]
-        kin["kinematics"]
-        cmd["command_language"]
-        mp["motion_planners"]
-        tc["task_composer"]
-    end
-
-    subgraph sqp["SQP (Real-time Optimization)"]
-        tsqp["trajopt_sqp"]
-        tifopt["trajopt_ifopt"]
-    end
-
-    Robot --> env
-    Robot --> kin
-    MP --> cmd
-    PF --> mp
-    TC --> tc
-    mp --> tsqp
-    tc --> tsqp
-    tsqp --> tifopt
+```bash
+pip install --pre "tesseract-robotics-nanobind[support]"
 ```
 
-## Quick Example
-
+<!-- snippet: skip (the README's hero block, which runs; tests/docs/test_readme_structure.py keeps the two identical) -->
 ```python
-import numpy as np
 from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
 from tesseract_robotics.planning import (
-    Robot, MotionProgram, JointTarget, CartesianTarget, Pose, plan_freespace,
+    CartesianTarget, JointTarget, MotionProgram, Pose, Robot, plan_freespace,
 )
+from tesseract_robotics.viewer import TesseractViewer
 
-# Load a robot from tesseract's support data (the [support] extra)
 locator = GeneralResourceLocator(paths=[get_tesseract_resource_path()])
 robot = Robot.from_tesseract_support("abb_irb2400", locator)
 
-# Forward kinematics (note: group_name is first positional arg)
-joints = np.zeros(6)
-tcp_pose = robot.fk("manipulator", joints, "tool0")
-print(f"TCP position: {tcp_pose.translation}")
-
-# Inverse kinematics: tool pointing down (upstream freespace_example.cpp), quaternion [qx, qy, qz, qw]
-target = Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.0, -1.0, 0.0, 0.0)
-ik_solution = robot.ik("manipulator", target, "tool0", seed=joints)
-
-# Plan a freespace motion
+# All-zero joints (rad) to a tool-down pose of tool0 in base_link: metres, [qx, qy, qz, qw]
 program = (
     MotionProgram("manipulator", tcp_frame="tool0", working_frame="base_link")
-    .move_to(JointTarget(joints))
-    .move_to(CartesianTarget(target))
+    .move_to(JointTarget([0.0] * 6))
+    .move_to(CartesianTarget(Pose.from_xyz_quat(0.8, -0.2, 0.8, 0.0, -1.0, 0.0, 0.0)))
 )
 result = plan_freespace(robot, program)
 assert result.successful, result.message
-print(f"Found trajectory with {len(result.trajectory)} waypoints")
+
+with TesseractViewer() as viewer:
+    viewer.update_environment(robot.env)
+    viewer.update_trajectory(result.raw_results)
+    input(f"{len(result.trajectory)} states, {result.trajectory[-1].time:.2f} s: open {viewer.url}, Enter quits")
 ```
 
-## Planners
+`plan_freespace` runs the `TrajOptPipeline`: TrajOpt, a discrete collision check of every
+state, and time parameterization. `result.trajectory` holds joint positions (rad), velocities,
+accelerations and time stamps (s); the viewer plays it in the browser.
 
-| Planner | Type | Use Case |
-|---------|------|----------|
-| **OMPL** | Sampling-based | Free-space motion, complex environments |
-| **TrajOpt** | Optimization | Cartesian paths, collision avoidance |
-| **TrajOptIfopt** | SQP/OSQP | Real-time replanning, online control |
-| **Descartes** | Graph search | Dense Cartesian toolpaths |
-| **Simple** | Interpolation | Joint-space interpolation |
+## Next steps
 
-## Performance
+<div class="grid cards" markdown>
 
-The low-level SQP API enables real-time trajectory optimization.
-Rates depend on problem size and collision mode. See
-[`online_planning_sqp_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/online_planning_sqp_example.py)
-which prints measured rates for its 8-DOF gantry workcell on your machine.
+-   **Install**
 
-## Next Steps
+    ---
 
-- [Installation](getting-started/installation.md) - Install the package
-- [Quickstart](getting-started/quickstart.md) - Your first motion plan
-- [Core Concepts](getting-started/concepts.md) - Understand the architecture
-- [Examples](examples/index.md) - Learn from working examples
+    Wheels for Linux, macOS and Windows, or a source build with pixi.
 
+    [:octicons-arrow-right-24: Installation](getting-started/installation.md)
+
+-   **Quickstart**
+
+    ---
+
+    Kinematics, a collision check and three planners on one robot, in ten minutes.
+
+    [:octicons-arrow-right-24: Quickstart](getting-started/quickstart.md)
+
+-   **Concepts**
+
+    ---
+
+    The environment, programs, pipelines and profiles, and the frames a target names.
+
+    [:octicons-arrow-right-24: Concepts](concepts/index.md)
+
+</div>
+
+## What is in the package
+
+| Task | Guide | Modules |
+| --- | --- | --- |
+| Load and edit a robot cell | [Environment and scene graph](user-guide/environment.md) | `environment`, `scene_graph`, `urdf`, `srdf` |
+| Forward and inverse kinematics, Jacobians | [Kinematics](user-guide/kinematics.md) | `kinematics`, `state_solver` |
+| Distances and contacts, one state or a swept motion | [Collision checking](user-guide/collision.md) | `collision`, `geometry` |
+| Plan freespace, Cartesian and raster motions | [Motion planning](user-guide/planning.md) | `planning`, `motion_planners_*` |
+| Chain planners into pipelines | [Task composer](user-guide/task-composer.md) | `task_composer`, `task_composer_planning` |
+| Replan in a loop, add constraints in Python | [Low-level SQP](user-guide/low-level-sqp.md) | `trajopt_ifopt`, `trajopt_sqp` |
+| Watch and record trajectories | [Viewer](user-guide/viewer.md) | `viewer` |
+| Write controller programs | [Program emitters](user-guide/emitters.md) | `emitters` |
+| Save environments and programs | [Serialization](user-guide/serialization.md) | `serialization` |
+
+Every recorded example plays in the browser on the [examples](examples/index.md) pages.
+
+## Versions
+
+A release `0.A.B.C` wraps the Tesseract `A.B` series; `C` counts the binding releases. The 0.36
+series builds tesseract, trajopt and tesseract_planning from upstream `master` plus the
+upstream pull requests it carries; `tesseract_robotics.build_identity.UPSTREAM_SOURCES` names
+the exact commits. Changes are in the [changelog](CHANGELOG.md) and the
+[breaking API changes](breaking-changes.md).

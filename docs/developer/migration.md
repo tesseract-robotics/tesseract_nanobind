@@ -1,4 +1,4 @@
-# Migration Notes: SWIG to nanobind
+# SWIG to nanobind
 
 ## Cross-Module Inheritance
 
@@ -23,7 +23,8 @@ profiles.addProfile("OMPLMotionPlannerTask", "DEFAULT", plan_profile)
 ### Known Issue: Waypoint Type Mismatch
 
 The `InstructionsTrajectory` class expects `StateWaypointPoly` waypoints but motion planners like OMPL return `JointWaypointPoly`. This causes a type erasure error:
-```
+
+```text
 RuntimeError: TypeErasureBase, tried to cast 'tesseract_planning::JointWaypointPoly' to 'tesseract_planning::StateWaypointPoly'
 ```
 
@@ -43,7 +44,7 @@ The command_language uses type-erased "Poly" types (WaypointPoly, InstructionPol
 
 The C++ type erasure `as<T>()` method uses `typeid()` comparison which fails across shared library boundaries. Even when the underlying type IS `MoveInstructionPoly`, the cast fails:
 
-```
+```text
 RuntimeError: TypeErasureBase, tried to cast 'tesseract_planning::MoveInstructionPoly' to 'tesseract_planning::MoveInstructionPoly'
 ```
 
@@ -166,13 +167,11 @@ TrajOpt output uses `StateWaypointPoly`, which is compatible with time parameter
 
 ## C++ Build Issues
 
-The tesseract C++ stack is no longer built in this repository: it comes prebuilt
-from the `tesseract-robotics` conda channel (see
-[How the binaries are built](binaries.md)). The colcon build issues recorded
-here during the migration (Qt6 `QT_HOST_PATH` under PCL/VTK, a missing `libode`,
-`TESSERACT_BUILD_TASK_COMPOSER_PLANNING` being off by default) no longer apply.
-The `tesseract-robotics-planning` package ships
-`libtesseract_task_composer_planning_factories`, which the planning pipelines
+The C++ stack is built by `scripts/native_stack.py` (see [The native stack](native-stack.md)).
+The colcon build issues recorded during the SWIG migration (Qt6 `QT_HOST_PATH` under PCL/VTK,
+a missing `libode`, `TESSERACT_BUILD_TASK_COMPOSER_PLANNING` being off by default) do not apply to
+the vcpkg-based build, which builds the task composer planning factories
+(`libtesseract_task_composer_planning_factories`) that the planning pipelines
 (`FreespacePipeline`, `TrajOptPipeline`, `OMPLPipeline`, …) need.
 
 ## Task Composer API Differences

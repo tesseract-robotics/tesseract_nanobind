@@ -1,5 +1,16 @@
 # tesseract_robotics.scene_graph
 
+<!-- snippet: ambient
+from tesseract_robotics.common import Isometry3d
+from tesseract_robotics.geometry import Box
+from tesseract_robotics.scene_graph import Joint, Link
+
+link = Link("part")
+joint = Joint("joint_1")
+geometry = Box(0.1, 0.1, 0.1)
+transform = Isometry3d.Identity()
+-->
+
 Scene graph elements: links, joints, and kinematic tree.
 
 ## SceneGraph
@@ -7,14 +18,21 @@ Scene graph elements: links, joints, and kinematic tree.
 The kinematic tree structure.
 
 ```python
-from tesseract_robotics.scene_graph import SceneGraph
+from tesseract_robotics.scene_graph import Joint, JointType, Link, SceneGraph
 
 graph = SceneGraph()
 graph.setName("my_robot")
 
-# Add elements
-graph.addLink(link)
-graph.addJoint(joint)
+# Add elements: a chain base_link -> link_1 -> ... -> link_4 -> tool0
+names = ["base_link", "link_1", "link_2", "link_3", "link_4", "tool0"]
+for name in names:
+    graph.addLink(Link(name))
+for parent, child in zip(names, names[1:]):
+    joint = Joint(f"{parent}_to_{child}")
+    joint.type = JointType.FIXED
+    joint.parent_link_id = parent
+    joint.child_link_id = child
+    graph.addJoint(joint)
 
 # Query structure
 links = graph.getLinks()
@@ -23,14 +41,13 @@ root = graph.getRoot()
 
 # Find elements
 link = graph.getLink("base_link")
-joint = graph.getJoint("joint_1")
+joint = graph.getJoint("base_link_to_link_1")
 
 # Kinematic queries
 child_links = graph.getLinkChildrenIds("base_link")
-moved_links = graph.getJointChildrenIds("joint_1")              # links below joint_1
-moved_links = graph.getJointChildrenIds(["joint_1", "joint_2"])    # union, no duplicates, unordered
+moved_links = graph.getJointChildrenIds("base_link_to_link_1")   # links below the joint
+moved_links = graph.getJointChildrenIds(["base_link_to_link_1", "link_1_to_link_2"])  # union, no duplicates, unordered
 path = graph.getShortestPath("base_link", "tool0")
-root = graph.getRoot()
 
 # Which listed link each link moves with: a listed link maps itself and every link
 # below it, stopping at another listed link; an unknown name raises KeyError
@@ -50,7 +67,7 @@ from tesseract_robotics.common import AllowedCollisionMatrix
 acm = AllowedCollisionMatrix()
 acm.addAllowedCollision("link_1", "link_2", "adjacent")
 graph.setAllowedCollisionMatrix(acm)
-graph.isCollisionAllowed("link_1", "link_2")  # True
+graph.isCollisionAllowed(("link_1", "link_2"))  # True
 ```
 
 ## Link
@@ -106,8 +123,7 @@ visual.geometry = geometry
 visual.origin = transform
 
 # Material (optional)
-material = Material()
-material.name = "red"
+material = Material("red")  # the name is fixed at construction; getName() reads it
 material.color = np.array([1.0, 0.0, 0.0, 1.0])  # RGBA
 visual.material = material
 ```
@@ -137,7 +153,7 @@ joint.type = JointType.REVOLUTE
 joint.parent_link_id = "link_0"
 joint.child_link_id = "link_1"
 joint.parent_to_joint_origin_transform = Isometry3d.Identity()
-joint.axis = np.array([0, 0, 1])  # rotation axis
+joint.axis = np.array([0.0, 0.0, 1.0])  # rotation axis
 ```
 
 ### JointType
@@ -209,7 +225,7 @@ joint.dynamics = dynamics
 from tesseract_robotics.scene_graph import JointMimic
 
 mimic = JointMimic()
-mimic.joint_name = "joint_1"  # joint to mimic
+mimic.joint_id = "joint_1"  # joint to mimic
 mimic.multiplier = 1.0
 mimic.offset = 0.0
 
@@ -259,10 +275,6 @@ tcp_pose = transforms["tool0"]
 `floating_joints`, `getFloatingJointValues` and `==` are described with the state solver:
 [SceneState](state_solver.md#scenestate).
 
-## Auto-generated API Reference
+## Reference
 
 ::: tesseract_robotics.scene_graph._scene_graph
-    options:
-      show_root_heading: false
-      show_source: false
-      members_order: source

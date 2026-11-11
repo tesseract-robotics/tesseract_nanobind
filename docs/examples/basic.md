@@ -1,4 +1,4 @@
-# Basic Examples
+# Basics
 
 Fundamental examples demonstrating kinematics, collision detection, and scene graph operations.
 
@@ -12,7 +12,7 @@ tesseract_kinematics_example
 pixi run python -m tesseract_robotics.examples.tesseract_kinematics_example
 ```
 
-## Kinematics Example
+## Kinematics example
 
 Forward and inverse kinematics with the KUKA LBR IIWA 14 R820 (7-DOF). The snippet
 below is the core of the example — loaded directly from the shipped source.
@@ -30,11 +30,10 @@ tesseract_kinematics_example
 !!! tip "Quaternion convention — scalar-last everywhere"
     Project canonical order is **scalar-last** `[qx, qy, qz, qw]`. Build
     with `Quaterniond.from_xyzw(qx, qy, qz, qw)`; access components via
-    `q.x`, `q.y`, `q.z`, `q.w` properties. The Eigen-style
-    `Quaterniond(w, x, y, z)` ctor exists for direct interop but is not the
-    preferred call shape.
+    `q.x`, `q.y`, `q.z`, `q.w` properties. Eigen's scalar-first
+    `Quaterniond(w, x, y, z)` constructor is not bound.
 
-## Collision Detection Example
+## Collision detection example
 
 Check for collisions in the environment:
 
@@ -45,7 +44,7 @@ tesseract_collision_example
 See the source at
 [`tesseract_collision_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/tesseract_collision_example.py).
 
-## Scene Graph Example
+## Scene graph example
 
 --8<-- "docs/demos/players/scene_graph_example.html"
 
@@ -69,7 +68,7 @@ on the planar and revolute joints.
 --8<-- "src/tesseract_robotics/examples/scene_graph_example.py:build"
 ```
 
-`getAdjacencyMap(link_names)` maps every link at or below the given links to the
+`getAdjacencyMap(link_ids)` maps every link at or below the given links to the
 nearest of them above it: `link_4` to `link_3`, `link_5` to `link_2`.
 
 ```python title="scene_graph_example.py"
@@ -111,7 +110,7 @@ They default to `True`; set on a `Link` before `addLink`, the graph reads them b
     is returned is a tie-break. The example takes the path while the graph is a
     tree, where it is unique.
 
-## Geometry Showcase
+## Geometry showcase
 
 --8<-- "docs/demos/players/geometry_showcase_example.html"
 
@@ -140,7 +139,7 @@ See the source at
 
     Loading from bytes, normals and textures, and writing PLY: [Geometry Examples](geometry.md).
 
-## Point cloud → Octree Example
+## Point cloud → octree example
 
 --8<-- "docs/demos/players/pointcloud_octree_collision_example.html"
 
@@ -173,7 +172,7 @@ Collision-aware trajectory: 0/11 waypoints collide
 Source:
 [`pointcloud_octree_collision_example.py`](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/pointcloud_octree_collision_example.py).
 For the generic "octree as a collision obstacle" recipe, see the user-guide
-section [Point Clouds as Collision Obstacles](../user-guide/collision.md#point-clouds-as-collision-obstacles).
+section [Point Clouds as Collision Obstacles](../user-guide/collision.md#point-clouds-as-obstacles).
 
 **How the comparison is built**
 
@@ -204,7 +203,7 @@ differs, which is what makes the result fair to eyeball.
     penetrations deeper than 10 m would register and the colliding plan is
     allowed to finish and return a real `CompositeInstruction`.
 
-## Next Steps
+## Next steps
 
 - [Planning Examples](planning.md) - Motion planning
-- [Online Planning](online-planning.md) - Real-time replanning
+- [Online planning](online-planning.md): replanning around a moving obstacle

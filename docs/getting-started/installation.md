@@ -1,11 +1,15 @@
 # Installation
 
-## Users: Install from PyPI
+Users install a wheel from PyPI; it bundles the C++ libraries and needs no compiler, no ROS
+and no conda. Contributors build from source with pixi.
+
+## Users: install from PyPI
 
 ```bash
-pip install "tesseract-robotics-nanobind[support]"
+pip install --pre "tesseract-robotics-nanobind[support]"
 ```
 
+`--pre` installs the current release candidate, `0.36.0.0rc1`; drop it once 0.36.0.0 is final.
 The wheel bundles all C++ dependencies (~30 MB). No compiler needed. The `[support]` extra
 installs tesseract's example robots and meshes as a separate wheel,
 `tesseract-robotics-nanobind-support` (~40 MB); the examples and these pages load robots from it.
@@ -21,7 +25,13 @@ robot = Robot.from_tesseract_support("abb_irb2400", locator)
 print(f"Loaded: {len(robot.get_joint_names('manipulator'))} joints")
 ```
 
-**Supported platforms:** macOS (ARM), Linux (x86_64/aarch64), Windows (x64).
+**Supported platforms:**
+
+| OS | Architectures | Minimum |
+| -- | ------------- | ------- |
+| Linux | x86_64, aarch64 | `manylinux_2_39`: Ubuntu 24.04, Debian 13 (Ubuntu 22.04 stays on 0.35.0.8) |
+| macOS | arm64, x86_64 | macOS 15.0 (`macosx_15_0`, imposed by the bundled `libomp`) |
+| Windows | x86_64 | |
 
 **Python versions:** 3.12–3.15, from one `cp312-abi3` stable-ABI wheel per platform.
 That includes Rhino 9, which embeds CPython 3.13. Rhino 8 (CPython 3.9) and Python
@@ -31,7 +41,7 @@ On 3.15, `zstandard`, which `viser` requires, compiles from source until it ship
 
 ---
 
-## Developers: Build from Source
+## Developers: build from source
 
 ### Prerequisites
 
@@ -41,22 +51,26 @@ Install [pixi](https://pixi.sh):
 curl -fsSL https://pixi.sh/install.sh | bash
 ```
 
-You'll also need a C++17 compiler and ~4GB disk space.
+You also need the platform's C++17 compiler (Apple clang, gcc/g++ or MSVC; pixi does not
+provide it), git, and disk for `.native/` (5.2 GB on macOS arm64 after a build).
 
-### Build (3 commands)
+### Build
 
 ```bash
 git clone https://github.com/tesseract-robotics/tesseract_nanobind.git
 cd tesseract_nanobind
-pixi run build   # resolves conda deps + compiles the nanobind extensions
+pixi run build   # native-build, then the bindings (editable) and the support data
 ```
 
-The tesseract C++ libraries come **prebuilt** from the
-[`tesseract-robotics` conda channel](https://anaconda.org/tesseract-robotics) —
-only the nanobind extension modules compile locally (~10-15 min first time,
-incremental after).
+`pixi run build` first runs `pixi run native-build`, which compiles the C++ stack (tesseract,
+trajopt, tesseract_planning, descartes_light, opw_kinematics, ruckig, boost_plugin_loader on
+vcpkg's third-party libraries) into `.native/<triplet>/` with `scripts/native_stack.py`, the
+script the wheel workflow runs. The first build compiles the whole stack and is slow; each of
+its stages records a content-addressed identity, so later runs skip a stage whose inputs did not
+change. The bindings then compile against `.native/<triplet>/ws/install`. See
+[The native stack](../developer/native-stack.md) for the stages and how to change them.
 
-That's it. Run an example:
+Run an example:
 
 ```bash
 pixi run tesseract_freespace_ompl_example
@@ -64,34 +78,21 @@ pixi run tesseract_freespace_ompl_example
 
 ---
 
-## What Pixi Does
+## What pixi does
 
-Pixi replaces the usual conda/pip/brew chaos with a single lockfile. For this project, it manages:
+Pixi resolves the toolchain and the Python environment from one lockfile. It does not provide
+the C++ stack, which `scripts/native_stack.py` builds:
 
 | Category | Examples |
 | -------- | -------- |
-| Prebuilt tesseract C++ stack | tesseract-robotics, tesseract-robotics-planning (conda channel) |
-| Transitive C++ libraries | Eigen, PCL, OMPL, FCL, Bullet, OSQP, console_bridge |
-| Python packages | numpy, scipy, nanobind, pytest, loguru |
-| Build tools | cmake, ninja, pkg-config |
-| Platform-specific | llvm-openmp (macOS), patchelf (Linux) |
+| Build tools | cmake, ninja, make, pkg-config, ccache, colcon, vcs2l |
+| Python packages | numpy, scipy, nanobind, scikit-build-core, pytest, loguru |
+| Platform-specific | llvm-openmp (macOS) |
 
-### Why This Matters for C++ Bindings
-
-Pure Python packages are forgiving - pip resolves versions at install time and everything just works. C++ bindings are not forgiving.
-
-The nanobind-generated code must match the *exact* headers it was compiled against. If you build against Eigen 3.4.0 but run against 3.4.1, subtle struct layout differences can cause silent memory corruption or crashes. These bugs are notoriously hard to diagnose.
-
-The `pixi.lock` file pins **exact versions** of all ~200 transitive dependencies - down to libc and OpenSSL. Every developer and CI machine builds against identical binaries. This eliminates an entire class of "works on my machine" bugs.
-
-!!! warning "The lockfile is a loaded weapon"
-    The Eigen 5 migration on conda-forge demonstrated the flip side: a lockfile
-    solved mid-migration froze an `orocos-kdl` built against Eigen 3.4 next to
-    tesseract libs built against Eigen 5 — a legal solve (the old KDL build
-    predates the `eigen-abi` metadata) that heap-corrupts every KDL code path at
-    runtime. CI runs `pixi install --locked` so lock↔manifest drift fails loudly,
-    and the build jobs run a kinematics ABI canary against the freshly built
-    wheel. If you re-lock, re-run the test suite.
+The `pixi.lock` file pins the exact versions of the toolchain and Python packages, so every
+developer and CI machine builds the bindings with the same tools. The C++ stack is pinned
+elsewhere: the commits in `dependencies.rosinstall`, and the vcpkg revision and package list in
+`scripts/native_stack.toml`.
 
 ```bash
 # See what's pinned
@@ -103,20 +104,21 @@ pixi install
 
 ---
 
-## C++ Dependencies
+## C++ dependencies
 
-The tesseract C++ stack (tesseract, trajopt, tesseract_planning, descartes_light, opw_kinematics,
-ruckig, boost_plugin_loader) is built from the sources in `dependencies.rosinstall`, against vcpkg's
-third-party libraries, by the same script the wheel workflow runs:
+`scripts/native_stack.py` builds three stages into `.native/<triplet>/`:
 
-```bash
-pixi run native-build   # into .native/<triplet>; the first build takes ~35 min, reruns skip unchanged stages
-pixi run build          # then compile the bindings against it
-```
+| Stage | Source | Output |
+| ----- | ------ | ------ |
+| `sources` | `vcs import` of `dependencies.rosinstall` (tesseract, trajopt, tesseract_planning, descartes_light, opw_kinematics, ruckig, boost_plugin_loader) | `ws/src` |
+| `vcpkg` | the revision and packages in `scripts/native_stack.toml` (Eigen, Boost, OMPL, FCL, Bullet, PCL, OSQP, spdlog, ...) | `vcpkg/installed/<triplet>` |
+| `colcon` | the sources against the vcpkg libraries | `ws/install` (`TESSERACT_CPP_PREFIX`) |
 
-The pixi env supplies the toolchain only. See [The native stack build](../developer/native-stack.md).
+To run any command against that stack, use `python scripts/native_stack.py exec -- <command>`.
+Both the pixi tasks and the wheel workflow go through the same script, so a development build and
+a wheel compile the same sources with the same flags.
 
-### Submodule (Optional)
+### Submodule (optional)
 
 The `ws/src/tesseract_ros_workcell` submodule provides industrial workcell models:
 
@@ -133,7 +135,7 @@ sources, which only the 0.36 inner loop needs.
 
 ## Troubleshooting
 
-### Plugin Loading Errors
+### Plugin loading errors
 
 ```text
 Error: Failed to load plugin library
@@ -141,16 +143,15 @@ Error: Failed to load plugin library
 
 Run within pixi: `pixi run python your_script.py` or enter `pixi shell` first.
 
-### OpenMP Crashes (macOS)
+### OpenMP crashes (macOS)
 
 Pixi installs `llvm-openmp` from conda-forge. If you have Homebrew's libomp installed, library conflicts can cause crashes. The pixi environment isolates this, but running outside `pixi shell` may pick up the wrong library.
 
 The PyPI wheels carry their own `libomp.dylib`. In a plain venv (pip, uv) that is the only runtime, but inside a conda or pixi environment that has `llvm-openmp` it makes two: Descartes aborts with `OMP: Error #15`, and under `KMP_DUPLICATE_LIB_OK=TRUE` it survives `num_threads=1` but segfaults at 2. Install the wheel into a venv, or use the pixi environment's editable install. The mechanism is in [macOS Wheel Gotchas](../developer/macos-wheels.md).
 
-### Scattered Segfaults / "double free or corruption"
+### Scattered segfaults / "double free or corruption"
 
-Random crashes across kinematics, planning, and trajopt code paths — while
-imports and simple geometry work — are the signature of an ABI-incoherent
-dependency set (see the lockfile warning above). Re-lock with
-`pixi lock`, reinstall, and re-run the suite. CI's `locked: true` +
-kinematics canary exist to stop this class of wheel from shipping.
+Random crashes across kinematics, planning, and trajopt code paths, while imports and simple
+geometry work, are the signature of bindings compiled against a different C++ stack than the one
+they load. Rebuild both against the same inputs: `pixi run build` recompiles any stage whose
+inputs changed, and an editable install keeps pointing at `.native/<triplet>/ws/install`.
