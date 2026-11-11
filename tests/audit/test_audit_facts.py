@@ -1,7 +1,6 @@
 """Contract tests of the cached TU facts (`scripts/audit_facts.py`): a cached fact equals the
 fresh extraction, a hit does not parse, and an edit to any header the TU reads re-parses."""
 
-import json
 import shutil
 from pathlib import Path
 
@@ -92,6 +91,6 @@ def test_another_extractor_source_is_another_key():
 
 def test_every_include_dir_in_the_repo_is_listed():
     key = facts_.fact_key("decl", IDENTITY, facts_.audit_args((FIXTURE_INCLUDE,)), 0, ())
-    listed = set(json.loads(key.toolchain)["repo_dirs"])
+    listed = {d for d, _ in key.toolchain.repo_dirs}
     assert {str(FIXTURE_INCLUDE), str(FIXTURES), str(audit.SRC)} <= listed
     assert not any(Path(d).is_relative_to(audit.CONDA_PREFIX) for d in listed)

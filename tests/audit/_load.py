@@ -11,6 +11,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 SCRIPTS = (
     "audit_types",
     "audit_ownership",
+    "audit_telemetry",
+    "audit_toolchain",
     "audit_cache",
     "audit_parse",
     "audit_bound",
