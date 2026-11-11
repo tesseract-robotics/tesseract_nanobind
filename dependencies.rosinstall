@@ -15,8 +15,10 @@
     version: a6483823830c8cf145370bc79f1ac260cac1f807
 - git:
     local-name: trajopt
-    uri: https://github.com/tesseract-robotics/trajopt.git
-    version: a504b2208d43ca0e4e80e39f6c1712eacb4a6772
+    # tesseract-robotics/trajopt#628 (a504b22 + 4 commits) until it merges: the bindings call the
+    # constructors and calcJacobianBlock it defines. The dev conda trajopt carries it as patches.
+    uri: https://github.com/jf---/trajopt.git
+    version: 3fd89a814c5b2abc66a795476aae2b94c4cd2fac
 - git:
     local-name: descartes_light
     uri: https://github.com/swri-robotics/descartes_light.git
