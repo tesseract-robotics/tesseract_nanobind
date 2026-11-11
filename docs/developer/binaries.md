@@ -132,20 +132,22 @@ tesseract stack. Both build the same `CMakeLists.txt`: the wheel against a colco
 
 The bindings get a feedstock of their own, `tesseract-robotics-nanobind-feedstock`,
 laid out like `tesseract-robotics-python-feedstock`: rattler-build, conda-smithy,
-GitHub Actions on linux-64, linux-aarch64, osx-64, osx-arm64 and win-64, Python
-3.12 to 3.14 (#162 step 2). It turns this repository into the conda package
+GitHub Actions on linux-64, linux-aarch64, osx-arm64 and win-64 (the platforms the
+`label/dev` stack is published for: its `tesseract-robotics-planning` has no osx-64 build
+of the current dev snapshot), Python 3.12 to 3.14 (#162 step 2). It turns this repository into the conda package
 `tesseract-robotics-nanobind`, built the same way as the C++ stack under it.
 
 !!! warning "Status"
     - **Incomplete:** the feedstock repository does not exist yet, so neither
       does the `packaging/tesseract-robotics-nanobind-feedstock` submodule the
-      `build-feedstock-nanobind` task runs in. Its CI and the upload to
-      `label/dev` (by the holder of the channel's `BINSTAR_TOKEN`) follow.
+      `build-feedstock-nanobind` task runs in. The tree is prepared (rendered with
+      conda-smithy: recipe, `.ci_support`, GitHub Actions workflow); its CI and the upload
+      to `label/dev` (by the holder of the channel's `BINSTAR_TOKEN`) follow.
     - **Confirmed:** the recipe builds on osx-arm64 for Python 3.12 against the
-      `label/dev` stack (32 min locally) and its tests pass: imports, `pip check`,
-      and 238 collision and kinematics tests. The first build's import test found
-      `pyyaml` missing from `[project] dependencies`; it is declared now.
-    - **Under verification:** the other four platforms and Python 3.13 and 3.14.
+      `label/dev` stack (about 30 min locally, `build-locally.py`) and its tests pass:
+      imports, `pip check`, and 289 collision and kinematics tests. An earlier build's
+      import test found `pyyaml` missing from `[project] dependencies`; it is declared now.
+    - **Under verification:** linux-64, linux-aarch64 and win-64, and Python 3.13 and 3.14.
 
 The recipe (`recipe/recipe.yaml`):
 
