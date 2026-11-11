@@ -485,7 +485,7 @@ ti::Jacobian jacobian_checked(const ti::Differentiable& self) {
     return jacobian;
 }
 
-NB_MODULE(trajopt_ifopt, m) {
+NB_MODULE(_trajopt_ifopt, m) {
     m.doc() = "trajopt_ifopt Python bindings - variables, constraints, and costs for IFOPT-based trajectory optimization";
 
     // JointTrajectory (toJointTrajectory)

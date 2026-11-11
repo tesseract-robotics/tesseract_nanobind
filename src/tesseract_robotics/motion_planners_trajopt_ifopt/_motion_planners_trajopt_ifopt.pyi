@@ -10,7 +10,7 @@ import tesseract_robotics.command_language
 import tesseract_robotics.common._common
 import tesseract_robotics.environment
 import tesseract_robotics.motion_planners._motion_planners
-import tesseract_robotics.trajopt_ifopt
+import tesseract_robotics.trajopt_ifopt._trajopt_ifopt
 import tesseract_robotics.trajopt_sqp
 
 
@@ -123,28 +123,28 @@ class TrajOptIfoptTermInfos:
     def __init__(self) -> None: ...
 
     @property
-    def constraints(self) -> list[tesseract_robotics.trajopt_ifopt.ConstraintSet]: ...
+    def constraints(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
 
     @constraints.setter
-    def constraints(self, arg: Sequence[tesseract_robotics.trajopt_ifopt.ConstraintSet], /) -> None: ...
+    def constraints(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
 
     @property
-    def squared_costs(self) -> list[tesseract_robotics.trajopt_ifopt.ConstraintSet]: ...
+    def squared_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
 
     @squared_costs.setter
-    def squared_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt.ConstraintSet], /) -> None: ...
+    def squared_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
 
     @property
-    def absolute_costs(self) -> list[tesseract_robotics.trajopt_ifopt.ConstraintSet]: ...
+    def absolute_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
 
     @absolute_costs.setter
-    def absolute_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt.ConstraintSet], /) -> None: ...
+    def absolute_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
 
     @property
-    def hinge_costs(self) -> list[tesseract_robotics.trajopt_ifopt.ConstraintSet]: ...
+    def hinge_costs(self) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]: ...
 
     @hinge_costs.setter
-    def hinge_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt.ConstraintSet], /) -> None: ...
+    def hinge_costs(self, arg: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet], /) -> None: ...
 
 class TrajOptIfoptWaypointInfo:
     """
@@ -160,7 +160,7 @@ class TrajOptIfoptWaypointInfo:
     def term_infos(self, arg: TrajOptIfoptTermInfos, /) -> None: ...
 
     @property
-    def node(self, /) -> tesseract_robotics.trajopt_ifopt.Node | None:
+    def node(self, /) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node | None:
         """The waypoint's variable node (owned by this object), or None"""
 
     @property
@@ -191,7 +191,7 @@ class TrajOptIfoptCompositeProfile(tesseract_robotics.command_language.Profile):
     def createKey() -> int:
         """The key every TrajOpt-Ifopt composite profile carries"""
 
-    def create(self, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment, nodes: Sequence[tesseract_robotics.trajopt_ifopt.Node], fixed_indices: Sequence[int]) -> TrajOptIfoptTermInfos:
+    def create(self, composite_manip_info: tesseract_robotics.common._common.ManipulatorInfo, env: tesseract_robotics.environment.Environment, nodes: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Node], fixed_indices: Sequence[int]) -> TrajOptIfoptTermInfos:
         """
         Build the trajectory-wide terms the planner adds over all waypoint nodes. `nodes` are the planner's and read-only: a Python override that adds variables or sets values raises TrajOptIfoptNodeLayoutChangedError.
         """
@@ -267,16 +267,16 @@ class TrajOptIfoptDefaultCompositeProfile(TrajOptIfoptCompositeProfile):
     def __init__(self) -> None: ...
 
     @property
-    def collision_cost_config(self) -> tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig: ...
+    def collision_cost_config(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig: ...
 
     @collision_cost_config.setter
-    def collision_cost_config(self, arg: tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
+    def collision_cost_config(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
 
     @property
-    def collision_constraint_config(self) -> tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig: ...
+    def collision_constraint_config(self) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig: ...
 
     @collision_constraint_config.setter
-    def collision_constraint_config(self, arg: tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
+    def collision_constraint_config(self, arg: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, /) -> None: ...
 
     @property
     def smooth_velocities(self) -> bool: ...
@@ -399,24 +399,24 @@ class TrajOptIfoptPIQPSolverProfile(TrajOptIfoptSolverProfile):
         `settings:` (PIQP, read into qp_settings) and `opt_params:` are merged into the profile's values; settings PIQP's sparse backend rejects raise RuntimeError.
         """
 
-def createJointPositionConstraint(joint_waypoint: tesseract_robotics.command_language.JointWaypointPoly, var: tesseract_robotics.trajopt_ifopt.Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt.ConstraintSet:
+def createJointPositionConstraint(joint_waypoint: tesseract_robotics.command_language.JointWaypointPoly, var: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var, coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
     """
     Joint position constraint at a waypoint: equality to its position, or its tolerance band
     """
 
-def createCollisionConstraints(vars: Sequence[tesseract_robotics.trajopt_ifopt.Var], env: tesseract_robotics.environment.Environment, manip_info: tesseract_robotics.common._common.ManipulatorInfo, config: tesseract_robotics.trajopt_ifopt.TrajOptCollisionConfig, fixed_indices: Sequence[int], fixed_sparsity: bool) -> list[tesseract_robotics.trajopt_ifopt.ConstraintSet]:
+def createCollisionConstraints(vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], env: tesseract_robotics.environment.Environment, manip_info: tesseract_robotics.common._common.ManipulatorInfo, config: tesseract_robotics.trajopt_ifopt._trajopt_ifopt.TrajOptCollisionConfig, fixed_indices: Sequence[int], fixed_sparsity: bool) -> list[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet]:
     """
     Collision constraint sets of config's collision check type: one per unfixed step (DISCRETE)
     or one per segment (LVS_DISCRETE, LVS_CONTINUOUS, CONTINUOUS); none for NONE
     """
 
-def createJointVelocityConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt.ConstraintSet:
+def createJointVelocityConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
     """Joint velocity constraint over vars toward target"""
 
-def createJointAccelerationConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt.ConstraintSet:
+def createJointAccelerationConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
     """Joint acceleration constraint over vars toward target"""
 
-def createJointJerkConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt.ConstraintSet:
+def createJointJerkConstraint(target: Annotated[NDArray[numpy.float64], dict(shape=(None,), writable=False)] | Sequence[float], vars: Sequence[tesseract_robotics.trajopt_ifopt._trajopt_ifopt.Var], coeffs: Annotated[NDArray[numpy.float64], dict(shape=(None,), order='C')] | Sequence[float]) -> tesseract_robotics.trajopt_ifopt._trajopt_ifopt.ConstraintSet:
     """Joint jerk constraint over vars toward target"""
 
 class TrajOptIfoptMotionPlanner(tesseract_robotics.motion_planners._motion_planners.MotionPlanner):
