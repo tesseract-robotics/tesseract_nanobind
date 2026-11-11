@@ -1,4 +1,4 @@
-"""Brand-independent emitter core — typed IR, lowering, shared machinery."""
+"""Brand-independent emitter core: typed IR, lowering, frames, posture, shared machinery."""
 
 from .backend import ProgramBackend as ProgramBackend
 from .backend import drive as drive
@@ -8,12 +8,27 @@ from .dsl import Writer as Writer
 from .errors import EmitterError as EmitterError
 from .errors import EmptyProgramError as EmptyProgramError
 from .errors import ExternalAxisError as ExternalAxisError
-from .errors import ExternalAxisUnitError as ExternalAxisUnitError
 from .errors import IdentifierError as IdentifierError
+from .errors import InvalidCalibrationError as InvalidCalibrationError
+from .errors import InvalidDeclarationError as InvalidDeclarationError
+from .errors import InvalidEventError as InvalidEventError
+from .errors import InvalidFrameBindingError as InvalidFrameBindingError
+from .errors import InvalidLayoutError as InvalidLayoutError
+from .errors import InvalidProfileError as InvalidProfileError
+from .errors import MissingCalibrationError as MissingCalibrationError
 from .errors import MissingConfigurationError as MissingConfigurationError
+from .errors import MissingManipulatorInfoError as MissingManipulatorInfoError
 from .errors import MissingProfileError as MissingProfileError
+from .errors import NoActiveWriterError as NoActiveWriterError
+from .errors import ProgramFileCountError as ProgramFileCountError
+from .errors import ProgramStructureError as ProgramStructureError
+from .errors import SingularPostureError as SingularPostureError
+from .errors import TcpOffsetError as TcpOffsetError
+from .errors import ToolConflictError as ToolConflictError
+from .errors import UnboundFrameError as UnboundFrameError
 from .errors import UncoordinatedTargetError as UncoordinatedTargetError
-from .errors import UnknownKinematicTopologyError as UnknownKinematicTopologyError
+from .errors import UndeclaredVariableError as UndeclaredVariableError
+from .errors import UnemittableTextError as UnemittableTextError
 from .errors import UnsupportedInstructionError as UnsupportedInstructionError
 from .events import CartesianMove as CartesianMove
 from .events import Dwell as Dwell
@@ -30,7 +45,14 @@ from .external_axes import ExternalAxisKind as ExternalAxisKind
 from .external_axes import ExternalAxisLayout as ExternalAxisLayout
 from .external_axes import ExternalAxisSpec as ExternalAxisSpec
 from .external_axes import ExternalAxisValue as ExternalAxisValue
+from .frames import FrameBinding as FrameBinding
+from .frames import FramedPose as FramedPose
+from .frames import MoveFrames as MoveFrames
 from .identity import EmitIdentity as EmitIdentity
 from .lowering import lower as lower
-from .naming import safe_identifier as safe_identifier
+from .naming import IdentifierRules as IdentifierRules
+from .posture import ArmPosture as ArmPosture
+from .posture import OpwParameters as OpwParameters
+from .posture import OpwPostureSolver as OpwPostureSolver
+from .posture import PostureSolver as PostureSolver
 from .program import EmittedProgram as EmittedProgram

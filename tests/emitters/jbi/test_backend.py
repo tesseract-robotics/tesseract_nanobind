@@ -1,119 +1,83 @@
-"""JbiBackend: consume IR events, accumulate a two-section .jbi body."""
+"""JbiBackend: IR events to a two-section .jbi body."""
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
-from tesseract_robotics.emitters.core.backend import _dispatch
-from tesseract_robotics.emitters.core.errors import MissingProfileError
+from tesseract_robotics.emitters.core.backend import drive
+from tesseract_robotics.emitters.core.errors import (
+    MissingProfileError,
+    ToolConflictError,
+    UnemittableTextError,
+    UnsupportedInstructionError,
+)
 from tesseract_robotics.emitters.core.events import (
-    CartesianMove,
     Dwell,
     JointMove,
-    MoveKind,
     Note,
+    ProgramIR,
+    SetAnalog,
     SetDigital,
 )
-from tesseract_robotics.emitters.jbi.backend import JbiBackend, MissingSeedError
-from tesseract_robotics.emitters.jbi.profile import JbiProfile
+from tesseract_robotics.emitters.core.frames import MoveFrames
+from tesseract_robotics.emitters.jbi import JbiProfile, jbi_frames
+from tesseract_robotics.emitters.jbi.backend import JbiBackend
 from tesseract_robotics.planning import Pose
+from tests.emitters.jbi.spike import CALIBRATION
+from tests.emitters.programs import cart_move, joint_move
+
+_FRAMES = jbi_frames(tools={"tool0": 2, "gun": 3})
+_PROFILES = {"J": JbiProfile.build(joint_speed_percent=50.0)}
 
 
-def _run(events, profiles) -> str:
-    backend = JbiBackend(profiles=profiles, program_name="SPIKE")
-    backend.prog_start()
-    for e in events:
-        _dispatch(e, backend)
-    return backend.prog_finish()["SPIKE.jbi"]
+def _run(events) -> str:  # noqa: ANN001
+    ir = ProgramIR(name="SPIKE", events=tuple(events))
+    backend = JbiBackend(
+        profiles=_PROFILES, frames=_FRAMES, calibration=CALIBRATION, program_name="SPIKE"
+    )
+    return drive(ir, backend)["SPIKE.jbi"]
 
 
 def test_joint_move_emits_movj_and_position() -> None:
-    jbi = _run(
-        [JointMove(joints=tuple(np.zeros(6)), profile="J")],
-        {"J": JbiProfile.build(joint_speed_percent=50.0)},
-    )
-    # File scaffolding.
-    assert jbi.startswith("/JOB")
-    assert "//NAME SPIKE" in jbi
-    assert "//POS" in jbi and "//INST" in jbi
-    assert "///POSTYPE PULSE" in jbi and "///PULSE" in jbi
-    assert jbi.rstrip().endswith("END")
-    # The move references position C00000, and the table holds that row.
+    jbi = _run([joint_move([0, 0, 0, 0, 0, 0])])
+    assert jbi.startswith("/JOB") and "//NAME SPIKE" in jbi and jbi.rstrip().endswith("END")
+    assert "///NPOS 1,0,0,0,0,0" in jbi and "///TOOL 2" in jbi and "///POSTYPE PULSE" in jbi
     assert "MOVJ C00000 VJ=50.00" in jbi
-    assert "C00000=0.000,0.000,0.000,0.000,0.000,0.000" in jbi
-    assert "///NPOS 1,0,0,0,0,0" in jbi
+    assert "C00000=0,0,0,0,0,100" in jbi
 
 
-def test_linear_move_with_seed_emits_movl() -> None:
-    seed = tuple(np.deg2rad([10, 20, 30, 40, 50, 60]))
+def test_cartesian_move_raises() -> None:
+    with pytest.raises(UnsupportedInstructionError, match="RCONF"):
+        _run([cart_move(Pose.from_xyz(0.6, -0.1, 0.8), seed_deg=[0] * 6)])
+
+
+def test_tool_conflict_raises() -> None:
+    gun = MoveFrames("base_link", "gun", Pose())
+    with pytest.raises(ToolConflictError, match=r"\[2, 3\]"):
+        _run([joint_move([0] * 6), JointMove((0.1,) * 6, "J", gun)])
+
+
+def test_io_lines() -> None:
     jbi = _run(
-        [
-            CartesianMove(
-                pose=Pose.from_xyz(0.6, -0.1, 0.8),
-                kind=MoveKind.LINEAR,
-                profile="L",
-                seed_joints=seed,
-            )
-        ],
-        {"L": JbiProfile.build(linear_speed_mms=123.0)},
-    )
-    assert "MOVL C00000 V=123.0" in jbi
-    assert "C00000=10.000,20.000,30.000,40.000,50.000,60.000" in jbi
-
-
-def test_freespace_cartesian_with_seed_emits_movj() -> None:
-    seed = tuple(np.zeros(6))
-    jbi = _run(
-        [
-            CartesianMove(
-                pose=Pose.from_xyz(0.6, -0.1, 0.8),
-                kind=MoveKind.FREESPACE,
-                profile="F",
-                seed_joints=seed,
-            )
-        ],
-        {"F": JbiProfile.build(joint_speed_percent=25.0)},
-    )
-    assert "MOVJ C00000 VJ=25.00" in jbi
-
-
-def test_dwell_setdigital_note() -> None:
-    jbi = _run(
-        [Note("hello"), Dwell(seconds=2.5), SetDigital(key=None, index=3, value=True)],
-        {},
+        [Note("hello"), Dwell(seconds=2.5), SetDigital(None, 3, True), SetAnalog(None, 1, 12.7)]
     )
     assert "'hello" in jbi and "TIMER T=2.5" in jbi and "DOUT OT#(3) ON" in jbi
+    assert "AOUT AO#(1) 12.70" in jbi
+    assert "///TOOL" not in jbi
 
 
-def test_position_indices_increment() -> None:
-    jbi = _run(
-        [
-            JointMove(joints=tuple(np.zeros(6)), profile="J"),
-            JointMove(joints=tuple(np.deg2rad([1, 2, 3, 4, 5, 6])), profile="J"),
-        ],
-        {"J": JbiProfile.build()},
-    )
-    assert "MOVJ C00000 VJ=" in jbi and "MOVJ C00001 VJ=" in jbi
-    assert "C00000=" in jbi and "C00001=" in jbi
-    assert "///NPOS 2,0,0,0,0,0" in jbi
+def test_analog_out_of_range_raises() -> None:
+    with pytest.raises(UnsupportedInstructionError, match="AOUT"):
+        _run([SetAnalog(None, 0, 1.0)])
+    with pytest.raises(UnsupportedInstructionError, match="AOUT"):
+        _run([SetAnalog(None, 1, 15.0)])
+
+
+def test_long_comment_raises() -> None:
+    with pytest.raises(UnemittableTextError, match="maximum is 32"):
+        _run([Note("x" * 33)])
 
 
 def test_missing_profile_raises() -> None:
     with pytest.raises(MissingProfileError):
-        _run([JointMove(joints=tuple(np.zeros(6)), profile="NOPE")], {"J": JbiProfile.build()})
-
-
-def test_cartesian_without_seed_raises() -> None:
-    with pytest.raises(MissingSeedError):
-        _run(
-            [
-                CartesianMove(
-                    pose=Pose.from_xyz(0.6, -0.1, 0.8),
-                    kind=MoveKind.LINEAR,
-                    profile="L",
-                    seed_joints=None,
-                )
-            ],
-            {"L": JbiProfile.build()},
-        )
+        _run([joint_move([0] * 6, profile="NOPE")])

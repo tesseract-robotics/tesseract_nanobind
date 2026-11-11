@@ -2,7 +2,6 @@
 
 import io
 import struct
-import time
 from pathlib import Path
 
 import msgspec
@@ -33,8 +32,10 @@ RAMP_FRAMES = 11
 TIME_ATOL_S = 1e-9
 # viser's wire format stores positions as float32: ~1e-7 relative on ~1 m positions.
 POSITION_ATOL_M = 1e-6
-# Long enough for the 30 Hz player to tick if record() let it [s].
-PLAYER_TICKS_S = 0.2
+# Player iterations to let run before recording, so playback is live when record() starts.
+PLAYER_ITERATIONS = 6
+# Longest wait for those iterations [s]; generous for loaded CI.
+PLAYER_TIMEOUT_S = 5.0
 OTHER_ROBOT_URDF = """
 <robot name="other" xmlns:tesseract="http://ros.org/wiki/tesseract" tesseract:make_convex="false">
   <link name="world"/>
@@ -146,7 +147,7 @@ def test_phases_play_in_order_each_posed_by_its_own_environment(viewer, env):
 def test_the_player_adds_nothing_while_recording(viewer, env):
     viewer.update_environment(env)
     viewer.update_trajectory(_ramp())
-    time.sleep(PLAYER_TICKS_S)
+    assert viewer.wait_player_iterations(PLAYER_ITERATIONS, PLAYER_TIMEOUT_S)
 
     recording = _decode(viewer.record([RecordingPhase(env, _ramp())], fps=FPS_HZ))
 
@@ -208,3 +209,22 @@ def test_a_phase_with_other_links_raises_and_leaves_the_live_scene(viewer, env):
     assert viewer._env is env
     # The failed recording must not stay registered: a later one still works.
     assert _decode(viewer.record([RecordingPhase(env, _ramp())], fps=FPS_HZ))["viserVersion"]
+
+
+def test_a_failing_later_phase_restores_the_live_poses(viewer, env):
+    """The first phase moves the scene; when the second fails, the live poses come back."""
+    other = Environment()
+    assert other.init(
+        OTHER_ROBOT_URDF, GeneralResourceLocator(paths=[get_tesseract_resource_path()])
+    )
+    viewer.update_environment(env)
+    before = np.array(viewer._link_frames["tool0"].position)
+    bad = Trajectory.build(["other_joint"], np.array([[0.0], [0.5]]), np.array([0.0, 1.0]))
+
+    with pytest.raises(StaleSceneError):
+        viewer.record(
+            [RecordingPhase(env, _ramp(0.5, 1.0)), RecordingPhase(other, bad)], fps=FPS_HZ
+        )
+
+    np.testing.assert_allclose(viewer._link_frames["tool0"].position, before, atol=POSITION_ATOL_M)
+    assert viewer._env is env

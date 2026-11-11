@@ -10,13 +10,20 @@ from numpy.typing import ArrayLike, NDArray
 
 from tesseract_robotics.command_language import (
     CompositeInstruction,
+    JointWaypointPoly,
     MoveInstructionType,
+    StateWaypointPoly,
 )
 
-from .errors import EmptyTrajectoryError, TrajectoryShapeError, UnplannedWaypointError
+from .errors import (
+    EmptyTrajectoryError,
+    TrajectoryShapeError,
+    UnplannedWaypointError,
+    UntimedTrajectoryError,
+)
 
 
-def _names(waypoint) -> list[str]:
+def _names(waypoint: StateWaypointPoly | JointWaypointPoly) -> list[str]:
     """Joint names of a state or joint waypoint: the viewer works in `str`, tesseract in ids."""
     return [jid.name() for jid in waypoint.getJointIds()]
 
@@ -86,23 +93,34 @@ class Trajectory:
 
         Returns:
             The trajectory.
+
+        Raises:
+            EmptyTrajectoryError: no rows.
+            TrajectoryShapeError: `rows` is not 2-D, or its shape disagrees with `joint_names`.
         """
         a = np.asarray(rows, dtype=np.float64)
-        if a.ndim != 2:
+        if a.size == 0:
             raise EmptyTrajectoryError("trajectory has no waypoints")
+        if a.ndim != 2:
+            raise TrajectoryShapeError(f"rows must be 2-D (N, J + 1), got shape {a.shape}")
         return cls.build(joint_names, a[:, :-1], a[:, -1])
 
     @classmethod
-    def from_composite(cls, composite: CompositeInstruction) -> Trajectory:
+    def from_composite(
+        cls, composite: CompositeInstruction, *, untimed_step_s: float | None = None
+    ) -> Trajectory:
         """Build from a planned program, descending into child composites.
 
-        State waypoints keep their time; joint waypoints carry none, so their index is
-        their time. So is a state waypoint's index when every time is zero: the program
-        was not time-parameterized and would otherwise have no duration. Columns follow
-        the first waypoint's joint order, whatever order later waypoints name them in.
+        State waypoints keep their time. A program without times (joint waypoints, or
+        state waypoints that were never time-parameterized, all at zero) has no
+        duration of its own; it is placed on a clock only when the caller says how:
+        waypoint `i` at `i * untimed_step_s`. Columns follow the first waypoint's
+        joint order, whatever order later waypoints name them in.
 
         Args:
             composite: Planner output, e.g. `PlanningResult.raw_results`.
+            untimed_step_s: Time between waypoints [s] for a program without times;
+                `None` raises on such a program instead of inventing a clock.
 
         Returns:
             The trajectory.
@@ -110,11 +128,15 @@ class Trajectory:
         Raises:
             EmptyTrajectoryError: no move instruction.
             UnplannedWaypointError: a move has a Cartesian waypoint.
-            TrajectoryShapeError: waypoints name different joints, or times decrease.
+            UntimedTrajectoryError: the program has no times and `untimed_step_s` is `None`.
+            TrajectoryShapeError: waypoints name different joints, times decrease, or
+                `untimed_step_s` is not positive.
         """
+        if untimed_step_s is not None and not untimed_step_s > 0.0:
+            raise TrajectoryShapeError(f"untimed_step_s must be positive, got {untimed_step_s}")
         joint_names: list[str] | None = None
         rows: list[NDArray[np.float64]] = []
-        times: list[float] = []
+        times: list[float | None] = []
         move_types: list[MoveInstructionType] = []
         moves = [i for i in composite.flatten() if i.isMoveInstruction()]
         for index, instruction in enumerate(moves):
@@ -125,7 +147,7 @@ class Trajectory:
                 names, q, t = _names(state), state.getPosition(), state.getTime()
             elif wp.isJointWaypoint():
                 joint = wp.asJointWaypoint()
-                names, q, t = _names(joint), joint.getPosition(), float(index)
+                names, q, t = _names(joint), joint.getPosition(), None
             else:
                 raise UnplannedWaypointError(
                     f"move {index} has a Cartesian waypoint; plan it first"
@@ -142,9 +164,18 @@ class Trajectory:
             move_types.append(move.getMoveType())
         if joint_names is None:
             raise EmptyTrajectoryError("no state or joint waypoint in the program")
-        if not any(times):
-            times = [float(index) for index in range(len(times))]
-        return cls.build(joint_names, np.stack(rows), times, move_types)
+        timed = [t for t in times if t is not None]
+        if len(timed) == len(times) and any(timed):
+            return cls.build(joint_names, np.stack(rows), timed, move_types)
+        if timed and any(timed):
+            raise TrajectoryShapeError("the program mixes timed state and untimed joint waypoints")
+        if untimed_step_s is None:
+            raise UntimedTrajectoryError(
+                "the program carries no waypoint times (not time-parameterized); "
+                "time-parameterize it, or pass untimed_step_s to place waypoint i at i * step"
+            )
+        steps = [index * untimed_step_s for index in range(len(times))]
+        return cls.build(joint_names, np.stack(rows), steps, move_types)
 
     @property
     def duration_s(self) -> float:

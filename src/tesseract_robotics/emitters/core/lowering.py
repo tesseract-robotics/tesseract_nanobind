@@ -1,10 +1,14 @@
-"""Lower a tesseract ``CompositeInstruction`` to the brand-free event IR.
+"""Lower a tesseract `CompositeInstruction` to the brand-free event IR.
 
-The single walk every backend shares — mirrors ``emitters.rapid.emit`` but
-emits typed ``Event`` objects so brand formatting lives downstream. This is the
-anti-corruption layer at the nanobind boundary: loosely-typed binding objects in,
-strictly-typed dataclasses out. One instruction may expand to several events
-(Timer → Dwell + SetDigital). Unknown instructions raise (no silent fallback).
+The single walk every backend shares. This is the anti-corruption layer at the
+nanobind boundary: loosely-typed binding objects in, strictly-typed dataclasses
+out. One instruction may expand to several events (Timer becomes Dwell +
+SetDigital). Unknown instructions raise; nothing falls back silently.
+
+Frames: tesseract resolves a move's `ManipulatorInfo` by overlaying it on its
+parent composite's (`getCombined`: non-empty fields of the child win). The walk
+does the same down the composite tree, so every move event carries the frames
+the planner used.
 """
 
 from __future__ import annotations
@@ -23,9 +27,16 @@ from tesseract_robotics.command_language import (
     TimerInstructionType,
     WaitInstructionType,
 )
-from tesseract_robotics.planning import Pose
+from tesseract_robotics.common import Isometry3d, ManipulatorInfo
+from tesseract_robotics.planning.transforms import Pose
 
-from .errors import EmptyProgramError, UncoordinatedTargetError, UnsupportedInstructionError
+from .errors import (
+    EmptyProgramError,
+    MissingManipulatorInfoError,
+    TcpOffsetError,
+    UncoordinatedTargetError,
+    UnsupportedInstructionError,
+)
 from .events import (
     CartesianMove,
     Dwell,
@@ -39,16 +50,17 @@ from .events import (
     WaitDigital,
 )
 from .external_axes import ExternalAxisLayout, ExternalAxisValue
+from .frames import FramedPose, MoveFrames
 
-#: ``ProgramIR`` name used when the ``CompositeInstruction`` has no description.
+#: `ProgramIR` name used when the `CompositeInstruction` has no description.
 _DEFAULT_PROGRAM_NAME = "program"
-#: Wait-instruction members that block on an *input* (vs an output) signal.
-#: Compared explicitly rather than substring-sniffing ``kind.name`` — an upstream
+#: Wait-instruction members that block on an input (vs an output) signal.
+#: Compared explicitly rather than substring-sniffing `kind.name`: an upstream
 #: enum rename would silently invert a name-sniff, but breaks this loudly.
 _WAIT_INPUT_TYPES = frozenset(
     {WaitInstructionType.DIGITAL_INPUT_HIGH, WaitInstructionType.DIGITAL_INPUT_LOW}
 )
-#: Wait-instruction members that block until the signal is *HIGH* (vs LOW).
+#: Wait-instruction members that block until the signal is HIGH (vs LOW).
 _WAIT_HIGH_TYPES = frozenset(
     {WaitInstructionType.DIGITAL_INPUT_HIGH, WaitInstructionType.DIGITAL_OUTPUT_HIGH}
 )
@@ -59,41 +71,67 @@ def lower(
     *,
     external_axes: ExternalAxisLayout | None = None,
 ) -> ProgramIR:
-    """Walk ``composite`` → ``ProgramIR``. Raises ``EmptyProgramError`` if no leaves.
+    """Walk `composite` into a `ProgramIR`.
 
-    ``external_axes`` classifies which group joints are the six arm axes vs.
-    track/positioner external axes. When supplied, every coordinated move's joint
-    vector is split by joint *name* so ``jointtarget``/``robtarget`` keep their six
-    robax and carry the external DOF in the ``eax`` field. ``None`` leaves joint
-    vectors whole (plain, uncoupled 6-DOF).
+    Args:
+        composite: Program to lower (planner results or a `MotionProgram` output).
+        external_axes: Arm-vs-external joint classification. When supplied, every
+            joint vector (targets and Cartesian seeds) is split by joint name so
+            the arm keeps six axes and the external DOF travel separately. `None`
+            leaves joint vectors whole.
+
+    Returns:
+        The lowered program.
+
+    Raises:
+        EmptyProgramError: no leaf instructions.
+        UnsupportedInstructionError: CIRCULAR moves, unknown instruction or waypoint
+            types, or a coordinated Cartesian target (tesseract stores no
+            external-axis target values for it).
+        MissingManipulatorInfoError: a move has no working or TCP frame.
+        TcpOffsetError: a move's `tcp_offset` names a link instead of a pose.
+        UncoordinatedTargetError: a joint vector does not match `external_axes`.
     """
-    leaves = list(_walk(composite))
+    leaves = list(_walk(composite, composite.getManipulatorInfo()))
     if not leaves:
         raise EmptyProgramError(composite.getDescription())
     events: list[Event] = []
-    for instr in leaves:
-        events.extend(_lower_instruction(instr, external_axes))
+    move_index = 0
+    for instr, info in leaves:
+        if instr.isMoveInstruction():
+            move_index += 1
+        events.extend(_lower_instruction(instr, info, move_index, external_axes))
     return ProgramIR(name=composite.getDescription() or _DEFAULT_PROGRAM_NAME, events=tuple(events))
 
 
-def _walk(composite: CompositeInstruction) -> Iterator[InstructionPoly]:
-    """Yield leaf instructions, recursing into nested composites."""
+def _walk(
+    composite: CompositeInstruction, info: ManipulatorInfo
+) -> Iterator[tuple[InstructionPoly, ManipulatorInfo]]:
+    """Yield `(leaf, combined ManipulatorInfo)`, recursing into nested composites."""
     for instr in composite.getInstructions():
         if instr.isCompositeInstruction():
-            yield from _walk(instr.asCompositeInstruction())
+            child = instr.asCompositeInstruction()
+            yield from _walk(child, info.getCombined(child.getManipulatorInfo()))
         else:
-            yield instr
+            yield instr, info
 
 
-def _lower_instruction(instr: InstructionPoly, layout: ExternalAxisLayout | None) -> list[Event]:
+def _lower_instruction(
+    instr: InstructionPoly,
+    info: ManipulatorInfo,
+    move_index: int,
+    layout: ExternalAxisLayout | None,
+) -> list[Event]:
     if instr.isMoveInstruction():
-        return [_lower_move(instr.asMoveInstruction(), layout)]
+        move = instr.asMoveInstruction()
+        frames = _move_frames(info.getCombined(move.getManipulatorInfo()), move_index)
+        return [_lower_move(move, frames, layout)]
 
     if instr.isWaitInstruction():
         wait = instr.asWaitInstruction()
         kind = wait.getWaitType()
         if kind == WaitInstructionType.TIME:
-            return [Dwell(seconds=float(wait.getWaitTime()))]
+            return [Dwell.build(float(wait.getWaitTime()))]
         return [
             WaitDigital(
                 is_input=kind in _WAIT_INPUT_TYPES,
@@ -104,11 +142,11 @@ def _lower_instruction(instr: InstructionPoly, layout: ExternalAxisLayout | None
         ]
 
     if instr.isTimerInstruction():
-        # tesseract Timer = "after N s drive digital IO i {high,low}" → Dwell + SetDigital.
-        # key=None ⇒ unnamed output #i (RAPID renders do<i>, KRL renders $OUT[i]).
+        # tesseract Timer = "after N s drive digital IO i {high,low}": Dwell + SetDigital.
+        # key=None means unnamed output #i (RAPID renders do<i>, KRL renders $OUT[i]).
         timer = instr.asTimerInstruction()
         return [
-            Dwell(seconds=float(timer.getTimerTime())),
+            Dwell.build(float(timer.getTimerTime())),
             SetDigital(
                 key=None,
                 index=int(timer.getTimerIO()),
@@ -132,14 +170,33 @@ def _lower_instruction(instr: InstructionPoly, layout: ExternalAxisLayout | None
     )
 
 
-def _lower_move(move: MoveInstructionPoly, layout: ExternalAxisLayout | None) -> Event:
+def _move_frames(info: ManipulatorInfo, move_index: int) -> MoveFrames:
+    """The `MoveFrames` of a combined `ManipulatorInfo`; raise on missing frames."""
+    working = info.working_frame.name()
+    tcp = info.tcp_frame.name()
+    if not working:
+        raise MissingManipulatorInfoError("working_frame", move_index)
+    if not tcp:
+        raise MissingManipulatorInfoError("tcp_frame", move_index)
+    offset = info.tcp_offset
+    if not isinstance(offset, Isometry3d):
+        raise TcpOffsetError(
+            "IR",
+            f"move #{move_index} names tcp_offset link {offset.name()!r}; the emitter has no "
+            "environment to resolve a link offset, pass the offset as a pose",
+        )
+    return MoveFrames(working_frame=working, tcp_frame=tcp, tcp_offset=Pose(offset.matrix))
+
+
+def _lower_move(
+    move: MoveInstructionPoly, frames: MoveFrames, layout: ExternalAxisLayout | None
+) -> Event:
     profile = move.getProfile()
     waypoint = move.getWaypoint()
     move_type = move.getMoveType()
 
     if waypoint.isCartesianWaypoint():
         cart = waypoint.asCartesianWaypoint()
-        pose = Pose(cart.getTransform().matrix)
         if move_type == MoveInstructionType.LINEAR:
             kind = MoveKind.LINEAR
         elif move_type == MoveInstructionType.FREESPACE:
@@ -149,19 +206,25 @@ def _lower_move(move: MoveInstructionPoly, layout: ExternalAxisLayout | None) ->
                 "CIRCULAR moves cannot be lowered from a CompositeInstruction "
                 "(MoveInstructionPoly carries no via point)."
             )
-        # Coordinated-Cartesian eax (a robtarget carrying the seed's external DOF)
-        # is E2; the CartesianMove.external_axes field and the backend plumbing are
-        # ready, so lowering leaves it empty here rather than split an unverified seed.
-        return CartesianMove(pose=pose, kind=kind, profile=profile, seed_joints=_seed_joints(cart))
+        if layout is not None and layout.external_axes:
+            raise UnsupportedInstructionError(
+                "coordinated Cartesian target: a tesseract CartesianWaypoint stores no "
+                "external-axis target values (its seed is an IK hint, not a target); "
+                "plan coordinated motion as joint waypoints"
+            )
+        target = FramedPose(pose=Pose(cart.getTransform().matrix), frames=frames)
+        return CartesianMove(
+            target=target, kind=kind, profile=profile, seed_joints=_seed_joints(cart, layout)
+        )
 
     if waypoint.isJointWaypoint():
         joint = waypoint.asJointWaypoint()
         positions = _to_tuple(joint.getPosition())
         if layout is None:
-            return JointMove(joints=positions, profile=profile)
+            return JointMove(joints=positions, profile=profile, frames=frames)
         names = tuple(str(name) for name in joint.getJointIds())
         arm, external = _split_external(names, positions, layout)
-        return JointMove(joints=arm, profile=profile, external_axes=external)
+        return JointMove(joints=arm, profile=profile, frames=frames, external_axes=external)
 
     raise UnsupportedInstructionError(
         "Move waypoint type not supported: neither Cartesian nor Joint"
@@ -175,11 +238,11 @@ def _split_external(
 ) -> tuple[tuple[float, ...], tuple[ExternalAxisValue, ...]]:
     """Split a coordinated joint vector into (six arm values, external values) by name.
 
-    The waypoint's joint-name set must exactly equal the layout's (arm ∪ external);
-    a missing external DOF, an unclassified joint, a length mismatch, or duplicate
-    names all raise ``UncoordinatedTargetError`` — the by-name split never guesses a
-    slot. Arm values follow ``layout.arm_joint_names`` (robax order); external values
-    follow ``layout.external_axes`` (eax-slot order).
+    The waypoint's joint-name set must exactly equal the layout's (arm and
+    external); a missing external DOF, an unclassified joint, a length mismatch,
+    or duplicate names all raise `UncoordinatedTargetError`. Arm values follow
+    `layout.arm_joint_names` (robax order); external values follow
+    `layout.external_axes` (eax-slot order).
     """
     layout_names = layout.joint_names
     waypoint_set = set(names)
@@ -188,7 +251,7 @@ def _split_external(
     extra = tuple(name for name in names if name not in layout_set)
     if missing or extra or len(names) != len(positions) or len(waypoint_set) != len(names):
         raise UncoordinatedTargetError(missing=missing, extra=extra, waypoint_names=names)
-    by_name = dict(zip(names, positions))
+    by_name = dict(zip(names, positions, strict=True))
     arm = tuple(by_name[name] for name in layout.arm_joint_names)
     external = tuple(
         ExternalAxisValue(by_name[spec.joint_name], spec.kind) for spec in layout.external_axes
@@ -196,10 +259,19 @@ def _split_external(
     return arm, external
 
 
-def _seed_joints(cart: CartesianWaypointPoly) -> tuple[float, ...] | None:
-    """The waypoint's IK seed as a radians tuple, or ``None`` if it carries none."""
-    pos = np.asarray(cart.getSeed().position, dtype=np.float64).ravel()
-    return tuple(float(v) for v in pos) if pos.size else None
+def _seed_joints(
+    cart: CartesianWaypointPoly, layout: ExternalAxisLayout | None
+) -> tuple[float, ...] | None:
+    """The waypoint's seed as a radians tuple (arm axes when a layout is given), or `None`."""
+    seed = cart.getSeed()
+    pos = _to_tuple(seed.position)
+    if not pos:
+        return None
+    if layout is None:
+        return pos
+    names = tuple(str(jid) for jid in seed.joint_ids)
+    arm, _ = _split_external(names, pos, layout)
+    return arm
 
 
 def _to_tuple(values: ArrayLike) -> tuple[float, ...]:

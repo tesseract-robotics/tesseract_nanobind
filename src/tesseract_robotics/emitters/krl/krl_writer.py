@@ -1,21 +1,18 @@
-"""KUKA KRL code-generation DSL — class-per-statement with ``with``-block scopes.
+"""KUKA KRL code-generation DSL: class-per-statement with `with`-block scopes.
 
-A thin specialization of the shared ``core.dsl`` skeleton (the twin of
-``emitters.rapid.rapid_writer``): ``KrlWriter`` sets the tab width, ``KrlCommand``
-binds the writer, and ``Def`` is a ``Block``. Every statement writes itself on
-instantiation, so the DSL reads like the target language —
+A thin specialization of the shared `core.dsl` skeleton: `KrlWriter` sets the
+tab width, `KrlCommand` binds the writer type, and `Def` is a `Block`. Every
+statement writes itself into the active `KrlWriter` on instantiation:
 
 ```python
-with Def("WELD_01"):
-    Comment("approach")
-    BasVelPtp(100)
-    Ptp("{A1 0.0,A2 -20.0,A3 30.0,A4 0.0,A5 50.0,A6 0.0}")
-    VelCp(0.1)
-    Lin("{X 600.0,Y -100.0,Z 800.0,A 0.0,B 0.0,C 180.0}")
+with KrlWriter() as krl:
+    with Def("WELD_01"):
+        Comment("approach")
+        BasVelPtp(100)
+        Ptp("{A1 0.0000,A2 -20.0000,A3 30.0000,A4 0.0000,A5 50.0000,A6 0.0000}")
+        VelCp(0.1)
+        Lin("{X 600.000,Y -100.000,Z 800.000,A 0.0000,B 0.0000,C 180.0000}")
 ```
-
-``KrlBackend`` drives these same classes from the brand-neutral IR, exactly as
-``RapidBackend`` drives the RAPID DSL.
 """
 
 from __future__ import annotations
@@ -23,9 +20,8 @@ from __future__ import annotations
 from typing import ClassVar
 
 from ..core.dsl import Block, Command, Writer
-
-#: ``$VEL.CP`` is printed in metres/second with 5 decimals.
-_VEL_CP_DECIMALS = 5
+from ..core.precision import M_DECIMALS, MM_DECIMALS, fixed
+from .syntax import KRL_IDENTIFIERS, comment_text
 
 
 class KrlWriter(Writer):
@@ -36,64 +32,89 @@ class KrlWriter(Writer):
 
 
 class KrlCommand(Command):
-    """Base for every KRL DSL class; bound to the ``KrlWriter`` singleton."""
+    """Base for every KRL DSL class; writes into the active `KrlWriter`."""
 
-    writer: ClassVar[KrlWriter] = KrlWriter()
+    writer_type: ClassVar[type[Writer]] = KrlWriter
 
 
 class Def(KrlCommand, Block):
-    """``DEF <name>() ... END`` program block."""
+    """`DEF <name>() ... END` program block."""
 
     def __init__(self, name: str) -> None:
-        Block.__init__(self, f"DEF {name}()", "END")
+        Block.__init__(self, f"DEF {KRL_IDENTIFIERS.validate(name)}()", "END")
 
 
 class Comment(KrlCommand):
-    """``; <text>`` — KRL line comment."""
+    """`; <text>`: KRL line comment (never contains a line break)."""
 
     def __init__(self, text: str) -> None:
-        self.writer.write(f"; {text}")
+        self.writer.write(f"; {comment_text(text)}")
 
 
 class BasVelPtp(KrlCommand):
-    """``BAS(#VEL_PTP, <percent>)`` — set PTP velocity as a percentage."""
+    """`BAS(#VEL_PTP, <percent>)`: PTP velocity as a percentage of maximum."""
 
     def __init__(self, percent: float) -> None:
         self.writer.write(f"BAS(#VEL_PTP, {percent:g})")
 
 
 class VelCp(KrlCommand):
-    """``$VEL.CP = <m/s>`` — set the Cartesian path velocity (metres/second)."""
+    """`$VEL.CP = <m/s>`: Cartesian path velocity in metres/second."""
 
     def __init__(self, m_per_s: float) -> None:
-        self.writer.write(f"$VEL.CP = {m_per_s:.{_VEL_CP_DECIMALS}f}")
+        self.writer.write(f"$VEL.CP = {fixed(m_per_s, M_DECIMALS)}")
+
+
+class ApoCdis(KrlCommand):
+    """`$APO.CDIS = <mm>`: the distance criterion `C_DIS` approximation uses."""
+
+    def __init__(self, mm: float) -> None:
+        self.writer.write(f"$APO.CDIS = {fixed(mm, MM_DECIMALS)}")
+
+
+class SetBase(KrlCommand):
+    """`$BASE = <frame>`: select the base (work) frame."""
+
+    def __init__(self, frame_expr: str) -> None:
+        self.writer.write(f"$BASE = {frame_expr}")
+
+
+class SetTool(KrlCommand):
+    """`$TOOL = <frame>`: select the tool frame."""
+
+    def __init__(self, frame_expr: str) -> None:
+        self.writer.write(f"$TOOL = {frame_expr}")
+
+
+def _approx(c_dis: bool) -> str:
+    return " C_DIS" if c_dis else ""
 
 
 class Ptp(KrlCommand):
-    """``PTP <target>`` — point-to-point move to an axis or frame target literal."""
+    """`PTP <target> [C_DIS]`: point-to-point move to an axis target literal."""
 
-    def __init__(self, target: str) -> None:
-        self.writer.write(f"PTP {target}")
+    def __init__(self, target: str, *, c_dis: bool = False) -> None:
+        self.writer.write(f"PTP {target}{_approx(c_dis)}")
 
 
 class Lin(KrlCommand):
-    """``LIN <target>`` — linear move to a frame target literal."""
+    """`LIN <target> [C_DIS]`: linear move to a frame target literal."""
 
-    def __init__(self, target: str) -> None:
-        self.writer.write(f"LIN {target}")
+    def __init__(self, target: str, *, c_dis: bool = False) -> None:
+        self.writer.write(f"LIN {target}{_approx(c_dis)}")
 
 
 class WaitSec(KrlCommand):
-    """``WAIT SEC <seconds>`` — dwell for a fixed duration."""
+    """`WAIT SEC <seconds>`: dwell for a fixed duration."""
 
     def __init__(self, seconds: float) -> None:
         self.writer.write(f"WAIT SEC {seconds:g}")
 
 
 class WaitFor(KrlCommand):
-    """``WAIT FOR ($IN[i] == TRUE)`` — block until a digital signal matches.
+    """`WAIT FOR ($IN[i] == TRUE)`: block until a digital signal matches.
 
-    ``is_input`` selects ``$IN`` vs ``$OUT``.
+    `is_input` selects `$IN` vs `$OUT`.
     """
 
     def __init__(self, index: int, value: bool, *, is_input: bool) -> None:
@@ -102,14 +123,14 @@ class WaitFor(KrlCommand):
 
 
 class SetOut(KrlCommand):
-    """``$OUT[i] = TRUE|FALSE`` — drive a digital output."""
+    """`$OUT[i] = TRUE|FALSE`: drive a digital output."""
 
     def __init__(self, index: int, value: bool) -> None:
         self.writer.write(f"$OUT[{index}] = {'TRUE' if value else 'FALSE'}")
 
 
 class SetAnOut(KrlCommand):
-    """``$ANOUT[i] = <value>`` — drive an analog output."""
+    """`$ANOUT[i] = <value>`: drive an analog output."""
 
     def __init__(self, index: int, value: float) -> None:
         self.writer.write(f"$ANOUT[{index}] = {value:g}")

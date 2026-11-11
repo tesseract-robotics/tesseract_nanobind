@@ -1,9 +1,11 @@
-"""EmitIdentity: same program in → same digest out (structural reproducibility)."""
+"""EmitIdentity: same program in, same digest out (structural reproducibility)."""
 
 from __future__ import annotations
 
+from importlib.metadata import version
+
 from tesseract_robotics.emitters.core.events import Dwell, Note, ProgramIR
-from tesseract_robotics.emitters.core.identity import EmitIdentity
+from tesseract_robotics.emitters.core.identity import EmitIdentity, stable_repr
 
 
 def test_identical_inputs_give_identical_digests() -> None:
@@ -25,8 +27,16 @@ def test_digests_are_prefixed_sha256_hex() -> None:
     assert len(ident.ir_digest) == len("sha256:") + 64
 
 
-def test_header_lines_have_version_and_digest() -> None:
+def test_version_is_the_installed_distribution() -> None:
     ident = EmitIdentity.build(ProgramIR(name="p"), profiles_repr="x")
-    lines = ident.header_lines()
-    assert any("tesseract_robotics.emitters" in ln for ln in lines)
-    assert any(ident.ir_digest in ln for ln in lines)
+    assert ident.package_version == version("tesseract-robotics-nanobind")
+    assert ident.header_lines()[0].endswith(ident.package_version)
+
+
+def test_stable_repr_names_callables_without_addresses() -> None:
+    def resolver(q):  # noqa: ANN001, ANN202
+        return q
+
+    text = stable_repr(resolver)
+    assert "0x" not in text and text.endswith("resolver")
+    assert stable_repr(lambda q: q) == stable_repr(lambda q: q)

@@ -1,23 +1,22 @@
 """The backend contract and the IR-to-backend driver.
 
-``ProgramBackend`` is the abstract contract that **each robot dialect concretely
-implements** — RAPID, KRL, LS, JBI, URScript are its subclasses. The IR events
-are brand-neutral *data*; a backend is the dialect that renders them. One
-``@abstractmethod`` per event type means a new dialect (or a newly added event)
-fails at class-definition until every case is handled — the contract is enforced
-nominally, not merely hoped-for structurally.
+`ProgramBackend` is the abstract contract each robot dialect implements: RAPID,
+KRL, LS, JBI and URScript are its subclasses. The IR events are brand-neutral
+data; a backend is the dialect that renders them. One `@abstractmethod` per
+event type means a new dialect (or a newly added event) fails at instantiation
+until every case is handled.
 
-``drive()`` is the visitor: it walks a ``ProgramIR`` and routes each event to the
-matching backend method, exhaustively (a new event type without a branch trips
-``_assert_never``, and the type checker flags the unhandled case). Together:
-the ABC says *what* every dialect must handle; ``drive`` says *how* events reach
-those handlers — and the IR stays a single brand-neutral, content-addressable
-artifact that one lowering can feed to every backend.
+`drive()` is the visitor: it opens the backend's writer session, walks a
+`ProgramIR` and routes each event to the matching backend method, exhaustively
+(a new event type without a branch trips `_assert_never`, and the type checker
+flags the unhandled case). The session closes even when a handler raises, so a
+failed emit never leaves its writer active.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 
 from .events import (
     CartesianMove,
@@ -34,52 +33,47 @@ from .events import (
 
 
 class ProgramBackend(ABC):
-    """Abstract dialect contract — one concrete subclass per robot language.
+    """Abstract dialect contract: one concrete subclass per robot language.
 
-    Inline provenance documents the attic ``RobotPost`` name each descends from.
-    A backend receives its program/module name(s) at construction; ``prog_start``
-    opens the program and ``prog_finish`` returns the emitted filename→text map.
+    A backend receives its program name, profiles and frame binding at
+    construction; `session` returns the context that activates its writer;
+    `prog_start` opens the program and `prog_finish` returns the emitted
+    filename-to-text map.
     """
 
     @abstractmethod
-    def prog_start(self) -> None:  # attic: RobotPost.ProgStart
-        ...
+    def session(self) -> AbstractContextManager[object]:
+        """Context that makes this backend's writer the active one while it is open."""
 
     @abstractmethod
-    def move_joint(self, m: JointMove) -> None:  # attic: RobotPost.MoveJ (pose=None)
-        ...
+    def prog_start(self) -> None: ...
 
     @abstractmethod
-    def move_cartesian(self, m: CartesianMove) -> None:  # attic: RobotPost.MoveJ/MoveL
-        ...
+    def move_joint(self, m: JointMove) -> None: ...
 
     @abstractmethod
-    def dwell(self, e: Dwell) -> None:  # attic: RobotPost.Pause
-        ...
+    def move_cartesian(self, m: CartesianMove) -> None: ...
 
     @abstractmethod
-    def wait_digital(self, e: WaitDigital) -> None:  # attic: RobotPost.waitDI
-        ...
+    def dwell(self, e: Dwell) -> None: ...
 
     @abstractmethod
-    def set_digital(self, e: SetDigital) -> None:  # attic: RobotPost.setDO
-        ...
+    def wait_digital(self, e: WaitDigital) -> None: ...
 
     @abstractmethod
-    def set_analog(self, e: SetAnalog) -> None:  # attic: RobotPost.setAO
-        ...
+    def set_digital(self, e: SetDigital) -> None: ...
 
     @abstractmethod
-    def tool_change(self, e: ToolChange) -> None:  # attic: RobotPost.setTool
-        ...
+    def set_analog(self, e: SetAnalog) -> None: ...
 
     @abstractmethod
-    def note(self, e: Note) -> None:  # attic: RobotPost.RunMessage(iscomment=True)
-        ...
+    def tool_change(self, e: ToolChange) -> None: ...
 
     @abstractmethod
-    def prog_finish(self) -> dict[str, str]:  # attic: RobotPost.ProgFinish + ProgSave
-        ...
+    def note(self, e: Note) -> None: ...
+
+    @abstractmethod
+    def prog_finish(self) -> dict[str, str]: ...
 
 
 def _dispatch(event: Event, backend: ProgramBackend) -> None:
@@ -109,8 +103,9 @@ def _assert_never(value: object) -> None:
 
 
 def drive(ir: ProgramIR, backend: ProgramBackend) -> dict[str, str]:
-    """Run ``ir`` through ``backend``; return the emitted filename→text mapping."""
-    backend.prog_start()
-    for event in ir.events:
-        _dispatch(event, backend)
-    return backend.prog_finish()
+    """Run `ir` through `backend`; return the emitted filename-to-text mapping."""
+    with backend.session():
+        backend.prog_start()
+        for event in ir.events:
+            _dispatch(event, backend)
+        return backend.prog_finish()

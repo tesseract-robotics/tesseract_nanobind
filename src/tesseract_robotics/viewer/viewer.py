@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import threading
 import time
+import weakref
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import partial
@@ -65,6 +66,9 @@ PLOT_AXES_RADIUS_RATIO = 0.05
 PLOT_PATH_THICKNESS_M = 0.002
 # Recording rate [Hz]: the player's own 30 Hz, so a recording moves as the live view does.
 RECORD_FPS_HZ = 30.0
+# Waypoint spacing plot_trajectory gives a program without times [s]: the plot draws the
+# path, not its timing, so any positive step draws the same geometry.
+PLOT_UNTIMED_STEP_S = 1.0
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,9 @@ class TesseractViewer:
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
         """Start serving.
+
+        A viewer that is garbage-collected, or still open at interpreter exit, stops
+        its player and releases its port; `close()` does so deterministically.
 
         Args:
             host: Interface to bind.
@@ -133,12 +140,20 @@ class TesseractViewer:
             )
             self._gui_speed = gui.add_number("Speed", DEFAULT_SPEED, min=0.0, step=SPEED_STEP)
             self._gui_loop = gui.add_checkbox("Loop", True)
-        self._gui_time.on_update(self._on_time_dragged)
+        # Weakly: viser's threads keep the server, and so its callbacks, alive.
+        self._gui_time.on_update(_weak_callback(self._on_time_dragged))
 
         self._stop_player = threading.Event()
+        # Player iterations, ticked or not, so a caller can wait for the player to move on.
+        self._ticks = 0
+        self._ticked = threading.Condition()
+        # The thread holds the viewer only weakly, so an unreferenced viewer can be collected
+        # and its finalizer can stop the server.
         self._player = threading.Thread(
-            target=self._play, name="tesseract-viewer-player", daemon=True
-        )
+            target=_play, args=(weakref.ref(self), self._stop_player),
+            name="tesseract-viewer-player", daemon=True,
+        )  # fmt: skip
+        self._finalizer = weakref.finalize(self, _release, self._server, self._stop_player)
         self._player.start()
 
     @property
@@ -206,7 +221,7 @@ class TesseractViewer:
                 plane="xy",
                 cell_size=FLOOR_CELL_M,
                 section_size=FLOOR_SECTION_M,
-                position=(*floor.center_m, 0.0),
+                position=(*floor.center_m, floor.z_m),
                 shadow_opacity=FLOOR_SHADOW_OPACITY,
             )
             traj = self._trajectory
@@ -239,22 +254,29 @@ class TesseractViewer:
             self._pose_links(joint_names, np.asarray(q, dtype=np.float64))
             self._gui_play.value = False
 
-    def update_trajectory(self, trajectory: CompositeInstruction | Trajectory) -> None:
+    def update_trajectory(
+        self,
+        trajectory: CompositeInstruction | Trajectory,
+        *,
+        untimed_step_s: float | None = None,
+    ) -> None:
         """Animate `trajectory` from its start; loops while `Loop` is on.
 
         Args:
-            trajectory: Planned program or joint trajectory. A program's joint
-                waypoints carry no time, so their index is their time [s].
+            trajectory: Planned program or joint trajectory.
+            untimed_step_s: For a program without waypoint times, the time between
+                waypoints [s]; see `Trajectory.from_composite`.
 
         Raises:
             NoEnvironmentError: no environment yet.
+            UntimedTrajectoryError: the program has no times and `untimed_step_s` is `None`.
             UnknownJointError: the trajectory names a joint the environment lacks.
             StaleSceneError: the environment gained or lost links; push it again.
         """
         traj = (
             trajectory
             if isinstance(trajectory, Trajectory)
-            else Trajectory.from_composite(trajectory)
+            else Trajectory.from_composite(trajectory, untimed_step_s=untimed_step_s)
         )
         with self._pose_lock:
             # Posing first validates: a bad trajectory raises before anything changes.
@@ -293,6 +315,8 @@ class TesseractViewer:
         """Draw the TCP path `trajectory` commands, with an axes triad per waypoint.
 
         See `tcp_path` for how each move type is drawn. Nothing is drawn if it raises.
+        Plots belong to the scene: `update_environment` clears them. A program without
+        waypoint times is drawn too: the plot shows the path, not its timing.
 
         Args:
             trajectory: Planned program or joint trajectory.
@@ -306,35 +330,36 @@ class TesseractViewer:
             UnsupportedMoveTypeError: a move is neither `LINEAR` nor `FREESPACE`.
             MovingWorkingFrameError: a `LINEAR` move's working frame moves with the group.
         """
-        env = self._require_env()
         traj = (
             trajectory
             if isinstance(trajectory, Trajectory)
-            else Trajectory.from_composite(trajectory)
+            else Trajectory.from_composite(trajectory, untimed_step_s=PLOT_UNTIMED_STEP_S)
         )
-        path = tcp_path(env, traj, manip_info)
-        n = len(self._plot_handles) // 2
-        self._plot_handles.append(
-            self._server.scene.add_line_segments(
-                f"/plot/{n}/path", path.segments, color, thickness=PLOT_PATH_THICKNESS_M
+        with self._pose_lock:
+            path = tcp_path(self._require_env(), traj, manip_info)
+            n = len(self._plot_handles) // 2
+            self._plot_handles.append(
+                self._server.scene.add_line_segments(
+                    f"/plot/{n}/path", path.segments, color, thickness=PLOT_PATH_THICKNESS_M
+                )
             )
-        )
-        self._plot_handles.append(
-            self._server.scene.add_batched_axes(
-                f"/plot/{n}/axes",
-                path.wxyzs,
-                path.positions,
-                axes_length=axes_length,
-                axes_radius=axes_length * PLOT_AXES_RADIUS_RATIO,
+            self._plot_handles.append(
+                self._server.scene.add_batched_axes(
+                    f"/plot/{n}/axes",
+                    path.wxyzs,
+                    path.positions,
+                    axes_length=axes_length,
+                    axes_radius=axes_length * PLOT_AXES_RADIUS_RATIO,
+                )
             )
-        )
 
     def record(self, phases: Sequence[RecordingPhase], *, fps: float = RECORD_FPS_HZ) -> bytes:
         """Record `phases` in order as `.viser` file content, for viser's static client.
 
         The scene as it stands (environment, `plot_trajectory`, `server.scene` additions)
         becomes the recording's start, so add those first. Playback waits meanwhile, and
-        the live scene returns to its poses afterwards.
+        the live scene returns to its environment and poses afterwards, also when a
+        phase fails.
 
         Args:
             phases: What to play; empty records the scene as it stands, with no timeline.
@@ -379,12 +404,15 @@ class TesseractViewer:
                         clock_s = at_s
                         self._pose_links(traj.joint_names, traj.sample(float(t_s)))
             finally:
-                # Also on failure: an unserialized recording stays registered with viser.
-                data = serializer.serialize()
-                self._env = live_env
-            for name, (position, wxyz) in live_poses.items():
-                self._link_frames[name].position = position
-                self._link_frames[name].wxyz = wxyz
+                try:
+                    # Also on failure: an unserialized recording stays registered with viser.
+                    # First, so the restore below is not recorded as a frame.
+                    data = serializer.serialize()
+                finally:
+                    self._env = live_env
+                    for name, (position, wxyz) in live_poses.items():
+                        self._link_frames[name].position = position
+                        self._link_frames[name].wxyz = wxyz
             return data
 
     def close(self) -> None:
@@ -396,6 +424,7 @@ class TesseractViewer:
         if self._closed:
             return
         self._closed = True
+        self._finalizer.detach()
         self._stop_player.set()
         self._player.join(PLAYER_JOIN_TIMEOUT_S)
         if self._player.is_alive():
@@ -408,12 +437,12 @@ class TesseractViewer:
             self._server.stop()
 
     def serve_forever(self) -> None:
-        """Block until Ctrl-C, then `close()`."""
+        """Block until Ctrl-C, then `close()`. Ctrl-C is the way out, so it returns normally."""
         try:
             while True:
                 time.sleep(SERVE_POLL_S)
         except KeyboardInterrupt:
-            pass
+            logger.info("interrupted: closing the viewer")
         finally:
             self.close()
 
@@ -426,7 +455,17 @@ class TesseractViewer:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        self.close()
+        if exc is None:
+            self.close()
+            return
+        # An exception is already on its way out: a close() failure must not replace it.
+        try:
+            self.close()
+        except ViewerCloseTimeoutError as close_error:
+            logger.error(
+                f"close() failed while handling {exc_type.__name__ if exc_type else exc}: {close_error}"
+            )
+            exc.add_note(f"and closing the viewer then failed: {close_error}")
 
     def _require_env(self) -> Environment:
         if self._env is None:
@@ -461,11 +500,12 @@ class TesseractViewer:
             self._t_s = self._gui_time.value
             self.show_time(self._t_s)
 
-    def _play(self) -> None:
-        while not self._stop_player.wait(PLAYBACK_DT_S):
+    def _play_once(self) -> None:
+        """One player iteration: a tick if the pose lock frees up within a frame."""
+        try:
             # Timed: a long push holds the lock, and close() must still be able to stop this.
             if not self._pose_lock.acquire(timeout=PLAYBACK_DT_S):
-                continue
+                return
             try:
                 self._tick()
             except Exception:
@@ -475,6 +515,24 @@ class TesseractViewer:
                 self._gui_play.value = False
             finally:
                 self._pose_lock.release()
+        finally:
+            with self._ticked:
+                self._ticks += 1
+                self._ticked.notify_all()
+
+    def wait_player_iterations(self, count: int, timeout_s: float) -> bool:
+        """Block until the player has run `count` more iterations (ticked or skipped).
+
+        Args:
+            count: Iterations to wait for.
+            timeout_s: Longest wait [s].
+
+        Returns:
+            Whether the player got there within `timeout_s`.
+        """
+        with self._ticked:
+            target = self._ticks + count
+            return self._ticked.wait_for(lambda: self._ticks >= target, timeout_s)
 
     def _tick(self) -> None:
         # Under the pose lock: a pause from another thread cannot interleave with a frame.
@@ -518,8 +576,41 @@ class TesseractViewer:
             handle.remove()
         for frame in self._link_frames.values():
             frame.remove()
+        for plot in self._plot_handles:
+            plot.remove()
         self._visual_handles.clear()
         self._link_frames.clear()
+        self._plot_handles.clear()
+
+
+def _play(viewer_ref: weakref.ref[TesseractViewer], stop: threading.Event) -> None:
+    """The player thread: one iteration per frame until `stop`, or the viewer is collected."""
+    while not stop.wait(PLAYBACK_DT_S):
+        viewer = viewer_ref()
+        if viewer is None:
+            return
+        viewer._play_once()
+        del viewer
+
+
+def _weak_callback(
+    method: Callable[[viser.GuiEvent], None],
+) -> Callable[[viser.GuiEvent], None]:
+    """`method` as a GUI callback that does not keep its viewer alive."""
+    ref = weakref.WeakMethod(method)
+
+    def call(event: viser.GuiEvent) -> None:
+        bound = ref()
+        if bound is not None:
+            bound(event)
+
+    return call
+
+
+def _release(server: viser.ViserServer, stop: threading.Event) -> None:
+    """Finalizer of an unclosed viewer: stop its player and release its port."""
+    stop.set()
+    server.stop()
 
 
 def _call_on_loop[T](loop: asyncio.AbstractEventLoop, call: Callable[[], T]) -> T:

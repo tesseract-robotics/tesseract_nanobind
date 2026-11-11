@@ -1,4 +1,4 @@
-"""Public JBI emission: ``CompositeInstruction`` → ``EmittedProgram``."""
+"""Public JBI emission: `CompositeInstruction` to `EmittedProgram`."""
 
 from __future__ import annotations
 
@@ -7,43 +7,54 @@ from collections.abc import Mapping
 from tesseract_robotics.command_language import CompositeInstruction
 
 from ..core.backend import drive
+from ..core.frames import FrameBinding
 from ..core.identity import EmitIdentity
 from ..core.lowering import lower
 from ..core.program import EmittedProgram
 from .backend import JbiBackend
 from .profile import JbiProfile
+from .syntax import JbiPulseCalibration
 
 
 def emit_jbi(
     composite: CompositeInstruction,
     profiles: Mapping[str, JbiProfile],
     *,
+    frames: FrameBinding[int, int],
+    calibration: JbiPulseCalibration,
     program_name: str | None = None,
 ) -> EmittedProgram:
-    """Emit a Yaskawa Motoman INFORM ``.jbi`` from a tesseract ``CompositeInstruction``.
+    """Emit a Yaskawa Motoman INFORM `.jbi` from a tesseract `CompositeInstruction`.
 
     Args:
-        composite: planned/authored program (sparse Cartesian or joint moves).
-        profiles: tesseract profile name → ``JbiProfile``; every move's profile
-            must be present, else ``MissingProfileError``.
-        program_name: JBI job name (``//NAME``); defaults to the composite
-            description.
+        composite: Program of joint moves (Cartesian moves raise).
+        profiles: tesseract profile name to `JbiProfile`; every move's profile
+            must be present.
+        frames: Binding of TCP frames to tool numbers (build with `jbi_frames`).
+        calibration: Per-axis pulse calibration of the robot.
+        program_name: JBI job name (`//NAME`); defaults to the composite description.
 
     Returns:
-        An ``EmittedProgram`` with one ``<name>.jbi`` file: a ``//POS`` position
-        table (``///POSTYPE PULSE``, joint degrees) and a ``//INST`` instruction
-        body. The content-addressed identity is emitted as ``'`` comment lines
-        immediately after ``NOP``.
+        One `<name>.jbi` file. The identity is on `EmittedProgram.identity` only:
+        its lines exceed INFORM's 32-character comment limit.
 
     Raises:
-        EmptyProgramError: the composite has no leaf instructions.
-        MissingProfileError: a move references a profile not in ``profiles``.
-        MissingSeedError: a Cartesian move has no seed joints (PULSE positions
-            are joint angles, so seed joints are required).
-        UnsupportedInstructionError: an instruction the IR cannot represent.
+        EmptyProgramError: no leaf instructions.
+        MissingProfileError: a move's profile is absent from `profiles`.
+        UnboundFrameError: a move's TCP frame is not in `frames`.
+        ToolConflictError: moves bind to more than one tool.
+        ExternalAxisError: a move carries more than six axes.
+        UnsupportedInstructionError: Cartesian or CIRCULAR moves, tool changes,
+            named signals, analog values outside the AOUT range.
+        IdentifierError: the job name is not legal.
     """
     ir = lower(composite)
     name = program_name or ir.name
-    identity = EmitIdentity.build(ir, profiles_repr=repr(sorted(profiles.items())))
-    backend = JbiBackend(profiles=profiles, program_name=name, identity=identity)
-    return EmittedProgram(files=drive(ir, backend))
+    identity = EmitIdentity.build(
+        ir,
+        profiles_repr=repr((sorted(profiles.items()), sorted(frames.tools.items()), calibration)),
+    )
+    backend = JbiBackend(
+        profiles=profiles, frames=frames, calibration=calibration, program_name=name
+    )
+    return EmittedProgram(identity=identity, files=drive(ir, backend))

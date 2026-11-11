@@ -5,13 +5,28 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pytest
 
+from tesseract_robotics.emitters.core.errors import ExternalAxisError
 from tesseract_robotics.emitters.urscript.targets import (
     joints_literal,
     pose_literal,
     rotation_vector,
 )
 from tesseract_robotics.planning import Pose
+
+
+def test_joints_literal_rejects_external_axes() -> None:
+    with pytest.raises(ExternalAxisError):
+        joints_literal((0.0,) * 7)
+
+
+def test_rotation_vector_at_pi_about_diagonal() -> None:
+    axis = np.array([1.0, 1.0, 0.0]) / math.sqrt(2.0)
+    pose = Pose.from_matrix_position(2.0 * np.outer(axis, axis) - np.eye(3), [0.0, 0.0, 0.0])
+    v = np.array(rotation_vector(pose))
+    assert math.isclose(float(np.linalg.norm(v)), math.pi, abs_tol=1e-12)
+    assert np.allclose(np.abs(v / np.linalg.norm(v)), axis, atol=1e-12)
 
 
 def test_joints_literal_radians_six_decimals() -> None:

@@ -34,7 +34,7 @@ def trajectory(robot):
         wp = JointWaypointPoly(JointWaypoint(joints, q))
         mi = MoveInstruction(wp, MoveInstructionType.FREESPACE)
         program.push_back(MoveInstructionPoly(mi))
-    return Trajectory.from_composite(program)
+    return Trajectory.from_composite(program, untimed_step_s=1.0)
 
 
 def test_trajectory_carries_joint_names_as_str(robot, trajectory):

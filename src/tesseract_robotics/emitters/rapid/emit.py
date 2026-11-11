@@ -1,64 +1,90 @@
-"""Tesseract ``CompositeInstruction`` → RAPID.
+"""Tesseract `CompositeInstruction` to RAPID.
 
-Thin orchestration over the brand-independent core: ``lower()`` produces the
-typed event IR and ``drive()`` runs it through ``RapidBackend``. The walk and
-per-instruction recognition now live in ``emitters.core.lowering``; this module
-keeps the public ``emit_rapid`` signature and re-exports the error names that
-``emitters.rapid`` has always exposed (now the shared core classes).
+Thin orchestration over the brand-independent core: `lower()` produces the
+typed event IR and `drive()` runs it through `RapidBackend`.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from tesseract_robotics.command_language import CompositeInstruction
 
 from ..core.backend import drive
-from ..core.errors import EmitterError as EmitterError
-from ..core.errors import EmptyProgramError as EmptyProgramError
-from ..core.errors import MissingProfileError as MissingProfileError
-from ..core.errors import UncoordinatedTargetError as UncoordinatedTargetError
-from ..core.errors import UnsupportedInstructionError as UnsupportedInstructionError
-from ..core.external_axes import ExternalAxisKind as ExternalAxisKind
-from ..core.external_axes import ExternalAxisLayout as ExternalAxisLayout
-from ..core.external_axes import ExternalAxisSpec as ExternalAxisSpec
+from ..core.external_axes import ExternalAxisLayout
+from ..core.frames import FrameBinding
+from ..core.identity import EmitIdentity, stable_repr
 from ..core.lowering import lower
+from ..core.posture import PostureSolver
+from ..core.program import EmittedProgram
 from .backend import RapidBackend
-from .profile import RapidProfile
-
-
-class RapidEmitterError(EmitterError):
-    """Backward-compatible alias base (was the rapid-local error root)."""
+from .profile import RapidProfile, ToolName, WobjName
 
 
 def emit_rapid(
     composite: CompositeInstruction,
-    profiles: dict[str, RapidProfile],
+    profiles: Mapping[str, RapidProfile],
     *,
+    frames: FrameBinding[WobjName, ToolName],
+    posture: PostureSolver | None = None,
     external_axes: ExternalAxisLayout | None = None,
     module_name: str = "main_program",
     proc_name: str = "main",
-) -> str:
-    """Walk a tesseract ``CompositeInstruction`` and emit a RAPID ``MODULE`` string.
+) -> EmittedProgram:
+    """Emit a RAPID `MODULE` from a tesseract `CompositeInstruction`.
 
     Args:
-        composite: top-level CompositeInstruction (planner ``raw_results`` or a
-            ``MotionProgram.to_composite_instruction()`` output).
-        profiles: tesseract profile name → ``RapidProfile``. Every move's profile
-            must be present, else ``MissingProfileError``.
-        external_axes: arm-vs-external joint classification for a coordinated
-            (track/positioner) group. When given, each move's joint vector is split
-            by joint name so ``jointtarget``/``robtarget`` keep six robax and carry
-            the external DOF in ``eax`` (mm for LINEAR, deg for ROTARY). ``None``
-            emits a plain uncoupled program (``eax`` all ``9E+09``).
-        module_name: RAPID ``MODULE`` name.
-        proc_name: RAPID ``PROC`` name.
+        composite: Top-level program (planner results or a
+            `MotionProgram.to_composite_instruction()` output).
+        profiles: tesseract profile name to `RapidProfile`. Every move's profile
+            must be present.
+        frames: Binding of working frames to `wobjdata` and TCP frames to
+            `tooldata` (build with `rapid_frames`).
+        posture: Posture solver for the arm. Required as soon as the program has
+            a Cartesian move: it yields `cfx`. Seed joints yield `cf1/cf4/cf6`.
+        external_axes: Arm-vs-external joint classification for a coordinated
+            (track/positioner) group. When given, each joint vector is split by
+            joint name so `jointtarget` keeps six robax and carries the external
+            DOF in `eax` (mm for LINEAR, deg for ROTARY). `None` emits a plain
+            program (`eax` all `9E+09`).
+        module_name: RAPID `MODULE` name.
+        proc_name: RAPID `PROC` name.
+
+    Returns:
+        One `<module_name>.mod` file; the identity header is the module's first
+        comment lines.
 
     Raises:
         EmptyProgramError: composite has no leaf instructions.
-        UnsupportedInstructionError: CIRCULAR moves, unrecognized polymorphism.
-        MissingProfileError: profile referenced but absent from ``profiles``.
-        UncoordinatedTargetError: a move's joints do not match ``external_axes``.
+        UnsupportedInstructionError: CIRCULAR moves, tool changes, unrecognized
+            instructions.
+        MissingProfileError: profile referenced but absent from `profiles`.
+        UnboundFrameError: a move's working or TCP frame is not in `frames`.
+        MissingConfigurationError: a Cartesian move without seed joints or without
+            a `posture` solver.
+        SingularPostureError: a seed lies exactly on a posture boundary.
+        UncoordinatedTargetError: a move's joints do not match `external_axes`.
+        IdentifierError: a module, procedure or signal name is not legal RAPID.
     """
     ir = lower(composite, external_axes=external_axes)
-    backend = RapidBackend(profiles=profiles, module_name=module_name, proc_name=proc_name)
-    files = drive(ir, backend)
-    return next(iter(files.values()))
+    identity = EmitIdentity.build(
+        ir,
+        profiles_repr=repr(
+            (
+                sorted(profiles.items()),
+                sorted(frames.work_frames.items()),
+                sorted(frames.tools.items()),
+                stable_repr(posture),
+                external_axes,
+            )
+        ),  # fmt: skip
+    )
+    backend = RapidBackend(
+        profiles=profiles,
+        frames=frames,
+        posture=posture,
+        module_name=module_name,
+        proc_name=proc_name,
+        identity=identity,
+    )
+    return EmittedProgram(identity=identity, files=drive(ir, backend))

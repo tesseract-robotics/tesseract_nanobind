@@ -1,65 +1,50 @@
 """Pure URScript literal formatters — no state, no I/O, property-testable.
 
-URScript joint targets are radians; Cartesian poses are ``p[x, y, z, rx, ry, rz]``
+URScript joint targets are radians; Cartesian poses are `p[x, y, z, rx, ry, rz]`
 with translation in **metres** (UR's native unit — no scaling) and orientation as
-a **rotation vector** (axis-angle, ``axis * angle``, radians).
+a **rotation vector** (axis-angle, `axis * angle`, radians).
 
-The rotation vector is the matrix logarithm of the rotation: ``angle`` from the
+The rotation vector is the matrix logarithm of the rotation: `angle` from the
 trace, axis from the off-diagonal antisymmetric part. The angle≈π case is the
 numerically delicate one (the antisymmetric part vanishes there); the robust
 recipe used here recovers the axis from the symmetric part via the largest
 diagonal element — Shepperd's matrix→quaternion branch, which selects the same
-``(R + I)`` diagonal component a direct ``(R + I)/2`` extraction would, but stays
-exact for all angles. See ``rotation_vector`` for the per-branch derivation.
+`(R + I)` diagonal component a direct `(R + I)/2` extraction would, but stays
+exact for all angles. See `rotation_vector` for the per-branch derivation.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 
 import numpy as np
 
-from tesseract_robotics.planning import Pose
+from tesseract_robotics.planning.transforms import Pose
 
-#: Joint, pose, and rotation-vector components print with 6 decimals.
-_JOINT_DECIMALS = 6
-_POSE_DECIMALS = 6
-#: Below this rotation angle (radians) the rotation vector is the zero vector.
-#: ~1e-7 rad ≈ 6e-6 deg — far tighter than any controller resolution.
-_ANGLE_FLOOR = 1e-7
-#: |quaternion vector part| below this ⇒ identity rotation (pure numeric guard).
-_QUAT_VEC_FLOOR = 1e-12
+from ..core.errors import ExternalAxisError
+from ..core.precision import M_DECIMALS, RAD_DECIMALS, fixed
+from .syntax import BRAND
 
-
-def _fmt(value: float, decimals: int) -> str:
-    """Fixed-decimal format with negative-zero normalized to ``0`` (``round`` to
-    the display precision then ``+ 0.0`` collapses ``-0.0`` and tiny negatives
-    like ``-1e-16`` to a clean ``0.000000``). Mirrors KRL's ``_fmt``."""
-    return f"{round(value, decimals) + 0.0:.{decimals}f}"
+#: Robot axes in a URScript joint vector.
+_ROBOT_AXES = 6
 
 
 def rotation_vector(pose: Pose) -> tuple[float, float, float]:
-    """Return the URScript rotation vector ``(rx, ry, rz)`` (axis-angle, radians).
+    """Return the URScript rotation vector `(rx, ry, rz)` (axis-angle, radians).
 
-    ``angle = arccos(clamp((trace − 1) / 2))``. For ``angle ≈ 0`` the result is
-    ``(0, 0, 0)``. Otherwise the unit axis is recovered through the matrix→
-    quaternion conversion (Shepperd's largest-diagonal branch): this is exact at
-    every angle, including the ``angle ≈ π`` singularity where the antisymmetric
-    ``(R − Rᵀ)`` part vanishes and a direct ``1/(2 sin angle)`` extraction blows
-    up. The vector part of the (canonicalized, ``w ≥ 0``) quaternion gives the
-    axis; ``angle = 2·atan2(|vec|, w)`` and the result is ``axis · angle``.
+    The unit quaternion comes from Shepperd's largest-diagonal branch, which is
+    exact at every angle, including angle = pi where the antisymmetric part of
+    the matrix vanishes. Canonicalized to `w >= 0`, its vector part `v` gives
+    the axis and `angle = 2 atan2(|v|, w)`; the rotation vector is
+    `v / |v| * angle`, and exactly zero for the identity (`|v| = 0`). Near the
+    identity `angle / |v|` tends to 2, so no small-angle cut-off is needed.
     """
     r = np.asarray(pose.rotation_matrix, dtype=np.float64)
-    trace = r[0, 0] + r[1, 1] + r[2, 2]
-    cos_angle = max(-1.0, min(1.0, (trace - 1.0) / 2.0))
-    angle = math.acos(cos_angle)
-    if angle < _ANGLE_FLOOR:
-        return (0.0, 0.0, 0.0)
-
     w, vx, vy, vz = _matrix_to_quaternion(r)
     vec = np.array([vx, vy, vz], dtype=np.float64)
     vec_norm = float(np.linalg.norm(vec))
-    if vec_norm < _QUAT_VEC_FLOOR:
+    if vec_norm == 0.0:
         return (0.0, 0.0, 0.0)
     # Canonicalize to w >= 0 so the recovered angle lands in [0, π].
     if w < 0.0:
@@ -71,10 +56,10 @@ def rotation_vector(pose: Pose) -> tuple[float, float, float]:
 
 
 def _matrix_to_quaternion(r: np.ndarray) -> tuple[float, float, float, float]:
-    """Robust rotation-matrix → unit quaternion ``(w, x, y, z)`` (Shepperd).
+    """Robust rotation-matrix → unit quaternion `(w, x, y, z)` (Shepperd).
 
-    Branches on the largest of ``trace`` / the three diagonal elements so the
-    divisor ``s`` is never near zero — numerically stable across the whole
+    Branches on the largest of `trace` / the three diagonal elements so the
+    divisor `s` is never near zero — numerically stable across the whole
     rotation group, the angle≈π case included.
     """
     trace = r[0, 0] + r[1, 1] + r[2, 2]
@@ -105,26 +90,23 @@ def _matrix_to_quaternion(r: np.ndarray) -> tuple[float, float, float, float]:
     return (w, x, y, z)
 
 
-def joints_literal(joints_rad: tuple[float, ...]) -> str:
-    """Format a 6-axis joint target ``[j1, …, j6]`` (radians, 6 decimals)."""
-    if len(joints_rad) < 6:
-        raise ValueError(f"URScript joint target needs >=6 joints; got {len(joints_rad)}")
-    parts = [_fmt(float(j), _JOINT_DECIMALS) for j in joints_rad[:6]]
-    return "[" + ", ".join(parts) + "]"
+def joints_literal(joints_rad: Sequence[float]) -> str:
+    """Six-axis joint vector `[j1, ..., j6]` (radians).
+
+    Raises:
+        ExternalAxisError: not exactly six values (external axes are not emitted).
+    """
+    if len(joints_rad) != _ROBOT_AXES:
+        raise ExternalAxisError(len(joints_rad), _ROBOT_AXES, BRAND)
+    return "[" + ", ".join(fixed(float(j), RAD_DECIMALS) for j in joints_rad) + "]"
 
 
 def pose_literal(pose: Pose) -> str:
-    """Format a Cartesian pose ``p[x, y, z, rx, ry, rz]`` (metres + rotvec rad).
+    """Cartesian pose `p[x, y, z, rx, ry, rz]` (metres, rotation vector in radians).
 
-    Translation is emitted as-is in metres (UR's native unit — never scaled);
-    orientation is the rotation vector from :func:`rotation_vector`.
+    Translation is emitted in metres (UR's native unit, never scaled);
+    orientation is the rotation vector from `rotation_vector`.
     """
-    t = pose.translation
-    rx, ry, rz = rotation_vector(pose)
-    n = _POSE_DECIMALS
-    return (
-        "p["
-        f"{_fmt(float(t[0]), n)}, {_fmt(float(t[1]), n)}, {_fmt(float(t[2]), n)}, "
-        f"{_fmt(rx, n)}, {_fmt(ry, n)}, {_fmt(rz, n)}"
-        "]"
-    )
+    xyz = [fixed(float(v), M_DECIMALS) for v in pose.translation]
+    rot = [fixed(v, RAD_DECIMALS) for v in rotation_vector(pose)]
+    return "p[" + ", ".join(xyz + rot) + "]"

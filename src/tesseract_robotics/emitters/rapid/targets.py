@@ -1,10 +1,24 @@
-"""RAPID target bundles + literal formatters — pure, no writer state.
+"""RAPID target bundles and literal formatters: pure, no writer state.
 
-The twin of the other brands' ``targets.py``. Holds the robtarget/jointtarget
-data bundles (``RapidTarget`` / ``JointTarget``), the axis-quadrant ``Config``
-and ``ExternalAxis`` value types, and the private ``/MN``-line and literal
-formatters consumed by the DSL move/declaration classes. All conversions
-(m → mm, scalar-last → scalar-first quaternion) live here, inline.
+Holds the robtarget/jointtarget bundles (`RapidTarget` / `JointTarget`), the
+`Config` (confdata) and `ExternalAxis` value types, and the one formatter per
+literal. All unit conversions (metres to millimetres, radians to degrees,
+scalar-last to scalar-first quaternion) go through `core.units` here.
+
+`confdata` (3HAC050917, section `confdata`, six-axis serial robots):
+
+- `cf1`, `cf4`, `cf6` are quadrant numbers of axes 1, 4 and 6: "quadrant 0 is
+  the first quarter revolution, 0 to 90 deg, in a positive direction from the
+  zero position; quadrant 1 is the next quarter revolution, 90 to 180 deg, and
+  so on. Quadrant -1 is the quarter revolution 0 to (-90) deg". The manual does
+  not assign the exact multiples of 90 deg; `quadrant` uses the half-open
+  intervals `[k*90, (k+1)*90)` (floor), the one assignment under which quadrant
+  0 owns 0 deg (the zero position) and every quadrant has the same shape.
+- `cfx` selects one of eight configurations by three bits, in this order:
+  wrist centre relative to axis 1 (in front of / behind), wrist centre relative
+  to the lower arm (in front of / behind), axis 5 angle (positive / negative):
+  0 = front, front, positive; 1 = front, front, negative; 2 = front, behind,
+  positive; ...; 7 = behind, behind, negative.
 """
 
 from __future__ import annotations
@@ -13,183 +27,210 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-import numpy as np
-from numpy.typing import ArrayLike
-
 from tesseract_robotics.common import Quaterniond
-from tesseract_robotics.planning import Pose
+from tesseract_robotics.planning.transforms import Pose
 
-from .profile import RapidProfile
-from .utils import format_ext_axis
+from ..core.errors import InvalidDeclarationError
+from ..core.external_axes import ExternalAxisKind, ExternalAxisValue
+from ..core.posture import ArmPosture
+from ..core.precision import DEG_DECIMALS, MM_DECIMALS, QUAT_DECIMALS, fixed
+from ..core.units import Metres, Radians, to_degrees, to_millimetres
+from .profile import RapidProfile, ToolName, WobjName
+
+#: Robot axes in a robtarget/jointtarget (robax a1..a6).
+_ROBAX = 6
+#: External-axis slots in a robtarget/jointtarget (eax a..f).
+_EAX_SLOTS = 6
+#: ABB's "no value" marker for an unused external-axis slot.
+_EAX_UNUSED = "9E+09"
+#: One quadrant is a quarter revolution (rad).
+_QUARTER_TURN = math.pi / 2.0
 
 
-@dataclass
+def quadrant(angle: Radians) -> int:
+    """ABB confdata quadrant number of a joint angle: `floor(angle / 90 deg)`."""
+    return math.floor(angle / _QUARTER_TURN)
+
+
+def cfx(posture: ArmPosture) -> int:
+    """ABB six-axis `cfx` (0..7) from the three posture bits (manual table order)."""
+    return (
+        4 * (not posture.wrist_in_front_of_axis1)
+        + 2 * (not posture.wrist_in_front_of_lower_arm)
+        + (not posture.axis5_positive)
+    )
+
+
+@dataclass(frozen=True)
 class Config:
-    """RAPID robtarget axis-quadrant config — 4 integers ``[cf1, cf4, cf6, cfx]``.
+    """RAPID robtarget confdata `[cf1, cf4, cf6, cfx]`."""
 
-    ``cf1``, ``cf4``, ``cf6`` are rotational quadrant indices for axes 1, 4, and
-    6: ``0`` = ``[0, π/2)``, ``1`` = ``[π/2, π)``, etc.; negative values use the
-    inverse convention. ``cfx`` is a robot-model-specific encoded configuration
-    for the remaining axes (2, 3, 5). Defaults to ``[1, 0, 0, 0]`` — RAPID's most
-    common axis-quadrant placeholder. For robot-specific home configurations, use
-    ``Config.neutral_for(name)``.
-    """
+    cf1: int
+    cf4: int
+    cf6: int
+    cfx: int
 
-    cf1: int = 1
-    cf4: int = 0
-    cf6: int = 0
-    cfx: int = 0
+    @classmethod
+    def from_joints(cls, joints: Sequence[float], posture: ArmPosture) -> Config:
+        """Exact confdata of a six-axis joint configuration.
 
-    def __str__(self) -> str:
+        Args:
+            joints: Six arm-axis values (radians) of the configuration the target
+                is meant to be reached in.
+            posture: The posture of those joints (from a `PostureSolver`).
+
+        Raises:
+            InvalidDeclarationError: `joints` is not six values.
+        """
+        if len(joints) != _ROBAX:
+            raise InvalidDeclarationError(
+                f"confdata needs {_ROBAX} joint values; got {len(joints)}"
+            )
+        return cls(
+            cf1=quadrant(Radians(joints[0])),
+            cf4=quadrant(Radians(joints[3])),
+            cf6=quadrant(Radians(joints[5])),
+            cfx=cfx(posture),
+        )
+
+    def literal(self) -> str:
         return f"[{self.cf1}, {self.cf4}, {self.cf6}, {self.cfx}]"
 
-    @classmethod
-    def neutral_for(cls, robot: str) -> Config:
-        """Return a known-good neutral axis-quadrant config for the named robot.
 
-        The "neutral" config is what the controller reports when the arm is at
-        its home position with no axes wrapped past their quadrant boundaries —
-        useful as a baseline before ``ConfL \\Off`` paths.
-
-        Raises ``ValueError`` for unregistered robots; pass ``Config(...)``
-        explicitly instead.
-
-        Example:
-            ```python
-            config = Config.neutral_for("abb_irb2400")
-            target = RapidTarget(pose, config=config)
-            ```
-        """
-        table = {
-            "abb_irb1200": cls(cf1=1, cf4=0, cf6=0, cfx=0),
-            "abb_irb2400": cls(cf1=1, cf4=0, cf6=0, cfx=0),
-            "abb_irb4400": cls(cf1=1, cf4=0, cf6=0, cfx=0),
-            "abb_irb6640": cls(cf1=1, cf4=0, cf6=0, cfx=0),
-            "abb_irb6700": cls(cf1=1, cf4=0, cf6=0, cfx=0),
-        }
-        if robot not in table:
-            raise ValueError(
-                f"no neutral Config registered for robot {robot!r}; "
-                f"known robots: {sorted(table.keys())}. "
-                f"Pass `Config(cf1, cf4, cf6, cfx)` explicitly."
-            )
-        return table[robot]
-
-
-@dataclass
+@dataclass(frozen=True)
 class ExternalAxis:
-    """RAPID external-axis values — up to six slots; unset slots serialize to the
-    ``9E+09`` sentinel ABB uses for "no value".
+    """RAPID external-axis values in SI, one per used slot (at most six).
 
-    Each entry is either a raw ``float`` (formatted by ``str()`` — the DSL
-    hand-authoring convention) or an already-formatted display token ``str``
-    (what ``RapidBackend`` emits: unit- and precision-correct mm/deg from the
-    ``core.units`` chokepoint). ``str`` is idempotent under ``format_ext_axis``,
-    so both render identically and float callers stay byte-for-byte unchanged.
+    Unused slots serialize to `9E+09`, ABB's marker for "no value". LINEAR values
+    print in millimetres, ROTARY values in degrees.
     """
 
-    values: Sequence[float | str] = ()
-
-    def __str__(self) -> str:
-        return format_ext_axis(self.values)
+    values: tuple[ExternalAxisValue, ...] = ()
 
     @classmethod
-    def from_list(cls, values: Sequence[float | str]) -> ExternalAxis:
-        return cls(values=values)
+    def build(cls, values: Sequence[ExternalAxisValue]) -> ExternalAxis:
+        """Validate and construct.
+
+        Raises:
+            InvalidDeclarationError: more than six values, or a non-finite value.
+        """
+        vals = tuple(values)
+        if len(vals) > _EAX_SLOTS:
+            raise InvalidDeclarationError(
+                f"RAPID has {_EAX_SLOTS} external-axis slots; got {len(vals)} values"
+            )
+        for v in vals:
+            if not math.isfinite(v.value_si):
+                raise InvalidDeclarationError(f"external-axis value must be finite; got {v}")
+        return cls(vals)
+
+    def literal(self) -> str:
+        tokens = [_eax_token(v) for v in self.values]
+        tokens.extend([_EAX_UNUSED] * (_EAX_SLOTS - len(tokens)))
+        return "[" + ",".join(tokens) + "]"
 
 
-@dataclass
+def _eax_token(value: ExternalAxisValue) -> str:
+    if value.kind is ExternalAxisKind.LINEAR:
+        return fixed(to_millimetres(Metres(value.value_si)), MM_DECIMALS)
+    if value.kind is ExternalAxisKind.ROTARY:
+        return fixed(to_degrees(Radians(value.value_si)), DEG_DECIMALS)
+    raise AssertionError(f"unhandled ExternalAxisKind: {value.kind!r}")  # pragma: no cover
+
+
+@dataclass(frozen=True)
 class RapidTarget:
-    """RAPID robtarget bundle — pose + axis-quadrant config + external axes.
+    """RAPID robtarget bundle: pose, confdata and external axes.
 
-    The ``.robtarget`` property serializes this to a RAPID robtarget literal,
-    handling both axis-convention conversions inline (m → mm; scalar-last
-    ``[qx,qy,qz,qw]`` → scalar-first ``[w,x,y,z]``).
+    Attributes:
+        pose: TCP pose in the work object (metres, scalar-last quaternion).
+        config: confdata of the configuration the pose is meant to be reached in.
+        external_axis: External-axis values (all unused by default).
     """
 
     pose: Pose
-    config: Config = field(default_factory=Config)
+    config: Config
     external_axis: ExternalAxis = field(default_factory=ExternalAxis)
 
-    @property
-    def robtarget(self) -> str:
-        """Serialize to ``[[mm xyz], [wxyz quat], [config], [ext]]``."""
-        t = self.pose.translation
-        qx, qy, qz, qw = Quaterniond(self.pose.linear).coeffs()
-        x_mm, y_mm, z_mm = t[0] * 1000.0, t[1] * 1000.0, t[2] * 1000.0
-        pos = f"[{x_mm:.4f}, {y_mm:.4f}, {z_mm:.4f}]"
-        rot = f"[{qw:.8f}, {qx:.8f}, {qy:.8f}, {qz:.8f}]"
-        return "[" + ",".join([pos, rot, str(self.config), str(self.external_axis)]) + "]"
-
-
-@dataclass
-class JointTarget:
-    """RAPID jointtarget bundle — 6-axis joint values (radians) + external axes.
-
-    Mirrors ``RapidTarget`` for joint-space moves. ``__str__`` returns the RAPID
-    jointtarget literal with joints converted radians → degrees and external axes
-    padded to six slots with ``9E+09``.
-    """
-
-    joints_rad: ArrayLike
-    external_axis: ExternalAxis = field(default_factory=ExternalAxis)
-
-    def __str__(self) -> str:
-        joints = np.asarray(self.joints_rad, dtype=np.float64).ravel()
-        if joints.size != 6:
-            raise ValueError(
-                f"JointTarget requires exactly 6 joint values; got {joints.size} ({joints!r})"
+    def literal(self) -> str:
+        """Serialize to `[[x, y, z], [q1, q2, q3, q4], [confdata], [eax]]` (mm, w-first)."""
+        return (
+            "["
+            + ",".join(
+                [
+                    position_literal(self.pose),
+                    orientation_literal(self.pose),
+                    self.config.literal(),
+                    self.external_axis.literal(),
+                ]
             )
-        deg = [math.degrees(float(j)) for j in joints]
-        joints_str = (
-            f"[{deg[0]:.2f}, {deg[1]:.2f}, {deg[2]:.2f}, {deg[3]:.2f}, {deg[4]:.2f}, {deg[5]:.2f}]"
+            + "]"
         )
-        return f"[{joints_str}, {self.external_axis}]"
 
 
-# ---------------------------------------------------------------------------
-# Private formatters — consumed by the DSL move/declaration classes.
-# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class JointTarget:
+    """RAPID jointtarget bundle: six arm angles (radians) plus external axes.
 
-
-def _move_line(keyword: str, robtarget: str, profile: RapidProfile) -> str:
-    """Build a ``MoveL`` / ``MoveJ`` line referencing one robtarget."""
-    return (
-        f"{keyword} {robtarget}, "
-        f"{profile.speed}, {profile.zone}, {profile.tool} \\Wobj:={profile.wobj};"
-    )
-
-
-def _movec_line(robtarget_via: str, robtarget_end: str, profile: RapidProfile) -> str:
-    """Build a ``MoveC`` line referencing two robtargets (via, end)."""
-    return (
-        f"MoveC {robtarget_via}, {robtarget_end}, "
-        f"{profile.speed}, {profile.zone}, {profile.tool} \\Wobj:={profile.wobj};"
-    )
-
-
-def _xyz_mm(x: float, y: float, z: float) -> str:
-    """Format ``[x, y, z]`` for ``tooldata`` / ``wobjdata`` declarations (3-decimal mm)."""
-    return f"[ {x:.3f}, {y:.3f}, {z:.3f} ]"
-
-
-def _quat_wxyz(q: Sequence[float]) -> str:
-    """Format scalar-first ``[w, x, y, z]`` quaternion (9-decimal precision)."""
-    return f"[ {q[0]:.9f}, {q[1]:.9f}, {q[2]:.9f}, {q[3]:.9f} ]"
-
-
-def _cog_kg(cog: Sequence[float], kg: float) -> str:
-    """Format ``kg, [cog_x, cog_y, cog_z]`` for the ``tooldata`` inertia frame."""
-    return f"{kg}, [ {cog[0]:.3f}, {cog[1]:.3f}, {cog[2]:.3f} ]"
-
-
-def _robtarget_str(t: RapidTarget | str) -> str:
-    """Accept a ``RapidTarget`` (→ inline robtarget literal) or a ``str`` (→ an
-    already-declared robtarget variable name).
-
-    Lets idiomatic RAPID workflows split between ``MoveL [[...],...], v200, ...``
-    (one-shot, all data inline) and ``CONST robtarget pN := [...]; MoveL pN, ...``
-    (large declared block, referenced by name). The latter is preferred for long
-    toolpaths and operator-tunable programs.
+    Build via `JointTarget.build` (validates the axis count and finiteness).
     """
-    return t if isinstance(t, str) else t.robtarget
+
+    joints: tuple[Radians, Radians, Radians, Radians, Radians, Radians]
+    external_axis: ExternalAxis = field(default_factory=ExternalAxis)
+
+    @classmethod
+    def build(
+        cls, joints: Sequence[float], external_axis: ExternalAxis | None = None
+    ) -> JointTarget:
+        """Validate and construct.
+
+        Raises:
+            InvalidDeclarationError: not exactly six finite joint values.
+        """
+        if len(joints) != _ROBAX:
+            raise InvalidDeclarationError(
+                f"jointtarget needs exactly {_ROBAX} joint values; got {len(joints)}"
+            )
+        q = tuple(Radians(float(j)) for j in joints)
+        if not all(math.isfinite(j) for j in q):
+            raise InvalidDeclarationError(f"jointtarget joint values must be finite; got {q}")
+        return cls((q[0], q[1], q[2], q[3], q[4], q[5]), external_axis or ExternalAxis())
+
+    def literal(self) -> str:
+        """Serialize to `[[a1, ..., a6], [eax]]` (degrees)."""
+        deg = ", ".join(fixed(to_degrees(j), DEG_DECIMALS) for j in self.joints)
+        return f"[[{deg}], {self.external_axis.literal()}]"
+
+
+# ---------------------------------------------------------------------------
+# Formatters, consumed by the DSL move and declaration classes.
+# ---------------------------------------------------------------------------
+
+
+def position_literal(pose: Pose) -> str:
+    """`[x, y, z]` of `pose` in millimetres."""
+    t = pose.translation
+    return "[" + ", ".join(fixed(to_millimetres(Metres(float(v))), MM_DECIMALS) for v in t) + "]"
+
+
+def orientation_literal(pose: Pose) -> str:
+    """`[q1, q2, q3, q4]` = scalar-first `[w, x, y, z]` of `pose`'s rotation."""
+    qx, qy, qz, qw = (float(v) for v in Quaterniond(pose.linear).coeffs())
+    return "[" + ", ".join(fixed(v, QUAT_DECIMALS) for v in (qw, qx, qy, qz)) + "]"
+
+
+def pose_literal(pose: Pose) -> str:
+    """`[[x, y, z], [q1, q2, q3, q4]]` (the `pose` data type) of `pose`."""
+    return f"[{position_literal(pose)},{orientation_literal(pose)}]"
+
+
+def move_line(
+    keyword: str, target: str, profile: RapidProfile, tool: ToolName, wobj: WobjName
+) -> str:
+    """A `MoveL` / `MoveJ` statement to one robtarget expression."""
+    return f"{keyword} {target}, {profile.speed}, {profile.zone}, {tool} \\WObj:={wobj};"
+
+
+def movec_line(via: str, end: str, profile: RapidProfile, tool: ToolName, wobj: WobjName) -> str:
+    """A `MoveC` statement through `via` to `end`."""
+    return f"MoveC {via}, {end}, {profile.speed}, {profile.zone}, {tool} \\WObj:={wobj};"
