@@ -125,7 +125,7 @@ def test_class_extension_trait_has_no_row(g4_reports):
 def test_any_poly_ctor_rules_by_location(g4_reports):
     """Each AnyPoly ctor gets its own rule; the overload-table key "1" must not hide the forwarding
     ctor templates. Lines are read from the header, so an upstream edit above them moves both."""
-    lines = (audit.CONDA_INCLUDE / ANY_POLY_H).read_text(encoding="utf-8").splitlines()
+    lines = (audit.NATIVE_INCLUDES[0] / ANY_POLY_H).read_text(encoding="utf-8").splitlines()
 
     def line_of(declaration: str) -> str:
         [number] = [i for i, text in enumerate(lines, 1) if text.strip() == declaration]

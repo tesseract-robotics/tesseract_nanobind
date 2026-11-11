@@ -81,175 +81,21 @@ jobs:
       with:
         path: tesseract_nanobind
         fetch-depth: 0  # setuptools-scm derives the version from the tag history
-    # Only the toolchain and the tools vcpkg ports need; all libraries come from vcpkg.
-    # The runner image already carries most of them, so apt runs only for the packages it lacks,
-    # and their .debs are cached per image: an Ubuntu mirror outage (2026-11-11: the x64 runners'
-    # azure.archive.ubuntu.com stopped resolving) then costs nothing once the cache is warm.
-    - name: apt packages the image lacks
-      id: apt-missing
-      shell: bash
-      env:
-        APT_PACKAGES: >-
-          python3-pip python3-venv python3-dev git cmake ninja-build build-essential pkg-config
-          curl zip unzip tar autoconf autoconf-archive automake libtool bison flex perl ccache
-          linux-libc-dev
-      run: |
-        missing=()
-        for p in $APT_PACKAGES; do
-          dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q 'install ok installed' || missing+=("$p")
-        done
-        echo "missing: ${missing[*]:-none}"
-        . /etc/os-release
-        echo "packages=${missing[*]}" >> "$GITHUB_OUTPUT"
-        echo "image=${ImageOS:-$ID$VERSION_ID}-${ImageVersion:-$VERSION_ID}" >> "$GITHUB_OUTPUT"
-        echo "debs=$HOME/apt-debs" >> "$GITHUB_OUTPUT"
-        echo "pkghash=$(printf %s "${missing[*]}" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-    - name: restore cached .debs
-      id: apt-cache
-      if: steps.apt-missing.outputs.packages != ''
-      uses: actions/cache/restore@v5
+    # The toolchain and the tools vcpkg ports need; all libraries come from vcpkg. No apt: the
+    # Ubuntu mirrors stopped resolving on the runners for hours on 2026-11-11. The image already
+    # carries everything except ccache and autoconf-archive, which come from pinned, checksummed
+    # GitHub sources; a tool the image stops shipping fails here, by name.
+    - name: native stack
+      id: native
+      uses: ./tesseract_nanobind/.github/actions/native-linux
       with:
-        path: ${{ steps.apt-missing.outputs.debs }}
-        key: apt-debs-${{ steps.apt-missing.outputs.image }}-${{ runner.arch }}-${{ steps.apt-missing.outputs.pkghash }}
-    - name: apt install from cache
-      if: steps.apt-missing.outputs.packages != '' && steps.apt-cache.outputs.cache-hit == 'true'
-      run: sudo dpkg -i ${{ steps.apt-missing.outputs.debs }}/*.deb
-    - name: apt install from the mirror
-      if: steps.apt-missing.outputs.packages != '' && steps.apt-cache.outputs.cache-hit != 'true'
-      # A dead mirror fails here in minutes instead of hanging the job.
-      timeout-minutes: 5
-      shell: bash
-      env:
-        DEBS: ${{ steps.apt-missing.outputs.debs }}
-      run: |
-        if [ -f /etc/apt/apt-mirrors.txt ]; then
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          grep -q '//archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt ||
-            echo 'http://archive.ubuntu.com/ubuntu/' | sudo tee -a /etc/apt/apt-mirrors.txt >/dev/null
-        fi
-        printf 'Acquire::Retries "3";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' |
-          sudo tee /etc/apt/apt.conf.d/80-ci-net >/dev/null
-        mkdir -p "$DEBS/partial"
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq -o Dir::Cache::archives="$DEBS" ${{ steps.apt-missing.outputs.packages }}
-        sudo rm -rf "$DEBS/partial" "$DEBS/lock"
-        sudo chown -R "$USER" "$DEBS"
-        ls "$DEBS"/*.deb
-    - name: save cached .debs
-      if: steps.apt-missing.outputs.packages != '' && steps.apt-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
-      with:
-        path: ${{ steps.apt-missing.outputs.debs }}
-        key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-    - name: pip
-      shell: bash
-      run: |
-        python3 -m venv $GITHUB_WORKSPACE/venv
-        source $GITHUB_WORKSPACE/venv/bin/activate
-        python -m pip install --upgrade pip
-        python -m pip install colcon-common-extensions vcs2l auditwheel patchelf $NB_BUILD_REQS
-        python tesseract_nanobind/scripts/check_wheel_sources.py
-    - name: declare native stack
-      shell: bash
-      run: python3 tesseract_nanobind/scripts/native_stack.py github-env
-    - name: restore native build artifacts
-      id: native_cache
-      uses: ./tesseract_nanobind/.github/actions/native-cache
-      with:
-        platform: linux-${{ matrix.config.arch }}
+        arch: ${{ matrix.config.arch }}
+        vcpkg-triplet: ${{ matrix.config.vcpkg_triplet }}
         refresh: ${{ github.event_name == 'schedule' || inputs.refresh-native }}
-    - name: vcs import
-      if: steps.native_cache.outputs.native-run == ''
-      shell: bash
-      run: |
-        source $GITHUB_WORKSPACE/venv/bin/activate
-        python tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE"
-    - name: restore vcpkg binary packages
-      id: vcpkg_cache
-      if: steps.native_cache.outputs.native-run == '' && steps.native_cache.outputs.vcpkg-run == ''
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ runner.temp }}/vcpkg_cache
-        key: vcpkg-${{ runner.os }}-${{ matrix.config.vcpkg_triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
-    - name: vcpkg build
-      id: vcpkg
-      if: steps.native_cache.outputs.native-run == ''
-      shell: bash
-      run: |
-        source $GITHUB_WORKSPACE/venv/bin/activate
-        python tesseract_nanobind/scripts/native_stack.py vcpkg --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE" --binary-cache "$RUNNER_TEMP/vcpkg_cache"
-    - name: save vcpkg binary packages
-      if: steps.vcpkg.outcome == 'success' && steps.vcpkg_cache.outcome == 'success' && steps.vcpkg_cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
-      with:
-        path: ${{ runner.temp }}/vcpkg_cache
-        key: vcpkg-${{ runner.os }}-${{ matrix.config.vcpkg_triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
-    - name: archive vcpkg binary packages
-      if: steps.vcpkg.outcome == 'success'
-      shell: bash
-      run: >-
-        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-vcpkg
-        --workspace "$RUNNER_TEMP" --artifact cache-artifacts/vcpkg
-    - name: publish vcpkg binary packages
-      if: steps.vcpkg.outcome == 'success'
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.native_cache.outputs.vcpkg-name }}
-        path: cache-artifacts/vcpkg/vcpkg-binaries.tar
-        retention-days: 14
-        compression-level: 0
-        overwrite: true
-        if-no-files-found: error
-    - name: restore compiler cache
-      id: compiler_cache
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ env.CCACHE_DIR }}
-        key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
-        restore-keys: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
-    - name: reset compiler counters
-      run: ccache --zero-stats
-    - name: colcon build
-      id: native_build
-      if: steps.native_cache.outputs.native-run == ''
-      shell: bash
-      run: |
-        source $GITHUB_WORKSPACE/venv/bin/activate
-        python tesseract_nanobind/scripts/native_stack.py colcon --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE"
-    - name: archive installed native stack
-      if: steps.native_build.outcome == 'success'
-      shell: bash
-      run: >-
-        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-native
-        --workspace "$GITHUB_WORKSPACE" --artifact cache-artifacts/native
-        --environment cache-work/current-environment.json
-    - name: record native producer checkout
-      if: steps.native_build.outcome == 'success'
-      shell: bash
-      run: |
-        mkdir -p cache-artifacts/native-source
-        git -C tesseract_nanobind rev-parse HEAD > cache-artifacts/native-source/revision.txt
-    - name: publish native producer checkout
-      if: steps.native_build.outcome == 'success'
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.native_cache.outputs.native-name }}-source
-        path: cache-artifacts/native-source/
-        retention-days: 14
-        overwrite: true
-        if-no-files-found: error
-    - name: publish installed native stack
-      if: steps.native_build.outcome == 'success'
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.native_cache.outputs.native-name }}
-        path: cache-artifacts/native/
-        retention-days: 14
-        compression-level: 1
-        overwrite: true
-        if-no-files-found: error
+        pip-extra: auditwheel patchelf ${{ env.NB_BUILD_REQS }}
+        check-script: tesseract_nanobind/scripts/check_wheel_sources.py
     - name: upstream compiler statistics
-      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      if: ${{ !cancelled() && steps.native.outputs.compiler-cache-key != '' }}
       shell: bash
       run: |
         ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
@@ -269,15 +115,15 @@ jobs:
         auditwheel show dist/*.whl
         auditwheel repair --plat ${{ matrix.config.plat }} -w wheelhouse dist/*.whl
     - name: binding compiler statistics
-      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      if: ${{ !cancelled() && steps.native.outputs.compiler-cache-key != '' }}
       shell: bash
       run: ccache --show-stats --verbose | tee -a "$GITHUB_STEP_SUMMARY"
     - name: save compiler results before tests
-      if: ${{ !cancelled() && steps.compiler_cache.outcome == 'success' }}
+      if: ${{ !cancelled() && steps.native.outputs.compiler-cache-key != '' }}
       uses: actions/cache/save@v5
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: ${{ steps.compiler_cache.outputs.cache-primary-key }}
+        key: ${{ steps.native.outputs.compiler-cache-key }}
     - name: build support data wheel
       # tesseract's robot models and meshes, one py3-none-any wheel for every platform, copied
       # from the same colcon prefix (packaging/tesseract-robotics-nanobind-support); test-wheels/

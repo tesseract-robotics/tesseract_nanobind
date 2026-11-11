@@ -46,6 +46,7 @@ from audit_parse import (
     BODY_PARSE_OPTIONS,
     CONDA_PREFIX,
     INCLUDE_DIRS,
+    NATIVE_ROOT,
     PARSE_ARGS,
     PARSE_OPTIONS,
     decl_names,
@@ -194,9 +195,12 @@ def fact_key(
 
 def _in_repo(directory: Path) -> bool:
     """`directory` holds repo files. The pixi env can live inside the repo (`.pixi/envs/audit`
-    in CI); its dirs are covered by `environment_fingerprint`, not by a listing."""
+    in CI) and so can the native stack (`.native/<triplet>` locally); their files are covered by
+    `environment_fingerprint` and by the content hash of each header a parse read, not by a
+    listing."""
     d = directory.resolve()
-    return d.is_relative_to(REPO_ROOT) and not d.is_relative_to(CONDA_PREFIX.resolve())
+    outside = (CONDA_PREFIX.resolve(), NATIVE_ROOT.resolve())
+    return d.is_relative_to(REPO_ROOT) and not any(d.is_relative_to(o) for o in outside)
 
 
 def tu_files(tu: ci.TranslationUnit, synthetic: Synthetic | None = None) -> list[Path]:

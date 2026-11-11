@@ -33,13 +33,17 @@ flowchart LR
 
 Regenerate with `pixi run -e audit audit-bindings` and test with `pixi run -e audit audit-test`. CI runs both on every merge into main and on tags, and fails if the regenerated report differs from the committed one (provenance line excepted). `.github/workflows/audit.yml` computes the full audit once, last: the contract tests without the ledger row test, the GIL list, then `audit-bindings --json`, whose findings the ledger test below reads (`BINDING_AUDIT_JSON`), then the report check. Nothing runs on a pull request, so nothing here is enforced before merge: a PR's unledgered rows or stale report show up on main after it lands. `workflow_dispatch` runs the audit on a branch by hand.
 
-A stub row names its file, not its line, and a header row keeps its line. Line numbers in the header rows move only when the headers change, which is only on a tesseract bump through `pixi.lock`. The report therefore changes only when a row is added, removed or reclassified, and needs regenerating only after one of these changes:
+A stub row names its file, not its line, and a header row keeps its line. Line numbers in the header rows move only when the headers change, which is only on a tesseract bump through `dependencies.rosinstall`. The report therefore changes only when a row is added, removed or reclassified, and needs regenerating only after one of these changes:
 
-- a tesseract bump (`pixi.lock` headers);
+- a tesseract bump (`dependencies.rosinstall`, the native stack's headers);
 - a binding added, removed or given another signature;
 - a change to `scripts/audit_*.py` or `scripts/audit_ledger.json`.
 
 Other changes (rebases, tests, CI, a stub edit that only moves lines) leave it current; CI's "Report is current" step says when it is not. The JSON report (`--json`) keeps every line number.
+
+### Header source
+
+libclang parses the bindings against the native stack the wheels link against, not against conda headers: `ws/install/include` (tesseract, trajopt, tesseract_planning) and `vcpkg/installed/<triplet>/include` (Eigen, OMPL, Boost, ...), from `audit_parse.native_include_dirs`. `$AUDIT_NATIVE_ROOT` names the stack root; unset, it is the one `.native/<triplet>` that `pixi run native-build` made. A missing or ambiguous stack raises `NativeStackMissingError`. In CI, `.github/actions/native-linux` restores the wheel workflow's native-stack artifact or builds the stack with `scripts/native_stack.py`. The libclang resource dir (`stdarg.h`, ...) still comes from the audit env's `clang-22`.
 
 ## Audited modules
 
@@ -103,7 +107,7 @@ The audit's cost is libclang: two parses of each binding (one with function bodi
 `scripts/audit_cache.py` stores each fact as one JSON entry under `.cache/binding-audit/<fact>/<digest>.json`, together with the SHA-256 of every file the parse read (the main file plus `get_includes()`). An entry is used only when every one of those files is byte-identical. The digest covers everything else the fact depends on, as one typed value: `audit_toolchain.Toolchain`. `Toolchain.build` sorts its two mappings, and `Toolchain.canonical()` is the only serialisation, so two keys built in another order are the same key and a field added to the class is part of the digest without further code. Its fields:
 
 - the parse arguments, in order (argument order is search order), and the options;
-- the audit env's package set (`conda-meta` records and `dist-info` names): libclang, every header package, nanobind;
+- the audit env's package set (`conda-meta` records and `dist-info` names): libclang, nanobind. The C++ headers are not in it: they come from the native stack the wheels build (below), and each header a parse read is hashed in its entry;
 - `CPATH`, `C_INCLUDE_PATH` and `CPLUS_INCLUDE_PATH`;
 - the file listing of each include dir inside the repo (`repo_dir_listing`), because a new file there can shadow a header found later on the search path;
 - the source of the scripts that run during extraction (`*_EXTRACTORS`).
