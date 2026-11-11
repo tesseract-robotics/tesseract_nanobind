@@ -72,7 +72,7 @@ The report is the source of these numbers. This table is copied from it once per
 
 ## Fact cache
 
-Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the remaining cost is the uncached declarations parse (see the end of this section). Status: **under verification** for the typed key, the listing rule and the telemetry: their libclang-free contract tests pass, the libclang side has not run in CI yet.
+Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **confirmed** for correctness and the timings below; the typed key, the listing rule and the telemetry ran green cold and warm at 06c5ff2a. The remaining cost is measured (§ Telemetry): the synthetic TUs of unincluded headers and `cpp_api`, then the declarations parse.
 
 | step | main, no cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42889787253)) | cold cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42937052432)) | warm cache ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/42946926141)) | warm cache, main at 16a89e46 ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43003311837)) |
 |---|---|---|---|---|
@@ -81,7 +81,7 @@ Only the part of the audit that libclang computes is cached, and only per transl
 | audit | 12:35 | 3:36 | 3:55 | 2:52 |
 | job | ~50 min | ~25 min | ~15 min | ~10 min |
 
-Why the second warm run is faster than the first is not known: nothing was profiled between them, and the telemetry below is what will say.
+Step times of two runs do not compare to better than a factor of two: the two runs measured below ran the same commit, and every uncached phase took 1.7 to 2.2 times longer in the second. That is enough to explain why the second warm run above is faster than the first; no code change is shown to be the cause.
 
 The cold run gains because the per-entry lock lets one xdist worker parse each binding with bodies while the others wait for its entry, and the audit step then reads what the contract tests computed. The warm run's regenerated report differs from the committed one in exactly the 28 rows that main's uncached run reported (2026-11-11): the cached path changes no row.
 
@@ -132,7 +132,40 @@ match                  34      9.7
 unincluded-headers     34     12.3
 ```
 
-The numbers above only show the layout; they are not a measurement. Reading it: a warm run has 0 misses for `bound` and `gil`; `wait` is time workers spent blocked on another worker's parse of the same binding; `decl-parse` and `cpp-api` seconds are the uncached cost that the last paragraph of this section is about, summed over the processes that paid it. `match` is not rule time alone: it includes reading the stub (`py_api`) and, on a miss, the bodies parse behind `bound_facts`.
+The numbers above only show the layout; the measurement follows. Reading it: a warm run has 0 misses for `bound` and `gil`; `wait` is time workers spent blocked on another worker's parse of the same binding; `decl-parse` and `cpp-api` seconds are the uncached cost that the last paragraph of this section is about, summed over the processes that paid it. `match` is not rule time alone: it includes reading the stub (`py_api`) and, on a miss, the bodies parse behind `bound_facts`.
+
+Measured at 06c5ff2a, cold ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43009174175): `ENTRY_FORMAT` 2 matched no stored entry) and then warm ([run](https://github.com/tesseract-robotics/tesseract_nanobind/actions/runs/43012075700), restored from the cold run's cache). All steps green in both, "Report is current" included.
+
+| step | cold | warm |
+|---|---|---|
+| contract tests | 9:56 | 14:15 |
+| GIL list | 6:13 | 0:01 |
+| audit | 2:52 | 5:03 |
+| job | 19:18 | 21:08 |
+
+| step | fact | cold hits | cold misses | cold compute s | cold wait s | warm hits | warm misses | warm compute s | warm wait s |
+|---|---|---|---|---|---|---|---|---|---|
+| contract tests (7 processes) | `bound` | 70 | 37 | 214.1 | 371.4 | 103 | 4 | 16.4 | 0.0 |
+| | `decl` | 90 | 53 | 213.6 | 56.8 | 126 | 20 | 6.1 | 0.9 |
+| | `gil` | 1 | 1 | 4.6 | 0.0 | 1 | 1 | 11.3 | 0.0 |
+| GIL list | `gil` | 0 | 22 | 372.7 | 0.0 | 22 | 0 | 0.0 | 0.0 |
+| audit | `bound` | 22 | 0 | 0.0 | 0.0 | 22 | 0 | 0.0 | 0.0 |
+| | `decl` | 22 | 0 | 0.0 | 0.0 | 22 | 0 | 0.0 | 0.0 |
+
+| phase | contract tests: calls (cold / warm) | cold s | warm s | audit: calls | cold s | warm s |
+|---|---|---|---|---|---|---|
+| `decl-parse` | 116 / 119 | 122.3 | 295.1 | 22 | 17.3 | 37.8 |
+| `cpp-api` | 114 / 117 | 422.1 | 960.9 | 22 | 67.3 | 112.1 |
+| `match` | 114 / 117 | 522.8 | 8.2 | 22 | 0.6 | 1.1 |
+| `unincluded-headers` | 114 / 117 | 465.7 | 1072.7 | 22 | 75.5 | 133.8 |
+
+What the numbers say:
+
+- **The cache works where it applies.** Warm, the GIL list and the audit step miss nothing, and the GIL list drops from 6:13 to 0:01. The misses left in the warm contract tests (4 `bound`, 20 `decl`, 1 `gil`) cost 34 s together; which tests cause them is not established (an event does not name its source file).
+- **The warm run was slower than the cold one, and not because of the cache.** Every uncached phase took 1.7 to 2.2 times longer on the warm run's runner (`setup pixi` alone 1:47 against 0:14). Compare phases within a run, not step times across runs.
+- **The uncached cost is three phases, in a stable ratio.** In the audit step, `unincluded-headers` is 47% of the timed seconds in both runs, `cpp-api` 39 to 42%, `decl-parse` 11 to 13%, the rules (`match`) under 1%. The timed phases are 93% of the step.
+- **"The remaining cost is the declarations parse plus `cpp_api`" is refuted as stated.** The largest phase is the synthetic TUs of headers a binding does not include, which that hypothesis left out; the declarations parse is the smallest of the three.
+- **The contract tests pay the audit step's phases about five times.** They run `audit_tu` 117 times in 7 processes against 22 modules; warm, `match` falls from 522.8 s to 8.2 s because the bodies parse behind a `bound` miss is gone, and what remains is the same three phases.
 
 Rejected alternatives:
 
@@ -141,7 +174,7 @@ Rejected alternatives:
 - **Listing only header suffixes (`.h`, `.hpp`).** Unsound: a parse also reads headers with no suffix (`<vector>`, `<Eigen/Core>`) and `.tcc` / `.ipp` files, and the fixture include dir is searched first. A new file named `vector` there would shadow the standard header with no listed file and no recorded file changing. Listing everything except what no parse reads, and checking that per parse, has no such hole.
 - **The toolchain as a JSON string assembled in `fact_key`** (the first version). Any caller could build a key with other fields or another order; the type now owns both.
 
-Still parsed on every audit: the declarations parse of each audited module for `cpp_api`, and the synthetic TUs of headers that a binding does not include. `cpp_api` takes a callback over every module's bound classes, so it is not yet a function of one TU's inputs. This is the remaining cost: warm, the audit step takes as long as cold (3:55 against 3:36), so caching the three whole-TU walks saved nothing measurable, and the 10:40 of warm contract tests is these parses repeated per worker. Splitting `cpp_api` into a per-TU extraction and a cross-module pass is the next step.
+Still parsed on every audit: the declarations parse of each audited module for `cpp_api`, and the synthetic TUs of headers that a binding does not include. `cpp_api` takes a callback over every module's bound classes, so it is not yet a function of one TU's inputs. Caching the three whole-TU walks saved nothing measurable (first warm run: audit 3:55 against 3:36 cold). The next step follows the measured order: the unincluded-header TUs first, then `cpp_api` (split into a per-TU extraction and a cross-module pass), and the contract tests' fivefold repetition of both.
 
 Tests: `tests/audit/test_audit_cache.py` covers hit and miss, edits that keep size and mtime, removed files, the key parts, concurrent workers, pruning and corrupt entries. `tests/audit/test_audit_toolchain.py` covers the key's serialisation (mapping order, every field, unset against empty variables) and the listing rule in both directions. `tests/audit/test_audit_telemetry.py` covers one event per fetch, none on a failed compute or without a log, whole lines under three concurrent writers, and the tables. These three need no libclang and run in the default env:
 
