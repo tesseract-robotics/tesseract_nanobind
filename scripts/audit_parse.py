@@ -38,7 +38,6 @@ from audit_toolchain import Selection
 from audit_types import RECORD_KINDS, record_path
 
 CONDA_PREFIX = Path(os.environ["CONDA_PREFIX"])
-CONDA_INCLUDE = CONDA_PREFIX / "include"
 # Major version of the `clang-22` package in the pixi `audit` feature (pyproject.toml).
 LIBCLANG_MAJOR = 22
 # Builtin headers (stdarg.h, stddef.h) shipped by `clang-22`; libclang does not find
@@ -46,40 +45,107 @@ LIBCLANG_MAJOR = 22
 CLANG_RESOURCE_DIR = CONDA_PREFIX / "lib" / "clang" / str(LIBCLANG_MAJOR)
 # Matches CMakeLists.txt `set(CMAKE_CXX_STANDARD 17)`.
 CXX_STD = "c++17"
+# The native stack the wheels link against (scripts/native_stack.py): `ws/install` holds
+# tesseract, trajopt, tesseract_planning; `vcpkg/installed/<triplet>` the third-party libraries.
+# CI points this at the restored native install; locally it is `pixi run native-build`'s output.
+NATIVE_ROOT_ENV = "AUDIT_NATIVE_ROOT"
 
 
 class IncludeDirError(FileNotFoundError):
     """A versioned include dir of the binding build is missing or ambiguous."""
 
 
-def versioned_include(name: str, include: Path) -> Path:
-    """The one `include/<name>-<version>` dir (OMPL installs under `include/ompl-1.7`).
+class NativeStackMissingError(FileNotFoundError):
+    """The native stack the bindings build against is absent or ambiguous under its root."""
+
+
+def ompl_include(include: Path) -> Path:
+    """The include dir that holds `ompl/`: `include/ompl-<version>` or `include` itself.
 
     Raises:
-        IncludeDirError: no such dir, or more than one (an upstream bump left two).
+        IncludeDirError: no OMPL headers, or more than one versioned dir.
     """
-    found = sorted(d for d in include.glob(f"{name}-*") if d.is_dir())
-    if len(found) != 1:
-        raise IncludeDirError(
-            f"expected one {include / name}-<version> dir, found {len(found)}: "
-            f"{[d.name for d in found]}"
+    found = sorted(d for d in include.glob("ompl-*") if d.is_dir())
+    if len(found) > 1:
+        raise IncludeDirError(f"expected one {include / 'ompl'}-<version> dir, found {len(found)}")
+    if found:
+        return found[0]
+    if (include / "ompl").is_dir():
+        return include
+    raise IncludeDirError(f"no OMPL headers under {include}: no ompl/ and no ompl-<version>/")
+
+
+def native_root() -> Path:
+    """The native stack root: `$AUDIT_NATIVE_ROOT`, else the one dev build under `.native/`.
+
+    Raises:
+        NativeStackMissingError: no variable and not exactly one `.native/<triplet>` dir.
+    """
+    explicit = os.environ.get(NATIVE_ROOT_ENV)
+    if explicit:
+        return Path(explicit)
+    builds = sorted(d for d in (REPO_ROOT / ".native").glob("*") if d.is_dir())
+    if len(builds) != 1:
+        raise NativeStackMissingError(
+            f"set {NATIVE_ROOT_ENV}, or build the native stack (`pixi run native-build`) so that "
+            f"exactly one .native/<triplet> exists; found {[d.name for d in builds]}"
         )
-    return found[0]
+    return builds[0]
 
 
-# Header search path of the binding build: tesseract, yaml-cpp and console_bridge
-# from the conda prefix; Eigen under include/eigen3; OMPL under include/ompl-<version> and
-# OSQP under include/osqp (the ompl and osqp CMake targets export both); tesseract_nb.h from
-# src/; nanobind and Python headers from their packages.
-INCLUDE_DIRS = (
-    CONDA_INCLUDE,
-    CONDA_INCLUDE / "eigen3",
-    versioned_include("ompl", CONDA_INCLUDE),
-    CONDA_INCLUDE / "osqp",
-    SRC,
-    Path(nanobind.include_dir()),
-    Path(sysconfig.get_paths()["include"]),
-)
+def native_include_roots(root: Path) -> tuple[Path, Path]:
+    """The two include roots of a native stack: the colcon install and vcpkg's installed prefix.
+
+    Raises:
+        NativeStackMissingError: either root is missing, or vcpkg holds not exactly one triplet.
+    """
+    install = root / "ws" / "install" / "include"
+    triplets = sorted(
+        d for d in (root / "vcpkg" / "installed").glob("*") if d.is_dir() and d.name != "vcpkg"
+    )
+    if len(triplets) != 1:
+        raise NativeStackMissingError(
+            f"expected one vcpkg triplet under {root / 'vcpkg' / 'installed'}, "
+            f"found {[d.name for d in triplets]}; build the native stack "
+            f"(`pixi run native-build`) or set {NATIVE_ROOT_ENV} to its root"
+        )
+    vcpkg = triplets[0] / "include"
+    for include in (install, vcpkg):
+        if not include.is_dir():
+            raise NativeStackMissingError(f"{include} does not exist (native stack at {root})")
+    return install, vcpkg
+
+
+def native_include_dirs(root: Path) -> tuple[Path, ...]:
+    """Header search path of the binding build, from the native stack at `root`.
+
+    Both include roots, vcpkg's Eigen (`include/eigen3`), its OMPL dir (`ompl_include`) and an
+    `osqp` dir where a root has one (the ompl and osqp CMake targets export both); then
+    `tesseract_nb.h` from src/, and the nanobind and Python headers from their packages.
+
+    Raises:
+        NativeStackMissingError: see `native_include_roots`; or no root has an `osqp` dir.
+        IncludeDirError: see `ompl_include`.
+    """
+    install, vcpkg = native_include_roots(root)
+    osqp = [d for d in (install / "osqp", vcpkg / "osqp") if d.is_dir()]
+    if not osqp:
+        raise NativeStackMissingError(f"no osqp/ include dir under {install} or {vcpkg}")
+    return (
+        install,
+        vcpkg,
+        vcpkg / "eigen3",
+        ompl_include(vcpkg),
+        *osqp,
+        SRC,
+        Path(nanobind.include_dir()),
+        Path(sysconfig.get_paths()["include"]),
+    )
+
+
+NATIVE_ROOT = native_root()
+NATIVE_INCLUDES = native_include_roots(NATIVE_ROOT)
+INCLUDE_DIRS = native_include_dirs(NATIVE_ROOT)
 PARSE_ARGS = (
     "-x",
     "c++",
@@ -214,16 +280,16 @@ RAW_BUFFER_POINTEES = frozenset(
 
 
 def header_rel(path: Path) -> str:
-    """A header path relative to the conda include dir or the repo; else absolute (an SDK header)."""
+    """A header path relative to a native include root or the repo; else absolute (an SDK header)."""
     path = path.resolve()
-    for base in (CONDA_INCLUDE, REPO_ROOT):
+    for base in (*NATIVE_INCLUDES, REPO_ROOT):
         if path.is_relative_to(base):
             return path.relative_to(base).as_posix()
     return path.as_posix()
 
 
 def location(cursor: ci.Cursor) -> str:
-    """`header:line`, relative to the conda include dir or the repo."""
+    """`header:line`, relative to a native include root or the repo."""
     return f"{header_rel(Path(cursor.location.file.name))}:{cursor.location.line}"
 
 
@@ -448,12 +514,13 @@ def _is_reference_wrapper_vector(parm: ci.Cursor) -> bool:
 
 
 # Header roots of third-party libraries the bindings never bind: a type declared under one has
-# no Python form (spec D8). OMPL's include dir is versioned (`include/ompl-1.7/ompl/…`), so its
-# root, as `header_rel` spells it, comes from `versioned_include` (`ompl-1.7/ompl/`, not
-# `ompl/`). Eigen, std and boost have casters and are absent.
+# no Python form (spec D8). OMPL's include dir may be versioned (`include/ompl-1.7/ompl/…`), so
+# its root, as `header_rel` spells it, comes from `ompl_include` (`ompl-1.7/ompl/` or `ompl/`). Eigen, std and boost have casters and are absent.
 UNBOUND_DEPENDENCY_ROOTS = (
     "OsqpEigen/",
-    f"{versioned_include('ompl', CONDA_INCLUDE).relative_to(CONDA_INCLUDE).as_posix()}/ompl/",
+    f"{ompl_include(NATIVE_INCLUDES[1]).relative_to(NATIVE_INCLUDES[1]).as_posix()}/ompl/".removeprefix(
+        "./"
+    ),
 )
 # Namespaces of the same libraries, for types an owned header only forward-declares: the
 # tesseract OMPL headers declare `namespace ompl::base { class Planner; }` and never include
@@ -500,8 +567,8 @@ def _unbound_dependency(t: ci.Type, not_api: frozenset[Path]) -> Dependency:
     flagged = bool(qualified) and qualified.startswith(UNBOUND_DEPENDENCY_NAMESPACES)
     if not flagged and decl.location.file is not None:
         path = Path(decl.location.file.name).resolve()
-        # `header_rel` spells only the conda and repo trees; the SDK's libc++ is in neither.
-        spelled = path.is_relative_to(CONDA_INCLUDE) or path.is_relative_to(REPO_ROOT)
+        # `header_rel` spells only the native and repo trees; the SDK's libc++ is in neither.
+        spelled = any(path.is_relative_to(b) for b in (*NATIVE_INCLUDES, REPO_ROOT))
         flagged = (spelled and header_rel(path).startswith(UNBOUND_DEPENDENCY_ROOTS)) or (
             path in not_api
         )

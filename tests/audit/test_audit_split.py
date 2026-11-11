@@ -65,8 +65,10 @@ def test_combined_namespace_rejects_two_definitions_of_one_name():
 
 
 PARSE = {
-    "CONDA_PREFIX", "CONDA_INCLUDE", "LIBCLANG_MAJOR", "CLANG_RESOURCE_DIR", "CXX_STD",
-    "IncludeDirError", "versioned_include", "INCLUDE_DIRS", "PARSE_ARGS", "PARSE_OPTIONS",
+    "CONDA_PREFIX", "LIBCLANG_MAJOR", "CLANG_RESOURCE_DIR", "CXX_STD",
+    "NATIVE_ROOT_ENV", "NativeStackMissingError", "ompl_include", "native_root",
+    "native_include_roots", "native_include_dirs", "NATIVE_ROOT", "NATIVE_INCLUDES",
+    "IncludeDirError", "INCLUDE_DIRS", "PARSE_ARGS", "PARSE_OPTIONS",
     "MAX_REPORTED_DIAGNOSTICS", "HeaderParseError", "parse_tu", "STRINGSTREAM", "CEREAL_HOOKS",
     "ALLOCATION_OPERATORS", "OPERATOR_DUNDERS", "OSTREAM_DECL", "FOREIGN_NAMESPACES",
     "FUNCTION_KINDS", "METHOD_KINDS", "FIELD_KINDS", "RAW_BUFFER_POINTEES",

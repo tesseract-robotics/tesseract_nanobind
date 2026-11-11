@@ -1,0 +1,187 @@
+name: Native stack, Linux
+description: >-
+  The native C++ stack the wheels link against (tesseract, trajopt, tesseract_planning on vcpkg),
+  restored from a compatible wheel-workflow artifact or built by scripts/native_stack.py and
+  published for the next run. The one path of the wheel workflow's Linux legs and the binding audit.
+  Needs the repository checked out at `tesseract_nanobind/` (the native-cache action's layout) and
+  CCACHE_DIR in the job env; the stack lands under $GITHUB_WORKSPACE (`ws/install`,
+  `vcpkg/installed/<triplet>`) and the build venv at $GITHUB_WORKSPACE/venv.
+inputs:
+  arch:
+    required: true
+    description: x64 or arm64
+  vcpkg-triplet:
+    required: true
+    description: vcpkg triplet of the leg, e.g. x64-linux-dynamic-release
+  refresh:
+    default: 'false'
+    description: Rebuild native sources while retaining vcpkg binary reuse
+  pip-extra:
+    default: ''
+    description: Further pip requirements for the build venv, space separated
+  check-script:
+    default: ''
+    description: Python script, relative to the workspace, run in the build venv right after pip
+outputs:
+  compiler-cache-key:
+    description: Primary key of the compiler cache restore; empty if it did not run
+    value: ${{ steps.compiler_cache.outputs.cache-primary-key }}
+runs:
+  using: composite
+  steps:
+    - name: toolchain present on the image
+      shell: bash
+      run: |
+        missing=()
+        for tool in gcc g++ make cmake ninja pkg-config curl zip unzip tar git perl autoconf \
+                    automake libtoolize bison flex python3; do
+          command -v "$tool" >/dev/null || missing+=("$tool")
+        done
+        python3 -c 'import venv, ensurepip, sysconfig; assert sysconfig.get_config_var("INCLUDEPY")' \
+          || missing+=("python3-venv/python3-dev")
+        [ -f /usr/include/linux/version.h ] || missing+=("linux-libc-dev")
+        if [ ${#missing[@]} -gt 0 ]; then
+          echo "::error::runner image lacks: ${missing[*]}"
+          exit 1
+        fi
+    - name: ccache and autoconf-archive from pinned GitHub sources
+      shell: bash
+      env:
+        CCACHE_VERSION: 4.14.3
+        # sha256 of ccache-<version>-linux-<arch>-musl-static.tar.xz from the ccache release
+        CCACHE_SHA256_X64: d553fac006ed93a37342cee9228cf4e13dd66690fa1a8075c54c7bace9b72ae6
+        CCACHE_SHA256_ARM64: f13e56bdb02f62b6f08f54ac527a0a7674dff22ea607167f33621fe2f2ded37b
+        AUTOCONF_ARCHIVE_VERSION: v2024.10.16
+        # sha256 of the autoconf-archive tag tarball from github.com/autoconf-archive
+        AUTOCONF_ARCHIVE_SHA256: 5297eed6a1f9b0ccad742a416bb875581a66ea331b00321b700cd24575417713
+      run: |
+        case "${{ inputs.arch }}" in
+          x64) cc_arch=x86_64; cc_sha=$CCACHE_SHA256_X64 ;;
+          arm64) cc_arch=aarch64; cc_sha=$CCACHE_SHA256_ARM64 ;;
+        esac
+        cd "$RUNNER_TEMP"
+        cc_tar="ccache-$CCACHE_VERSION-linux-$cc_arch-musl-static.tar.xz"
+        curl -fsSL --retry 5 -o "$cc_tar" \
+          "https://github.com/ccache/ccache/releases/download/v$CCACHE_VERSION/$cc_tar"
+        echo "$cc_sha  $cc_tar" | sha256sum -c -
+        tar xJf "$cc_tar"
+        sudo install -m 0755 "${cc_tar%.tar.xz}/ccache" /usr/local/bin/ccache
+        ccache --version | head -1
+        aa_tar="autoconf-archive-$AUTOCONF_ARCHIVE_VERSION.tar.gz"
+        curl -fsSL --retry 5 -o "$aa_tar" \
+          "https://github.com/autoconf-archive/autoconf-archive/archive/refs/tags/$AUTOCONF_ARCHIVE_VERSION.tar.gz"
+        echo "$AUTOCONF_ARCHIVE_SHA256  $aa_tar" | sha256sum -c -
+        tar xzf "$aa_tar"
+        sudo install -m 0644 autoconf-archive-*/m4/*.m4 "$(aclocal --print-ac-dir)/"
+        ls "$(aclocal --print-ac-dir)"/ax_*.m4 | wc -l
+    - name: pip
+      shell: bash
+      env:
+        PIP_EXTRA: ${{ inputs.pip-extra }}
+        CHECK_SCRIPT: ${{ inputs.check-script }}
+      run: |
+        python3 -m venv $GITHUB_WORKSPACE/venv
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        python -m pip install --upgrade pip
+        python -m pip install colcon-common-extensions vcs2l $PIP_EXTRA
+        if [ -n "$CHECK_SCRIPT" ]; then python "$CHECK_SCRIPT"; fi
+    - name: declare native stack
+      shell: bash
+      run: python3 tesseract_nanobind/scripts/native_stack.py github-env
+    - name: restore native build artifacts
+      id: native_cache
+      uses: ./tesseract_nanobind/.github/actions/native-cache
+      with:
+        platform: linux-${{ inputs.arch }}
+        refresh: ${{ inputs.refresh }}
+    - name: vcs import
+      if: steps.native_cache.outputs.native-run == ''
+      shell: bash
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        python tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ inputs.vcpkg-triplet }} --root "$GITHUB_WORKSPACE"
+    - name: restore vcpkg binary packages
+      id: vcpkg_cache
+      if: steps.native_cache.outputs.native-run == '' && steps.native_cache.outputs.vcpkg-run == ''
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ inputs.vcpkg-triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
+    - name: vcpkg build
+      id: vcpkg
+      if: steps.native_cache.outputs.native-run == ''
+      shell: bash
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        python tesseract_nanobind/scripts/native_stack.py vcpkg --triplet ${{ inputs.vcpkg-triplet }} --root "$GITHUB_WORKSPACE" --binary-cache "$RUNNER_TEMP/vcpkg_cache"
+    - name: save vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success' && steps.vcpkg_cache.outcome == 'success' && steps.vcpkg_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ inputs.vcpkg-triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
+    - name: archive vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-vcpkg
+        --workspace "$RUNNER_TEMP" --artifact cache-artifacts/vcpkg
+    - name: publish vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.vcpkg-name }}
+        path: cache-artifacts/vcpkg/vcpkg-binaries.tar
+        retention-days: 14
+        compression-level: 0
+        overwrite: true
+        if-no-files-found: error
+    - name: restore compiler cache
+      id: compiler_cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: compiler-${{ runner.os }}-${{ runner.arch }}-${{ env.VCPKG_REVISION }}-
+    - name: reset compiler counters
+      shell: bash
+      run: ccache --zero-stats
+    - name: colcon build
+      id: native_build
+      if: steps.native_cache.outputs.native-run == ''
+      shell: bash
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        python tesseract_nanobind/scripts/native_stack.py colcon --triplet ${{ inputs.vcpkg-triplet }} --root "$GITHUB_WORKSPACE"
+    - name: archive installed native stack
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: >-
+        python tesseract_nanobind/scripts/wheel_cache_archive.py pack-native
+        --workspace "$GITHUB_WORKSPACE" --artifact cache-artifacts/native
+        --environment cache-work/current-environment.json
+    - name: record native producer checkout
+      if: steps.native_build.outcome == 'success'
+      shell: bash
+      run: |
+        mkdir -p cache-artifacts/native-source
+        git -C tesseract_nanobind rev-parse HEAD > cache-artifacts/native-source/revision.txt
+    - name: publish native producer checkout
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}-source
+        path: cache-artifacts/native-source/
+        retention-days: 14
+        overwrite: true
+        if-no-files-found: error
+    - name: publish installed native stack
+      if: steps.native_build.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.native_cache.outputs.native-name }}
+        path: cache-artifacts/native/
+        retention-days: 14
+        compression-level: 1
+        overwrite: true
+        if-no-files-found: error
