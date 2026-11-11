@@ -21,6 +21,7 @@ from .pointcloud_octree_collision_example import run as pointcloud_octree_collis
 from .pick_and_place_example import run as pick_and_place_example
 from .plugin_configuration_example import run as plugin_configuration_example
 from .puzzle_piece_auxillary_axes_example import run as puzzle_piece_auxillary_axes_example
+from .python_constraints_example import run as python_constraints_example
 from .pythonic_api_example import main as pythonic_api_example
 from .raster_example import run as raster_example
 from .scene_graph_example import run as scene_graph_example

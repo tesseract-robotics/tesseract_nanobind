@@ -11,8 +11,9 @@ sys.path.insert(0, str(REPO / "scripts/demos"))
 
 import manifest  # noqa: E402
 
-# Issue #379's count; a new viewer example must land in the manifest and raise this on purpose.
-VIEWER_EXAMPLE_COUNT = 20
+# Issue #379's count, and python_constraints_example; a new viewer example must land in the
+# manifest and raise this on purpose.
+VIEWER_EXAMPLE_COUNT = 21
 
 
 HERO_QUERY = (

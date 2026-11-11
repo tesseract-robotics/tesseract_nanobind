@@ -345,6 +345,59 @@ trampoline landed in 0.34.1.1 (see the
 `scipy` is required at runtime because nanobind's sparse-matrix conversion
 goes through `scipy.sparse`.
 
+### `PyConstraint`: a rule from `f(q)`
+
+A `ConstraintSet` subclass has five methods to write and a sparse Jacobian to place in the
+right columns. `trajopt_ifopt.python_constraints.PyConstraint` reduces that to one: `f(q)`,
+the rule's values at one waypoint's joint values, with `lower <= f(q) <= upper`.
+
+```python
+import numpy as np
+from tesseract_robotics.trajopt_ifopt.python_constraints import PyConstraint
+
+
+class ElbowAbove(PyConstraint):
+    """link_3 stays at least `height` above link_2."""
+
+    def __init__(self, var, manip, height):
+        super().__init__("elbow_above", var, lower=[height], upper=[np.inf])
+        self.manip = manip
+
+    def f(self, q):
+        tf = self.manip.calcFwdKin(q)
+        return [tf["link_3"].translation[2] - tf["link_2"].translation[2]]
+
+
+for var in vars_list:
+    problem.addConstraintSet(ElbowAbove(var, manip, 0.2))
+```
+
+| What | How |
+|---|---|
+| **Jacobian** | By default a forward difference over that waypoint's joints (`calcForwardNumJac`, `n_dof + 1` calls to `f`), placed in the waypoint's columns. Override `jacobian(q)` where an analytic one is cheap. |
+| **Range rows** | A row with `lower < upper`, both finite, is split into two one-sided rows, as `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` does, because `TrajOptQPProblem` takes no range row. |
+| **Weight** | `coeff` is the merit coefficient, one value or one per row. |
+
+The module ships rules built on it, from what Tesseract already computes:
+
+| Rule | Value | From |
+|---|---|---|
+| `PointsDown` | cosine of the tool axis' angle to a direction | forward kinematics, analytic Jacobian |
+| `HoldAxis` | the tool axis' two components across a direction, for a tolerance of a fraction of a degree | forward kinematics, analytic Jacobian |
+| `StayDexterous` | manipulability (`calcManipulability(J).m.volume`) | the Jacobian |
+| `ElbowUp` | height of one link above another | forward kinematics |
+| `WatchTheTool` | cosine of the angle between a camera's optical axis and the line to the tool | forward kinematics of two links |
+| `Clearance` | closest distance of some links to the scene, in a window | the discrete contact manager |
+| `WorldHold` | tool position in the world, given the base's pose | forward kinematics, analytic Jacobian |
+
+`PointsDown` and `HoldAxis` have C++ counterparts, `CartAxisConeConstraint` and
+`CartAxisAlignConstraint`: use those in production, and read the Python ones as worked
+examples of an analytic Jacobian. `scripts/bench_python_constraints.py` measures what a
+Python rule costs in the online SQP loop against the C++ constraint.
+
+The [Python constraints example](../examples/python-constraints.md) runs all seven in one
+live loop, one solve per frame, with a gauge per rule.
+
 ## Migrating from 0.33
 
 If you have 0.33 SQP code, see the [full migration guide](../changes.md) —
