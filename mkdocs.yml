@@ -153,6 +153,7 @@ nav:
     - Planning Examples: examples/planning.md
     - OMPL Examples: examples/ompl.md
     - Online Planning: examples/online-planning.md
+    - Python Constraints: examples/python-constraints.md
   - API Reference:
     - api/index.md
     - High-Level:

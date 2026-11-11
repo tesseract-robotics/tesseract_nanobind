@@ -395,6 +395,9 @@ The module ships rules built on it, from what Tesseract already computes:
 examples of an analytic Jacobian. `scripts/bench_python_constraints.py` measures what a
 Python rule costs in the online SQP loop against the C++ constraint.
 
+The [Python constraints example](../examples/python-constraints.md) runs all seven in one
+live loop, one solve per frame, with a gauge per rule.
+
 ## Migrating from 0.33
 
 If you have 0.33 SQP code, see the [full migration guide](../changes.md) —
