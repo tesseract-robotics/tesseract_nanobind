@@ -116,6 +116,7 @@ The scripts import in one direction, top to bottom. Each file has one job.
 | `scripts/audit_bound.py` | what a binding TU binds: `bound_classes` reads the `nb::class_`/`nb::enum_` constructions in the `NB_MODULE` body (Python name → qualified C++ class); `audit_match` builds its per-module `bound_index` from it |
 | `scripts/audit_cache.py` | content-addressed fact cache: entries keyed on every file a parse read, per-entry lock, prune (`audit-cache-prune`) |
 | `scripts/audit_facts.py` | the cached facts of a binding TU (`bound_facts`, `decl_facts`, `gil_releases`) and their toolchain key |
+| `scripts/audit_cache_prune.py` | thin CLI (`pixi run -e audit audit-cache-prune`): drop the entries a run did not use |
 | `scripts/audit_stub.py` | `.pyi` → `PySymbol`/`PyOverload`; deviations and quoted names |
 | `scripts/audit_rules.py` | `ACCEPTED` rule texts and every rule table; checks at import that each table entry names a rule |
 | `scripts/audit_match.py` | the comparison: cover, accept, gap, deviation; base rows; header rows |

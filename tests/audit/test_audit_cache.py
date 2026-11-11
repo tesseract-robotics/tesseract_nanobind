@@ -30,6 +30,16 @@ def _load_cache_module():
 ac = _load_cache_module()
 
 
+def _load_prune_cli():
+    """The prune CLI; it imports `audit_cache`, which `_load_cache_module` registered."""
+    path = SCRIPT.with_name("audit_cache_prune.py")
+    spec = importlib.util.spec_from_file_location("audit_cache_prune", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class Counter:
     """A `compute` that records its calls and reads `deps` as the parse would."""
 
@@ -215,6 +225,6 @@ def test_prune_command_keeps_what_the_run_used(tmp_path, tree):
     os.utime(stamp, ns=(10**18, 10**18))
     os.utime(cache.entry_path(unused), ns=(1, 1))
     os.utime(cache.entry_path(used), ns=(2 * 10**18, 2 * 10**18))
-    assert ac.main(["prune", str(root), str(stamp)]) == 0
+    assert _load_prune_cli().main([str(root), str(stamp)]) == 0
     assert not cache.entry_path(unused).exists()
     assert cache.entry_path(used).exists()
