@@ -190,6 +190,7 @@ nav:
     - Binding Audit Coverage: developer/binding-audit-coverage.md
     - Threading and the GIL: developer/threading.md
     - How the Binaries Are Built: developer/binaries.md
+    - The Native Stack Build: developer/native-stack.md
     - Program Emitters: developer/emitters.md
     - SWIG to Nanobind Migration: developer/migration.md
     - TrajOpt-Ifopt Constraints: developer/trajopt_ifopt_missing_constraints.md

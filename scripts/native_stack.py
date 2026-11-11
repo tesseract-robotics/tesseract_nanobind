@@ -1,6 +1,6 @@
 """Build the native C++ stack the bindings link against: the one path CI and the dev env share.
 
-Layout under `--root` (CI: the workspace; dev: `.native/<triplet>`):
+Layout under `--root` (CI: the workspace; default: `.native/<triplet>` of the host, gitignored):
 
     ws/src/      tesseract, trajopt, tesseract_planning, ... from dependencies.rosinstall
     ws/install/  the colcon install; this is TESSERACT_CPP_PREFIX
@@ -13,8 +13,8 @@ the current one is skipped.
 
 Example:
     ```bash
-    python scripts/native_stack.py all --triplet arm64-osx-dynamic-release --root .native/arm64
-    python scripts/native_stack.py exec --root .native/arm64 -- pip install -e . --no-build-isolation
+    python scripts/native_stack.py all --libomp-prefix "$CONDA_PREFIX"
+    python scripts/native_stack.py exec --libomp-prefix "$CONDA_PREFIX" -- pip install -e . --no-build-isolation
     ```
 """
 
@@ -406,9 +406,10 @@ def stage(name: str, stack: Stack) -> None:
 
 
 def build_stack(args: argparse.Namespace) -> Stack:
-    root = args.root.resolve()
+    triplet = args.triplet or host_triplet()
+    root = (args.root or REPO / ".native" / triplet).resolve()
     return Stack(
-        triplet=args.triplet or host_triplet(),
+        triplet=triplet,
         root=root,
         binary_cache=(args.binary_cache or root / "vcpkg_cache").resolve(),
         libomp_prefix=args.libomp_prefix,
@@ -423,7 +424,7 @@ def main(argv: list[str]) -> None:
         "command", choices=("sources", "vcpkg", "colcon", "all", "github-env", "exec")
     )
     parser.add_argument("--triplet", help="vcpkg triplet (default: this machine's)")
-    parser.add_argument("--root", type=Path, help="the build root (all but github-env)")
+    parser.add_argument("--root", type=Path, help="build root (default: <repo>/.native/<triplet>)")
     parser.add_argument(
         "--binary-cache", type=Path, help="vcpkg binary cache (default: <root>/vcpkg_cache)"
     )
@@ -439,8 +440,6 @@ def main(argv: list[str]) -> None:
         with Path(os.environ["GITHUB_ENV"]).open("a", newline="\n") as env_file:
             env_file.write(f"VCPKG_REVISION={declarations()['vcpkg']['revision']}\n")
         return
-    if args.root is None:
-        parser.error(f"{args.command} needs --root")
     stack = build_stack(args)
     if args.command == "exec":
         run(args.rest, env=stack.binding_env())

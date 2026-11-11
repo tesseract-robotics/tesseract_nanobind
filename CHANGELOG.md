@@ -224,6 +224,7 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Changes
 
+- **One native build for CI and development** — `scripts/native_stack.py` builds the C++ stack (`vcs import` of `dependencies.rosinstall`, vcpkg, colcon) and is the only place its flags live. `wheels.yml` calls it per step; `pixi run native-build` builds the same stack into the gitignored `.native/<triplet>`, and `pixi run build` / `install` compile the bindings against it through `TESSERACT_CPP_PREFIX`. Each stage records a content-addressed identity and is skipped when its inputs are unchanged. The default pixi env carries the toolchain only. See `docs/developer/native-stack.md` ([#162]).
 - **The README's poster opens the docs player, not the bare client** — it links the docs home with `#play`, and `demos.js` starts a page's first player when the URL carries that hash.
 - **The live viewer looks like the docs' demo players** — dark theme without viser's logo, a floor grid (`/floor`) under the scene's footprint laid by `update_environment`, and orange as `plot_trajectory`'s default path colour (was white). The demo recorder shares the floor and colour constants from `tesseract_robotics.viewer.floor` and `viewer.PLOT_COLOR_RGB`.
 - **Batch collision-object updates** — `CollisionObjectSpec` and, on `DiscreteContactManager` and `ContinuousContactManager`, `addCollisionObjects`, `removeCollisionObjects`, `setCollisionObjectsEnabled` (a `{id: bool}` dict, or ids and one state), `getCollisionObjectsTransform(id)` and `setCollisionObjectsTransform(ids, state)`, with `setCollisionObjectsTransform(ids, state0, state1)` on `ContinuousContactManager` for casts. Each batch is upstream's "the single calls in order": an id the manager does not hold returns `False` with the present ids still applied (remove, enable), or raises `IndexError` (get a transform); a `state` that lacks an id raises `IndexError` and moves nothing ([#373]).
@@ -765,6 +766,7 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#370]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/370
 [#373]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/373
 [#161]: https://github.com/tesseract-robotics/tesseract_nanobind/pull/161
+[#162]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/162
 [#146]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/146
 [#151]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/151
 [07f8f9c]: https://github.com/tesseract-robotics/tesseract_nanobind/commit/07f8f9c8c54ab13c3d10ceca00181091d0126336
