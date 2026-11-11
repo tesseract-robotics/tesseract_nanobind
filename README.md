@@ -12,7 +12,7 @@
 
 Python bindings for [Tesseract](https://github.com/tesseract-robotics/tesseract) robotics motion planning using [nanobind](https://github.com/wjakob/nanobind).
 
-## Documentation 
+## Documentation
 
 Maintained in `/docs` and published to https://tesseract-robotics.github.io/tesseract_nanobind/
 
@@ -21,16 +21,17 @@ Maintained in `/docs` and published to https://tesseract-robotics.github.io/tess
 - Scene loading and management (URDF, SRDF, meshes)
 - Collision checking (Bullet, FCL)
 - Kinematics (KDL, OPW, UR)
-- Motion planning (OMPL, Descartes, TrajOpt)
-- Time parameterization (TOTG, ISP, Ruckig)
+- Motion planning (OMPL, Descartes, TrajOpt, TrajOpt IFOPT, simple planners)
+- Constraints written in Python for the online SQP solver (`trajopt_ifopt.python_constraints`)
+- Time parameterization (TOTG, ISP, constant TCP speed, Ruckig)
 - Task composition and pipelines
 - Pythonic high-level API
 
-for an excellent overview of `Tesseract's` architecture & features see [this presentation on Vimeo](https://vimeo.com/649656119)
+For an overview of Tesseract's architecture and features, see [this presentation on Vimeo](https://vimeo.com/649656119)
 
 ## Test suite
 
-1900+ pytest tests in `tests/`, mirroring the module layout (`collision`, `kinematics`, `task_composer`, `trajopt_sqp`, …) plus the high-level `planning` API, examples and viewer. CI installs each built wheel into a clean environment and runs the full suite on Linux, macOS and Windows before anything is published to PyPI. See [Running tests](https://tesseract-robotics.github.io/tesseract_nanobind/developer/#running-tests).
+3900+ pytest tests in `tests/`, mirroring the module layout (`collision`, `kinematics`, `task_composer`, `trajopt_sqp`, …) plus the high-level `planning` API, examples and viewer. CI installs each built wheel into a clean environment and runs the full suite on Linux, macOS and Windows before anything is published to PyPI. See [Running tests](https://tesseract-robotics.github.io/tesseract_nanobind/developer/#running-tests).
 
 ## Installation
 
@@ -100,14 +101,18 @@ for pt in result.trajectory:
 
 For direct C++ API access:
 
-<!-- snippet: skip -->
 ```python
-from tesseract_robotics.environment import Environment
+from tesseract_robotics import get_tesseract_resource_path
 from tesseract_robotics.common import GeneralResourceLocator
+from tesseract_robotics.environment import Environment
 
+support = get_tesseract_resource_path()
+locator = GeneralResourceLocator(paths=[support])
+urdf = support / "tesseract" / "support" / "urdf" / "abb_irb2400.urdf"
+
+# Pass paths as Path: a str is read as URDF / SRDF text, not as a file name
 env = Environment()
-locator = GeneralResourceLocator()
-env.init("/path/to/robot.urdf", "/path/to/robot.srdf", locator)
+assert env.init(urdf, urdf.with_suffix(".srdf"), locator)
 
 print(f"Joints: {env.getJointNames()}")
 print(f"Links: {env.getLinkNames()}")
@@ -115,7 +120,9 @@ print(f"Links: {env.getLinkNames()}")
 
 ## Versioning
 
-Version follows `0.A.B.C` where `A.B` tracks the upstream [Tesseract](https://github.com/tesseract-robotics/tesseract) release and `C` is the nanobind patch number. For example, `0.34.1.0` wraps Tesseract `0.34.1`.
+Version follows `0.A.B.C` where `A.B` tracks the upstream [Tesseract](https://github.com/tesseract-robotics/tesseract) release and `C` is the nanobind patch number. For example, `0.36.0.0` wraps Tesseract `0.36.0`. A pre-release such as `0.36.0.0rc1` builds tesseract, trajopt and tesseract_planning from the commits pinned in [`dependencies.rosinstall`](dependencies.rosinstall), ahead of the upstream tag.
+
+Upgrading from 0.35: the modules are renamed (`tesseract_robotics.tesseract_collision` is now `tesseract_robotics.collision`) and the old names raise `ModuleNotFoundError`. See [breaking changes](https://tesseract-robotics.github.io/tesseract_nanobind/breaking-changes/).
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
