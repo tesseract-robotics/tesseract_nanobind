@@ -284,11 +284,11 @@ def render(step: str, events: Sequence[Mapping[str, object]]) -> str:
         ]
         lines += _aligned(phase_rows)
     if summed.miss_sources:
-        miss_rows = [("miss", "count", "source")]
-        miss_rows += [
-            (kind, str(n), source) for (kind, source), n in sorted(summed.miss_sources.items())
-        ]
-        lines += _aligned(miss_rows)
+        # The source goes last and unpadded: a path is as wide as the rest of the table.
+        misses = sorted(summed.miss_sources.items())
+        counts = _aligned([("miss", "count"), *((kind, str(n)) for (kind, _), n in misses)])
+        sources = ["source", *(source for (_, source), _ in misses)]
+        lines += [f"{count}  {source}" for count, source in zip(counts, sources, strict=True)]
     return "\n".join(lines)
 
 

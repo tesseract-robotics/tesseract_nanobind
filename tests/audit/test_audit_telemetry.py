@@ -158,7 +158,7 @@ def test_the_rendered_table_names_every_kind_and_phase():
     assert lines[0] == "3-audit: 2 events from 1 process"
     assert any(line.split() == ["bound", "0", "1", "2.0", "0.5"] for line in lines)
     assert any(line.split() == ["decl-parse", "1", "61.2"] for line in lines)
-    assert any(line.split() == ["bound", "1", "/src/a.cpp"] for line in lines)
+    assert "bound      1  /src/a.cpp" in lines  # the source is not padded to a column
 
 
 def test_the_report_prints_one_table_per_step(tmp_path, capsys):
