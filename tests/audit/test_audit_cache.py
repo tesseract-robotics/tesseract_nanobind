@@ -4,6 +4,7 @@ parse read is byte-identical, one computation per key across processes, loud on 
 Needs no libclang (`_free`), so these tests run in any env.
 """
 
+import dataclasses
 import multiprocessing
 import os
 import time
@@ -205,3 +206,45 @@ def test_prune_command_keeps_what_the_run_used(tmp_path, tree):
     assert load_free("audit_cache_prune").main([str(root), str(stamp)]) == 0
     assert not cache.entry_path(unused).exists()
     assert cache.entry_path(used).exists()
+
+
+def _selection(*audited: str) -> "tc.Selection":
+    return tc.Selection.build(
+        audited=[Path(a) for a in audited],
+        not_api=[],
+        dependency_roots=[],
+        dependency_namespaces=[],
+    )
+
+
+def test_unsaved_text_is_part_of_the_key(tmp_path):
+    source = tmp_path / "a_unincluded_headers.cpp"
+    plain = ac.FactKey(kind="api", source=source, toolchain=toolchain())
+    digests = {
+        dataclasses.replace(plain, unsaved=text).digest()
+        for text in (None, "", "#include <a.h>\n", "#include <b.h>\n")
+    }
+    assert len(digests) == 4
+
+
+def test_the_selection_is_part_of_the_key(tmp_path):
+    plain = ac.FactKey(kind="api", source=tmp_path / "a.cpp", toolchain=toolchain())
+    digests = {
+        dataclasses.replace(plain, selection=s).digest()
+        for s in (None, _selection(), _selection("/inc/a.h"), _selection("/inc/b.h"))
+    }
+    assert len(digests) == 4
+
+
+def test_an_unsaved_main_file_is_no_dependency(tmp_path, tree):
+    """A synthetic TU's main file is not on disk: its text is in the key, each text an entry."""
+    cache = ac.FactCache(tmp_path / "cache")
+    source = tree / "a_unincluded_headers.cpp"
+    compute = Counter("v", [tree / "a.h"])
+    one = ac.FactKey(kind="api", source=source, toolchain=toolchain(), unsaved="#include <a.h>\n")
+    two = dataclasses.replace(one, unsaved="#include <b.h>\n")
+    cache.fetch(one, compute)
+    cache.fetch(one, compute)
+    assert compute.calls == 1
+    cache.fetch(two, compute)
+    assert compute.calls == 2

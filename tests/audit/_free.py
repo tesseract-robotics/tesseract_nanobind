@@ -12,7 +12,7 @@ from types import ModuleType
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 # Import order: each script imports only the ones before it.
-FREE_SCRIPTS = ("audit_telemetry", "audit_toolchain", "audit_cache")
+FREE_SCRIPTS = ("audit_telemetry", "audit_toolchain", "audit_cache", "audit_symbols")
 FREE_CLIS = ("audit_cache_prune", "audit_telemetry_report")
 
 

@@ -66,6 +66,7 @@ def test_a_miss_and_a_hit_are_one_event_each(tmp_path, header):
     miss, hit = tel.read_events(log)
     assert (miss["event"], miss["kind"], miss["hit"]) == ("fetch", "decl", False)
     assert (hit["event"], hit["kind"], hit["hit"]) == ("fetch", "decl", True)
+    assert miss["source"] == hit["source"] == str(header)
     assert miss["compute_s"] > 0
     assert hit["compute_s"] == 0
     assert miss["wait_s"] >= 0 and hit["wait_s"] >= 0
@@ -103,7 +104,7 @@ def test_a_timed_phase_is_recorded_when_its_body_raises(tmp_path):
 def _write_many(path: str, count: int) -> None:
     log = load_free("audit_telemetry").EventLog(Path(path))
     for _ in range(count):
-        log.fetched("bound", hit=True, compute_s=0.0, wait_s=0.0)
+        log.fetched("bound", source="/src/a.cpp", hit=True, compute_s=0.0, wait_s=0.0)
 
 
 def test_concurrent_writers_leave_whole_lines(tmp_path):
@@ -131,9 +132,9 @@ def test_a_line_that_is_not_an_event_is_loud(tmp_path):
 
 def test_totals_per_kind_and_phase():
     events = [
-        {"event": "fetch", "kind": "bound", "hit": False, "compute_s": 2.0, "wait_s": 0.5, "pid": 1},
-        {"event": "fetch", "kind": "bound", "hit": True, "compute_s": 0.0, "wait_s": 1.5, "pid": 2},
-        {"event": "fetch", "kind": "gil", "hit": True, "compute_s": 0.0, "wait_s": 0.0, "pid": 1},
+        {"event": "fetch", "kind": "bound", "source": "/src/a.cpp", "hit": False, "compute_s": 2.0, "wait_s": 0.5, "pid": 1},
+        {"event": "fetch", "kind": "bound", "source": "/src/a.cpp", "hit": True, "compute_s": 0.0, "wait_s": 1.5, "pid": 2},
+        {"event": "fetch", "kind": "gil", "source": "/src/b.cpp", "hit": True, "compute_s": 0.0, "wait_s": 0.0, "pid": 1},
         {"event": "phase", "name": "cpp-api", "seconds": 3.0, "pid": 1},
         {"event": "phase", "name": "cpp-api", "seconds": 4.0, "pid": 2},
     ]  # fmt: skip
@@ -144,11 +145,12 @@ def test_totals_per_kind_and_phase():
     }
     assert totals.phases == {"cpp-api": tel.PhaseTotal(calls=2, seconds=7.0)}
     assert totals.processes == 2
+    assert totals.miss_sources == {("bound", "/src/a.cpp"): 1}
 
 
 def test_the_rendered_table_names_every_kind_and_phase():
     events = [
-        {"event": "fetch", "kind": "bound", "hit": False, "compute_s": 2.0, "wait_s": 0.5, "pid": 1},
+        {"event": "fetch", "kind": "bound", "source": "/src/a.cpp", "hit": False, "compute_s": 2.0, "wait_s": 0.5, "pid": 1},
         {"event": "phase", "name": "decl-parse", "seconds": 61.25, "pid": 1},
     ]  # fmt: skip
     text = tel.render("3-audit", events)
@@ -156,13 +158,18 @@ def test_the_rendered_table_names_every_kind_and_phase():
     assert lines[0] == "3-audit: 2 events from 1 process"
     assert any(line.split() == ["bound", "0", "1", "2.0", "0.5"] for line in lines)
     assert any(line.split() == ["decl-parse", "1", "61.2"] for line in lines)
+    assert any(line.split() == ["bound", "1", "/src/a.cpp"] for line in lines)
 
 
 def test_the_report_prints_one_table_per_step(tmp_path, capsys):
     events = tmp_path / "events"
     events.mkdir()
-    tel.EventLog(events / "2-gil.jsonl").fetched("gil", hit=True, compute_s=0.0, wait_s=0.0)
-    tel.EventLog(events / "1-tests.jsonl").fetched("decl", hit=False, compute_s=1.0, wait_s=0.0)
+    tel.EventLog(events / "2-gil.jsonl").fetched(
+        "gil", source="/src/a.cpp", hit=True, compute_s=0.0, wait_s=0.0
+    )
+    tel.EventLog(events / "1-tests.jsonl").fetched(
+        "decl", source="/src/a.cpp", hit=False, compute_s=1.0, wait_s=0.0
+    )
     assert load_free("audit_telemetry_report").main([str(events)]) == 0
     out = capsys.readouterr().out
     assert out.index("1-tests:") < out.index("2-gil:")
@@ -171,3 +178,19 @@ def test_the_report_prints_one_table_per_step(tmp_path, capsys):
 def test_the_report_needs_its_directory(tmp_path):
     with pytest.raises(tel.NoEventsDirError):
         load_free("audit_telemetry_report").main([str(tmp_path / "absent")])
+
+
+def test_a_fetch_event_without_its_source_is_loud(tmp_path):
+    log = tmp_path / "events.jsonl"
+    event = {"event": "fetch", "kind": "decl", "hit": True, "compute_s": 0.0, "wait_s": 0.0}
+    log.write_text(json.dumps({**event, "pid": 1}) + "\n", encoding="utf-8")
+    with pytest.raises(tel.EventShapeError):
+        tel.read_events(log)
+
+
+def test_hits_are_not_listed_as_miss_sources():
+    events = [
+        {"event": "fetch", "kind": "api", "source": "/src/a.cpp", "hit": True, "compute_s": 0.0, "wait_s": 0.0, "pid": 1},
+    ]  # fmt: skip
+    assert tel.totals(events).miss_sources == {}
+    assert "source" not in tel.render("1-tests", events)

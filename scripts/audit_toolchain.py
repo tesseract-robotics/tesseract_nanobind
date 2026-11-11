@@ -21,7 +21,7 @@ import dataclasses
 import functools
 import hashlib
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NewType
@@ -41,6 +41,14 @@ class UnlistedIncludeError(RuntimeError):
 
 class RelativeRepoDirError(ValueError):
     """A repo include dir is relative: it names another directory from another cwd."""
+
+
+class RelativeHeaderError(ValueError):
+    """A selected header path is relative: it names another file from another cwd."""
+
+
+class NotASiblingError(ValueError):
+    """A file passed as a sibling of the main file is not in the main file's directory."""
 
 
 def digest_of(value: object) -> Sha256:
@@ -70,17 +78,26 @@ def repo_dir_listing(directory: Path) -> Sha256:
     )
 
 
-def require_listed(source: Path, files: Iterable[Path]) -> None:
+def require_listed(source: Path, files: Iterable[Path], *, siblings: Collection[Path] = ()) -> None:
     """Check that every file a parse read, except its main file, is one a listing names.
 
     Args:
         source: The TU's main file.
         files: Every file the parse read.
+        siblings: Files the main text includes from its own directory by `#include "name"`
+            (a synthetic TU includes its binding source so). That directory is searched
+            first for a quoted include, so no listed dir can shadow them, and each is a
+            recorded dependency: they need no listing.
 
     Raises:
+        NotASiblingError: a sibling is not in the main file's directory.
         UnlistedIncludeError: an included file has a suffix or a directory the listing skips.
     """
-    unlisted = sorted(str(f) for f in files if f != source and not _listed(f))
+    strangers = sorted(str(s) for s in siblings if s.parent != source.parent)
+    if strangers:
+        raise NotASiblingError(f"not beside {source}: {', '.join(strangers)}")
+    exempt = {source, *siblings}
+    unlisted = sorted(str(f) for f in files if f not in exempt and not _listed(f))
     if unlisted:
         raise UnlistedIncludeError(
             f"{source} includes {', '.join(unlisted)}: `repo_dir_listing` skips such files "
@@ -134,6 +151,54 @@ class Toolchain:
             search_env=tuple(sorted(search_env.items())),
             repo_dirs=tuple(sorted((str(d), listing) for d, listing in repo_dirs.items())),
             extractors=extractors,
+        )
+
+    def canonical(self) -> str:
+        """The one serialisation: every field by name. `FactKey.digest` hashes it."""
+        return json.dumps(dataclasses.asdict(self), sort_keys=True)
+
+
+@dataclass(frozen=True)
+class Selection:
+    """What an `api` extraction reads of a TU that a table decides, not the parse.
+
+    Each field is sorted and unique: the extraction reads them as sets.
+
+    Attributes:
+        audited: The headers whose declarations are read, absolute.
+        not_api: The owned not-API headers the TU includes, absolute.
+        dependency_roots: `audit_parse.UNBOUND_DEPENDENCY_ROOTS` at extraction.
+        dependency_namespaces: `audit_parse.UNBOUND_DEPENDENCY_NAMESPACES` at extraction.
+    """
+
+    audited: tuple[str, ...]
+    not_api: tuple[str, ...]
+    dependency_roots: tuple[str, ...]
+    dependency_namespaces: tuple[str, ...]
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        audited: Iterable[Path],
+        not_api: Iterable[Path],
+        dependency_roots: Iterable[str],
+        dependency_namespaces: Iterable[str],
+    ) -> Selection:
+        """A selection in one order, whatever order its sets were built in.
+
+        Raises:
+            RelativeHeaderError: a header path is not absolute.
+        """
+        audited, not_api = set(audited), set(not_api)
+        relative = sorted(str(h) for h in audited | not_api if not h.is_absolute())
+        if relative:
+            raise RelativeHeaderError(", ".join(relative))
+        return cls(
+            audited=tuple(sorted(str(h) for h in audited)),
+            not_api=tuple(sorted(str(h) for h in not_api)),
+            dependency_roots=tuple(sorted(set(dependency_roots))),
+            dependency_namespaces=tuple(sorted(set(dependency_namespaces))),
         )
 
     def canonical(self) -> str:
