@@ -476,9 +476,6 @@
     },
     "isValidState": {
       "issue": "#333"
-    },
-    "operator==": {
-      "issue": "#393"
     }
   },
   "tesseract_motion_planners_ompl": {

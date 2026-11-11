@@ -159,6 +159,25 @@ void check_triangle_faces(const tcommon::VectorVector3d& vertices, const Eigen::
     }
 }
 
+// ContactResultVector.__getitem__ returns a reference into the vector (so `v[i].x = y` writes
+// through). A call that may reallocate or destroy the elements while Python still holds one
+// would leave it pointing at freed memory (#395), so it raises this instead, as bytearray
+// raises BufferError when it would resize under an exported buffer.
+struct ContactResultHeldError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+// Raise ContactResultHeldError if Python holds a reference to any element of `v`. nb::find
+// looks up a live Python instance of ContactResult at the element's address without creating
+// one; a held `v[i]` is registered there until it is collected. O(len(v)).
+void check_no_held_element(const tc::ContactResultVector& v, const char* caller) {
+    for (std::size_t i = 0; i < v.size(); ++i)
+        if (nb::find(v[i]).is_valid())
+            throw ContactResultHeldError(std::string(caller) + ": element " + std::to_string(i) +
+                                         " of the ContactResultVector is still held by Python; "
+                                         "delete the reference first, or hold copy.copy(v[i])");
+}
+
 void check_nonempty(const CRM::MappedType& results) {
     if (results.empty())
         throw EmptyContactResultsError("ContactResultMap: results must hold at least one ContactResult");
@@ -264,20 +283,36 @@ NB_MODULE(_tesseract_collision, m) {
         .def_rw("single_contact_point", &tc::ContactResult::single_contact_point)
         .def("clear", &tc::ContactResult::clear);
     bind_value_equality(contact_result);
+    bind_copy(contact_result);  // copy.copy(v[i]): a copy that does not pin v (#395)
 
     // ========== ContactResultVector ==========
-    // ContactResultVector uses Eigen aligned_allocator, so we need to bind manually
-    nb::class_<tc::ContactResultVector>(m, "ContactResultVector")
+    // ContactResultVector uses Eigen aligned_allocator, so we need to bind manually.
+    // Elements are references into the vector (write-through); the mutators that may reallocate
+    // or destroy them refuse while one is held (ContactResultHeldError, #395).
+    nb::exception<ContactResultHeldError>(m, "ContactResultHeldError", PyExc_BufferError)
+        .attr("__doc__") = "A ContactResultVector call would reallocate or destroy its elements while Python "
+                           "holds a reference to one (`x = v[i]`).";
+
+    nb::class_<tc::ContactResultVector>(m, "ContactResultVector",
+        "List of ContactResult. `v[i]` is a reference into the vector: `v[i].distance = d` writes "
+        "through. While Python holds such a reference, `append`, `clear` and "
+        "`ContactResultMap.flattenMoveResults(v)` raise ContactResultHeldError and leave `v` unchanged; "
+        "delete the reference, or hold a copy (`copy.copy(v[i])`), first.")
         .def(nb::init<>())
         .def("__len__", [](const tc::ContactResultVector& v) { return v.size(); })
-        .def("__getitem__", [](const tc::ContactResultVector& v, size_t i) -> const tc::ContactResult& {
+        .def("__getitem__", [](tc::ContactResultVector& v, size_t i) -> tc::ContactResult& {
             if (i >= v.size()) throw nb::index_error();
             return v[i];
-        }, nb::rv_policy::reference_internal)
+        }, nb::rv_policy::reference_internal,
+           "Reference to the element at the index (write-through), kept valid by refusing reallocation while it is held.")
         .def("append", [](tc::ContactResultVector& v, const tc::ContactResult& item) {
+            check_no_held_element(v, "append");
             v.push_back(item);
-        })
-        .def("clear", [](tc::ContactResultVector& v) { v.clear(); });
+        }, "item"_a, "Append a copy of `item`; raises ContactResultHeldError while an element is held.")
+        .def("clear", [](tc::ContactResultVector& v) {
+            check_no_held_element(v, "clear");
+            v.clear();
+        }, "Remove every element; raises ContactResultHeldError while an element is held.");
 
     // ========== ContactResultMap ==========
     nb::exception<EmptyContactResultsError>(m, "EmptyContactResultsError", PyExc_ValueError)
@@ -299,8 +334,11 @@ NB_MODULE(_tesseract_collision, m) {
             return v;
         })
         .def("flattenMoveResults", [](CRM& self, tc::ContactResultVector& v) {
+            check_no_held_element(v, "flattenMoveResults");  // clears and refills v
             self.flattenMoveResults(v);
-        }, "results"_a)
+        }, "results"_a,
+           "Move every result into `results` (cleared first); raises ContactResultHeldError, before "
+           "moving anything, while an element of `results` is held.")
         .def("__len__", &CRM::size)
         .def("at", [](const CRM& self, const CRM::KeyType& key) -> tc::ContactResultVector {
             const auto& container = self.getContainer();
