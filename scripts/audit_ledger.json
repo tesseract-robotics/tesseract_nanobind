@@ -15,11 +15,17 @@
     "tesseract/collision/common.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
     },
+    "tesseract/collision/per_thread_contact_manager.h": {
+      "wont_fix": "Per-thread clones for the C++ planners' parallel collision evaluators, keyed by `std::thread::id`; a Python thread calls `clone()` for its own manager."
+    },
     "tesseract/collision/utils.h": {
       "wont_fix": "Helpers for C++ collision backends; a Python subclass cannot be a backend."
     }
   },
   "command_language": {
+    "CompositeInstructionIterator.__next__": {
+      "wont_fix": "Python iterator protocol of the iterator `CompositeInstruction.__iter__` returns; no C++ counterpart."
+    },
     "Profile.createKey": {
       "wont_fix": "Template over the key-owning profile base; each bound key-owning base class has its own static `createKey()` (#344, #346)."
     }
@@ -354,6 +360,18 @@
     },
     "validateTypeCastWithRange": {
       "wont_fix": "Validator template for `PropertyTree.addValidator`, which stays C++; `validate()` runs a schema's validators."
+    },
+    "ContactManagersPluginInfo.insert": {
+      "wont_fix": "The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one."
+    },
+    "KinematicsPluginInfo.insert": {
+      "wont_fix": "The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one."
+    },
+    "ProfilesPluginInfo.insert": {
+      "wont_fix": "The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one."
+    },
+    "TaskComposerPluginInfo.insert": {
+      "wont_fix": "The inherited `PluginDiscoveryInfo::insert`, which the C++ overload hides: the class is a `PluginDiscoveryInfo`, so `insert` takes one."
     }
   },
   "environment": {
@@ -366,8 +384,8 @@
     "Environment.__init__": {
       "wont_fix": "Takes the private `Environment::Implementation`, used only by `clone`."
     },
-    "Environment.getCurrentJointValuesByNames": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
+    "Environment.addEventCallback": {
+      "wont_fix": "Takes the callable alone and returns its key: the binding picks a key no registered callback holds, for `removeEventCallback`."
     },
     "Environment.getEventCallbacks": {
       "wont_fix": "Returns opaque `std::function` objects."
@@ -375,20 +393,11 @@
     "Environment.getFindTCPOffsetCallbacks": {
       "wont_fix": "Returns opaque `std::function` objects."
     },
-    "Environment.getStateByMap": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
-    },
-    "Environment.getStateByNamesAndValues": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
-    },
     "Environment.link_transforms_batch": {
       "wont_fix": "Python-only batch form of `getLinkTransforms` for numpy callers; no C++ counterpart."
     },
     "Environment.lockRead": {
       "wont_fix": "A `shared_lock` held from Python while other calls release the GIL is a deadlock trap."
-    },
-    "Environment.setStateByNamesAndValues": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseB-review-decisions.md:74 #187)"
     },
     "Event.__init__": {
       "wont_fix": "Events are fired by `Environment`; Python cannot fire one."
@@ -414,7 +423,13 @@
       "wont_fix": "Its body is `assert(false)` (octree.h:83)."
     },
     "SignedDistanceField.__init__": {
-      "wont_fix": "`Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`."
+      "issue": "#429"
+    },
+    "SignedDistanceField.getBandClamp": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.getDistanceAndGradient": {
+      "issue": "#429"
     },
     "SignedDistanceField.getDomain": {
       "wont_fix": "`Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`."
@@ -425,26 +440,50 @@
     "SignedDistanceField.getDomainMin": {
       "wont_fix": "`Eigen::AlignedBox3d` has no Python class: the binding takes `domain_min` and `domain_max`."
     },
+    "SignedDistanceField.getGradient": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.getGradientInterpolation": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.getInterpolation": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.getNVDB": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.isSparse": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.setGradientInterpolation": {
+      "issue": "#429"
+    },
+    "SignedDistanceField.setInterpolation": {
+      "issue": "#429"
+    },
+    "SignedDistanceFieldInterpolation": {
+      "issue": "#429"
+    },
     "createMeshFromAsset": {
       "wont_fix": "Takes an assimp `aiScene`; assimp is never exposed to Python."
     },
     "extractMeshData": {
       "wont_fix": "Takes an assimp `aiScene`/`aiNode`; assimp is never exposed to Python."
     },
+    "getSignedDistanceFieldNVDBGridNames": {
+      "issue": "#429"
+    },
     "readSignedDistanceFieldNVDB": {
       "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
     },
     "readSignedDistanceFieldVDB": {
       "wont_fix": "`bytes` is the Python form of the `std::vector<std::uint8_t>` overload."
+    },
+    "readSparseSignedDistanceFieldNVDB": {
+      "issue": "#429"
     }
   },
   "kinematics": {
-    "JointGroup.calcJacobianWithPoint": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:23 #212)"
-    },
-    "KinematicGroup.calcInvKinMultiple": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:24 #212)"
-    },
     "PositionerSampleResolution.__init__": {
       "wont_fix": "Spells the C++ aggregate initialization `{name, value, min, max}`; `min` and `max` default to None, the joint's limits."
     },
@@ -480,6 +519,32 @@
       "wont_fix": "Python form of `value()`: `float(cost)` reads the cost."
     }
   },
+  "motion_planners_trajopt_ifopt": {
+    "TrajOptIfoptOSQPSolverProfile.getAbsoluteTolerance": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getAdaptiveRho": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getAdaptiveRhoInterval": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getMaxIteration": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getPolish": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getRelativeTolerance": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getVerbosity": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "TrajOptIfoptOSQPSolverProfile.getWarmStart": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    }
+  },
   "scene_graph": {
     "SceneGraph.getEdge": {
       "wont_fix": "Returns a Boost Graph descriptor."
@@ -510,12 +575,6 @@
   "state_solver": {
     "KDLStateSolver.__init__": {
       "wont_fix": "`data` is a `KDLTreeData`, a KDL tree type; KDL is never exposed to Python."
-    },
-    "StateSolver.setStateByMap": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219)"
-    },
-    "StateSolver.setStateByNamesAndValues": {
-      "wont_fix": "deferred: compatibility alias kept until a separate breaking go (phaseC-review-decisions.md:57 #219)"
     }
   },
   "task_composer": {
@@ -562,6 +621,30 @@
     }
   },
   "trajopt_sqp": {
+    "OSQPEigenSolver.getAbsoluteTolerance": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getAdaptiveRho": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getAdaptiveRhoInterval": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getMaxIteration": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getPolish": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getRelativeTolerance": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getVerbosity": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
+    "OSQPEigenSolver.getWarmStart": {
+      "wont_fix": "`OsqpEigen::Settings` has setters only; the getter reads the `OSQPSettings` its setter writes."
+    },
     "PIQPKKTSolver": {
       "wont_fix": "piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings."
     },

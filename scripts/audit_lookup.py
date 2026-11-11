@@ -31,18 +31,25 @@ def _stub_py_api(stub: Path) -> PyApi:
 def _base_stub(base: str, py: PyApi, stub_roots: Sequence[Path]) -> tuple[PyApi, str] | None:
     """The stub declaring `base` and the class name in it, or None if no stub declares it.
 
-    A plain name is a class of the same stub. nanobind spells a base bound in another
-    extension by its module path (`tesseract_robotics.common._common.X`),
-    which maps to `<root>/tesseract_robotics/common/_common.pyi`; a module that is itself the
-    extension (`tesseract_robotics.collision.X`) maps to `<root>/tesseract_robotics/collision.pyi`.
+    A plain name is a class of the same stub. A base bound in another extension is spelled by
+    its module path: a module that is itself the extension (`tesseract_robotics.collision.X`)
+    maps to `<root>/tesseract_robotics/collision.pyi`; a wrapped package's public path
+    (`tesseract_robotics.common.X`, which the stub generator writes for the private
+    `tesseract_robotics.common._common.X`) maps to `<root>/tesseract_robotics/common/_common.pyi`,
+    as does the private path itself.
     """
     module, _, cls = base.rpartition(".")
     if not module:
         return py, cls
-    stub = Path(*module.split(".")).with_suffix(".pyi")
+    parts = module.split(".")
+    candidates = (
+        Path(*parts).with_suffix(".pyi"),
+        Path(*parts, f"_{parts[-1]}").with_suffix(".pyi"),
+    )
     for root in stub_roots:
-        if (root / stub).is_file():
-            return _stub_py_api(root / stub), cls
+        for stub in candidates:
+            if (root / stub).is_file():
+                return _stub_py_api(root / stub), cls
     return None
 
 
