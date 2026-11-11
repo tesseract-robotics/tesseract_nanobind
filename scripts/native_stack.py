@@ -283,8 +283,11 @@ def write_identity(directory: Path, identity: dict[str, str]) -> None:
 
 
 def fetch_sources(stack: Stack) -> None:
-    """`vcs import` dependencies.rosinstall into ws/src."""
-    stack.src.mkdir(parents=True, exist_ok=True)
+    """`vcs import` dependencies.rosinstall into a fresh ws/src."""
+    # vcs import cannot move a checkout to another repository: a changed rosinstall starts clean.
+    if stack.src.exists():
+        shutil.rmtree(stack.src)
+    stack.src.mkdir(parents=True)
     run([require_tool("vcs"), "import", "--input", str(ROSINSTALL), str(stack.src)])
 
 
@@ -411,9 +414,8 @@ def build_colcon(stack: Stack) -> None:
 def stage(name: str, stack: Stack) -> None:
     """Run one stage unless its recorded identity equals the current one."""
     if name == "sources":
-        fetch_sources(stack)
-        return
-    if name == "vcpkg":
+        directory, identity, build = stack.src, sources_identity(), fetch_sources
+    elif name == "vcpkg":
         directory, identity, build = stack.vcpkg_prefix.parent, vcpkg_identity(stack), build_vcpkg
     else:
         directory, identity, build = stack.install, colcon_identity(stack), build_colcon
