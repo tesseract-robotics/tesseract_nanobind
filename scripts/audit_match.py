@@ -9,7 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import audit_types
-from audit_bound import bound_classes, bound_exceptions
+from audit_facts import bound_facts, decl_facts
 from audit_lookup import (
     NO_ALIAS,
     BoundLookup,
@@ -50,7 +50,6 @@ from audit_parse import (
     audited_headers,
     binding_module,
     cpp_api,
-    decl_names,
     direct_include_spellings,
     foreign_headers,
     header_rel,
@@ -299,9 +298,9 @@ def _bound_of(
     cpp: Path, extra_include_dirs: tuple[Path, ...]
 ) -> tuple[Mapping[str, str], frozenset[str]]:
     """`bound_classes` and the `bound_exceptions` names of one binding source, parsed with
-    bodies once per audit run."""
-    tu = parse_tu(cpp, extra_include_dirs, bodies=True)
-    return MappingProxyType(bound_classes(tu)), frozenset(bound_exceptions(tu))
+    bodies once per audit run, on a fact-cache miss only (`audit_facts.bound_facts`)."""
+    facts = bound_facts(cpp, extra_include_dirs, parse_tu)
+    return MappingProxyType(dict(facts.classes)), facts.exceptions
 
 
 def _bound_classes_of(cpp: Path, extra_include_dirs: tuple[Path, ...]) -> Mapping[str, str]:
@@ -818,6 +817,7 @@ def audit_tu(
         return any(qualified in lookup(m).values() for m in modules)
 
     tu = parse_tu(cpp_path, extra_include_dirs)
+    decl = decl_facts(cpp_path, extra_include_dirs, lambda: tu)
     direct = audited_headers(tu, module, prefixes, include_dirs)
     other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
     owned_elsewhere = frozenset().union(*other_includes.values())
@@ -841,13 +841,13 @@ def audit_tu(
     report = match(
         module,
         cpp_api(tu, frozenset(audited) & included, prefixes, bound_anywhere),
-        decl_names(tu),
+        decl.names,
         py_api(load_stub(stub_path), rel(stub_path)),
         rel(stub_path),
         stub_roots,
-        audit_types.class_ancestors(tu),
+        decl.ancestors,
         lookup,
-        audit_types.public_bases(tu),
+        decl.bases,
         _bound_of(cpp_path, tuple(extra_include_dirs))[1],
     )
     unincluded = {h: s for h, s in audited.items() if h not in included}

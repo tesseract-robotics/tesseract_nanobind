@@ -362,7 +362,9 @@ def compare(
 
 
 def main(argv: list[str] | None = None) -> int:
-    import audit_parse  # needs the audit env (CONDA_PREFIX); not at import, for the tests
+    # Need the audit env (CONDA_PREFIX); not at import, for the tests.
+    import audit_parse
+    from audit_facts import gil_releases
     from audit_ownership import binding_modules, binding_source
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -372,7 +374,11 @@ def main(argv: list[str] | None = None) -> int:
     args = [*audit_parse.PARSE_ARGS, *(f"-I{d}" for d in audit_parse.INCLUDE_DIRS)]
     found: dict[Release, str] = {}
     for module in modules:
-        found.update(Scanner(parse(binding_source(module), args), module).scan())
+
+        def scan(tu: ci.TranslationUnit, module: str = module) -> dict[Release, str]:
+            return Scanner(tu, module).scan()
+
+        found.update(gil_releases(binding_source(module), args, scan, parse))
     problems = compare(found, load_entry_points(ENTRY_POINTS), modules)
     for line in problems:
         print(line, file=sys.stderr)

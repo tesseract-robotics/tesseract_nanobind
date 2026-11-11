@@ -110,6 +110,10 @@ def test_main_checks_coverage_before_parsing(monkeypatch):
     monkeypatch.setattr(
         load("audit_match"), "parse_tu", lambda *a, **k: pytest.fail("parsed before coverage")
     )
+    # A warm fact cache answers without parsing: the guard covers the cached facts too.
+    monkeypatch.setattr(
+        load("audit_match"), "bound_facts", lambda *a, **k: pytest.fail("read before coverage")
+    )
     with pytest.raises(own.UnclassifiedModuleError):
         cli.main([])
 
@@ -195,6 +199,10 @@ def test_audit_tu_refuses_a_prefix_that_disagrees_with_prefixes(monkeypatch):
     """`prefix` and `prefixes[module]` name the same thing; a mismatch is a caller bug."""
     monkeypatch.setattr(
         load("audit_match"), "parse_tu", lambda *a, **k: pytest.fail("parsed before the check")
+    )
+    # A warm fact cache answers without parsing: the guard covers the cached facts too.
+    monkeypatch.setattr(
+        load("audit_match"), "bound_facts", lambda *a, **k: pytest.fail("read before the check")
     )
     fixtures = FIXTURE_INCLUDE.parent
     with pytest.raises(audit.PrefixMismatchError, match="tesseract/other/"):

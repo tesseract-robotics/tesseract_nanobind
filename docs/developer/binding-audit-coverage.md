@@ -69,6 +69,41 @@ Other changes (rebases, tests, CI, a stub edit that only moves lines) leave it c
 
 The report is the source of these numbers. This table is copied from it once per regeneration that changes a count.
 
+## Fact cache
+
+Only the part of the audit that libclang computes is cached, and only per translation unit: a binding re-parses when a file its parse read changes, and no other binding does. Every rule still runs on every audit. Status: **under verification**. The tests pass locally without libclang. The run time on CI is not measured yet.
+
+The audit's cost is libclang: two parses of each binding (one with function bodies), a third for the GIL list, and whole-TU walks from Python (std, Eigen and boost included). The 2026-11-10 run on main took 50 min: contract tests 26 min, GIL list 11 min, audit 12.5 min. In the contract tests, each xdist worker parsed every binding with bodies on its first real-module test: the four workers stalled together for 9 min.
+
+`scripts/audit_facts.py` caches three facts, each one extractor's output on one parse:
+
+| fact | parse | replaces |
+|---|---|---|
+| `bound_facts` | bodies (`BODY_PARSE_OPTIONS`) | `bound_classes` + `bound_exceptions`; every module's `bound_index` |
+| `decl_facts` | declarations (`PARSE_OPTIONS`) | the three whole-TU walks `decl_names`, `class_ancestors`, `public_bases` |
+| `gil_releases` | the GIL audit's own bodies parse | `audit_gil.Scanner.scan` |
+
+`scripts/audit_cache.py` stores each fact as one JSON entry under `.cache/binding-audit/<fact>/<digest>.json`, together with the SHA-256 of every file the parse read (the main file plus `get_includes()`). An entry is used only when every one of those files is byte-identical. The digest covers everything else the fact depends on:
+
+- the parse arguments and options;
+- the audit env's package set (`conda-meta` records and `dist-info` names): libclang, every header package, nanobind;
+- `CPATH`, `C_INCLUDE_PATH` and `CPLUS_INCLUDE_PATH`;
+- the file listing of each include dir inside the repo, because a new file there can shadow a header found later on the search path;
+- the source of the scripts that run during extraction (`*_EXTRACTORS`).
+
+`audit_ownership.py` is not part of the digest. The parse reads only its path constants, which the arguments already cover, and its `header_rel`, which only formats errors. Binding PRs edit its tables constantly.
+
+A per-entry `flock` makes xdist workers that ask for one fact compute it once. In CI, `audit.yml` restores the newest earlier cache, stamps the run start, and after a run that reached every step drops the entries nothing used since the stamp (`audit-cache-prune`). It then saves the cache, also after a failed step.
+
+Rejected alternatives:
+
+- **Caching whole module reports.** Contract tests patch the rule tables (`ACCEPTED`, `UNAUDITED_HEADERS`, …) and then audit, so a report keyed on files would return stale rows. Every module's report also reads every other binding through `bound_index`, so any binding edit would invalidate all of them.
+- **Caching libclang ASTs** (`TranslationUnit.save` / `from_ast_file`). This removes the parse but not the Python walks. Loading also validates every input file's mtime, and a fresh checkout changes every mtime.
+
+Still parsed on every audit: the declarations parse of each audited module for `cpp_api`, and the synthetic TUs of headers that a binding does not include. `cpp_api` takes a callback over every module's bound classes, so it is not yet a function of one TU's inputs.
+
+Tests: `tests/audit/test_audit_cache.py` covers hit and miss, edits that keep size and mtime, removed files, the key parts, concurrent workers, pruning and corrupt entries, without libclang. `tests/audit/test_audit_facts.py` checks that a cached fact equals the fresh extraction and that a hit does not parse, and that an edit to an included fixture header re-parses.
+
 ## Module layout
 
 The scripts import in one direction, top to bottom. Each file has one job.
@@ -79,6 +114,8 @@ The scripts import in one direction, top to bottom. Each file has one job.
 | `scripts/audit_ownership.py` | module tables, header ownership (longest prefix), not-API and third-party header patterns, coverage errors |
 | `scripts/audit_parse.py` | libclang TUs → `CppSymbol`/`CppOverload`; structural `absent_ok` predicates; `bound_classes` from `nb::class_`/`nb::enum_` |
 | `scripts/audit_bound.py` | what a binding TU binds: `bound_classes` reads the `nb::class_`/`nb::enum_` constructions in the `NB_MODULE` body (Python name → qualified C++ class); `audit_match` builds its per-module `bound_index` from it |
+| `scripts/audit_cache.py` | content-addressed fact cache: entries keyed on every file a parse read, per-entry lock, prune (`audit-cache-prune`) |
+| `scripts/audit_facts.py` | the cached facts of a binding TU (`bound_facts`, `decl_facts`, `gil_releases`) and their toolchain key |
 | `scripts/audit_stub.py` | `.pyi` → `PySymbol`/`PyOverload`; deviations and quoted names |
 | `scripts/audit_rules.py` | `ACCEPTED` rule texts and every rule table; checks at import that each table entry names a rule |
 | `scripts/audit_match.py` | the comparison: cover, accept, gap, deviation; base rows; header rows |
