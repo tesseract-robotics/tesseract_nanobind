@@ -16,6 +16,7 @@
     "pick_and_place_example": "1d476a01ae03decf8326747b1c80d1c5ec7e19fc4870cb598b03262a800202c7",
     "pointcloud_octree_collision_example": "c6f1667650fed631005f2efa8d42b2f9d424c136b71b58c6a38ae9b7f561204e",
     "puzzle_piece_auxillary_axes_example": "c39d9987ab6247ecccc652eac1cffff035f31d16785f03c99cca027eed83c242",
+    "python_constraints_example": "968e0b2cb9247437aa92627ca52e6b2d64143db3f1f57b7ad663f9177be9dd30",
     "raster_example": "ddb6ec3673c1cbf1bb84423bc0df855d9ddb370e71601ec678c62ae7a6b42684",
     "scene_graph_example": "3072b84df3343d6bc8a437c8073920b4ea3521fd50ac026bbb12eb650679821d",
     "sdf_collision_example": "0691c49222f81abc619b16e60243361d1551b1142a7c259fb437e817338bbaec",
@@ -149,6 +150,15 @@
       },
       "recording_sha256": "b08059bdf72f3e1a62cce627704bd7f78e27fa0985c46ae13c4dd6a5018e8f23",
       "size_bytes": 2557187
+    },
+    "python_constraints_example": {
+      "identity": {
+        "inputs_sha256": "bac56b5929ab354037a0d91e84cc00ff9e678fa60a28660c549862818ef07687",
+        "package_version": "0.35.0.9.dev692",
+        "viser_version": "1.1.1"
+      },
+      "recording_sha256": "2c9d339ad3271b5a419eb7093db334e6a6e0eeae132f35fe1671d960c2b4c5a6",
+      "size_bytes": 1012578
     },
     "raster_example": {
       "identity": {

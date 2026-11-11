@@ -167,8 +167,7 @@ module = "python_constraints_example"
 page = "examples/python-constraints.md"
 title = "Python constraints"
 blurb = "Seven Python-defined rules switched on one after another in a live loop: one solve per frame, with a gauge per rule and the solve time against the frame."
-status = "excluded"
-reason = "awaiting review of its first recording"
+status = "published"
 floor_size_m = 12.0
 [example.camera]
 position = [3.9, -2.3, 2.0]
