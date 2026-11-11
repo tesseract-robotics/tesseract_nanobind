@@ -183,14 +183,59 @@ def test_planning_binding_tu_parses_clean(module):
     audit.parse_tu(audit.binding_source(module))
 
 
-def test_versioned_include_requires_one_match(tmp_path):
-    with pytest.raises(audit.IncludeDirError, match="ompl-"):
-        audit.versioned_include("ompl", tmp_path)
+def test_ompl_include_is_versioned_or_plain(tmp_path):
+    with pytest.raises(audit.IncludeDirError, match="no OMPL headers"):
+        audit.ompl_include(tmp_path)
+    (tmp_path / "ompl").mkdir()
+    assert audit.ompl_include(tmp_path) == tmp_path
     (tmp_path / "ompl-1.7").mkdir()
-    assert audit.versioned_include("ompl", tmp_path) == tmp_path / "ompl-1.7"
+    assert audit.ompl_include(tmp_path) == tmp_path / "ompl-1.7"
     (tmp_path / "ompl-1.8").mkdir()
     with pytest.raises(audit.IncludeDirError, match="2"):
-        audit.versioned_include("ompl", tmp_path)
+        audit.ompl_include(tmp_path)
+
+
+def _native_stack(root, triplets=("x64-linux-dynamic-release",)):
+    (root / "ws" / "install" / "include").mkdir(parents=True)
+    for t in triplets:
+        (root / "vcpkg" / "installed" / t / "include" / "ompl").mkdir(parents=True)
+    (root / "vcpkg" / "installed" / "vcpkg").mkdir(parents=True)  # vcpkg's own bookkeeping dir
+    return root
+
+
+def test_native_include_roots_are_the_install_and_the_one_vcpkg_triplet(tmp_path):
+    root = _native_stack(tmp_path)
+    install, vcpkg = audit.native_include_roots(root)
+    assert install == root / "ws" / "install" / "include"
+    assert vcpkg == root / "vcpkg" / "installed" / "x64-linux-dynamic-release" / "include"
+
+
+def test_native_stack_missing_or_ambiguous_raises_by_name(tmp_path):
+    with pytest.raises(audit.NativeStackMissingError, match="native-build"):
+        audit.native_include_roots(tmp_path)
+    root = _native_stack(tmp_path / "two", ("a-linux", "b-linux"))
+    with pytest.raises(audit.NativeStackMissingError, match="a-linux.*b-linux"):
+        audit.native_include_roots(root)
+    bare = tmp_path / "bare"
+    (bare / "vcpkg" / "installed" / "a-linux" / "include").mkdir(parents=True)
+    with pytest.raises(audit.NativeStackMissingError, match="ws/install/include"):
+        audit.native_include_roots(bare)
+
+
+def test_native_include_dirs_need_an_osqp_dir(tmp_path):
+    root = _native_stack(tmp_path)
+    with pytest.raises(audit.NativeStackMissingError, match="osqp"):
+        audit.native_include_dirs(root)
+    (root / "ws" / "install" / "include" / "osqp").mkdir()
+    dirs = audit.native_include_dirs(root)
+    install, vcpkg = audit.native_include_roots(root)
+    assert dirs[:2] == (install, vcpkg)
+    assert vcpkg / "eigen3" in dirs and install / "osqp" in dirs
+
+
+def test_native_root_prefers_the_variable(tmp_path, monkeypatch):
+    monkeypatch.setenv(audit.NATIVE_ROOT_ENV, str(tmp_path))
+    assert audit.native_root() == tmp_path
 
 
 def test_syntax_error_raises_header_parse_error():
