@@ -357,6 +357,10 @@ add_tesseract_nanobind_extension(
   trajopt::trajopt_ifopt
   tesseract::common
 )
+# PIQPSettings' operator== lives in the header-only tesseract/motion_planners/piqp/settings_utils.h
+# (#393): its include path only, no tesseract_planning library linked.
+target_include_directories(_trajopt_sqp PRIVATE
+  $<TARGET_PROPERTY:tesseract::motion_planners,INTERFACE_INCLUDE_DIRECTORIES>)
 
 # Find and add tesseract_time_parameterization
 find_package(tesseract_planning REQUIRED COMPONENTS time_parameterization time_parameterization_isp time_parameterization_totg time_parameterization_kdl time_parameterization_ruckig)

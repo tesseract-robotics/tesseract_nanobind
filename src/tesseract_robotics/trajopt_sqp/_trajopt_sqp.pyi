@@ -931,6 +931,12 @@ class PIQPSettings:
     @compute_timings.setter
     def compute_timings(self, arg: bool, /) -> None: ...
 
+    def __eq__(self, arg: PIQPSettings, /) -> bool: ...
+
+    def __ne__(self, arg: PIQPSettings, /) -> bool: ...
+
+    __hash__: None = None
+
 class PIQPSolver(QPSolver):
     """PIQP-based (interior point) QP solver"""
 

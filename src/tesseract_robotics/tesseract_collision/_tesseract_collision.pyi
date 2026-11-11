@@ -165,16 +165,38 @@ class ContactResult:
 
     __hash__: None = None
 
+    def __copy__(self) -> ContactResult: ...
+
+    def __deepcopy__(self, memo: dict) -> ContactResult: ...
+
+class ContactResultHeldError(BufferError):
+    """
+    A ContactResultVector call would reallocate or destroy its elements while Python holds a reference to one (`x = v[i]`).
+    """
+
 class ContactResultVector:
+    """
+    List of ContactResult. `v[i]` is a reference into the vector: `v[i].distance = d` writes through. While Python holds such a reference, `append`, `clear` and `ContactResultMap.flattenMoveResults(v)` raise ContactResultHeldError and leave `v` unchanged; delete the reference, or hold a copy (`copy.copy(v[i])`), first.
+    """
+
     def __init__(self) -> None: ...
 
     def __len__(self) -> int: ...
 
-    def __getitem__(self, arg: int, /) -> ContactResult: ...
+    def __getitem__(self, arg: int, /) -> ContactResult:
+        """
+        Reference to the element at the index (write-through), kept valid by refusing reallocation while it is held.
+        """
 
-    def append(self, arg: ContactResult, /) -> None: ...
+    def append(self, item: ContactResult) -> None:
+        """
+        Append a copy of `item`; raises ContactResultHeldError while an element is held.
+        """
 
-    def clear(self) -> None: ...
+    def clear(self) -> None:
+        """
+        Remove every element; raises ContactResultHeldError while an element is held.
+        """
 
 class EmptyContactResultsError(ValueError):
     """A ContactResultMap vector overload got an empty ContactResultVector."""
@@ -196,7 +218,10 @@ class ContactResultMap:
 
     def flattenCopyResults(self) -> ContactResultVector: ...
 
-    def flattenMoveResults(self, results: ContactResultVector) -> None: ...
+    def flattenMoveResults(self, results: ContactResultVector) -> None:
+        """
+        Move every result into `results` (cleared first); raises ContactResultHeldError, before moving anything, while an element of `results` is held.
+        """
 
     def __len__(self) -> int: ...
 
