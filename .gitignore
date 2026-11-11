@@ -56,3 +56,4 @@ upstream/build/
 
 # Demo recordings, posters and player snippets: generated, and pinned by scripts/demos/demos.lock.json
 docs/demos/
+.native/

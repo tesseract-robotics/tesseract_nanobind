@@ -1,0 +1,21 @@
+# Declarations of the native C++ stack, read by scripts/native_stack.py and hashed into its
+# build identity. The sources (tesseract, trajopt, ...) are declared in dependencies.rosinstall.
+
+[vcpkg]
+repository = "https://github.com/microsoft/vcpkg.git"
+# A vcpkg release tag.
+revision = "2026.10.16"
+packages = [
+  "boost-dll", "boost-program-options",
+  "boost-serialization", "boost-filesystem",
+  "boost-stacktrace", "boost-algorithm",
+  "boost-format", "cereal",
+  "tinyxml2", "spdlog", "assimp",
+  "urdfdom", "octomap", "orocos-kdl", "pcl",
+  "gtest", "benchmark", "flann", "jsoncpp",
+  "yaml-cpp", "eigen3",
+  "openblas",
+  "fcl", "ompl", "taskflow",
+  "bullet3[multithreading,double-precision,rtti]",
+  "ccd[double-precision]", "gperftools",
+]

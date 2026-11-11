@@ -45,25 +45,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Same release used by the successful pre-review wheel build.
-  VCPKG_REVISION: "2026.10.16"
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   # Initial 1 GiB working set per platform; statistics expose eviction pressure.
   CCACHE_MAXSIZE: 1G
   CCACHE_BASEDIR: ${{ github.workspace }}
-  VCPKG_PKGS: >-
-    boost-dll boost-program-options
-    boost-serialization boost-filesystem
-    boost-stacktrace boost-algorithm
-    boost-format cereal
-    tinyxml2 spdlog assimp
-    urdfdom octomap orocos-kdl pcl
-    gtest benchmark flann jsoncpp
-    yaml-cpp eigen3
-    openblas
-    fcl ompl taskflow
-    bullet3[multithreading,double-precision,rtti]
-    ccd[double-precision] gperftools
   # Tag builds must yield exactly the tag version (a dirty tree otherwise makes setuptools-scm
   # guess the next dev version); other builds take the version setuptools-scm derives
   SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -91,8 +76,6 @@ jobs:
           plat: manylinux_2_39_aarch64
     env:
       DEBIAN_FRONTEND: noninteractive
-      # vcpkg does not ship prebuilt tools for arm64 Linux; use the system cmake/ninja everywhere
-      VCPKG_FORCE_SYSTEM_BINARIES: 1
     steps:
     - uses: actions/checkout@v6
       with:
@@ -166,6 +149,9 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install colcon-common-extensions vcs2l auditwheel patchelf $NB_BUILD_REQS
         python tesseract_nanobind/scripts/check_wheel_sources.py
+    - name: declare native stack
+      shell: bash
+      run: python3 tesseract_nanobind/scripts/native_stack.py github-env
     - name: restore native build artifacts
       id: native_cache
       uses: ./tesseract_nanobind/.github/actions/native-cache
@@ -177,26 +163,27 @@ jobs:
       shell: bash
       run: |
         source $GITHUB_WORKSPACE/venv/bin/activate
-        mkdir -p ws/src
-        vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
+        python tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE"
+    - name: restore vcpkg binary packages
+      id: vcpkg_cache
+      if: steps.native_cache.outputs.native-run == '' && steps.native_cache.outputs.vcpkg-run == ''
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.config.vcpkg_triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
     - name: vcpkg build
       id: vcpkg
       if: steps.native_cache.outputs.native-run == ''
-      uses: johnwason/vcpkg-action@v8
+      shell: bash
+      run: |
+        source $GITHUB_WORKSPACE/venv/bin/activate
+        python tesseract_nanobind/scripts/native_stack.py vcpkg --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE" --binary-cache "$RUNNER_TEMP/vcpkg_cache"
+    - name: save vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success' && steps.vcpkg_cache.outcome == 'success' && steps.vcpkg_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
       with:
-        revision: ${{ env.VCPKG_REVISION }}
-        # Once artifact-seeded, do not duplicate the large binaries in Actions cache.
-        disable-cache: ${{ steps.native_cache.outputs.vcpkg-run != '' }}
-        pkgs: >-
-          ${{ env.VCPKG_PKGS }}
-        triplet: ${{ matrix.config.vcpkg_triplet }}
-        extra-args: >-
-          --clean-after-build
-          --overlay-triplets=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_triplets
-          --overlay-ports=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_overlays
-          --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
-        token: ${{ github.token }}
-        cache-key: linux-${{ matrix.config.vcpkg_triplet }}
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.config.vcpkg_triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
     - name: archive vcpkg binary packages
       if: steps.vcpkg.outcome == 'success'
       shell: bash
@@ -226,28 +213,9 @@ jobs:
       id: native_build
       if: steps.native_cache.outputs.native-run == ''
       shell: bash
-      working-directory: ws
       run: |
         source $GITHUB_WORKSPACE/venv/bin/activate
-        VCPKG_PREFIX=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.vcpkg_triplet }}
-        export CMAKE_PREFIX_PATH=$VCPKG_PREFIX
-        export LD_LIBRARY_PATH=$VCPKG_PREFIX/lib:$GITHUB_WORKSPACE/ws/install/lib
-        # Upstream headers (tesseract_planning's poly types) use std::runtime_error without
-        # <stdexcept>; the distro Boost pulled it in transitively, vcpkg's Boost does not
-        # Tracked upstream: tesseract-robotics/tesseract_planning#802
-        export CXXFLAGS="-include stdexcept"
-        # Two packages at a time, each building with every core: four packages at once peaks
-        # past the runner's 16 GB and the runner is shut down mid-build
-        colcon build --merge-install --parallel-workers 2 \
-          --cmake-force-configure \
-          --packages-ignore tesseract_examples gtest \
-          --event-handlers console_cohesion+ \
-          --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
-          -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_ENABLE_TESTING=OFF \
-          -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
-          -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        python tesseract_nanobind/scripts/native_stack.py colcon --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE"
     - name: archive installed native stack
       if: steps.native_build.outcome == 'success'
       shell: bash
@@ -416,6 +384,9 @@ jobs:
     - name: choco
       run: |
         choco install ninja ccache -r
+    - name: declare native stack
+      shell: bash
+      run: python tesseract_nanobind/scripts/native_stack.py github-env
     - name: restore native build artifacts
       id: native_cache
       uses: ./tesseract_nanobind/.github/actions/native-cache
@@ -424,26 +395,29 @@ jobs:
         refresh: ${{ github.event_name == 'schedule' || inputs.refresh-native }}
     - name: vcs import
       if: steps.native_cache.outputs.native-run == ''
-      run: |
-        mkdir ws\src
-        vcs import --input tesseract_nanobind\dependencies.rosinstall ws\src
+      shell: bash
+      run: python tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ matrix.config.vcpkg_triplet }} --root "$GITHUB_WORKSPACE"
+    - name: restore vcpkg binary packages
+      id: vcpkg_cache
+      if: steps.native_cache.outputs.native-run == '' && steps.native_cache.outputs.vcpkg-run == ''
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.config.vcpkg_triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
     - name: vcpkg build
       id: vcpkg
       if: steps.native_cache.outputs.native-run == ''
-      uses: johnwason/vcpkg-action@v8
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+        python tesseract_nanobind\scripts\native_stack.py vcpkg --triplet ${{ matrix.config.vcpkg_triplet }} --root "%GITHUB_WORKSPACE%" --binary-cache "%RUNNER_TEMP%\vcpkg_cache"
+        if %ERRORLEVEL% GEQ 1 exit 1
+    - name: save vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success' && steps.vcpkg_cache.outcome == 'success' && steps.vcpkg_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
       with:
-        revision: ${{ env.VCPKG_REVISION }}
-        # Once artifact-seeded, do not duplicate the large binaries in Actions cache.
-        disable-cache: ${{ steps.native_cache.outputs.vcpkg-run != '' }}
-        pkgs: >-
-          ${{ env.VCPKG_PKGS }}
-        triplet: ${{ matrix.config.vcpkg_triplet }}
-        extra-args: >-
-          --clean-after-build
-          --overlay-ports=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_overlays_windows
-          --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
-        token: ${{ github.token }}
-        cache-key: win-${{ matrix.config.arch }}-nanobind
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.config.vcpkg_triplet }}-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
     - name: archive vcpkg binary packages
       if: steps.vcpkg.outcome == 'success'
       shell: bash
@@ -483,24 +457,10 @@ jobs:
     - name: colcon build
       id: native_build
       if: steps.native_cache.outputs.native-run == ''
-      working-directory: ws
       shell: cmd
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
-        set CMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}
-        set PATH=%PATH%;%GITHUB_WORKSPACE%\vcpkg\installed\${{ matrix.config.vcpkg_triplet }}\bin
-        set CC=cl
-        set CXX=cl
-        colcon build --merge-install ^
-        --cmake-force-configure ^
-        --event-handlers console_cohesion+ ^
-        --packages-ignore tesseract_examples gtest ^
-        --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release ^
-        -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ^
-        -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON ^
-        -DVCPKG_APPLOCAL_DEPS=OFF ^
-        -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON ^
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        python tesseract_nanobind\scripts\native_stack.py colcon --triplet ${{ matrix.config.vcpkg_triplet }} --root "%GITHUB_WORKSPACE%"
         if %ERRORLEVEL% GEQ 1 exit 1
     - name: archive installed native stack
       if: steps.native_build.outcome == 'success'
@@ -654,6 +614,9 @@ jobs:
       run: |
         python3 -m pip install colcon-common-extensions vcs2l ${{ env.NB_BUILD_REQS }}
         python3 tesseract_nanobind/scripts/check_wheel_sources.py
+    - name: declare native stack
+      shell: bash
+      run: python3 tesseract_nanobind/scripts/native_stack.py github-env
     - name: restore native build artifacts
       id: native_cache
       uses: ./tesseract_nanobind/.github/actions/native-cache
@@ -662,27 +625,28 @@ jobs:
         refresh: ${{ github.event_name == 'schedule' || inputs.refresh-native }}
     - name: vcs import
       if: steps.native_cache.outputs.native-run == ''
+      shell: bash
       run: |
-        mkdir -p ws/src
-        vcs import --input tesseract_nanobind/dependencies.rosinstall ws/src
+        python3 tesseract_nanobind/scripts/native_stack.py sources --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix ${{ matrix.config.brew_prefix }}/opt/libomp
+    - name: restore vcpkg binary packages
+      id: vcpkg_cache
+      if: steps.native_cache.outputs.native-run == '' && steps.native_cache.outputs.vcpkg-run == ''
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.config.arch }}-osx-dynamic-release-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
     - name: vcpkg build
       id: vcpkg
       if: steps.native_cache.outputs.native-run == ''
-      uses: johnwason/vcpkg-action@v8
+      shell: bash
+      run: |
+        python3 tesseract_nanobind/scripts/native_stack.py vcpkg --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix ${{ matrix.config.brew_prefix }}/opt/libomp --binary-cache "$RUNNER_TEMP/vcpkg_cache"
+    - name: save vcpkg binary packages
+      if: steps.vcpkg.outcome == 'success' && steps.vcpkg_cache.outcome == 'success' && steps.vcpkg_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
       with:
-        revision: ${{ env.VCPKG_REVISION }}
-        # Once artifact-seeded, do not duplicate the large binaries in Actions cache.
-        disable-cache: ${{ steps.native_cache.outputs.vcpkg-run != '' }}
-        pkgs: >-
-          ${{ env.VCPKG_PKGS }}
-        triplet: ${{ matrix.config.arch }}-osx-dynamic-release
-        extra-args: >-
-          --clean-after-build
-          --overlay-triplets=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_triplets
-          --overlay-ports=${{ github.workspace }}/tesseract_nanobind/.github/workflows/vcpkg_overlays
-          --overlay-ports=${{ github.workspace }}/ws/src/tesseract_planning/.github/workflows/vcpkg_overlays
-        token: ${{ github.token }}
-        cache-key: osx-${{ matrix.config.arch }}-vcpkg
+        path: ${{ runner.temp }}/vcpkg_cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.config.arch }}-osx-dynamic-release-${{ hashFiles('tesseract_nanobind/dependencies.rosinstall', 'tesseract_nanobind/scripts/native_stack.*', 'tesseract_nanobind/.github/workflows/vcpkg_*/**') }}
     - name: archive vcpkg binary packages
       if: steps.vcpkg.outcome == 'success'
       shell: bash
@@ -711,29 +675,9 @@ jobs:
     - name: colcon build
       id: native_build
       if: steps.native_cache.outputs.native-run == ''
-      working-directory: ws
+      shell: bash
       run: |
-        export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib:$GITHUB_WORKSPACE/ws/install/lib
-        export CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release
-
-        colcon build --merge-install \
-            --packages-ignore tesseract_examples ifopt vhacd \
-            --event-handlers console_cohesion+ \
-            --cmake-force-configure \
-            --cmake-args -GNinja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DINSTALL_OMPL=OFF -DINSTALL_OMPL_TAG=master -DBUILD_IPOPT=OFF -DBUILD_SNOPT=OFF \
-            -DBUILD_SHARED_LIBS=ON -DTESSERACT_ENABLE_EXAMPLES=OFF -DTESSERACT_BUILD_TRAJOPT_IFOPT=ON \
-            -DVCPKG_APPLOCAL_DEPS=OFF -DTESSERACT_ENABLE_TESTING=OFF \
-            -DTESSERACT_PLUGIN_FACTORY_CALLBACKS=ON \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-            -DOpenMP_CXX_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
-            -DOpenMP_C_INCLUDE_DIR=${{ matrix.config.brew_prefix }}/opt/libomp/include \
-            -DOpenMP_CXX_LIB_NAMES=libomp -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp" \
-            -DOpenMP_C_LIB_NAMES=libomp -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp" \
-            -DOpenMP_libomp_LIBRARY=${{ matrix.config.brew_prefix }}/opt/libomp/lib/libomp.dylib \
-            -Dtcmalloc_minimal_LIBRARY=${{ github.workspace }}/vcpkg/installed/${{ matrix.config.arch }}-osx-dynamic-release/lib/libtcmalloc_minimal.dylib \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        python3 tesseract_nanobind/scripts/native_stack.py colcon --triplet ${{ matrix.config.arch }}-osx-dynamic-release --root "$GITHUB_WORKSPACE" --libomp-prefix ${{ matrix.config.brew_prefix }}/opt/libomp
     - name: archive installed native stack
       if: steps.native_build.outcome == 'success'
       shell: bash
