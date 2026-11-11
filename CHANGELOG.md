@@ -424,6 +424,8 @@ Builds against tesseract, trajopt and tesseract_planning 0.36 ahead of its relea
 
 ### Fixed
 
+- **A `ContactResultVector` element no longer outlives its storage** — `v[i]` returned a reference into the vector that `append` (on reallocation), `clear` and `ContactResultMap.flattenMoveResults(v)` freed, so a held element read garbage and lost writes. `v[i]` is still a write-through reference (`v[i].distance = d` updates `v`), and while Python holds one those three calls raise `ContactResultHeldError` (a `BufferError`, as `bytearray` raises under an exported buffer) and leave `v` and the map unchanged. Delete the reference, or hold `copy.copy(v[i])`: `ContactResult` now has `__copy__` / `__deepcopy__` ([#395]).
+- **`PIQPSettings` compares by value** — `==` was identity, so equal settings compared `False`. `PIQPSettings` now has `==` / `!=` from upstream's `operator==` (`piqp/settings_utils.h`: relative float-epsilon tolerance on the floating-point fields, exact on the rest) and `__hash__ = None`. It is bound in `trajopt_sqp`, which owns the type, from the header alone (no planner library linked), so the equality holds whatever else is imported ([#393]).
 - **A shape from `makeImplicitSDFShape` keeps its geometry alive** — an SDF shape referenced its `SignedDistanceField` without holding it, so once the field was dropped `collideImplicitSDF` could return no contacts with no error, and reading the shape's callables could crash. They now hold the geometry, and `collideImplicitSDF` solves on copies, so assigning a member during a call affects only later calls ([#373]).
 - **A Python error in `createOptimizationObjective` keeps its type** — it reached Python as `RuntimeError` holding the traceback text, because the OMPL module did not register the cross-module `python_error` translator; it now propagates as the original exception ([#156], [#362]).
 - **The clearance example's threshold case plans OMPL at the helpers' collision margin** — case 2's `LengthAndClearanceProfile` is a fresh `OMPLRealVectorMoveProfile`, whose `contact_manager_config.default_margin` was unset, so its OMPL paths came within 0.0007 to 0.094 mm of the cubes while case 1 planned at 10 mm. Both cases now plan at `planning.profiles.OMPL_CONTACT_MARGIN_M` (0.01 m), the constant `create_ompl_default_profiles` uses, and differ only in the objective. The docs no longer claim the 4.0 rad threshold takes OMPL 1.1 to 1.5 s: in one run of 10 seeds on this pipeline OMPL met it in 0.04 to 0.07 s. With one planner its first path meets it on 4 of 5 seeds (`pixi run ompl-first-path-probe`) ([#362]).
@@ -738,6 +740,8 @@ First PyPI-published macOS arm64 wheels, shipping via a dedicated `wheels-macos.
 [#369]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/369
 [#136]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/136
 [#377]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/377
+[#395]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/395
+[#393]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/393
 [#308]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/308
 [#261]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/261
 [#273]: https://github.com/tesseract-robotics/tesseract_nanobind/issues/273

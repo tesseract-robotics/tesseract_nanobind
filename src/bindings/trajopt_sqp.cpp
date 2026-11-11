@@ -16,6 +16,10 @@
 #include <trajopt_sqp/qp_solver.h>
 #include <trajopt_sqp/osqp_eigen_solver.h>
 #include <trajopt_sqp/piqp_solver.h>
+// PIQPSettings' operator== (#393). Header-only (inline, on tesseract_common's
+// almostEqualRelativeAndAbs): an include path, no planner library linked. Bound here, on the
+// owning module, so the equality and its stub do not depend on what else was imported.
+#include <tesseract/motion_planners/piqp/settings_utils.h>
 #include <trajopt_sqp/qp_problem.h>
 #include <trajopt_sqp/trajopt_qp_problem.h>
 #include <trajopt_sqp/trust_region_sqp_solver.h>
@@ -632,7 +636,8 @@ NB_MODULE(trajopt_sqp, m) {
         .value("sparse_ldlt_cond", piqp::KKTSolver::sparse_ldlt_cond)
         .value("sparse_multistage", piqp::KKTSolver::sparse_multistage);
 
-    nb::class_<piqp::Settings<double>>(m, "PIQPSettings", "PIQP solver settings (piqp::Settings<double>)")
+    auto piqp_settings = nb::class_<piqp::Settings<double>>(m, "PIQPSettings", "PIQP solver settings (piqp::Settings<double>)");
+    piqp_settings
         .def(nb::init<>(), "PIQP's own defaults")
         .def_rw("rho_init", &piqp::Settings<double>::rho_init, "Initial primal proximal penalty")
         .def_rw("delta_init", &piqp::Settings<double>::delta_init, "Initial augmented Lagrangian penalty")
@@ -662,6 +667,17 @@ NB_MODULE(trajopt_sqp, m) {
         .def_rw("iterative_refinement_static_regularization_rel", &piqp::Settings<double>::iterative_refinement_static_regularization_rel, "Iterative refinement relative static regularization")
         .def_rw("verbose", &piqp::Settings<double>::verbose, "Print solver progress")
         .def_rw("compute_timings", &piqp::Settings<double>::compute_timings, "Measure the solver timings");
+    // tesseract::motion_planners::operator== (piqp/settings_utils.h): relative tolerance of float
+    // epsilon (no absolute floor) on the floating-point fields, exact on the rest. ADL does not
+    // find it from piqp::Settings, so the operator is named.
+    piqp_settings
+        .def("__eq__", [](const piqp::Settings<double>& a, const piqp::Settings<double>& b) {
+            return tesseract::motion_planners::operator==(a, b);
+        }, nb::is_operator())
+        .def("__ne__", [](const piqp::Settings<double>& a, const piqp::Settings<double>& b) {
+            return !tesseract::motion_planners::operator==(a, b);
+        }, nb::is_operator());
+    piqp_settings.attr("__hash__") = nb::none();  // mutable value type, as bind_value_equality
 
     nb::class_<tsqp::PIQPSolver, tsqp::QPSolver>(m, "PIQPSolver", "PIQP-based (interior point) QP solver")
         .def(nb::init<>(), "With trajopt's default PIQP settings")

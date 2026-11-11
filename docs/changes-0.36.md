@@ -404,7 +404,7 @@ Additions, not changes: 0.35 code keeps working. Each was a 0.36 API with no bin
 | `task_composer` | `schema()` on graphs, pipelines, tasks and the Taskflow executor; `TaskComposerNodePorts.inputSchema` / `outputSchema`; `ValidationError.toString` |
 | `common` | `PropertyTree` (YAML as text), `PluginDiscoveryInfo` |
 | `trajopt_ifopt` | `CartAxisKinematics`; `calcJacobianBlock` on the CartAxis constraints; `CollisionCoeffData.hasZeroCoeff` |
-| planners | `==`, `!=` and `from_yaml` on the PIQP solver profiles; `checkPIQPSettings` |
+| planners | `==`, `!=` and `from_yaml` on the PIQP solver profiles; `checkPIQPSettings`; `==` / `!=` on `trajopt_sqp.PIQPSettings` (#393) |
 
 ```python
 # 0.35: one call, one broadphase update, per object

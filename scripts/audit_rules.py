@@ -339,6 +339,11 @@ ACCEPTED_SYMBOLS = {
     ("motion_planners", "PlannerResponse.data"): "type-erased-data",
     # C2 (a): the reason overload of checkRequest under its own name (#332).
     ("motion_planners", "MotionPlanner.checkRequestReason"): "reason-out-param",
+    # #393: `operator==(const piqp::Settings<double>&, …)` of piqp/settings_utils.h is bound as
+    # `PIQPSettings.__eq__` in trajopt_sqp, the module that binds the class. The structural
+    # rule looks for the dunder in the stub of the module that owns the header, so it cannot
+    # see a class another module binds.
+    ("motion_planners", "operator=="): "free-function-as-method",
     # R14 (C13 = keep): OMPL's process-global RNG.
     ("motion_planners_ompl", "RNG_setSeed"): "third-party-global",
     ("motion_planners_ompl", "RNG_getSeed"): "third-party-global",

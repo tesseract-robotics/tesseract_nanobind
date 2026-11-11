@@ -7,13 +7,13 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 
 | module | covered | gaps | deviations | accepted | quoted types | type fallbacks |
 |---|---|---|---|---|---|---|
-| collision | 278 | 4 | 2 | 14 | 0 | 8 |
+| collision | 278 | 4 | 2 | 16 | 0 | 8 |
 | command_language | 380 | 1 | 0 | 128 | 0 | 16 |
 | common | 262 | 89 | 24 | 59 | 0 | 11 |
 | environment | 237 | 9 | 7 | 55 | 0 | 0 |
 | geometry | 158 | 8 | 4 | 22 | 0 | 1 |
 | kinematics | 105 | 6 | 3 | 16 | 0 | 5 |
-| motion_planners | 39 | 4 | 0 | 6 | 0 | 3 |
+| motion_planners | 39 | 3 | 0 | 7 | 0 | 3 |
 | motion_planners_descartes | 62 | 0 | 0 | 34 | 0 | 4 |
 | motion_planners_ompl | 123 | 0 | 1 | 28 | 0 | 0 |
 | motion_planners_simple | 104 | 0 | 0 | 29 | 0 | 0 |
@@ -27,7 +27,7 @@ tesseract-robotics `==0.36.0.dev20261103` · libclang `clang version 22.1.8` · 
 | task_composer_planning | 70 | 0 | 0 | 21 | 0 | 0 |
 | time_parameterization | 75 | 0 | 0 | 10 | 0 | 0 |
 | trajopt_ifopt | 334 | 10 | 0 | 47 | 0 | 0 |
-| trajopt_sqp | 188 | 2 | 3 | 33 | 0 | 6 |
+| trajopt_sqp | 188 | 2 | 3 | 34 | 0 | 6 |
 | urdf | 4 | 5 | 0 | 0 | 0 | 0 |
 
 Quoted C++ names in the stubs of audited modules (unbound type, or a missing `nb::module_::import_`):
@@ -203,6 +203,8 @@ None.
 | `ContactManagerConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
 | `ContactManagersPluginFactory.__init__` | yaml-node | tesseract/collision/contact_managers_plugin_factory.h:126 |
 | `ContactRequest.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
+| `ContactResult.__copy__` | clone-as-copy | src/tesseract_robotics/collision.pyi |
+| `ContactResult.__deepcopy__` | clone-as-copy | src/tesseract_robotics/collision.pyi |
 | `ContactResult.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
 | `ContactResultMap.__hash__` | value-equality-unhashable | src/tesseract_robotics/collision.pyi |
 | `ContactResultMap.__iter__` | iterator-pair | src/tesseract_robotics/collision.pyi |
@@ -771,7 +773,6 @@ None.
 | `PlannerResponse.failed_instructions` | field | tesseract/motion_planners/types.h:98 | — | won't fix: Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty. |
 | `PlannerResponse.succeeded_instructions` | field | tesseract/motion_planners/types.h:96 | — | won't fix: Declared in motion_planners/types.h but no upstream planner writes it, so the Python list would always be empty. |
 | `isValidState` | function | tesseract/motion_planners/planner_utils.h:79 | — | #333 |
-| `operator==` | function | tesseract/motion_planners/piqp/settings_utils.h:43 | — | #393 |
 
 ### Deviations
 
@@ -787,6 +788,7 @@ None.
 | `PlannerResponse.data` | type-erased-data | tesseract/motion_planners/types.h:101 |
 | `contactCheckProgram` | out-param | tesseract/motion_planners/utils.h:111 |
 | `contactCheckProgram` | out-param | tesseract/motion_planners/utils.h:95 |
+| `operator==` | free-function-as-method | tesseract/motion_planners/piqp/settings_utils.h:43 |
 
 ### Headers audited with another module
 
@@ -1356,11 +1358,11 @@ None.
 
 | symbol | rule | location |
 |---|---|---|
-| `BoundsType.EQUALITY` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
-| `BoundsType.LOWER_BOUND` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
-| `BoundsType.RANGE_BOUND` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
-| `BoundsType.UNBOUNDED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
-| `BoundsType.UPPER_BOUND` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `BoundsType.EQUALITY` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
+| `BoundsType.LOWER_BOUND` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
+| `BoundsType.RANGE_BOUND` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
+| `BoundsType.UNBOUNDED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
+| `BoundsType.UPPER_BOUND` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `BoundsType.kEquality` | k-prefix-enumerator | trajopt_ifopt/core/bounds.h:62 |
 | `BoundsType.kLowerBound` | k-prefix-enumerator | trajopt_ifopt/core/bounds.h:65 |
 | `BoundsType.kRangeBound` | k-prefix-enumerator | trajopt_ifopt/core/bounds.h:71 |
@@ -1371,17 +1373,17 @@ None.
 | `CartAxisKinematics.calcAxisAndJacobian` | out-param | trajopt_ifopt/constraints/cartesian_axis_kinematics.h:88 |
 | `CartLineConstraint.calcJacobianBlock` | out-param | trajopt_ifopt/constraints/cartesian_line_constraint.h:150 |
 | `CartPosConstraint.calcJacobianBlock` | out-param | trajopt_ifopt/constraints/cartesian_position_constraint.h:104 |
-| `CollisionCoeffData.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `CollisionCoeffData.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `Component.print` | stdout-printer | trajopt_ifopt/core/component.h:126 |
-| `ContinuousCollisionConstraint.__init__` | split-var-pair | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `ContinuousCollisionConstraint.__init__` | split-var-pair | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `ContinuousCollisionConstraint.__init__` | split-var-pair | trajopt_ifopt/constraints/collision/continuous_collision_constraint.h:59 |
-| `ContinuousCollisionConstraintD.__init__` | split-var-pair | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `ContinuousCollisionConstraintD.__init__` | split-var-pair | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `ContinuousCollisionConstraintD.__init__` | split-var-pair | trajopt_ifopt/constraints/collision/continuous_collision_constraint.h:146 |
 | `ContinuousCollisionEvaluator.calcCollisionData` | out-param | trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h:74 |
-| `ContinuousCollisionNumericalConstraint.__init__` | split-var-pair | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `ContinuousCollisionNumericalConstraint.__init__` | split-var-pair | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `ContinuousCollisionNumericalConstraint.__init__` | split-var-pair | trajopt_ifopt/constraints/collision/continuous_collision_numerical_constraint.h:56 |
-| `Differentiable.Mode.STACK_ROWS` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
-| `Differentiable.Mode.SUM_TO_SCALAR` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `Differentiable.Mode.STACK_ROWS` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
+| `Differentiable.Mode.SUM_TO_SCALAR` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `Differentiable.Mode.kStackRows` | k-prefix-enumerator | trajopt_ifopt/core/component.h:200 |
 | `Differentiable.Mode.kSumToScalar` | k-prefix-enumerator | trajopt_ifopt/core/component.h:201 |
 | `DiscreteCollisionEvaluator.calcCollisions` | out-param | trajopt_ifopt/constraints/collision/discrete_collision_evaluators.h:71 |
@@ -1390,17 +1392,17 @@ None.
 | `LVSContinuousCollisionEvaluator.calcCollisionData` | out-param | trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h:128 |
 | `LVSDiscreteCollisionEvaluator.calcCollisionData` | out-param | trajopt_ifopt/constraints/collision/continuous_collision_evaluators.h:186 |
 | `NodesVariables.addObserver` | unimplemented-observer | trajopt_ifopt/variable_sets/nodes_variables.h:103 |
-| `RangeBoundHandling.KEEP_AS_IS` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
-| `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `RangeBoundHandling.KEEP_AS_IS` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
+| `RangeBoundHandling.SPLIT_TO_TWO_INEQUALITIES` | k-prefix-enumerator | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `RangeBoundHandling.kKeepAsIs` | k-prefix-enumerator | trajopt_ifopt/core/constraint_set.h:63 |
 | `RangeBoundHandling.kSplitToTwoInequalities` | k-prefix-enumerator | trajopt_ifopt/core/constraint_set.h:76 |
 | `SingleTimestepCollisionEvaluator.calcCollisions` | out-param | trajopt_ifopt/constraints/collision/discrete_collision_evaluators.h:117 |
-| `TrajOptCollisionConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `TrajOptCollisionConfig.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `calcBoundsErrors` | out-param | trajopt_ifopt/utils/ifopt_utils.h:94 |
 | `calcBoundsViolations` | out-param | trajopt_ifopt/utils/ifopt_utils.h:105 |
 | `calcNumericalConstraintGradient` | ifopt-problem-only | trajopt_ifopt/utils/ifopt_utils.h:125 |
 | `calcNumericalCostGradient` | ifopt-problem-only | trajopt_ifopt/utils/ifopt_utils.h:116 |
-| `createNodesVariables` | nodes-variables-factory | src/tesseract_robotics/trajopt_ifopt.pyi |
+| `createNodesVariables` | nodes-variables-factory | src/tesseract_robotics/trajopt_ifopt/_trajopt_ifopt.pyi |
 | `getGradient` | out-param | trajopt_common/collision_utils.h:122 |
 | `getGradient` | out-param | trajopt_common/collision_utils.h:137 |
 
@@ -1421,39 +1423,40 @@ None.
 
 | Python name | kind | stub | arity | issue |
 |---|---|---|---|---|
-| `PIQPKKTSolver` | enum | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings. |
-| `PIQPSettings` | class | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings. |
-| `PIQPSolver.defaultSettings` | method | src/tesseract_robotics/trajopt_sqp.pyi | — | won't fix: Returning form of `setDefaultPIQPSettings`, whose out-param Python can't use. |
+| `PIQPKKTSolver` | enum | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi | — | won't fix: piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings. |
+| `PIQPSettings` | class | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi | — | won't fix: piqp has no binding module of its own; trajopt_sqp owns the Python type, as the solver profiles' settings. |
+| `PIQPSolver.defaultSettings` | method | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi | — | won't fix: Returning form of `setDefaultPIQPSettings`, whose out-param Python can't use. |
 
 ### Accepted
 
 | symbol | rule | location |
 |---|---|---|
-| `CostPenaltyType.ABSOLUTE` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `CostPenaltyType.HINGE` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `CostPenaltyType.SQUARED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
+| `CostPenaltyType.ABSOLUTE` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `CostPenaltyType.HINGE` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `CostPenaltyType.SQUARED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `CostPenaltyType.kAbsolute` | k-prefix-enumerator | trajopt_sqp/types.h:72 |
 | `CostPenaltyType.kHinge` | k-prefix-enumerator | trajopt_sqp/types.h:75 |
 | `CostPenaltyType.kSquared` | k-prefix-enumerator | trajopt_sqp/types.h:57 |
 | `OSQPEigenSolver.setDefaultOSQPSettings` | unbound-dependency-type | trajopt_sqp/osqp_eigen_solver.h:59 |
-| `OSQPEigenSolver.setWarmStart` | unbound-dependency-type | src/tesseract_robotics/trajopt_sqp.pyi |
+| `OSQPEigenSolver.setWarmStart` | unbound-dependency-type | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `OSQPEigenSolver.solver_` | unbound-dependency-type | trajopt_sqp/osqp_eigen_solver.h:86 |
-| `QPProblem.setVariables` | sized-double-array | src/tesseract_robotics/trajopt_sqp.pyi |
+| `PIQPSettings.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `QPProblem.setVariables` | sized-double-array | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `QPProblem.setVariables` | sized-double-array | trajopt_sqp/qp_problem.h:51 |
-| `QPSolverStatus.FAILED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `QPSolverStatus.INITIALIZED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `QPSolverStatus.UNINITIALIZED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
+| `QPSolverStatus.FAILED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `QPSolverStatus.INITIALIZED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `QPSolverStatus.UNINITIALIZED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `QPSolverStatus.kFailed` | k-prefix-enumerator | trajopt_sqp/qp_solver.h:57 |
 | `QPSolverStatus.kInitialized` | k-prefix-enumerator | trajopt_sqp/qp_solver.h:49 |
 | `QPSolverStatus.kUninitialized` | k-prefix-enumerator | trajopt_sqp/qp_solver.h:46 |
-| `SQPParameters.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.CONVERGED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.ITERATION_LIMIT` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.PENALTY_ITERATION_LIMIT` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.QP_SOLVE_FAILED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.RUNNING` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.STOPPED_BY_CALLBACK` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
-| `SQPStatus.TIME_LIMIT` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp.pyi |
+| `SQPParameters.__hash__` | value-equality-unhashable | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.CONVERGED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.ITERATION_LIMIT` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.PENALTY_ITERATION_LIMIT` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.QP_SOLVE_FAILED` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.RUNNING` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.STOPPED_BY_CALLBACK` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
+| `SQPStatus.TIME_LIMIT` | k-prefix-enumerator | src/tesseract_robotics/trajopt_sqp/_trajopt_sqp.pyi |
 | `SQPStatus.kConverged` | k-prefix-enumerator | trajopt_sqp/types.h:224 |
 | `SQPStatus.kIterationLimit` | k-prefix-enumerator | trajopt_sqp/types.h:225 |
 | `SQPStatus.kPenaltyIterationLimit` | k-prefix-enumerator | trajopt_sqp/types.h:226 |
@@ -1466,7 +1469,6 @@ None.
 ### Headers audited with another module
 
 None.
-
 ## urdf
 
 ### Gaps
@@ -1490,3 +1492,4 @@ None.
 ### Headers audited with another module
 
 None.
+

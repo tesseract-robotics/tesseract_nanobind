@@ -43,6 +43,34 @@ for i in range(len(results)):
     print(f"{r.link_ids[0]} <-> {r.link_ids[1]}: distance = {r.distance:.4f} m")
 ```
 
+### Holding a `ContactResultVector` element
+
+`results[i]` is a reference into the vector, not a copy: `results[i].distance = d` changes
+`results`. A reference must not outlive the storage it points at, so while Python holds one,
+the calls that can reallocate or free the elements (`append`, `clear`, and
+`ContactResultMap.flattenMoveResults(results)`) raise `ContactResultHeldError`, a
+`BufferError`, and change nothing. `bytearray` refuses to resize under an exported buffer the
+same way.
+
+```python
+import copy
+
+from tesseract_robotics.tesseract_collision import ContactResultHeldError
+
+r = results[0]
+try:
+    results.clear()               # r is still held
+except ContactResultHeldError:
+    pass
+
+kept = copy.copy(results[0])      # an independent ContactResult
+del r                             # release the reference
+results.clear()                   # now allowed; kept is unaffected
+```
+
+A loop variable counts as a reference: after `for i in range(len(results)): r = results[i]`,
+`del r` before reusing `results`.
+
 ## Collision Managers
 
 tesseract supports multiple collision backends:
