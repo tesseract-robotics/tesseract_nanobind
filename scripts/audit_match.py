@@ -9,6 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import audit_types
+from audit_anchor import check_anchor_headers, check_anchor_includes_current
 from audit_facts import bound_facts, decl_facts
 from audit_lookup import (
     NO_ALIAS,
@@ -26,6 +27,7 @@ from audit_lookup import (
 )
 from audit_ownership import (
     AUDITED_HEADER_PREFIX,
+    PLUGIN_ANCHOR_INCLUDES,
     SRC,
     STUB_ROOT,
     UNAUDITED_MODULES,
@@ -790,10 +792,13 @@ def audit_tu(
     #includes and its owner's binding does not is audited here when this module is its auditor.
     Stub base classes bound in other extensions resolve through stubs under `stub_roots`.
     Class identity (`match`'s `bound`) defaults to this binding's own `bound_classes` and
-    `bound_index` for every other module.
+    `bound_index` for every other module. A `PLUGIN_ANCHOR_INCLUDES` header the binding
+    #includes is not audited; it is checked to declare only plugin plumbing instead.
 
     Raises:
         PrefixMismatchError: `prefixes` holds `module` with other prefixes than `prefix`.
+        StaleAnchorIncludeError: see `check_anchor_includes_current`.
+        AnchorHeaderApiError: see `check_anchor_headers`.
     """
     include_dirs = (*extra_include_dirs, *INCLUDE_DIRS)
     if prefixes is not None and prefixes.get(module, prefix) != prefix:
@@ -819,12 +824,17 @@ def audit_tu(
     tu = parse_tu(cpp_path, extra_include_dirs)
     decl = decl_facts(cpp_path, extra_include_dirs, lambda: tu)
     direct = audited_headers(tu, module, prefixes, include_dirs)
+    own_includes = direct_include_spellings([cpp_path])
+    check_anchor_includes_current(module, own_includes, prefixes)
     other_includes = {binding_module(p): direct_include_spellings([p]) for p in other_bindings}
     owned_elsewhere = frozenset().union(*other_includes.values())
     audited: dict[Path, str] = {}
     delegated: dict[str, str] = {}
+    anchor_headers: dict[Path, str] = {}
     for h, spelling in prefix_headers(module, prefixes, include_dirs).items():
-        if h in direct:
+        if h in direct and spelling in PLUGIN_ANCHOR_INCLUDES:
+            anchor_headers[h] = spelling
+        elif h in direct:
             audited[h] = spelling
         elif is_unaudited(spelling, prefix):
             continue
@@ -834,9 +844,8 @@ def audit_tu(
             )
         else:
             audited[h] = spelling
-    audited |= foreign_headers(
-        module, direct_include_spellings([cpp_path]), other_includes, prefixes, include_dirs
-    )
+    check_anchor_headers(tu, anchor_headers)
+    audited |= foreign_headers(module, own_includes, other_includes, prefixes, include_dirs)
     included = frozenset(Path(i.include.name).resolve() for i in tu.get_includes())
     report = match(
         module,

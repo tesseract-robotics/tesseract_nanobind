@@ -276,6 +276,46 @@ THIRD_PARTY_HEADERS = {
     "binding #includes it directly only so that `convex_decomposition_vhacd.h` does not compile "
     "a second copy of its implementation (#179).",
 }
+# Headers a binding #includes only to call the plugin anchor they declare (`PLUGIN_ANCHOR_DECL`):
+# the binding passes the anchor to `addSymbolLibraryToSearchLibrariesEnv`, which puts the plugin
+# library linked into the module on the plugin loader's search path. Such an include is build
+# plumbing, not a statement that the header is module API, so the header is not audited although
+# the binding #includes it directly. Exact include spellings, never patterns: header -> reason.
+# `audit_anchor.check_anchor_headers` holds every listed header to that claim (its functions
+# are anchors by signature, `const void* f()`; its classes derive only from plugin factory
+# interfaces, members not inspected) and raises on any other declaration, so a new function or
+# class in one of these headers still fails the audit.
+ANCHOR_CALL_ONLY = (
+    "Included only for its plugin anchor, which the binding calls at import to put the bundled "
+    "plugin library on the plugin search path; the plugins in that library are created by name "
+    "from the plugin config through `{factory}`."
+)
+PLUGIN_ANCHOR_INCLUDES = {
+    **dict.fromkeys(
+        (
+            "tesseract/collision/bullet/bullet_factories.h",
+            "tesseract/collision/fcl/fcl_factories.h",
+        ),
+        ANCHOR_CALL_ONLY.format(factory="ContactManagersPluginFactory"),
+    ),
+    **dict.fromkeys(
+        (
+            "tesseract/kinematics/kdl/kdl_factories.h",
+            "tesseract/kinematics/opw/opw_factory.h",
+            "tesseract/kinematics/rep_factory.h",
+            "tesseract/kinematics/rop_factory.h",
+            "tesseract/kinematics/ur/ur_factory.h",
+        ),
+        ANCHOR_CALL_ONLY.format(factory="KinematicsPluginFactory"),
+    ),
+    **dict.fromkeys(
+        (
+            "tesseract/task_composer/task_composer_task_plugin_factory.h",
+            "tesseract/task_composer/taskflow/taskflow_task_composer_plugin_factories.h",
+        ),
+        ANCHOR_CALL_ONLY.format(factory="TaskComposerPluginFactory"),
+    ),
+}
 # Direct `<…>` includes decide header ownership: a header its prefix owner's binding does not
 # #include, but another binding does, is audited with `header_auditor` of those modules.
 INCLUDE_DIRECTIVE = re.compile(r"^\s*#\s*include\s*<([^>]+)>", re.MULTILINE)
@@ -466,8 +506,9 @@ def check_unaudited_keys() -> None:
 
 
 def is_unaudited(spelling: str, prefixes: tuple[str, ...]) -> bool:
-    """Whether `THIRD_PARTY_HEADERS`, or the `UNAUDITED_HEADERS` patterns of the longest of
-    `prefixes` that holds the header and of `ANY_PREFIX`, match its path below that prefix.
+    """Whether `spelling` is a `PLUGIN_ANCHOR_INCLUDES` header, or `THIRD_PARTY_HEADERS` or the
+    `UNAUDITED_HEADERS` patterns of the longest of `prefixes` that holds the header and of
+    `ANY_PREFIX` match its path below that prefix.
 
     Raises:
         UnknownPrefixError: see `check_unaudited_keys`.
@@ -476,7 +517,11 @@ def is_unaudited(spelling: str, prefixes: tuple[str, ...]) -> bool:
     prefix = longest_prefix(spelling, prefixes)
     below = spelling if prefix is None else spelling.removeprefix(prefix)
     patterns = {**UNAUDITED_HEADERS[ANY_PREFIX], **UNAUDITED_HEADERS.get(prefix or "", {})}
-    return is_third_party(below) or any(fnmatch.fnmatchcase(below, p) for p in patterns)
+    return (
+        spelling in PLUGIN_ANCHOR_INCLUDES
+        or is_third_party(below)
+        or any(fnmatch.fnmatchcase(below, p) for p in patterns)
+    )
 
 
 def header_is_unaudited(spelling: str, prefixes: Mapping[str, tuple[str, ...]]) -> bool:

@@ -19,6 +19,7 @@ SCRIPTS = (
     "audit_stub",
     "audit_lookup",
     "audit_rules",
+    "audit_anchor",
     "audit_match",
     "audit_report",
     "audit_bindings",

@@ -27,7 +27,8 @@ def defined_names(module: str) -> set[str]:
 
 # Grows with each extraction (Tasks 2-5) to the final import order:
 # audit_types, audit_ownership, audit_cache, audit_parse, audit_bound, gil_entry_points,
-# audit_facts, audit_stub, audit_lookup, audit_rules, audit_match, audit_report, audit_bindings.
+# audit_facts, audit_stub, audit_lookup, audit_rules, audit_anchor, audit_match, audit_report,
+# audit_bindings.
 EXPECTED_SCRIPTS = (
     "audit_types",
     "audit_ownership",
@@ -39,6 +40,7 @@ EXPECTED_SCRIPTS = (
     "audit_stub",
     "audit_lookup",
     "audit_rules",
+    "audit_anchor",
     "audit_match",
     "audit_report",
     "audit_bindings",
@@ -181,6 +183,20 @@ MATCH = {
 
 def test_match_defines_exactly():
     assert defined_names("audit_match") == MATCH
+
+
+# PLUGIN_ANCHOR_INCLUDES: the check that a listed header declares only plugin plumbing.
+ANCHOR = {
+    "FACTORY_INTERFACE_RULE", "PLUGIN_FACTORY_INTERFACES", "ANCHOR_RESULT", "RECORD_DECLS",
+    "AnchorHeaderApiError", "StaleAnchorIncludeError", "_declarations", "_is_anchor",
+    "_is_plugin_factory", "anchor_header_api", "check_anchor_headers",
+    "check_anchor_includes_current",
+}  # fmt: skip
+
+
+def test_anchor_defines_exactly():
+    assert defined_names("audit_anchor") == ANCHOR
+    assert not defined_names("audit_match") & ANCHOR
 
 
 # Wave 3 split (#256): a C++ symbol's Python form across stubs, out of `match` at the 1k gate.
