@@ -8,18 +8,17 @@ Three facts, each one extractor's output on one parse:
   bodies parse (`BODY_PARSE_OPTIONS`);
 - `gil_releases`: `audit_gil.Scanner.scan` of the GIL audit's own bodies parse.
 
-A fact's `FactKey.toolchain` holds whatever the parse reads besides the files it records:
-the parse arguments and options, the environment's package set (libclang, every header
-package, nanobind), the header-search variables libclang reads, the file listing of each
-include dir in the repo (a new file there can shadow a header found later on the search
-path), and the source of every script that runs while the fact is extracted.
+A fact's `FactKey.toolchain` (`audit_toolchain.Toolchain`, built by `fact_key`) holds whatever
+the parse reads besides the files it records: the parse arguments and options, the
+environment's package set (libclang, every header package, nanobind), the header-search
+variables libclang reads, the file listing of each include dir in the repo (a new file there
+can shadow a header found later on the search path), and the source of every script that
+runs while the fact is extracted.
 """
 
 from __future__ import annotations
 
 import functools
-import hashlib
-import json
 import os
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -38,6 +37,7 @@ from audit_parse import (
     PARSE_OPTIONS,
     decl_names,
 )
+from audit_toolchain import Sha256, Toolchain, digest_of, repo_dir_listing, require_listed
 from gil_entry_points import Release
 
 # Gitignored (`.cache/`); CI restores and saves it between runs (.github/workflows/audit.yml).
@@ -46,12 +46,11 @@ FACT_CACHE = FactCache(CACHE_ROOT)
 SCRIPTS = Path(__file__).resolve().parent
 # Environment variables that add to libclang's header search path.
 HEADER_SEARCH_ENV = ("CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH")
-# Written by the interpreter, never #included; their churn must not invalidate the cache.
-LISTING_IGNORED_DIRS = frozenset({"__pycache__"})
-# The scripts each fact's extraction runs: the cache, this module, the parse and the walks.
+# The scripts each fact's extraction runs: the cache and its key, this module, the parse and
+# the walks. Not `audit_telemetry.py`: it records a fetch and decides nothing about a fact.
 # Not `audit_ownership.py`: the parse reads only its path constants (in the key as `args`) and
 # its `header_rel` for error text, and binding PRs edit its tables all the time.
-COMMON_EXTRACTORS = ("audit_cache.py", "audit_facts.py", "audit_parse.py")
+COMMON_EXTRACTORS = ("audit_cache.py", "audit_toolchain.py", "audit_facts.py", "audit_parse.py")
 DECL_EXTRACTORS = (*COMMON_EXTRACTORS, "audit_types.py")
 BOUND_EXTRACTORS = (*COMMON_EXTRACTORS, "audit_types.py", "audit_bound.py")
 GIL_EXTRACTORS = (*COMMON_EXTRACTORS, "audit_gil.py", "gil_entry_points.py")
@@ -90,29 +89,18 @@ class BoundFacts:
 
 
 @functools.cache
-def environment_fingerprint() -> str:
+def environment_fingerprint() -> Sha256:
     """The audit env's package set: every conda record and Python distribution, by version
     and build. Any package change (libclang, a header package) changes it."""
     records = sorted(p.name for p in (CONDA_PREFIX / "conda-meta").glob("*.json"))
     dists = sorted(p.name for p in CONDA_PREFIX.glob("lib/python*/site-packages/*.dist-info"))
-    return _digest([records, dists])
+    return digest_of([records, dists])
 
 
 @functools.cache
-def repo_dir_listing(directory: Path) -> str:
-    """Every file under one include dir inside the repo, as one digest."""
-    files = sorted(
-        str(p.relative_to(directory))
-        for p in directory.rglob("*")
-        if p.is_file() and LISTING_IGNORED_DIRS.isdisjoint(p.relative_to(directory).parts)
-    )
-    return _digest(files)
-
-
-@functools.cache
-def extractor_digest(names: tuple[str, ...]) -> str:
+def extractor_digest(names: tuple[str, ...]) -> Sha256:
     """The source of the scripts that extract a fact."""
-    return _digest({n: sha256_of(SCRIPTS / n) for n in names})
+    return digest_of({n: sha256_of(SCRIPTS / n) for n in names})
 
 
 def fact_key(
@@ -133,16 +121,16 @@ def fact_key(
     """
     cpp = cpp.resolve()
     include_dirs = [Path(a.removeprefix("-I")) for a in args if a.startswith("-I")]
-    repo_dirs = sorted({d.resolve() for d in (cpp.parent, *include_dirs) if _in_repo(d)})
-    toolchain = {
-        "args": list(args),
-        "options": options,
-        "env": environment_fingerprint(),
-        "search_env": {v: os.environ.get(v) for v in HEADER_SEARCH_ENV},
-        "repo_dirs": {str(d): repo_dir_listing(d) for d in repo_dirs},
-        "extractors": extractor_digest(extractors),
-    }
-    return FactKey(kind=kind, source=cpp, toolchain=json.dumps(toolchain, sort_keys=True))
+    repo_dirs = {d.resolve() for d in (cpp.parent, *include_dirs) if _in_repo(d)}
+    toolchain = Toolchain.build(
+        args=args,
+        options=options,
+        env=environment_fingerprint(),
+        search_env={v: os.environ.get(v) for v in HEADER_SEARCH_ENV},
+        repo_dirs={d: repo_dir_listing(d) for d in repo_dirs},
+        extractors=extractor_digest(extractors),
+    )
+    return FactKey(kind=kind, source=cpp, toolchain=toolchain)
 
 
 def _in_repo(directory: Path) -> bool:
@@ -153,8 +141,16 @@ def _in_repo(directory: Path) -> bool:
 
 
 def tu_files(tu: ci.TranslationUnit) -> list[Path]:
-    """Every file the parse read: the main file and each header it included."""
-    return [Path(tu.spelling), *(Path(i.include.name) for i in tu.get_includes())]
+    """Every file the parse read: the main file and each header it included.
+
+    Raises:
+        UnlistedIncludeError: the parse included a file `repo_dir_listing` skips, so the
+            key would not see a shadowing file of that kind (`require_listed`).
+    """
+    source = Path(tu.spelling)
+    files = [source, *(Path(i.include.name) for i in tu.get_includes())]
+    require_listed(source, files)
+    return files
 
 
 def audit_args(extra_include_dirs: Sequence[Path]) -> list[str]:
@@ -238,10 +234,6 @@ def gil_releases(
         module, scope, name, where = _strings(row)
         out[Release(module, scope, name)] = where
     return out
-
-
-def _digest(value: object) -> str:
-    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
 def _object(value: Json) -> dict[str, Json]:

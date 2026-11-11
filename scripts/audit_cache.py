@@ -4,13 +4,15 @@ The audit's cost is libclang: parsing each binding (twice, once with function bo
 walking the whole TU from Python. The facts it keeps from a TU (bound classes, declaration
 names, class bases, GIL releases) are plain data, a pure function of the TU's inputs. This
 cache stores each fact as one JSON entry under `FactKey.digest()`: the toolchain that made
-it (`FactKey.toolchain`: parse arguments, environment, extractor sources) plus the content
-hash of every file the parse read. An entry is a hit only when every one of those files is
+it (`FactKey.toolchain`, an `audit_toolchain.Toolchain`: parse arguments, environment,
+extractor sources) plus the content hash of every file the parse read. An entry is a hit only when every one of those files is
 byte-identical, so an edit anywhere a binding's headers reach re-parses that binding and no
 other. The rules that turn facts into report rows always run; only extraction is cached.
 
 `fetch` holds a lock per entry: xdist workers asking for one fact at once compute it once.
 CI restores the cache directory between runs and prunes what a run did not use (`prune`).
+Each answered fetch is one event of `audit_telemetry.EventLog`: a hit or a miss, the time
+`compute` took and the time spent waiting for the lock.
 
 `scripts/audit_cache_prune.py` is the prune CLI (`pixi run -e audit audit-cache-prune`).
 """
@@ -22,16 +24,18 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NewType
+
+from audit_telemetry import EventLog
+from audit_toolchain import Sha256, Toolchain
 
 type Json = None | bool | int | float | str | list[Json] | dict[str, Json]
-Sha256 = NewType("Sha256", str)
 # Layout of an entry; part of every digest, so a layout change starts a fresh cache.
-ENTRY_FORMAT = 1
+ENTRY_FORMAT = 2
 ENTRY_SUFFIX = ".json"
 LOCK_SUFFIX = ".lock"
 # Read size for hashing a dependency, bytes.
@@ -50,6 +54,10 @@ class CorruptEntryError(CacheError):
     """An entry on disk is not one `fetch` wrote (entries are replaced atomically)."""
 
 
+class EventsInCacheError(CacheError):
+    """The event log lies under the cache root: CI would save it and restore it into later runs."""
+
+
 @dataclass(frozen=True)
 class FactKey:
     """What a fact is, apart from the files its parse read.
@@ -57,16 +65,16 @@ class FactKey:
     Attributes:
         kind: The fact (`decl`, `bound`, `gil`): one extractor's output.
         source: The TU's main file.
-        toolchain: Everything else the extractor's output depends on, as one string.
+        toolchain: Everything else the extractor's output depends on.
     """
 
     kind: str
     source: Path
-    toolchain: str
+    toolchain: Toolchain
 
     def digest(self) -> str:
         """The entry's file name: stable across processes and machines."""
-        text = json.dumps([ENTRY_FORMAT, self.kind, str(self.source), self.toolchain])
+        text = json.dumps([ENTRY_FORMAT, self.kind, str(self.source), self.toolchain.canonical()])
         return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -95,12 +103,22 @@ class FactCache:
 
     Attributes:
         root: The cache directory; created on first store.
+        events: Where each answered fetch is recorded; `BINDING_AUDIT_EVENTS` by default.
+
+    Raises:
+        EventsInCacheError: the event log is under `root`.
     """
 
     root: Path
+    events: EventLog = field(default_factory=EventLog.from_env)
     # (path, inode, size, mtime, ctime) -> hash, so a process hashes each header once. ctime
     # moves on every write and cannot be set back, unlike mtime.
     _hashes: dict[tuple[str, int, int, int, int], Sha256] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        log = self.events.path
+        if log is not None and log.resolve().is_relative_to(self.root.resolve()):
+            raise EventsInCacheError(f"{log} is inside the cache directory {self.root}")
 
     def entry_path(self, key: FactKey) -> Path:
         return self.root / key.kind / f"{key.digest()}{ENTRY_SUFFIX}"
@@ -123,16 +141,22 @@ class FactCache:
         """
         entry = self.entry_path(key)
         entry.parent.mkdir(parents=True, exist_ok=True)
+        asked = time.perf_counter()
         with _locked(entry.with_suffix(LOCK_SUFFIX)):
+            wait_s = time.perf_counter() - asked
             if entry.exists():
                 deps_then, stored = self._read(entry)
                 if self._current(deps_then):
                     os.utime(entry)  # used by this run: `prune` keeps it
+                    self.events.fetched(key.kind, hit=True, compute_s=0.0, wait_s=wait_s)
                     return stored
+            started = time.perf_counter()
             value, deps = compute()
+            compute_s = time.perf_counter() - started
             record = {"deps": self._hash_all(deps), "value": value}
             text = json.dumps(record, sort_keys=True)
             self._write(entry, text)
+            self.events.fetched(key.kind, hit=False, compute_s=compute_s, wait_s=wait_s)
             return json.loads(text)["value"]
 
     def prune(self, unused_since_ns: int) -> list[Path]:
