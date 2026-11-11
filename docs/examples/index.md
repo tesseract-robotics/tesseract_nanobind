@@ -124,6 +124,14 @@ Replanning while the world changes.
 
     `tesseract_online_planning_sqp_example`
 
+-   [![Python constraints demo, opening frame](../demos/posters/python_constraints_example.png)](python-constraints.md#what-you-are-watching)
+
+    **[Python constraints](python-constraints.md#what-you-are-watching)** · [source](https://github.com/tesseract-robotics/tesseract_nanobind/blob/main/src/tesseract_robotics/examples/python_constraints_example.py)
+
+    Seven rules written in Python, switched on one after another in a live loop: one solve per frame, a gauge per rule, the solve time against the frame.
+
+    `tesseract_python_constraints_example`
+
 </div>
 
 ## Collision and scenes
