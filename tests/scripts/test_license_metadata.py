@@ -6,6 +6,7 @@ installed distribution, so test-wheel checks the wheel it installed and the dev
 env checks its editable install, with no build backend in either env.
 """
 
+import tomllib
 from importlib.metadata import distribution
 from pathlib import Path
 
@@ -26,3 +27,27 @@ def test_metadata_declares_apache_2() -> None:
     assert sorted(shipped) == list(LICENSE_FILES)
     for name in LICENSE_FILES:
         assert shipped[name].read_text() == (REPO_ROOT / name).read_text()
+
+
+SUPPORT_PACKAGE = REPO_ROOT / "packaging" / "tesseract-robotics-nanobind-support"
+# Each SPDX id in the support wheel's expression ships as `licenses/LICENSE.<id>`, the
+# names tesseract's own repository uses for the same texts.
+SUPPORT_LICENSE_DIR = "licenses"
+
+
+def test_support_wheel_ships_the_license_texts_it_declares() -> None:
+    project = tomllib.loads((SUPPORT_PACKAGE / "pyproject.toml").read_text())["project"]
+
+    declared = project["license"].split(" AND ")
+    assert declared == ["Apache-2.0", "BSD-3-Clause"]
+    expected = {f"{SUPPORT_LICENSE_DIR}/LICENSE.{spdx}" for spdx in declared}
+
+    # PEP 639 `license-files` globs are relative to the project root
+    listed = {
+        path.relative_to(SUPPORT_PACKAGE).as_posix()
+        for pattern in project.get("license-files", [])
+        for path in SUPPORT_PACKAGE.glob(pattern)
+    }
+    assert listed == expected
+    for relative in expected:
+        assert (SUPPORT_PACKAGE / relative).read_text().strip()

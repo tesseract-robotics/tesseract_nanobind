@@ -67,7 +67,7 @@ env:
   # guess the next dev version); other builds take the version setuptools-scm derives
   SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
   SETUPTOOLS_SCM_PRETEND_VERSION_FOR_TESSERACT_ROBOTICS_NANOBIND_SUPPORT: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-  NB_BUILD_REQS: scikit-build-core>=0.10 nanobind==2.12.0 setuptools-scm>=8 wheel
+  NB_BUILD_REQS: scikit-build-core>=0.11 nanobind==2.12.0 setuptools-scm>=8 wheel
 
 jobs:
   build-ubuntu:
