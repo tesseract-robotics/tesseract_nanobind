@@ -124,25 +124,39 @@ class TestWorkersLoggingIntoPython:
     def test_workers_log_while_a_gil_holding_call_logs(self):
         """A worker logging into a Python handler held console_bridge's mutex while it waited for
         the GIL; the main thread held the GIL in a call that logs (a failed
-        createTaskComposerNode) and waited for that mutex: a deadlock."""
+        createTaskComposerNode) and waited for that mutex: a deadlock.
+
+        The overlap is forced, not raced: the worker's handler waits until the main thread's
+        logging call has returned, so the call always runs while a worker is inside a handler.
+        A run that finished before the first lookup used to skip the overlap (`failed` 0).
+        """
         out = _run(
             _WORKER_HANDLER
-            + """
+            + f"""
+import sys
 from tesseract_robotics.task_composer import TaskComposerPluginError
-from tesseract_robotics import get_tesseract_resource_path, get_tesseract_support_path
-from tesseract_robotics.common import GeneralResourceLocator
-handler = WorkerHook(lambda: None)
+in_handler = threading.Event()
+main_logged = threading.Event()
+
+def hold_worker_until_main_logged():
+    in_handler.set()
+    if not main_logged.wait({GATE_DEADLINE_S}):
+        print("worker: the main thread never finished its logging call", flush=True)
+
+handler = WorkerHook(hold_worker_until_main_logged)
 handler_id = tesseract_common.addLogRecordHandler(handler)
 executor = factory.createTaskComposerExecutor("TaskflowExecutor")
 node = factory.createTaskComposerNode("TrajOptPipeline")
 storage = make_storage(node)
 future = executor.run(node, storage)
+if not in_handler.wait({GATE_DEADLINE_S}):
+    sys.exit("no worker logged into the handler in {GATE_DEADLINE_S} s")
 failed = 0
-while not future.ready():
-    try:
-        factory.createTaskComposerNode("NoSuchPlugin")
-    except TaskComposerPluginError:
-        failed += 1
+try:
+    factory.createTaskComposerNode("NoSuchPlugin")  # holds the GIL and logs
+except TaskComposerPluginError:
+    failed += 1
+main_logged.set()
 future.wait()
 tesseract_common.removeLogRecordHandler(handler_id)
 print("DONE", failed > 0, handler.fired, future.context.isSuccessful())
