@@ -105,6 +105,17 @@ def test_a_returned_map_round_trips_into_a_setter():
     copy.joints = state.joints
     assert copy.joints == state.joints
     assert set(copy.link_transforms) == set(state.link_transforms)
+    for name, transform in state.link_transforms.items():
+        np.testing.assert_array_equal(copy.link_transforms[name].matrix, transform.matrix)
+
+
+def test_a_setter_takes_names_and_ids_mixed():
+    from tesseract_robotics.common import JointId
+
+    state = type(_fresh_env().getState(_IIWA_JOINTS, Q))()
+    state.joints = {"a": 1.0, JointId("b"): 2.0}
+    assert state.joints == {"a": 1.0, "b": 2.0}
+    assert all(type(key) is str for key in state.joints)
 
 
 @pytest.mark.timeout(120)
