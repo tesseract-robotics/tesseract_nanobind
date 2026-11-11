@@ -27,15 +27,16 @@ from typing import TYPE_CHECKING, override
 
 import numpy as np
 import scipy.sparse
-
-from tesseract_robotics.tesseract_kinematics import calcManipulability
 from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Bounds, ConstraintSet, calcForwardNumJac
 
+from tesseract_robotics.kinematics import calcManipulability
+
 if TYPE_CHECKING:
-    from tesseract_robotics.tesseract_common import Isometry3d
-    from tesseract_robotics.tesseract_environment import Environment
-    from tesseract_robotics.tesseract_kinematics import JointGroup
     from tesseract_robotics.trajopt_ifopt._trajopt_ifopt import Var
+
+    from tesseract_robotics.common import Isometry3d
+    from tesseract_robotics.environment import Environment
+    from tesseract_robotics.kinematics import JointGroup
 
 __all__ = [
     "PyConstraint",
@@ -337,13 +338,13 @@ class Clearance(PyConstraint):
         name: str = "clearance",
         **kwargs,
     ):
-        from tesseract_robotics.tesseract_collision import (
+        from tesseract_robotics.collision import (
             ContactRequest,
             ContactResultMap,
             ContactResultVector,
             ContactTestType,
         )
-        from tesseract_robotics.tesseract_common import CollisionMarginData
+        from tesseract_robotics.common import CollisionMarginData
 
         super().__init__(name, var, [d_min], [d_max], **kwargs)
         self.env, self.joint_ids = env, list(joint_ids)
