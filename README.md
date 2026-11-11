@@ -114,8 +114,8 @@ urdf = support / "tesseract" / "support" / "urdf" / "abb_irb2400.urdf"
 env = Environment()
 assert env.init(urdf, urdf.with_suffix(".srdf"), locator)
 
-print(f"Joints: {env.getJointNames()}")
-print(f"Links: {env.getLinkNames()}")
+print("Joints:", [j.name() for j in env.getJointIds()])
+print("Links:", [link.name() for link in env.getLinkIds()])
 ```
 
 ## Versioning
