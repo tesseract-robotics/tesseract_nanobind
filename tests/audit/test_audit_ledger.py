@@ -27,6 +27,12 @@ def ledger():
     return audit.load_ledger()
 
 
+def test_committed_ledger_parses_and_validates(ledger):
+    """A stray line in the JSON (a half-applied edit) failed every main audit run before any row."""
+    assert ledger
+    json.loads(audit.LEDGER_PATH.read_text(encoding="utf-8"))
+
+
 def _open_rows(modules):
     for module, data in modules.items():
         for table, key in OPEN_TABLES:
