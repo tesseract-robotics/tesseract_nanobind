@@ -55,7 +55,7 @@ same way.
 ```python
 import copy
 
-from tesseract_robotics.tesseract_collision import ContactResultHeldError
+from tesseract_robotics.collision import ContactResultHeldError
 
 r = results[0]
 try:
