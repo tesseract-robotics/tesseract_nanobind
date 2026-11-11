@@ -299,18 +299,12 @@ jobs:
         source $GITHUB_WORKSPACE/check-venv/bin/activate
         pyright src/tesseract_robotics
     - name: fetch the TWC workcell the rail tests load
-      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       shell: bash
       run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
-    # One cp312-abi3 wheel covers every supported Python: test it on each, in this job (pull
-    # requests on 3.12 only). Runs even if a gate above failed.
-    - name: test Python 3.12
-      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
-      timeout-minutes: 45
-      uses: ./tesseract_nanobind/.github/actions/test_python_ver
-      with:
-        python_version: "3.12"
-        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    # One cp312-abi3 wheel covers every supported Python. test-artifacts runs it on 3.12 on a
+    # runner without the native install, which is the only suite run a pull request gets; pushes,
+    # tags and scheduled runs also test the newer Pythons here. Runs even if a gate above failed.
     - name: test Python 3.13
       if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       timeout-minutes: 45
@@ -539,18 +533,12 @@ jobs:
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
     - name: fetch the TWC workcell the rail tests load
-      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       shell: bash
       run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
-    # One cp312-abi3 wheel covers every supported Python: test it on each, in this job (pull
-    # requests on 3.12 only). Runs even if a gate above failed.
-    - name: test Python 3.12
-      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
-      timeout-minutes: 45
-      uses: ./tesseract_nanobind/.github/actions/test_python_ver
-      with:
-        python_version: "3.12"
-        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    # One cp312-abi3 wheel covers every supported Python. test-artifacts runs it on 3.12 on a
+    # runner without the native install, which is the only suite run a pull request gets; pushes,
+    # tags and scheduled runs also test the newer Pythons here. Runs even if a gate above failed.
     - name: test Python 3.13
       if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       timeout-minutes: 45
@@ -812,18 +800,12 @@ jobs:
         cd tesseract_nanobind
         python scripts/generate_stubs.py --check
     - name: fetch the TWC workcell the rail tests load
-      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
+      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       shell: bash
       run: git -C tesseract_nanobind submodule update --init --depth 1 ws/src/tesseract_ros_workcell
-    # One cp312-abi3 wheel covers every supported Python: test it on each, in this job (pull
-    # requests on 3.12 only). Runs even if a gate above failed.
-    - name: test Python 3.12
-      if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' }}
-      timeout-minutes: 45
-      uses: ./tesseract_nanobind/.github/actions/test_python_ver
-      with:
-        python_version: "3.12"
-        wheel_dir: ${{ github.workspace }}/tesseract_nanobind/test-wheels
+    # One cp312-abi3 wheel covers every supported Python. test-artifacts runs it on 3.12 on a
+    # runner without the native install, which is the only suite run a pull request gets; pushes,
+    # tags and scheduled runs also test the newer Pythons here. Runs even if a gate above failed.
     - name: test Python 3.13
       if: ${{ !cancelled() && steps.test_wheels.outcome == 'success' && github.event_name != 'pull_request' }}
       timeout-minutes: 45
